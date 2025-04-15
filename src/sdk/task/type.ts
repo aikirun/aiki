@@ -1,4 +1,4 @@
-import { MaybeField } from "../../common/object/types.ts";
+import { MaybeField } from "../../common/object/type.ts";
 import { RetryStrategy } from "../../common/retry/strategy.ts";
 import { WorkflowRun } from "../workflow-run/index.ts";
 

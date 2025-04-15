@@ -1,4 +1,4 @@
-import { MaybeField } from "../../common/object/types.ts";
+import { MaybeField } from "../../common/object/type.ts";
 import { TriggerStrategy } from "../../common/trigger/strategy.ts";
 import { WorkflowRun } from "../workflow-run/index.ts";
 import { AikiClient } from "../client/index.ts";

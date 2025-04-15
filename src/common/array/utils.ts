@@ -1,4 +1,4 @@
-import { NonEmptyArray } from "./types.ts";
+import { NonEmptyArray } from "./type.ts";
 
 export function groupBy<Item, Key, Value>(
     items: Item[], 
