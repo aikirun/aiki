@@ -6,9 +6,9 @@ export class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 
 	public async run<WorkflowPayload, WorkflowResult>(
 		workflowRun: WorkflowRun<WorkflowPayload, WorkflowResult>, 
-		runParams: TaskRunParams<Payload>
+		taskRunParams: TaskRunParams<Payload>
 	): Promise<Result> {
-		const path = this.getPath(workflowRun, runParams);
+		const path = this.getPath(workflowRun, taskRunParams);
 
 		const preExistingResult = await workflowRun._getSubTaskRunResult<Result>(path);
 		if (preExistingResult.state === "completed") {
@@ -18,7 +18,7 @@ export class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 		// TODO: check if result state is failed and there are still retries left
 		// if not return failed result
 		try {
-			const result = await this.params.run(runParams);
+			const result = await this.params.run(taskRunParams);
 			await workflowRun._addSubTaskRunResult(path, {
 				state: "completed",
 				result
@@ -37,12 +37,13 @@ export class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 
 	private getPath<WorkflowPayload, WorkflowResult>(
 		workflowRun: WorkflowRun<WorkflowPayload, WorkflowResult>,
-		runParams: TaskRunParams<Payload>
+		taskRunParams: TaskRunParams<Payload>
 	): string {
-		const payloadString = JSON.stringify(runParams.payload);
+		// TODO: instead of stringify consider a binary encoding scheme
+		const payloadString = JSON.stringify(taskRunParams.payload);
 
-		return runParams.idempotencyKey
-			? `${workflowRun.path}/${this.params.name}/${runParams.idempotencyKey}/${payloadString}`
+		return taskRunParams.idempotencyKey
+			? `${workflowRun.path}/${this.params.name}/${taskRunParams.idempotencyKey}/${payloadString}`
 			: `${workflowRun.path}/${this.params.name}/${payloadString}`;
 	}
 }

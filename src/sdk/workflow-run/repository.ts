@@ -7,7 +7,7 @@ export class WorkflowRunRepositoryImpl implements WorkflowRunRepository {
 
     public create<Payload, Result>(
         _workflow: Workflow<Payload, Result>, 
-        _runParams: WorkflowRunParams<Payload>
+        _workflowRunParams: WorkflowRunParams<Payload>
     ): Promise<WorkflowRunRow> {
         // TODO: submit workflow and payload to storage
 		// don't run the actual code yet

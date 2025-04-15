@@ -44,7 +44,7 @@ export interface WorkflowRunRow {
 export interface WorkflowRunRepository {
     create: <Payload, Result>(
         workflow: Workflow<Payload, Result>, 
-        runParams: WorkflowRunParams<Payload>
+        workflowRunParams: WorkflowRunParams<Payload>
     ) => Promise<WorkflowRunRow>;
 
     getResult: <Result>(workflowRunId: string) => Promise<WorkflowRunResult<Result>>;

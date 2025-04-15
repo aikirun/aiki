@@ -13,13 +13,13 @@ export class WorkflowImpl<Payload, Result> implements Workflow<Payload, Result> 
 
 	public async run(
 		client: AikiClient, 
-		runParams: WorkflowRunParams<Payload>
+		workflowRunParams: WorkflowRunParams<Payload>
 	): Promise<WorkflowRun<Payload, Result>> {
-		const workflowRunRow = await client.workflowRunRepository.create(this, runParams);
+		const workflowRunRow = await client.workflowRunRepository.create(this, workflowRunParams);
 		return initWorkflowRun({
 			client,
 			workflow: this,
-			runParams,
+			workflowRunParams,
 			workflowRunRow
 		});
 	}

@@ -28,7 +28,7 @@ export async function workflowExecutor({client}: WorkflowExecutorParams) {
 	const workflowRun = initWorkflowRun({
 		client,
 		workflow,
-		runParams: {
+		workflowRunParams: {
 			payload: {
 				a: "jingle bells",
 				b: 10

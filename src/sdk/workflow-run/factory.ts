@@ -8,14 +8,14 @@ export function initWorkflowRun<Payload, Result>(
     params: {
         client: AikiClient;
         workflow: Workflow<Payload, Result>;
-        runParams: WorkflowRunParams<Payload>;
+        workflowRunParams: WorkflowRunParams<Payload>;
         workflowRunRow: WorkflowRunRow
     }
 ): WorkflowRun<Payload, Result> {
     return new WorkflowRunImpl(
         params.client,
         params.workflow,
-        params.runParams,
+        params.workflowRunParams,
         params.workflowRunRow
     );
 }
