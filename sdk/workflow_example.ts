@@ -1,5 +1,5 @@
-import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "../task/index.ts";
-import { workflow } from "./factory.ts";
+import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "./task_example.ts";
+import { workflow } from "./workflow.ts";
 
 export const morningRoutingWorkflowV1 = workflow<{a: string; b: number}, {alarmResult: string, stretchResult: number}>({
 	name: "morning-routine",

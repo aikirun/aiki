@@ -1,4 +1,4 @@
-import { task } from "./factory.ts";
+import { task } from "./task.ts";
 
 export const ringAlarm = task<{song: string}, string>({
 	name: "ring-alarm",
@@ -29,6 +29,7 @@ export const drinkCoffee = task<{withSugar: boolean}, boolean>({
 export const sayPrayer = task({
 	name: "say-prayer",
 	run ({payload}) {
+		// deno-lint-ignore no-console
 		console.log(payload);
 		return Promise.resolve();
 	}

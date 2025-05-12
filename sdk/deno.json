@@ -1,0 +1,10 @@
+{
+    "name": "@aiki/sdk",
+    "version": "0.1.0",
+    "exports": {
+        ".": "./mod.ts",
+        "./client": "./client.ts",
+        "./workflow": "./workflow.ts",
+        "./task": "./task.ts"
+    }
+}

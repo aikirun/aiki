@@ -1,0 +1,12 @@
+{
+    "name": "@aiki/lib",
+    "version": "0.1.0",
+    "exports": {
+        ".": "./mod.ts",
+        "./array": "./array.ts",
+        "./expect": "./expect.ts",
+        "./object": "./object.ts",
+        "./retry": "./retry.ts",
+        "./trigger": "./trigger.ts"
+    }
+}
