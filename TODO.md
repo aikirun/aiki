@@ -61,3 +61,15 @@ task state is not in cancelled.
 idempotency key for when starting workflow
 
 add no return await es lint rule
+
+
+* is it possible to use lambdas as workers, possibly giving a web_hook to trigger
+
+* payload wasn't initially intuitive, when creating a task, is the payload static or from aiki or a template
+
+* enhance workflow run handler to return more info e.g. give me a view of the tasks that have been run by this workflow
+
+* wait for webhook. Pause till the provided url is called
+
+add a means for workers to claim workflows from othere workers.
+This should also help re-assign tasks to the workflow which has a handler for that task.
