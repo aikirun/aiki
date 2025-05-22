@@ -3,15 +3,15 @@ import type { Equal, ExpectFalse, ExpectTrue } from "./expect.ts";
 export type NonEmptyArray<T> = [T, ...T[]];
 //#region <NonEmptyArray Tests>
 type TestNonEmptyArrayShouldBeATupleOfOneOrMoreElements = ExpectTrue<
-  Equal<NonEmptyArray<number>, [number, ...number[]]>
+	Equal<NonEmptyArray<number>, [number, ...number[]]>
 >;
 type TestNonEmptyArrayIsNotEmptyTuple = ExpectFalse<
-  Equal<NonEmptyArray<number>, []>
+	Equal<NonEmptyArray<number>, []>
 >;
 type TestNonEmptyArrayIsNotSingleItemTuple = ExpectFalse<
-  Equal<NonEmptyArray<number>, [number]>
+	Equal<NonEmptyArray<number>, [number]>
 >;
 type TestNonEmptyArrayIsNotarray = ExpectFalse<
-  Equal<NonEmptyArray<number>, number[]>
+	Equal<NonEmptyArray<number>, number[]>
 >;
 //#endregion
