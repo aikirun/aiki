@@ -20,6 +20,8 @@ export interface WorkflowRunRepository {
 		taskPath: string,
 		taskResult: TaskRunResult<TaskResult>,
 	) => Promise<void>;
+
+	updateHeartbeat: (workflowRunId: string) => Promise<void>;
 }
 
 export interface WorkflowRunRow<Payload, Result> {
@@ -68,6 +70,10 @@ class WorkflowRunRepositoryImpl implements WorkflowRunRepository {
 		_taskResult: TaskRunResult<TaskResult>,
 	): Promise<void> {
 		// TODO: add in storage
+		return Promise.resolve();
+	}
+
+	public updateHeartbeat(_workflowRunId: string): Promise<void> {
 		return Promise.resolve();
 	}
 }

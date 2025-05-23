@@ -78,7 +78,7 @@ class WorkflowRunImpl<Payload, Result> implements WorkflowRun<Payload, Result> {
 			{
 				type: "fixed",
 				maxAttempts: Math.ceil(params.maxDurationMs / delayMs),
-				delayMs,
+				delayMs
 			},
 			(result) => Promise.resolve(result.state !== state),
 		).run();

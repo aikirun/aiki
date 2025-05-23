@@ -10,26 +10,28 @@ export function initWorkflowRunSubscriber(
 }
 
 export interface WorkflowRunSubscriber {
-	_next: () => Promise<WorkflowRunRow<unknown, unknown> | null>;
+	_nextBatch: (size: number) => Promise<WorkflowRunRow<unknown, unknown>[]>;
 }
 
 class WorkflowRunSubscriberImpl implements WorkflowRunSubscriber {
 	constructor(private readonly repository: WorkflowRunRepository) {}
 
 	// TODO: implement
-	public _next(): Promise<WorkflowRunRow<unknown, unknown> | null> {
+	public _nextBatch(_size: number): Promise<WorkflowRunRow<unknown, unknown>[]> {
 		// TODO: fetch from storage or queue
-		return Promise.resolve({
-			id: "1",
-			params: {} as WorkflowRunParams<unknown>,
-			result: {
-				state: "queued",
-			},
-			workflow: {
-				path: "workflow-path",
-			},
-			subTasksRunResult: {},
-			subWorkflowsRunResult: {},
-		});
+		return Promise.resolve([
+			{
+				id: "1",
+				params: {} as WorkflowRunParams<unknown>,
+				result: {
+					state: "queued",
+				},
+				workflow: {
+					path: "workflow-path",
+				},
+				subTasksRunResult: {},
+				subWorkflowsRunResult: {},
+			}
+		]);
 	}
 }
