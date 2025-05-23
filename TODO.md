@@ -73,3 +73,10 @@ add no return await es lint rule
 
 add a means for workers to claim workflows from othere workers.
 This should also help re-assign tasks to the workflow which has a handler for that task.
+
+
+use branded types for ids
+
+find workflows that were marked as running but have not return a heartbeat in a while
+
+adaptive polling
