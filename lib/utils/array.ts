@@ -20,5 +20,5 @@ export function groupBy<Item, Key, Value>(
 }
 
 export function isNonEmptyArray<T>(value: T[]): value is NonEmptyArray<T> {
-    return value.length > 0;
+	return value.length > 0;
 }

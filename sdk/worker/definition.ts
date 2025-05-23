@@ -47,13 +47,13 @@ export interface Worker {
 }
 
 interface ActiveWorkflowRun {
-	run: WorkflowRunRow<unknown, unknown>; 
-	promise: Promise<void>; 
+	run: WorkflowRunRow<unknown, unknown>;
+	promise: Promise<void>;
 }
 
-type WorkflowRunBatchResult = 
-	| { type: "success"; rows: WorkflowRunRow<unknown, unknown>[]; }
-	| { type: "error"; retryParams: RetryParams; };
+type WorkflowRunBatchResult =
+	| { type: "success"; rows: WorkflowRunRow<unknown, unknown>[] }
+	| { type: "error"; retryParams: RetryParams };
 
 class WorkerImpl implements Worker {
 	public readonly id: string;
@@ -75,20 +75,27 @@ class WorkerImpl implements Worker {
 		const abortSignal = this.abortController.signal;
 
 		const config = this.getConfig();
-		
+
 		let nextDelayMs = config.pollIntervalMs;
 		let subscriberFailedAttempts = 0;
 
 		while (!abortSignal.aborted) {
 			await delay(nextDelayMs);
 
-			const nextBatchSize = Math.min(config.maxConcurrent - this.activeWorkflowRunsById.size, config.maxBatchSize);
+			const nextBatchSize = Math.min(
+				config.maxConcurrent - this.activeWorkflowRunsById.size,
+				config.maxBatchSize,
+			);
 			if (nextBatchSize <= 0) {
 				nextDelayMs = config.pollIntervalMs;
 				continue;
 			}
 
-			const nextBatchResult = await this.fetchNextWorkflowRunBatch(nextBatchSize, subscriberFailedAttempts, config);
+			const nextBatchResult = await this.fetchNextWorkflowRunBatch(
+				nextBatchSize,
+				subscriberFailedAttempts,
+				config,
+			);
 			if (nextBatchResult.type === "error") {
 				subscriberFailedAttempts++;
 
@@ -96,7 +103,7 @@ class WorkerImpl implements Worker {
 				if (!retryParams.retriesLeft) {
 					await this.stop();
 					break;
-				};
+				}
 
 				nextDelayMs = retryParams.delayMs;
 				continue;
@@ -126,8 +133,8 @@ class WorkerImpl implements Worker {
 		if (timeoutMs > 0) {
 			try {
 				await Promise.race([
-					Promise.all(activeWorkflowRuns.map((w) => w.promise)), 
-					delay(timeoutMs)
+					Promise.all(activeWorkflowRuns.map((w) => w.promise)),
+					delay(timeoutMs),
 				]);
 			} catch (error) {
 				// deno-lint-ignore no-console
@@ -151,20 +158,20 @@ class WorkerImpl implements Worker {
 			maxBatchSize: this.params.workflowRunSubscriber?.maxBatchSize ?? 1,
 			maxRetryDelayMs: this.params.workflowRunSubscriber?.maxRetryDelayMs ?? 30_000,
 			maxConcurrent: this.params.maxConcurrentWorkflowRuns ?? 1,
-			heartbeatIntervalMs: this.params.workflowRun?.heartbeatIntervalMs ?? 30_000
-		}
+			heartbeatIntervalMs: this.params.workflowRun?.heartbeatIntervalMs ?? 30_000,
+		};
 	}
 
 	private async fetchNextWorkflowRunBatch(
 		size: number,
 		attempts: number,
-		config: ReturnType<typeof this.getConfig>
+		config: ReturnType<typeof this.getConfig>,
 	): Promise<WorkflowRunBatchResult> {
 		try {
 			const workflowRunRows = await this.workflowRunSubscriber._nextBatch(size);
 			return {
 				type: "success",
-				rows: workflowRunRows
+				rows: workflowRunRows,
 			};
 		} catch (error) {
 			// deno-lint-ignore no-console
@@ -178,16 +185,16 @@ class WorkerImpl implements Worker {
 					type: "jittered",
 					maxAttempts: Infinity,
 					baseDelayMs: config.pollIntervalMs,
-					maxDelayMs: config.maxRetryDelayMs
-				})
-			}
+					maxDelayMs: config.maxRetryDelayMs,
+				}),
+			};
 		}
 	}
 
 	private enqueueWorkflowRunBatch(
 		workflowRunRows: NonEmptyArray<WorkflowRunRow<unknown, unknown>>,
 		abortSignal: AbortSignal,
-		config: ReturnType<typeof this.getConfig>
+		config: ReturnType<typeof this.getConfig>,
 	): void {
 		for (const workflowRunRow of workflowRunRows) {
 			// TODO: no need to execute if workflow result is in final state or paused state
@@ -211,7 +218,7 @@ class WorkerImpl implements Worker {
 
 			this.activeWorkflowRunsById.set(workflowRunRow.id, {
 				run: workflowRunRow,
-				promise: workflowExecutionPromise
+				promise: workflowExecutionPromise,
 			});
 		}
 	}
@@ -219,7 +226,7 @@ class WorkerImpl implements Worker {
 	private async executeWorkflow(
 		workflowRunRow: WorkflowRunRow<unknown, unknown>,
 		workflow: Workflow<unknown, unknown>,
-		config: ReturnType<typeof this.getConfig>
+		config: ReturnType<typeof this.getConfig>,
 	): Promise<void> {
 		let heartbeatInterval: number | undefined;
 		try {
@@ -229,7 +236,7 @@ class WorkerImpl implements Worker {
 			});
 
 			heartbeatInterval = setInterval(async () => {
-				try {	
+				try {
 					await this.workflowRunRepository.updateHeartbeat(workflowRun.id);
 				} catch (error) {
 					// deno-lint-ignore no-console
@@ -242,7 +249,7 @@ class WorkerImpl implements Worker {
 			// deno-lint-ignore no-console
 			console.error(`Worker ${this.id}: Error processing workflow: ${workflowRunRow.id}`, error);
 		} finally {
-			if(heartbeatInterval) clearInterval(heartbeatInterval);
+			if (heartbeatInterval) clearInterval(heartbeatInterval);
 			this.activeWorkflowRunsById.delete(workflowRunRow.id);
 		}
 	}
@@ -250,10 +257,10 @@ class WorkerImpl implements Worker {
 	private registerTerminationHandlers(): void {
 		for (const signal of ["SIGINT", "SIGTERM"] as const) {
 			Deno.addSignalListener(signal, async () => {
-			  // deno-lint-ignore no-console
-			  console.log(`Received ${signal}, gracefully shutting down worker...`);
-			  await this.stop();
-			  Deno.exit(0);
+				// deno-lint-ignore no-console
+				console.log(`Received ${signal}, gracefully shutting down worker...`);
+				await this.stop();
+				Deno.exit(0);
 			});
 		}
 

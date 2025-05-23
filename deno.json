@@ -17,6 +17,7 @@
 		"useTabs": true,
 		"lineWidth": 120,
 		"indentWidth": 4,
+		"trailingCommas": "onlyMultiLine",
 		"exclude": ["*.md"]
 	},
 	"lint": {

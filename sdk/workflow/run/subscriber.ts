@@ -31,7 +31,7 @@ class WorkflowRunSubscriberImpl implements WorkflowRunSubscriber {
 				},
 				subTasksRunResult: {},
 				subWorkflowsRunResult: {},
-			}
+			},
 		]);
 	}
 }

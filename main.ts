@@ -5,7 +5,13 @@ import { morningRoutingWorkflowV1, morningRoutingWorkflowV2, morningRoutingWorkf
 if (import.meta.main) {
 	const client = await createClient({ url: "localhost:9090" });
 
-	const workerA = await worker(client, { id: "worker-a" });
+	const workerA = await worker(client, {
+		id: "worker-a",
+		workflowRunSubscriber: {
+			pollIntervalMs: 100,
+			maxRetryDelayMs: 30_000,
+		},
+	});
 	const workerB = await worker(client, { id: "worker-b" });
 
 	workerA.registry
@@ -34,4 +40,7 @@ if (import.meta.main) {
 	});
 	// deno-lint-ignore no-console
 	console.log(`id = ${workflowRun.id}; result = ${result}`);
+
+	await workerA.stop();
+	await workerB.stop();
 }

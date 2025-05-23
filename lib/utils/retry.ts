@@ -78,13 +78,13 @@ export function withRetry<Args, Result>(
 	};
 }
 
-export type RetryParams = 
-	| { retriesLeft: false } 
+export type RetryParams =
+	| { retriesLeft: false }
 	| { retriesLeft: true; delayMs: number };
 
 export function getRetryParams(
 	attempts: number,
-	strategy: RetryStrategy
+	strategy: RetryStrategy,
 ): RetryParams {
 	const strategyType = strategy.type;
 	switch (strategyType) {
@@ -111,7 +111,7 @@ export function getRetryParams(
 			const delayMs = strategy.baseDelayMs * Math.pow(strategy.factor ?? 2, attempts - 1);
 			return {
 				retriesLeft: true,
-				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity)
+				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity),
 			};
 		}
 		case "jittered": {
@@ -124,7 +124,7 @@ export function getRetryParams(
 			const delayMs = base / 2 + Math.random() * base / 2;
 			return {
 				retriesLeft: true,
-				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity)
+				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity),
 			};
 		}
 		default:
