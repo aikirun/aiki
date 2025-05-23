@@ -48,7 +48,7 @@ export interface Worker {
 
 interface ActiveWorkflowRun {
 	run: WorkflowRunRow<unknown, unknown>;
-	promise: Promise<void>;
+	executionPromise: Promise<void>;
 }
 
 type WorkflowRunBatchResult =
@@ -133,7 +133,7 @@ class WorkerImpl implements Worker {
 		if (timeoutMs > 0) {
 			try {
 				await Promise.race([
-					Promise.all(activeWorkflowRuns.map((w) => w.promise)),
+					Promise.all(activeWorkflowRuns.map((w) => w.executionPromise)),
 					delay(timeoutMs),
 				]);
 			} catch (error) {
@@ -218,7 +218,7 @@ class WorkerImpl implements Worker {
 
 			this.activeWorkflowRunsById.set(workflowRunRow.id, {
 				run: workflowRunRow,
-				promise: workflowExecutionPromise,
+				executionPromise: workflowExecutionPromise,
 			});
 		}
 	}
