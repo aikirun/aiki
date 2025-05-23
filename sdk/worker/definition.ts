@@ -51,10 +51,6 @@ interface ActiveWorkflowRun {
 	executionPromise: Promise<void>;
 }
 
-type WorkflowRunBatchResult =
-	| { type: "success"; rows: WorkflowRunRow<unknown, unknown>[] }
-	| { type: "error"; retryParams: RetryParams };
-
 class WorkerImpl implements Worker {
 	public readonly id: string;
 	private abortController: AbortController | undefined;
@@ -166,7 +162,10 @@ class WorkerImpl implements Worker {
 		size: number,
 		attempts: number,
 		config: ReturnType<typeof this.getConfig>,
-	): Promise<WorkflowRunBatchResult> {
+	): Promise<
+		| { type: "success"; rows: WorkflowRunRow<unknown, unknown>[] }
+		| { type: "error"; retryParams: RetryParams }
+	> {
 		try {
 			const workflowRunRows = await this.workflowRunSubscriber._nextBatch(size);
 			return {
