@@ -15,6 +15,7 @@ export interface ExponentialRetryStrategy {
 	maxAttempts: number;
 	baseDelayMs: number;
 	factor?: number; // TODO: document default value
+	maxDelayMs?: number;
 }
 
 export interface JitteredRetryStrategy {
@@ -22,6 +23,7 @@ export interface JitteredRetryStrategy {
 	maxAttempts: number;
 	baseDelayMs: number;
 	jitterFactor?: number; // TODO: document default value
+	maxDelayMs?: number;
 }
 
 export type RetryStrategy =
@@ -38,7 +40,7 @@ export function withRetry<Args, Result>(
 ): { run: (...args: Args[]) => Promise<Result> } {
 	return {
 		run: async (...args: Args[]) => {
-			let attempts: number = 0;
+			let attempts = 0;
 
 			while (true) {
 				attempts++;
@@ -64,7 +66,7 @@ export function withRetry<Args, Result>(
 					error = err;
 				}
 
-				const retryParams = getRetryParams(strategy, attempts);
+				const retryParams = getRetryParams(attempts, strategy);
 				if (!retryParams.retriesLeft) {
 					if (error) throw error;
 					throw new Error("Retry allowance has been exhausted");
@@ -76,10 +78,14 @@ export function withRetry<Args, Result>(
 	};
 }
 
-function getRetryParams(
-	strategy: RetryStrategy,
+export type RetryParams = 
+	| { retriesLeft: false } 
+	| { retriesLeft: true; delayMs: number };
+
+export function getRetryParams(
 	attempts: number,
-): { retriesLeft: false } | { retriesLeft: true; delayMs: number } {
+	strategy: RetryStrategy
+): RetryParams {
 	const strategyType = strategy.type;
 	switch (strategyType) {
 		case "never":
@@ -96,28 +102,29 @@ function getRetryParams(
 				retriesLeft: true,
 				delayMs: strategy.delayMs,
 			};
-		case "exponential":
+		case "exponential": {
 			if (attempts >= strategy.maxAttempts) {
 				return {
 					retriesLeft: false,
 				};
 			}
+			const delayMs = strategy.baseDelayMs * Math.pow(strategy.factor ?? 2, attempts - 1);
 			return {
 				retriesLeft: true,
-				delayMs: strategy.baseDelayMs *
-					Math.pow(strategy.factor ?? 2, attempts - 1),
+				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity)
 			};
+		}
 		case "jittered": {
 			if (attempts >= strategy.maxAttempts) {
 				return {
 					retriesLeft: false,
 				};
 			}
-			const base = strategy.baseDelayMs *
-				Math.pow(strategy.jitterFactor ?? 2, attempts - 1);
+			const base = strategy.baseDelayMs * Math.pow(strategy.jitterFactor ?? 2, attempts - 1);
+			const delayMs = base / 2 + Math.random() * base / 2;
 			return {
 				retriesLeft: true,
-				delayMs: base / 2 + Math.random() * base / 2,
+				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity)
 			};
 		}
 		default:
