@@ -1,6 +1,6 @@
-import type { MaybeField } from "@lib/types/object.ts";
+import type { MaybeField } from "@lib/object/mod.ts";
 import type { WorkflowRun } from "./definition.ts";
-import type { TriggerStrategy } from "@lib/utils/trigger.ts";
+import type { TriggerStrategy } from "@lib/trigger/mod.ts";
 
 export interface WorkflowRunContext<Payload, Result> {
 	workflowRun: WorkflowRun<Payload, Result>;

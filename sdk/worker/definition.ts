@@ -4,9 +4,9 @@ import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registr
 import type { WorkflowRunSubscriber } from "../workflow/run/subscriber.ts";
 import { initWorkflowRun } from "../workflow/run/definition.ts";
 import type { WorkflowRunRepository, WorkflowRunRow } from "../workflow/run/repository.ts";
-import { getRetryParams, type RetryParams } from "@lib/utils/retry.ts";
-import { isNonEmptyArray } from "@lib/utils/array.ts";
-import type { NonEmptyArray } from "@lib/types/array.ts";
+import { getRetryParams, type RetryParams } from "@lib/retry/mod.ts";
+import { isNonEmptyArray } from "@lib/array/mod.ts";
+import type { NonEmptyArray } from "@lib/array/mod.ts";
 import type { Workflow } from "../workflow/definition.ts";
 
 export async function worker(

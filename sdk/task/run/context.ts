@@ -1,5 +1,5 @@
-import type { MaybeField } from "@lib/types/object.ts";
-import type { RetryStrategy } from "@lib/utils/retry.ts";
+import type { MaybeField } from "@lib/object/mod.ts";
+import type { RetryStrategy } from "@lib/retry/mod.ts";
 
 export type TaskRunContext<Payload> = MaybeField<"payload", Payload>;
 

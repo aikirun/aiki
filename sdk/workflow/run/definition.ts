@@ -1,4 +1,4 @@
-import { withRetry } from "@lib/utils/retry.ts";
+import { withRetry } from "@lib/retry/mod.ts";
 import type { WorkflowRunParams } from "./context.ts";
 import type { WorkflowRunRepository, WorkflowRunRow } from "./repository.ts";
 import type { TaskRunResult } from "../../task/run/result.ts";

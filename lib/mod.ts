@@ -1,2 +1,5 @@
-export * from "./types/mod.ts";
-export * from "./utils/mod.ts";
+export * from "./array/mod.ts";
+export * from "./object/mod.ts";
+export * from "./retry/mod.ts";
+export * from "./testing/expect/mod.ts";
+export * from "./trigger/mod.ts";

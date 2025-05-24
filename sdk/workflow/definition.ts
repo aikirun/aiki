@@ -1,4 +1,4 @@
-import type { TriggerStrategy } from "@lib/utils/trigger.ts";
+import type { TriggerStrategy } from "@lib/trigger/mod.ts";
 import type { WorkflowRunContext, WorkflowRunParams } from "./run/context.ts";
 import { initWorkflowRun, type WorkflowRun } from "./run/definition.ts";
 import type { Client } from "../client/definition.ts";

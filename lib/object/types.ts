@@ -1,4 +1,4 @@
-import type { Equal, ExpectTrue } from "./expect.ts";
+import type { Equal, ExpectTrue } from "../testing/expect/types.ts";
 
 export type UndefinedToPartial<T extends object> =
 	& {

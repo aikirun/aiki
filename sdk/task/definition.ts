@@ -1,4 +1,4 @@
-import type { RetryStrategy } from "@lib/utils/retry.ts";
+import type { RetryStrategy } from "@lib/retry/mod.ts";
 import type { TaskRunContext, TaskRunParams } from "./run/context.ts";
 import type { WorkflowRun } from "../workflow/run/definition.ts";
 
