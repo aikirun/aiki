@@ -80,3 +80,5 @@ use branded types for ids
 find workflows that were marked as running but have not return a heartbeat in a while
 
 adaptive polling
+
+abstract away deno specific features so we can support multiple runtimes.
