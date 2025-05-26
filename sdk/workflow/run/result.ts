@@ -39,6 +39,7 @@ export type WorkflowRunState =
 	| "completed";
 
 export interface WorkflowRunWaitSyncParams {
+	pollIntervalMs?: number;
 	maxDurationMs: number;
 }
 
@@ -47,8 +48,7 @@ export interface WorkflowRunResultHandle<Result> {
 
 	getResult: () => Promise<WorkflowRunResult<Result>>;
 
-	// TODO only use in tests
-	waitForStateSync<
+	waitForState<
 		T extends WorkflowRunState,
 		U extends (T extends "completed" ? WorkflowRunResultComplete<Result>
 			: WorkflowRunResultInComplete),
@@ -65,13 +65,12 @@ class WorkflowRunResultHandleImpl<Result> implements WorkflowRunResultHandle<Res
 		return this.repository.getResult(this.id);
 	}
 
-	public async waitForStateSync<
+	public async waitForState<
 		T extends WorkflowRunState,
 		U extends (T extends "completed" ? WorkflowRunResultComplete<Result>
 			: WorkflowRunResultInComplete),
 	>(state: T, params: WorkflowRunWaitSyncParams): Promise<U> {
-		// TODO choose proper default
-		const delayMs = 100;
+		const delayMs = params.pollIntervalMs ?? 100;
 
 		const result = await withRetry(
 			this.getResult,

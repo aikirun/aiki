@@ -12,7 +12,7 @@ if (import.meta.main) {
 		},
 	});
 
-	const result = await resultHandle.waitForStateSync("completed", {
+	const {result} = await resultHandle.waitForState("completed", {
 		maxDurationMs: 10_000,
 	});
 	// deno-lint-ignore no-console
