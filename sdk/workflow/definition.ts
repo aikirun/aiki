@@ -19,7 +19,7 @@ export interface WorkflowParams<Payload, Result> {
 
 export interface Workflow<Payload, Result> {
 	path: string;
-	run: (
+	enqueue: (
 		client: Client,
 		params: WorkflowRunParams<Payload>,
 	) => Promise<WorkflowRun<Payload, Result>>;
@@ -39,7 +39,7 @@ class WorkflowImpl<Payload, Result> implements Workflow<Payload, Result> {
 		this._execute = params.run;
 	}
 
-	public async run(
+	public async enqueue(
 		client: Client,
 		workflowRunParams: WorkflowRunParams<Payload>,
 	): Promise<WorkflowRun<Payload, Result>> {
