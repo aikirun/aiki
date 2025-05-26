@@ -65,7 +65,7 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 		workflows: Workflow<Payload, Result>[],
 	): WorkflowRegistry {
 		for (const workflow of workflows) {
-			this.workflowsByPath.delete(workflow.path);	
+			this.workflowsByPath.delete(workflow.path);
 		}
 		return this;
 	}

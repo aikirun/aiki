@@ -12,7 +12,7 @@ export function workflow<
 
 export interface WorkflowParams<Payload, Result> {
 	name: string;
-	version: string;
+	version: `${number}.${number}.${number}`;
 	run: (context: WorkflowRunContext<Payload, Result>) => Promise<Result>;
 	trigger?: TriggerStrategy;
 }
@@ -21,7 +21,7 @@ export interface Workflow<Payload, Result> {
 	path: string;
 	enqueue: (
 		client: Client,
-		params: WorkflowRunParams<Payload>,
+		_params: WorkflowRunParams<Payload>, // TODO: params is unused
 	) => Promise<WorkflowRun<Payload, Result>>;
 	_execute: (context: WorkflowRunContext<Payload, Result>) => Promise<Result>;
 }

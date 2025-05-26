@@ -1,6 +1,6 @@
 import { createClient } from "@aiki/sdk/client";
 import { worker } from "@aiki/sdk/worker";
-import { morningRoutingWorkflowV1, morningRoutingWorkflowV2, morningRoutingWorkflowV3 } from "@aiki/sdk/workflow";
+import { eveningRoutineWorkflow, morningRoutineWorkflowV1, morningRoutineWorkflowV2 } from "@aiki/sdk/workflow";
 
 if (import.meta.main) {
 	const client = await createClient({ url: "localhost:9090" });
@@ -15,13 +15,13 @@ if (import.meta.main) {
 	const workerB = await worker(client, { id: "worker-b" });
 
 	workerA.registry
-		.add(morningRoutingWorkflowV1)
-		.add(morningRoutingWorkflowV2)
-		.add(morningRoutingWorkflowV3);
+		.add(morningRoutineWorkflowV1)
+		.add(morningRoutineWorkflowV2)
+		.add(eveningRoutineWorkflow);
 
 	workerB.registry
-		.add(morningRoutingWorkflowV1)
-		.add(morningRoutingWorkflowV2);
+		.add(morningRoutineWorkflowV1)
+		.add(morningRoutineWorkflowV2);
 
 	workerA.start();
 	workerB.start();

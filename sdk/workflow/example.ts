@@ -1,7 +1,7 @@
 import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "../task/example.ts";
 import { type Workflow, workflow } from "./definition.ts";
 
-export const morningRoutingWorkflowV1: Workflow<
+export const morningRoutineWorkflowV1: Workflow<
 	{ a: string; b: number },
 	{ alarmResult: string; stretchResult: number }
 > = workflow({
@@ -25,7 +25,7 @@ export const morningRoutingWorkflowV1: Workflow<
 	},
 });
 
-export const morningRoutingWorkflowV2: Workflow<{ a: boolean }, void> = workflow({
+export const morningRoutineWorkflowV2: Workflow<{ a: boolean }, void> = workflow({
 	name: "morning-routine",
 	version: "2.0.0",
 	async run({ workflowRun }) {
@@ -35,9 +35,9 @@ export const morningRoutingWorkflowV2: Workflow<{ a: boolean }, void> = workflow
 	},
 });
 
-export const morningRoutingWorkflowV3: Workflow<undefined, void> = workflow({
-	name: "morning-routine",
-	version: "3.0.0",
+export const eveningRoutineWorkflow: Workflow<undefined, void> = workflow({
+	name: "evening-routine",
+	version: "1.0.0",
 	async run({ workflowRun }) {
 		await sayPrayer.run(workflowRun, {});
 	},

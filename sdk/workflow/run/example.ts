@@ -1,10 +1,10 @@
 import { createClient } from "../../client/definition.ts";
-import { morningRoutingWorkflowV1 } from "../example.ts";
+import { morningRoutineWorkflowV1 } from "../example.ts";
 
 if (import.meta.main) {
 	const client = await createClient({ url: "localhost:9090" });
 
-	const workflowRun = await morningRoutingWorkflowV1.enqueue(client, {
+	const workflowRun = await morningRoutineWorkflowV1.enqueue(client, {
 		payload: { a: "1", b: 1 },
 		trigger: {
 			type: "delayed",
