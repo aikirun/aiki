@@ -35,6 +35,7 @@ class WorkflowImpl<Payload, Result> implements Workflow<Payload, Result> {
 	constructor(private readonly params: WorkflowParams<Payload, Result>) {
 		this.path = `${params.name}/${params.version}`;
 		// TODO execute should be it's own method that try catches run and updates status on failure
+		// TODO: no need to execute if workflow result is in final state or paused state
 		this._execute = params.run;
 	}
 

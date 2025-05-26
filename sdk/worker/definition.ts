@@ -176,8 +176,6 @@ class WorkerImpl implements Worker {
 			// deno-lint-ignore no-console
 			console.error(`Worker ${this.id}: Error getting next workflow runs batch`, error);
 
-			// TODO: maybe report warning if attempts exceeds threshold
-
 			return {
 				type: "error",
 				retryParams: getRetryParams(attempts, {
@@ -196,8 +194,6 @@ class WorkerImpl implements Worker {
 		config: ReturnType<typeof this.getConfig>,
 	): void {
 		for (const workflowRunRow of workflowRunRows) {
-			// TODO: no need to execute if workflow result is in final state or paused state
-
 			if (this.activeWorkflowRunsById.has(workflowRunRow.id)) {
 				// deno-lint-ignore no-console
 				console.log(`Workflow ${workflowRunRow.id} already in progress, skipping`);
