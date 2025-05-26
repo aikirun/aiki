@@ -1,6 +1,7 @@
 import type { WorkflowRunParams } from "./context.ts";
 import type { WorkflowRunRepository, WorkflowRunRow } from "./repository.ts";
 import type { TaskRunResult } from "../../task/run/result.ts";
+import type { WorkflowRunState } from "./result.ts";
 
 export function initWorkflowRun<Payload, Result>(
 	params: {
@@ -13,10 +14,12 @@ export function initWorkflowRun<Payload, Result>(
 	);
 }
 
-export interface WorkflowRun<Payload, Result> {
+export interface WorkflowRun<Payload, _Result> {
 	id: string;
 	path: string;
 	params: WorkflowRunParams<Payload>;
+
+	updateState: (state: WorkflowRunState) => Promise<void>;
 
 	_getSubTaskRunResult: <TaskResult>(
 		taskPath: string,
@@ -39,6 +42,10 @@ class WorkflowRunImpl<Payload, Result> implements WorkflowRun<Payload, Result> {
 		this.id = workflowRunRow.id;
 		this.path = `${this.workflowRunRow.workflow.path}/${workflowRunRow.id}`;
 		this.params = workflowRunRow.params;
+	}
+
+	public updateState(state: WorkflowRunState): Promise<void> {
+	  return this.repository.updateState(this.id, state);
 	}
 
 	public _getSubTaskRunResult<TaskResult>(

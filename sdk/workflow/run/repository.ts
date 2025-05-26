@@ -1,7 +1,7 @@
 import type { TaskRunResult } from "../../task/run/result.ts";
 import type { Workflow } from "../definition.ts";
 import type { WorkflowRunParams } from "./context.ts";
-import type { WorkflowRunResult } from "./result.ts";
+import type { WorkflowRunResult, WorkflowRunState } from "./result.ts";
 
 export function initWorkflowRunRepository(): Promise<WorkflowRunRepository> {
 	return Promise.resolve(new WorkflowRunRepositoryImpl());
@@ -21,7 +21,9 @@ export interface WorkflowRunRepository {
 		taskResult: TaskRunResult<TaskResult>,
 	) => Promise<void>;
 
-	updateHeartbeat: (workflowRunId: string) => Promise<void>;
+	updateHeartbeat: (id: string) => Promise<void>;
+
+	updateState: (id: string, state: WorkflowRunState) => Promise<void>;
 }
 
 export interface WorkflowRunRow<Payload, Result> {
@@ -74,6 +76,10 @@ class WorkflowRunRepositoryImpl implements WorkflowRunRepository {
 	}
 
 	public updateHeartbeat(_workflowRunId: string): Promise<void> {
+		return Promise.resolve();
+	}
+
+	public updateState(_id: string, _state: WorkflowRunState): Promise<void> {
 		return Promise.resolve();
 	}
 }

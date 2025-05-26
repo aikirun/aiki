@@ -1,7 +1,7 @@
 import type { TriggerStrategy } from "@lib/trigger/mod.ts";
 import type { WorkflowRunContext, WorkflowRunParams } from "./run/context.ts";
 import type { Client } from "../client/definition.ts";
-import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "./mod.ts";
+import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "./run/result-handle.ts";
 
 export function workflow<
 	Payload = undefined,
@@ -50,11 +50,12 @@ class WorkflowImpl<Payload, Result> implements Workflow<Payload, Result> {
 	public async _execute(context: WorkflowRunContext<Payload, Result>): Promise<void> {		
 		try {
 			await this.params.run(context);
+			// TODO: persists workflow run result
 		} catch (error) {
 			// deno-lint-ignore no-console
 			console.error(`Error while executing workflow ${context.workflowRun.path}`, error);
-
-			// TODO: update workflow state
+			
+			context.workflowRun.updateState("failed");
 
 			throw error;
 		}
