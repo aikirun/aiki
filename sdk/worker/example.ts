@@ -15,13 +15,13 @@ if (import.meta.main) {
 	const workerB = await worker(client, { id: "worker-b" });
 
 	workerA.registry
-		.register(morningRoutingWorkflowV1)
-		.register(morningRoutingWorkflowV2)
-		.register(morningRoutingWorkflowV3);
+		.add(morningRoutingWorkflowV1)
+		.add(morningRoutingWorkflowV2)
+		.add(morningRoutingWorkflowV3);
 
 	workerB.registry
-		.register(morningRoutingWorkflowV1)
-		.register(morningRoutingWorkflowV2);
+		.add(morningRoutingWorkflowV1)
+		.add(morningRoutingWorkflowV2);
 
 	workerA.start();
 	workerB.start();
