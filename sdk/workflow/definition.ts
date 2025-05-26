@@ -1,7 +1,7 @@
 import type { TriggerStrategy } from "@lib/trigger/mod.ts";
 import type { WorkflowRunContext, WorkflowRunParams } from "./run/context.ts";
-import { initWorkflowRun, type WorkflowRun } from "./run/definition.ts";
 import type { Client } from "../client/definition.ts";
+import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "./mod.ts";
 
 export function workflow<
 	Payload = undefined,
@@ -22,34 +22,41 @@ export interface Workflow<Payload, Result> {
 	enqueue: (
 		client: Client,
 		_params: WorkflowRunParams<Payload>, // TODO: params is unused
-	) => Promise<WorkflowRun<Payload, Result>>;
-	_execute: (context: WorkflowRunContext<Payload, Result>) => Promise<Result>;
+	) => Promise<WorkflowRunResultHandle<Result>>;
+	_execute: (context: WorkflowRunContext<Payload, Result>) => Promise<void>;
 }
 
 class WorkflowImpl<Payload, Result> implements Workflow<Payload, Result> {
 	public readonly path: string;
-	public readonly _execute: (
-		context: WorkflowRunContext<Payload, Result>,
-	) => Promise<Result>;
 
 	constructor(private readonly params: WorkflowParams<Payload, Result>) {
 		this.path = `${params.name}/${params.version}`;
-		// TODO execute should be it's own method that try catches run and updates status on failure
-		// TODO: no need to execute if workflow result is in final state or paused state
-		this._execute = params.run;
 	}
 
 	public async enqueue(
 		client: Client,
 		workflowRunParams: WorkflowRunParams<Payload>,
-	): Promise<WorkflowRun<Payload, Result>> {
+	): Promise<WorkflowRunResultHandle<Result>> {
 		const workflowRunRow = await client.workflowRunRepository.create(
 			this,
 			workflowRunParams,
 		);
-		return initWorkflowRun({
-			repository: client.workflowRunRepository,
-			workflowRunRow,
+		return initWorkflowRunResultHandle({
+			id: workflowRunRow.id,
+			repository: client.workflowRunRepository
 		});
+	}
+
+	public async _execute(context: WorkflowRunContext<Payload, Result>): Promise<void> {		
+		try {
+			await this.params.run(context);
+		} catch (error) {
+			// deno-lint-ignore no-console
+			console.error(`Error while executing workflow ${context.workflowRun.path}`, error);
+
+			// TODO: update workflow state
+
+			throw error;
+		}
 	}
 }

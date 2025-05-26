@@ -4,7 +4,7 @@ import { morningRoutineWorkflowV1 } from "../example.ts";
 if (import.meta.main) {
 	const client = await createClient({ url: "localhost:9090" });
 
-	const workflowRun = await morningRoutineWorkflowV1.enqueue(client, {
+	const resultHandle = await morningRoutineWorkflowV1.enqueue(client, {
 		payload: { a: "1", b: 1 },
 		trigger: {
 			type: "delayed",
@@ -12,9 +12,9 @@ if (import.meta.main) {
 		},
 	});
 
-	const result = await workflowRun.waitForStateSync("completed", {
+	const result = await resultHandle.waitForStateSync("completed", {
 		maxDurationMs: 10_000,
 	});
 	// deno-lint-ignore no-console
-	console.log(`id = ${workflowRun.id}; result = ${result}`);
+	console.log(`id = ${resultHandle.id}; result = ${result}`);
 }
