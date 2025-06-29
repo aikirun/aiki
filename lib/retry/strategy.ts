@@ -36,7 +36,7 @@ export type WithRetryOptions<Result, Abortable extends boolean> = {
 	shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>,
 	shouldNotRetryOnError?: (error: unknown) => Promise<boolean>,
 } & (
-	Abortable extends true ? { signal: AbortSignal } : { signal?: never }
+	Abortable extends true ? { abortSignal: AbortSignal } : { abortSignal?: never }
 );
 
 type CompletedResult<Result> = {
@@ -70,10 +70,10 @@ export function withRetry<Args, Result>(
 			let attempts = 0;
 
 			while (true) {
-				if (options?.signal?.aborted) {
+				if (options?.abortSignal?.aborted) {
 					return {
 						state: "aborted",
-						reason: options.signal.reason
+						reason: options.abortSignal.reason
 					};
 				}
 
@@ -110,7 +110,7 @@ export function withRetry<Args, Result>(
 					throw new Error("Retry allowance has been exhausted");
 				}
 
-				await delay(retryParams.delayMs, { signal: options?.signal });
+				await delay(retryParams.delayMs, { abortSignal: options?.abortSignal });
 			}
 		},
 	};

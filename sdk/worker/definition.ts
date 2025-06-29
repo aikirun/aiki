@@ -76,7 +76,7 @@ class WorkerImpl implements Worker {
 		let subscriberFailedAttempts = 0;
 
 		while (!abortSignal.aborted) {
-			await delay(nextDelayMs, { signal: abortSignal });
+			await delay(nextDelayMs, { abortSignal });
 
 			const nextBatchSize = Math.min(
 				config.maxConcurrent - this.activeWorkflowRunsById.size,
@@ -129,7 +129,7 @@ class WorkerImpl implements Worker {
 			try {
 				await Promise.race([
 					Promise.all(activeWorkflowRuns.map((w) => w.executionPromise)),
-					delay(timeoutMs, { signal: this.abortController?.signal }),
+					delay(timeoutMs),
 				]);
 			} catch (error) {
 				// deno-lint-ignore no-console
