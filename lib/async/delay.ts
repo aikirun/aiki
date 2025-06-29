@@ -1,5 +1,5 @@
 export function delay(ms: number, options?: { abortSignal?: AbortSignal }): Promise<void> {
-    const abortSignal = options?.abortSignal;
+	const abortSignal = options?.abortSignal;
 	if (abortSignal?.aborted) return Promise.reject(abortSignal.reason);
 
 	return new Promise((resolve, reject) => {

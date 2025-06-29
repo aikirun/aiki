@@ -41,7 +41,7 @@ class WorkflowRunImpl<Payload, Result> implements WorkflowRun<Payload, Result> {
 	}
 
 	public updateState(state: WorkflowRunState): Promise<void> {
-	  return this.repository.updateState(this.id, state);
+		return this.repository.updateState(this.id, state);
 	}
 
 	public _getSubTaskRunResult<TaskResult>(taskPath: string): TaskRunResult<TaskResult> {

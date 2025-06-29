@@ -32,12 +32,14 @@ export type RetryStrategy =
 	| ExponentialRetryStrategy
 	| JitteredRetryStrategy;
 
-export type WithRetryOptions<Result, Abortable extends boolean> = {
-	shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>,
-	shouldNotRetryOnError?: (error: unknown) => Promise<boolean>,
-} & (
-	Abortable extends true ? { abortSignal: AbortSignal } : { abortSignal?: never }
-);
+export type WithRetryOptions<Result, Abortable extends boolean> =
+	& {
+		shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>;
+		shouldNotRetryOnError?: (error: unknown) => Promise<boolean>;
+	}
+	& (
+		Abortable extends true ? { abortSignal: AbortSignal } : { abortSignal?: never }
+	);
 
 type CompletedResult<Result> = {
 	state: "completed";
@@ -45,7 +47,7 @@ type CompletedResult<Result> = {
 	attempts: number;
 };
 
-type AbortedResult = { 
+type AbortedResult = {
 	state: "aborted";
 	reason: unknown;
 };
@@ -73,7 +75,7 @@ export function withRetry<Args, Result>(
 				if (options?.abortSignal?.aborted) {
 					return {
 						state: "aborted",
-						reason: options.abortSignal.reason
+						reason: options.abortSignal.reason,
 					};
 				}
 
@@ -91,7 +93,7 @@ export function withRetry<Args, Result>(
 						return {
 							state: "completed",
 							result,
-							attempts
+							attempts,
 						};
 					}
 				} catch (err) {

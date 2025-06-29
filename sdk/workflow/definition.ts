@@ -43,18 +43,18 @@ class WorkflowImpl<Payload, Result> implements Workflow<Payload, Result> {
 		);
 		return initWorkflowRunResultHandle({
 			id: workflowRunRow.id,
-			repository: client.workflowRunRepository
+			repository: client.workflowRunRepository,
 		});
 	}
 
-	public async _execute(context: WorkflowRunContext<Payload, Result>): Promise<void> {		
+	public async _execute(context: WorkflowRunContext<Payload, Result>): Promise<void> {
 		try {
 			await this.params.run(context);
 			// TODO: persists workflow run result
 		} catch (error) {
 			// deno-lint-ignore no-console
 			console.error(`Error while executing workflow ${context.workflowRun.path}`, error);
-			
+
 			context.workflowRun.updateState("failed");
 
 			throw error;
