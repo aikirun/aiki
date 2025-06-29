@@ -1,6 +1,7 @@
 import type { RetryStrategy } from "@lib/retry/mod.ts";
 import type { TaskRunContext, TaskRunParams } from "./run/context.ts";
 import type { WorkflowRun } from "../workflow/run/definition.ts";
+import { sha256 } from "@lib/crypto/mod.ts";
 
 export function task<
 	Payload = undefined,
@@ -29,7 +30,7 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 		workflowRun: WorkflowRun<WorkflowPayload, WorkflowResult>,
 		taskRunParams: TaskRunParams<Payload>,
 	): Promise<Result> {
-		const path = this.getPath(workflowRun, taskRunParams);
+		const path = await this.getPath(workflowRun, taskRunParams);
 
 		const preExistingResult = workflowRun._getSubTaskRunResult<Result>(path);
 		if (preExistingResult.state === "completed") {
@@ -56,15 +57,14 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 		throw new Error();
 	}
 
-	private getPath<WorkflowPayload, WorkflowResult>(
+	private async getPath<WorkflowPayload, WorkflowResult>(
 		workflowRun: WorkflowRun<WorkflowPayload, WorkflowResult>,
 		taskRunParams: TaskRunParams<Payload>,
-	): string {
-		// TODO: hash the payload instead. Choose hash function that works in deno and node
-		const payloadString = JSON.stringify(taskRunParams.payload);
+	): Promise<string> {
+		const payloadHash = await sha256(JSON.stringify(taskRunParams.payload));
 
 		return taskRunParams.idempotencyKey
-			? `${workflowRun.path}/${this.params.name}/${taskRunParams.idempotencyKey}/${payloadString}`
-			: `${workflowRun.path}/${this.params.name}/${payloadString}`;
+			? `${workflowRun.path}/${this.params.name}/${payloadHash}/${taskRunParams.idempotencyKey}`
+			: `${workflowRun.path}/${this.params.name}/${payloadHash}`;
 	}
 }
