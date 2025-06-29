@@ -60,7 +60,7 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 		workflowRun: WorkflowRun<WorkflowPayload, WorkflowResult>,
 		taskRunParams: TaskRunParams<Payload>,
 	): string {
-		// TODO: instead of stringify consider a binary encoding scheme
+		// TODO: hash the payload instead. Choose hash function that works in deno and node
 		const payloadString = JSON.stringify(taskRunParams.payload);
 
 		return taskRunParams.idempotencyKey
