@@ -1,4 +1,3 @@
-import { delay } from "@std/async/delay";
 import type { Client } from "../client/definition.ts";
 import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
 import type { WorkflowRunSubscriber } from "../workflow/run/subscriber.ts";
@@ -8,6 +7,7 @@ import { getRetryParams, type RetryParams } from "@lib/retry/mod.ts";
 import { isNonEmptyArray } from "@lib/array/mod.ts";
 import type { NonEmptyArray } from "@lib/array/mod.ts";
 import type { Workflow } from "../workflow/definition.ts";
+import { delay } from "@lib/async/delay.ts";
 
 export async function worker(
 	client: Client,
