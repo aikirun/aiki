@@ -32,17 +32,51 @@ export type RetryStrategy =
 	| ExponentialRetryStrategy
 	| JitteredRetryStrategy;
 
+export type WithRetryOptions<Result, Abortable extends boolean> = {
+	shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>,
+	shouldNotRetryOnError?: (error: unknown) => Promise<boolean>,
+} & (
+	Abortable extends true ? { signal: AbortSignal } : { signal?: never }
+);
+
+type CompletedResult<Result> = {
+	state: "completed";
+	result: Result;
+	attempts: number;
+};
+
+type AbortedResult = { 
+	state: "aborted";
+	reason: unknown;
+};
+
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
-	shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>,
-	shouldNotRetryOnError?: (error: unknown) => Promise<boolean>,
-): { run: (...args: Args[]) => Promise<Result> } {
+	options?: WithRetryOptions<Result, false>,
+): { run: (...args: Args[]) => Promise<CompletedResult<Result>> };
+export function withRetry<Args, Result>(
+	fn: (...args: Args[]) => Promise<Result>,
+	strategy: RetryStrategy,
+	options: WithRetryOptions<Result, true>,
+): { run: (...args: Args[]) => Promise<CompletedResult<Result> | AbortedResult> };
+export function withRetry<Args, Result>(
+	fn: (...args: Args[]) => Promise<Result>,
+	strategy: RetryStrategy,
+	options?: WithRetryOptions<Result, boolean>,
+): { run: (...args: Args[]) => Promise<CompletedResult<Result> | AbortedResult> } {
 	return {
 		run: async (...args: Args[]) => {
 			let attempts = 0;
 
 			while (true) {
+				if (options?.signal?.aborted) {
+					return {
+						state: "aborted",
+						reason: options.signal.reason
+					};
+				}
+
 				attempts++;
 
 				let result: Result | undefined;
@@ -51,15 +85,19 @@ export function withRetry<Args, Result>(
 				try {
 					result = await fn(...args);
 					if (
-						shouldRetryOnResult === undefined ||
-						!(await shouldRetryOnResult(result))
+						options?.shouldRetryOnResult === undefined ||
+						!(await options.shouldRetryOnResult(result))
 					) {
-						return result;
+						return {
+							state: "completed",
+							result,
+							attempts
+						};
 					}
 				} catch (err) {
 					if (
-						shouldNotRetryOnError !== undefined &&
-						(await shouldNotRetryOnError(err))
+						options?.shouldNotRetryOnError !== undefined &&
+						(await options.shouldNotRetryOnError(err))
 					) {
 						throw err;
 					}
@@ -72,7 +110,7 @@ export function withRetry<Args, Result>(
 					throw new Error("Retry allowance has been exhausted");
 				}
 
-				await delay(retryParams.delayMs);
+				await delay(retryParams.delayMs, { signal: options?.signal });
 			}
 		},
 	};

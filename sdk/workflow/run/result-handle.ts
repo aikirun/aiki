@@ -45,14 +45,16 @@ class WorkflowRunResultHandleImpl<Result> implements WorkflowRunResultHandle<Res
     >(state: T, params: WorkflowRunWaitSyncParams): Promise<U> {
         const delayMs = params.pollIntervalMs ?? 100;
 
-        const result = await withRetry(
+        const {result} = await withRetry(
             this.getResult,
             {
                 type: "fixed",
                 maxAttempts: Math.ceil(params.maxDurationMs / delayMs),
                 delayMs,
             },
-            (result) => Promise.resolve(result.state !== state),
+            {
+                shouldRetryOnResult: (result) => Promise.resolve(result.state !== state),
+            }
         ).run();
 
         return result as U;
