@@ -31,9 +31,7 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 	): Promise<Result> {
 		const path = this.getPath(workflowRun, taskRunParams);
 
-		const preExistingResult = workflowRun._getSubTaskRunResult<Result>(
-			path,
-		);
+		const preExistingResult = workflowRun._getSubTaskRunResult<Result>(path);
 		if (preExistingResult.state === "completed") {
 			return preExistingResult.result;
 		}

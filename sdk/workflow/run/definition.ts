@@ -9,9 +9,7 @@ export function initWorkflowRun<Payload, Result>(
 		workflowRunRow: WorkflowRunRow<Payload, Result>;
 	},
 ): Promise<WorkflowRun<Payload, Result>> {
-	return Promise.resolve(
-		new WorkflowRunImpl(params.repository, params.workflowRunRow),
-	);
+	return Promise.resolve(new WorkflowRunImpl(params.repository, params.workflowRunRow));
 }
 
 export interface WorkflowRun<Payload, _Result> {
@@ -21,9 +19,7 @@ export interface WorkflowRun<Payload, _Result> {
 
 	updateState: (state: WorkflowRunState) => Promise<void>;
 
-	_getSubTaskRunResult: <TaskResult>(
-		taskPath: string,
-	) => TaskRunResult<TaskResult>;
+	_getSubTaskRunResult: <TaskResult>(taskPath: string) => TaskRunResult<TaskResult>;
 	_addSubTaskRunResult: <TaskResult>(
 		taskPath: string,
 		taskResult: TaskRunResult<TaskResult>,
@@ -48,9 +44,7 @@ class WorkflowRunImpl<Payload, Result> implements WorkflowRun<Payload, Result> {
 	  return this.repository.updateState(this.id, state);
 	}
 
-	public _getSubTaskRunResult<TaskResult>(
-		taskPath: string,
-	): TaskRunResult<TaskResult> {
+	public _getSubTaskRunResult<TaskResult>(taskPath: string): TaskRunResult<TaskResult> {
 		const taskRunResult = this.workflowRunRow.subTasksRunResult[taskPath];
 		if (taskRunResult === undefined) {
 			return {
