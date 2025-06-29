@@ -76,7 +76,7 @@ class WorkerImpl implements Worker {
 		let subscriberFailedAttempts = 0;
 
 		while (!abortSignal.aborted) {
-			await delay(nextDelayMs);
+			await delay(nextDelayMs, { signal: abortSignal });
 
 			const nextBatchSize = Math.min(
 				config.maxConcurrent - this.activeWorkflowRunsById.size,
@@ -119,7 +119,6 @@ class WorkerImpl implements Worker {
 
 	public async stop(): Promise<void> {
 		this.abortController?.abort();
-		this.abortController = undefined;
 
 		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
 		if (activeWorkflowRuns.length === 0) return;
@@ -130,7 +129,7 @@ class WorkerImpl implements Worker {
 			try {
 				await Promise.race([
 					Promise.all(activeWorkflowRuns.map((w) => w.executionPromise)),
-					delay(timeoutMs),
+					delay(timeoutMs, { signal: this.abortController?.signal }),
 				]);
 			} catch (error) {
 				// deno-lint-ignore no-console
