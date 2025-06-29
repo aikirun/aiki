@@ -258,11 +258,5 @@ class WorkerImpl implements Worker {
 				processWrapper.exit(0);
 			});
 		}
-
-		addEventListener("beforeunload", async (_event) => {
-			// deno-lint-ignore no-console
-			console.log("Application shutting down, stopping worker...");
-			await this.stop();
-		});
 	}
 }
