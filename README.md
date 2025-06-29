@@ -431,7 +431,76 @@ A deterministic task:
 
 ### Why Determinism Matters
 
-#### **1. Reliable Replay**
+#### **1. Best Effort Once Execution**
+Tasks in durable workflows are executed with **best effort once** semantics, not exactly once. This means:
+- Tasks may be executed multiple times due to retries, restarts, or network issues
+- The same task might run twice with the same input
+- Determinism ensures that duplicate executions produce the same result
+
+```typescript
+// ❌ Non-deterministic task - dangerous with duplicate execution
+const badTask = task({
+  name: "create-user",
+  run({ payload }) {
+    // This could create duplicate users if executed twice
+    const userId = generateRandomId(); // Different each time
+    return createUserInDatabase(userId, payload.userData);
+  }
+});
+
+// ✅ Deterministic task - safe with duplicate execution
+const goodTask = task({
+  name: "create-user",
+  run({ payload }) {
+    // Same input always produces same result
+    const userId = generateIdFromEmail(payload.email); // Deterministic
+    return createUserInDatabase(userId, payload.userData);
+  }
+});
+```
+
+#### **2. Idempotent Operations**
+Since tasks may execute multiple times, they should be idempotent:
+
+```typescript
+// ✅ Idempotent task - safe to run multiple times
+const sendEmail = task({
+  name: "send-welcome-email",
+  run({ payload }) {
+    const { userId, email } = payload;
+    
+    // Check if email was already sent
+    if (await hasEmailBeenSent(userId, "welcome")) {
+      return { sent: false, reason: "already sent" };
+    }
+    
+    // Send email and mark as sent
+    await sendEmailToUser(email, welcomeTemplate);
+    await markEmailAsSent(userId, "welcome");
+    
+    return { sent: true };
+  }
+});
+
+// ✅ Idempotent payment processing
+const processPayment = task({
+  name: "process-payment",
+  run({ payload }) {
+    const { paymentId, amount } = payload;
+    
+    // Check if payment was already processed
+    const existingPayment = await getPayment(paymentId);
+    if (existingPayment && existingPayment.status === "completed") {
+      return existingPayment;
+    }
+    
+    // Process payment
+    return processPaymentWithId(paymentId, amount);
+  }
+});
+```
+
+#### **3. Reliable Replay**
 When a workflow fails and restarts, tasks must produce the same results to ensure consistency:
 
 ```typescript
@@ -458,7 +527,7 @@ const goodTask = task({
 });
 ```
 
-#### **2. Predictable State Recovery**
+#### **4. Predictable State Recovery**
 If a workflow crashes after completing some tasks, deterministic tasks ensure the workflow can resume correctly:
 
 ```typescript
@@ -480,7 +549,7 @@ const orderWorkflow = workflow({
 });
 ```
 
-#### **3. Debugging and Testing**
+#### **5. Debugging and Testing**
 Deterministic tasks make workflows easier to debug and test:
 
 ```typescript
@@ -587,8 +656,9 @@ const processPayment = task({
 3. **Debuggability**: Easy to reproduce and debug issues
 4. **Testability**: Simple to write unit tests
 5. **Predictability**: Workflow behavior is predictable and trustworthy
+6. **Duplicate Safety**: Tasks can be executed multiple times without side effects
 
-By following these principles, your workflows become more reliable, easier to maintain, and more trustworthy in production environments.
+By following these principles, your workflows become more reliable, easier to maintain, and more trustworthy in production environments where network issues, restarts, and retries are inevitable.
 
 ## Contributing
 
