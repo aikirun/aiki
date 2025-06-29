@@ -8,7 +8,7 @@ import { isNonEmptyArray } from "@lib/array/mod.ts";
 import type { NonEmptyArray } from "@lib/array/mod.ts";
 import type { Workflow } from "../workflow/definition.ts";
 import { delay } from "@lib/async/mod.ts";
-import { CrossPlatformProcess } from "@lib/process/mod.ts";
+import { processWrapper } from "@lib/process/mod.ts";
 
 export async function worker(
 	client: Client,
@@ -251,11 +251,11 @@ class WorkerImpl implements Worker {
 
 	private registerTerminationHandlers(): void {
 		for (const signal of ["SIGINT", "SIGTERM"] as const) {
-			CrossPlatformProcess.addSignalListener(signal, async () => {
+			processWrapper.addSignalListener(signal, async () => {
 				// deno-lint-ignore no-console
 				console.log(`Received ${signal}, gracefully shutting down worker...`);
 				await this.stop();
-				CrossPlatformProcess.exit(0);
+				processWrapper.exit(0);
 			});
 		}
 
