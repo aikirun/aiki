@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-process-global
 import type { ProcessWrapper } from "./api.ts";
 
 export const processWrapper: ProcessWrapper = {
