@@ -203,8 +203,11 @@ const ringAlarm = task({
 ### Workflow Runs
 A workflow run is an instance of a workflow execution. It tracks the state, progress, and results of a specific workflow execution.
 
+### Aiki Server
+The Aiki Server is responsible for orchestrating workflows and communicating with workers. It manages workflow state, handles workflow enqueueing, and coordinates with the queue system. The server does not execute workflows or tasks - it only manages their lifecycle and state.
+
 ### Workers
-Workers are processes that execute workflows. They poll for available workflow runs and execute them concurrently.
+Workers are processes that execute workflows in your own environment and infrastructure. They poll the queue for available workflow runs and execute them locally. This design ensures that your business logic runs in your controlled environment, not in Aiki's infrastructure.
 
 ```typescript
 import { worker } from "@aiki/sdk/worker";
@@ -225,6 +228,12 @@ workerInstance.registry
 workerInstance.start();
 ```
 
+### Queue
+The queue system stands between the Aiki Server and workers, managing the distribution of workflow runs. It ensures reliable message delivery and handles worker coordination.
+
+### Storage
+The storage layer behind the Aiki Server persists workflow and task state, execution history, and metadata. This enables durability and allows workflows to survive server restarts and failures.
+
 ### Client
 The client provides access to workflow operations like enqueueing new workflow runs and managing workflow execution.
 
@@ -243,40 +252,64 @@ const result = await resultHandle.waitForCompletion();
 ## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Application   │    │   Application   │    │   Application   │
-│   (Enqueues     │    │   (Enqueues     │    │   (Enqueues     │
-│   Workflows)    │    │   Workflows)    │    │   Workflows)    │
-└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
-          │                      │                      │
-          └──────────────────────┼──────────────────────┘
-                                 │
-                    ┌─────────────▼─────────────┐
-                    │        Client             │
-                    │  (Workflow Management)    │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │   Workflow Registry       │
-                    │  (Workflow Definitions)   │
-                    └─────────────┬─────────────┘
-                                  │
-          ┌───────────────────────┼───────────────────────┐
-          │                       │                       │
-┌─────────▼─────────┐  ┌─────────▼─────────┐  ┌─────────▼─────────┐
-│     Worker A      │  │     Worker B      │  │     Worker C      │
-│  (Executes        │  │  (Executes        │  │  (Executes        │
-│   Workflows)      │  │   Workflows)      │  │   Workflows)      │
-└─────────┬─────────┘  └─────────┬─────────┘  └─────────┬─────────┘
-          │                      │                      │
-          └──────────────────────┼──────────────────────┘
-                                 │
-                    ┌─────────────▼─────────────┐
-                    │   Storage Layer           │
-                    │  (Workflow Runs, Tasks,   │
-                    │   Results, State)         │
-                    └───────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Your Application                               │
+│                    (Uses Aiki SDK to enqueue workflows)                     │
+└─────────────────────┬───────────────────────────────────────────────────────┘
+                      │
+                      │ SDK Client
+                      │ (Enqueues workflows)
+                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Aiki Server                                    │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐  │
+│  │  Workflow       │  │  Task           │  │  Storage Layer              │  │
+│  │  Orchestration  │  │  Management     │  │  (Workflow Runs, Tasks,     │  │
+│  │                 │  │                 │  │   Results, State)           │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
+└─────────────────────┬───────────────────────────────────────────────────────┘
+                      │
+                      │ Queue System
+                      │ (Message Distribution)
+                      ▼
+          ┌─────────────────────────────────────────────────────────┐
+          │                                                         │
+          │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
+          │  │   Worker A  │  │   Worker B  │  │   Worker C  │     │
+          │  │             │  │             │  │             │     │
+          │  │ Executes    │  │ Executes    │  │ Executes    │     │
+          │  │ Workflows   │  │ Workflows   │  │ Workflows   │     │
+          │  │ in YOUR     │  │ in YOUR     │  │ in YOUR     │     │
+          │  │ Environment │  │ in YOUR     │  │ Environment │     │
+          │  └─────────────┘  └─────────────┘  └─────────────┘     │
+          │                                                         │
+          │                    Your Infrastructure                  │
+          │              (Your servers, containers, etc.)           │
+          └─────────────────────────────────────────────────────────┘
 ```
+
+### Key Architecture Benefits
+
+#### **1. Execution in Your Environment**
+- **Security**: Your business logic runs in your controlled infrastructure
+- **Privacy**: Sensitive data never leaves your environment
+- **Compliance**: Meet regulatory requirements for data handling
+- **Integration**: Direct access to your databases, APIs, and services
+
+#### **2. Scalability**
+- **Horizontal Scaling**: Add more workers to handle increased load
+- **Geographic Distribution**: Deploy workers in different regions
+- **Resource Control**: Scale workers based on your infrastructure needs
+
+#### **3. Reliability**
+- **Durability**: Workflow state persisted in Aiki Server
+- **Fault Tolerance**: Workers can restart without losing progress
+- **Queue Reliability**: Ensures no workflow runs are lost
+
+#### **4. Flexibility**
+- **Self-Hosted or Cloud**: Choose your deployment model
+- **Custom Infrastructure**: Use your existing servers, containers, or serverless
+- **Technology Agnostic**: Workers can be deployed in any environment that supports the Aiki SDK
 
 ## Key Features
 
