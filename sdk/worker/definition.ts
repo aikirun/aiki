@@ -7,7 +7,8 @@ import { getRetryParams, type RetryParams } from "@lib/retry/mod.ts";
 import { isNonEmptyArray } from "@lib/array/mod.ts";
 import type { NonEmptyArray } from "@lib/array/mod.ts";
 import type { Workflow } from "../workflow/definition.ts";
-import { delay } from "@lib/async/delay.ts";
+import { delay } from "@lib/async/mod.ts";
+import { addSignalListener, exit } from "@lib/process/mod.ts";
 
 export async function worker(
 	client: Client,
@@ -250,11 +251,11 @@ class WorkerImpl implements Worker {
 
 	private registerTerminationHandlers(): void {
 		for (const signal of ["SIGINT", "SIGTERM"] as const) {
-			Deno.addSignalListener(signal, async () => {
+			addSignalListener(signal, async () => {
 				// deno-lint-ignore no-console
 				console.log(`Received ${signal}, gracefully shutting down worker...`);
 				await this.stop();
-				Deno.exit(0);
+				exit(0);
 			});
 		}
 

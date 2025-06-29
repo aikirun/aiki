@@ -1,4 +1,4 @@
-import { withRetry } from "@lib/retry/strategy.ts";
+import { withRetry } from "@lib/retry/mod.ts";
 import type { WorkflowRunRepository } from "./repository.ts";
 import type { WorkflowRunResult, WorkflowRunResultComplete, WorkflowRunResultInComplete, WorkflowRunState } from "./result.ts";
 

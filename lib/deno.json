@@ -6,6 +6,7 @@
 		"./array": "./array/mod.ts",
 		"./async": "./async/mod.ts",
 		"./object": "./object/mod.ts",
+		"./process": "./process/mod.ts",
 		"./retry": "./retry/mod.ts",
 		"./testing/expect": "./testing/expect/mod.ts",
 		"./trigger": "./trigger/mod.ts"
