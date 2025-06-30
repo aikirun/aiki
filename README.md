@@ -195,59 +195,37 @@ import { workflow, task, worker } from "jsr:@aiki/sdk@^0.1.0";
 
 ### A Simple Example
 
-Let's build a user onboarding workflow to see how this works in practice:
+Let's see how to use the order processing workflow we defined earlier:
 
 ```typescript
 import { workflow, task, worker, createClient } from "@aiki/sdk";
-
-// Define a task for sending welcome emails
-const sendWelcomeEmail = task({
-  name: "send-welcome-email",
-  run({ payload }) {
-    // This task is deterministic - same input always produces same output
-    return sendEmailToUser(payload.email, welcomeTemplate);
-  },
-  retry: {
-    type: "exponential",
-    maxAttempts: 3,
-    baseDelayMs: 1000
-  }
-});
-
-// Define the onboarding workflow
-const userOnboardingWorkflow = workflow({
-  name: "user-onboarding",
-  version: "1.0.0",
-  async run({ workflowRun }) {
-    // Send welcome email
-    const emailResult = await sendWelcomeEmail.run(workflowRun, {
-      payload: { email: workflowRun.params.payload.email }
-    });
-    
-    return { emailSent: emailResult.sent };
-  }
-});
 
 // Set up the infrastructure
 const client = await createClient({ url: "localhost:9090" });
 
 const workerInstance = await worker(client, {
-  id: "onboarding-worker",
+  id: "order-worker",
   maxConcurrentWorkflowRuns: 5
 });
 
-workerInstance.registry.add(userOnboardingWorkflow);
+workerInstance.registry.add(orderProcessingWorkflow);
 
 // Start processing workflows
 workerInstance.start();
 
 // Enqueue a workflow run
-const resultHandle = await userOnboardingWorkflow.enqueue(client, {
-  payload: { email: "newuser@example.com" }
+const resultHandle = await orderProcessingWorkflow.enqueue(client, {
+  payload: { 
+    orderData: {
+      items: [{ id: "item-1", quantity: 2 }],
+      customerEmail: "customer@example.com"
+    },
+    email: "customer@example.com"
+  }
 });
 
 const result = await resultHandle.waitForCompletion();
-console.log("Onboarding completed:", result);
+console.log("Order processing completed:", result);
 ```
 
 ## Key Benefits
