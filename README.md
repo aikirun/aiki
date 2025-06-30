@@ -213,6 +213,9 @@ workerInstance.registry.add(orderProcessingWorkflow);
 // Start processing workflows
 workerInstance.start();
 
+// Note: workerInstance.start() runs indefinitely in a polling loop.
+// Don't await it unless you want your application to block until the worker stops.
+
 // Enqueue a workflow run
 const resultHandle = await orderProcessingWorkflow.enqueue(client, {
   payload: { 

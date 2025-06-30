@@ -273,7 +273,7 @@ Workers have a simple lifecycle:
 
 ```typescript
 // Start the worker
-await workerInstance.start();
+workerInstance.start();
 
 // The worker is now polling for workflow runs and executing them
 
