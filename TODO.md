@@ -1,84 +1,95 @@
-workflows should be able to kick off sub workflows
+# Aiki TODO
 
-add input and out schema validation. Use common schema
+This document tracks planned features and improvements for the Aiki durable workflow engine.
 
-// interface Organization {
-//     id: number;
-//     name: string;
-// }
+## Core Features
 
-// interface Workspace {
-//     id: number;
-//     name: string;
-//     organization_id: number;
-// }
+### Workflow Orchestration
+- [ ] **Sub-workflows**: Enable workflows to trigger and orchestrate other workflows
+- [ ] **Workflow Scheduling**: Add cron-based and time-based workflow scheduling
+- [ ] **Workflow Cancellation**: Allow cancellation of workflows and tasks in progress
+- [ ] **Workflow Timeouts**: Add maximum execution time limits for workflows
 
-Add scheduling of workflow
-// export type X =
-    | { type: "cron"; expression: string };
+### Schema Validation
+- [ ] **Input/Output Validation**: Implement schema validation for workflow and task payloads using common schema formats
+- [ ] **Type Safety**: Add comprehensive TypeScript type checking for payloads and results
 
-export type WorkflowScheduleParams<Payload> = UndefinedToPartial<{
-	payload: Payload;
-	idempotencyKey?: string;
-	trigger?: TriggerStrategy;
-}>;
+### Task Management
+- [ ] **Task Cancellation**: Implement graceful task cancellation with status checking
+- [ ] **Task Dependencies**: Add support for task dependencies and conditional execution
+- [ ] **Task Timeouts**: Add per-task timeout configuration
 
-// schedule: (params: WorkflowScheduleParams<Payload>) => Promise<WorkflowRun<Payload, Result>>;
+## Workflow Lifecycle Hooks
 
-// add max execution ts
+### Pre/Post Execution
+- [ ] **Pre-workflow Tasks**: Tasks that run exactly once before workflow execution starts
+- [ ] **Post-workflow Tasks**: Tasks that run when workflow completes (success or failure)
+- [ ] **Workflow Hooks**: Add `onSleep`, `onComplete`, `onError` handlers
 
+### Execution Control
+- [ ] **Block Until Complete**: Add method to wait for workflow completion
+- [ ] **Workflow Pausing**: Support for pausing workflows mid-execution
+- [ ] **Webhook Integration**: Pause workflow execution until external webhook is called
 
-// TODO:
-	// possibly allow passing publish handler to submit workflow updates
-	// why not just write it in the workflow?
+## Worker Management
 
-	// task to perofrm on workflow completion?
-	// write in workflow?
+### Worker Coordination
+- [ ] **Work Stealing**: Allow workers to claim workflows from other workers
+- [ ] **Task Reassignment**: Automatically reassign tasks to workers with appropriate handlers
+- [ ] **Adaptive Polling**: Implement intelligent polling based on workload
+- [ ] **Heartbeat Monitoring**: Detect and handle workers that haven't sent heartbeats
 
-	// task to perform before workflow starts?
-	// performed exactly once per workflow run
+### Worker Deployment
+- [ ] **Lambda Support**: Explore using AWS Lambda as workers with webhook triggers
+- [ ] **Multi-runtime Support**: Abstract Deno-specific features to support Node.js and other runtimes
 
-	// task to perform before each workflow start?
-	// performed more than once
+## Security & Data Protection
 
-	// add handler for onSleep, onComplete
+### Encryption
+- [ ] **Payload Encryption**: Optional encryption of task/workflow payloads and results
+- [ ] **Secret Management**: Support for user-provided encryption keys
 
+### Idempotency
+- [ ] **Enhanced Idempotency**: Improve idempotency key handling and validation
 
-add ability to cancel tasks/workflows that are already in progress
-an idea for doing this is to simply update the task status in storage
-the running task isn't really cancelled, instead it runs as is.
-When this running task completes, before updating the storage with the result, it checks if the 
-task state is not in cancelled.
+## Developer Experience
 
-* throw types errors
+### API Improvements
+- [ ] **Enhanced Workflow Status**: Provide detailed view of tasks executed within a workflow
+- [ ] **Better Error Handling**: Improve error messages, types and debugging information
+- [ ] **Payload Clarity**: Clarify payload source (static, dynamic, or templated) in documentation
 
-* add a block until done method to a workflow, or rather an an onComplete method to the workflowrun that only resolves when the workflow truly completes.
+### Code Quality
+- [ ] **Linting Rules**: Add `no-return-await` lint rule
+- [ ] **Branded Types**: Use branded types for IDs to improve type safety
+- [ ] **Documentation**: Improve API documentation and examples
 
+## Architecture Improvements
 
-// possibly encrypt task/workflow payload and result with a secret key provided by the sdk user. Should be optional.
+### Storage & Persistence
+- [ ] **Enhanced Storage**: Improve workflow run result persistence
+- [ ] **Audit Trail**: Better tracking of workflow execution history
 
+### Performance
+- [ ] **Optimization**: Performance improvements for high-throughput scenarios
+- [ ] **Caching**: Implement intelligent caching for frequently accessed data
 
-idempotency key for when starting workflow
+## Research & Exploration
 
-add no return await es lint rule
+### Advanced Features
+- [ ] **Event Sourcing**: Explore event sourcing patterns for workflow state
+- [ ] **Saga Pattern**: Research integration with saga pattern for distributed transactions
+- [ ] **Machine Learning**: Investigate ML-based workflow optimization
 
+### Integration
+- [ ] **External Systems**: Better integration with external services and APIs
+- [ ] **Monitoring**: Enhanced monitoring and observability features
 
-* is it possible to use lambdas as workers, possibly giving a web_hook to trigger
+---
 
-* payload wasn't initially intuitive, when creating a task, is the payload static or from aiki or a template
+## Notes
 
-* enhance workflow run handler to return more info e.g. give me a view of the tasks that have been run by this workflow
-
-* wait for webhook. Pause till the provided url is called
-
-add a means for workers to claim workflows from othere workers.
-This should also help re-assign tasks to the workflow which has a handler for that task.
-
-
-use branded types for ids
-
-find workflows that were marked as running but have not return a heartbeat in a while
-
-adaptive polling
-
-abstract away deno specific features so we can support multiple runtimes.
+- Task cancellation is implemented by updating task status in storage rather than interrupting running tasks
+- Workers check cancellation status before updating storage with results
+- Consider using webhooks for serverless worker deployments
+- Focus on maintaining backward compatibility during feature additions
