@@ -33,7 +33,7 @@ const duplicateHandle = await orderWorkflow.enqueue(client, {
 
 ## Task Idempotency
 
-Tasks can also use idempotency keys to ensure they're only executed once:
+Tasks within a workflow are **automatically idempotent** by default. When you run the same task with the same payload multiple times, it will only execute once and return the cached result:
 
 ```typescript
 const sendEmail = task({
@@ -43,16 +43,14 @@ const sendEmail = task({
   }
 });
 
-// Use idempotency key when running the task
+// First call: Actually executes the task
 await sendEmail.run(workflowRun, {
-  payload: { email: "user@example.com" },
-  idempotencyKey: "welcome-email-user-123"
+  payload: { email: "user@example.com" }
 });
 
-// If called again with the same idempotency key, the task won't execute again
+// Second call with same payload: Returns cached result, doesn't execute again
 await sendEmail.run(workflowRun, {
-  payload: { email: "user@example.com" },
-  idempotencyKey: "welcome-email-user-123"
+  payload: { email: "user@example.com" }
 });
 ```
 
@@ -62,125 +60,80 @@ await sendEmail.run(workflowRun, {
 When you provide an `idempotencyKey` when enqueueing a workflow, the system checks if a workflow run with that key already exists. If it does, it returns the existing workflow run instead of creating a new one.
 
 ### Task Level
-When you provide an `idempotencyKey` when running a task, the system generates a unique path for the task that includes:
+Tasks within a workflow are automatically idempotent based on their payload. The system generates a unique path for each task execution that includes:
 - The workflow path
 - The task name
 - A hash of the task payload
-- The idempotency key (if provided)
 
-This ensures that tasks with the same idempotency key and payload are treated as the same execution.
+When you provide an `idempotencyKey`, it's added to this path, allowing you to create different execution contexts for the same task and payload combination.
 
 ## Determinism vs Idempotency Keys
 
-You might wonder: if tasks are deterministic (same input → same output), why do we need idempotency keys? This is a great question that highlights the complementary nature of these two concepts.
+You might wonder: if tasks are deterministic (same input → same output) and automatically idempotent within workflows, why do we need idempotency keys? This is a great question that highlights the complementary nature of these concepts.
 
 ### The Apparent Tension
 
 There seems to be a logical conflict:
 - **Determinism**: Same input always produces same output
-- **Idempotency keys**: Same key skips execution, returns cached result
+- **Automatic Idempotency**: Same payload within a workflow only executes once
+- **Idempotency keys**: Allow forcing re-execution of the same task with same payload
 
-If tasks are truly deterministic, calling the same task twice with the same input should produce the same result anyway, making idempotency keys seem redundant.
+If tasks are truly deterministic and automatically idempotent, why would we ever want to execute the same task twice with the same input?
 
-### Why Both Concepts Are Valuable
+### Why Idempotency Keys Are Valuable
 
-#### 1. Performance Optimization
-Even deterministic tasks can be expensive to execute:
-
-```typescript
-const expensiveTask = task({
-  name: "fetch-user-data",
-  run({ payload }) {
-    // Deterministic but expensive - database queries, API calls
-    return fetchUserFromDatabase(payload.userId);
-  }
-});
-
-// Without idempotency: Executes twice, makes two DB calls
-await expensiveTask.run(workflowRun, { payload: { userId: "123" } });
-await expensiveTask.run(workflowRun, { payload: { userId: "123" } });
-
-// With idempotency: Executes once, caches result
-await expensiveTask.run(workflowRun, { 
-  payload: { userId: "123" }, 
-  idempotencyKey: "user-123" 
-});
-await expensiveTask.run(workflowRun, { 
-  payload: { userId: "123" }, 
-  idempotencyKey: "user-123" 
-});
-```
-
-#### 2. External Side Effects
-Deterministic tasks might still have external side effects:
+#### 1. Intentional Re-execution
+Sometimes you want the same task executed multiple times for different reasons:
 
 ```typescript
 const sendEmail = task({
   name: "send-email",
   run({ payload }) {
-    // Deterministic: Same input always produces same result
-    // But we don't want to send the email twice!
     return sendEmailToUser(payload.email, payload.content);
   }
 });
 
-// First call: Actually sends email
-await sendEmail.run(workflowRun, { 
-  payload: { email: "user@example.com", content: "Welcome!" },
-  idempotencyKey: "welcome-email-user-123"
-});
-
-// Second call: Returns cached result, doesn't send duplicate email
-await sendEmail.run(workflowRun, { 
-  payload: { email: "user@example.com", content: "Welcome!" },
-  idempotencyKey: "welcome-email-user-123"
-});
-```
-
-#### 3. Different Intent with Same Input
-Sometimes you want the same task executed multiple times for different reasons:
-
-```typescript
 // First call: Send welcome email
 await sendEmail.run(workflowRun, { 
-  payload: { email: "user@example.com", content: "Welcome!" },
-  idempotencyKey: "welcome-email-user-123"
+  payload: { email: "user@example.com", content: "Welcome!" }
 });
 
 // Second call: Send reminder email (same email, different intent)
 await sendEmail.run(workflowRun, { 
   payload: { email: "user@example.com", content: "Welcome!" },
-  idempotencyKey: "reminder-email-user-123" // Different key = different execution
+  idempotencyKey: "reminder-email-user-123" // Forces re-execution
 });
 ```
 
 ### Design Philosophy
 
-This design follows the principle of **separation of concerns**:
+This design follows the principle of **flexible execution control**:
 
 - **Determinism**: Ensures task logic is predictable, testable, and reliable
-- **Idempotency keys**: Control execution behavior and optimize performance
+- **Automatic Idempotency**: Prevents accidental duplicate executions by default
+- **Idempotency keys**: Provide explicit control when you need the same operation to happen multiple times
 
-It's similar to memoization in functional programming - the function is pure and deterministic, but we cache results for performance.
+It's similar to having a cache with the ability to bypass it when needed - the function is pure and deterministic, but you can control when to use cached results vs. fresh execution.
 
 ## Benefits of Idempotency Keys
 
-1. **Prevent Duplicates**: Ensure operations are only executed once
-2. **Safe Retries**: Allow clients to retry failed requests without side effects
-3. **Consistency**: Maintain data consistency even with network issues
-4. **Performance**: Avoid unnecessary duplicate work
+1. **Force Re-execution**: Allow the same task with same payload to execute multiple times when needed
+2. **Different Contexts**: Enable the same operation to happen in different execution contexts
+3. **Intentional Duplicates**: Support scenarios where you want the same operation to occur multiple times
+4. **Flexible Control**: Provide explicit control over when to bypass automatic idempotency
 
 ## When to Use Idempotency Keys
 
-- **Critical Operations**: Payments, user creation, order processing
-- **External API Calls**: Email sending, webhook notifications
-- **Resource Creation**: Database records, file uploads
-- **State Changes**: Status updates, configuration changes
+- **Multiple Executions**: When you need the same operation to happen multiple times (emails, notifications)
+- **Different Contexts**: Processing the same data for different purposes (audit, compliance, retry)
+- **Intentional Retries**: When you want to retry an operation with the same input but track it separately
+- **Bypass Cache**: When you need fresh execution even with the same payload
 
 ## Summary
 
-Determinism and idempotency keys are complementary concepts:
+Determinism, automatic idempotency, and idempotency keys work together to provide flexible execution control:
 - **Determinism** ensures your task logic is reliable and predictable
-- **Idempotency keys** give you control over execution behavior and performance
+- **Automatic Idempotency** prevents accidental duplicate executions by default
+- **Idempotency keys** give you explicit control when you need the same operation to happen multiple times
 
-Together, they provide the foundation for building robust, efficient, and maintainable workflows that can handle the complexities of distributed systems. 
+Together, they provide the foundation for building robust, efficient, and maintainable workflows that can handle both the need for consistency and the flexibility for intentional re-execution. 
