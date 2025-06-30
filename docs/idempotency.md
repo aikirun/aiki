@@ -38,164 +38,37 @@ Tasks can also use idempotency keys to ensure they're only executed once:
 ```typescript
 const sendEmail = task({
   name: "send-welcome-email",
-  run({ payload, workflowRun }) {
-    const { userId, email } = payload;
-    
-    // Use workflow run ID + task name as idempotency key
-    const idempotencyKey = `${workflowRun.id}-send-welcome-email`;
-    
-    // Check if this exact task execution already completed
-    const existingResult = await getTaskResult(idempotencyKey);
-    if (existingResult) {
-      return existingResult;
-    }
-    
-    // Send email
-    const result = await sendEmailToUser(email, welcomeTemplate);
-    
-    // Store result with idempotency key
-    await storeTaskResult(idempotencyKey, result);
-    
-    return result;
+  run({ payload }) {
+    return sendEmailToUser(payload.email, welcomeTemplate);
   }
+});
+
+// Use idempotency key when running the task
+await sendEmail.run(workflowRun, {
+  payload: { email: "user@example.com" },
+  idempotencyKey: "welcome-email-user-123"
+});
+
+// If called again with the same idempotency key, the task won't execute again
+await sendEmail.run(workflowRun, {
+  payload: { email: "user@example.com" },
+  idempotencyKey: "welcome-email-user-123"
 });
 ```
 
-## Generating Idempotency Keys
+## How Idempotency Works
 
-### 1. Business-Based Keys
-Use business identifiers that are naturally unique:
+### Workflow Level
+When you provide an `idempotencyKey` when enqueueing a workflow, the system checks if a workflow run with that key already exists. If it does, it returns the existing workflow run instead of creating a new one.
 
-```typescript
-// Order processing
-const orderKey = `order-${orderId}-process`;
+### Task Level
+When you provide an `idempotencyKey` when running a task, the system generates a unique path for the task that includes:
+- The workflow path
+- The task name
+- A hash of the task payload
+- The idempotency key (if provided)
 
-// User registration
-const userKey = `user-${email}-register`;
-
-// Payment processing
-const paymentKey = `payment-${paymentId}-process`;
-```
-
-### 2. Composite Keys
-Combine multiple identifiers for uniqueness:
-
-```typescript
-// Workflow + operation + timestamp
-const key = `${workflowName}-${operation}-${timestamp}`;
-
-// User + action + context
-const key = `${userId}-${action}-${context}`;
-```
-
-### 3. Hash-Based Keys
-Generate keys from payload content:
-
-```typescript
-import { createHash } from "crypto";
-
-const generateIdempotencyKey = (payload: any, operation: string) => {
-  const content = JSON.stringify(payload) + operation;
-  return createHash("sha256").update(content).digest("hex");
-};
-
-const key = generateIdempotencyKey(orderData, "process-order");
-```
-
-## Best Practices
-
-### 1. Make Keys Unique and Deterministic
-```typescript
-// ✅ Good: Deterministic key generation
-const createOrderKey = (orderId: string) => `order-${orderId}-process`;
-
-// ❌ Bad: Non-deterministic key generation
-const createOrderKey = () => `order-${Date.now()}-${Math.random()}`;
-```
-
-### 2. Include Context in Keys
-```typescript
-// ✅ Good: Include relevant context
-const key = `user-${userId}-email-${emailType}-${timestamp}`;
-
-// ❌ Bad: Too generic
-const key = `send-email`;
-```
-
-### 3. Handle Key Collisions
-```typescript
-const processPayment = task({
-  name: "process-payment",
-  run({ payload, workflowRun }) {
-    const { paymentId, amount } = payload;
-    const key = `payment-${paymentId}`;
-    
-    // Check for existing execution
-    const existing = await getPaymentExecution(key);
-    if (existing) {
-      // Return existing result if it was successful
-      if (existing.status === "completed") {
-        return existing.result;
-      }
-      // If it failed, we can retry
-      if (existing.status === "failed") {
-        // Continue with new execution
-      }
-    }
-    
-    // Process payment and store result
-    const result = await processPaymentWithId(paymentId, amount);
-    await storePaymentExecution(key, { status: "completed", result });
-    
-    return result;
-  }
-});
-```
-
-### 4. Set Appropriate Expiration
-```typescript
-// Store idempotency keys with expiration
-await storeIdempotencyKey(key, result, {
-  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-});
-```
-
-## Idempotency Key Storage
-
-You can implement idempotency key storage using various backends:
-
-### Redis Implementation
-```typescript
-class RedisIdempotencyStore {
-  async get(key: string) {
-    return await redis.get(`idempotency:${key}`);
-  }
-  
-  async set(key: string, value: any, ttl: number) {
-    await redis.setex(`idempotency:${key}`, ttl, JSON.stringify(value));
-  }
-}
-```
-
-### Database Implementation
-```typescript
-class DatabaseIdempotencyStore {
-  async get(key: string) {
-    const result = await db.query(
-      "SELECT result FROM idempotency_keys WHERE key = ? AND expires_at > NOW()",
-      [key]
-    );
-    return result[0]?.result;
-  }
-  
-  async set(key: string, value: any, expiresAt: Date) {
-    await db.query(
-      "INSERT INTO idempotency_keys (key, result, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE result = VALUES(result)",
-      [key, JSON.stringify(value), expiresAt]
-    );
-  }
-}
-```
+This ensures that tasks with the same idempotency key and payload are treated as the same execution.
 
 ## Determinism vs Idempotency Keys
 
@@ -281,31 +154,6 @@ await sendEmail.run(workflowRun, {
 });
 ```
 
-#### 4. Separation of Concerns
-The two concepts serve different purposes:
-
-```typescript
-const calculateTax = task({
-  name: "calculate-tax",
-  run({ payload }) {
-    // Deterministic: Same input always produces same output
-    return { tax: payload.amount * 0.1 };
-  }
-});
-
-// Both calls would produce the same result, but:
-// - First call: Actually executes the calculation
-// - Second call: Returns cached result (performance optimization)
-await calculateTax.run(workflowRun, { 
-  payload: { amount: 100 }, 
-  idempotencyKey: "tax-calculation-100" 
-});
-await calculateTax.run(workflowRun, { 
-  payload: { amount: 100 }, 
-  idempotencyKey: "tax-calculation-100" 
-});
-```
-
 ### Design Philosophy
 
 This design follows the principle of **separation of concerns**:
@@ -315,30 +163,12 @@ This design follows the principle of **separation of concerns**:
 
 It's similar to memoization in functional programming - the function is pure and deterministic, but we cache results for performance.
 
-### Best Practices
-
-#### When to Use the Same Idempotency Key
-- Identical task calls where you want to avoid duplicate work
-- Expensive operations that produce the same result
-- Operations with external side effects you want to prevent
-
-#### When to Use Different Idempotency Keys
-- Same task called for different purposes/intents
-- When you want to force re-execution even with same input
-- Testing or debugging scenarios
-
-#### When to Skip Idempotency Keys
-- Simple, fast tasks where overhead isn't worth it
-- Tasks that should always execute (like logging)
-- When you want to ensure fresh execution every time
-
 ## Benefits of Idempotency Keys
 
 1. **Prevent Duplicates**: Ensure operations are only executed once
 2. **Safe Retries**: Allow clients to retry failed requests without side effects
 3. **Consistency**: Maintain data consistency even with network issues
-4. **Audit Trail**: Track and debug duplicate attempts
-5. **Performance**: Avoid unnecessary duplicate work
+4. **Performance**: Avoid unnecessary duplicate work
 
 ## When to Use Idempotency Keys
 
@@ -353,6 +183,4 @@ Determinism and idempotency keys are complementary concepts:
 - **Determinism** ensures your task logic is reliable and predictable
 - **Idempotency keys** give you control over execution behavior and performance
 
-Together, they provide the foundation for building robust, efficient, and maintainable workflows that can handle the complexities of distributed systems.
-
-By implementing idempotency keys, you can build more robust workflows that handle the realities of distributed systems while maintaining data consistency and preventing duplicate operations. 
+Together, they provide the foundation for building robust, efficient, and maintainable workflows that can handle the complexities of distributed systems. 
