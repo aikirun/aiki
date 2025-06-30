@@ -17,14 +17,12 @@ If you're new to Aiki, start with the [main README](../README.md) for a quick in
 
 - **[Task Determinism](./task-determinism.md)** - Why tasks should be deterministic and how to implement them
 - **[Idempotency](./idempotency.md)** - Using idempotency keys for reliable execution and performance optimization
-- **[Best Practices](./best-practices.md)** - Guidelines for building robust, maintainable workflows
 
 ## Quick Navigation
 
 ### For Beginners
 1. Start with [Core Concepts](./core-concepts.md) to understand the fundamentals
-2. Read [Best Practices](./best-practices.md) for guidelines on building workflows
-3. Use JSDoc comments in the source code for detailed API reference
+2. Use JSDoc comments in the source code for detailed API reference
 
 ### For Advanced Users
 1. Review [Architecture](./architecture.md) to understand the system design
@@ -32,9 +30,8 @@ If you're new to Aiki, start with the [main README](../README.md) for a quick in
 3. Implement [Idempotency](./idempotency.md) for production-ready workflows
 
 ### For Production Deployment
-1. Follow [Best Practices](./best-practices.md) for robust workflows
-2. Understand [Architecture](./architecture.md) for scaling decisions
-3. Use JSDoc comments in the source code for complete implementation details
+1. Understand [Architecture](./architecture.md) for scaling decisions
+2. Use JSDoc comments in the source code for complete implementation details
 
 ## Contributing to Documentation
 
@@ -49,6 +46,5 @@ If you find issues or want to improve the documentation:
 If you need help with Aiki:
 
 - Check the [main README](../README.md) for quick start examples
-- Review the [Best Practices](./best-practices.md) for common solutions
 - Use JSDoc comments in the source code for detailed implementation help
 - Open an issue in the main repository for bugs or feature requests 

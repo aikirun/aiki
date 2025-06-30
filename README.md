@@ -248,7 +248,6 @@ This introduction gives you a taste of what Aiki can do, but there's much more t
 - **[Architecture](./docs/architecture.md)** - Understanding the system design
 - **[Task Determinism](./docs/task-determinism.md)** - Why tasks should be deterministic
 - **[Idempotency](./docs/idempotency.md)** - Using idempotency keys for reliable execution
-- **[Best Practices](./docs/best-practices.md)** - Guidelines for building robust workflows
 
 For complete API documentation, see the JSDoc comments in the source code.
 
