@@ -36,14 +36,14 @@ Aiki follows a distributed architecture pattern where workflow orchestration is 
                       ▼
           ┌─────────────────────────────────────────────────────────┐
           │                                                         │
-          │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
-          │  │   Worker A  │  │   Worker B  │  │   Worker C  │     │
-          │  │             │  │             │  │             │     │
-          │  │ Executes    │  │ Executes    │  │ Executes    │     │
-          │  │ Workflows   │  │ Workflows   │  │ Workflows   │     │
-          │  │ in YOUR     │  │ in YOUR     │  │ in YOUR     │     │
-          │  │ Environment │  │ Environment │  │ Environment │     │
-          │  └─────────────┘  └─────────────┘  └─────────────┘     │
+          │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+          │  │   Worker A  │  │   Worker B  │  │   Worker C  │      │
+          │  │             │  │             │  │             │      │
+          │  │ Executes    │  │ Executes    │  │ Executes    │      │
+          │  │ Workflows   │  │ Workflows   │  │ Workflows   │      │
+          │  │ in YOUR     │  │ in YOUR     │  │ in YOUR     │      │
+          │  │ Environment │  │ Environment │  │ Environment │      │
+          │  └─────────────┘  └─────────────┘  └─────────────┘      │
           │                                                         │
           │                    Your Infrastructure                  │
           │              (Your servers, containers, etc.)           │

@@ -411,7 +411,7 @@ const orderWorkflow = workflow({
 
 ### 2. Add Metrics
 
-Track important metrics for monitoring:
+Track key metrics for monitoring:
 
 ```typescript
 const processPayment = task({

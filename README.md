@@ -1,44 +1,127 @@
 # Aiki - Durable Workflow Engine
 
-Aiki is a cross-platform, durable workflow engine that enables you to build reliable, long-running business processes that can survive failures, restarts, and infrastructure changes. Built with TypeScript and designed to run on both Node.js and Deno.
+When you're building business applications, you often need to orchestrate complex processes that span multiple steps, external services, and time. Think of order processing, user onboarding, or data migration workflows. These processes are tricky because they can fail at any point - a server might restart, a network call could timeout, or a long-running operation might get interrupted.
 
-## What is Aiki?
+Traditional approaches to these problems often lead to brittle, hard-to-maintain code. You end up with complex retry logic scattered throughout your application, inconsistent error handling, and processes that can't survive infrastructure changes.
 
-Aiki is a workflow orchestration library that helps you build complex, reliable business processes by breaking them down into smaller, manageable tasks. It provides durability, fault tolerance, and scalability for your workflow executions.
+Aiki is a durable workflow engine that helps you build these complex business processes in a more reliable way. It's built with TypeScript and runs on both Node.js and Deno, giving you the flexibility to deploy it in your existing infrastructure.
 
-## The Problem
+## The Problem with Traditional Approaches
 
-Traditional application logic fails when:
-- Servers restart or crash
-- Network calls timeout or fail
-- Long-running processes get interrupted
-- You need to handle complex retry logic
-- You want to track and monitor business processes
+Let me illustrate the challenges with a typical scenario. Imagine you're building an order processing system:
 
-## The Solution: Durable Workflows
+```typescript
+// Traditional approach - brittle and hard to maintain
+async function processOrder(orderData) {
+  try {
+    // Step 1: Validate order
+    const validation = await validateOrder(orderData);
+    if (!validation.valid) {
+      throw new Error("Invalid order");
+    }
+    
+    // Step 2: Process payment
+    const payment = await processPayment(validation.paymentId, validation.amount);
+    if (!payment.success) {
+      throw new Error("Payment failed");
+    }
+    
+    // Step 3: Update inventory
+    await updateInventory(orderData.items);
+    
+    // Step 4: Send confirmation
+    await sendOrderConfirmation(orderData.email);
+    
+    return { success: true };
+  } catch (error) {
+    // What happens if the server crashes after payment but before inventory update?
+    // How do you handle retries without double-charging?
+    // How do you track the progress of long-running orders?
+    console.error("Order processing failed:", error);
+    throw error;
+  }
+}
+```
 
-Durable workflows are long-running business processes that:
-- **Survive failures**: Workflows continue from where they left off after crashes
-- **Handle retries**: Built-in retry mechanisms with configurable strategies
-- **Provide visibility**: Track workflow and task execution status
-- **Scale horizontally**: Multiple workers can process workflows concurrently
-- **Ensure consistency**: Tasks are executed exactly once with proper error handling
+This approach has several problems:
+- **No durability**: If the server crashes after payment but before inventory update, you're left in an inconsistent state
+- **Complex retry logic**: You need to handle retries carefully to avoid double-charging or duplicate operations
+- **Poor observability**: It's hard to track where a process failed or how long it's been running
+- **Scaling challenges**: Running multiple instances can lead to race conditions
 
-## Core Concepts
+## The Durable Workflow Solution
 
-### Workflows
-A workflow is a business process composed of multiple tasks. Workflows are versioned and can be updated over time.
+Aiki introduces the concept of **durable workflows** - long-running business processes that can survive failures, restarts, and infrastructure changes. The key insight is separating the orchestration logic from the execution logic.
 
-### Tasks
-Tasks are the building blocks of workflows. Each task represents a single unit of work that can be retried independently.
+Here's how the same order processing looks with Aiki:
 
-### Workers
-Workers are processes that execute workflows in your own environment and infrastructure. This ensures your business logic runs in your controlled environment, not in Aiki's infrastructure.
+```typescript
+import { workflow, task, worker, createClient } from "@aiki/sdk";
 
-### Aiki Server
-The Aiki Server orchestrates workflows and manages state, but doesn't execute your code. It coordinates with workers through a queue system.
+// Define individual tasks - each one is focused and can be retried independently
+const validateOrder = task({
+  name: "validate-order",
+  run({ payload }) {
+    return validateOrderData(payload.orderData);
+  }
+});
 
-## Architecture
+const processPayment = task({
+  name: "process-payment",
+  run({ payload }) {
+    return processPaymentWithId(payload.paymentId, payload.amount);
+  },
+  retry: {
+    type: "exponential",
+    maxAttempts: 3,
+    baseDelayMs: 1000
+  }
+});
+
+const updateInventory = task({
+  name: "update-inventory",
+  run({ payload }) {
+    return updateInventoryForItems(payload.items);
+  }
+});
+
+const sendConfirmation = task({
+  name: "send-confirmation",
+  run({ payload }) {
+    return sendEmail(payload.email, confirmationTemplate);
+  }
+});
+
+// Define the workflow - this orchestrates the tasks
+const orderProcessingWorkflow = workflow({
+  name: "order-processing",
+  version: "1.0.0",
+  async run({ workflowRun }) {
+    // Each step is a separate task that can be retried independently
+    const validation = await validateOrder.run(workflowRun, {
+      payload: { orderData: workflowRun.params.payload.orderData }
+    });
+    
+    const payment = await processPayment.run(workflowRun, {
+      payload: { paymentId: validation.paymentId, amount: validation.amount }
+    });
+    
+    await updateInventory.run(workflowRun, {
+      payload: { items: workflowRun.params.payload.orderData.items }
+    });
+    
+    await sendConfirmation.run(workflowRun, {
+      payload: { email: workflowRun.params.payload.email }
+    });
+    
+    return { success: true, orderId: validation.orderId };
+  }
+});
+```
+
+## How It Works
+
+Aiki follows a **distributed architecture** where workflow orchestration is separated from execution:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -63,19 +146,40 @@ The Aiki Server orchestrates workflows and manages state, but doesn't execute yo
                       ▼
           ┌─────────────────────────────────────────────────────────┐
           │                                                         │
-          │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
-          │  │   Worker A  │  │   Worker B  │  │   Worker C  │     │
-          │  │             │  │             │  │             │     │
-          │  │ Executes    │  │ Executes    │  │ Executes    │     │
-          │  │ Workflows   │  │ Workflows   │  │ Workflows   │     │
-          │  │ in YOUR     │  │ in YOUR     │  │ in YOUR     │     │
-          │  │ Environment │  │ Environment │  │ Environment │     │
-          │  └─────────────┘  └─────────────┘  └─────────────┘     │
+          │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+          │  │   Worker A  │  │   Worker B  │  │   Worker C  │      │
+          │  │             │  │             │  │             │      │
+          │  │ Executes    │  │ Executes    │  │ Executes    │      │
+          │  │ Workflows   │  │ Workflows   │  │ Workflows   │      │
+          │  │ in YOUR     │  │ in YOUR     │  │ in YOUR     │      │
+          │  │ Environment │  │ Environment │  │ Environment │      │
+          │  └─────────────┘  └─────────────┘  └─────────────┘      │
           │                                                         │
           │                    Your Infrastructure                  │
           │              (Your servers, containers, etc.)           │
           └─────────────────────────────────────────────────────────┘
 ```
+
+The key insight here is that **your business logic runs in your environment, not in Aiki's infrastructure**. The Aiki Server orchestrates workflows and manages state, but workers execute the actual tasks in your own infrastructure. This gives you:
+
+- **Security**: Your sensitive data never leaves your environment
+- **Integration**: Direct access to your databases, APIs, and services
+- **Control**: Full control over the execution environment
+- **Compliance**: Meet data residency and regulatory requirements
+
+## Core Concepts
+
+### Workflows
+A workflow is a business process composed of multiple tasks. Think of it as a recipe that describes the steps needed to complete a business operation. Workflows are versioned, so you can update them over time without breaking existing processes.
+
+### Tasks
+Tasks are the building blocks of workflows. Each task represents a single unit of work that can be retried independently. This is essential because it allows you to handle failures gracefully - if a payment fails, you can retry just the payment without re-running the entire order validation.
+
+### Workers
+Workers are processes that execute workflows in your own environment. They poll the queue for available workflow runs and execute them locally. You can run multiple workers to scale horizontally, and they'll automatically distribute the work among themselves.
+
+### Aiki Server
+The Aiki Server orchestrates workflows and manages state, but doesn't execute your code. It coordinates with workers through a queue system, ensuring reliable message delivery and state persistence.
 
 ## Getting Started
 
@@ -89,17 +193,19 @@ npm install @aiki/sdk
 import { workflow, task, worker } from "jsr:@aiki/sdk@^0.1.0";
 ```
 
-### Basic Example
+### A Simple Example
+
+Let's build a user onboarding workflow to see how this works in practice:
 
 ```typescript
 import { workflow, task, worker, createClient } from "@aiki/sdk";
 
-// Define a task
-const sendEmail = task({
-  name: "send-email",
+// Define a task for sending welcome emails
+const sendWelcomeEmail = task({
+  name: "send-welcome-email",
   run({ payload }) {
-    // Send email logic
-    return Promise.resolve({ sent: true, to: payload.recipient });
+    // This task is deterministic - same input always produces same output
+    return sendEmailToUser(payload.email, welcomeTemplate);
   },
   retry: {
     type: "exponential",
@@ -108,20 +214,21 @@ const sendEmail = task({
   }
 });
 
-// Define a workflow
-const onboardingWorkflow = workflow({
+// Define the onboarding workflow
+const userOnboardingWorkflow = workflow({
   name: "user-onboarding",
   version: "1.0.0",
   async run({ workflowRun }) {
-    const emailResult = await sendEmail.run(workflowRun, {
-      payload: { recipient: "user@example.com" }
+    // Send welcome email
+    const emailResult = await sendWelcomeEmail.run(workflowRun, {
+      payload: { email: workflowRun.params.payload.email }
     });
     
     return { emailSent: emailResult.sent };
   }
 });
 
-// Create a client and worker
+// Set up the infrastructure
 const client = await createClient({ url: "localhost:9090" });
 
 const workerInstance = await worker(client, {
@@ -129,21 +236,21 @@ const workerInstance = await worker(client, {
   maxConcurrentWorkflowRuns: 5
 });
 
-workerInstance.registry.add(onboardingWorkflow);
+workerInstance.registry.add(userOnboardingWorkflow);
 
-// Start the worker
+// Start processing workflows
 workerInstance.start();
 
 // Enqueue a workflow run
-const resultHandle = await onboardingWorkflow.enqueue(client, {
-  payload: { recipient: "newuser@example.com" }
+const resultHandle = await userOnboardingWorkflow.enqueue(client, {
+  payload: { email: "newuser@example.com" }
 });
 
 const result = await resultHandle.waitForCompletion();
 console.log("Onboarding completed:", result);
 ```
 
-## Key Features
+## Key Benefits
 
 - **🔄 Durability**: Workflows survive server restarts and crashes
 - **🚀 Scalability**: Horizontal scaling with multiple workers
@@ -152,15 +259,15 @@ console.log("Onboarding completed:", result);
 - **🔧 Flexibility**: Cross-platform support (Node.js and Deno)
 - **🔒 Security**: Execution in your own environment
 
-## Documentation
+## Next Steps
 
-For detailed documentation, see the [docs](./docs) directory:
+This introduction gives you a taste of what Aiki can do, but there's much more to explore. The documentation covers:
 
-- [Core Concepts](./docs/core-concepts.md) - Detailed explanation of workflows, tasks, and workers
-- [Architecture](./docs/architecture.md) - Deep dive into Aiki's architecture and design
-- [Task Determinism](./docs/task-determinism.md) - Why tasks should be deterministic
-- [Idempotency](./docs/idempotency.md) - Using idempotency keys for reliable execution
-- [Best Practices](./docs/best-practices.md) - Guidelines for building robust workflows
+- **[Core Concepts](./docs/core-concepts.md)** - Deep dive into workflows, tasks, and workers
+- **[Architecture](./docs/architecture.md)** - Understanding the system design
+- **[Task Determinism](./docs/task-determinism.md)** - Why tasks should be deterministic
+- **[Idempotency](./docs/idempotency.md)** - Using idempotency keys for reliable execution
+- **[Best Practices](./docs/best-practices.md)** - Guidelines for building robust workflows
 
 For complete API documentation, see the JSDoc comments in the source code.
 
