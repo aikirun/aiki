@@ -21,7 +21,7 @@ export interface Workflow<Payload, Result> {
 	path: string;
 	enqueue: (
 		client: Client,
-		_params: WorkflowRunParams<Payload>, // TODO: params is unused
+		workflowRunParams: WorkflowRunParams<Payload>,
 	) => Promise<WorkflowRunResultHandle<Result>>;
 	_execute: (context: WorkflowRunContext<Payload, Result>) => Promise<void>;
 }
@@ -37,10 +37,7 @@ class WorkflowImpl<Payload, Result> implements Workflow<Payload, Result> {
 		client: Client,
 		workflowRunParams: WorkflowRunParams<Payload>,
 	): Promise<WorkflowRunResultHandle<Result>> {
-		const workflowRunRow = await client.workflowRunRepository.create(
-			this,
-			workflowRunParams,
-		);
+		const workflowRunRow = await client.workflowRunRepository.create(this, workflowRunParams);
 		return initWorkflowRunResultHandle({
 			id: workflowRunRow.id,
 			repository: client.workflowRunRepository,
