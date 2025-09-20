@@ -2,7 +2,7 @@ import { createClient } from "../../client/definition.ts";
 import { morningRoutineWorkflowV1 } from "../example.ts";
 
 if (import.meta.main) {
-	const client = await createClient({ url: "localhost:9090" });
+	const client = await createClient({ serverUrl: "localhost:9090" });
 
 	const resultHandle = await morningRoutineWorkflowV1.enqueue(client, {
 		payload: { a: "1", b: 1 },
