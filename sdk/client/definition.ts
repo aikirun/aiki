@@ -7,12 +7,13 @@ export async function createClient(params: ClientParams): Promise<Client> {
 }
 
 export interface ClientParams {
-	url: string;
+	serverUrl: string;
 }
 
 export interface Client {
 	workflowRunRepository: WorkflowRunRepository;
 	getWorkflowRunSubscriber: () => Promise<WorkflowRunSubscriber>;
+	getServerUrl: () => string;
 }
 
 class ClientImpl implements Client {
@@ -21,7 +22,7 @@ class ClientImpl implements Client {
 	// TODO: params is unused
 	constructor(
 		public readonly workflowRunRepository: WorkflowRunRepository,
-		private readonly _params: ClientParams,
+		private readonly params: ClientParams,
 	) {}
 
 	public async getWorkflowRunSubscriber(): Promise<WorkflowRunSubscriber> {
@@ -31,5 +32,9 @@ class ClientImpl implements Client {
 			});
 		}
 		return this.workflowRunSubscriber;
+	}
+
+	public getServerUrl(): string {
+		return this.params.serverUrl;
 	}
 }
