@@ -1,3 +1,5 @@
+import { getRetryParams } from "../retry/mod.ts";
+
 export interface AdaptivePollingConfig {
 	/**
 	 * Minimum polling interval when busy (ms)
@@ -45,7 +47,7 @@ export class AdaptivePollingStrategy {
 	constructor(config: AdaptivePollingConfig) {
 		this.config = {
 			minPollIntervalMs: config.minPollIntervalMs ?? 50,
-			maxPollIntervalMs: config.maxPollIntervalMs ?? 5000,
+			maxPollIntervalMs: config.maxPollIntervalMs ?? 5_000,
 			backoffMultiplier: config.backoffMultiplier ?? 1.5,
 			emptyPollThreshold: config.emptyPollThreshold ?? 3,
 			jitterFactor: config.jitterFactor ?? 0.1,
@@ -76,10 +78,18 @@ export class AdaptivePollingStrategy {
 		this.consecutiveSuccessfulPolls = 0;
 
 		if (this.consecutiveEmptyPolls > this.config.emptyPollThreshold) {
-			this.currentIntervalMs = Math.min(
-				this.currentIntervalMs * this.config.backoffMultiplier,
-				this.config.maxPollIntervalMs,
-			);
+			const backoffAttempts = this.consecutiveEmptyPolls - this.config.emptyPollThreshold;
+			const retryParams = getRetryParams(backoffAttempts, {
+				type: "exponential",
+				maxAttempts: Infinity,
+				baseDelayMs: this.config.minPollIntervalMs,
+				factor: this.config.backoffMultiplier,
+				maxDelayMs: this.config.maxPollIntervalMs,
+			});
+
+			if (retryParams.retriesLeft) {
+				this.currentIntervalMs = retryParams.delayMs;
+			}
 		}
 
 		return this.getNextIntervalWithJitter();
