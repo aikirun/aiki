@@ -7,8 +7,10 @@
 		"./async": "./async/mod.ts",
 		"./crypto": "./crypto/mod.ts",
 		"./eventsource": "./eventsource/mod.ts",
+		"./number": "./number/mod.ts",
 		"./object": "./object/mod.ts",
 		"./process": "./process/mod.ts",
+		"./string": "./string/mod.ts",
 		"./retry": "./retry/mod.ts",
 		"./testing/expect": "./testing/expect/mod.ts",
 		"./trigger": "./trigger/mod.ts"
