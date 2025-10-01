@@ -22,3 +22,33 @@ export function groupBy<Item, Key, Value>(
 export function isNonEmptyArray<T>(value: T[]): value is NonEmptyArray<T> {
 	return value.length > 0;
 }
+
+/**
+ * Shuffles an array using Fisher-Yates algorithm for better randomness
+ * @param array The array to shuffle
+ * @returns A new shuffled array
+ */
+export function shuffleArray<T>(array: readonly T[]): T[] {
+	const shuffled = [...array];
+	for (let i = shuffled.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+	}
+	return shuffled;
+}
+
+/**
+ * Distributes a total size across an array of items using round-robin distribution
+ * @param totalSize The total size to distribute
+ * @param itemCount The number of items to distribute across
+ * @returns Array of sizes for each item
+ */
+export function distributeRoundRobin(totalSize: number, itemCount: number): number[] {
+	if (itemCount <= 0) return [];
+
+	const distribution = Array(itemCount).fill(0);
+	for (let i = 0; i < totalSize; i++) {
+		distribution[i % itemCount]!++;
+	}
+	return distribution;
+}

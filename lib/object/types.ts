@@ -54,7 +54,7 @@ type TestRequiredDeep = ExpectTrue<
 				c: number;
 				d: {
 					e: [];
-				}
+				};
 			};
 		}
 	>
