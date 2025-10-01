@@ -1,27 +1,48 @@
-import { createClient } from "@aiki/sdk/client";
 import { worker } from "@aiki/sdk/worker";
-import { eveningRoutineWorkflow, morningRoutineWorkflowV1, morningRoutineWorkflowV2 } from "@aiki/sdk/workflow";
+import { eveningWorkflow, morningWorkflow } from "@aiki/sdk/workflow";
+import { Aiki } from "@aiki/sdk";
 
-if (import.meta.main) {
-	const client = await createClient({ url: "localhost:9090" });
+async function createPollingWorker() {
+	const aikiClient = await Aiki.client({ serverUrl: "http://localhost:9090" });
 
-	const workerA = await worker(client, {
-		id: "worker-a",
-		workflowRunSubscriber: {
-			pollIntervalMs: 100,
-			maxRetryDelayMs: 30_000,
+	return worker(aikiClient, {
+		id: "polling-worker",
+		maxConcurrentWorkflowRuns: 5,
+		subscriber: {
+			type: "polling",
+			intervalMs: 200,
+			maxRetryIntervalMs: 10000,
 		},
 	});
-	const workerB = await worker(client, { id: "worker-b" });
+}
 
-	workerA.registry
-		.add(morningRoutineWorkflowV1)
-		.add(morningRoutineWorkflowV2)
-		.add(eveningRoutineWorkflow);
+async function createAdaptivePollingWorker() {
+	const aikiClient = await Aiki.client({ serverUrl: "http://localhost:9090" });
 
-	workerB.registry
-		.add(morningRoutineWorkflowV1)
-		.add(morningRoutineWorkflowV2);
+	return worker(aikiClient, {
+		id: "adaptive-worker",
+		maxConcurrentWorkflowRuns: 10,
+		subscriber: {
+			type: "adaptive_polling",
+			minPollIntervalMs: 50,
+			maxPollIntervalMs: 5000,
+			backoffMultiplier: 1.5,
+			emptyPollThreshold: 3,
+			jitterFactor: 0.1,
+		},
+	});
+}
+
+if (import.meta.main) {
+	const workerA = await createPollingWorker();
+	const workerB = await createAdaptivePollingWorker();
+
+	workerA.workflowRegistry
+		.add(morningWorkflow)
+		.add(eveningWorkflow);
+
+	workerB.workflowRegistry
+		.add(morningWorkflow);
 
 	workerA.start();
 	workerB.start();

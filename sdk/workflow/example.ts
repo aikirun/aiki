@@ -1,44 +1,34 @@
 import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "../task/example.ts";
-import { type Workflow, workflow } from "./definition.ts";
+import { workflow } from "./definition.ts";
 
-export const morningRoutineWorkflowV1: Workflow<
-	{ a: string; b: number },
-	{ alarmResult: string; stretchResult: number }
-> = workflow({
-	name: "morning-routine",
-	version: "1.0.0",
-	async run({ workflowRun }) {
-		const alarmResult = await ringAlarm.run(workflowRun, {
-			payload: { song: workflowRun.params.payload.a },
+export const morningWorkflow = workflow({ name: "morning-routine" });
+
+export const morningWorkflowV1 = morningWorkflow.v("1.0", {
+	async run(ctx, payload: { a: string; b: number }): Promise<string> {
+		const alarmResult = await ringAlarm.run(ctx, {
+			payload: { song: payload.a },
 		});
 
-		// TODO: waitfor to 10 days
-
-		const stretchResult = await stretch.run(workflowRun, {
-			payload: { duration: workflowRun.params.payload.b },
+		const stretchResult = await stretch.run(ctx, {
+			payload: { duration: payload.b },
 		});
 
-		return {
-			alarmResult,
-			stretchResult,
-		};
+		return `Alarm: ${alarmResult}, Stretch: ${stretchResult}`;
 	},
 });
 
-export const morningRoutineWorkflowV2: Workflow<{ a: boolean }, void> = workflow({
-	name: "morning-routine",
-	version: "2.0.0",
-	async run({ workflowRun }) {
-		await drinkCoffee.run(workflowRun, {
-			payload: { withSugar: workflowRun.params.payload.a },
+export const morningWorkflowV2 = morningWorkflow.v("2.0", {
+	async run(ctx, payload: { a: boolean }) {
+		await drinkCoffee.run(ctx, {
+			payload: { withSugar: payload.a },
 		});
 	},
 });
 
-export const eveningRoutineWorkflow: Workflow<undefined, void> = workflow({
-	name: "evening-routine",
-	version: "1.0.0",
-	async run({ workflowRun }) {
-		await sayPrayer.run(workflowRun, {});
+export const eveningWorkflow = workflow({ name: "evening-routine" });
+
+export const eveningRoutineWorkflowV1 = eveningWorkflow.v("1.0.0", {
+	async run(ctx) {
+		await sayPrayer.run(ctx, {});
 	},
 });

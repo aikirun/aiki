@@ -2,7 +2,9 @@
 	"name": "@aiki/sdk",
 	"version": "0.1.0",
 	"imports": {
-		"@lib/": "../lib/"
+		"@lib/": "../lib/",
+		"redis": "npm:ioredis@^5.4.1",
+		"zod": "npm:zod@^3.23.8"
 	},
 	"exports": {
 		".": "./mod.ts",

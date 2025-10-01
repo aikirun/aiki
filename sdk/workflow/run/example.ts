@@ -1,10 +1,10 @@
-import { createClient } from "../../client/definition.ts";
-import { morningRoutineWorkflowV1 } from "../example.ts";
+import { Aiki } from "@aiki/sdk";
+import { morningWorkflowV1 } from "../example.ts";
 
 if (import.meta.main) {
-	const client = await createClient({ serverUrl: "localhost:9090" });
+	const aikiClient = await Aiki.client({ serverUrl: "localhost:9090" });
 
-	const resultHandle = await morningRoutineWorkflowV1.enqueue(client, {
+	const resultHandle = await morningWorkflowV1.enqueue(aikiClient, {
 		payload: { a: "1", b: 1 },
 		trigger: {
 			type: "delayed",

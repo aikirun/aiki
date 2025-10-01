@@ -141,8 +141,8 @@ Aiki follows a **distributed architecture** where workflow orchestration is sepa
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
 └─────────────────────┬───────────────────────────────────────────────────────┘
                       │
-                      │ Queue System
-                      │ (Message Distribution)
+                      │ Redis Streams / Queue System
+                      │ (High-performance message distribution with fault tolerance)
                       ▼
           ┌─────────────────────────────────────────────────────────┐
           │                                                         │
@@ -198,14 +198,24 @@ import { workflow, task, worker } from "jsr:@aiki/sdk@^0.1.0";
 Let's see how to use the order processing workflow we defined earlier:
 
 ```typescript
-import { workflow, task, worker, createClient } from "@aiki/sdk";
+import { workflow, task, worker, client } from "@aiki/sdk";
 
-// Set up the infrastructure
-const client = await createClient({ url: "localhost:9090" });
+// Set up the infrastructure with Redis for high-performance messaging
+const aikiClient = await client({
+  serverUrl: "localhost:9090",
+  redis: {
+    host: "localhost",
+    port: 6379
+  }
+});
 
-const workerInstance = await worker(client, {
+const workerInstance = await worker(aikiClient, {
   id: "order-worker",
-  maxConcurrentWorkflowRuns: 5
+  maxConcurrentWorkflowRuns: 5,
+  subscriber: {
+    type: "redis_streams",
+    claimMinIdleTimeMs: 60_000 // Enable fault tolerance
+  }
 });
 
 workerInstance.registry.add(orderProcessingWorkflow);
@@ -217,7 +227,7 @@ workerInstance.start();
 // Don't await it unless you want your application to block until the worker stops.
 
 // Enqueue a workflow run
-const resultHandle = await orderProcessingWorkflow.enqueue(client, {
+const resultHandle = await orderProcessingWorkflow.enqueue(aikiClient, {
   payload: { 
     orderData: {
       items: [{ id: "item-1", quantity: 2 }],
@@ -235,17 +245,68 @@ console.log("Order processing completed:", result);
 
 - **🔄 Durability**: Workflows survive server restarts and crashes
 - **🚀 Scalability**: Horizontal scaling with multiple workers
-- **🛡️ Reliability**: Built-in retry mechanisms and error handling
+- **🛡️ Reliability**: Built-in retry mechanisms, fault tolerance, and message claiming
+- **⚡ Performance**: Redis Streams integration with parallel operations
 - **📊 Observability**: Track workflow and task execution status
 - **🔧 Flexibility**: Cross-platform support (Node.js and Deno)
 - **🔒 Security**: Execution in your own environment
+- **🎯 Intelligent Polling**: Adaptive polling strategies that scale with workload
+
+## Subscriber Strategies & Fault Tolerance
+
+Aiki supports multiple subscriber strategies for different performance and reliability requirements:
+
+### Simple Polling
+Basic polling strategy suitable for development and low-volume scenarios:
+
+```typescript
+const workerInstance = await worker(client, {
+  subscriber: {
+    type: "polling",
+    intervalMs: 1000
+  }
+});
+```
+
+### Adaptive Polling
+Intelligent polling that adapts to workload, backing off when idle and speeding up when busy:
+
+```typescript
+const workerInstance = await worker(client, {
+  subscriber: {
+    type: "adaptive_polling",
+    minPollIntervalMs: 50,      // Fast polling when busy
+    maxPollIntervalMs: 5000,    // Slow polling when idle
+    emptyPollThreshold: 3       // Start backing off after 3 empty polls
+  }
+});
+```
+
+### Redis Streams (Recommended for Production)
+High-performance strategy with built-in fault tolerance and message claiming:
+
+```typescript
+const workerInstance = await worker(client, {
+  subscriber: {
+    type: "redis_streams",
+    claimMinIdleTimeMs: 60_000,  // Claim stuck messages after 1 minute
+    blockTimeMs: 1000            // Block for 1 second waiting for new messages
+  }
+});
+```
+
+**Fault Tolerance Features:**
+- **Message Claiming**: Workers can claim messages from failed workers using XPENDING/XCLAIM
+- **Parallel Operations**: Multiple Redis streams are processed in parallel for maximum throughput
+- **Fair Distribution**: Round-robin distribution prevents any single stream from being overwhelmed
+- **Automatic Recovery**: Messages are automatically reprocessed if workers crash or become unresponsive
 
 ## Next Steps
 
 This introduction gives you a taste of what Aiki can do, but there's much more to explore. The documentation covers:
 
 - **[Core Concepts](./docs/core-concepts.md)** - Deep dive into workflows, tasks, and workers
-- **[Architecture](./docs/architecture.md)** - Understanding the system design
+- **[Architecture](./docs/architecture.md)** - Understanding the system design and subscriber strategies
 - **[Task Determinism](./docs/task-determinism.md)** - Why tasks should be deterministic
 - **[Idempotency](./docs/idempotency.md)** - Using idempotency keys for reliable execution
 

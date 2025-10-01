@@ -31,8 +31,19 @@ Aiki follows a distributed architecture pattern where workflow orchestration is 
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
 └─────────────────────┬───────────────────────────────────────────────────────┘
                       │
-                      │ Queue System
-                      │ (Message Distribution)
+                      │ Redis Streams / Queue System
+                      │ (High-performance message distribution with fault tolerance)
+                      ▼
+            ┌───────────────────────────────────┐
+            │         Redis Cluster             │
+            │  ┌─────────────────────────────┐  │
+            │  │  Stream 1: workflow:orders  │  │
+            │  │  Stream 2: workflow:users   │  │
+            │  │  Stream 3: workflow:reports │  │
+            │  │  (XPENDING/XCLAIM support)  │  │
+            │  └─────────────────────────────┘  │
+            └───────────────────────────────────┘
+                      │
                       ▼
           ┌─────────────────────────────────────────────────────────┐
           │                                                         │
@@ -113,44 +124,118 @@ The Aiki Server is the central orchestration component that manages workflow lif
 - **API Management**: Provides REST/gRPC interfaces
 - **Security**: Handles authentication and authorization
 
-### 4. Queue System
+### 4. Queue System & Subscriber Strategies
 
-The queue system ensures reliable message delivery between the server and workers.
+Aiki supports multiple queue systems and subscriber strategies, allowing you to choose the right approach for your performance and reliability requirements.
 
-**Features:**
+#### Subscriber Strategy Architecture
+
+Workers use pluggable subscriber strategies to fetch work from the queue system:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Worker Process                       │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │            Subscriber Strategy                      │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐ │ │
+│  │  │   Simple    │ │  Adaptive   │ │ Redis Streams   │ │ │
+│  │  │   Polling   │ │   Polling   │ │ (Recommended)   │ │ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘ │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                           │                              │
+└───────────────────────────┼──────────────────────────────┘
+                            │
+                            ▼
+            ┌─────────────────────────────────┐
+            │        Queue Backend            │
+            │   (Database, Redis, etc.)       │
+            └─────────────────────────────────┘
+```
+
+#### Strategy Types
+
+**1. Simple Polling Strategy**
+- Basic polling with fixed intervals
+- Suitable for development and low-volume scenarios
+- Uses repository-based polling with configurable intervals
+
+**2. Adaptive Polling Strategy**
+- Intelligent polling that adapts to workload
+- Backs off exponentially when no work is found
+- Speeds up when work is consistently available
+- Includes jitter to prevent thundering herd problems
+
+**3. Redis Streams Strategy (Recommended for Production)**
+- High-performance Redis Streams integration
+- Built-in fault tolerance with message claiming
+- Parallel processing across multiple streams
+- Round-robin distribution for fair work allocation
+
+#### Fault Tolerance Features (Redis Streams)
+
+**Message Claiming:**
+- Uses Redis XPENDING to find stuck messages
+- XCLAIM operations to steal messages from failed workers
+- Server-side idle time filtering for efficiency
+- Automatic retry of claimed messages
+
+**Parallel Operations:**
+- Multiple Redis streams processed simultaneously
+- XREADGROUP operations run in parallel
+- XCLAIM operations execute concurrently
+- Optimized for maximum throughput
+
+**Fair Distribution:**
+- Stream shuffling ensures fairness over time
+- Round-robin batch size distribution
+- Prevents any single stream from being overwhelmed
+
+**Queue Features:**
 - **Reliable Delivery**: Messages are persisted and survive server restarts
 - **Load Balancing**: Distributes work across multiple workers
 - **Retry Logic**: Handles failed deliveries with exponential backoff
 - **Message Ordering**: Maintains order for related workflow runs
-- **Dead Letter Queues**: Handles messages that can't be processed
-
-**Queue Types:**
-- **Workflow Queue**: New workflow runs to be executed
-- **Task Queue**: Individual tasks within workflows
-- **Result Queue**: Task results back to the server
-- **Dead Letter Queue**: Failed messages for investigation
+- **Dead Letter Handling**: Acknowledges malformed messages to prevent infinite loops
 
 ### 5. Workers
 
-Workers execute workflows in your own environment and infrastructure.
+Workers execute workflows in your own environment and infrastructure with enhanced architecture for reliability and performance.
 
-#### Worker Architecture
+#### Enhanced Worker Architecture
 
-**Polling Mechanism:**
-- Workers poll the queue for available workflow runs
-- Configurable polling intervals and batch sizes
-- Exponential backoff for empty queues
+**Subscriber Strategy Integration:**
+- Workers use pluggable subscriber strategies for maximum flexibility
+- Strategy selection based on performance and reliability requirements
+- Support for both polling and streaming approaches
+
+**Advanced Polling Mechanisms:**
+- Adaptive polling that scales with workload
+- Parallel stream processing for Redis Streams
+- Intelligent backoff and jitter algorithms
+- Round-robin work distribution
+
+**Sharding Support:**
+- Workers can be assigned to specific shards
+- Enables horizontal scaling with predictable work distribution
+- Supports geographic distribution and compliance requirements
 
 **Execution Engine:**
 - Loads workflow definitions from registry
-- Executes tasks in sequence
-- Handles task failures and retries
-- Reports progress back to server
+- Executes tasks in sequence with enhanced error handling
+- Discriminated union error patterns for better debugging
+- Reports progress back to server with detailed status
 
-**State Management:**
-- Maintains local execution state
-- Handles worker restarts and recovery
-- Provides heartbeat monitoring
+**Enhanced State Management:**
+- Maintains local execution state with recovery capabilities
+- Handles worker restarts and graceful shutdown
+- Provides heartbeat monitoring with timeout detection
+- Capacity management for optimal resource utilization
+
+**Fault Recovery:**
+- Message claiming from failed workers (Redis Streams)
+- Automatic redistribution of stuck workflows
+- Dead worker detection and cleanup
+- Graceful handling of network partitions
 
 #### Worker Benefits
 
@@ -169,7 +254,79 @@ Workers execute workflows in your own environment and infrastructure.
 - Scale horizontally based on demand
 - Geographic distribution for global applications
 
-### 6. Storage Layer
+### 6. Redis Streams Integration
+
+Aiki's Redis Streams integration provides high-performance, fault-tolerant message distribution with advanced reliability features.
+
+#### Redis Streams Architecture
+
+**Stream Organization:**
+- One stream per workflow type: `workflow:${workflowName}`
+- Sharded streams for horizontal scaling: `workflow:${workflowName}:${shard}`
+- Consumer groups for distributed processing
+- Message claiming for fault tolerance
+
+**Message Flow:**
+```
+Server → Redis Stream → Consumer Group → Worker
+   ↓         ↑              ↓            ↓
+Storage   XPENDING      XREADGROUP    Process
+          XCLAIM        (parallel)    Workflow
+```
+
+**Key Operations:**
+
+**XREADGROUP (Message Retrieval):**
+- Parallel reads across multiple streams
+- Round-robin batch size distribution
+- Blocking reads with configurable timeout
+- Automatic fair distribution across workers
+
+**XPENDING (Stuck Message Detection):**
+- Server-side idle time filtering
+- Parallel queries across streams
+- Identifies messages stuck with failed workers
+- Efficient dead worker detection
+
+**XCLAIM (Message Recovery):**
+- Parallel claiming operations for performance
+- Steals messages from unresponsive workers
+- Automatic retry of claimed messages
+- Maintains message processing guarantees
+
+#### Fault Tolerance Mechanisms
+
+**Dead Worker Detection:**
+- Configurable idle time thresholds (e.g., 60 seconds)
+- Automatic identification of stuck messages
+- Parallel scanning across all streams
+
+**Message Recovery:**
+- Reactive claiming (only when worker has capacity)
+- Round-robin claiming distribution
+- Preserves message ordering where possible
+- Automatic acknowledgment of malformed messages
+
+**Performance Optimizations:**
+- Parallel Redis operations using Promise.allSettled
+- Stream shuffling for fair access over time
+- Intelligent batch size distribution
+- Minimal Redis round trips
+
+#### Configuration Options
+
+**Reliability Settings:**
+- `claimMinIdleTimeMs`: Time before claiming stuck messages
+- `blockTimeMs`: How long to wait for new messages
+- `maxRetryIntervalMs`: Maximum backoff for Redis failures
+
+**Performance Settings:**
+- Parallel stream processing
+- Configurable batch sizes
+- Adaptive polling intervals
+- Connection pooling
+
+### 7. Storage Layer
 
 The storage layer provides durability and persistence for workflow state.
 

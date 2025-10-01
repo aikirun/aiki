@@ -1,26 +1,28 @@
 import type { Client } from "../client/definition.ts";
 import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
-import type { WorkflowRunSubscriber } from "../workflow/run/subscriber.ts";
 import { initWorkflowRun } from "../workflow/run/definition.ts";
-import type { WorkflowRunRepository, WorkflowRunRow } from "../workflow/run/repository.ts";
-import { getRetryParams, type RetryParams } from "@lib/retry/mod.ts";
+import type { WorkflowRunId, WorkflowRunRepository, WorkflowRunRow } from "../workflow/run/repository.ts";
 import { isNonEmptyArray } from "@lib/array/mod.ts";
 import type { NonEmptyArray } from "@lib/array/mod.ts";
-import type { Workflow } from "../workflow/definition.ts";
+import type { WorkflowVersion } from "../workflow/definition.ts";
 import { delay } from "@lib/async/mod.ts";
-import { processWrapper } from "@lib/process/mod.ts";
+import type { ResolvedSubscriberStrategy, SubscriberStrategyBuilder, SubscriberStrategy } from "../client/strategies/subscriber-strategies.ts";
 
 export async function worker(
 	client: Client,
 	params: WorkerParams,
 ): Promise<Worker> {
-	const registry = initWorkflowRegistry();
-	const workflowRunSubscriber = await client.getWorkflowRunSubscriber();
+	const workflowRegistry = initWorkflowRegistry();
+	const subscriberStrategyBuilder = client.createSubscriberStrategy(
+		params.subscriber ?? { type: "polling" },
+		workflowRegistry,
+		params.shards,
+	);
 	return Promise.resolve(
 		new WorkerImpl(
-			registry,
+			workflowRegistry,
 			client.workflowRunRepository,
-			workflowRunSubscriber,
+			subscriberStrategyBuilder,
 			params,
 		),
 	);
@@ -28,21 +30,24 @@ export async function worker(
 
 export interface WorkerParams {
 	id?: string;
-	workflowRunSubscriber?: {
-		pollIntervalMs?: number;
-		maxBatchSize?: number;
-		maxRetryDelayMs?: number;
-	};
 	maxConcurrentWorkflowRuns?: number;
 	workflowRun?: {
 		heartbeatIntervalMs?: number;
 	};
 	gracefulShutdownTimeoutMs?: number;
+	subscriber?: SubscriberStrategy;
+	/**
+	 * Optional array of shard keys this worker should process.
+	 * When provided, the worker will only subscribe to sharded streams: workflow:${workflowName}:${shard}
+	 * When omitted, the worker subscribes to default streams: workflow:${workflowName}
+	 * Cannot be combined with non-sharded workflows in the same worker instance.
+	 */
+	shards?: string[];
 }
 
 export interface Worker {
 	id: string;
-	registry: WorkflowRegistry;
+	workflowRegistry: WorkflowRegistry;
 	start: () => Promise<void>;
 	stop: () => Promise<void>;
 }
@@ -56,66 +61,27 @@ class WorkerImpl implements Worker {
 	public readonly id: string;
 	private abortController: AbortController | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
+	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
 
 	constructor(
-		public readonly registry: WorkflowRegistry,
+		public readonly workflowRegistry: WorkflowRegistry,
 		private readonly workflowRunRepository: WorkflowRunRepository,
-		private readonly workflowRunSubscriber: WorkflowRunSubscriber,
+		private readonly subscriberStrategyBuilder: SubscriberStrategyBuilder<ResolvedSubscriberStrategy>,
 		private readonly params: WorkerParams,
 	) {
 		this.id = params.id ?? crypto.randomUUID();
-		this.registerTerminationHandlers();
 	}
 
 	public async start(): Promise<void> {
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
 
-		const config = this.getConfig();
+		this.subscriberStrategy = await this.subscriberStrategyBuilder.init(this.id, {
+			onError: (error: Error) => this.handleNotificationError(error),
+			onStop: () => this.stop(),
+		});
 
-		let nextDelayMs = config.pollIntervalMs;
-		let subscriberFailedAttempts = 0;
-
-		while (!abortSignal.aborted) {
-			await delay(nextDelayMs, { abortSignal });
-
-			const nextBatchSize = Math.min(
-				config.maxConcurrent - this.activeWorkflowRunsById.size,
-				config.maxBatchSize,
-			);
-			if (nextBatchSize <= 0) {
-				nextDelayMs = config.pollIntervalMs;
-				continue;
-			}
-
-			const nextBatchResult = await this.fetchNextWorkflowRunBatch(
-				nextBatchSize,
-				subscriberFailedAttempts,
-				config,
-			);
-			if (nextBatchResult.type === "error") {
-				subscriberFailedAttempts++;
-
-				const retryParams = nextBatchResult.retryParams;
-				if (!retryParams.retriesLeft) {
-					await this.stop();
-					break;
-				}
-
-				nextDelayMs = retryParams.delayMs;
-				continue;
-			}
-			subscriberFailedAttempts = 0;
-
-			if (!isNonEmptyArray(nextBatchResult.rows)) {
-				nextDelayMs = config.pollIntervalMs;
-				continue;
-			}
-
-			this.enqueueWorkflowRunBatch(nextBatchResult.rows, abortSignal, config);
-
-			nextDelayMs = config.pollIntervalMs;
-		}
+		await this.startPolling(abortSignal);
 	}
 
 	public async stop(): Promise<void> {
@@ -148,68 +114,109 @@ class WorkerImpl implements Worker {
 		this.activeWorkflowRunsById.clear();
 	}
 
-	private getConfig() {
-		return {
-			pollIntervalMs: this.params.workflowRunSubscriber?.pollIntervalMs ?? 100,
-			maxBatchSize: this.params.workflowRunSubscriber?.maxBatchSize ?? 1,
-			maxRetryDelayMs: this.params.workflowRunSubscriber?.maxRetryDelayMs ?? 30_000,
-			maxConcurrent: this.params.maxConcurrentWorkflowRuns ?? 1,
-			heartbeatIntervalMs: this.params.workflowRun?.heartbeatIntervalMs ?? 30_000,
-		};
+	private async startPolling(abortSignal: AbortSignal): Promise<void> {
+		if (!this.subscriberStrategy) {
+			throw new Error("Subscriber strategy not initialized");
+		}
+
+		let nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: false });
+		let subscriberFailedAttempts = 0;
+
+		while (!abortSignal.aborted) {
+			await delay(nextDelayMs, { abortSignal });
+
+			const availableCapacity = (this.params.maxConcurrentWorkflowRuns ?? 1) - this.activeWorkflowRunsById.size;
+
+			if (availableCapacity <= 0) {
+				nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "at_capacity" });
+				continue;
+			}
+
+			const nextBatchResult = await this.fetchNextWorkflowRunBatch(availableCapacity);
+			if (!nextBatchResult.success) {
+				subscriberFailedAttempts++;
+
+				nextDelayMs = this.subscriberStrategy.getNextDelay({
+					type: "retry",
+					attemptNumber: subscriberFailedAttempts,
+				});
+				continue;
+			}
+
+			subscriberFailedAttempts = 0;
+
+			if (!isNonEmptyArray(nextBatchResult.ids)) {
+				nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: false });
+				continue;
+			}
+
+			await this.enqueueWorkflowRunBatch(nextBatchResult.ids, abortSignal);
+			nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: true });
+		}
 	}
 
 	private async fetchNextWorkflowRunBatch(
 		size: number,
-		attempts: number,
-		config: ReturnType<typeof this.getConfig>,
 	): Promise<
-		| { type: "success"; rows: WorkflowRunRow<unknown, unknown>[] }
-		| { type: "error"; retryParams: RetryParams }
+		| { success: true; ids: WorkflowRunId[] }
+		| { success: false; error: Error }
 	> {
-		try {
-			const workflowRunRows = await this.workflowRunSubscriber._nextBatch(size);
+		if (!this.subscriberStrategy) {
 			return {
-				type: "success",
-				rows: workflowRunRows,
+				success: false,
+				error: new Error("Subscriber strategy not initialized"),
+			};
+		}
+
+		try {
+			const workflowRunIds = await this.subscriberStrategy.getNextBatch(size);
+			return {
+				success: true,
+				ids: workflowRunIds,
 			};
 		} catch (error) {
 			// deno-lint-ignore no-console
 			console.error(`Worker ${this.id}: Error getting next workflow runs batch`, error);
 
 			return {
-				type: "error",
-				retryParams: getRetryParams(attempts, {
-					type: "jittered",
-					maxAttempts: Infinity,
-					baseDelayMs: config.pollIntervalMs,
-					maxDelayMs: config.maxRetryDelayMs,
-				}),
+				success: false,
+				error: error as Error,
 			};
 		}
 	}
 
-	private enqueueWorkflowRunBatch(
-		workflowRunRows: NonEmptyArray<WorkflowRunRow<unknown, unknown>>,
+	private async enqueueWorkflowRunBatch(
+		workflowRunIds: NonEmptyArray<WorkflowRunId>,
 		abortSignal: AbortSignal,
-		config: ReturnType<typeof this.getConfig>,
-	): void {
-		for (const workflowRunRow of workflowRunRows) {
-			if (this.activeWorkflowRunsById.has(workflowRunRow.id)) {
-				// deno-lint-ignore no-console
-				console.log(`Workflow ${workflowRunRow.id} already in progress, skipping`);
+	): Promise<void> {
+		for (const workflowRunId of workflowRunIds) {
+			if (this.activeWorkflowRunsById.has(workflowRunId)) {
+				// Debug: Skip already in progress workflows
 				continue;
 			}
 
-			const workflow = this.registry._getByPath(workflowRunRow.workflow.path);
+			// Fetch the full workflow run row by ID
+			const workflowRunRow = await this.workflowRunRepository.getById(workflowRunId);
+			if (!workflowRunRow) {
+				// Debug: Workflow run not found in repository
+				continue;
+			}
+
+			const workflow = this.workflowRegistry._internal.getByName(workflowRunRow.workflowVersion.name);
 			if (!workflow) {
-				// deno-lint-ignore no-console
-				console.log(`No registered workflow on path: ${workflowRunRow.workflow.path}`);
+				// Debug: No registered workflow for name
+				continue;
+			}
+
+			const workflowVersion = workflow._internal.getVersion(workflowRunRow.workflowVersion.versionId);
+			if (!workflowVersion) {
+				// Debug: No registered version for workflow
 				continue;
 			}
 
 			if (abortSignal.aborted) break;
 
-			const workflowExecutionPromise = this.executeWorkflow(workflowRunRow, workflow, config);
+			const workflowExecutionPromise = this.executeWorkflow(workflowRunRow, workflowVersion);
 
 			this.activeWorkflowRunsById.set(workflowRunRow.id, {
 				run: workflowRunRow,
@@ -220,8 +227,7 @@ class WorkerImpl implements Worker {
 
 	private async executeWorkflow(
 		workflowRunRow: WorkflowRunRow<unknown, unknown>,
-		workflow: Workflow<unknown, unknown>,
-		config: ReturnType<typeof this.getConfig>,
+		workflowVersion: WorkflowVersion<unknown, unknown>,
 	): Promise<void> {
 		let heartbeatInterval: number | undefined;
 		try {
@@ -237,9 +243,9 @@ class WorkerImpl implements Worker {
 					// deno-lint-ignore no-console
 					console.warn(`Worker ${this.id}: Failed to update workflow heartbeat ${workflowRun.id}`, error);
 				}
-			}, config.heartbeatIntervalMs);
+			}, this.params.workflowRun?.heartbeatIntervalMs ?? 30_000);
 
-			await workflow._execute({ workflowRun });
+			await workflowVersion._execute({ workflowRun }, workflowRunRow.params.payload);
 		} catch (error) {
 			// deno-lint-ignore no-console
 			console.error(`Worker ${this.id}: Error processing workflow: ${workflowRunRow.id}`, error);
@@ -249,14 +255,14 @@ class WorkerImpl implements Worker {
 		}
 	}
 
-	private registerTerminationHandlers(): void {
-		for (const signal of ["SIGINT", "SIGTERM"] as const) {
-			processWrapper.addSignalListener(signal, async () => {
-				// deno-lint-ignore no-console
-				console.log(`Received ${signal}, gracefully shutting down worker...`);
-				await this.stop();
-				processWrapper.exit(0);
-			});
+	private handleNotificationError(error: Error): void {
+		// deno-lint-ignore no-console
+		console.warn(`Worker ${this.id}: Notification error:`, error);
+
+		const fallbackEnabled = true; // Fallback is always enabled
+
+		if (fallbackEnabled) {
+			// Debug: Fallback to polling due to error
 		}
 	}
 }

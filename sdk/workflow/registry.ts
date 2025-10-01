@@ -1,81 +1,69 @@
-import type { Workflow } from "./definition.ts";
+import type { Workflow, WorkflowName } from "./definition.ts";
 
 export function initWorkflowRegistry(): WorkflowRegistry {
 	return new WorkflowRegistryImpl();
 }
 
 export interface WorkflowRegistry {
-	add: <Payload, Result>(workflow: Workflow<Payload, Result>) => WorkflowRegistry;
-	addMany: <Payload, Result>(workflows: Workflow<Payload, Result>[]) => WorkflowRegistry;
-	remove: <Payload, Result>(workflow: Workflow<Payload, Result>) => WorkflowRegistry;
-	removeMany: <Payload, Result>(workflows: Workflow<Payload, Result>[]) => WorkflowRegistry;
+	add: (workflow: Workflow) => WorkflowRegistry;
+	addMany: (workflows: Workflow[]) => WorkflowRegistry;
+	remove: (workflow: Workflow) => WorkflowRegistry;
+	removeMany: (workflows: Workflow[]) => WorkflowRegistry;
 	removeAll: () => WorkflowRegistry;
-
-	_getByPath: (path: string) => Workflow<unknown, unknown> | undefined;
+	_internal: {
+		getNames(): WorkflowName[];
+		getByName: (name: WorkflowName) => Workflow | undefined;
+	}
 }
 
 class WorkflowRegistryImpl implements WorkflowRegistry {
-	private workflowsByPath: Map<string, Workflow<unknown, unknown>> = new Map();
+	public readonly _internal: WorkflowRegistry["_internal"];
+	private workflowsByName: Map<WorkflowName, Workflow> = new Map();
 
 	constructor() {
-		this.workflowsByPath = new Map();
+		this._internal = {
+			getNames: () => Array.from(this.workflowsByName.keys()),
+			getByName: (name: WorkflowName) => this.workflowsByName.get(name)
+		};
 	}
 
-	public add<Payload, Result>(
-		workflow: Workflow<Payload, Result>,
-	): WorkflowRegistry {
-		if (this.workflowsByPath.has(workflow.path)) {
-			// TODO: use custom error
-			throw new Error(
-				`2 workflows cannot have the same path ${workflow.path}`,
-			);
+	public add(workflow: Workflow): WorkflowRegistry {
+		if (this.workflowsByName.has(workflow.name)) {
+			throw new Error(`Workflow "${workflow.name}" is already registered`);
 		}
-		this.workflowsByPath.set(
-			workflow.path,
-			workflow as Workflow<unknown, unknown>,
-		);
+
+		const workflowVersions = workflow._internal.getAllVersions();
+		const uniqueWorkflowVersionIds = new Set(workflow._internal.getAllVersions().map(({ versionId }) => versionId));
+		if (workflowVersions.length !== uniqueWorkflowVersionIds.size) {
+			throw new Error(`Workflow "${workflow.name}" has duplicate versions`);
+		}
+
+		this.workflowsByName.set(workflow.name, workflow);
+
 		return this;
 	}
 
-	public addMany<Payload, Result>(
-		workflows: Workflow<Payload, Result>[],
-	): WorkflowRegistry {
+	public addMany(workflows: Workflow[]): WorkflowRegistry {
 		for (const workflow of workflows) {
-			if (this.workflowsByPath.has(workflow.path)) {
-				throw new Error(
-					`2 workflows cannot have the same path ${workflow.path}`,
-				);
-			}
-			this.workflowsByPath.set(
-				workflow.path,
-				workflow as Workflow<unknown, unknown>,
-			);
+			this.add(workflow);
 		}
 		return this;
 	}
 
-	public remove<Payload, Result>(
-		workflow: Workflow<Payload, Result>,
-	): WorkflowRegistry {
-		this.workflowsByPath.delete(workflow.path);
+	public remove(workflow: Workflow): WorkflowRegistry {
+		this.workflowsByName.delete(workflow.name);
 		return this;
 	}
 
-	public removeMany<Payload, Result>(
-		workflows: Workflow<Payload, Result>[],
-	): WorkflowRegistry {
+	public removeMany(workflows: Workflow[]): WorkflowRegistry {
 		for (const workflow of workflows) {
-			this.workflowsByPath.delete(workflow.path);
+			this.remove(workflow);
 		}
 		return this;
 	}
 
 	public removeAll(): WorkflowRegistry {
-		this.workflowsByPath.clear();
+		this.workflowsByName.clear();
 		return this;
-	}
-
-	public _getByPath(path: string): Workflow<unknown, unknown> | undefined {
-		return this.workflowsByPath.get(path);
 	}
 }
