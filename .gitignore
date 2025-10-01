@@ -4,3 +4,5 @@ deno.lock
 .idea
 .vim
 .vscode
+
+.claude
