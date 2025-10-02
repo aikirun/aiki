@@ -12,17 +12,19 @@ Here's how you define a workflow in Aiki:
 import { workflow } from "@aiki/sdk/workflow";
 
 const morningRoutineWorkflow = workflow({
-  name: "morning-routine",
-  version: "1.0.0",
-  async run({ workflowRun }) {
-    const alarmResult = await ringAlarm.run(workflowRun, {
+  name: "morning-routine"
+});
+
+const morningRoutineV1 = morningRoutineWorkflow.v("1.0.0", {
+  async run(ctx, payload: { duration?: number }) {
+    const alarmResult = await ringAlarm.run(ctx, {
       payload: { song: "Wake up!" }
     });
-    
-    const stretchResult = await stretch.run(workflowRun, {
-      payload: { duration: 300 }
+
+    const stretchResult = await stretch.run(ctx, {
+      payload: { duration: payload.duration || 300 }
     });
-    
+
     return { alarmResult, stretchResult };
   }
 });
@@ -39,44 +41,46 @@ Here's an example with more complex logic:
 
 ```typescript
 const orderProcessingWorkflow = workflow({
-  name: "order-processing",
-  version: "1.0.0",
-  async run({ workflowRun }) {
-    const { orderData } = workflowRun.params.payload;
-    
+  name: "order-processing"
+});
+
+const orderProcessingV1 = orderProcessingWorkflow.v("1.0.0", {
+  async run(ctx, payload: { orderData: any }) {
+    const { orderData } = payload;
+
     // Validate order
-    const validation = await validateOrder.run(workflowRun, {
+    const validation = await validateOrder.run(ctx, {
       payload: { orderData }
     });
-    
+
     // Business logic: Check if order qualifies for discount
     let finalAmount = validation.amount;
     if (validation.amount > 100) {
       finalAmount = validation.amount * 0.9; // 10% discount
     }
-    
+
     // Process payment with calculated amount
-    const payment = await processPayment.run(workflowRun, {
+    const payment = await processPayment.run(ctx, {
       payload: { paymentId: validation.paymentId, amount: finalAmount }
     });
-    
+
     // Conditional logic: Only update inventory if payment succeeded
     if (payment.success) {
-      await updateInventory.run(workflowRun, {
+      await updateInventory.run(ctx, {
         payload: { items: orderData.items }
       });
-      
+
       // Send confirmation
-      await sendConfirmation.run(workflowRun, {
+      await sendConfirmation.run(ctx, {
         payload: { email: orderData.email, amount: finalAmount }
       });
     } else {
       // Handle payment failure
-      await sendPaymentFailureNotification.run(workflowRun, {
+      await sendPaymentFailureNotification.run(ctx, {
         payload: { email: orderData.email, reason: payment.error }
       });
     }
-    
+
     return { success: payment.success, orderId: validation.orderId };
   }
 });
@@ -86,40 +90,57 @@ This separation is important because it allows each step to be retried independe
 
 ### Workflow Properties
 
-Every workflow has a few fundamental properties:
+Workflows in Aiki are created using a two-step process:
 
-- **name**: A unique identifier for the workflow. I like to use descriptive names that clearly indicate what the workflow does, like "user-onboarding" or "order-processing".
+1. **Workflow Definition**: First, you create a workflow with just a name:
+   ```typescript
+   const myWorkflow = workflow({ name: "user-onboarding" });
+   ```
 
-- **version**: This follows semantic versioning (like "1.0.0", "2.1.0"). Versioning is essential because workflows can evolve over time, and you need to handle both old and new versions running simultaneously.
+2. **Workflow Versions**: Then, you create versioned implementations using the `.v()` method:
+   ```typescript
+   const myWorkflowV1 = myWorkflow.v("1.0.0", {
+     async run(ctx, payload) {
+       // Your workflow logic here
+     }
+   });
+   ```
 
-- **run**: This is the main function that orchestrates the workflow. It receives a context object with information about the current workflow run.
+**Key Properties:**
+
+- **name**: A unique identifier for the workflow. Use descriptive names that clearly indicate what the workflow does, like "user-onboarding" or "order-processing".
+
+- **version**: Specified when calling `.v()`, this follows semantic versioning (like "1.0.0", "2.1.0"). Versioning is essential because workflows can evolve over time, and you need to handle both old and new versions running simultaneously.
+
+- **run**: This is the main function that orchestrates the workflow. It receives a context object and the payload, and returns the workflow result.
 
 ### Workflow Versioning
 
 One of the most powerful features of Aiki is workflow versioning. This allows you to update workflows over time without breaking existing processes. Here's how it works:
 
 ```typescript
+// Create the workflow definition
+const userOnboardingWorkflow = workflow({
+  name: "user-onboarding"
+});
+
 // Version 1.0.0 - Simple user onboarding
-const workflowV1 = workflow({
-  name: "user-onboarding",
-  version: "1.0.0",
-  async run({ workflowRun }) {
-    await sendWelcomeEmail.run(workflowRun, { 
-      payload: { userId: workflowRun.params.payload.userId } 
+const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
+  async run(ctx, payload: { userId: string }) {
+    await sendWelcomeEmail.run(ctx, {
+      payload: { userId: payload.userId }
     });
   }
 });
 
 // Version 2.0.0 - Add profile creation step
-const workflowV2 = workflow({
-  name: "user-onboarding",
-  version: "2.0.0",
-  async run({ workflowRun }) {
-    await sendWelcomeEmail.run(workflowRun, { 
-      payload: { userId: workflowRun.params.payload.userId } 
+const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
+  async run(ctx, payload: { userId: string }) {
+    await sendWelcomeEmail.run(ctx, {
+      payload: { userId: payload.userId }
     });
-    await createUserProfile.run(workflowRun, { 
-      payload: { userId: workflowRun.params.payload.userId } 
+    await createUserProfile.run(ctx, {
+      payload: { userId: payload.userId }
     });
   }
 });

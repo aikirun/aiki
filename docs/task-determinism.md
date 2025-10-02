@@ -138,17 +138,19 @@ If a workflow crashes after completing some tasks, deterministic tasks ensure th
 
 ```typescript
 const orderWorkflow = workflow({
-  name: "process-order",
-  version: "1.0.0",
-  async run({ workflowRun }) {
+  name: "process-order"
+});
+
+const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+  async run(ctx, payload: any) {
     // If this workflow crashes after validateOrder completes,
     // it will resume here with the same result
-    const validation = await validateOrder.run(workflowRun, {
-      payload: workflowRun.params.payload
+    const validation = await validateOrder.run(ctx, {
+      payload
     });
-    
+
     // This will always produce the same result for the same order
-    const payment = await processPayment.run(workflowRun, {
+    const payment = await processPayment.run(ctx, {
       payload: { orderId: validation.orderId, amount: validation.amount }
     });
   }

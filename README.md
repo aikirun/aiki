@@ -94,26 +94,28 @@ const sendConfirmation = task({
 
 // Define the workflow - this orchestrates the tasks
 const orderProcessingWorkflow = workflow({
-  name: "order-processing",
-  version: "1.0.0",
-  async run({ workflowRun }) {
+  name: "order-processing"
+});
+
+const orderProcessingWorkflowV1 = orderProcessingWorkflow.v("1.0.0", {
+  async run(ctx, payload: { orderData: any; email: string }) {
     // Each step is a separate task that can be retried independently
-    const validation = await validateOrder.run(workflowRun, {
-      payload: { orderData: workflowRun.params.payload.orderData }
+    const validation = await validateOrder.run(ctx, {
+      payload: { orderData: payload.orderData }
     });
-    
-    const payment = await processPayment.run(workflowRun, {
+
+    const payment = await processPayment.run(ctx, {
       payload: { paymentId: validation.paymentId, amount: validation.amount }
     });
-    
-    await updateInventory.run(workflowRun, {
-      payload: { items: workflowRun.params.payload.orderData.items }
+
+    await updateInventory.run(ctx, {
+      payload: { items: payload.orderData.items }
     });
-    
-    await sendConfirmation.run(workflowRun, {
-      payload: { email: workflowRun.params.payload.email }
+
+    await sendConfirmation.run(ctx, {
+      payload: { email: payload.email }
     });
-    
+
     return { success: true, orderId: validation.orderId };
   }
 });
@@ -218,7 +220,7 @@ const workerInstance = await worker(aikiClient, {
   }
 });
 
-workerInstance.registry.add(orderProcessingWorkflow);
+workerInstance.workflowRegistry.add(orderProcessingWorkflow);
 
 // Start processing workflows
 workerInstance.start();
@@ -227,7 +229,7 @@ workerInstance.start();
 // Don't await it unless you want your application to block until the worker stops.
 
 // Enqueue a workflow run
-const resultHandle = await orderProcessingWorkflow.enqueue(aikiClient, {
+const resultHandle = await orderProcessingWorkflowV1.enqueue(aikiClient, {
   payload: { 
     orderData: {
       items: [{ id: "item-1", quantity: 2 }],
