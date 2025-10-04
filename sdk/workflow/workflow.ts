@@ -1,10 +1,5 @@
-import type { BrandedString } from "@lib/string/mod.ts";
-import {
-	type WorkflowVersion,
-	type WorkflowVersionId,
-	WorkflowVersionImpl,
-	type WorkflowVersionParams,
-} from "./version/workflow-version.ts";
+import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
+import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "@aiki/sdk/workflow";
 
 export function workflow(params: WorkflowParams): Workflow {
 	return new WorkflowImpl(params);
@@ -13,8 +8,6 @@ export function workflow(params: WorkflowParams): Workflow {
 export interface WorkflowParams {
 	name: string;
 }
-
-export type WorkflowName = BrandedString<"workflow_name">;
 
 export interface Workflow {
 	name: WorkflowName;

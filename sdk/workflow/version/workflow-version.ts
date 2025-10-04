@@ -1,11 +1,7 @@
-import type { TriggerStrategy } from "@lib/trigger/mod.ts";
-import type { BrandedString } from "@lib/string/mod.ts";
-import type { WorkflowRunContext, WorkflowRunParams } from "../run/context.ts";
-import type { Client } from "../../client/client.ts";
-import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
-import type { WorkflowName } from "../workflow.ts";
-
-export type WorkflowVersionId = BrandedString<"workflow_version_id">;
+import type { TriggerStrategy } from "@aiki/lib/trigger";
+import type { WorkflowName, WorkflowRunParams, WorkflowVersionId } from "@aiki/types/workflow";
+import type { Client } from "@aiki/sdk/client";
+import { initWorkflowRunResultHandle, type WorkflowRunContext, type WorkflowRunResultHandle } from "@aiki/sdk/workflow";
 
 export interface WorkflowVersionParams<Payload, Result> {
 	run: (
@@ -39,11 +35,12 @@ export class WorkflowVersionImpl<Payload, Result> implements WorkflowVersion<Pay
 		client: Client,
 		workflowRunParams: WorkflowRunParams<Payload>,
 	): Promise<WorkflowRunResultHandle<Result>> {
-		const workflowRunRow = await client.workflowRunRepository.create(this, workflowRunParams);
-		return initWorkflowRunResultHandle({
-			id: workflowRunRow.id,
-			repository: client.workflowRunRepository,
+		const workflowRunRow = await client.api.workflowRun.createV1.mutate({
+			name: this.name,
+			versionId: this.versionId,
+			params: workflowRunParams,
 		});
+		return initWorkflowRunResultHandle(workflowRunRow.id, client.api);
 	}
 
 	public async _execute(

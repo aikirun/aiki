@@ -1,5 +1,5 @@
-import type { MaybeField } from "@lib/object/mod.ts";
-import type { RetryStrategy } from "@lib/retry/mod.ts";
+import type { MaybeField } from "@aiki/lib/object";
+import type { RetryStrategy } from "@aiki/lib/retry";
 
 export type TaskRunContext<Payload> = MaybeField<"payload", Payload>;
 

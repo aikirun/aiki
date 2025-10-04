@@ -3,7 +3,7 @@ import { eveningWorkflow, morningWorkflow } from "@aiki/sdk/workflow";
 import { Aiki } from "@aiki/sdk";
 
 async function createPollingWorker() {
-	const aikiClient = await Aiki.client({ serverUrl: "http://localhost:9090" });
+	const aikiClient = await Aiki.client({ baseUrl: "http://localhost:9090" });
 
 	return worker(aikiClient, {
 		id: "polling-worker",
@@ -17,7 +17,7 @@ async function createPollingWorker() {
 }
 
 async function createAdaptivePollingWorker() {
-	const aikiClient = await Aiki.client({ serverUrl: "http://localhost:9090" });
+	const aikiClient = await Aiki.client({ baseUrl: "http://localhost:9090" });
 
 	return worker(aikiClient, {
 		id: "adaptive-worker",

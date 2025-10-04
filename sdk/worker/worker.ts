@@ -1,28 +1,29 @@
-import type { Client } from "../client/client.ts";
-import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
-import { initWorkflowRun } from "../workflow/run/workflow-run.ts";
-import type { WorkflowRunId, WorkflowRunRepository, WorkflowRunRow } from "../workflow/run/repository.ts";
-import { isNonEmptyArray } from "@lib/array/mod.ts";
-import type { NonEmptyArray } from "@lib/array/mod.ts";
-import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
-import { delay } from "@lib/async/mod.ts";
-import type { ResolvedSubscriberStrategy, SubscriberStrategy, SubscriberStrategyBuilder } from "../client/subscribers/strategy-resolver.ts";
+import type { WorkflowName, WorkflowRunId, WorkflowRunRow, WorkflowVersionId } from "@aiki/types/workflow";
+import { isNonEmptyArray } from "@aiki/lib/array";
+import type { NonEmptyArray } from "@aiki/lib/array";
+import { delay } from "@aiki/lib/async";
+import type {
+	Client,
+	ResolvedSubscriberStrategy,
+	SubscriberStrategy,
+	SubscriberStrategyBuilder,
+} from "@aiki/sdk/client";
+import { initWorkflowRegistry, initWorkflowRun, type WorkflowRegistry, type WorkflowVersion } from "@aiki/sdk/workflow";
 
-export async function worker(
+export function worker(
 	client: Client,
 	params: WorkerParams,
 ): Promise<Worker> {
 	const workflowRegistry = initWorkflowRegistry();
-	const workflowNames = workflowRegistry._internal.getNames();
 	const subscriberStrategyBuilder = client._internal.subscriber.create(
 		params.subscriber ?? { type: "polling" },
-		workflowNames,
+		workflowRegistry._internal.getNames(),
 		params.shards,
 	);
 	return Promise.resolve(
 		new WorkerImpl(
+			client,
 			workflowRegistry,
-			client.workflowRunRepository,
 			subscriberStrategyBuilder,
 			params,
 		),
@@ -61,12 +62,12 @@ interface ActiveWorkflowRun {
 class WorkerImpl implements Worker {
 	public readonly id: string;
 	private abortController: AbortController | undefined;
-	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
+	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 
 	constructor(
+		private readonly client: Client,
 		public readonly workflowRegistry: WorkflowRegistry,
-		private readonly workflowRunRepository: WorkflowRunRepository,
 		private readonly subscriberStrategyBuilder: SubscriberStrategyBuilder,
 		private readonly params: WorkerParams,
 	) {
@@ -197,19 +198,19 @@ class WorkerImpl implements Worker {
 			}
 
 			// Fetch the full workflow run row by ID
-			const workflowRunRow = await this.workflowRunRepository.getById(workflowRunId);
+			const workflowRunRow = await this.client.api.workflowRun.getByIdV1.query({ id: workflowRunId });
 			if (!workflowRunRow) {
 				// Debug: Workflow run not found in repository
 				continue;
 			}
 
-			const workflow = this.workflowRegistry._internal.getByName(workflowRunRow.workflowVersion.name);
+			const workflow = this.workflowRegistry._internal.getByName(workflowRunRow.name as WorkflowName);
 			if (!workflow) {
 				// Debug: No registered workflow for name
 				continue;
 			}
 
-			const workflowVersion = workflow._internal.getVersion(workflowRunRow.workflowVersion.versionId);
+			const workflowVersion = workflow._internal.getVersion(workflowRunRow.versionId as WorkflowVersionId);
 			if (!workflowVersion) {
 				// Debug: No registered version for workflow
 				continue;
@@ -217,10 +218,13 @@ class WorkerImpl implements Worker {
 
 			if (abortSignal.aborted) break;
 
-			const workflowExecutionPromise = this.executeWorkflow(workflowRunRow, workflowVersion);
+			const workflowExecutionPromise = this.executeWorkflow(
+				workflowRunRow as WorkflowRunRow<unknown, unknown>,
+				workflowVersion,
+			);
 
 			this.activeWorkflowRunsById.set(workflowRunRow.id, {
-				run: workflowRunRow,
+				run: workflowRunRow as WorkflowRunRow<unknown, unknown>,
 				executionPromise: workflowExecutionPromise,
 			});
 		}
@@ -232,14 +236,11 @@ class WorkerImpl implements Worker {
 	): Promise<void> {
 		let heartbeatInterval: number | undefined;
 		try {
-			const workflowRun = await initWorkflowRun({
-				repository: this.workflowRunRepository,
-				workflowRunRow,
-			});
+			const workflowRun = await initWorkflowRun(this.client.api, workflowRunRow);
 
-			heartbeatInterval = setInterval(async () => {
+			heartbeatInterval = setInterval(() => {
 				try {
-					await this.workflowRunRepository.updateHeartbeat(workflowRun.id);
+					// TODO: update heart beat via redis stream
 				} catch (error) {
 					// deno-lint-ignore no-console
 					console.warn(`Worker ${this.id}: Failed to update workflow heartbeat ${workflowRun.id}`, error);

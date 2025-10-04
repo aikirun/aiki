@@ -1,15 +1,12 @@
-import type { WorkflowRunParams } from "./context.ts";
-import type { WorkflowRunId, WorkflowRunRepository, WorkflowRunRow } from "./repository.ts";
-import type { TaskRunResult } from "../../task/run/result.ts";
-import type { WorkflowRunState } from "./result.ts";
+import type { WorkflowRunId, WorkflowRunParams, WorkflowRunRow, WorkflowRunState } from "@aiki/types/workflow";
+import type { Client } from "@aiki/sdk/client";
+import type { TaskRunResult } from "@aiki/types/task";
 
 export function initWorkflowRun<Payload, Result>(
-	params: {
-		repository: WorkflowRunRepository;
-		workflowRunRow: WorkflowRunRow<Payload, Result>;
-	},
+	api: Client["api"],
+	workflowRunRow: WorkflowRunRow<Payload, Result>,
 ): Promise<WorkflowRun<Payload, Result>> {
-	return Promise.resolve(new WorkflowRunImpl(params.repository, params.workflowRunRow));
+	return Promise.resolve(new WorkflowRunImpl(api, workflowRunRow));
 }
 
 export interface WorkflowRun<Payload, _Result> {
@@ -32,25 +29,24 @@ class WorkflowRunImpl<Payload, Result> implements WorkflowRun<Payload, Result> {
 	public readonly id: WorkflowRunId;
 	public readonly path: string;
 	public readonly params: WorkflowRunParams<Payload>;
-	public readonly _internal: WorkflowRun<Payload, Result>["_internal"]
+	public readonly _internal: WorkflowRun<Payload, Result>["_internal"];
 
 	constructor(
-		private readonly repository: WorkflowRunRepository,
+		private readonly api: Client["api"],
 		private readonly workflowRunRow: WorkflowRunRow<Payload, Result>,
 	) {
 		this.id = workflowRunRow.id;
-		const { name, versionId } = workflowRunRow.workflowVersion;
-		this.path = `${name}/${versionId}/${this.id}`;
+		this.path = `${workflowRunRow.name}/${workflowRunRow.versionId}/${this.id}`;
 		this.params = workflowRunRow.params;
 
 		this._internal = {
 			getSubTaskRunResult: this.getSubTaskRunResult,
-			addSubTaskRunResult: this.addSubTaskRunResult
+			addSubTaskRunResult: this.addSubTaskRunResult,
 		};
 	}
 
 	public updateState(state: WorkflowRunState): Promise<void> {
-		return this.repository.updateState(this.id, state);
+		return this.api.workflowRun.updateStateV1.mutate({ id: this.id, state });
 	}
 
 	private getSubTaskRunResult<TaskResult>(taskPath: string): TaskRunResult<TaskResult> {
@@ -69,11 +65,11 @@ class WorkflowRunImpl<Payload, Result> implements WorkflowRun<Payload, Result> {
 		taskPath: string,
 		taskResult: TaskRunResult<TaskResult>,
 	): Promise<void> {
-		await this.repository.addSubTaskRunResult(
-			this.id,
+		await this.api.workflowRun.addSubTaskRunResultV1.mutate({
+			workflowRunId: this.id,
 			taskPath,
 			taskResult,
-		);
+		});
 		this.workflowRunRow.subTasksRunResult[taskPath] = taskResult;
 	}
 }

@@ -1,12 +1,9 @@
-import { getRetryParams } from "@lib/retry/mod.ts";
-import type { Client } from "../client.ts";
 import type { Redis } from "redis";
-import type { WorkflowName } from "../../workflow/workflow.ts";
-import type { WorkflowRunId } from "../../workflow/run/repository.ts";
-import { distributeRoundRobin, groupBy, isNonEmptyArray, shuffleArray } from "@lib/array/utils.ts";
-import type { NonEmptyArray } from "@lib/array/types.ts";
+import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aiki/lib/array";
 import { z } from "zod";
-import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
+import { getRetryParams } from "@aiki/lib/retry";
+import type { WorkflowName, WorkflowRunId } from "@aiki/types/workflow";
+import type { Client, StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "@aiki/sdk/client";
 
 /**
  * Redis Streams subscriber strategy configuration
@@ -188,7 +185,6 @@ export function createRedisStreamsStrategy(
 }
 
 function getRedisStreamConsumerGroupMap(workflowNames: WorkflowName[], shards?: string[]): Map<string, string> {
-
 	if (!shards || !isNonEmptyArray(shards)) {
 		return new Map(workflowNames.map((workflowName) => [
 			`workflow:${workflowName}`,

@@ -1,6 +1,5 @@
-import { type AdaptivePollingConfig, AdaptivePollingStrategy } from "@lib/polling/adaptive.ts";
-import type { Client } from "../client.ts";
-import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
+import { type AdaptivePollingConfig, AdaptivePollingStrategy } from "@aiki/lib/polling";
+import type { Client, StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "@aiki/sdk/client";
 
 /**
  * Adaptive polling subscriber strategy configuration
@@ -38,15 +37,15 @@ export function createAdaptivePollingStrategy(
 		}
 	};
 
-	const getNextBatch = (size: number) => client.workflowRunRepository.getReadyIds(size);
+	const getNextBatch = (size: number) => client.api.workflowRun.getReadyIdsV1.query({ size });
 
 	return {
-		async init(_workerId: string, _callbacks: StrategyCallbacks) {
-			return {
+		init(_workerId: string, _callbacks: StrategyCallbacks) {
+			return Promise.resolve({
 				type: strategy.type,
 				getNextDelay,
 				getNextBatch,
-			};
+			});
 		},
 	};
 }

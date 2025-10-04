@@ -1,15 +1,15 @@
-import { initWorkflowRunRepository, type WorkflowRunRepository } from "../workflow/run/repository.ts";
-import {
-	resolveSubscriberStrategy,
-	type SubscriberStrategy,
-	type SubscriberStrategyBuilder,
-} from "./subscribers/strategy-resolver.ts";
-import type { WorkflowName } from "../workflow/workflow.ts";
+import type { WorkflowName } from "@aiki/types/workflow";
 import { Redis } from "redis";
+import { apiClient, type ApiClient } from "@aiki/server";
+import { resolveSubscriberStrategy, type SubscriberStrategy, type SubscriberStrategyBuilder } from "@aiki/sdk/client";
 
-export async function client(params: ClientParams): Promise<Client> {
-	const workflowRunRepository = await initWorkflowRunRepository();
-	return Promise.resolve(new ClientImpl(workflowRunRepository, params));
+export function client(params: ClientParams): Promise<Client> {
+	return Promise.resolve(new ClientImpl(params));
+}
+
+export interface ClientParams {
+	baseUrl: string;
+	redisStreams?: RedisConfig;
 }
 
 export interface RedisConfig {
@@ -22,14 +22,8 @@ export interface RedisConfig {
 	connectTimeoutMs?: number;
 }
 
-export interface ClientParams {
-	serverUrl: string;
-	redisStreams?: RedisConfig;
-}
-
 export interface Client {
-	workflowRunRepository: WorkflowRunRepository;
-	getServerUrl: () => string;
+	api: ApiClient;
 	_internal: {
 		subscriber: {
 			create: (
@@ -46,13 +40,12 @@ export interface Client {
 }
 
 class ClientImpl implements Client {
+	public readonly api: ApiClient;
 	public readonly _internal: Client["_internal"];
 	private redisStreamsConnection?: Redis;
 
-	constructor(
-		public readonly workflowRunRepository: WorkflowRunRepository,
-		private readonly params: ClientParams,
-	) {
+	constructor(private readonly params: ClientParams) {
+		this.api = apiClient({ baseUrl: params.baseUrl });
 		this._internal = {
 			subscriber: {
 				create: (strategy, workflowNames, workerShards) =>
@@ -63,10 +56,6 @@ class ClientImpl implements Client {
 				closeConnection: () => this.closeRedisStreamsConnection(),
 			},
 		};
-	}
-
-	public getServerUrl(): string {
-		return this.params.serverUrl;
 	}
 
 	private getRedisStreamsConnection(): Redis {

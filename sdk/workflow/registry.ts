@@ -1,4 +1,5 @@
-import type { Workflow, WorkflowName } from "./workflow.ts";
+import type { WorkflowName } from "@aiki/types/workflow";
+import type { Workflow } from "@aiki/sdk/workflow";
 
 export function initWorkflowRegistry(): WorkflowRegistry {
 	return new WorkflowRegistryImpl();

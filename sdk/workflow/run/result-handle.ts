@@ -1,19 +1,15 @@
-import { withRetry } from "@lib/retry/mod.ts";
-import type { WorkflowRunRepository } from "./repository.ts";
+import { withRetry } from "@aiki/lib/retry";
 import type {
+WorkflowRunId,
 	WorkflowRunResult,
 	WorkflowRunResultComplete,
 	WorkflowRunResultInComplete,
 	WorkflowRunState,
-} from "./result.ts";
+} from "@aiki/types/workflow";
+import type { Client } from "@aiki/sdk/client";
 
-export function initWorkflowRunResultHandle<Result>(
-	params: {
-		id: string;
-		repository: WorkflowRunRepository;
-	},
-) {
-	return new WorkflowRunResultHandleImpl<Result>(params.id, params.repository);
+export function initWorkflowRunResultHandle<Result>(id: WorkflowRunId, api: Client["api"]) {
+	return new WorkflowRunResultHandleImpl<Result>(id, api);
 }
 
 export interface WorkflowRunWaitSyncParams {
@@ -36,11 +32,12 @@ export interface WorkflowRunResultHandle<Result> {
 class WorkflowRunResultHandleImpl<Result> implements WorkflowRunResultHandle<Result> {
 	constructor(
 		public readonly id: string,
-		private readonly repository: WorkflowRunRepository,
+		private readonly api: Client["api"],
 	) {}
 
-	public getResult(): Promise<WorkflowRunResult<Result>> {
-		return this.repository.getResult(this.id);
+	public async getResult(): Promise<WorkflowRunResult<Result>> {
+		const result = await this.api.workflowRun.getResultV1.query({ id: this.id });
+		return result as WorkflowRunResult<Result>;
 	}
 
 	public async waitForState<
