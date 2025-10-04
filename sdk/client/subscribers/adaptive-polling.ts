@@ -1,5 +1,6 @@
 import { type AdaptivePollingConfig, AdaptivePollingStrategy } from "@aiki/lib/polling";
-import type { Client, StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "@aiki/sdk/client";
+import type { Client } from "../client.ts";
+import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
 
 /**
  * Adaptive polling subscriber strategy configuration

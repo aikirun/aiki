@@ -1,7 +1,8 @@
 import type { TriggerStrategy } from "@aiki/lib/trigger";
 import type { WorkflowName, WorkflowRunParams, WorkflowVersionId } from "@aiki/types/workflow";
-import type { Client } from "@aiki/sdk/client";
-import { initWorkflowRunResultHandle, type WorkflowRunContext, type WorkflowRunResultHandle } from "@aiki/sdk/workflow";
+import type { Client } from "../../client/client.ts";
+import type { WorkflowRunContext } from "../run/context.ts";
+import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
 
 export interface WorkflowVersionParams<Payload, Result> {
 	run: (

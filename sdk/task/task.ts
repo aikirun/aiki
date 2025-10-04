@@ -1,7 +1,7 @@
 import { sha256 } from "@aiki/lib/crypto";
 import type { RetryStrategy } from "@aiki/lib/retry";
-import type { WorkflowRunContext } from "@aiki/sdk/workflow";
-import type { TaskRunContext, TaskRunParams } from "@aiki/sdk/task";
+import type { WorkflowRunContext } from "../workflow/run/context.ts";
+import type { TaskRunContext, TaskRunParams } from "./run/context.ts";
 
 export function task<
 	Payload = undefined,

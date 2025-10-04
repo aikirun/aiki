@@ -1,4 +1,4 @@
-import type { WorkflowRun } from "@aiki/sdk/workflow";
+import type { WorkflowRun } from "./workflow-run.ts";
 
 export interface WorkflowRunContext<Payload, Result> {
 	workflowRun: Omit<WorkflowRun<Payload, Result>, "params">;

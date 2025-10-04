@@ -1,5 +1,5 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
-import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "@aiki/sdk/workflow";
+import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./version/workflow-version.ts";
 
 export function workflow(params: WorkflowParams): Workflow {
 	return new WorkflowImpl(params);

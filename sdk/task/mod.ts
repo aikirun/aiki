@@ -1,3 +1,5 @@
-export * from "./task.ts";
-export * from "./example.ts";
-export * from "./run/context.ts";
+export { task } from "./task.ts";
+export type { Task, TaskParams } from "./task.ts";
+export type { TaskRunContext } from "./run/context.ts";
+
+export type { TaskRunParams } from "./run/context.ts";

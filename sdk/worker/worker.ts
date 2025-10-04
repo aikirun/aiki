@@ -2,13 +2,11 @@ import type { WorkflowName, WorkflowRunId, WorkflowRunRow, WorkflowVersionId } f
 import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay } from "@aiki/lib/async";
-import type {
-	Client,
-	ResolvedSubscriberStrategy,
-	SubscriberStrategy,
-	SubscriberStrategyBuilder,
-} from "@aiki/sdk/client";
-import { initWorkflowRegistry, initWorkflowRun, type WorkflowRegistry, type WorkflowVersion } from "@aiki/sdk/workflow";
+import type { Client, SubscriberStrategy } from "../client/mod.ts";
+import type { ResolvedSubscriberStrategy, SubscriberStrategyBuilder } from "../client/subscribers/strategy-resolver.ts";
+import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
+import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
+import { initWorkflowRun } from "../workflow/run/workflow-run.ts";
 
 export function worker(
 	client: Client,

@@ -1,13 +1,11 @@
 import type { WorkflowName, WorkflowRunId } from "@aiki/types/workflow";
-import {
-	type AdaptivePollingSubscriberStrategy,
-	type Client,
-	createAdaptivePollingStrategy,
-	createPollingStrategy,
-	createRedisStreamsStrategy,
-	type PollingSubscriberStrategy,
-	type RedisStreamsSubscriberStrategy,
-} from "@aiki/sdk/client";
+import type { Client } from "../client.ts";
+import type { PollingSubscriberStrategy } from "./polling.ts";
+import type { AdaptivePollingSubscriberStrategy } from "./adaptive-polling.ts";
+import type { RedisStreamsSubscriberStrategy } from "./redis-streams.ts";
+import { createPollingStrategy } from "./polling.ts";
+import { createAdaptivePollingStrategy } from "./adaptive-polling.ts";
+import { createRedisStreamsStrategy } from "./redis-streams.ts";
 
 export type SubscriberStrategy =
 	| PollingSubscriberStrategy

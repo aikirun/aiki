@@ -1,9 +1,9 @@
-export * from "./workflow.ts";
+export { workflow } from "./workflow.ts";
+export type { Workflow, WorkflowParams } from "./workflow.ts";
 
-export * from "./registry.ts";
-export * from "./version/workflow-version.ts";
+export type { WorkflowVersion, WorkflowVersionParams } from "./version/workflow-version.ts";
+export type { WorkflowRunContext } from "./run/context.ts";
 
-export * from "./run/context.ts";
-export * from "./run/workflow-run.ts";
-export * from "./run/result.ts";
-export * from "./run/result-handle.ts";
+export type { WorkflowRegistry } from "./registry.ts";
+export type { WorkflowRun } from "./run/workflow-run.ts";
+export type { WorkflowRunResultHandle } from "./run/result-handle.ts";

@@ -1,5 +1,6 @@
 import { getRetryParams } from "@aiki/lib/retry";
-import type { Client, StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "@aiki/sdk/client";
+import type { Client } from "../client.ts";
+import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
 
 /**
  * Simple polling subscriber strategy configuration
