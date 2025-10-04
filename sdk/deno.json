@@ -7,5 +7,10 @@
 		"./task": "./task/mod.ts",
 		"./worker": "./worker/mod.ts",
 		"./workflow": "./workflow/mod.ts"
+	},
+	"imports": {
+		"@trpc/client": "npm:@trpc/client@^11.0.0",
+		"zod": "npm:zod@^4.1.11",
+		"redis": "npm:ioredis@^5.4.1"
 	}
 }

@@ -147,12 +147,23 @@
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@^1.0.13",
-      "jsr:@std/async@^1.0.12",
-      "jsr:@std/dotenv@0.225",
-      "npm:@trpc/client@11",
-      "npm:@trpc/server@11",
-      "npm:ioredis@^5.4.1",
-      "npm:zod@^4.1.11"
-    ]
+      "jsr:@std/async@^1.0.12"
+    ],
+    "members": {
+      "sdk": {
+        "dependencies": [
+          "npm:@trpc/client@11",
+          "npm:ioredis@^5.4.1",
+          "npm:zod@^4.1.11"
+        ]
+      },
+      "server": {
+        "dependencies": [
+          "jsr:@std/dotenv@0.225",
+          "npm:@trpc/server@11",
+          "npm:zod@^4.1.11"
+        ]
+      }
+    }
   }
 }

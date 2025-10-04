@@ -1,6 +1,7 @@
 import type { WorkflowName } from "@aiki/types/workflow";
 import { Redis } from "redis";
-import { type ApiClient, apiClient } from "@aiki/server";
+import { createTRPCClient, httpBatchLink, type TRPCClient } from "@trpc/client";
+import type { AppRouter } from "@aiki/server";
 import {
 	resolveSubscriberStrategy,
 	type SubscriberStrategy,
@@ -27,7 +28,7 @@ export interface RedisConfig {
 }
 
 export interface Client {
-	api: ApiClient;
+	api: TRPCClient<AppRouter>;
 	_internal: {
 		subscriber: {
 			create: (
@@ -44,12 +45,18 @@ export interface Client {
 }
 
 class ClientImpl implements Client {
-	public readonly api: ApiClient;
+	public readonly api: TRPCClient<AppRouter>;
 	public readonly _internal: Client["_internal"];
 	private redisStreamsConnection?: Redis;
 
 	constructor(private readonly params: ClientParams) {
-		this.api = apiClient({ baseUrl: params.baseUrl });
+		this.api = createTRPCClient<AppRouter>({
+			links: [
+				httpBatchLink({
+					url: `${params.baseUrl}/api`,
+				}),
+			],
+		});
 		this._internal = {
 			subscriber: {
 				create: (strategy, workflowNames, workerShards) =>
