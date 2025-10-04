@@ -1,7 +1,7 @@
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCClient, httpBatchLink, type TRPCClient } from "@trpc/client";
 import type { AppRouter } from "./router.ts";
 
-export function apiClient(params: { baseUrl: string }) {
+export function apiClient(params: { baseUrl: string }): TRPCClient<AppRouter> {
 	return createTRPCClient<AppRouter>({
 		links: [
 			httpBatchLink({
