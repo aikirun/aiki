@@ -4,7 +4,7 @@ import { initWorkflowRun } from "../workflow/run/workflow-run.ts";
 import type { WorkflowRunId, WorkflowRunRepository, WorkflowRunRow } from "../workflow/run/repository.ts";
 import { isNonEmptyArray } from "@lib/array/mod.ts";
 import type { NonEmptyArray } from "@lib/array/mod.ts";
-import type { WorkflowVersion } from "../workflow/workflow.ts";
+import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
 import { delay } from "@lib/async/mod.ts";
 import type { ResolvedSubscriberStrategy, SubscriberStrategyBuilder, SubscriberStrategy } from "../client/strategies/subscriber-strategies.ts";
 

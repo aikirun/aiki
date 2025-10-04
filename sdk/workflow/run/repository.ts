@@ -1,6 +1,7 @@
 import type { BrandedString } from "@lib/string/types.ts";
 import type { TaskRunResult } from "../../task/run/result.ts";
-import type { WorkflowName, WorkflowVersion, WorkflowVersionId } from "../workflow.ts";
+import type { WorkflowName } from "../workflow.ts";
+import type { WorkflowVersion, WorkflowVersionId } from "../version/workflow-version.ts";
 import type { WorkflowRunParams } from "./context.ts";
 import type { WorkflowRunResult, WorkflowRunState } from "./result.ts";
 
