@@ -1,8 +1,4 @@
-import type {
-	EventSourceOptions,
-	EventTypeMap,
-	EventSourceWrapper,
-} from "./api.ts";
+import type { EventSourceOptions, EventSourceWrapper, EventTypeMap } from "./api.ts";
 
 class DenoEventSourceWrapper implements EventSourceWrapper {
 	private readonly eventSource: EventSource;
