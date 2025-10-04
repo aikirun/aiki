@@ -35,16 +35,25 @@ export interface Client {
 		workerShards?: string[],
 	) => SubscriberStrategyBuilder;
 	getServerUrl: () => string;
-	getRedisConnection: () => Redis;
+	redisStreams: {
+		getConnection: () => Redis;
+		closeConnection: () => Promise<void>;
+	};
 }
 
 class ClientImpl implements Client {
-	private redisConnection?: Redis;
+	private redisStreamsConnection?: Redis;
+	public readonly redisStreams: Client["redisStreams"];
 
 	constructor(
 		public readonly workflowRunRepository: WorkflowRunRepository,
 		private readonly params: ClientParams,
-	) {}
+	) {
+		this.redisStreams = {
+			getConnection: () => this.getRedisStreamsConnection(),
+			closeConnection: () => this.closeRedisStreamsConnection(),
+		};
+	}
 
 	public createSubscriberStrategy(
 		strategy: SubscriberStrategy,
@@ -58,20 +67,22 @@ class ClientImpl implements Client {
 		return this.params.serverUrl;
 	}
 
-	public getRedisConnection(): Redis {
-		if (!this.redisConnection) {
+	private getRedisStreamsConnection(): Redis {
+		if (!this.redisStreamsConnection) {
 			if (!this.params.redisStreams) {
-				throw new Error("Redis Streams configuration not provided to client. Add 'redisStreams' to ClientParams.");
+				throw new Error(
+					"Redis Streams configuration not provided to client. Add 'redisStreams' to ClientParams.",
+				);
 			}
-			this.redisConnection = new Redis(this.params.redisStreams);
+			this.redisStreamsConnection = new Redis(this.params.redisStreams);
 		}
-		return this.redisConnection;
+		return this.redisStreamsConnection;
 	}
 
-	public async closeRedisConnection(): Promise<void> {
-		if (this.redisConnection) {
-			await this.redisConnection.quit();
-			this.redisConnection = undefined;
+	private async closeRedisStreamsConnection(): Promise<void> {
+		if (this.redisStreamsConnection) {
+			await this.redisStreamsConnection.quit();
+			this.redisStreamsConnection = undefined;
 		}
 	}
 }

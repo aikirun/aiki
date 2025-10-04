@@ -122,7 +122,7 @@ export function createRedisStreamsStrategy(
 	workflowRegistry: WorkflowRegistry,
 	workerShards?: string[],
 ): SubscriberStrategyBuilder {
-	const redis = client.getRedisConnection();
+	const redis = client.redisStreams.getConnection();
 
 	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflowRegistry, workerShards);
 	const streams = Array.from(streamConsumerGroupMap.keys());
