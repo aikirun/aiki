@@ -1,5 +1,4 @@
 export * from "./workflow.ts";
-export * from "./example.ts";
 
 export * from "./registry.ts";
 export * from "./version/workflow-version.ts";

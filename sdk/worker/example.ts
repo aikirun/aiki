@@ -1,6 +1,6 @@
 import { worker } from "@aiki/sdk/worker";
-import { eveningWorkflow, morningWorkflow } from "@aiki/sdk/workflow";
 import { Aiki } from "@aiki/sdk";
+import { eveningWorkflow, morningWorkflow } from "../workflow/example.ts";
 
 async function createPollingWorker() {
 	const aikiClient = await Aiki.client({ baseUrl: "http://localhost:9090" });

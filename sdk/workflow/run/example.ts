@@ -1,5 +1,5 @@
 import { Aiki } from "@aiki/sdk";
-import { morningWorkflowV1 } from "@aiki/sdk/workflow";
+import { morningWorkflowV1 } from "../example.ts";
 
 if (import.meta.main) {
 	const aikiClient = await Aiki.client({ baseUrl: "localhost:9090" });
