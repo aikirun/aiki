@@ -3,5 +3,10 @@
 	"version": "0.1.0",
 	"exports": {
 		".": "./mod.ts"
+	},
+	"lint": {
+		"rules": {
+			"exclude": ["no-slow-types"]
+		}
 	}
 }
