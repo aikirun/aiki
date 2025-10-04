@@ -40,16 +40,19 @@ export interface WorkflowRunResultComplete<Result> {
 }
 
 // TODO: revise these states
-export type WorkflowRunState =
-	| "scheduled"
-	| "queued"
-	| "starting"
-	| "running"
-	| "paused"
-	| "sleeping"
-	| "awaiting_event"
-	| "awaiting_retry"
-	| "awaiting_sub_workflow"
-	| "cancelled"
-	| "failed"
-	| "completed";
+const WORKFLOW_RUN_STATES = [
+	"scheduled",
+	"queued",
+	"starting",
+	"running",
+	"paused",
+	"sleeping",
+	"awaiting_event",
+	"awaiting_retry",
+	"awaiting_sub_workflow",
+	"cancelled",
+	"failed",
+	"completed",
+] as const;
+
+export type WorkflowRunState = typeof WORKFLOW_RUN_STATES[number];
