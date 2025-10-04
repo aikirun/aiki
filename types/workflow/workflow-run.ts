@@ -1,7 +1,7 @@
-import type { BrandedString } from "@lib/string/types.ts";
-import type { MaybeField } from "@lib/object/mod.ts";
-import type { TriggerStrategy } from "@lib/trigger/mod.ts";
-import type { TaskRunResult } from "./task-run.ts";
+import type { BrandedString } from "@aiki/lib/string";
+import type { MaybeField } from "@aiki/lib/object";
+import type { TriggerStrategy } from "@aiki/lib/trigger";
+import type { TaskRunResult } from "../task/task-run.ts";
 
 export type WorkflowRunId = BrandedString<"workflow_run_id">;
 
@@ -40,7 +40,7 @@ export interface WorkflowRunResultComplete<Result> {
 }
 
 // TODO: revise these states
-const WORKFLOW_RUN_STATES = [
+export const WORKFLOW_RUN_STATES = [
 	"scheduled",
 	"queued",
 	"starting",
