@@ -8,7 +8,10 @@ import type {
 } from "@aiki/types/workflow";
 import type { Client } from "@aiki/sdk/client";
 
-export function initWorkflowRunResultHandle<Result>(id: WorkflowRunId, api: Client["api"]) {
+export function initWorkflowRunResultHandle<Result>(
+	id: WorkflowRunId,
+	api: Client["api"],
+): WorkflowRunResultHandle<Result> {
 	return new WorkflowRunResultHandleImpl<Result>(id, api);
 }
 
