@@ -1,6 +1,6 @@
 import type { WorkflowName } from "@aiki/types/workflow";
 import { Redis } from "redis";
-import { apiClient, type ApiClient } from "@aiki/server";
+import { type ApiClient, apiClient } from "@aiki/server";
 import { resolveSubscriberStrategy, type SubscriberStrategy, type SubscriberStrategyBuilder } from "@aiki/sdk/client";
 
 export function client(params: ClientParams): Promise<Client> {

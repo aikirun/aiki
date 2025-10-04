@@ -1,4 +1,4 @@
-import { task, type Task } from "@aiki/sdk/task";
+import { type Task, task } from "@aiki/sdk/task";
 
 export const ringAlarm: Task<{ song: string }, string> = task({
 	name: "ring-alarm",
