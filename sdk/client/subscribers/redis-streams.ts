@@ -289,6 +289,7 @@ async function processRedisStreamMessages(
 	for (const streamEntry of streamEntries) {
 		const streamEntryResult = RedisStreamEntrySchema.safeParse(streamEntry);
 		if (!streamEntryResult.success) {
+			// deno-lint-ignore no-console
 			console.error("Invalid Redis stream entry structure:", streamEntryResult.error.format());
 			continue;
 		}
@@ -297,6 +298,7 @@ async function processRedisStreamMessages(
 
 		const consumerGroup = streamConsumerGroupMap.get(stream);
 		if (!consumerGroup) {
+			// deno-lint-ignore no-console
 			console.error(`No consumer group found for stream: ${stream}`);
 			continue;
 		}
@@ -304,6 +306,7 @@ async function processRedisStreamMessages(
 		for (const [messageId, rawMessageData] of messages) {
 			const messageData = RedisMessageDataSchema.safeParse(rawMessageData);
 			if (!messageData.success) {
+				// deno-lint-ignore no-console
 				console.warn(
 					`Invalid message structure in ${stream}/${messageId}:`,
 					messageData.error.format(),
@@ -379,13 +382,17 @@ async function claimStuckRedisStreamMessages(
 
 			// Handle specific Redis errors gracefully
 			if (errorMessage.includes("NOGROUP")) {
+				// deno-lint-ignore no-console
 				console.warn(`Consumer group does not exist for stream ${stream}, skipping claim operation`);
 			} else if (errorMessage.includes("BUSYGROUP")) {
+				// deno-lint-ignore no-console
 				console.warn(`Consumer group busy for stream ${stream}, skipping claim operation`);
 			} else if (errorMessage.includes("NOSCRIPT")) {
+				// deno-lint-ignore no-console
 				console.warn(`Redis script not loaded for stream ${stream}, skipping claim operation`);
 			} else {
 				// Log unexpected errors with more context
+				// deno-lint-ignore no-console
 				console.error(`Failed to claim messages from stream ${stream}:`, {
 					error: errorMessage,
 					messageIds: messageIds.length,
@@ -467,6 +474,7 @@ async function findClaimableRedisStreamMessages(
 
 		const parsedResult = RedisStreamPendingMessagesSchema.safeParse(result);
 		if (!parsedResult.success) {
+			// deno-lint-ignore no-console
 			console.error(`Invalid XPENDING response for ${stream}:`, parsedResult.error.format());
 			continue;
 		}
