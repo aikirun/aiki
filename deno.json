@@ -6,8 +6,8 @@
 		"noUncheckedIndexedAccess": true
 	},
 	"tasks": {
-		"server": "deno run --allow-net --allow-read server/server.ts",
-		"server:watch": "deno run --allow-net --allow-read --watch server/server.ts"
+		"server": "deno run --allow-net --allow-read --allow-env server/server.ts",
+		"server:watch": "deno run --allow-net --allow-read --allow-env --watch server/server.ts"
 	},
 	"imports": {
 		"@std/assert": "jsr:@std/assert@^1.0.13",

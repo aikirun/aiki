@@ -1,16 +1,16 @@
 import { createHTTPServer } from "@trpc/server/adapters/standalone";
 import { appRouter } from "./router.ts";
+import { loadConfig } from "./config/mod.ts";
 
 if (import.meta.main) {
+	const config = loadConfig();
+
 	const server = createHTTPServer({
 		router: appRouter,
 	});
 
-	// TODO: get from config
-	const port = 3000;
-
-	server.listen(port);
+	server.listen(config.port);
 
 	// deno-lint-ignore no-console
-	console.log(`Aiki Server listening on http://localhost:${port}`);
+	console.log(`Aiki Server listening on http://localhost:${config.port}`);
 }
