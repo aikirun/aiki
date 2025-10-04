@@ -13,7 +13,7 @@ export interface WorkflowRegistry {
 	_internal: {
 		getNames(): WorkflowName[];
 		getByName: (name: WorkflowName) => Workflow | undefined;
-	}
+	};
 }
 
 class WorkflowRegistryImpl implements WorkflowRegistry {
@@ -23,7 +23,7 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 	constructor() {
 		this._internal = {
 			getNames: () => Array.from(this.workflowsByName.keys()),
-			getByName: (name: WorkflowName) => this.workflowsByName.get(name)
+			getByName: (name: WorkflowName) => this.workflowsByName.get(name),
 		};
 	}
 
