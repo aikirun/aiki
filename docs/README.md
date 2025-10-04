@@ -1,6 +1,7 @@
 # Aiki Documentation
 
-Welcome to the Aiki documentation! This directory contains comprehensive documentation for building reliable, durable workflows with Aiki.
+Welcome to the Aiki documentation! This directory contains comprehensive documentation for building reliable, durable
+workflows with Aiki.
 
 ## Getting Started
 
@@ -10,8 +11,10 @@ If you're new to Aiki, start with the [main README](../README.md) for a quick in
 
 ### Core Documentation
 
-- **[Core Concepts](./core-concepts.md)** - Detailed explanation of workflows, tasks, workers, and other fundamental concepts
-- **[Architecture](./architecture.md)** - Deep dive into Aiki's architecture, design principles, and component interactions
+- **[Core Concepts](./core-concepts.md)** - Detailed explanation of workflows, tasks, workers, and other fundamental
+  concepts
+- **[Architecture](./architecture.md)** - Deep dive into Aiki's architecture, design principles, and component
+  interactions
 
 ### Advanced Topics
 
@@ -21,15 +24,18 @@ If you're new to Aiki, start with the [main README](../README.md) for a quick in
 ## Quick Navigation
 
 ### For Beginners
+
 1. Start with [Core Concepts](./core-concepts.md) to understand the fundamentals
 2. Use JSDoc comments in the source code for detailed API reference
 
 ### For Advanced Users
+
 1. Review [Architecture](./architecture.md) to understand the system design
 2. Study [Task Determinism](./task-determinism.md) for reliable workflow design
 3. Implement [Idempotency](./idempotency.md) for production-ready workflows
 
 ### For Production Deployment
+
 1. Understand [Architecture](./architecture.md) for scaling decisions
 2. Use JSDoc comments in the source code for complete implementation details
 
@@ -47,4 +53,4 @@ If you need help with Aiki:
 
 - Check the [main README](../README.md) for quick start examples
 - Use JSDoc comments in the source code for detailed implementation help
-- Open an issue in the main repository for bugs or feature requests 
+- Open an issue in the main repository for bugs or feature requests

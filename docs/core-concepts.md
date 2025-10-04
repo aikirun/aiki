@@ -1,10 +1,13 @@
 # Core Concepts
 
-Let me walk you through Aiki's core concepts step by step, starting with the basics and building up to more advanced ideas.
+Let me walk you through Aiki's core concepts step by step, starting with the basics and building up to more advanced
+ideas.
 
 ## Workflows
 
-Think of a workflow as a **recipe for a business process**. Just like a recipe tells you the steps to make a dish, a workflow tells you the steps to complete a business operation. For example, processing an order might involve validating the order, charging the customer, updating inventory, and sending a confirmation email.
+Think of a workflow as a **recipe for a business process**. Just like a recipe tells you the steps to make a dish, a
+workflow tells you the steps to complete a business operation. For example, processing an order might involve validating
+the order, charging the customer, updating inventory, and sending a confirmation email.
 
 Here's how you define a workflow in Aiki:
 
@@ -12,25 +15,26 @@ Here's how you define a workflow in Aiki:
 import { workflow } from "@aiki/sdk/workflow";
 
 const morningRoutineWorkflow = workflow({
-  name: "morning-routine"
+	name: "morning-routine",
 });
 
 const morningRoutineV1 = morningRoutineWorkflow.v("1.0.0", {
-  async run(ctx, payload: { duration?: number }) {
-    const alarmResult = await ringAlarm.run(ctx, {
-      payload: { song: "Wake up!" }
-    });
+	async run(ctx, payload: { duration?: number }) {
+		const alarmResult = await ringAlarm.run(ctx, {
+			payload: { song: "Wake up!" },
+		});
 
-    const stretchResult = await stretch.run(ctx, {
-      payload: { duration: payload.duration || 300 }
-    });
+		const stretchResult = await stretch.run(ctx, {
+			payload: { duration: payload.duration || 300 },
+		});
 
-    return { alarmResult, stretchResult };
-  }
+		return { alarmResult, stretchResult };
+	},
 });
 ```
 
-The workflow function (`run`) orchestrates the individual steps, but it can contain any logic you need. While it often calls tasks to perform specific operations, it can also include:
+The workflow function (`run`) orchestrates the individual steps, but it can contain any logic you need. While it often
+calls tasks to perform specific operations, it can also include:
 
 - **Conditional logic**: Different paths based on data or results
 - **Data transformation**: Processing and transforming data between steps
@@ -41,52 +45,53 @@ Here's an example with more complex logic:
 
 ```typescript
 const orderProcessingWorkflow = workflow({
-  name: "order-processing"
+	name: "order-processing",
 });
 
 const orderProcessingV1 = orderProcessingWorkflow.v("1.0.0", {
-  async run(ctx, payload: { orderData: any }) {
-    const { orderData } = payload;
+	async run(ctx, payload: { orderData: any }) {
+		const { orderData } = payload;
 
-    // Validate order
-    const validation = await validateOrder.run(ctx, {
-      payload: { orderData }
-    });
+		// Validate order
+		const validation = await validateOrder.run(ctx, {
+			payload: { orderData },
+		});
 
-    // Business logic: Check if order qualifies for discount
-    let finalAmount = validation.amount;
-    if (validation.amount > 100) {
-      finalAmount = validation.amount * 0.9; // 10% discount
-    }
+		// Business logic: Check if order qualifies for discount
+		let finalAmount = validation.amount;
+		if (validation.amount > 100) {
+			finalAmount = validation.amount * 0.9; // 10% discount
+		}
 
-    // Process payment with calculated amount
-    const payment = await processPayment.run(ctx, {
-      payload: { paymentId: validation.paymentId, amount: finalAmount }
-    });
+		// Process payment with calculated amount
+		const payment = await processPayment.run(ctx, {
+			payload: { paymentId: validation.paymentId, amount: finalAmount },
+		});
 
-    // Conditional logic: Only update inventory if payment succeeded
-    if (payment.success) {
-      await updateInventory.run(ctx, {
-        payload: { items: orderData.items }
-      });
+		// Conditional logic: Only update inventory if payment succeeded
+		if (payment.success) {
+			await updateInventory.run(ctx, {
+				payload: { items: orderData.items },
+			});
 
-      // Send confirmation
-      await sendConfirmation.run(ctx, {
-        payload: { email: orderData.email, amount: finalAmount }
-      });
-    } else {
-      // Handle payment failure
-      await sendPaymentFailureNotification.run(ctx, {
-        payload: { email: orderData.email, reason: payment.error }
-      });
-    }
+			// Send confirmation
+			await sendConfirmation.run(ctx, {
+				payload: { email: orderData.email, amount: finalAmount },
+			});
+		} else {
+			// Handle payment failure
+			await sendPaymentFailureNotification.run(ctx, {
+				payload: { email: orderData.email, reason: payment.error },
+			});
+		}
 
-    return { success: payment.success, orderId: validation.orderId };
-  }
+		return { success: payment.success, orderId: validation.orderId };
+	},
 });
 ```
 
-This separation is important because it allows each step to be retried independently if something goes wrong, while still giving you the flexibility to include complex business logic in your workflows.
+This separation is important because it allows each step to be retried independently if something goes wrong, while
+still giving you the flexibility to include complex business logic in your workflows.
 
 ### Workflow Properties
 
@@ -100,57 +105,64 @@ Workflows in Aiki are created using a two-step process:
 2. **Workflow Versions**: Then, you create versioned implementations using the `.v()` method:
    ```typescript
    const myWorkflowV1 = myWorkflow.v("1.0.0", {
-     async run(ctx, payload) {
-       // Your workflow logic here
-     }
+   	async run(ctx, payload) {
+   		// Your workflow logic here
+   	},
    });
    ```
 
 **Key Properties:**
 
-- **name**: A unique identifier for the workflow. Use descriptive names that clearly indicate what the workflow does, like "user-onboarding" or "order-processing".
+- **name**: A unique identifier for the workflow. Use descriptive names that clearly indicate what the workflow does,
+  like "user-onboarding" or "order-processing".
 
-- **version**: Specified when calling `.v()`, this follows semantic versioning (like "1.0.0", "2.1.0"). Versioning is essential because workflows can evolve over time, and you need to handle both old and new versions running simultaneously.
+- **version**: Specified when calling `.v()`, this follows semantic versioning (like "1.0.0", "2.1.0"). Versioning is
+  essential because workflows can evolve over time, and you need to handle both old and new versions running
+  simultaneously.
 
-- **run**: This is the main function that orchestrates the workflow. It receives a context object and the payload, and returns the workflow result.
+- **run**: This is the main function that orchestrates the workflow. It receives a context object and the payload, and
+  returns the workflow result.
 
 ### Workflow Versioning
 
-One of the most powerful features of Aiki is workflow versioning. This allows you to update workflows over time without breaking existing processes. Here's how it works:
+One of the most powerful features of Aiki is workflow versioning. This allows you to update workflows over time without
+breaking existing processes. Here's how it works:
 
 ```typescript
 // Create the workflow definition
 const userOnboardingWorkflow = workflow({
-  name: "user-onboarding"
+	name: "user-onboarding",
 });
 
 // Version 1.0.0 - Simple user onboarding
 const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
-  async run(ctx, payload: { userId: string }) {
-    await sendWelcomeEmail.run(ctx, {
-      payload: { userId: payload.userId }
-    });
-  }
+	async run(ctx, payload: { userId: string }) {
+		await sendWelcomeEmail.run(ctx, {
+			payload: { userId: payload.userId },
+		});
+	},
 });
 
 // Version 2.0.0 - Add profile creation step
 const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
-  async run(ctx, payload: { userId: string }) {
-    await sendWelcomeEmail.run(ctx, {
-      payload: { userId: payload.userId }
-    });
-    await createUserProfile.run(ctx, {
-      payload: { userId: payload.userId }
-    });
-  }
+	async run(ctx, payload: { userId: string }) {
+		await sendWelcomeEmail.run(ctx, {
+			payload: { userId: payload.userId },
+		});
+		await createUserProfile.run(ctx, {
+			payload: { userId: payload.userId },
+		});
+	},
 });
 ```
 
-When you deploy version 2.0.0, existing workflow runs continue with version 1.0.0, while new runs use version 2.0.0. This gives you the flexibility to gradually migrate to new workflow versions.
+When you deploy version 2.0.0, existing workflow runs continue with version 1.0.0, while new runs use version 2.0.0.
+This gives you the flexibility to gradually migrate to new workflow versions.
 
 ## Tasks
 
-Tasks are the building blocks of workflows. Each task represents a single unit of work that can be retried independently. This is a fundamental concept because it allows you to handle failures gracefully.
+Tasks are the building blocks of workflows. Each task represents a single unit of work that can be retried
+independently. This is a fundamental concept because it allows you to handle failures gracefully.
 
 Here's a simple task definition:
 
@@ -158,26 +170,28 @@ Here's a simple task definition:
 import { task } from "@aiki/sdk/task";
 
 const ringAlarm = task({
-  name: "ring-alarm",
-  run({ payload }) {
-    // Your business logic here
-    return Promise.resolve(payload.song);
-  },
-  retry: {
-    type: "fixed",
-    maxAttempts: 3,
-    delayMs: 1000
-  }
+	name: "ring-alarm",
+	run({ payload }) {
+		// Your business logic here
+		return Promise.resolve(payload.song);
+	},
+	retry: {
+		type: "fixed",
+		maxAttempts: 3,
+		delayMs: 1000,
+	},
 });
 ```
 
 ### Task Properties
 
-- **name**: A unique identifier for the task. I recommend using descriptive names that clearly indicate what the task does.
+- **name**: A unique identifier for the task. I recommend using descriptive names that clearly indicate what the task
+  does.
 
 - **run**: The function that performs the actual work. This is where your business logic goes.
 
-- **retry**: Optional configuration for how the task should be retried if it fails. This is one of the key benefits of using Aiki - you get sophisticated retry logic without having to implement it yourself.
+- **retry**: Optional configuration for how the task should be retried if it fails. This is one of the key benefits of
+  using Aiki - you get sophisticated retry logic without having to implement it yourself.
 
 ### Task Execution Context
 
@@ -190,21 +204,22 @@ Here's an example that uses these:
 
 ```typescript
 const processPayment = task({
-  name: "process-payment",
-  run({ payload, workflowRun }) {
-    console.log(`Processing payment for workflow ${workflowRun.id}`);
-    
-    // You can access workflow-level data if needed
-    const orderId = workflowRun.params.payload.orderId;
-    
-    return processPaymentWithId(payload.paymentId, payload.amount);
-  }
+	name: "process-payment",
+	run({ payload, workflowRun }) {
+		console.log(`Processing payment for workflow ${workflowRun.id}`);
+
+		// You can access workflow-level data if needed
+		const orderId = workflowRun.params.payload.orderId;
+
+		return processPaymentWithId(payload.paymentId, payload.amount);
+	},
 });
 ```
 
 ## Workflow Runs
 
-A workflow run is an **instance** of a workflow execution. Think of it like this: a workflow is the recipe, and a workflow run is what happens when you actually follow that recipe to cook a meal.
+A workflow run is an **instance** of a workflow execution. Think of it like this: a workflow is the recipe, and a
+workflow run is what happens when you actually follow that recipe to cook a meal.
 
 ### Workflow Run States
 
@@ -223,7 +238,7 @@ Here's how you typically interact with workflow runs:
 ```typescript
 // Create a workflow run
 const resultHandle = await workflow.enqueue(client, {
-  payload: { userId: "123", email: "user@example.com" }
+	payload: { userId: "123", email: "user@example.com" },
 });
 
 // Check the status
@@ -235,11 +250,13 @@ const result = await resultHandle.waitForCompletion();
 console.log("Workflow completed with result:", result);
 ```
 
-The `resultHandle` is a powerful abstraction that gives you a way to monitor and interact with a workflow run without having to worry about the underlying implementation details.
+The `resultHandle` is a powerful abstraction that gives you a way to monitor and interact with a workflow run without
+having to worry about the underlying implementation details.
 
 ## Workers
 
-Workers are processes that execute workflows in your own environment and infrastructure. This is a key design decision in Aiki - your business logic never leaves your controlled environment.
+Workers are processes that execute workflows in your own environment and infrastructure. This is a key design decision
+in Aiki - your business logic never leaves your controlled environment.
 
 ### Worker Configuration
 
@@ -249,17 +266,17 @@ Here's how you create and configure a worker:
 import { worker } from "@aiki/sdk/worker";
 
 const workerInstance = await worker(client, {
-  id: "worker-1",
-  maxConcurrentWorkflowRuns: 5,
-  workflowRunSubscriber: {
-    pollIntervalMs: 100,
-    maxBatchSize: 10,
-    maxRetryDelayMs: 30000
-  },
-  workflowRun: {
-    heartbeatIntervalMs: 30000
-  },
-  gracefulShutdownTimeoutMs: 5000
+	id: "worker-1",
+	maxConcurrentWorkflowRuns: 5,
+	workflowRunSubscriber: {
+		pollIntervalMs: 100,
+		maxBatchSize: 10,
+		maxRetryDelayMs: 30000,
+	},
+	workflowRun: {
+		heartbeatIntervalMs: 30000,
+	},
+	gracefulShutdownTimeoutMs: 5000,
 });
 ```
 
@@ -267,9 +284,11 @@ Let me break down these configuration options:
 
 - **id**: A unique identifier for the worker. This is useful for monitoring and debugging.
 
-- **maxConcurrentWorkflowRuns**: How many workflows this worker can execute simultaneously. This is significant for resource management.
+- **maxConcurrentWorkflowRuns**: How many workflows this worker can execute simultaneously. This is significant for
+  resource management.
 
-- **workflowRunSubscriber**: Configuration for how the worker polls for new workflow runs. The polling interval and batch size affect performance and responsiveness.
+- **workflowRunSubscriber**: Configuration for how the worker polls for new workflow runs. The polling interval and
+  batch size affect performance and responsiveness.
 
 - **workflowRun**: Configuration for workflow execution, including how often to send heartbeats.
 
@@ -281,12 +300,13 @@ Workers maintain a registry of workflows they can execute. This is how the worke
 
 ```typescript
 workerInstance.registry
-  .add(morningRoutineWorkflow)
-  .add(eveningRoutineWorkflow)
-  .add(onboardingWorkflow);
+	.add(morningRoutineWorkflow)
+	.add(eveningRoutineWorkflow)
+	.add(onboardingWorkflow);
 ```
 
-The registry pattern here is valuable because it allows you to have different workers handle different types of workflows. For example, you might have one worker for payment processing workflows and another for email workflows.
+The registry pattern here is valuable because it allows you to have different workers handle different types of
+workflows. For example, you might have one worker for payment processing workflows and another for email workflows.
 
 ### Worker Lifecycle
 
@@ -302,11 +322,13 @@ workerInstance.start();
 await workerInstance.stop();
 ```
 
-The graceful shutdown is necessary because it ensures that active workflows have a chance to complete before the worker stops.
+The graceful shutdown is necessary because it ensures that active workflows have a chance to complete before the worker
+stops.
 
 ## Aiki Server
 
-The Aiki Server is responsible for orchestrating workflows and communicating with workers. It's the central coordination point in the system.
+The Aiki Server is responsible for orchestrating workflows and communicating with workers. It's the central coordination
+point in the system.
 
 ### Server Responsibilities
 
@@ -325,11 +347,13 @@ The server is composed of several components:
 - **Task Management**: Handles task state and results
 - **Storage Layer**: Persists workflow runs, tasks, and metadata
 
-The separation of these components is beneficial because it allows for different storage backends and scaling strategies.
+The separation of these components is beneficial because it allows for different storage backends and scaling
+strategies.
 
 ## Queue System
 
-The queue system stands between the Aiki Server and workers, managing the distribution of workflow runs. This is a critical piece of the architecture because it provides reliable message delivery.
+The queue system stands between the Aiki Server and workers, managing the distribution of workflow runs. This is a
+critical piece of the architecture because it provides reliable message delivery.
 
 ### Queue Features
 
@@ -342,7 +366,8 @@ The queue system provides several key features:
 
 ## Storage
 
-The storage layer behind the Aiki Server persists workflow and task state, execution history, and metadata. This is what makes workflows durable - even if the server crashes, the state is preserved.
+The storage layer behind the Aiki Server persists workflow and task state, execution history, and metadata. This is what
+makes workflows durable - even if the server crashes, the state is preserved.
 
 ### Stored Data
 
@@ -364,7 +389,8 @@ The storage layer provides several key benefits:
 
 ## Client
 
-The client provides access to workflow operations like enqueueing new workflow runs and managing workflow execution. It's the primary interface that your application uses to interact with Aiki.
+The client provides access to workflow operations like enqueueing new workflow runs and managing workflow execution.
+It's the primary interface that your application uses to interact with Aiki.
 
 ### Client Operations
 
@@ -377,8 +403,8 @@ const client = await createClient({ url: "localhost:9090" });
 
 // Enqueue a workflow run
 const resultHandle = await workflow.enqueue(client, {
-  payload: { userId: "123" },
-  idempotencyKey: "user-123-onboarding"
+	payload: { userId: "123" },
+	idempotencyKey: "user-123-onboarding",
 });
 
 // Get workflow run status
@@ -397,7 +423,8 @@ The client provides several valuable features:
 - **Result Retrieval**: Get workflow execution results
 - **Idempotency Support**: Prevent duplicate workflow runs
 
-The idempotency support is especially valuable for production systems where you need to ensure that the same operation isn't performed multiple times.
+The idempotency support is especially valuable for production systems where you need to ensure that the same operation
+isn't performed multiple times.
 
 ## Putting It All Together
 
@@ -420,4 +447,5 @@ This architecture provides several key benefits:
 - **Observability**: Every step is tracked and can be monitored
 - **Flexibility**: You can deploy workers in different environments and regions
 
-The key insight is that by separating orchestration from execution, you get a system that's both more reliable and more flexible than traditional approaches. 
+The key insight is that by separating orchestration from execution, you get a system that's both more reliable and more
+flexible than traditional approaches.

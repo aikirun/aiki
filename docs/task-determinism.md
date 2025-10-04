@@ -1,28 +1,33 @@
 # Task Determinism
 
-When I first started working with durable workflows, I was puzzled by the emphasis on task determinism. Why does it matter if a task produces the same result every time? After all, isn't the whole point of workflows to handle dynamic, real-world scenarios?
+When I first started working with durable workflows, I was puzzled by the emphasis on task determinism. Why does it
+matter if a task produces the same result every time? After all, isn't the whole point of workflows to handle dynamic,
+real-world scenarios?
 
-It took me a while to understand that determinism isn't about making tasks boring or predictable - it's about making them **reliable**. Let me walk you through why this matters and how to implement it effectively.
+It took me a while to understand that determinism isn't about making tasks boring or predictable - it's about making
+them **reliable**. Let me walk you through why this matters and how to implement it effectively.
 
 ## What is Determinism?
 
-A deterministic task is one that always returns the same result for the same input. Think of it like a mathematical function: if you put in 2 + 2, you always get 4, regardless of when you do the calculation or how many times you repeat it.
+A deterministic task is one that always returns the same result for the same input. Think of it like a mathematical
+function: if you put in 2 + 2, you always get 4, regardless of when you do the calculation or how many times you repeat
+it.
 
 Here's a simple example:
 
 ```typescript
 // ✅ Deterministic task
 const calculateTax = task({
-  name: "calculate-tax",
-  run({ payload }) {
-    const { amount, taxRate } = payload;
-    return { tax: amount * taxRate, total: amount * (1 + taxRate) };
-  }
+	name: "calculate-tax",
+	run({ payload }) {
+		const { amount, taxRate } = payload;
+		return { tax: amount * taxRate, total: amount * (1 + taxRate) };
+	},
 });
 
 // This will always return { tax: 10, total: 110 } for the same input
 const result = await calculateTax.run(workflowRun, {
-  payload: { amount: 100, taxRate: 0.1 }
+	payload: { amount: 100, taxRate: 0.1 },
 });
 ```
 
@@ -30,7 +35,8 @@ const result = await calculateTax.run(workflowRun, {
 
 ### 1. Best Effort Once Execution
 
-This is the most important reason. Tasks in durable workflows are executed with **best effort once** semantics, not exactly once. This means:
+This is the most important reason. Tasks in durable workflows are executed with **best effort once** semantics, not
+exactly once. This means:
 
 - Tasks may be executed multiple times due to retries, restarts, or network issues
 - The same task might run twice with the same input
@@ -41,94 +47,98 @@ Let me illustrate this with a cautionary tale:
 ```typescript
 // ❌ Non-deterministic task - dangerous with duplicate execution
 const badTask = task({
-  name: "create-user",
-  run({ payload }) {
-    // This could create duplicate users if executed twice
-    const userId = generateRandomId(); // Different each time!
-    return createUserInDatabase(userId, payload.userData);
-  }
+	name: "create-user",
+	run({ payload }) {
+		// This could create duplicate users if executed twice
+		const userId = generateRandomId(); // Different each time!
+		return createUserInDatabase(userId, payload.userData);
+	},
 });
 
 // ✅ Deterministic task - safe with duplicate execution
 const goodTask = task({
-  name: "create-user",
-  run({ payload }) {
-    // Same input always produces same result
-    const userId = generateIdFromEmail(payload.email); // Deterministic!
-    return createUserInDatabase(userId, payload.userData);
-  }
+	name: "create-user",
+	run({ payload }) {
+		// Same input always produces same result
+		const userId = generateIdFromEmail(payload.email); // Deterministic!
+		return createUserInDatabase(userId, payload.userData);
+	},
 });
 ```
 
-If the first task runs twice (which can happen), you'll end up with two users with different IDs. If the second task runs twice, you'll get the same user ID both times, and the second execution will either fail gracefully or update the existing user.
+If the first task runs twice (which can happen), you'll end up with two users with different IDs. If the second task
+runs twice, you'll get the same user ID both times, and the second execution will either fail gracefully or update the
+existing user.
 
 ### 2. Idempotent Operations
 
-Since tasks may execute multiple times, they should be idempotent. This means running the same operation multiple times has the same effect as running it once.
+Since tasks may execute multiple times, they should be idempotent. This means running the same operation multiple times
+has the same effect as running it once.
 
 ```typescript
 // ✅ Idempotent task - safe to run multiple times
 const sendEmail = task({
-  name: "send-welcome-email",
-  run({ payload }) {
-    const { userId, email } = payload;
-    
-    // Check if email was already sent
-    if (await hasEmailBeenSent(userId, "welcome")) {
-      return { sent: false, reason: "already sent" };
-    }
-    
-    // Send email and mark as sent
-    await sendEmailToUser(email, welcomeTemplate);
-    await markEmailAsSent(userId, "welcome");
-    
-    return { sent: true };
-  }
+	name: "send-welcome-email",
+	run({ payload }) {
+		const { userId, email } = payload;
+
+		// Check if email was already sent
+		if (await hasEmailBeenSent(userId, "welcome")) {
+			return { sent: false, reason: "already sent" };
+		}
+
+		// Send email and mark as sent
+		await sendEmailToUser(email, welcomeTemplate);
+		await markEmailAsSent(userId, "welcome");
+
+		return { sent: true };
+	},
 });
 
 // ✅ Idempotent payment processing
 const processPayment = task({
-  name: "process-payment",
-  run({ payload }) {
-    const { paymentId, amount } = payload;
-    
-    // Check if payment was already processed
-    const existingPayment = await getPayment(paymentId);
-    if (existingPayment && existingPayment.status === "completed") {
-      return existingPayment;
-    }
-    
-    // Process payment
-    return processPaymentWithId(paymentId, amount);
-  }
+	name: "process-payment",
+	run({ payload }) {
+		const { paymentId, amount } = payload;
+
+		// Check if payment was already processed
+		const existingPayment = await getPayment(paymentId);
+		if (existingPayment && existingPayment.status === "completed") {
+			return existingPayment;
+		}
+
+		// Process payment
+		return processPaymentWithId(paymentId, amount);
+	},
 });
 ```
 
 ### 3. Reliable Replay
 
-When a workflow fails and restarts, tasks must produce the same results to ensure consistency. This is critical for debugging and recovery.
+When a workflow fails and restarts, tasks must produce the same results to ensure consistency. This is critical for
+debugging and recovery.
 
 ```typescript
 // ❌ Non-deterministic task
 const badTask = task({
-  name: "bad-task",
-  run({ payload }) {
-    // This will produce different results on each run
-    const randomId = Math.random();
-    const timestamp = Date.now();
-    return { id: randomId, time: timestamp };
-  }
+	name: "bad-task",
+	run({ payload }) {
+		// This will produce different results on each run
+		const randomId = Math.random();
+		const timestamp = Date.now();
+		return { id: randomId, time: timestamp };
+	},
 });
 
 // ✅ Deterministic task
 const goodTask = task({
-  name: "good-task",
-  run({ payload }) {
-    // Same input always produces same output
-    const userId = payload.userId;
-    const email = `${userId}@example.com`;
-    return { email, userId };
-  }
+	name: "good-task",
+	run({ payload }) {
+		// Same input always produces same output
+		const userId = payload.userId;
+		const email = `${userId}@example.com`;
+		return { email, userId };
+	},
 });
 ```
 
@@ -138,22 +148,22 @@ If a workflow crashes after completing some tasks, deterministic tasks ensure th
 
 ```typescript
 const orderWorkflow = workflow({
-  name: "process-order"
+	name: "process-order",
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-  async run(ctx, payload: any) {
-    // If this workflow crashes after validateOrder completes,
-    // it will resume here with the same result
-    const validation = await validateOrder.run(ctx, {
-      payload
-    });
+	async run(ctx, payload: any) {
+		// If this workflow crashes after validateOrder completes,
+		// it will resume here with the same result
+		const validation = await validateOrder.run(ctx, {
+			payload,
+		});
 
-    // This will always produce the same result for the same order
-    const payment = await processPayment.run(ctx, {
-      payload: { orderId: validation.orderId, amount: validation.amount }
-    });
-  }
+		// This will always produce the same result for the same order
+		const payment = await processPayment.run(ctx, {
+			payload: { orderId: validation.orderId, amount: validation.amount },
+		});
+	},
 });
 ```
 
@@ -164,16 +174,16 @@ Deterministic tasks make workflows easier to debug and test:
 ```typescript
 // Easy to test - same input, same output
 const testTask = task({
-  name: "calculate-tax",
-  run({ payload }) {
-    const { amount, taxRate } = payload;
-    return { tax: amount * taxRate, total: amount * (1 + taxRate) };
-  }
+	name: "calculate-tax",
+	run({ payload }) {
+		const { amount, taxRate } = payload;
+		return { tax: amount * taxRate, total: amount * (1 + taxRate) };
+	},
 });
 
 // Test case
 const result = await testTask.run(mockWorkflowRun, {
-  payload: { amount: 100, taxRate: 0.1 }
+	payload: { amount: 100, taxRate: 0.1 },
 });
 // result will always be { tax: 10, total: 110 }
 ```
@@ -187,48 +197,49 @@ Here are the common pitfalls to avoid:
 ```typescript
 // ❌ Avoid these in tasks:
 const badPractices = task({
-  name: "bad-practices",
-  run({ payload }) {
-    // Don't use random numbers
-    const random = Math.random();
-    
-    // Don't use current timestamps
-    const now = Date.now();
-    
-    // Don't use external APIs that might change
-    const weather = await fetchWeatherAPI();
-    
-    // Don't use global state
-    const globalCounter = incrementGlobalCounter();
-    
-    return { random, now, weather, globalCounter };
-  }
+	name: "bad-practices",
+	run({ payload }) {
+		// Don't use random numbers
+		const random = Math.random();
+
+		// Don't use current timestamps
+		const now = Date.now();
+
+		// Don't use external APIs that might change
+		const weather = await fetchWeatherAPI();
+
+		// Don't use global state
+		const globalCounter = incrementGlobalCounter();
+
+		return { random, now, weather, globalCounter };
+	},
 });
 
 // ✅ Use deterministic alternatives:
 const goodPractices = task({
-  name: "good-practices",
-  run({ payload }) {
-    // Use provided IDs or generate from input
-    const id = generateIdFromInput(payload);
-    
-    // Use provided timestamps or calculate from input
-    const calculatedTime = payload.createdAt + payload.duration;
-    
-    // Use provided data or fetch once and store
-    const userData = payload.userData;
-    
-    // Use local state based on input
-    const localCounter = payload.sequenceNumber;
-    
-    return { id, calculatedTime, userData, localCounter };
-  }
+	name: "good-practices",
+	run({ payload }) {
+		// Use provided IDs or generate from input
+		const id = generateIdFromInput(payload);
+
+		// Use provided timestamps or calculate from input
+		const calculatedTime = payload.createdAt + payload.duration;
+
+		// Use provided data or fetch once and store
+		const userData = payload.userData;
+
+		// Use local state based on input
+		const localCounter = payload.sequenceNumber;
+
+		return { id, calculatedTime, userData, localCounter };
+	},
 });
 ```
 
 ### Handle External Dependencies
 
 For tasks that need external data, make them deterministic by:
+
 - Passing external data as input
 - Using idempotent operations
 - Storing external state in the workflow context
@@ -236,28 +247,28 @@ For tasks that need external data, make them deterministic by:
 ```typescript
 // ✅ Good: External data passed as input
 const sendEmail = task({
-  name: "send-email",
-  run({ payload }) {
-    // Email content is deterministic based on input
-    const { recipient, template, variables } = payload;
-    const emailContent = generateEmail(template, variables);
-    
-    // Send email (idempotent operation)
-    return sendEmailToRecipient(recipient, emailContent);
-  }
+	name: "send-email",
+	run({ payload }) {
+		// Email content is deterministic based on input
+		const { recipient, template, variables } = payload;
+		const emailContent = generateEmail(template, variables);
+
+		// Send email (idempotent operation)
+		return sendEmailToRecipient(recipient, emailContent);
+	},
 });
 
 // ✅ Good: Store external state in workflow
 const processPayment = task({
-  name: "process-payment",
-  run({ payload, workflowRun }) {
-    // Use workflow state to ensure determinism
-    const paymentId = workflowRun.params.paymentId;
-    const amount = workflowRun.params.amount;
-    
-    // Process payment with deterministic parameters
-    return processPaymentWithId(paymentId, amount);
-  }
+	name: "process-payment",
+	run({ payload, workflowRun }) {
+		// Use workflow state to ensure determinism
+		const paymentId = workflowRun.params.paymentId;
+		const amount = workflowRun.params.amount;
+
+		// Process payment with deterministic parameters
+		return processPaymentWithId(paymentId, amount);
+	},
 });
 ```
 
@@ -268,19 +279,19 @@ const processPayment = task({
 ```typescript
 // ❌ Bad: Random numbers
 const badTask = task({
-  name: "generate-id",
-  run({ payload }) {
-    return { id: Math.random().toString(36) };
-  }
+	name: "generate-id",
+	run({ payload }) {
+		return { id: Math.random().toString(36) };
+	},
 });
 
 // ✅ Good: Deterministic ID generation
 const goodTask = task({
-  name: "generate-id",
-  run({ payload }) {
-    const { userId, timestamp } = payload;
-    return { id: `${userId}-${timestamp}` };
-  }
+	name: "generate-id",
+	run({ payload }) {
+		const { userId, timestamp } = payload;
+		return { id: `${userId}-${timestamp}` };
+	},
 });
 ```
 
@@ -289,18 +300,18 @@ const goodTask = task({
 ```typescript
 // ❌ Bad: Current timestamp
 const badTask = task({
-  name: "create-record",
-  run({ payload }) {
-    return createRecord({ ...payload, createdAt: Date.now() });
-  }
+	name: "create-record",
+	run({ payload }) {
+		return createRecord({ ...payload, createdAt: Date.now() });
+	},
 });
 
 // ✅ Good: Use provided timestamp
 const goodTask = task({
-  name: "create-record",
-  run({ payload }) {
-    return createRecord({ ...payload, createdAt: payload.createdAt });
-  }
+	name: "create-record",
+	run({ payload }) {
+		return createRecord({ ...payload, createdAt: payload.createdAt });
+	},
 });
 ```
 
@@ -309,19 +320,19 @@ const goodTask = task({
 ```typescript
 // ❌ Bad: External API that might change
 const badTask = task({
-  name: "get-exchange-rate",
-  run({ payload }) {
-    return fetchExchangeRate(payload.currency);
-  }
+	name: "get-exchange-rate",
+	run({ payload }) {
+		return fetchExchangeRate(payload.currency);
+	},
 });
 
 // ✅ Good: Pass rate as input or use idempotent lookup
 const goodTask = task({
-  name: "get-exchange-rate",
-  run({ payload }) {
-    const { currency, rate } = payload;
-    return { currency, rate };
-  }
+	name: "get-exchange-rate",
+	run({ payload }) {
+		const { currency, rate } = payload;
+		return { currency, rate };
+	},
 });
 ```
 
@@ -331,19 +342,19 @@ const goodTask = task({
 // ❌ Bad: Global counter
 let globalCounter = 0;
 const badTask = task({
-  name: "increment-counter",
-  run({ payload }) {
-    globalCounter++;
-    return { counter: globalCounter };
-  }
+	name: "increment-counter",
+	run({ payload }) {
+		globalCounter++;
+		return { counter: globalCounter };
+	},
 });
 
 // ✅ Good: Pass counter as input
 const goodTask = task({
-  name: "increment-counter",
-  run({ payload }) {
-    return { counter: payload.currentCounter + 1 };
-  }
+	name: "increment-counter",
+	run({ payload }) {
+		return { counter: payload.currentCounter + 1 };
+	},
 });
 ```
 
@@ -353,19 +364,19 @@ const goodTask = task({
 
 ```typescript
 describe("calculateTax task", () => {
-  it("should be deterministic", async () => {
-    const payload = { amount: 100, taxRate: 0.1 };
-    
-    // Run the same task multiple times
-    const result1 = await calculateTax.run(mockWorkflowRun, { payload });
-    const result2 = await calculateTax.run(mockWorkflowRun, { payload });
-    const result3 = await calculateTax.run(mockWorkflowRun, { payload });
-    
-    // All results should be identical
-    expect(result1).toEqual(result2);
-    expect(result2).toEqual(result3);
-    expect(result1).toEqual({ tax: 10, total: 110 });
-  });
+	it("should be deterministic", async () => {
+		const payload = { amount: 100, taxRate: 0.1 };
+
+		// Run the same task multiple times
+		const result1 = await calculateTax.run(mockWorkflowRun, { payload });
+		const result2 = await calculateTax.run(mockWorkflowRun, { payload });
+		const result3 = await calculateTax.run(mockWorkflowRun, { payload });
+
+		// All results should be identical
+		expect(result1).toEqual(result2);
+		expect(result2).toEqual(result3);
+		expect(result1).toEqual({ tax: 10, total: 110 });
+	});
 });
 ```
 
@@ -401,13 +412,16 @@ describe("order processing workflow", () => {
 
 ## Summary
 
-By following these principles, your workflows become more reliable, easier to maintain, and more trustworthy in production environments where network issues, restarts, and retries are inevitable.
+By following these principles, your workflows become more reliable, easier to maintain, and more trustworthy in
+production environments where network issues, restarts, and retries are inevitable.
 
 **Key Takeaways:**
+
 - Always make tasks deterministic
 - Use idempotent operations for external side effects
 - Pass external data as input rather than fetching it
 - Test that tasks produce the same result for the same input
 - Avoid random numbers, timestamps, and global state in tasks
 
-Remember, determinism isn't about making your tasks boring - it's about making them bulletproof. When you can trust that your tasks will behave consistently, you can build workflows that are truly reliable and maintainable. 
+Remember, determinism isn't about making your tasks boring - it's about making them bulletproof. When you can trust that
+your tasks will behave consistently, you can build workflows that are truly reliable and maintainable.
