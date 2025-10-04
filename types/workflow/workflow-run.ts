@@ -1,7 +1,7 @@
 import type { BrandedString } from "@aiki/lib/string";
 import type { MaybeField } from "@aiki/lib/object";
 import type { TriggerStrategy } from "@aiki/lib/trigger";
-import type { TaskRunResult } from "../task/task-run.ts";
+import type { TaskRunResult } from "@aiki/types/task";
 
 export type WorkflowRunId = BrandedString<"workflow_run_id">;
 
