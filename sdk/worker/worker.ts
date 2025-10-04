@@ -6,7 +6,7 @@ import { isNonEmptyArray } from "@lib/array/mod.ts";
 import type { NonEmptyArray } from "@lib/array/mod.ts";
 import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
 import { delay } from "@lib/async/mod.ts";
-import type { ResolvedSubscriberStrategy, SubscriberStrategyBuilder, SubscriberStrategy } from "../client/strategies/subscriber-strategies.ts";
+import type { ResolvedSubscriberStrategy, SubscriberStrategy, SubscriberStrategyBuilder } from "../client/subscribers/strategy-resolver.ts";
 
 export async function worker(
 	client: Client,
@@ -66,7 +66,7 @@ class WorkerImpl implements Worker {
 	constructor(
 		public readonly workflowRegistry: WorkflowRegistry,
 		private readonly workflowRunRepository: WorkflowRunRepository,
-		private readonly subscriberStrategyBuilder: SubscriberStrategyBuilder<ResolvedSubscriberStrategy>,
+		private readonly subscriberStrategyBuilder: SubscriberStrategyBuilder,
 		private readonly params: WorkerParams,
 	) {
 		this.id = params.id ?? crypto.randomUUID();

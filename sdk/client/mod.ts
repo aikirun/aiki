@@ -1,2 +1,2 @@
 export * from "./client.ts";
-export * from "./strategies/mod.ts";
+export * from "./subscribers/mod.ts";

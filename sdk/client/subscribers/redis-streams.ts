@@ -1,4 +1,3 @@
-import { type AdaptivePollingConfig, AdaptivePollingStrategy } from "@lib/polling/adaptive.ts";
 import { getRetryParams } from "@lib/retry/mod.ts";
 import type { Client } from "../client.ts";
 import type { Redis } from "redis";
@@ -7,62 +6,7 @@ import type { WorkflowRunId } from "../../workflow/run/repository.ts";
 import { distributeRoundRobin, groupBy, isNonEmptyArray, shuffleArray } from "@lib/array/utils.ts";
 import type { NonEmptyArray } from "@lib/array/types.ts";
 import { z } from "zod";
-
-export function resolveSubscriberStrategy(
-	client: Client,
-	strategy: SubscriberStrategy,
-	workflowRegistry: WorkflowRegistry,
-	workerShards?: string[],
-): SubscriberStrategyBuilder<ResolvedSubscriberStrategy> {
-	switch (strategy.type) {
-		case "polling":
-			return createPollingStrategy(client, strategy);
-		case "adaptive_polling":
-			return createAdaptivePollingStrategy(client, strategy);
-		case "redis_streams":
-			return createRedisStreamsStrategy(client, strategy, workflowRegistry, workerShards);
-		default:
-			return strategy satisfies never;
-	}
-}
-
-/**
- * Simple polling subscriber strategy configuration
- */
-export interface PollingSubscriberStrategy {
-	type: "polling";
-
-	/**
-	 * Polling interval in milliseconds
-	 * @default 100
-	 */
-	intervalMs?: number;
-
-	/**
-	 * Maximum retry interval in milliseconds when polling fails
-	 * @default 30_000
-	 */
-	maxRetryIntervalMs?: number;
-
-	/**
-	 * Polling interval when at capacity (milliseconds)
-	 * @default 50
-	 */
-	atCapacityIntervalMs?: number;
-}
-
-/**
- * Adaptive polling subscriber strategy configuration
- */
-export interface AdaptivePollingSubscriberStrategy extends AdaptivePollingConfig {
-	type: "adaptive_polling";
-
-	/**
-	 * Polling interval when at capacity (milliseconds)
-	 * @default 50
-	 */
-	atCapacityIntervalMs?: number;
-}
+import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
 
 /**
  * Redis Streams subscriber strategy configuration
@@ -101,48 +45,6 @@ export interface RedisStreamsSubscriberStrategy {
 	 */
 	claimMinIdleTimeMs?: number;
 }
-
-export type SubscriberStrategy =
-	| PollingSubscriberStrategy
-	| AdaptivePollingSubscriberStrategy
-	| RedisStreamsSubscriberStrategy;
-
-export interface SubscriberStrategyBuilder<T extends ResolvedSubscriberStrategy> {
-	init(workerId: string, callbacks: StrategyCallbacks): Promise<T>;
-}
-
-export interface StrategyCallbacks {
-	onError?: (error: Error) => void;
-	onStop?: () => Promise<void>;
-}
-
-export interface BaseResolvedSubscriberStrategy {
-	getNextDelay(context: SubscriberDelayContext): number;
-	getNextBatch(size: number): Promise<WorkflowRunId[]>;
-}
-
-type ResolvedPollingSubscriberStrategy =
-	& BaseResolvedSubscriberStrategy
-	& { type: "polling" };
-
-type ResolvedAdaptivePollingSubscriberStrategy =
-	& BaseResolvedSubscriberStrategy
-	& { type: "adaptive_polling" };
-
-type ResolvedRedisStreamsSubscriberStrategy =
-	& BaseResolvedSubscriberStrategy
-	& { type: "redis_streams" };
-
-export type ResolvedSubscriberStrategy =
-	| ResolvedPollingSubscriberStrategy
-	| ResolvedAdaptivePollingSubscriberStrategy
-	| ResolvedRedisStreamsSubscriberStrategy;
-
-export type SubscriberDelayContext =
-	| { type: "polled"; foundWork: boolean }
-	| { type: "retry"; attemptNumber: number }
-	| { type: "heartbeat" }
-	| { type: "at_capacity" };
 
 const WorkflowRunReadyMessageDataSchema = z.object({
 	type: z.literal("workflow_run_ready"),
@@ -214,93 +116,12 @@ interface ClaimableRedisStreamMessage {
 	messageId: string;
 }
 
-function createPollingStrategy(
-	client: Client,
-	strategy: PollingSubscriberStrategy,
-): SubscriberStrategyBuilder<ResolvedPollingSubscriberStrategy> {
-	const intervalMs = strategy.intervalMs ?? 100;
-	const maxRetryIntervalMs = strategy.maxRetryIntervalMs ?? 30_000;
-	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;
-
-	const getNextDelay = (ctx: SubscriberDelayContext) => {
-		switch (ctx.type) {
-			case "polled":
-			case "heartbeat":
-				return intervalMs;
-			case "at_capacity":
-				return atCapacityIntervalMs;
-			case "retry": {
-				const retryParams = getRetryParams(ctx.attemptNumber, {
-					type: "jittered",
-					maxAttempts: Infinity,
-					baseDelayMs: intervalMs,
-					maxDelayMs: maxRetryIntervalMs,
-				});
-				if (!retryParams.retriesLeft) {
-					return maxRetryIntervalMs;
-				}
-				return retryParams.delayMs;
-			}
-			default:
-				return ctx satisfies never;
-		}
-	};
-
-	const getNextBatch = (size: number) => client.workflowRunRepository.getReadyIds(size);
-
-	return {
-		async init(_workerId: string, _callbacks: StrategyCallbacks) {
-			return {
-				type: strategy.type,
-				getNextDelay,
-				getNextBatch,
-			};
-		},
-	};
-}
-
-function createAdaptivePollingStrategy(
-	client: Client,
-	strategy: AdaptivePollingSubscriberStrategy,
-): SubscriberStrategyBuilder<ResolvedAdaptivePollingSubscriberStrategy> {
-	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;
-
-	const adaptive = new AdaptivePollingStrategy(strategy);
-
-	const getNextDelay = (ctx: SubscriberDelayContext) => {
-		switch (ctx.type) {
-			case "polled":
-				return ctx.foundWork ? adaptive.recordWorkFound() : adaptive.recordNoWork();
-			case "retry":
-				return adaptive.forceSlowPolling();
-			case "heartbeat":
-				return adaptive.recordNoWork();
-			case "at_capacity":
-				return atCapacityIntervalMs;
-			default:
-				return ctx satisfies never;
-		}
-	};
-
-	const getNextBatch = (size: number) => client.workflowRunRepository.getReadyIds(size);
-
-	return {
-		async init(_workerId: string, _callbacks: StrategyCallbacks) {
-			return {
-				type: strategy.type,
-				getNextDelay,
-				getNextBatch,
-			};
-		},
-	};
-}
-
-function createRedisStreamsStrategy(
+export function createRedisStreamsStrategy(
 	client: Client,
 	strategy: RedisStreamsSubscriberStrategy,
 	workflowRegistry: WorkflowRegistry,
 	workerShards?: string[],
-): SubscriberStrategyBuilder<ResolvedRedisStreamsSubscriberStrategy> {
+): SubscriberStrategyBuilder {
 	const redis = client.getRedisConnection();
 
 	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflowRegistry, workerShards);

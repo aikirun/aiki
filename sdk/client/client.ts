@@ -1,10 +1,9 @@
 import { initWorkflowRunRepository, type WorkflowRunRepository } from "../workflow/run/repository.ts";
 import {
-	type ResolvedSubscriberStrategy,
 	resolveSubscriberStrategy,
 	type SubscriberStrategy,
 	type SubscriberStrategyBuilder,
-} from "./strategies/subscriber-strategies.ts";
+} from "./subscribers/strategy-resolver.ts";
 import type { WorkflowRegistry } from "../workflow/registry.ts";
 import { Redis } from "redis";
 
@@ -34,7 +33,7 @@ export interface Client {
 		strategy: SubscriberStrategy,
 		registry: WorkflowRegistry,
 		workerShards?: string[],
-	) => SubscriberStrategyBuilder<ResolvedSubscriberStrategy>;
+	) => SubscriberStrategyBuilder;
 	getServerUrl: () => string;
 	getRedisConnection: () => Redis;
 }
@@ -51,7 +50,7 @@ class ClientImpl implements Client {
 		strategy: SubscriberStrategy,
 		registry: WorkflowRegistry,
 		workerShards?: string[],
-	): SubscriberStrategyBuilder<ResolvedSubscriberStrategy> {
+	): SubscriberStrategyBuilder {
 		return resolveSubscriberStrategy(this, strategy, registry, workerShards);
 	}
 
