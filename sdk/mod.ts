@@ -1,7 +1,7 @@
-import { client } from "./client/definition.ts";
-import { task } from "./task/definition.ts";
-import { worker } from "./worker/definition.ts";
-import { workflow } from "./workflow/definition.ts";
+import { client } from "./client/client.ts";
+import { task } from "./task/task.ts";
+import { worker } from "./worker/worker.ts";
+import { workflow } from "./workflow/workflow.ts";
 
 export * from "./client/mod.ts";
 export * from "./task/mod.ts";

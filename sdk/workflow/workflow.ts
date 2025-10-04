@@ -1,7 +1,7 @@
 import type { TriggerStrategy } from "@lib/trigger/mod.ts";
 import type { BrandedString } from "@lib/string/mod.ts";
 import type { WorkflowRunContext, WorkflowRunParams } from "./run/context.ts";
-import type { Client } from "../client/definition.ts";
+import type { Client } from "../client/client.ts";
 import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "./run/result-handle.ts";
 
 export function workflow(params: WorkflowParams): Workflow {

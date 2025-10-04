@@ -1,6 +1,6 @@
 import { assertEquals, assertExists } from "https://deno.land/std@0.201.0/assert/mod.ts";
 import { resolveSubscriberStrategy, type RedisStreamsSubscriberStrategy } from "./subscriber-strategies.ts";
-import type { Client } from "../definition.ts";
+import type { Client } from "../client.ts";
 
 // Mock client for testing
 const mockClient = {

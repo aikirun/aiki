@@ -1,5 +1,5 @@
 import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "../task/example.ts";
-import { workflow } from "./definition.ts";
+import { workflow } from "./workflow.ts";
 
 export const morningWorkflow = workflow({ name: "morning-routine" });
 

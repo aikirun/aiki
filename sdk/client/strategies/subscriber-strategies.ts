@@ -1,6 +1,6 @@
 import { type AdaptivePollingConfig, AdaptivePollingStrategy } from "@lib/polling/adaptive.ts";
 import { getRetryParams } from "@lib/retry/mod.ts";
-import type { Client } from "../definition.ts";
+import type { Client } from "../client.ts";
 import type { Redis } from "redis";
 import type { WorkflowRegistry } from "../../workflow/registry.ts";
 import type { WorkflowRunId } from "../../workflow/run/repository.ts";

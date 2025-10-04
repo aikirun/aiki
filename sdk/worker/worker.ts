@@ -1,10 +1,10 @@
-import type { Client } from "../client/definition.ts";
+import type { Client } from "../client/client.ts";
 import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
-import { initWorkflowRun } from "../workflow/run/definition.ts";
+import { initWorkflowRun } from "../workflow/run/workflow-run.ts";
 import type { WorkflowRunId, WorkflowRunRepository, WorkflowRunRow } from "../workflow/run/repository.ts";
 import { isNonEmptyArray } from "@lib/array/mod.ts";
 import type { NonEmptyArray } from "@lib/array/mod.ts";
-import type { WorkflowVersion } from "../workflow/definition.ts";
+import type { WorkflowVersion } from "../workflow/workflow.ts";
 import { delay } from "@lib/async/mod.ts";
 import type { ResolvedSubscriberStrategy, SubscriberStrategyBuilder, SubscriberStrategy } from "../client/strategies/subscriber-strategies.ts";
 

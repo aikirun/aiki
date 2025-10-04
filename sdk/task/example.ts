@@ -1,4 +1,4 @@
-import { type Task, task } from "./definition.ts";
+import { type Task, task } from "./task.ts";
 
 export const ringAlarm: Task<{ song: string }, string> = task({
 	name: "ring-alarm",

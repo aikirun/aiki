@@ -1,4 +1,4 @@
-import type { Workflow, WorkflowName } from "./definition.ts";
+import type { Workflow, WorkflowName } from "./workflow.ts";
 
 export function initWorkflowRegistry(): WorkflowRegistry {
 	return new WorkflowRegistryImpl();

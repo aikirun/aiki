@@ -1,1 +1,1 @@
-export * from "./definition.ts";
+export * from "./worker.ts";
