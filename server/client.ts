@@ -10,3 +10,5 @@ export function apiClient(params: { baseUrl: string }) {
         ],
     });
 }
+
+export type ApiClient = ReturnType<typeof apiClient>;
