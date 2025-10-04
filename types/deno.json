@@ -1,0 +1,8 @@
+{
+	"name": "@aiki/types",
+	"version": "0.1.0",
+	"imports": {
+		"@lib/": "../lib/"
+	},
+	"exports": "./mod.ts"
+}
