@@ -1,5 +1,5 @@
 import type { Client } from "../client.ts";
-import type { WorkflowRegistry } from "../../workflow/registry.ts";
+import type { WorkflowName } from "../../workflow/workflow.ts";
 import type { WorkflowRunId } from "../../workflow/run/repository.ts";
 import { createPollingStrategy, type PollingSubscriberStrategy } from "./polling.ts";
 import { type AdaptivePollingSubscriberStrategy, createAdaptivePollingStrategy } from "./adaptive-polling.ts";
@@ -34,7 +34,7 @@ export type SubscriberDelayContext =
 export function resolveSubscriberStrategy(
 	client: Client,
 	strategy: SubscriberStrategy,
-	workflowRegistry: WorkflowRegistry,
+	workflowNames: WorkflowName[],
 	workerShards?: string[],
 ): SubscriberStrategyBuilder {
 	switch (strategy.type) {
@@ -43,7 +43,7 @@ export function resolveSubscriberStrategy(
 		case "adaptive_polling":
 			return createAdaptivePollingStrategy(client, strategy);
 		case "redis_streams":
-			return createRedisStreamsStrategy(client, strategy, workflowRegistry, workerShards);
+			return createRedisStreamsStrategy(client, strategy, workflowNames, workerShards);
 		default:
 			return strategy satisfies never;
 	}

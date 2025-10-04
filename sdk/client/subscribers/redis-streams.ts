@@ -1,7 +1,7 @@
 import { getRetryParams } from "@lib/retry/mod.ts";
 import type { Client } from "../client.ts";
 import type { Redis } from "redis";
-import type { WorkflowRegistry } from "../../workflow/registry.ts";
+import type { WorkflowName } from "../../workflow/workflow.ts";
 import type { WorkflowRunId } from "../../workflow/run/repository.ts";
 import { distributeRoundRobin, groupBy, isNonEmptyArray, shuffleArray } from "@lib/array/utils.ts";
 import type { NonEmptyArray } from "@lib/array/types.ts";
@@ -119,12 +119,12 @@ interface ClaimableRedisStreamMessage {
 export function createRedisStreamsStrategy(
 	client: Client,
 	strategy: RedisStreamsSubscriberStrategy,
-	workflowRegistry: WorkflowRegistry,
+	workflowNames: WorkflowName[],
 	workerShards?: string[],
 ): SubscriberStrategyBuilder {
 	const redis = client.redisStreams.getConnection();
 
-	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflowRegistry, workerShards);
+	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflowNames, workerShards);
 	const streams = Array.from(streamConsumerGroupMap.keys());
 
 	const intervalMs = strategy.intervalMs ?? 50;
@@ -187,8 +187,7 @@ export function createRedisStreamsStrategy(
 	};
 }
 
-function getRedisStreamConsumerGroupMap(workflowRegistry: WorkflowRegistry, shards?: string[]): Map<string, string> {
-	const workflowNames = workflowRegistry._internal.getNames();
+function getRedisStreamConsumerGroupMap(workflowNames: WorkflowName[], shards?: string[]): Map<string, string> {
 
 	if (!shards || !isNonEmptyArray(shards)) {
 		return new Map(workflowNames.map((workflowName) => [

@@ -13,9 +13,10 @@ export async function worker(
 	params: WorkerParams,
 ): Promise<Worker> {
 	const workflowRegistry = initWorkflowRegistry();
-	const subscriberStrategyBuilder = client.createSubscriberStrategy(
+	const workflowNames = workflowRegistry._internal.getNames();
+	const subscriberStrategyBuilder = client.subscriber.create(
 		params.subscriber ?? { type: "polling" },
-		workflowRegistry,
+		workflowNames,
 		params.shards,
 	);
 	return Promise.resolve(

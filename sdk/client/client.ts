@@ -4,7 +4,7 @@ import {
 	type SubscriberStrategy,
 	type SubscriberStrategyBuilder,
 } from "./subscribers/strategy-resolver.ts";
-import type { WorkflowRegistry } from "../workflow/registry.ts";
+import type { WorkflowName } from "../workflow/workflow.ts";
 import { Redis } from "redis";
 
 export async function client(params: ClientParams): Promise<Client> {
@@ -29,12 +29,14 @@ export interface ClientParams {
 
 export interface Client {
 	workflowRunRepository: WorkflowRunRepository;
-	createSubscriberStrategy: (
-		strategy: SubscriberStrategy,
-		registry: WorkflowRegistry,
-		workerShards?: string[],
-	) => SubscriberStrategyBuilder;
 	getServerUrl: () => string;
+	subscriber: {
+		create: (
+			strategy: SubscriberStrategy,
+			workflowNames: WorkflowName[],
+			workerShards?: string[],
+		) => SubscriberStrategyBuilder;
+	};
 	redisStreams: {
 		getConnection: () => Redis;
 		closeConnection: () => Promise<void>;
@@ -42,25 +44,22 @@ export interface Client {
 }
 
 class ClientImpl implements Client {
-	private redisStreamsConnection?: Redis;
+	public readonly subscriber: Client["subscriber"];
 	public readonly redisStreams: Client["redisStreams"];
+	private redisStreamsConnection?: Redis;
 
 	constructor(
 		public readonly workflowRunRepository: WorkflowRunRepository,
 		private readonly params: ClientParams,
 	) {
+		this.subscriber = {
+			create: (strategy, workflowNames, workerShards) =>
+				resolveSubscriberStrategy(this, strategy, workflowNames, workerShards),
+		};
 		this.redisStreams = {
 			getConnection: () => this.getRedisStreamsConnection(),
 			closeConnection: () => this.closeRedisStreamsConnection(),
 		};
-	}
-
-	public createSubscriberStrategy(
-		strategy: SubscriberStrategy,
-		registry: WorkflowRegistry,
-		workerShards?: string[],
-	): SubscriberStrategyBuilder {
-		return resolveSubscriberStrategy(this, strategy, registry, workerShards);
 	}
 
 	public getServerUrl(): string {
