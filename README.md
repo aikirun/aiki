@@ -204,7 +204,7 @@ import { workflow, task, worker, client } from "@aiki/sdk";
 
 // Set up the infrastructure with Redis for high-performance messaging
 const aikiClient = await client({
-  serverUrl: "localhost:9090",
+  baseUrl: "localhost:9090",
   redis: {
     host: "localhost",
     port: 6379
