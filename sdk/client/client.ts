@@ -24,7 +24,7 @@ export interface RedisConfig {
 
 export interface ClientParams {
 	serverUrl: string;
-	redis?: RedisConfig;
+	redisStreams?: RedisConfig;
 }
 
 export interface Client {
@@ -60,10 +60,10 @@ class ClientImpl implements Client {
 
 	public getRedisConnection(): Redis {
 		if (!this.redisConnection) {
-			if (!this.params.redis) {
-				throw new Error("Redis configuration not provided to client. Add 'redis' to ClientParams.");
+			if (!this.params.redisStreams) {
+				throw new Error("Redis Streams configuration not provided to client. Add 'redisStreams' to ClientParams.");
 			}
-			this.redisConnection = new Redis(this.params.redis);
+			this.redisConnection = new Redis(this.params.redisStreams);
 		}
 		return this.redisConnection;
 	}
