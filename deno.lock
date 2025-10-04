@@ -4,6 +4,7 @@
     "jsr:@std/assert@^1.0.13": "1.0.13",
     "jsr:@std/async@1": "1.0.12",
     "jsr:@std/async@^1.0.12": "1.0.12",
+    "jsr:@std/dotenv@0.225": "0.225.5",
     "jsr:@std/internal@^1.0.6": "1.0.6",
     "npm:@trpc/client@11": "11.6.0_@trpc+server@11.6.0__typescript@5.9.3_typescript@5.9.3",
     "npm:@trpc/server@11": "11.6.0_typescript@5.9.3",
@@ -20,6 +21,9 @@
     },
     "@std/async@1.0.12": {
       "integrity": "d1bfcec459e8012846fe4e38dfc4241ab23240ecda3d8d6dfcf6d81a632e803d"
+    },
+    "@std/dotenv@0.225.5": {
+      "integrity": "9ce6f9d0ec3311f74a32535aa1b8c62ed88b1ab91b7f0815797d77a6f60c922f"
     },
     "@std/internal@1.0.6": {
       "integrity": "9533b128f230f73bd209408bb07a4b12f8d4255ab2a4d22a1fd6d87304aca9a4"
@@ -144,6 +148,7 @@
     "dependencies": [
       "jsr:@std/assert@^1.0.13",
       "jsr:@std/async@^1.0.12",
+      "jsr:@std/dotenv@0.225",
       "npm:@trpc/client@11",
       "npm:@trpc/server@11",
       "npm:ioredis@^5.4.1",

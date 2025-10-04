@@ -3,7 +3,7 @@ import { appRouter } from "./router.ts";
 import { loadConfig } from "./config/mod.ts";
 
 if (import.meta.main) {
-	const config = loadConfig();
+	const config = await loadConfig();
 
 	const server = createHTTPServer({
 		router: appRouter,

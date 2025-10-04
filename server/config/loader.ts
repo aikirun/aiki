@@ -1,9 +1,14 @@
+import { load } from "@std/dotenv";
 import { type Config, configSchema } from "./schema.ts";
 
-export function loadConfig(): Config {
+export async function loadConfig(): Promise<Config> {
+	await load({
+		export: true,
+		envPath: new URL("../.env", import.meta.url).pathname,
+	});
+
 	const raw = {
-		PORT: Deno.env.get("PORT"),
-		NODE_ENV: Deno.env.get("NODE_ENV"),
+		port: Deno.env.get("PORT"),
 	};
 
 	const result = configSchema.safeParse(raw);
