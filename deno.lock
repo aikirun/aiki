@@ -9,7 +9,6 @@
     "npm:@trpc/server@11": "11.6.0_typescript@5.9.3",
     "npm:@types/node@*": "22.15.15",
     "npm:ioredis@^5.4.1": "5.8.0",
-    "npm:zod@^3.23.8": "3.25.76",
     "npm:zod@^4.1.11": "4.1.11"
   },
   "jsr": {
@@ -103,9 +102,6 @@
     "undici-types@6.21.0": {
       "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="
     },
-    "zod@3.25.76": {
-      "integrity": "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="
-    },
     "zod@4.1.11": {
       "integrity": "sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg=="
     }
@@ -150,15 +146,8 @@
       "jsr:@std/async@^1.0.12",
       "npm:@trpc/client@11",
       "npm:@trpc/server@11",
+      "npm:ioredis@^5.4.1",
       "npm:zod@^4.1.11"
-    ],
-    "members": {
-      "sdk": {
-        "dependencies": [
-          "npm:ioredis@^5.4.1",
-          "npm:zod@^3.23.8"
-        ]
-      }
-    }
+    ]
   }
 }

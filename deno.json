@@ -14,7 +14,8 @@
 		"@std/async": "jsr:@std/async@^1.0.12",
 		"@trpc/client": "npm:@trpc/client@^11.0.0",
 		"@trpc/server": "npm:@trpc/server@^11.0.0",
-		"zod": "npm:zod@^4.1.11"
+		"zod": "npm:zod@^4.1.11",
+		"redis": "npm:ioredis@^5.4.1"
 	},
 	"fmt": {
 		"useTabs": true,
