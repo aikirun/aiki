@@ -1,8 +1,8 @@
 import type { BrandedString } from "@lib/string/mod.ts";
 import {
-	WorkflowVersionImpl,
 	type WorkflowVersion,
 	type WorkflowVersionId,
+	WorkflowVersionImpl,
 	type WorkflowVersionParams,
 } from "./version/workflow-version.ts";
 
@@ -53,4 +53,3 @@ class WorkflowImpl implements Workflow {
 		return workflowVersion;
 	}
 }
-
