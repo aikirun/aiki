@@ -14,7 +14,7 @@ export interface ExponentialRetryStrategy {
 	type: "exponential";
 	maxAttempts: number;
 	baseDelayMs: number;
-	factor?: number; // TODO: document default value
+	factor?: number;
 	maxDelayMs?: number;
 }
 
@@ -22,7 +22,7 @@ export interface JitteredRetryStrategy {
 	type: "jittered";
 	maxAttempts: number;
 	baseDelayMs: number;
-	jitterFactor?: number; // TODO: document default value
+	jitterFactor?: number;
 	maxDelayMs?: number;
 }
 
