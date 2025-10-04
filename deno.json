@@ -6,11 +6,15 @@
 		"noUncheckedIndexedAccess": true
 	},
 	"tasks": {
-		"dev": "deno run --watch main.ts"
+		"server": "deno run --allow-net --allow-read server/server.ts",
+		"server:watch": "deno run --allow-net --allow-read --watch server/server.ts"
 	},
 	"imports": {
 		"@std/assert": "jsr:@std/assert@^1.0.13",
-		"@std/async": "jsr:@std/async@^1.0.12"
+		"@std/async": "jsr:@std/async@^1.0.12",
+		"@trpc/client": "npm:@trpc/client@^11.0.0",
+		"@trpc/server": "npm:@trpc/server@^11.0.0",
+		"zod": "npm:zod@^4.1.11"
 	},
 	"fmt": {
 		"useTabs": true,
@@ -30,7 +34,9 @@
 		}
 	},
 	"workspace": [
-		"./sdk",
-		"./lib"
+		"./lib",
+		"./types",
+		"./server",
+		"./sdk"
 	]
 }
