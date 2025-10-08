@@ -312,6 +312,7 @@ async function processRedisStreamMessages(
 					`Invalid message structure in ${stream}/${messageId}:`,
 					messageData.error.format(),
 				);
+				// TODO: only acknoledge after message is truly processed
 				await redis.xack(stream, consumerGroup, messageId);
 				continue;
 			}
@@ -327,6 +328,7 @@ async function processRedisStreamMessages(
 					continue;
 			}
 
+			// TODO: only acknoledge after message is truly processed
 			await redis.xack(stream, consumerGroup, messageId);
 		}
 	}
