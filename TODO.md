@@ -93,3 +93,179 @@ This document tracks planned features and improvements for the Aiki durable work
 - Workers check cancellation status before updating storage with results
 - Consider using webhooks for serverless worker deployments
 - Focus on maintaining backward compatibility during feature additions
+
+
+
+### Add generic Dependencies type parameter to workflow() function. Dependencies flow to all versions automatically via generics.
+
+Changes:
+
+1. workflow(): Add generic <Dependencies = void> parameter, return Workflow<Dependencies>
+2. Workflow interface: Add Dependencies generic, pass to v() method and versions
+3. WorkflowVersion: Add Dependencies generic, pass to _execute() method
+4. WorkflowVersionParams: Add Dependencies generic, make run accept deps param (conditional on Dependencies)
+5. WorkflowRegistry.add(): Add generic, require dependencies parameter when Dependencies is not void (use conditional spread 
+args)
+6. WorkflowRegistryImpl: Store dependencies per workflow name in Map
+7. Worker.executeWorkflow(): Retrieve dependencies from registry, pass to workflowVersion._execute()
+
+  export interface Workflow<Dependencies = void> {
+    name: WorkflowName;
+    v: <Payload, Result>(
+      versionId: string,
+      params: WorkflowVersionParams<Payload, Result, Dependencies>
+    ) => WorkflowVersion<Payload, Result, Dependencies>;
+  }
+
+  // WorkflowVersionParams knows about Dependencies
+  export interface WorkflowVersionParams<Payload, Result, Dependencies = void> {
+    run: Dependencies extends void
+      ? (ctx: WorkflowRunContext<Payload, Result>, payload: Payload) => Promise<Result>
+      : (ctx: WorkflowRunContext<Payload, Result>, payload: Payload, deps: Dependencies) => Promise<Result>;
+    trigger?: TriggerStrategy;
+  }
+
+  // registry.ts
+  export interface WorkflowRegistry {
+    add: <Dependencies = void>(
+      workflow: Workflow<Dependencies>,
+      ...args: Dependencies extends void ? [] : [dependencies: Dependencies]
+    ) => WorkflowRegistry;
+  }
+
+API:
+
+const wf = workflow<{ email: EmailService }>({ name: "order" });
+wf.v("v1", {
+    run: async (ctx, payload: { id: string }, deps) => {
+    await deps.email.send();
+    }
+});
+worker.workflowRegistry.add(wf, { email: new SendgridService() });
+
+## We might also add task dependencies
+
+### Also, to solve the problem about workflow version specific versioning,
+we might update the workflowregistry add to accept workflow version not workflow
+
+
+#### Add logger to client and use internally in SDK
+export interface Logger {
+    trace(message: string, metadata?: Record<string, unknown>): void;
+    debug(message: string, metadata?: Record<string, unknown>): void;
+    info(message: string, metadata?: Record<string, unknown>): void;
+    warn(message: string, metadata?: Record<string, unknown>): void;
+    error(message: string, metadata?: Record<string, unknown>): void;
+    child(metadata: Record<string, unknown>): Logger;
+  }
+
+If the app happens to use a logger that accepts other params, they can use a closure e.g
+const getLogger = (ctx) => ({
+    info(message, meta) => logger.info(ctx, message, meta),
+    child(meta) => logger
+});
+
+const client = new Client({
+    baseUrl: "http://localhost:3000",
+    logger: pino({ level: 'info' }), // Optional, defaults to console
+  });
+
+  class ClientImpl implements Client {
+    private logger: Logger;
+
+    constructor(private readonly params: ClientParams) {
+      this.logger = params.logger ?? new ConsoleLogger();
+
+      this.rpcClient = new RpcClient({
+        baseUrl: params.baseUrl,
+        timeout: 30000,
+        logger: this.logger.child({ component: "rpc" }),
+      });
+    }
+
+    public _internal = {
+      getLogger: () => this.logger,
+      // ... other internal methods
+    };
+  }
+
+  class WorkerImpl implements Worker {
+    private logger: Logger;
+
+    constructor(
+      private readonly client: Client,
+      private readonly params: WorkerParams,
+    ) {
+      // Get logger from client and create worker-specific child
+      this.logger = client._internal.getLogger().child({
+        component: "worker",
+        workerId: this.id,
+      });
+    }
+
+    private async executeWorkflow(
+      workflowRunRow: WorkflowRunRow<unknown, unknown>,
+      workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
+    ): Promise<void> {
+      const workflowRun = await initWorkflowRun(
+        this.client.workflowRun,
+        workflowRunRow
+      );
+
+      // Create workflow-specific logger
+      const workflowLogger = this.logger.child({
+        workflowName: workflowRunRow.name,
+        workflowVersionId: workflowRunRow.versionId,
+        workflowRunId: workflowRunRow.id,
+      });
+
+      const dependencies = this.workflowRegistry._internal.getDependencies(
+        workflowRunRow.name,
+        workflowRunRow.versionId
+      );
+
+      await workflowVersion._execute(
+        { workflowRun, log: workflowLogger }, // Pass logger in context
+        workflowRunRow.params.payload,
+        dependencies
+      );
+    }
+  }
+
+
+   export interface WorkflowRunContext<Payload, Result> {
+    workflowRun: Omit<WorkflowRun<Payload, Result>, "params">;
+    log: Logger; // Workflow-specific logger with automatic context
+  }
+
+### Update function run to be exec. Also exec type should be 
+
+type ExecFunction<Payload, Result, Deps = void, Ctx = void> =
+    Ctx extends void
+      ? Deps extends void
+        ? (run: Run, payload: Payload) => Promise<Result>
+        : (run: Run, payload: Payload, deps: Deps) => Promise<Result>
+      : Deps extends void
+        ? (run: Run, payload: Payload, ctx: Ctx) => Promise<Result>
+        : (run: Run, payload: Payload, deps: Deps, ctx: Ctx) => Promise<Result>;
+
+actually, the above is wrong, we should place xtx before deps
+exec: async (run, payload, ctx, deps) => Result
+
+
+Then we can rename ctx to run
+
+
+### Add create ctx to worker 
+// 3. Worker with context factory
+  const worker = await worker(client, {
+    createContext: (workflowRun) => ({
+      requestId: workflowRun.id,
+      userId: workflowRun.params.payload.userId,
+      tenantId: workflowRun.params.payload.tenantId,
+    })
+  });
+
+  OR maybe add it to workflow level? for better type safety.
+
+  Actually, we should support both!
