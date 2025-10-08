@@ -48,6 +48,7 @@ export interface WorkerParams {
 export interface Worker {
 	id: string;
 	workflowRegistry: WorkflowRegistry;
+	// TODO: this should not return a promise
 	start: () => Promise<void>;
 	stop: () => Promise<void>;
 }
