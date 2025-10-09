@@ -13,5 +13,8 @@
 		"./string": "./string/mod.ts",
 		"./testing/expect": "./testing/expect/mod.ts",
 		"./trigger": "./trigger/mod.ts"
+	},
+	"imports": {
+		"zod": "npm:zod@^4.1.12"
 	}
 }

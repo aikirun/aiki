@@ -7,5 +7,9 @@
 		"./task-run": "./task-run/mod.ts",
 		"./workflow": "./workflow/mod.ts",
 		"./workflow-run": "./workflow-run/mod.ts"
+	},
+	"imports": {
+		"@orpc/contract": "npm:@orpc/contract@^1.9.3",
+		"zod": "npm:zod@^4.1.12"
 	}
 }

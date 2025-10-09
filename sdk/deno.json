@@ -9,8 +9,9 @@
 		"./workflow": "./workflow/mod.ts"
 	},
 	"imports": {
-		"@trpc/client": "npm:@trpc/client@^11.0.0",
-		"zod": "npm:zod@^4.1.11",
+		"@orpc/client": "npm:@orpc/client@^1.9.3",
+		"@orpc/contract": "npm:@orpc/contract@^1.9.3",
+		"zod": "npm:zod@^4.1.12",
 		"redis": "npm:ioredis@^5.4.1"
 	}
 }
