@@ -22,11 +22,11 @@ type TestUndefinedToPartial = ExpectTrue<
 export type MaybeField<Key extends string, Value> = Value extends undefined ? { [K in Key]?: undefined }
 	: { [K in Key]: Value };
 
-export type EmptyObject = Record<PropertyKey, never>;
+export type EmptyRecord = Record<PropertyKey, never>;
 
 export type NonArrayObject<T> = T extends object ? (T extends ReadonlyArray<unknown> ? never : T) : never;
 //#region <NonArrayObject Tests>
-type TestNonArrayObjectPlanObject = ExpectTrue<Equal<NonArrayObject<EmptyObject>, EmptyObject>>;
+type TestNonArrayObjectPlanObject = ExpectTrue<Equal<NonArrayObject<EmptyRecord>, EmptyRecord>>;
 type TestNonArrayObjectFunction = ExpectTrue<Equal<NonArrayObject<() => unknown>, () => unknown>>;
 type TestNonArrayObjectArray = ExpectTrue<Equal<NonArrayObject<[]>, never>>;
 type TestNonArrayReadonlyArray = ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>;
