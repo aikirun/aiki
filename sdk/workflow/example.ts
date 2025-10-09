@@ -3,22 +3,29 @@ import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "../task/example.ts";
 
 export const morningWorkflow = workflow({ name: "morning-routine" });
 
-export const morningWorkflowV1 = morningWorkflow.v("1.0", {
-	async run(ctx, payload: { a: string; b: number }): Promise<string> {
-		const alarmResult = await ringAlarm.run(ctx, {
-			payload: { song: payload.a },
-		});
+export const morningWorkflowV1 = morningWorkflow
+	.v("1.0", {
+		async exec(ctx, payload: { a: string; b: number }): Promise<string> {
+			const alarmResult = await ringAlarm.run(ctx, {
+				payload: { song: payload.a },
+			});
 
-		const stretchResult = await stretch.run(ctx, {
-			payload: { duration: payload.b },
-		});
+			const stretchResult = await stretch.run(ctx, {
+				payload: { duration: payload.b },
+			});
 
-		return `Alarm: ${alarmResult}, Stretch: ${stretchResult}`;
-	},
-});
+			return `Alarm: ${alarmResult}, Stretch: ${stretchResult}`;
+		},
+	})
+	.withOptions({
+		trigger: {
+			type: "delayed",
+			delayMs: 60 * 1000,
+		},
+	});
 
 export const morningWorkflowV2 = morningWorkflow.v("2.0", {
-	async run(ctx, payload: { a: boolean }) {
+	async exec(ctx, payload: { a: boolean }) {
 		await drinkCoffee.run(ctx, {
 			payload: { withSugar: payload.a },
 		});
@@ -28,7 +35,7 @@ export const morningWorkflowV2 = morningWorkflow.v("2.0", {
 export const eveningWorkflow = workflow({ name: "evening-routine" });
 
 export const eveningRoutineWorkflowV1 = eveningWorkflow.v("1.0.0", {
-	async run(ctx) {
+	async exec(ctx) {
 		await sayPrayer.run(ctx, {});
 	},
 });
