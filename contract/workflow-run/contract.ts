@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { os } from "@orpc/server";
+import { oc } from "@orpc/contract";
 import type { WorkflowRunId, WorkflowRunParams, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
 import {
 	workflowRunParamsSchema,
@@ -10,7 +10,7 @@ import {
 import type { EmptyObject } from "../../lib/object/types.ts";
 import type { TaskRunResult } from "../task/types.ts";
 import { taskRunResultSchema } from "../task/schemas.ts";
-import type { ProcedureWrapper } from "../procedure-wrapper.ts";
+import type { Contract } from "../contract-wrapper.ts";
 
 export interface GetReadyIdsRequestV1 {
 	size: number;
@@ -20,7 +20,7 @@ export interface GetReadyIdsResponseV1 {
 	ids: WorkflowRunId[];
 }
 
-const getReadyIdsV1: ProcedureWrapper<GetReadyIdsRequestV1, GetReadyIdsResponseV1> = os
+const getReadyIdsV1: Contract<GetReadyIdsRequestV1, GetReadyIdsResponseV1> = oc
 	.input(z.object({
 		size: z.number().int().positive(),
 	}))
@@ -36,7 +36,7 @@ export interface GetByIdResponseV1 {
 	run?: WorkflowRunRow<unknown, unknown>;
 }
 
-const getByIdV1: ProcedureWrapper<GetByIdRequestV1, GetByIdResponseV1> = os
+const getByIdV1: Contract<GetByIdRequestV1, GetByIdResponseV1> = oc
 	.input(z.object({
 		id: z.string().min(1),
 	}))
@@ -52,7 +52,7 @@ export interface GetResultResponseV1 {
 	result: WorkflowRunResult<unknown>;
 }
 
-const getResultV1: ProcedureWrapper<GetResultRequestV1, GetResultResponseV1> = os
+const getResultV1: Contract<GetResultRequestV1, GetResultResponseV1> = oc
 	.input(z.object({
 		id: z.string().min(1),
 	}))
@@ -70,7 +70,7 @@ export interface CreateResponseV1 {
 	run: WorkflowRunRow<unknown, unknown>;
 }
 
-const createV1: ProcedureWrapper<CreateRequestV1, CreateResponseV1> = os
+const createV1: Contract<CreateRequestV1, CreateResponseV1> = oc
 	.input(z.object({
 		name: z.string().min(1),
 		versionId: z.string().min(1),
@@ -88,7 +88,7 @@ export interface AddSubTaskRunResultRequestV1 {
 
 export type AddSubTaskRunResultResponseV1 = EmptyObject;
 
-const addSubTaskRunResultV1: ProcedureWrapper<AddSubTaskRunResultRequestV1, AddSubTaskRunResultResponseV1> = os
+const addSubTaskRunResultV1: Contract<AddSubTaskRunResultRequestV1, AddSubTaskRunResultResponseV1> = oc
 	.input(z.object({
 		id: z.string(),
 		taskPath: z.string(),
@@ -103,7 +103,7 @@ export interface UpdateStateRequestV1 {
 
 export type UpdateStateResponseV2 = EmptyObject;
 
-const updateStateV1: ProcedureWrapper<UpdateStateRequestV1, UpdateStateResponseV2> = os
+const updateStateV1: Contract<UpdateStateRequestV1, UpdateStateResponseV2> = oc
 	.input(z.object({
 		id: z.string().min(1),
 		state: workflowRunStateSchema,
@@ -118,3 +118,5 @@ export const workflowRunProcedures = {
 	addSubTaskRunResultV1,
 	updateStateV1,
 };
+
+export type WorkflowRunProcedures = typeof workflowRunProcedures;
