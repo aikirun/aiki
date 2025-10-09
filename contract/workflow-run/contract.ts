@@ -7,10 +7,10 @@ import {
 	workflowRunRowSchema,
 	workflowRunStateSchema,
 } from "./schemas.ts";
-import type { EmptyObject } from "../../lib/object/types.ts";
-import type { TaskRunResult } from "../task/types.ts";
-import { taskRunResultSchema } from "../task/schemas.ts";
+import type { EmptyRecord } from "../../lib/object/types.ts";
+import type { TaskRunResult } from "../task-run/types.ts";
 import type { Contract } from "../contract-wrapper.ts";
+import { taskRunResultSchema } from "../task-run/schemas.ts";
 
 export interface GetReadyIdsRequestV1 {
 	size: number;
@@ -86,7 +86,7 @@ export interface AddSubTaskRunResultRequestV1 {
 	taskResult: TaskRunResult<unknown>;
 }
 
-export type AddSubTaskRunResultResponseV1 = EmptyObject;
+export type AddSubTaskRunResultResponseV1 = EmptyRecord;
 
 const addSubTaskRunResultV1: Contract<AddSubTaskRunResultRequestV1, AddSubTaskRunResultResponseV1> = oc
 	.input(z.object({
@@ -101,7 +101,7 @@ export interface UpdateStateRequestV1 {
 	state: WorkflowRunState;
 }
 
-export type UpdateStateResponseV2 = EmptyObject;
+export type UpdateStateResponseV2 = EmptyRecord;
 
 const updateStateV1: Contract<UpdateStateRequestV1, UpdateStateResponseV2> = oc
 	.input(z.object({
@@ -110,7 +110,7 @@ const updateStateV1: Contract<UpdateStateRequestV1, UpdateStateResponseV2> = oc
 	}))
 	.output(z.object({}));
 
-export const workflowRunProcedures = {
+export const workflowRunContract = {
 	getReadyIdsV1,
 	getByIdV1,
 	getResultV1,
@@ -119,4 +119,4 @@ export const workflowRunProcedures = {
 	updateStateV1,
 };
 
-export type WorkflowRunProcedures = typeof workflowRunProcedures;
+export type WorkflowRunContract = typeof workflowRunContract;

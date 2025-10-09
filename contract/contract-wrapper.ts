@@ -1,9 +1,8 @@
-import type { z } from "zod";
-import type { ContractProcedureBuilderWithInputOutput } from "@orpc/contract";
+import type { ContractProcedure, Schema } from "@orpc/contract";
 
-export type Contract<I, O> = ContractProcedureBuilderWithInputOutput<
-	z.ZodType<I>,
-	z.ZodType<O>,
+export type Contract<I, O> = ContractProcedure<
+	Schema<I, unknown>,
+	Schema<unknown, O>,
 	Record<never, never>,
 	Record<never, never>
 >;
