@@ -60,3 +60,7 @@ type TestRequiredDeep = ExpectTrue<
 	>
 >;
 //#endregion
+
+export type UnionToRecord<T extends string> = {
+	[K in T]: K;
+};
