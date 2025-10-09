@@ -1,7 +1,9 @@
-import type { WorkflowName } from "@aiki/types/workflow";
+import type { WorkflowName } from "@aiki/contract/workflow";
 import { Redis } from "redis";
-import { createTRPCClient, httpBatchLink, type TRPCClient } from "@trpc/client";
-import type { AppRouter } from "@aiki/server";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import type { WorkflowRunContract } from "@aiki/contract/workflow-run";
+import type { ContractRouterClient } from "@orpc/contract";
 import {
 	resolveSubscriberStrategy,
 	type SubscriberStrategy,
@@ -28,7 +30,7 @@ export interface RedisConfig {
 }
 
 export interface Client {
-	api: TRPCClient<AppRouter>;
+	workflowRun: ContractRouterClient<WorkflowRunContract>;
 	_internal: {
 		subscriber: {
 			create: (
@@ -45,18 +47,16 @@ export interface Client {
 }
 
 class ClientImpl implements Client {
-	public readonly api: TRPCClient<AppRouter>;
+	public readonly workflowRun: ContractRouterClient<WorkflowRunContract>;
 	public readonly _internal: Client["_internal"];
 	private redisStreamsConnection?: Redis;
 
 	constructor(private readonly params: ClientParams) {
-		this.api = createTRPCClient<AppRouter>({
-			links: [
-				httpBatchLink({
-					url: `${params.baseUrl}/api`,
-				}),
-			],
+		const rpcLink = new RPCLink({
+			url: `${params.baseUrl}`,
 		});
+		this.workflowRun = createORPCClient(rpcLink);
+
 		this._internal = {
 			subscriber: {
 				create: (strategy, workflowNames, workerShards) =>

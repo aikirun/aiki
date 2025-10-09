@@ -2,7 +2,8 @@ import type { Redis } from "redis";
 import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aiki/lib/array";
 import { z } from "zod";
 import { getRetryParams } from "@aiki/lib/retry";
-import type { WorkflowName, WorkflowRunId } from "@aiki/types/workflow";
+import type { WorkflowName } from "@aiki/contract/workflow";
+import type { WorkflowRunId } from "@aiki/contract/workflow-run";
 import type { Client } from "../client.ts";
 import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
 

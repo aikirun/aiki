@@ -1,4 +1,5 @@
-import type { WorkflowName, WorkflowRunId } from "@aiki/types/workflow";
+import type { WorkflowName } from "@aiki/contract/workflow";
+import type { WorkflowRunId } from "@aiki/contract/workflow-run";
 import type { Client } from "../client.ts";
 import type { PollingSubscriberStrategy } from "./polling.ts";
 import type { AdaptivePollingSubscriberStrategy } from "./adaptive-polling.ts";
@@ -13,7 +14,7 @@ export type SubscriberStrategy =
 	| RedisStreamsSubscriberStrategy;
 
 export interface SubscriberStrategyBuilder {
-	init(workerId: string, callbacks: StrategyCallbacks): Promise<ResolvedSubscriberStrategy>;
+	init: (workerId: string, callbacks: StrategyCallbacks) => Promise<ResolvedSubscriberStrategy>;
 }
 
 export interface StrategyCallbacks {
@@ -23,8 +24,8 @@ export interface StrategyCallbacks {
 
 export interface ResolvedSubscriberStrategy {
 	type: SubscriberStrategy["type"];
-	getNextDelay(context: SubscriberDelayContext): number;
-	getNextBatch(size: number): Promise<WorkflowRunId[]>;
+	getNextDelay: (context: SubscriberDelayContext) => number;
+	getNextBatch: (size: number) => Promise<WorkflowRunId[]>;
 }
 
 export type SubscriberDelayContext =
