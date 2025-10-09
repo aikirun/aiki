@@ -196,7 +196,7 @@ class WorkerImpl implements Worker {
 				continue;
 			}
 
-			const { run: workflowRun } = await this.client.workflowRun.getByIdV1({ id: workflowRunId });
+			const { run: workflowRun } = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
 			if (!workflowRun) {
 				// Debug: Workflow run not found in repository
 				continue;
@@ -234,7 +234,7 @@ class WorkerImpl implements Worker {
 	): Promise<void> {
 		let heartbeatInterval: number | undefined;
 		try {
-			const workflowRunHandle = initWorkflowRunHandle(this.client.workflowRun, workflowRun);
+			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun);
 
 			heartbeatInterval = setInterval(() => {
 				try {

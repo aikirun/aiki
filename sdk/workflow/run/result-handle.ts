@@ -10,7 +10,7 @@ import type { Client } from "../../client/client.ts";
 
 export function initWorkflowRunResultHandle<Result>(
 	id: WorkflowRunId,
-	api: Client["workflowRun"],
+	api: Client["api"],
 ): WorkflowRunResultHandle<Result> {
 	return new WorkflowRunResultHandleImpl<Result>(id, api);
 }
@@ -35,11 +35,11 @@ export interface WorkflowRunResultHandle<Result> {
 class WorkflowRunResultHandleImpl<Result> implements WorkflowRunResultHandle<Result> {
 	constructor(
 		public readonly id: string,
-		private readonly api: Client["workflowRun"],
+		private readonly api: Client["api"],
 	) {}
 
 	public async getResult(): Promise<WorkflowRunResult<Result>> {
-		const response = await this.api.getResultV1({ id: this.id });
+		const response = await this.api.workflowRun.getResultV1({ id: this.id });
 		return response.result as unknown as WorkflowRunResult<Result>;
 	}
 

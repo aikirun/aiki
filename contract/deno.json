@@ -2,6 +2,7 @@
 	"name": "@aiki/contract",
 	"version": "0.1.0",
 	"exports": {
+		".": "./contract.ts",
 		"./common": "./common/mod.ts",
 		"./task": "./task/mod.ts",
 		"./task-run": "./task-run/mod.ts",

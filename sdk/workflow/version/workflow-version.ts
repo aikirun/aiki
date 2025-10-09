@@ -59,13 +59,13 @@ export class WorkflowVersionImpl<Payload, Result> implements WorkflowVersion<Pay
 		client: Client,
 		...args: Payload extends null ? [] : [Payload]
 	): Promise<WorkflowRunResultHandle<Result>> {
-		const response = await client.workflowRun.createV1({
+		const response = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
 			payload: isNonEmptyArray(args) ? args[0] : null,
 			options: this.options,
 		});
-		return initWorkflowRunResultHandle(response.run.id, client.workflowRun);
+		return initWorkflowRunResultHandle(response.run.id, client.api);
 	}
 
 	private async exec(
@@ -80,7 +80,7 @@ export class WorkflowVersionImpl<Payload, Result> implements WorkflowVersion<Pay
 			// deno-lint-ignore no-console
 			console.error(`Error while executing workflow ${runCtx.id}`, error);
 
-			await client.workflowRun.updateStateV1({ id: runCtx.id, state: "failed" });
+			await client.api.workflowRun.updateStateV1({ id: runCtx.id, state: "failed" });
 
 			throw error;
 		}

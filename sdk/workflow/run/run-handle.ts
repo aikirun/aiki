@@ -3,7 +3,7 @@ import type { Client } from "../../client/client.ts";
 import type { TaskRunResult } from "@aiki/contract/task-run";
 
 export function initWorkflowRunHandle<Payload, Result>(
-	api: Client["workflowRun"],
+	api: Client["api"],
 	run: WorkflowRunRow<Payload, Result>,
 ): WorkflowRunHandle<Payload, Result> {
 	return new WorkflowRunHandleImpl(api, run);
@@ -24,7 +24,7 @@ class WorkflowRunHandleImpl<Payload, Result> implements WorkflowRunHandle<Payloa
 	public readonly _internal: WorkflowRunHandle<Payload, Result>["_internal"];
 
 	constructor(
-		private readonly api: Client["workflowRun"],
+		private readonly api: Client["api"],
 		public readonly run: WorkflowRunRow<Payload, Result>,
 	) {
 		this._internal = {
@@ -34,7 +34,7 @@ class WorkflowRunHandleImpl<Payload, Result> implements WorkflowRunHandle<Payloa
 	}
 
 	public async updateState(state: WorkflowRunState): Promise<void> {
-		await this.api.updateStateV1({ id: this.run.id, state });
+		await this.api.workflowRun.updateStateV1({ id: this.run.id, state });
 	}
 
 	private getSubTaskRunResult<TaskResult>(taskPath: string): TaskRunResult<TaskResult> {
@@ -53,7 +53,7 @@ class WorkflowRunHandleImpl<Payload, Result> implements WorkflowRunHandle<Payloa
 		taskPath: string,
 		taskRunResult: TaskRunResult<TaskResult>,
 	): Promise<void> {
-		await this.api.addSubTaskRunResultV1({
+		await this.api.workflowRun.addSubTaskRunResultV1({
 			id: this.run.id,
 			taskPath,
 			taskRunResult,

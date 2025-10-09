@@ -2,7 +2,7 @@ import type { WorkflowName } from "@aiki/contract/workflow";
 import { Redis } from "redis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import type { WorkflowRunContract } from "@aiki/contract/workflow-run";
+import type { Contract } from "@aiki/contract";
 import type { ContractRouterClient } from "@orpc/contract";
 import {
 	resolveSubscriberStrategy,
@@ -30,7 +30,7 @@ export interface RedisConfig {
 }
 
 export interface Client {
-	workflowRun: ContractRouterClient<WorkflowRunContract>;
+	api: ContractRouterClient<Contract>;
 	_internal: {
 		subscriber: {
 			create: (
@@ -47,7 +47,7 @@ export interface Client {
 }
 
 class ClientImpl implements Client {
-	public readonly workflowRun: ContractRouterClient<WorkflowRunContract>;
+	public readonly api: ContractRouterClient<Contract>;
 	public readonly _internal: Client["_internal"];
 	private redisStreamsConnection?: Redis;
 
@@ -55,7 +55,7 @@ class ClientImpl implements Client {
 		const rpcLink = new RPCLink({
 			url: `${params.baseUrl}`,
 		});
-		this.workflowRun = createORPCClient(rpcLink);
+		this.api = createORPCClient(rpcLink);
 
 		this._internal = {
 			subscriber: {

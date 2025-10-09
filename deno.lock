@@ -261,7 +261,8 @@
         "dependencies": [
           "jsr:@std/dotenv@0.225",
           "npm:@orpc/contract@^1.9.3",
-          "npm:@orpc/server@^1.9.3"
+          "npm:@orpc/server@^1.9.3",
+          "npm:zod@^4.1.12"
         ]
       }
     }

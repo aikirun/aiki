@@ -6,11 +6,11 @@ import {
 	workflowRunResultSchema,
 	workflowRunRowSchema,
 	workflowRunStateSchema,
-} from "./schemas.ts";
+} from "./schema.ts";
 import type { EmptyRecord } from "../../lib/object/types.ts";
 import type { TaskRunResult } from "../task-run/types.ts";
-import { taskRunResultSchema } from "../task-run/schemas.ts";
-import type { Contract } from "../common/contract.ts";
+import { taskRunResultSchema } from "../task-run/schema.ts";
+import type { ContractProcedure } from "../common/procedure.ts";
 
 export interface GetReadyIdsRequestV1 {
 	size: number;
@@ -20,7 +20,7 @@ export interface GetReadyIdsResponseV1 {
 	ids: WorkflowRunId[];
 }
 
-const getReadyIdsV1: Contract<GetReadyIdsRequestV1, GetReadyIdsResponseV1> = oc
+const getReadyIdsV1: ContractProcedure<GetReadyIdsRequestV1, GetReadyIdsResponseV1> = oc
 	.input(z.object({
 		size: z.number().int().positive(),
 	}))
@@ -36,7 +36,7 @@ export interface GetByIdResponseV1 {
 	run?: WorkflowRunRow<unknown, unknown>;
 }
 
-const getByIdV1: Contract<GetByIdRequestV1, GetByIdResponseV1> = oc
+const getByIdV1: ContractProcedure<GetByIdRequestV1, GetByIdResponseV1> = oc
 	.input(z.object({
 		id: z.string().min(1),
 	}))
@@ -52,7 +52,7 @@ export interface GetResultResponseV1 {
 	result: WorkflowRunResult<unknown>;
 }
 
-const getResultV1: Contract<GetResultRequestV1, GetResultResponseV1> = oc
+const getResultV1: ContractProcedure<GetResultRequestV1, GetResultResponseV1> = oc
 	.input(z.object({
 		id: z.string().min(1),
 	}))
@@ -71,7 +71,7 @@ export interface CreateResponseV1 {
 	run: WorkflowRunRow<unknown, unknown>;
 }
 
-const createV1: Contract<CreateRequestV1, CreateResponseV1> = oc
+const createV1: ContractProcedure<CreateRequestV1, CreateResponseV1> = oc
 	.input(z.object({
 		name: z.string().min(1),
 		versionId: z.string().min(1),
@@ -90,7 +90,7 @@ export interface AddSubTaskRunResultRequestV1 {
 
 export type AddSubTaskRunResultResponseV1 = EmptyRecord;
 
-const addSubTaskRunResultV1: Contract<AddSubTaskRunResultRequestV1, AddSubTaskRunResultResponseV1> = oc
+const addSubTaskRunResultV1: ContractProcedure<AddSubTaskRunResultRequestV1, AddSubTaskRunResultResponseV1> = oc
 	.input(z.object({
 		id: z.string(),
 		taskPath: z.string(),
@@ -105,7 +105,7 @@ export interface UpdateStateRequestV1 {
 
 export type UpdateStateResponseV2 = EmptyRecord;
 
-const updateStateV1: Contract<UpdateStateRequestV1, UpdateStateResponseV2> = oc
+const updateStateV1: ContractProcedure<UpdateStateRequestV1, UpdateStateResponseV2> = oc
 	.input(z.object({
 		id: z.string().min(1),
 		state: workflowRunStateSchema,

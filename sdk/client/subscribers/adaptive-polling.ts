@@ -40,7 +40,7 @@ export function createAdaptivePollingStrategy(
 	};
 
 	const getNextBatch = async (size: number): Promise<WorkflowRunId[]> => {
-		const response = await client.workflowRun.getReadyIdsV1({ size });
+		const response = await client.api.workflowRun.getReadyIdsV1({ size });
 		return response.ids;
 	};
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { WorkflowOptions, WorkflowRunId, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
 import { triggerStrategySchema } from "@aiki/lib/trigger";
 import type { UnionToRecord } from "@aiki/lib/object";
-import { taskRunResultSchema } from "../task-run/schemas.ts";
+import { taskRunResultSchema } from "../task-run/schema.ts";
 import type { WorkflowName, WorkflowVersionId } from "../workflow/types.ts";
 
 export const workflowRunStateSchema: z.ZodEnum<UnionToRecord<WorkflowRunState>> = z.enum([

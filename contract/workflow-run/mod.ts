@@ -1,3 +1,3 @@
 export * from "./types.ts";
-export * from "./schemas.ts";
-export * from "./rpc.ts";
+export * from "./schema.ts";
+export * from "./procedure.ts";
