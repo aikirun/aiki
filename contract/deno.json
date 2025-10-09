@@ -3,6 +3,7 @@
 	"version": "0.1.0",
 	"exports": {
 		"./common": "./common/mod.ts",
+		"./task": "./task/mod.ts",
 		"./task-run": "./task-run/mod.ts",
 		"./workflow": "./workflow/mod.ts",
 		"./workflow-run": "./workflow-run/mod.ts"

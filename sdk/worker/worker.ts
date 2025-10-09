@@ -1,4 +1,4 @@
-import type { WorkflowName, WorkflowRunId, WorkflowRunRow, WorkflowVersionId } from "@aiki/types/workflow";
+import type { WorkflowRunId, WorkflowRunRow } from "@aiki/contract/workflow-run";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay } from "@aiki/lib/async";
@@ -6,7 +6,7 @@ import type { Client, SubscriberStrategy } from "../client/mod.ts";
 import type { ResolvedSubscriberStrategy, SubscriberStrategyBuilder } from "../client/subscribers/strategy-resolver.ts";
 import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
 import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
-import { initWorkflowRun } from "../workflow/run/workflow-run.ts";
+import { initWorkflowRunHandle } from "../workflow/run/run-handle.ts";
 
 export function worker(
 	client: Client,
@@ -196,20 +196,19 @@ class WorkerImpl implements Worker {
 				continue;
 			}
 
-			// Fetch the full workflow run row by ID
-			const workflowRunRow = await this.client.api.workflowRun.getByIdV1.query({ id: workflowRunId });
-			if (!workflowRunRow) {
+			const { run: workflowRun } = await this.client.workflowRun.getByIdV1({ id: workflowRunId });
+			if (!workflowRun) {
 				// Debug: Workflow run not found in repository
 				continue;
 			}
 
-			const workflow = this.workflowRegistry._internal.getByName(workflowRunRow.name as WorkflowName);
+			const workflow = this.workflowRegistry._internal.getByName(workflowRun.name);
 			if (!workflow) {
 				// Debug: No registered workflow for name
 				continue;
 			}
 
-			const workflowVersion = workflow._internal.getVersion(workflowRunRow.versionId as WorkflowVersionId);
+			const workflowVersion = workflow._internal.getVersion(workflowRun.versionId);
 			if (!workflowVersion) {
 				// Debug: No registered version for workflow
 				continue;
@@ -218,24 +217,24 @@ class WorkerImpl implements Worker {
 			if (abortSignal.aborted) break;
 
 			const workflowExecutionPromise = this.executeWorkflow(
-				workflowRunRow as WorkflowRunRow<unknown, unknown>,
+				workflowRun,
 				workflowVersion,
 			);
 
-			this.activeWorkflowRunsById.set(workflowRunRow.id, {
-				run: workflowRunRow as WorkflowRunRow<unknown, unknown>,
+			this.activeWorkflowRunsById.set(workflowRun.id, {
+				run: workflowRun,
 				executionPromise: workflowExecutionPromise,
 			});
 		}
 	}
 
 	private async executeWorkflow(
-		workflowRunRow: WorkflowRunRow<unknown, unknown>,
+		workflowRun: WorkflowRunRow<unknown, unknown>,
 		workflowVersion: WorkflowVersion<unknown, unknown>,
 	): Promise<void> {
 		let heartbeatInterval: number | undefined;
 		try {
-			const workflowRun = await initWorkflowRun(this.client.api, workflowRunRow);
+			const workflowRunHandle = initWorkflowRunHandle(this.client.workflowRun, workflowRun);
 
 			heartbeatInterval = setInterval(() => {
 				try {
@@ -246,13 +245,20 @@ class WorkerImpl implements Worker {
 				}
 			}, this.params.workflowRun?.heartbeatIntervalMs ?? 30_000);
 
-			await workflowVersion._execute({ workflowRun }, workflowRunRow.params.payload);
+			await workflowVersion._internal._exec(
+				this.client,
+				{
+					...workflowRun,
+					handle: workflowRunHandle,
+				},
+				workflowRun.payload,
+			);
 		} catch (error) {
 			// deno-lint-ignore no-console
-			console.error(`Worker ${this.id}: Error processing workflow: ${workflowRunRow.id}`, error);
+			console.error(`Worker ${this.id}: Error processing workflow: ${workflowRun.id}`, error);
 		} finally {
 			if (heartbeatInterval) clearInterval(heartbeatInterval);
-			this.activeWorkflowRunsById.delete(workflowRunRow.id);
+			this.activeWorkflowRunsById.delete(workflowRun.id);
 		}
 	}
 

@@ -1,5 +1,11 @@
 import { z } from "zod";
-import type { WorkflowRunId, WorkflowRunOptions, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
+import type {
+	WorkflowRunId,
+	WorkflowOptions,
+	WorkflowRunResult,
+	WorkflowRunRow,
+	WorkflowRunState,
+} from "./types.ts";
 import { triggerStrategySchema } from "@aiki/lib/trigger";
 import type { UnionToRecord } from "@aiki/lib/object";
 import { taskRunResultSchema } from "../task-run/schemas.ts";
@@ -20,7 +26,7 @@ export const workflowRunStateSchema: z.ZodEnum<UnionToRecord<WorkflowRunState>> 
 	"completed",
 ]);
 
-export const workflowRunOptionsSchema: z.ZodType<WorkflowRunOptions, WorkflowRunOptions> = z.object({
+export const workflowOptionsSchema: z.ZodType<WorkflowOptions, WorkflowOptions> = z.object({
 	idempotencyKey: z.string().optional(),
 	trigger: triggerStrategySchema.optional(),
 	shardKey: z.string().optional(),
@@ -41,7 +47,7 @@ export const workflowRunRowSchema: z.ZodType<WorkflowRunRow<unknown, unknown>> =
 	name: z.string().transform((val) => val as WorkflowName),
 	versionId: z.string().transform((val) => val as WorkflowVersionId),
 	payload: z.unknown(),
-	params: workflowRunOptionsSchema,
+	options: workflowOptionsSchema,
 	result: workflowRunResultSchema,
 	subTasksRunResult: z.record(z.string(), taskRunResultSchema),
 	subWorkflowsRunResult: z.record(z.string(), workflowRunResultSchema),

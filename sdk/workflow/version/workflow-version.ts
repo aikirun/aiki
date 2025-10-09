@@ -1,61 +1,86 @@
-import type { TriggerStrategy } from "@aiki/lib/trigger";
-import type { WorkflowName, WorkflowRunParams, WorkflowVersionId } from "@aiki/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
+import type { WorkflowOptions } from "@aiki/contract/workflow-run";
 import type { Client } from "../../client/client.ts";
 import type { WorkflowRunContext } from "../run/context.ts";
 import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
+import { isNonEmptyArray } from "@aiki/lib/array";
 
 export interface WorkflowVersionParams<Payload, Result> {
-	run: (
-		ctx: WorkflowRunContext<Payload, Result>,
+	exec: (
+		runCtx: WorkflowRunContext<Payload, Result>,
 		payload: Payload,
 	) => Promise<Result>;
-	trigger?: TriggerStrategy;
 }
 
 export interface WorkflowVersion<Payload, Result> {
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
-	enqueue: (
+
+	withOptions(options: WorkflowOptions): WorkflowVersion<Payload, Result>;
+
+	start: (
 		client: Client,
-		workflowRunParams: WorkflowRunParams<Payload>,
+		...args: Payload extends null ? [] : [Payload]
 	) => Promise<WorkflowRunResultHandle<Result>>;
-	_execute: (
-		ctx: WorkflowRunContext<Payload, Result>,
-		payload: Payload,
-	) => Promise<void>;
+
+	_internal: {
+		_exec: (
+			client: Client,
+			runCtx: WorkflowRunContext<Payload, Result>,
+			payload: Payload,
+		) => Promise<void>;
+	};
 }
 
 export class WorkflowVersionImpl<Payload, Result> implements WorkflowVersion<Payload, Result> {
+	public readonly _internal: WorkflowVersion<Payload, Result>["_internal"];
+
 	constructor(
 		public readonly name: WorkflowName,
 		public readonly versionId: WorkflowVersionId,
 		private readonly params: WorkflowVersionParams<Payload, Result>,
-	) {}
-
-	public async enqueue(
-		client: Client,
-		workflowRunParams: WorkflowRunParams<Payload>,
-	): Promise<WorkflowRunResultHandle<Result>> {
-		const workflowRunRow = await client.api.workflowRun.createV1.mutate({
-			name: this.name,
-			versionId: this.versionId,
-			params: workflowRunParams,
-		});
-		return initWorkflowRunResultHandle(workflowRunRow.id, client.api);
+		private readonly options?: WorkflowOptions,
+	) {
+		this._internal = {
+			_exec: this.exec,
+		};
 	}
 
-	public async _execute(
-		ctx: WorkflowRunContext<Payload, Result>,
+	public withOptions(options: WorkflowOptions): WorkflowVersion<Payload, Result> {
+		return new WorkflowVersionImpl(
+			this.name,
+			this.versionId,
+			this.params,
+			{ ...this.options, ...options },
+		);
+	}
+
+	public async start(
+		client: Client,
+		...args: Payload extends null ? [] : [Payload]
+	): Promise<WorkflowRunResultHandle<Result>> {
+		const response = await client.workflowRun.createV1({
+			name: this.name,
+			versionId: this.versionId,
+			payload: isNonEmptyArray(args) ? args[0] : null,
+			options: this.options,
+		});
+		return initWorkflowRunResultHandle(response.run.id, client.workflowRun);
+	}
+
+	private async exec(
+		client: Client,
+		runCtx: WorkflowRunContext<Payload, Result>,
 		payload: Payload,
 	): Promise<void> {
 		try {
-			await this.params.run(ctx, payload);
+			await this.params.exec(runCtx, payload);
 			// TODO: persists workflow run result
 		} catch (error) {
 			// deno-lint-ignore no-console
-			console.error(`Error while executing workflow ${ctx.workflowRun.path}`, error);
+			console.error(`Error while executing workflow ${runCtx.id}`, error);
 
-			ctx.workflowRun.updateState("failed");
+			await client.workflowRun.updateStateV1({ id: runCtx.id, state: "failed" });
 
 			throw error;
 		}

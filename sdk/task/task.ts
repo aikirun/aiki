@@ -1,10 +1,12 @@
 import { sha256 } from "@aiki/lib/crypto";
 import type { RetryStrategy } from "@aiki/lib/retry";
+import type { ValidPayload } from "@aiki/contract/common";
+import type { TaskName } from "@aiki/contract/task";
 import type { WorkflowRunContext } from "../workflow/run/context.ts";
-import type { TaskRunContext, TaskRunParams } from "./run/context.ts";
+import { isNonEmptyArray } from "@aiki/lib/array";
 
 export function task<
-	Payload = undefined,
+	Payload extends ValidPayload = null,
 	Result = void,
 >(params: TaskParams<Payload, Result>): Task<Payload, Result> {
 	return new TaskImpl(params);
@@ -12,27 +14,52 @@ export function task<
 
 export interface TaskParams<Payload, Result> {
 	name: string;
-	run: (context: TaskRunContext<Payload>) => Promise<Result>;
+	exec: (
+		...args: Payload extends null ? [] : [Payload]
+	) => Promise<Result>;
+}
+
+export interface TaskOptions {
 	retry?: RetryStrategy;
+	idempotencyKey?: string;
 }
 
 export interface Task<Payload, Result> {
-	run: <WorkflowPayload, WorkflowResult>(
-		ctx: WorkflowRunContext<WorkflowPayload, WorkflowResult>,
-		params: TaskRunParams<Payload>,
+	name: TaskName;
+
+	withOptions(options: TaskOptions): Task<Payload, Result>;
+
+	start: <WorkflowPayload, WorkflowResult>(
+		runCtx: WorkflowRunContext<WorkflowPayload, WorkflowResult>,
+		...args: Payload extends null ? [] : [Payload]
 	) => Promise<Result>;
 }
 
 class TaskImpl<Payload, Result> implements Task<Payload, Result> {
-	constructor(private readonly params: TaskParams<Payload, Result>) {}
+	public readonly name: TaskName;
 
-	public async run<WorkflowPayload, WorkflowResult>(
-		ctx: WorkflowRunContext<WorkflowPayload, WorkflowResult>,
-		taskRunParams: TaskRunParams<Payload>,
+	constructor(
+		private readonly params: TaskParams<Payload, Result>,
+		private readonly options?: TaskOptions,
+	) {
+		this.name = params.name as TaskName;
+	}
+
+	public withOptions(options: TaskOptions): Task<Payload, Result> {
+		return new TaskImpl(
+			this.params,
+			{ ...this.options, ...options },
+		);
+	}
+
+	public async start<WorkflowPayload, WorkflowResult>(
+		runCtx: WorkflowRunContext<WorkflowPayload, WorkflowResult>,
+		...args: Payload extends null ? [] : [Payload]
 	): Promise<Result> {
-		const path = await this.getPath(ctx.workflowRun.path, taskRunParams);
+		const payload = isNonEmptyArray(args) ? args[0] : null;
+		const path = await this.getPath(runCtx, payload);
 
-		const workflowRunInternal = ctx.workflowRun._internal;
+		const workflowRunInternal = runCtx.handle._internal;
 
 		const preExistingResult = workflowRunInternal.getSubTaskRunResult<Result>(path);
 		if (preExistingResult.state === "completed") {
@@ -42,7 +69,7 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 		// TODO: check if result state is failed and there are still retries left
 		// if not update workflow state to failed and return
 		try {
-			const result = await this.params.run(taskRunParams);
+			const result = await this.params.exec(...args);
 			await workflowRunInternal.addSubTaskRunResult(path, {
 				state: "completed",
 				result,
@@ -59,14 +86,16 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 		throw new Error();
 	}
 
-	private async getPath(
-		workflowRunPath: string,
-		taskRunParams: TaskRunParams<Payload>,
+	private async getPath<WorkflowPayload, WorkflowResult>(
+		runCtx: WorkflowRunContext<WorkflowPayload, WorkflowResult>,
+		payload: Payload | null,
 	): Promise<string> {
-		const payloadHash = await sha256(JSON.stringify(taskRunParams.payload));
+		const workflowRunPath = `${runCtx.name}/${runCtx.versionId}/${runCtx.id}`;
 
-		return taskRunParams.idempotencyKey
-			? `${workflowRunPath}/${this.params.name}/${payloadHash}/${taskRunParams.idempotencyKey}`
-			: `${workflowRunPath}/${this.params.name}/${payloadHash}`;
+		const payloadHash = await sha256(JSON.stringify(payload));
+
+		return this.options?.idempotencyKey
+			? `${workflowRunPath}/${this.name}/${payloadHash}/${this.options.idempotencyKey}`
+			: `${workflowRunPath}/${this.name}/${payloadHash}`;
 	}
 }

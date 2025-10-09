@@ -20,7 +20,7 @@ export type WorkflowRunState =
 	| "failed"
 	| "completed";
 
-export interface WorkflowRunOptions {
+export interface WorkflowOptions {
 	idempotencyKey?: string;
 	trigger?: TriggerStrategy;
 	shardKey?: string;
@@ -44,7 +44,7 @@ export interface WorkflowRunRow<Payload, Result> {
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
 	payload: Payload;
-	params: WorkflowRunOptions;
+	options: WorkflowOptions;
 	result: WorkflowRunResult<Result>;
 	subTasksRunResult: Record<string, TaskRunResult<unknown>>;
 	subWorkflowsRunResult: Record<string, WorkflowRunResult<unknown>>;

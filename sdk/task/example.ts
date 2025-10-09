@@ -1,10 +1,11 @@
-import { type Task, task } from "@aiki/sdk/task";
+import { task } from "@aiki/sdk/task";
 
-export const ringAlarm: Task<{ song: string }, string> = task({
+export const ringAlarm = task({
 	name: "ring-alarm",
-	run({ payload }) {
+	exec(payload: { song: string }) {
 		return Promise.resolve(payload.song);
 	},
+}).withOptions({
 	retry: {
 		type: "fixed",
 		maxAttempts: 3,
@@ -12,25 +13,23 @@ export const ringAlarm: Task<{ song: string }, string> = task({
 	},
 });
 
-export const stretch: Task<{ duration: number }, number> = task({
+export const stretch = task({
 	name: "stretch",
-	run({ payload }) {
+	exec(payload: { duration: number }) {
 		return Promise.resolve(payload.duration);
 	},
 });
 
-export const drinkCoffee: Task<{ withSugar: boolean }, boolean> = task({
+export const drinkCoffee = task({
 	name: "drink-coffee",
-	run({ payload }) {
+	exec(payload: { withSugar: boolean }) {
 		return Promise.resolve(payload.withSugar);
 	},
 });
 
-export const sayPrayer: Task<undefined, void> = task({
+export const sayPrayer = task({
 	name: "say-prayer",
-	run({ payload }) {
-		// deno-lint-ignore no-console
-		console.log(payload);
+	exec() {
 		return Promise.resolve();
 	},
 });

@@ -5,5 +5,5 @@ export type { WorkflowVersion, WorkflowVersionParams } from "./version/workflow-
 export type { WorkflowRunContext } from "./run/context.ts";
 
 export type { WorkflowRegistry } from "./registry.ts";
-export type { WorkflowRun } from "./run/workflow-run.ts";
+export type { WorkflowRunHandle } from "./run/run-handle.ts";
 export type { WorkflowRunResultHandle } from "./run/result-handle.ts";

@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { oc } from "@orpc/contract";
-import type { WorkflowRunId, WorkflowRunOptions, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
+import type {
+	WorkflowRunId,
+	WorkflowOptions,
+	WorkflowRunResult,
+	WorkflowRunRow,
+	WorkflowRunState,
+} from "./types.ts";
 import {
-	workflowRunOptionsSchema,
+	workflowOptionsSchema,
 	workflowRunResultSchema,
 	workflowRunRowSchema,
 	workflowRunStateSchema,
@@ -64,7 +70,7 @@ export interface CreateRequestV1 {
 	name: string;
 	versionId: string;
 	payload: unknown;
-	options?: WorkflowRunOptions;
+	options?: WorkflowOptions;
 }
 
 export interface CreateResponseV1 {
@@ -76,7 +82,7 @@ const createV1: Contract<CreateRequestV1, CreateResponseV1> = oc
 		name: z.string().min(1),
 		versionId: z.string().min(1),
 		payload: z.unknown(),
-		options: workflowRunOptionsSchema.optional(),
+		options: workflowOptionsSchema.optional(),
 	}))
 	.output(z.object({
 		run: workflowRunRowSchema,
@@ -85,7 +91,7 @@ const createV1: Contract<CreateRequestV1, CreateResponseV1> = oc
 export interface AddSubTaskRunResultRequestV1 {
 	id: string;
 	taskPath: string;
-	taskResult: TaskRunResult<unknown>;
+	taskRunResult: TaskRunResult<unknown>;
 }
 
 export type AddSubTaskRunResultResponseV1 = EmptyRecord;
@@ -94,7 +100,7 @@ const addSubTaskRunResultV1: Contract<AddSubTaskRunResultRequestV1, AddSubTaskRu
 	.input(z.object({
 		id: z.string(),
 		taskPath: z.string(),
-		taskResult: taskRunResultSchema,
+		taskRunResult: taskRunResultSchema,
 	}))
 	.output(z.object({}));
 

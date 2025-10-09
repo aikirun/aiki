@@ -1,4 +1,5 @@
-import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
+import type { ValidPayload } from "@aiki/contract/common";
 import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./version/workflow-version.ts";
 
 export function workflow(params: WorkflowParams): Workflow {
@@ -11,7 +12,7 @@ export interface WorkflowParams {
 
 export interface Workflow {
 	name: WorkflowName;
-	v: <Payload, Result>(
+	v: <Payload extends ValidPayload = null, Result = void>(
 		versionId: string,
 		params: WorkflowVersionParams<Payload, Result>,
 	) => WorkflowVersion<Payload, Result>;
