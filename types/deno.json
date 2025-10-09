@@ -1,8 +1,0 @@
-{
-	"name": "@aiki/types",
-	"version": "0.1.0",
-	"exports": {
-		"./workflow": "./workflow/mod.ts",
-		"./task": "./task/mod.ts"
-	}
-}
