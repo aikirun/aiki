@@ -1,16 +1,16 @@
 import { z } from "zod";
 import { oc } from "@orpc/contract";
-import type { WorkflowRunId, WorkflowRunParams, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
+import type { WorkflowRunId, WorkflowRunOptions, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
 import {
-	workflowRunParamsSchema,
+	workflowRunOptionsSchema,
 	workflowRunResultSchema,
 	workflowRunRowSchema,
 	workflowRunStateSchema,
 } from "./schemas.ts";
 import type { EmptyRecord } from "../../lib/object/types.ts";
 import type { TaskRunResult } from "../task-run/types.ts";
-import type { Contract } from "../contract-wrapper.ts";
 import { taskRunResultSchema } from "../task-run/schemas.ts";
+import type { Contract } from "../common/contract.ts";
 
 export interface GetReadyIdsRequestV1 {
 	size: number;
@@ -63,7 +63,8 @@ const getResultV1: Contract<GetResultRequestV1, GetResultResponseV1> = oc
 export interface CreateRequestV1 {
 	name: string;
 	versionId: string;
-	params: WorkflowRunParams;
+	payload: unknown;
+	options?: WorkflowRunOptions;
 }
 
 export interface CreateResponseV1 {
@@ -74,7 +75,8 @@ const createV1: Contract<CreateRequestV1, CreateResponseV1> = oc
 	.input(z.object({
 		name: z.string().min(1),
 		versionId: z.string().min(1),
-		params: workflowRunParamsSchema,
+		payload: z.unknown(),
+		options: workflowRunOptionsSchema.optional(),
 	}))
 	.output(z.object({
 		run: workflowRunRowSchema,
