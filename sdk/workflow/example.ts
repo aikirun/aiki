@@ -4,7 +4,7 @@ import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "../task/example.ts";
 export const morningWorkflow = workflow({ name: "morning-routine" });
 
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
-	async exec(run, input: { a: boolean }) {
+	async exec(input: { a: boolean }, run) {
 		await drinkCoffee.start(run, { withSugar: input.a });
 	},
 });
@@ -12,8 +12,8 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 export const morningWorkflowV2 = morningWorkflow
 	.v("2.0", {
 		async exec(
-			run,
 			input: { a: string; b: number },
+			run,
 			deps: { db: DatabaseConnection; email: EmailService },
 		): Promise<string> {
 			const alarmOutput = await ringAlarm.start(run, { song: input.a });
@@ -43,7 +43,7 @@ export interface EmailService {
 
 export const eveningRoutineWorkflowV1 = workflow({ name: "evening-routine" })
 	.v("1.0.0", {
-		async exec(run) {
+		async exec(_, run) {
 			await sayPrayer.start(run);
 		},
 	});

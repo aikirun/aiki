@@ -7,8 +7,8 @@ import { isNonEmptyArray } from "@aiki/lib/array";
 
 export interface WorkflowVersionParams<Input, Output, Dependencies = void> {
 	exec: (
-		runCtx: WorkflowRunContext<Input, Output>,
 		input: Input,
+		runCtx: WorkflowRunContext<Input, Output>,
 		deps: Dependencies,
 	) => Promise<Output>;
 }
@@ -77,7 +77,7 @@ export class WorkflowVersionImpl<Input, Output, Dependencies> implements Workflo
 		deps: Dependencies,
 	): Promise<void> {
 		try {
-			await this.params.exec(runCtx, input, deps);
+			await this.params.exec(input, runCtx, deps);
 			// TODO: persists workflow run result
 		} catch (error) {
 			// deno-lint-ignore no-console
