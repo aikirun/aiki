@@ -226,5 +226,3 @@ Then we can rename ctx to run
   ### workflow, task etc should be independently installable packages
 
   ### don't for get to bind(this)
-
-  ### switch payload and runCtx order
