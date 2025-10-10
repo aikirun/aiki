@@ -17,7 +17,7 @@ export function worker(
 	const subscriberStrategyBuilder = client._internal.subscriber.create(
 		params.subscriber ?? { type: "polling" },
 		workflowRegistry._internal.getNames(),
-		params.shards,
+		params.shardKeys,
 	);
 	return Promise.resolve(
 		new WorkerImpl(
@@ -38,12 +38,12 @@ export interface WorkerParams {
 	gracefulShutdownTimeoutMs?: number;
 	subscriber?: SubscriberStrategy;
 	/**
-	 * Optional array of shard keys this worker should process.
-	 * When provided, the worker will only subscribe to sharded streams: workflow:${workflowName}:${shard}
+	 * Optional array of shardKeys this worker should process.
+	 * When provided, the worker will only subscribe to sharded streams: workflow:${workflowName}:${Key}
 	 * When omitted, the worker subscribes to default streams: workflow:${workflowName}
 	 * Cannot be combined with non-sharded workflows in the same worker instance.
 	 */
-	shards?: string[];
+	shardKeys?: string[];
 }
 
 export interface Worker {

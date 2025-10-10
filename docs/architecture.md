@@ -235,7 +235,7 @@ performance.
 
 **Sharding Support:**
 
-- Workers can be assigned to specific shards
+- Workers can be assigned to specific shardKeys
 - Enables horizontal scaling with predictable work distribution
 - Supports geographic distribution and compliance requirements
 
@@ -290,7 +290,7 @@ reliability features.
 **Stream Organization:**
 
 - One stream per workflow type: `workflow:${workflowName}`
-- Sharded streams for horizontal scaling: `workflow:${workflowName}:${shard}`
+- Sharded streams for horizontal scaling: `workflow:${workflowName}:${shardKey}`
 - Consumer groups for distributed processing
 - Message claiming for fault tolerance
 

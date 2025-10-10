@@ -270,7 +270,4 @@ Then we can rename ctx to run
 
   Actually, we should support both!
 
-
-  ## TODO rename shard to shardKey
-
   ### workflow, task etc should be independently installable packages
