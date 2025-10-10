@@ -5,7 +5,7 @@ import type { WorkflowRunContext } from "../run/context.ts";
 import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
 
-export interface WorkflowVersionParams<Input, Output, Dependencies = void> {
+export interface WorkflowVersionParams<Input, Output, Dependencies> {
 	exec: (
 		input: Input,
 		runCtx: WorkflowRunContext<Input, Output>,
