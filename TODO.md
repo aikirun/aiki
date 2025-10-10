@@ -191,23 +191,6 @@ const client = new Client({
     log: Logger; // Workflow-specific logger with automatic context
   }
 
-### Update function run to be exec. Also exec type should be 
-
-type ExecFunction<Payload, Result, Deps = void, Ctx = void> =
-    Ctx extends void
-      ? Deps extends void
-        ? (run: Run, payload: Payload) => Promise<Result>
-        : (run: Run, payload: Payload, deps: Deps) => Promise<Result>
-      : Deps extends void
-        ? (run: Run, payload: Payload, ctx: Ctx) => Promise<Result>
-        : (run: Run, payload: Payload, deps: Deps, ctx: Ctx) => Promise<Result>;
-
-actually, the above is wrong, we should place xtx before deps
-exec: async (run, payload, ctx, deps) => Result
-
-
-Then we can rename ctx to run
-
 
 ### Add create ctx to worker 
 // 3. Worker with context factory
