@@ -28,8 +28,8 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		public readonly run: WorkflowRunRow<Input, Output>,
 	) {
 		this._internal = {
-			getSubTaskRunResult: this.getSubTaskRunResult,
-			addSubTaskRunResult: this.addSubTaskRunResult,
+			getSubTaskRunResult: this.getSubTaskRunResult.bind(this),
+			addSubTaskRunResult: this.addSubTaskRunResult.bind(this),
 		};
 	}
 
