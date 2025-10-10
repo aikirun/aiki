@@ -8,11 +8,11 @@ import type {
 } from "@aiki/contract/workflow-run";
 import type { Client } from "../../client/client.ts";
 
-export function initWorkflowRunResultHandle<Result>(
+export function initWorkflowRunResultHandle<Output>(
 	id: WorkflowRunId,
 	api: Client["api"],
-): WorkflowRunResultHandle<Result> {
-	return new WorkflowRunResultHandleImpl<Result>(id, api);
+): WorkflowRunResultHandle<Output> {
+	return new WorkflowRunResultHandleImpl<Output>(id, api);
 }
 
 export interface WorkflowRunWaitSyncParams {
@@ -20,32 +20,32 @@ export interface WorkflowRunWaitSyncParams {
 	maxDurationMs: number;
 }
 
-export interface WorkflowRunResultHandle<Result> {
+export interface WorkflowRunResultHandle<Output> {
 	id: string;
 
-	getResult: () => Promise<WorkflowRunResult<Result>>;
+	getResult: () => Promise<WorkflowRunResult<Output>>;
 
 	waitForState<
 		T extends WorkflowRunState,
-		U extends (T extends "completed" ? WorkflowRunResultComplete<Result>
+		U extends (T extends "completed" ? WorkflowRunResultComplete<Output>
 			: WorkflowRunResultInComplete),
 	>(state: T, params: WorkflowRunWaitSyncParams): Promise<U>;
 }
 
-class WorkflowRunResultHandleImpl<Result> implements WorkflowRunResultHandle<Result> {
+class WorkflowRunResultHandleImpl<Output> implements WorkflowRunResultHandle<Output> {
 	constructor(
 		public readonly id: string,
 		private readonly api: Client["api"],
 	) {}
 
-	public async getResult(): Promise<WorkflowRunResult<Result>> {
+	public async getResult(): Promise<WorkflowRunResult<Output>> {
 		const response = await this.api.workflowRun.getResultV1({ id: this.id });
-		return response.result as unknown as WorkflowRunResult<Result>;
+		return response.result as unknown as WorkflowRunResult<Output>;
 	}
 
 	public async waitForState<
 		T extends WorkflowRunState,
-		U extends (T extends "completed" ? WorkflowRunResultComplete<Result>
+		U extends (T extends "completed" ? WorkflowRunResultComplete<Output>
 			: WorkflowRunResultInComplete),
 	>(state: T, params: WorkflowRunWaitSyncParams): Promise<U> {
 		const delayMs = params.pollIntervalMs ?? 100;

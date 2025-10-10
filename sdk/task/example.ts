@@ -2,8 +2,8 @@ import { task } from "@aiki/sdk/task";
 
 export const ringAlarm = task({
 	name: "ring-alarm",
-	exec(payload: { song: string }) {
-		return Promise.resolve(payload.song);
+	exec(input: { song: string }) {
+		return Promise.resolve(input.song);
 	},
 }).withOptions({
 	retry: {
@@ -15,15 +15,15 @@ export const ringAlarm = task({
 
 export const stretch = task({
 	name: "stretch",
-	exec(payload: { duration: number }) {
-		return Promise.resolve(payload.duration);
+	exec(input: { duration: number }) {
+		return Promise.resolve(input.duration);
 	},
 });
 
 export const drinkCoffee = task({
 	name: "drink-coffee",
-	exec(payload: { withSugar: boolean }) {
-		return Promise.resolve(payload.withSugar);
+	exec(input: { withSugar: boolean }) {
+		return Promise.resolve(input.withSugar);
 	},
 });
 

@@ -4,8 +4,8 @@ import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "../task/example.ts";
 export const morningWorkflow = workflow({ name: "morning-routine" });
 
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
-	async exec(run, payload: { a: boolean }) {
-		await drinkCoffee.start(run, { withSugar: payload.a });
+	async exec(run, input: { a: boolean }) {
+		await drinkCoffee.start(run, { withSugar: input.a });
 	},
 });
 
@@ -13,17 +13,17 @@ export const morningWorkflowV2 = morningWorkflow
 	.v("2.0", {
 		async exec(
 			run,
-			payload: { a: string; b: number },
+			input: { a: string; b: number },
 			deps: { db: DatabaseConnection; email: EmailService },
 		): Promise<string> {
-			const alarmResult = await ringAlarm.start(run, { song: payload.a });
+			const alarmOutput = await ringAlarm.start(run, { song: input.a });
 
-			const stretchResult = await stretch.start(run, { duration: payload.b });
+			const stretchOutput = await stretch.start(run, { duration: input.b });
 
 			await deps.db.query("SELECT * FROM TABLE");
 			await deps.email.send("info@aiki.com", "It's dawn!");
 
-			return `Alarm: ${alarmResult}, Stretch: ${stretchResult}`;
+			return `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
 		},
 	})
 	.withOptions({

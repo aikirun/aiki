@@ -6,7 +6,7 @@ export const taskRunResultSchema: zT<TaskRunResult<unknown>> = z.discriminatedUn
 	"state",
 	[
 		z.object({ state: z.literal("none") }),
-		z.object({ state: z.literal("completed"), result: z.unknown() }),
+		z.object({ state: z.literal("completed"), output: z.unknown() }),
 		z.object({ state: z.literal("failed"), reason: z.string() }),
 	],
 );

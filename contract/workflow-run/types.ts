@@ -29,22 +29,22 @@ export interface WorkflowRunResultInComplete {
 	state: Exclude<WorkflowRunState, "completed">;
 }
 
-export interface WorkflowRunResultComplete<Result> {
+export interface WorkflowRunResultComplete<Output> {
 	state: "completed";
-	result: Result;
+	output: Output;
 }
 
-export type WorkflowRunResult<Result> =
+export type WorkflowRunResult<Output> =
 	| WorkflowRunResultInComplete
-	| WorkflowRunResultComplete<Result>;
+	| WorkflowRunResultComplete<Output>;
 
-export interface WorkflowRunRow<Payload, Result> {
+export interface WorkflowRunRow<Input, Output> {
 	id: string;
 	name: string;
 	versionId: string;
-	payload: Payload;
+	input: Input;
 	options: WorkflowOptions;
-	result: WorkflowRunResult<Result>;
+	result: WorkflowRunResult<Output>;
 	subTasksRunResult: Record<string, TaskRunResult<unknown>>;
 	subWorkflowsRunResult: Record<string, WorkflowRunResult<unknown>>;
 }

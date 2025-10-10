@@ -1,5 +1,5 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
-import type { ValidPayload } from "@aiki/contract/common";
+import type { SerializableInput } from "@aiki/contract/common";
 import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./version/workflow-version.ts";
 
 export function workflow(params: WorkflowParams): Workflow {
@@ -12,10 +12,10 @@ export interface WorkflowParams {
 
 export interface Workflow {
 	name: WorkflowName;
-	v: <Payload extends ValidPayload = null, Result = void, Dependencies = void>(
+	v: <Input extends SerializableInput = null, Output = void, Dependencies = void>(
 		versionId: string,
-		params: WorkflowVersionParams<Payload, Result, Dependencies>,
-	) => WorkflowVersion<Payload, Result, Dependencies>;
+		params: WorkflowVersionParams<Input, Output, Dependencies>,
+	) => WorkflowVersion<Input, Output, Dependencies>;
 }
 
 class WorkflowImpl implements Workflow {
@@ -25,10 +25,10 @@ class WorkflowImpl implements Workflow {
 		this.name = params.name as WorkflowName;
 	}
 
-	v<Payload, Result, Dependencies>(
+	v<Input, Output, Dependencies>(
 		versionId: string,
-		params: WorkflowVersionParams<Payload, Result, Dependencies>,
-	): WorkflowVersion<Payload, Result, Dependencies> {
+		params: WorkflowVersionParams<Input, Output, Dependencies>,
+	): WorkflowVersion<Input, Output, Dependencies> {
 		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
 		return workflowVersion;
 	}

@@ -1,10 +1,10 @@
-export type TaskRunResult<Result> =
+export type TaskRunResult<Output> =
 	| {
 		state: "none";
 	}
 	| {
 		state: "completed";
-		result: Result;
+		output: Output;
 	}
 	| {
 		state: "failed";

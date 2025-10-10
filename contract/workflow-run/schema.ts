@@ -39,7 +39,7 @@ export const workflowRunResultSchema: zT<WorkflowRunResult<unknown>> = z
 		}),
 		z.object({
 			state: z.literal("completed"),
-			result: z.unknown(),
+			output: z.unknown(),
 		}),
 	]);
 
@@ -48,7 +48,7 @@ export const workflowRunRowSchema: zT<WorkflowRunRow<unknown, unknown>> = z
 		id: z.string(),
 		name: z.string(),
 		versionId: z.string(),
-		payload: z.unknown(),
+		input: z.unknown(),
 		options: workflowOptionsSchema,
 		result: workflowRunResultSchema,
 		subTasksRunResult: z.record(z.string(), taskRunResultSchema),

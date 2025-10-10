@@ -11,12 +11,12 @@ export interface WorkflowRegistryEntry {
 }
 
 export interface WorkflowRegistry {
-	add: <Payload, Result, Dependencies>(
-		workflowVersion: WorkflowVersion<Payload, Result, Dependencies>,
+	add: <Input, Output, Dependencies>(
+		workflowVersion: WorkflowVersion<Input, Output, Dependencies>,
 		...args: Dependencies extends void ? [] : [Dependencies]
 	) => WorkflowRegistry;
-	remove: <Payload, Result, Dependencies>(
-		workflowVersion: WorkflowVersion<Payload, Result, Dependencies>,
+	remove: <Input, Output, Dependencies>(
+		workflowVersion: WorkflowVersion<Input, Output, Dependencies>,
 	) => WorkflowRegistry;
 	removeAll: () => WorkflowRegistry;
 
@@ -40,8 +40,8 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 		};
 	}
 
-	public add<Payload, Result, Dependencies>(
-		workflowVersion: WorkflowVersion<Payload, Result, Dependencies>,
+	public add<Input, Output, Dependencies>(
+		workflowVersion: WorkflowVersion<Input, Output, Dependencies>,
 		...args: Dependencies extends void ? [] : [Dependencies]
 	): WorkflowRegistry {
 		const entryByVersionId = this.registry.get(workflowVersion.name);
@@ -62,8 +62,8 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 		return this;
 	}
 
-	public remove<Payload, Result, Dependencies>(
-		workflowVersion: WorkflowVersion<Payload, Result, Dependencies>,
+	public remove<Input, Output, Dependencies>(
+		workflowVersion: WorkflowVersion<Input, Output, Dependencies>,
 	): WorkflowRegistry {
 		this.registry.get(workflowVersion.name)?.delete(workflowVersion.versionId);
 		return this;

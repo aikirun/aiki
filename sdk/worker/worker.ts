@@ -235,7 +235,7 @@ class WorkerImpl implements Worker {
 					...workflowRun,
 					handle: workflowRunHandle,
 				},
-				workflowRun.payload,
+				workflowRun.input,
 				workflowRegistryEntry.dependencies,
 			);
 		} catch (error) {

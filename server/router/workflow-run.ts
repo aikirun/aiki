@@ -18,7 +18,7 @@ const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 			id: input.id,
 			name: "test-workflow",
 			versionId: "v1",
-			payload: null,
+			input: null,
 			options: {},
 			result: { state: "running" },
 			subTasksRunResult: {},
@@ -33,7 +33,7 @@ const getResultV1 = os.getResultV1.handler(({ input }) => {
 	return {
 		result: {
 			state: "completed",
-			result: { success: true, data: "mock result" },
+			output: { success: true, data: "mock result" },
 		},
 	};
 });
@@ -47,7 +47,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 			id: runId,
 			name: input.name,
 			versionId: input.versionId,
-			payload: input.payload,
+			input: input.input,
 			options: input.options ?? {},
 			result: { state: "queued" },
 			subTasksRunResult: {},

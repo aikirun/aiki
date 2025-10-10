@@ -63,7 +63,7 @@ const getResultV1: ContractProcedure<GetResultRequestV1, GetResultResponseV1> = 
 export interface CreateRequestV1 {
 	name: string;
 	versionId: string;
-	payload: unknown;
+	input: unknown;
 	options?: WorkflowOptions;
 }
 
@@ -75,7 +75,7 @@ const createV1: ContractProcedure<CreateRequestV1, CreateResponseV1> = oc
 	.input(z.object({
 		name: z.string().min(1),
 		versionId: z.string().min(1),
-		payload: z.unknown(),
+		input: z.unknown(),
 		options: workflowOptionsSchema.optional(),
 	}))
 	.output(z.object({

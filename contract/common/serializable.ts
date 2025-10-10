@@ -1,7 +1,7 @@
-export type ValidPayload =
+export type SerializableInput =
 	| null
 	| string
 	| number
 	| boolean
-	| { [key: string]: ValidPayload }
-	| ValidPayload[];
+	| { [key: string]: SerializableInput }
+	| SerializableInput[];
