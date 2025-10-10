@@ -224,5 +224,3 @@ Then we can rename ctx to run
   Actually, we should support both!
 
   ### workflow, task etc should be independently installable packages
-
-  ### don't for get to bind(this)
