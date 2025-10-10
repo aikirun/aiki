@@ -1,23 +1,6 @@
 import { worker } from "@aiki/sdk/worker";
 import { Aiki } from "@aiki/sdk";
-import {
-	type DatabaseConnection,
-	type EmailService,
-	eveningRoutineWorkflowV1,
-	morningWorkflowV1,
-	morningWorkflowV2,
-} from "../workflow/example.ts";
-
-const dbConn: DatabaseConnection = {
-	query: (_sql) => {
-		return Promise.resolve([]);
-	},
-};
-
-const emailService: EmailService = {
-	send: async (_to: string, _message: string) => {
-	},
-};
+import { eveningRoutineWorkflow, morningWorkflow } from "../workflow/example.ts";
 
 if (import.meta.main) {
 	const client = await Aiki.client({ baseUrl: "http://localhost:9090" });
@@ -33,15 +16,11 @@ if (import.meta.main) {
 	});
 
 	workerA.workflowRegistry
-		.add(morningWorkflowV1)
-		.add(morningWorkflowV2, {
-			db: dbConn,
-			email: emailService,
-		})
-		.add(eveningRoutineWorkflowV1);
+		.add(morningWorkflow)
+		.add(eveningRoutineWorkflow);
 
 	workerB.workflowRegistry
-		.add(morningWorkflowV1);
+		.add(eveningRoutineWorkflow);
 
 	workerA.start();
 	workerB.start();
