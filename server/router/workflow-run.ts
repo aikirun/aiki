@@ -1,7 +1,6 @@
-import { implement } from "@orpc/server";
-import { workflowRunContract } from "@aiki/contract/workflow-run";
+import { baseImplementer } from "./base.ts";
 
-const os = implement(workflowRunContract);
+const os = baseImplementer.workflowRun;
 
 const getReadyIdsV1 = os.getReadyIdsV1.handler(({ input }) => {
 	// deno-lint-ignore no-console
