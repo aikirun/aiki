@@ -60,7 +60,8 @@ class WorkerImpl implements Worker {
 		this.workflowRegistry = initWorkflowRegistry();
 
 		this.logger = getChildLogger(client._internal.logger, {
-			aiki_workerId: this.id,
+			"aiki.component": "worker",
+			"aiki.workerId": this.id,
 		});
 
 		this.logger.info("Worker initialized");
@@ -243,9 +244,10 @@ class WorkerImpl implements Worker {
 		workflowVersion: WorkflowVersion<unknown, unknown>,
 	): Promise<void> {
 		const workflowLogger = getChildLogger(this.logger, {
-			aiki_workflowName: workflowRun.name,
-			aiki_workflowVersionId: workflowRun.versionId,
-			aiki_workflowRunId: workflowRun.id,
+			"aiki.component": "workflow-execution",
+			"aiki.workflowName": workflowRun.name,
+			"aiki.workflowVersionId": workflowRun.versionId,
+			"aiki.workflowRunId": workflowRun.id,
 		});
 
 		workflowLogger.info("Executing workflow");

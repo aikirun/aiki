@@ -65,7 +65,7 @@ class ClientImpl implements Client {
 		this.api = createORPCClient(rpcLink);
 
 		this.logger.info("Aiki client initialized", {
-			aiki_url: params.url,
+			"aiki.url": params.url,
 		});
 
 		this._internal = {
