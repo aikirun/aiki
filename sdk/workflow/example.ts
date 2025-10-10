@@ -12,11 +12,18 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 export const morningWorkflowV2 = morningWorkflow
 	.v("2.0", {
 		async exec(input: { a: string; b: number }, run): Promise<string> {
+			run.logger.info("Starting morning routine", { song: input.a, duration: input.b });
+
 			const alarmOutput = await ringAlarm.start(run, { song: input.a });
+			run.logger.debug("Alarm completed", { output: alarmOutput });
 
 			const stretchOutput = await stretch.start(run, { duration: input.b });
+			run.logger.debug("Stretch completed", { output: stretchOutput });
 
-			return `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
+			const result = `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
+			run.logger.info("Morning routine completed", { result });
+
+			return result;
 		},
 	})
 	.withOptions({

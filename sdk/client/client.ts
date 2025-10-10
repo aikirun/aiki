@@ -9,6 +9,8 @@ import {
 	type SubscriberStrategy,
 	type SubscriberStrategyBuilder,
 } from "./subscribers/strategy-resolver.ts";
+import type { Logger } from "../logger/mod.ts";
+import { ConsoleLogger } from "../logger/mod.ts";
 
 export function client(params: ClientParams): Promise<Client> {
 	return Promise.resolve(new ClientImpl(params));
@@ -17,6 +19,7 @@ export function client(params: ClientParams): Promise<Client> {
 export interface ClientParams {
 	url: string;
 	redisStreams?: RedisConfig;
+	logger?: Logger;
 }
 
 export interface RedisConfig {
@@ -43,19 +46,27 @@ export interface Client {
 			getConnection: () => Redis;
 			closeConnection: () => Promise<void>;
 		};
+		logger: Logger;
 	};
 }
 
 class ClientImpl implements Client {
 	public readonly api: ContractRouterClient<Contract>;
 	public readonly _internal: Client["_internal"];
+	private readonly logger: Logger;
 	private redisStreamsConnection?: Redis;
 
 	constructor(private readonly params: ClientParams) {
+		this.logger = params.logger ?? new ConsoleLogger();
+
 		const rpcLink = new RPCLink({
 			url: `${params.url}`,
 		});
 		this.api = createORPCClient(rpcLink);
+
+		this.logger.info("Aiki client initialized", {
+			url: params.url,
+		});
 
 		this._internal = {
 			subscriber: {
@@ -66,6 +77,7 @@ class ClientImpl implements Client {
 				getConnection: () => this.getRedisStreamsConnection(),
 				closeConnection: () => this.closeRedisStreamsConnection(),
 			},
+			logger: this.logger,
 		};
 	}
 

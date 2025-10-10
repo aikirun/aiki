@@ -8,6 +8,7 @@ import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registr
 import { initWorkflowRunHandle } from "../workflow/run/run-handle.ts";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
 import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
+import type { Logger } from "../logger/mod.ts";
 
 export function worker(
 	client: Client,
@@ -49,6 +50,7 @@ interface ActiveWorkflowRun {
 class WorkerImpl implements Worker {
 	public readonly id: string;
 	public readonly workflowRegistry: WorkflowRegistry;
+	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
@@ -56,9 +58,18 @@ class WorkerImpl implements Worker {
 	constructor(private readonly client: Client, private readonly params: WorkerParams) {
 		this.id = params.id ?? crypto.randomUUID();
 		this.workflowRegistry = initWorkflowRegistry();
+
+		this.logger = client._internal.logger.child({
+			component: "worker",
+			workerId: this.id,
+		});
+
+		this.logger.info("Worker initialized");
 	}
 
 	public async start(): Promise<void> {
+		this.logger.info("Worker starting");
+
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
 
@@ -77,6 +88,8 @@ class WorkerImpl implements Worker {
 	}
 
 	public async stop(): Promise<void> {
+		this.logger.info("Worker stopping");
+
 		this.abortController?.abort();
 
 		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
@@ -91,16 +104,18 @@ class WorkerImpl implements Worker {
 					delay(timeoutMs),
 				]);
 			} catch (error) {
-				// deno-lint-ignore no-console
-				console.warn("Error during graceful shutdown", error);
+				this.logger.warn("Error during graceful shutdown", {
+					error: error instanceof Error ? error.message : String(error),
+				});
 			}
 		}
 
 		const activeWorkflowRunsOnShutdown = Array.from(this.activeWorkflowRunsById.values());
 		if (activeWorkflowRunsOnShutdown.length > 0) {
 			const ids = activeWorkflowRunsOnShutdown.map((w) => w.run.id).join(", ");
-			// deno-lint-ignore no-console
-			console.warn(`Worker ${this.id} shutdown while workflows ${ids} still running`);
+			this.logger.warn("Worker shutdown with active workflows", {
+				activeWorkflowRunIds: ids,
+			});
 		}
 
 		this.activeWorkflowRunsById.clear();
@@ -167,8 +182,9 @@ class WorkerImpl implements Worker {
 				ids: workflowRunIds,
 			};
 		} catch (error) {
-			// deno-lint-ignore no-console
-			console.error(`Worker ${this.id}: Error getting next workflow runs batch`, error);
+			this.logger.error("Error getting next workflow runs batch", {
+				error: error instanceof Error ? error.message : String(error),
+			});
 
 			return {
 				success: false,
@@ -195,15 +211,20 @@ class WorkerImpl implements Worker {
 
 			const workflow = this.workflowRegistry._internal.get(workflowRun.name as WorkflowName);
 			if (!workflow) {
-				// deno-lint-ignore no-console
-				console.log(`Workflow: "${workflowRun.name}" not found`);
+				this.logger.warn("Workflow not found in registry", {
+					workflowName: workflowRun.name,
+					workflowRunId: workflowRun.id,
+				});
 				continue;
 			}
 
 			const workflowVersion = workflow._internal.getVersion(workflowRun.versionId as WorkflowVersionId);
 			if (!workflowVersion) {
-				// deno-lint-ignore no-console
-				console.log(`Workflow: "${workflowRun.name}/${workflowRun.versionId}" not found`);
+				this.logger.warn("Workflow version not found", {
+					workflowName: workflowRun.name,
+					workflowVersionId: workflowRun.versionId,
+					workflowRunId: workflowRun.id,
+				});
 				continue;
 			}
 
@@ -222,6 +243,15 @@ class WorkerImpl implements Worker {
 		workflowRun: WorkflowRunRow<unknown, unknown>,
 		workflowVersion: WorkflowVersion<unknown, unknown>,
 	): Promise<void> {
+		const workflowLogger = this.logger.child({
+			component: "workflow-execution",
+			workflowName: workflowRun.name,
+			workflowVersionId: workflowRun.versionId,
+			workflowRunId: workflowRun.id,
+		});
+
+		workflowLogger.info("Executing workflow");
+
 		let heartbeatInterval: number | undefined;
 		try {
 			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun);
@@ -230,8 +260,9 @@ class WorkerImpl implements Worker {
 				try {
 					// TODO: update heart beat via redis stream
 				} catch (error) {
-					// deno-lint-ignore no-console
-					console.warn(`Worker ${this.id}: Failed to update workflow heartbeat ${workflowRun.id}`, error);
+					workflowLogger.warn("Failed to update workflow heartbeat", {
+						error: error instanceof Error ? error.message : String(error),
+					});
 				}
 			}, this.params.workflowRun?.heartbeatIntervalMs ?? 30_000);
 
@@ -240,12 +271,17 @@ class WorkerImpl implements Worker {
 				{
 					...workflowRun,
 					handle: workflowRunHandle,
+					logger: workflowLogger,
 				},
 				workflowRun.input,
 			);
+
+			workflowLogger.info("Workflow execution completed");
 		} catch (error) {
-			// deno-lint-ignore no-console
-			console.error(`Worker ${this.id}: Error processing workflow: ${workflowRun.id}`, error);
+			workflowLogger.error("Workflow execution failed", {
+				error: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined,
+			});
 		} finally {
 			if (heartbeatInterval) clearInterval(heartbeatInterval);
 			this.activeWorkflowRunsById.delete(workflowRun.id);
@@ -253,13 +289,16 @@ class WorkerImpl implements Worker {
 	}
 
 	private handleNotificationError(error: Error): void {
-		// deno-lint-ignore no-console
-		console.warn(`Worker ${this.id}: Notification error:`, error);
+		this.logger.warn("Notification error, falling back to polling", {
+			error: error.message,
+			stack: error.stack,
+		});
 
+		// TODO: remove
 		const fallbackEnabled = true; // Fallback is always enabled
 
 		if (fallbackEnabled) {
-			// Debug: Fallback to polling due to error
+			this.logger.debug("Fallback to polling enabled");
 		}
 	}
 }
