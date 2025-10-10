@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { oc } from "@orpc/contract";
-import type { WorkflowOptions, WorkflowRunId, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
+import type { WorkflowOptions, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
 import {
 	workflowOptionsSchema,
 	workflowRunResultSchema,
@@ -17,7 +17,7 @@ export interface GetReadyIdsRequestV1 {
 }
 
 export interface GetReadyIdsResponseV1 {
-	ids: WorkflowRunId[];
+	ids: string[];
 }
 
 const getReadyIdsV1: ContractProcedure<GetReadyIdsRequestV1, GetReadyIdsResponseV1> = oc
@@ -25,7 +25,7 @@ const getReadyIdsV1: ContractProcedure<GetReadyIdsRequestV1, GetReadyIdsResponse
 		size: z.number().int().positive(),
 	}))
 	.output(z.object({
-		ids: z.array(z.string().transform((val) => val as WorkflowRunId)),
+		ids: z.array(z.string()),
 	}));
 
 export interface GetByIdRequestV1 {
@@ -33,7 +33,7 @@ export interface GetByIdRequestV1 {
 }
 
 export interface GetByIdResponseV1 {
-	run?: WorkflowRunRow<unknown, unknown>;
+	run: WorkflowRunRow<unknown, unknown>;
 }
 
 const getByIdV1: ContractProcedure<GetByIdRequestV1, GetByIdResponseV1> = oc
@@ -41,7 +41,7 @@ const getByIdV1: ContractProcedure<GetByIdRequestV1, GetByIdResponseV1> = oc
 		id: z.string().min(1),
 	}))
 	.output(z.object({
-		run: workflowRunRowSchema.optional(),
+		run: workflowRunRowSchema,
 	}));
 
 export interface GetResultRequestV1 {

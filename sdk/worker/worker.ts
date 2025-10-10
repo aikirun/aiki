@@ -7,6 +7,7 @@ import type { ResolvedSubscriberStrategy, SubscriberStrategyBuilder } from "../c
 import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
 import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
 import { initWorkflowRunHandle } from "../workflow/run/run-handle.ts";
+import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
 
 export function worker(
 	client: Client,
@@ -202,13 +203,13 @@ class WorkerImpl implements Worker {
 				continue;
 			}
 
-			const workflow = this.workflowRegistry._internal.getByName(workflowRun.name);
+			const workflow = this.workflowRegistry._internal.getByName(workflowRun.name as WorkflowName);
 			if (!workflow) {
 				// Debug: No registered workflow for name
 				continue;
 			}
 
-			const workflowVersion = workflow._internal.getVersion(workflowRun.versionId);
+			const workflowVersion = workflow._internal.getVersion(workflowRun.versionId as WorkflowVersionId);
 			if (!workflowVersion) {
 				// Debug: No registered version for workflow
 				continue;

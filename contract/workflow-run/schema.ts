@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { WorkflowOptions, WorkflowRunId, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
-import { triggerStrategySchema } from "@aiki/lib/trigger";
+import type { WorkflowOptions, WorkflowRunResult, WorkflowRunRow, WorkflowRunState } from "./types.ts";
 import type { UnionToRecord } from "@aiki/lib/object";
 import { taskRunResultSchema } from "../task-run/schema.ts";
-import type { WorkflowName, WorkflowVersionId } from "../workflow/types.ts";
+import type { zT } from "../common/schema.ts";
+import type { TriggerStrategy } from "@aiki/lib/trigger";
 
 export const workflowRunStateSchema: z.ZodEnum<UnionToRecord<WorkflowRunState>> = z.enum([
 	"scheduled",
@@ -20,29 +20,37 @@ export const workflowRunStateSchema: z.ZodEnum<UnionToRecord<WorkflowRunState>> 
 	"completed",
 ]);
 
-export const workflowOptionsSchema: z.ZodType<WorkflowOptions, WorkflowOptions> = z.object({
+export const triggerStrategySchema: zT<TriggerStrategy> = z.discriminatedUnion("type", [
+	z.object({ type: z.literal("immediate") }),
+	z.object({ type: z.literal("delayed"), delayMs: z.number() }),
+	z.object({ type: z.literal("startAt"), startAt: z.number() }),
+]);
+
+export const workflowOptionsSchema: zT<WorkflowOptions> = z.object({
 	idempotencyKey: z.string().optional(),
 	trigger: triggerStrategySchema.optional(),
 	shardKey: z.string().optional(),
 });
 
-export const workflowRunResultSchema: z.ZodType<WorkflowRunResult<unknown>> = z.discriminatedUnion("state", [
-	z.object({
-		state: workflowRunStateSchema.exclude(["completed"]),
-	}),
-	z.object({
-		state: z.literal("completed"),
-		result: z.unknown(),
-	}),
-]);
+export const workflowRunResultSchema: zT<WorkflowRunResult<unknown>> = z
+	.discriminatedUnion("state", [
+		z.object({
+			state: workflowRunStateSchema.exclude(["completed"]),
+		}),
+		z.object({
+			state: z.literal("completed"),
+			result: z.unknown(),
+		}),
+	]);
 
-export const workflowRunRowSchema: z.ZodType<WorkflowRunRow<unknown, unknown>> = z.object({
-	id: z.string().transform((val) => val as WorkflowRunId),
-	name: z.string().transform((val) => val as WorkflowName),
-	versionId: z.string().transform((val) => val as WorkflowVersionId),
-	payload: z.unknown(),
-	options: workflowOptionsSchema,
-	result: workflowRunResultSchema,
-	subTasksRunResult: z.record(z.string(), taskRunResultSchema),
-	subWorkflowsRunResult: z.record(z.string(), workflowRunResultSchema),
-});
+export const workflowRunRowSchema: zT<WorkflowRunRow<unknown, unknown>> = z
+	.object({
+		id: z.string(),
+		name: z.string(),
+		versionId: z.string(),
+		payload: z.unknown(),
+		options: workflowOptionsSchema,
+		result: workflowRunResultSchema,
+		subTasksRunResult: z.record(z.string(), taskRunResultSchema),
+		subWorkflowsRunResult: z.record(z.string(), workflowRunResultSchema),
+	});

@@ -1,5 +1,5 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
-import type { WorkflowOptions } from "@aiki/contract/workflow-run";
+import type { WorkflowOptions, WorkflowRunId } from "@aiki/contract/workflow-run";
 import type { Client } from "../../client/client.ts";
 import type { WorkflowRunContext } from "../run/context.ts";
 import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
@@ -65,7 +65,7 @@ export class WorkflowVersionImpl<Payload, Result> implements WorkflowVersion<Pay
 			payload: isNonEmptyArray(args) ? args[0] : null,
 			options: this.options,
 		});
-		return initWorkflowRunResultHandle(response.run.id, client.api);
+		return initWorkflowRunResultHandle(response.run.id as WorkflowRunId, client.api);
 	}
 
 	private async exec(

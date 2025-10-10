@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { TaskRunResult } from "./types.ts";
+import type { zT } from "../common/schema.ts";
 
-export const taskRunResultSchema: z.ZodType<TaskRunResult<unknown>, TaskRunResult<unknown>> = z.discriminatedUnion(
+export const taskRunResultSchema: zT<TaskRunResult<unknown>> = z.discriminatedUnion(
 	"state",
 	[
 		z.object({ state: z.literal("none") }),

@@ -1,7 +1,6 @@
 import type { BrandedString } from "@aiki/lib/string";
 import type { TriggerStrategy } from "@aiki/lib/trigger";
 import type { TaskRunResult } from "../task-run/types.ts";
-import type { WorkflowName, WorkflowVersionId } from "../workflow/types.ts";
 
 export type WorkflowRunId = BrandedString<"workflow_run_id">;
 
@@ -40,9 +39,9 @@ export type WorkflowRunResult<Result> =
 	| WorkflowRunResultComplete<Result>;
 
 export interface WorkflowRunRow<Payload, Result> {
-	id: WorkflowRunId;
-	name: WorkflowName;
-	versionId: WorkflowVersionId;
+	id: string;
+	name: string;
+	versionId: string;
 	payload: Payload;
 	options: WorkflowOptions;
 	result: WorkflowRunResult<Result>;
