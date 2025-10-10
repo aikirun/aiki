@@ -1,7 +1,7 @@
 import { getRetryParams } from "@aiki/lib/retry";
 import type { WorkflowRunId } from "@aiki/contract/workflow-run";
 import type { Client } from "../client.ts";
-import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
+import type { StrategyCallbacks, SubscriberDelayParams, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
 
 /**
  * Simple polling subscriber strategy configuration
@@ -36,15 +36,15 @@ export function createPollingStrategy(
 	const maxRetryIntervalMs = strategy.maxRetryIntervalMs ?? 30_000;
 	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;
 
-	const getNextDelay = (ctx: SubscriberDelayContext) => {
-		switch (ctx.type) {
+	const getNextDelay = (params: SubscriberDelayParams) => {
+		switch (params.type) {
 			case "polled":
 			case "heartbeat":
 				return intervalMs;
 			case "at_capacity":
 				return atCapacityIntervalMs;
 			case "retry": {
-				const retryParams = getRetryParams(ctx.attemptNumber, {
+				const retryParams = getRetryParams(params.attemptNumber, {
 					type: "jittered",
 					maxAttempts: Infinity,
 					baseDelayMs: intervalMs,
@@ -56,7 +56,7 @@ export function createPollingStrategy(
 				return retryParams.delayMs;
 			}
 			default:
-				return ctx satisfies never;
+				return params satisfies never;
 		}
 	};
 

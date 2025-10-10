@@ -5,7 +5,7 @@ import { getRetryParams } from "@aiki/lib/retry";
 import type { WorkflowName } from "@aiki/contract/workflow";
 import type { WorkflowRunId } from "@aiki/contract/workflow-run";
 import type { Client } from "../client.ts";
-import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
+import type { StrategyCallbacks, SubscriberDelayParams, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
 
 /**
  * Redis Streams subscriber strategy configuration
@@ -132,13 +132,13 @@ export function createRedisStreamsStrategy(
 	const blockTimeMs = strategy.blockTimeMs ?? 1_000;
 	const claimMinIdleTimeMs = strategy.claimMinIdleTimeMs ?? 60_000;
 
-	const getNextDelay = (ctx: SubscriberDelayContext) => {
-		switch (ctx.type) {
+	const getNextDelay = (params: SubscriberDelayParams) => {
+		switch (params.type) {
 			case "polled":
 			case "heartbeat":
 				return intervalMs;
 			case "retry": {
-				const retryParams = getRetryParams(ctx.attemptNumber, {
+				const retryParams = getRetryParams(params.attemptNumber, {
 					type: "jittered",
 					maxAttempts: Infinity,
 					baseDelayMs: intervalMs,
@@ -152,7 +152,7 @@ export function createRedisStreamsStrategy(
 			case "at_capacity":
 				return atCapacityIntervalMs;
 			default:
-				return ctx satisfies never;
+				return params satisfies never;
 		}
 	};
 

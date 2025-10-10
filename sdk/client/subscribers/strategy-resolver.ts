@@ -24,11 +24,11 @@ export interface StrategyCallbacks {
 
 export interface ResolvedSubscriberStrategy {
 	type: SubscriberStrategy["type"];
-	getNextDelay: (context: SubscriberDelayContext) => number;
+	getNextDelay: (context: SubscriberDelayParams) => number;
 	getNextBatch: (size: number) => Promise<WorkflowRunId[]>;
 }
 
-export type SubscriberDelayContext =
+export type SubscriberDelayParams =
 	| { type: "polled"; foundWork: boolean }
 	| { type: "retry"; attemptNumber: number }
 	| { type: "heartbeat" }

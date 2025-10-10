@@ -1,7 +1,7 @@
 import { type AdaptivePollingConfig, AdaptivePollingStrategy } from "@aiki/lib/polling";
 import type { WorkflowRunId } from "@aiki/contract/workflow-run";
 import type { Client } from "../client.ts";
-import type { StrategyCallbacks, SubscriberDelayContext, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
+import type { StrategyCallbacks, SubscriberDelayParams, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
 
 /**
  * Adaptive polling subscriber strategy configuration
@@ -24,10 +24,10 @@ export function createAdaptivePollingStrategy(
 
 	const adaptive = new AdaptivePollingStrategy(strategy);
 
-	const getNextDelay = (ctx: SubscriberDelayContext) => {
-		switch (ctx.type) {
+	const getNextDelay = (params: SubscriberDelayParams) => {
+		switch (params.type) {
 			case "polled":
-				return ctx.foundWork ? adaptive.recordWorkFound() : adaptive.recordNoWork();
+				return params.foundWork ? adaptive.recordWorkFound() : adaptive.recordNoWork();
 			case "retry":
 				return adaptive.forceSlowPolling();
 			case "heartbeat":
@@ -35,7 +35,7 @@ export function createAdaptivePollingStrategy(
 			case "at_capacity":
 				return atCapacityIntervalMs;
 			default:
-				return ctx satisfies never;
+				return params satisfies never;
 		}
 	};
 
