@@ -12,38 +12,24 @@ export interface WorkflowParams {
 
 export interface Workflow {
 	name: WorkflowName;
-	v: <Payload extends ValidPayload = null, Result = void>(
+	v: <Payload extends ValidPayload = null, Result = void, Dependencies = void>(
 		versionId: string,
-		params: WorkflowVersionParams<Payload, Result>,
-	) => WorkflowVersion<Payload, Result>;
-	_internal: {
-		getAllVersions: () => Array<WorkflowVersion<unknown, unknown>>;
-		getVersion: (versionId: WorkflowVersionId) => WorkflowVersion<unknown, unknown> | undefined;
-	};
+		params: WorkflowVersionParams<Payload, Result, Dependencies>,
+	) => WorkflowVersion<Payload, Result, Dependencies>;
 }
 
 class WorkflowImpl implements Workflow {
 	public readonly name: WorkflowName;
-	public readonly _internal: Workflow["_internal"];
-	private workflowVersionMap = new Map<WorkflowVersionId, WorkflowVersion<unknown, unknown>>();
 
 	constructor(params: WorkflowParams) {
 		this.name = params.name as WorkflowName;
-		this._internal = {
-			getAllVersions: () => Array.from(this.workflowVersionMap.values()),
-			getVersion: (versionId: WorkflowVersionId) => this.workflowVersionMap.get(versionId),
-		};
 	}
 
-	v<Payload, Result>(
+	v<Payload, Result, Dependencies>(
 		versionId: string,
-		params: WorkflowVersionParams<Payload, Result>,
-	): WorkflowVersion<Payload, Result> {
+		params: WorkflowVersionParams<Payload, Result, Dependencies>,
+	): WorkflowVersion<Payload, Result, Dependencies> {
 		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
-		this.workflowVersionMap.set(
-			versionId as WorkflowVersionId,
-			workflowVersion as unknown as WorkflowVersion<unknown, unknown>,
-		);
 		return workflowVersion;
 	}
 }

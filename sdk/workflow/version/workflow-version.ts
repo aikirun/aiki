@@ -5,18 +5,19 @@ import type { WorkflowRunContext } from "../run/context.ts";
 import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
 
-export interface WorkflowVersionParams<Payload, Result> {
+export interface WorkflowVersionParams<Payload, Result, Dependencies = void> {
 	exec: (
 		runCtx: WorkflowRunContext<Payload, Result>,
 		payload: Payload,
+		deps: Dependencies,
 	) => Promise<Result>;
 }
 
-export interface WorkflowVersion<Payload, Result> {
+export interface WorkflowVersion<Payload, Result, Dependencies> {
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
 
-	withOptions(options: WorkflowOptions): WorkflowVersion<Payload, Result>;
+	withOptions(options: WorkflowOptions): WorkflowVersion<Payload, Result, Dependencies>;
 
 	start: (
 		client: Client,
@@ -24,29 +25,31 @@ export interface WorkflowVersion<Payload, Result> {
 	) => Promise<WorkflowRunResultHandle<Result>>;
 
 	_internal: {
-		_exec: (
+		exec: (
 			client: Client,
 			runCtx: WorkflowRunContext<Payload, Result>,
 			payload: Payload,
+			deps: Dependencies,
 		) => Promise<void>;
 	};
 }
 
-export class WorkflowVersionImpl<Payload, Result> implements WorkflowVersion<Payload, Result> {
-	public readonly _internal: WorkflowVersion<Payload, Result>["_internal"];
+export class WorkflowVersionImpl<Payload, Result, Dependencies>
+	implements WorkflowVersion<Payload, Result, Dependencies> {
+	public readonly _internal: WorkflowVersion<Payload, Result, Dependencies>["_internal"];
 
 	constructor(
 		public readonly name: WorkflowName,
 		public readonly versionId: WorkflowVersionId,
-		private readonly params: WorkflowVersionParams<Payload, Result>,
+		private readonly params: WorkflowVersionParams<Payload, Result, Dependencies>,
 		private readonly options?: WorkflowOptions,
 	) {
 		this._internal = {
-			_exec: this.exec,
+			exec: this.exec.bind(this),
 		};
 	}
 
-	public withOptions(options: WorkflowOptions): WorkflowVersion<Payload, Result> {
+	public withOptions(options: WorkflowOptions): WorkflowVersion<Payload, Result, Dependencies> {
 		return new WorkflowVersionImpl(
 			this.name,
 			this.versionId,
@@ -72,9 +75,10 @@ export class WorkflowVersionImpl<Payload, Result> implements WorkflowVersion<Pay
 		client: Client,
 		runCtx: WorkflowRunContext<Payload, Result>,
 		payload: Payload,
+		deps: Dependencies,
 	): Promise<void> {
 		try {
-			await this.params.exec(runCtx, payload);
+			await this.params.exec(runCtx, payload, deps);
 			// TODO: persists workflow run result
 		} catch (error) {
 			// deno-lint-ignore no-console

@@ -1,70 +1,90 @@
-import type { WorkflowName } from "@aiki/contract/workflow";
-import type { Workflow } from "./workflow.ts";
+import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
+import type { WorkflowVersion } from "@aiki/sdk/workflow";
 
 export function initWorkflowRegistry(): WorkflowRegistry {
 	return new WorkflowRegistryImpl();
 }
 
+export interface WorkflowRegistryEntry {
+	workflowVersion: WorkflowVersion<unknown, unknown, unknown>;
+	dependencies: unknown;
+}
+
 export interface WorkflowRegistry {
-	add: (workflow: Workflow) => WorkflowRegistry;
-	addMany: (workflows: Workflow[]) => WorkflowRegistry;
-	remove: (workflow: Workflow) => WorkflowRegistry;
-	removeMany: (workflows: Workflow[]) => WorkflowRegistry;
+	add: <Payload, Result, Dependencies>(
+		workflowVersion: WorkflowVersion<Payload, Result, Dependencies>,
+		...args: Dependencies extends void ? [] : [Dependencies]
+	) => WorkflowRegistry;
+	remove: <Payload, Result, Dependencies>(
+		workflowVersion: WorkflowVersion<Payload, Result, Dependencies>,
+	) => WorkflowRegistry;
 	removeAll: () => WorkflowRegistry;
+
 	_internal: {
-		getNames(): WorkflowName[];
-		getByName: (name: WorkflowName) => Workflow | undefined;
+		getAll(): WorkflowRegistryEntry[];
+		get: (
+			name: WorkflowName,
+			versionId: WorkflowVersionId,
+		) => WorkflowRegistryEntry | undefined;
 	};
 }
 
 class WorkflowRegistryImpl implements WorkflowRegistry {
 	public readonly _internal: WorkflowRegistry["_internal"];
-	private workflowsByName: Map<WorkflowName, Workflow> = new Map();
+	private registry: Map<WorkflowName, Map<WorkflowVersionId, WorkflowRegistryEntry>> = new Map();
 
 	constructor() {
 		this._internal = {
-			getNames: () => Array.from(this.workflowsByName.keys()),
-			getByName: (name: WorkflowName) => this.workflowsByName.get(name),
+			getAll: this.getAll.bind(this),
+			get: this.get.bind(this),
 		};
 	}
 
-	public add(workflow: Workflow): WorkflowRegistry {
-		if (this.workflowsByName.has(workflow.name)) {
-			throw new Error(`Workflow "${workflow.name}" is already registered`);
+	public add<Payload, Result, Dependencies>(
+		workflowVersion: WorkflowVersion<Payload, Result, Dependencies>,
+		...args: Dependencies extends void ? [] : [Dependencies]
+	): WorkflowRegistry {
+		const entryByVersionId = this.registry.get(workflowVersion.name);
+		if (entryByVersionId && entryByVersionId.has(workflowVersion.versionId)) {
+			throw new Error(`Workflow "${workflowVersion.name}/${workflowVersion.versionId}" already registered`);
 		}
 
-		const workflowVersions = workflow._internal.getAllVersions();
-		const uniqueWorkflowVersionIds = new Set(workflow._internal.getAllVersions().map(({ versionId }) => versionId));
-		if (workflowVersions.length !== uniqueWorkflowVersionIds.size) {
-			throw new Error(`Workflow "${workflow.name}" has duplicate versions`);
+		const entry: WorkflowRegistryEntry = {
+			workflowVersion: workflowVersion as WorkflowVersion<unknown, unknown, unknown>,
+			dependencies: args[0],
+		};
+		if (entryByVersionId) {
+			entryByVersionId.set(workflowVersion.versionId, entry);
+		} else {
+			this.registry.set(workflowVersion.name, new Map([[workflowVersion.versionId, entry]]));
 		}
-
-		this.workflowsByName.set(workflow.name, workflow);
 
 		return this;
 	}
 
-	public addMany(workflows: Workflow[]): WorkflowRegistry {
-		for (const workflow of workflows) {
-			this.add(workflow);
-		}
-		return this;
-	}
-
-	public remove(workflow: Workflow): WorkflowRegistry {
-		this.workflowsByName.delete(workflow.name);
-		return this;
-	}
-
-	public removeMany(workflows: Workflow[]): WorkflowRegistry {
-		for (const workflow of workflows) {
-			this.remove(workflow);
-		}
+	public remove<Payload, Result, Dependencies>(
+		workflowVersion: WorkflowVersion<Payload, Result, Dependencies>,
+	): WorkflowRegistry {
+		this.registry.get(workflowVersion.name)?.delete(workflowVersion.versionId);
 		return this;
 	}
 
 	public removeAll(): WorkflowRegistry {
-		this.workflowsByName.clear();
+		this.registry.clear();
 		return this;
+	}
+
+	private get(name: WorkflowName, versionId: WorkflowVersionId): WorkflowRegistryEntry | undefined {
+		return this.registry.get(name)?.get(versionId);
+	}
+
+	private getAll(): WorkflowRegistryEntry[] {
+		const entries: WorkflowRegistryEntry[] = [];
+		for (const entryByVersionId of this.registry.values()) {
+			for (const entry of entryByVersionId.values()) {
+				entries.push(entry);
+			}
+		}
+		return entries;
 	}
 }

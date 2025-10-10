@@ -3,30 +3,16 @@ import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay } from "@aiki/lib/async";
 import type { Client, SubscriberStrategy } from "../client/mod.ts";
-import type { ResolvedSubscriberStrategy, SubscriberStrategyBuilder } from "../client/subscribers/strategy-resolver.ts";
-import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
-import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
+import type { ResolvedSubscriberStrategy } from "../client/subscribers/strategy-resolver.ts";
+import { initWorkflowRegistry, type WorkflowRegistry, type WorkflowRegistryEntry } from "../workflow/registry.ts";
 import { initWorkflowRunHandle } from "../workflow/run/run-handle.ts";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
 
 export function worker(
 	client: Client,
 	params: WorkerParams,
-): Promise<Worker> {
-	const workflowRegistry = initWorkflowRegistry();
-	const subscriberStrategyBuilder = client._internal.subscriber.create(
-		params.subscriber ?? { type: "polling" },
-		workflowRegistry._internal.getNames(),
-		params.shardKeys,
-	);
-	return Promise.resolve(
-		new WorkerImpl(
-			client,
-			workflowRegistry,
-			subscriberStrategyBuilder,
-			params,
-		),
-	);
+): Worker {
+	return new WorkerImpl(client, params);
 }
 
 export interface WorkerParams {
@@ -61,24 +47,27 @@ interface ActiveWorkflowRun {
 
 class WorkerImpl implements Worker {
 	public readonly id: string;
+	public readonly workflowRegistry: WorkflowRegistry;
 	private abortController: AbortController | undefined;
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 
-	constructor(
-		private readonly client: Client,
-		public readonly workflowRegistry: WorkflowRegistry,
-		private readonly subscriberStrategyBuilder: SubscriberStrategyBuilder,
-		private readonly params: WorkerParams,
-	) {
+	constructor(private readonly client: Client, private readonly params: WorkerParams) {
 		this.id = params.id ?? crypto.randomUUID();
+		this.workflowRegistry = initWorkflowRegistry();
 	}
 
 	public async start(): Promise<void> {
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
 
-		this.subscriberStrategy = await this.subscriberStrategyBuilder.init(this.id, {
+		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
+			this.params.subscriber ?? { type: "polling" },
+			this.workflowRegistry._internal.getAll().map((entry) => entry.workflowVersion.name),
+			this.params.shardKeys,
+		);
+
+		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
 			onError: (error: Error) => this.handleNotificationError(error),
 			onStop: () => this.stop(),
 		});
@@ -203,24 +192,18 @@ class WorkerImpl implements Worker {
 				continue;
 			}
 
-			const workflow = this.workflowRegistry._internal.getByName(workflowRun.name as WorkflowName);
-			if (!workflow) {
+			const workflowRegistryEntry = this.workflowRegistry._internal.get(
+				workflowRun.name as WorkflowName,
+				workflowRun.versionId as WorkflowVersionId,
+			);
+			if (!workflowRegistryEntry) {
 				// Debug: No registered workflow for name
-				continue;
-			}
-
-			const workflowVersion = workflow._internal.getVersion(workflowRun.versionId as WorkflowVersionId);
-			if (!workflowVersion) {
-				// Debug: No registered version for workflow
 				continue;
 			}
 
 			if (abortSignal.aborted) break;
 
-			const workflowExecutionPromise = this.executeWorkflow(
-				workflowRun,
-				workflowVersion,
-			);
+			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowRegistryEntry);
 
 			this.activeWorkflowRunsById.set(workflowRun.id, {
 				run: workflowRun,
@@ -231,7 +214,7 @@ class WorkerImpl implements Worker {
 
 	private async executeWorkflow(
 		workflowRun: WorkflowRunRow<unknown, unknown>,
-		workflowVersion: WorkflowVersion<unknown, unknown>,
+		workflowRegistryEntry: WorkflowRegistryEntry,
 	): Promise<void> {
 		let heartbeatInterval: number | undefined;
 		try {
@@ -246,13 +229,14 @@ class WorkerImpl implements Worker {
 				}
 			}, this.params.workflowRun?.heartbeatIntervalMs ?? 30_000);
 
-			await workflowVersion._internal._exec(
+			await workflowRegistryEntry.workflowVersion._internal.exec(
 				this.client,
 				{
 					...workflowRun,
 					handle: workflowRunHandle,
 				},
 				workflowRun.payload,
+				workflowRegistryEntry.dependencies,
 			);
 		} catch (error) {
 			// deno-lint-ignore no-console

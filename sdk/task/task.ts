@@ -14,9 +14,7 @@ export function task<
 
 export interface TaskParams<Payload, Result> {
 	name: string;
-	exec: (
-		...args: Payload extends null ? [] : [Payload]
-	) => Promise<Result>;
+	exec: (payload: Payload) => Promise<Result>;
 }
 
 export interface TaskOptions {
@@ -56,7 +54,8 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 		runCtx: WorkflowRunContext<WorkflowPayload, WorkflowResult>,
 		...args: Payload extends null ? [] : [Payload]
 	): Promise<Result> {
-		const payload = isNonEmptyArray(args) ? args[0] : null;
+		// this cast is okay cos if args is empty, Payload must be of type null
+		const payload = isNonEmptyArray(args) ? args[0] : null as Payload;
 		const path = await this.getPath(runCtx, payload);
 
 		const workflowRunInternal = runCtx.handle._internal;
@@ -69,7 +68,7 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 		// TODO: check if result state is failed and there are still retries left
 		// if not update workflow state to failed and return
 		try {
-			const result = await this.params.exec(...args);
+			const result = await this.params.exec(payload);
 			await workflowRunInternal.addSubTaskRunResult(path, {
 				state: "completed",
 				result,
@@ -88,7 +87,7 @@ class TaskImpl<Payload, Result> implements Task<Payload, Result> {
 
 	private async getPath<WorkflowPayload, WorkflowResult>(
 		runCtx: WorkflowRunContext<WorkflowPayload, WorkflowResult>,
-		payload: Payload | null,
+		payload: Payload,
 	): Promise<string> {
 		const workflowRunPath = `${runCtx.name}/${runCtx.versionId}/${runCtx.id}`;
 

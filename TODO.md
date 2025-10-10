@@ -96,53 +96,6 @@ This document tracks planned features and improvements for the Aiki durable work
 
 
 
-### Add generic Dependencies type parameter to workflow() function. Dependencies flow to all versions automatically via generics.
-
-Changes:
-
-1. workflow(): Add generic <Dependencies = void> parameter, return Workflow<Dependencies>
-2. Workflow interface: Add Dependencies generic, pass to v() method and versions
-3. WorkflowVersion: Add Dependencies generic, pass to _execute() method
-4. WorkflowVersionParams: Add Dependencies generic, make run accept deps param (conditional on Dependencies)
-5. WorkflowRegistry.add(): Add generic, require dependencies parameter when Dependencies is not void (use conditional spread 
-args)
-6. WorkflowRegistryImpl: Store dependencies per workflow name in Map
-7. Worker.executeWorkflow(): Retrieve dependencies from registry, pass to workflowVersion._execute()
-
-  export interface Workflow<Dependencies = void> {
-    name: WorkflowName;
-    v: <Payload, Result>(
-      versionId: string,
-      params: WorkflowVersionParams<Payload, Result, Dependencies>
-    ) => WorkflowVersion<Payload, Result, Dependencies>;
-  }
-
-  // WorkflowVersionParams knows about Dependencies
-  export interface WorkflowVersionParams<Payload, Result, Dependencies = void> {
-    run: Dependencies extends void
-      ? (ctx: WorkflowRunContext<Payload, Result>, payload: Payload) => Promise<Result>
-      : (ctx: WorkflowRunContext<Payload, Result>, payload: Payload, deps: Dependencies) => Promise<Result>;
-    trigger?: TriggerStrategy;
-  }
-
-  // registry.ts
-  export interface WorkflowRegistry {
-    add: <Dependencies = void>(
-      workflow: Workflow<Dependencies>,
-      ...args: Dependencies extends void ? [] : [dependencies: Dependencies]
-    ) => WorkflowRegistry;
-  }
-
-API:
-
-const wf = workflow<{ email: EmailService }>({ name: "order" });
-wf.v("v1", {
-    run: async (ctx, payload: { id: string }, deps) => {
-    await deps.email.send();
-    }
-});
-worker.workflowRegistry.add(wf, { email: new SendgridService() });
-
 ## We might also add task dependencies
 
 ### Also, to solve the problem about workflow version specific versioning,
@@ -271,3 +224,7 @@ Then we can rename ctx to run
   Actually, we should support both!
 
   ### workflow, task etc should be independently installable packages
+
+  ### don't for get to bind(this)
+
+  ### switch payload and runCtx order

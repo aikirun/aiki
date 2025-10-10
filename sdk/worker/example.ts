@@ -1,48 +1,47 @@
 import { worker } from "@aiki/sdk/worker";
 import { Aiki } from "@aiki/sdk";
-import { eveningWorkflow, morningWorkflow } from "../workflow/example.ts";
+import {
+	type DatabaseConnection,
+	type EmailService,
+	eveningRoutineWorkflowV1,
+	morningWorkflowV1,
+	morningWorkflowV2,
+} from "../workflow/example.ts";
 
-async function createPollingWorker() {
-	const aikiClient = await Aiki.client({ baseUrl: "http://localhost:9090" });
+const dbConn: DatabaseConnection = {
+	query: (_sql) => {
+		return Promise.resolve([]);
+	},
+};
 
-	return worker(aikiClient, {
-		id: "polling-worker",
-		maxConcurrentWorkflowRuns: 5,
-		subscriber: {
-			type: "polling",
-			intervalMs: 200,
-			maxRetryIntervalMs: 10000,
-		},
-	});
-}
-
-async function createAdaptivePollingWorker() {
-	const aikiClient = await Aiki.client({ baseUrl: "http://localhost:9090" });
-
-	return worker(aikiClient, {
-		id: "adaptive-worker",
-		maxConcurrentWorkflowRuns: 10,
-		subscriber: {
-			type: "adaptive_polling",
-			minPollIntervalMs: 50,
-			maxPollIntervalMs: 5000,
-			backoffMultiplier: 1.5,
-			emptyPollThreshold: 3,
-			jitterFactor: 0.1,
-		},
-	});
-}
+const emailService: EmailService = {
+	send: async (_to: string, _message: string) => {
+	},
+};
 
 if (import.meta.main) {
-	const workerA = await createPollingWorker();
-	const workerB = await createAdaptivePollingWorker();
+	const client = await Aiki.client({ baseUrl: "http://localhost:9090" });
+
+	const workerA = worker(client, {
+		id: "worker-A",
+		subscriber: { type: "redis_streams" },
+	});
+
+	const workerB = worker(client, {
+		id: "worker-B",
+		subscriber: { type: "redis_streams" },
+	});
 
 	workerA.workflowRegistry
-		.add(morningWorkflow)
-		.add(eveningWorkflow);
+		.add(morningWorkflowV1)
+		.add(morningWorkflowV2, {
+			db: dbConn,
+			email: emailService,
+		})
+		.add(eveningRoutineWorkflowV1);
 
 	workerB.workflowRegistry
-		.add(morningWorkflow);
+		.add(morningWorkflowV1);
 
 	workerA.start();
 	workerB.start();
