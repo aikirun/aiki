@@ -2,7 +2,7 @@ import { Aiki } from "@aiki/sdk";
 import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "../example.ts";
 
 if (import.meta.main) {
-	const client = await Aiki.client({ baseUrl: "localhost:9090" });
+	const client = await Aiki.client({ url: "localhost:9090" });
 
 	const resultHandle = await morningWorkflowV2.start(client, { a: "1", b: 1 });
 

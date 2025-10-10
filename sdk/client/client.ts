@@ -15,7 +15,7 @@ export function client(params: ClientParams): Promise<Client> {
 }
 
 export interface ClientParams {
-	baseUrl: string;
+	url: string;
 	redisStreams?: RedisConfig;
 }
 
@@ -53,7 +53,7 @@ class ClientImpl implements Client {
 
 	constructor(private readonly params: ClientParams) {
 		const rpcLink = new RPCLink({
-			url: `${params.baseUrl}`,
+			url: `${params.url}`,
 		});
 		this.api = createORPCClient(rpcLink);
 
