@@ -8,7 +8,7 @@ import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registr
 import { initWorkflowRunHandle } from "../workflow/run/run-handle.ts";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
 import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
-import type { Logger } from "../logger/mod.ts";
+import { getChildLogger, type Logger } from "../logger/mod.ts";
 
 export function worker(
 	client: Client,
@@ -59,9 +59,8 @@ class WorkerImpl implements Worker {
 		this.id = params.id ?? crypto.randomUUID();
 		this.workflowRegistry = initWorkflowRegistry();
 
-		this.logger = client._internal.logger.child({
-			component: "worker",
-			workerId: this.id,
+		this.logger = getChildLogger(client._internal.logger, {
+			aiki_workerId: this.id,
 		});
 
 		this.logger.info("Worker initialized");
@@ -243,11 +242,10 @@ class WorkerImpl implements Worker {
 		workflowRun: WorkflowRunRow<unknown, unknown>,
 		workflowVersion: WorkflowVersion<unknown, unknown>,
 	): Promise<void> {
-		const workflowLogger = this.logger.child({
-			component: "workflow-execution",
-			workflowName: workflowRun.name,
-			workflowVersionId: workflowRun.versionId,
-			workflowRunId: workflowRun.id,
+		const workflowLogger = getChildLogger(this.logger, {
+			aiki_workflowName: workflowRun.name,
+			aiki_workflowVersionId: workflowRun.versionId,
+			aiki_workflowRunId: workflowRun.id,
 		});
 
 		workflowLogger.info("Executing workflow");
