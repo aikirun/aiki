@@ -94,10 +94,6 @@ This document tracks planned features and improvements for the Aiki durable work
 - Consider using webhooks for serverless worker deployments
 - Focus on maintaining backward compatibility during feature additions
 
-
-
-## We might also add task dependencies
-
 ### Also, to solve the problem about workflow version specific versioning,
 we might update the workflowregistry add to accept workflow version not workflow
 
