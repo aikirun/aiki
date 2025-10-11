@@ -350,12 +350,5 @@ class WorkerImpl<AppContext> implements Worker {
 			"aiki.error": error.message,
 			"aiki.stack": error.stack,
 		});
-
-		// TODO: remove
-		const fallbackEnabled = true; // Fallback is always enabled
-
-		if (fallbackEnabled) {
-			this.logger.debug("Fallback to polling enabled");
-		}
 	}
 }

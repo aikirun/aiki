@@ -220,7 +220,6 @@ Exploratory work for future capabilities.
 ### Linting & Standards
 - [ ] **Linting Rules**: Add `no-return-await` lint rule
 - [ ] **Code Cleanup**: Remove completed TODOs
-  - `sdk/worker/worker.ts` - Remove fallback TODO comment (search for "fallback")
 
 ---
 
