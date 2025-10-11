@@ -3,7 +3,7 @@ import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "../example.ts";
 
 if (import.meta.main) {
 	const client = await Aiki.client({
-		url: "http://localhost:9090",
+		url: "http://localhost:3000",
 		contextFactory: (run) => ({
 			traceId: "123456789",
 			workflowRunId: run.id,

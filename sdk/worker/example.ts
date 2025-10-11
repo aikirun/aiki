@@ -3,7 +3,7 @@ import { Aiki } from "@aiki/sdk";
 import { eveningRoutineWorkflow, morningWorkflow } from "../workflow/example.ts";
 
 if (import.meta.main) {
-	const client = await Aiki.client({ url: "http://localhost:9090" });
+	const client = await Aiki.client({ url: "http://localhost:3000" });
 
 	const workerA = worker(client, {
 		id: "worker-A",
