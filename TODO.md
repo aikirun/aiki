@@ -8,22 +8,22 @@ These items block production adoption and must be implemented first.
 
 ### Task Reliability
 - [ ] **Task Retry Logic**: Implement automatic retry with exponential backoff for failed tasks
-  - Currently TODO in `sdk/task/task.ts:66` - tasks fail permanently without retries
+  - Currently TODO in `sdk/task/task.ts` (search for retry logic) - tasks fail permanently without retries
   - Need to track retry attempts, implement backoff delays, persist retry state
   - Critical for production reliability
 - [ ] **Error Serialization**: Proper error capture with stack traces and context
-  - Currently TODO in `sdk/task/task.ts:78` - errors cast to string without context
+  - Currently TODO in `sdk/task/task.ts` (search for error serialization) - errors cast to string without context
   - Need to serialize Error objects with message, stack, cause, name
 
 ### Workflow Results
 - [ ] **Workflow Result Persistence**: Store and retrieve workflow execution results
-  - Currently TODO in `sdk/workflow/version/workflow-version.ts:81`
+  - Currently TODO in `sdk/workflow/version/workflow-version.ts` (search for result persistence)
   - Need server API endpoint and database schema for output storage
   - Required for `WorkflowRunResultHandle` to actually return results
 
 ### Type Safety
 - [ ] **Task Result Type Validation**: Runtime validation of pre-existing task results
-  - Currently TODO in `sdk/workflow/run/run-handle.ts:48`
+  - Currently TODO in `sdk/workflow/run/run-handle.ts` (search for type validation)
   - Add Zod schema validation or runtime type checks
 
 ---
@@ -220,7 +220,7 @@ Exploratory work for future capabilities.
 ### Linting & Standards
 - [ ] **Linting Rules**: Add `no-return-await` lint rule
 - [ ] **Code Cleanup**: Remove completed TODOs
-  - `sdk/worker/worker.ts:359` - Remove fallback TODO comment
+  - `sdk/worker/worker.ts` - Remove fallback TODO comment (search for "fallback")
 
 ---
 

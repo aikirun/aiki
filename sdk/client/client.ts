@@ -19,7 +19,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 		this.logger = params.logger ?? new ConsoleLogger();
 
 		const rpcLink = new RPCLink({ url: `${params.url}` });
-		// Type safety: The server package has compile-time tests (server/contract/workflow-run/procedure.ts:84)
+		// Type safety: The server package has compile-time tests (see server/contract/workflow-run/procedure.ts)
 		// that verify the contract matches WorkflowRunApi. If the contract changes, server won't compile.
 		this.api = createORPCClient(rpcLink) as unknown as ApiClient;
 
