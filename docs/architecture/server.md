@@ -1,24 +1,29 @@
 # Aiki Server
 
-The Aiki Server is the central orchestration component that manages workflow lifecycle, state persistence, and coordination with workers.
+The Aiki Server is the central orchestration component that manages workflow lifecycle, state persistence, and
+coordination with workers.
 
 ## Responsibilities
 
 ### Workflow Management
 
-The server stores and versions workflow definitions, creates and tracks workflow runs, manages workflow state transitions, and coordinates workflow execution.
+The server stores and versions workflow definitions, creates and tracks workflow runs, manages workflow state
+transitions, and coordinates workflow execution.
 
 ### Task Management
 
-Task management involves tracking task execution status, storing task results and metadata, handling task dependencies, and managing task retries.
+Task management involves tracking task execution status, storing task results and metadata, handling task dependencies,
+and managing task retries.
 
 ### State Persistence
 
-The server persists workflow definitions, stores workflow run state, maintains task execution history, and provides an audit trail.
+The server persists workflow definitions, stores workflow run state, maintains task execution history, and provides an
+audit trail.
 
 ### Queue Coordination
 
-Queue coordination distributes work to available workers, monitors worker health, tracks execution metrics, and manages message delivery.
+Queue coordination distributes work to available workers, monitors worker health, tracks execution metrics, and manages
+message delivery.
 
 ## Components
 
@@ -30,7 +35,8 @@ Manages workflow lifecycle:
 Workflow Start → Validation → State Creation → Queue Publish → Monitoring
 ```
 
-The orchestration engine validates workflow definitions, creates workflow run records, publishes to Redis Streams, tracks workflow state, and handles completions and failures.
+The orchestration engine validates workflow definitions, creates workflow run records, publishes to Redis Streams,
+tracks workflow state, and handles completions and failures.
 
 ### Task Management
 
@@ -46,7 +52,8 @@ Task management records task attempts, stores task results, tracks task failures
 
 Persists all state:
 
-The storage layer maintains workflow definitions and versions, workflow run instances, task execution records, worker heartbeats, and audit logs. PostgreSQL is recommended, though MySQL and other relational databases are also supported.
+The storage layer maintains workflow definitions and versions, workflow run instances, task execution records, worker
+heartbeats, and audit logs. PostgreSQL is recommended, though MySQL and other relational databases are also supported.
 
 ## API Endpoints
 
@@ -104,20 +111,20 @@ TLS_ENABLED=true
 
 ```typescript
 const server = await createServer({
-  port: 9090,
-  database: {
-    url: process.env.DATABASE_URL,
-    poolSize: 20
-  },
-  redis: {
-    url: process.env.REDIS_URL
-  },
-  security: {
-    apiKey: process.env.API_KEY,
-    cors: {
-      origin: ["https://app.example.com"]
-    }
-  }
+	port: 9090,
+	database: {
+		url: process.env.DATABASE_URL,
+		poolSize: 20,
+	},
+	redis: {
+		url: process.env.REDIS_URL,
+	},
+	security: {
+		apiKey: process.env.API_KEY,
+		cors: {
+			origin: ["https://app.example.com"],
+		},
+	},
 });
 ```
 
@@ -131,7 +138,9 @@ pending → running → completed
                  → cancelled
 ```
 
-Workflow runs transition from `pending` to `running` when a worker picks them up, from `running` to `completed` when all tasks succeed, from `running` to `failed` on unrecoverable errors, and from any state to `cancelled` on manual cancellation.
+Workflow runs transition from `pending` to `running` when a worker picks them up, from `running` to `completed` when all
+tasks succeed, from `running` to `failed` on unrecoverable errors, and from any state to `cancelled` on manual
+cancellation.
 
 ### Task States
 
@@ -140,7 +149,8 @@ pending → running → completed
                  → failed → retrying → running
 ```
 
-Task retry uses exponential backoff with maximum retry attempts. Task-level retry configuration is planned for a future release.
+Task retry uses exponential backoff with maximum retry attempts. Task-level retry configuration is planned for a future
+release.
 
 ## Monitoring
 
@@ -199,7 +209,8 @@ headers: {
 
 ### Authorization
 
-The system uses role-based access control with three levels: admin for full access, worker for starting and updating workflow runs, and client for starting workflows and reading status.
+The system uses role-based access control with three levels: admin for full access, worker for starting and updating
+workflow runs, and client for starting workflows and reading status.
 
 ### Encryption
 
@@ -224,32 +235,33 @@ docker run -d \
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: aiki-server
+    name: aiki-server
 spec:
-  replicas: 3
-  template:
-    spec:
-      containers:
-      - name: aiki-server
-        image: aiki/server:latest
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: aiki-secrets
-              key: database-url
-        - name: REDIS_URL
-          valueFrom:
-            secretKeyRef:
-              name: aiki-secrets
-              key: redis-url
+    replicas: 3
+    template:
+        spec:
+            containers:
+                - name: aiki-server
+                  image: aiki/server:latest
+                  env:
+                      - name: DATABASE_URL
+                        valueFrom:
+                            secretKeyRef:
+                                name: aiki-secrets
+                                key: database-url
+                      - name: REDIS_URL
+                        valueFrom:
+                            secretKeyRef:
+                                name: aiki-secrets
+                                key: redis-url
 ```
 
 ## High Availability
 
 ### Server Redundancy
 
-Achieve server redundancy by running multiple server instances behind a load balancer. Session affinity isn't required due to the stateless server design.
+Achieve server redundancy by running multiple server instances behind a load balancer. Session affinity isn't required
+due to the stateless server design.
 
 ### Database
 

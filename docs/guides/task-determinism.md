@@ -28,7 +28,7 @@ const calculateTax = task({
 // This will always return { tax: 10, total: 110 } for the same input
 const result = await calculateTax.start(run, {
 	amount: 100,
-	taxRate: 0.1
+	taxRate: 0.1,
 });
 ```
 
@@ -161,7 +161,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 		// This will always produce the same result for the same order
 		const payment = await processPayment.start(run, {
 			orderId: validation.orderId,
-			amount: validation.amount
+			amount: validation.amount,
 		});
 	},
 });
@@ -184,7 +184,7 @@ const testTask = task({
 // Test case
 const result = await testTask.start(mockWorkflowRun, {
 	amount: 100,
-	taxRate: 0.1
+	taxRate: 0.1,
 });
 // result will always be { tax: 10, total: 110 }
 ```
@@ -384,26 +384,30 @@ describe("calculateTax task", () => {
 
 ```typescript
 describe("order processing workflow", () => {
-  it("should produce same result on replay", async () => {
-    const orderData = { orderId: "123", items: [{ id: "item-1", quantity: 2 }] };
+	it("should produce same result on replay", async () => {
+		const orderData = { orderId: "123", items: [{ id: "item-1", quantity: 2 }] };
 
-    // Run workflow
-    const result1 = await orderWorkflowV1.start(client, orderData);
-    const finalResult1 = await result1.waitForCompletion();
+		// Run workflow
+		const result1 = await orderWorkflowV1.start(client, orderData);
+		const finalResult1 = await result1.waitForCompletion();
 
-    // Simulate replay by running again with same input
-    const result2 = await orderWorkflowV1.start(client, orderData);
-    const finalResult2 = await result2.waitForCompletion();
+		// Simulate replay by running again with same input
+		const result2 = await orderWorkflowV1.start(client, orderData);
+		const finalResult2 = await result2.waitForCompletion();
 
-    // Results should be identical
-    expect(finalResult1).toEqual(finalResult2);
-  });
+		// Results should be identical
+		expect(finalResult1).toEqual(finalResult2);
+	});
 });
 ```
 
 ## Benefits of Deterministic Tasks
 
-Deterministic tasks enable workflows to be safely retried and resumed without unexpected behavior. They guarantee consistency by ensuring the same input always produces the same output. Debugging becomes easier because issues are reproducible. Testing simplifies since you can write straightforward unit tests with predictable outcomes. Workflow behavior becomes trustworthy and predictable. Finally, tasks can safely execute multiple times without unwanted side effects.
+Deterministic tasks enable workflows to be safely retried and resumed without unexpected behavior. They guarantee
+consistency by ensuring the same input always produces the same output. Debugging becomes easier because issues are
+reproducible. Testing simplifies since you can write straightforward unit tests with predictable outcomes. Workflow
+behavior becomes trustworthy and predictable. Finally, tasks can safely execute multiple times without unwanted side
+effects.
 
 ## Summary
 

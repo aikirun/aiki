@@ -8,11 +8,11 @@ The Aiki client provides the interface for starting workflows, monitoring execut
 import { client } from "@aiki/client";
 
 const aikiClient = await client({
-  url: "localhost:9090",
-  redis: {
-    host: "localhost",
-    port: 6379
-  }
+	url: "localhost:9090",
+	redis: {
+		host: "localhost",
+		port: 6379,
+	},
 });
 ```
 
@@ -23,9 +23,9 @@ const aikiClient = await client({
 The URL of the Aiki server:
 
 ```typescript
-url: "localhost:9090"  // Local development
+url: "localhost:9090"; // Local development
 // or
-url: "https://aiki.example.com"  // Production
+url: "https://aiki.example.com"; // Production
 ```
 
 ### redis
@@ -49,15 +49,16 @@ Use the workflow version's `.start()` method:
 
 ```typescript
 const resultHandle = await workflowVersion.start(aikiClient, {
-  payload: {
-    userId: "123",
-    email: "user@example.com"
-  },
-  idempotencyKey: "user-123-onboarding"  // Optional
+	payload: {
+		userId: "123",
+		email: "user@example.com",
+	},
+	idempotencyKey: "user-123-onboarding", // Optional
 });
 ```
 
-The `payload` parameter contains the input data for your workflow, while the optional `idempotencyKey` prevents duplicate executions. The method returns a result handle that you can use for monitoring and retrieving results.
+The `payload` parameter contains the input data for your workflow, while the optional `idempotencyKey` prevents
+duplicate executions. The method returns a result handle that you can use for monitoring and retrieving results.
 
 ### Monitoring Workflow Runs
 
@@ -66,10 +67,10 @@ Check the status of a workflow run:
 ```typescript
 const status = await resultHandle.getStatus();
 
-console.log(status.id);      // Workflow run ID
-console.log(status.state);   // pending, running, completed, failed, cancelled
-console.log(status.result);  // Result if completed
-console.log(status.error);   // Error if failed
+console.log(status.id); // Workflow run ID
+console.log(status.state); // pending, running, completed, failed, cancelled
+console.log(status.result); // Result if completed
+console.log(status.error); // Error if failed
 ```
 
 ### Waiting for Completion
@@ -98,14 +99,14 @@ Prevent duplicate workflow executions using idempotency keys:
 ```typescript
 // First call - starts the workflow
 const result1 = await workflowVersion.start(aikiClient, {
-  payload: { orderId: "order-123" },
-  idempotencyKey: "order-123-process"
+	payload: { orderId: "order-123" },
+	idempotencyKey: "order-123-process",
 });
 
 // Second call with same key - returns existing workflow run
 const result2 = await workflowVersion.start(aikiClient, {
-  payload: { orderId: "order-123" },
-  idempotencyKey: "order-123-process"
+	payload: { orderId: "order-123" },
+	idempotencyKey: "order-123-process",
 });
 
 // result1.id === result2.id (same workflow run)
@@ -124,36 +125,36 @@ This closes the Redis connection and cleans up resources.
 ## Complete Example
 
 ```typescript
-import { client, workflow, task } from "@aiki/sdk";
+import { client, task, workflow } from "@aiki/sdk";
 
 // Define task and workflow
 const sendEmail = task({
-  name: "send-email",
-  exec(input: { email: string }) {
-    console.log(`Sending email to ${input.email}`);
-    return { sent: true };
-  }
+	name: "send-email",
+	exec(input: { email: string }) {
+		console.log(`Sending email to ${input.email}`);
+		return { sent: true };
+	},
 });
 
 const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 const onboardingV1 = onboardingWorkflow.v("1.0.0", {
-  async exec(input: { email: string }, run) {
-    await sendEmail.start(run, { email: input.email });
-    return { success: true };
-  }
+	async exec(input: { email: string }, run) {
+		await sendEmail.start(run, { email: input.email });
+		return { success: true };
+	},
 });
 
 // Create client
 const aikiClient = await client({
-  url: "localhost:9090",
-  redis: { host: "localhost", port: 6379 }
+	url: "localhost:9090",
+	redis: { host: "localhost", port: 6379 },
 });
 
 // Start workflow
 const result = await onboardingV1
-  .withOptions({ idempotencyKey: "user-onboarding-123" })
-  .start(aikiClient, { email: "user@example.com" });
+	.withOptions({ idempotencyKey: "user-onboarding-123" })
+	.start(aikiClient, { email: "user@example.com" });
 
 // Monitor progress
 console.log("Workflow started:", result.id);
@@ -175,20 +176,20 @@ Handle errors when starting workflows:
 
 ```typescript
 try {
-  const result = await workflowVersion.start(aikiClient, {
-    payload: { userId: "123" }
-  });
+	const result = await workflowVersion.start(aikiClient, {
+		payload: { userId: "123" },
+	});
 
-  const finalResult = await result.waitForCompletion();
-  console.log("Success:", finalResult);
+	const finalResult = await result.waitForCompletion();
+	console.log("Success:", finalResult);
 } catch (error) {
-  if (error.code === "WORKFLOW_NOT_FOUND") {
-    console.error("Workflow doesn't exist");
-  } else if (error.code === "VALIDATION_ERROR") {
-    console.error("Invalid payload");
-  } else {
-    console.error("Unexpected error:", error);
-  }
+	if (error.code === "WORKFLOW_NOT_FOUND") {
+		console.error("Workflow doesn't exist");
+	} else if (error.code === "VALIDATION_ERROR") {
+		console.error("Invalid payload");
+	} else {
+		console.error("Unexpected error:", error);
+	}
 }
 ```
 

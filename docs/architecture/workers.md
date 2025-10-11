@@ -26,11 +26,13 @@ Workers execute workflows in your infrastructure, providing the execution layer 
 
 ### Subscriber Strategy
 
-The subscriber strategy manages workflow run acquisition. Redis Streams is currently supported, using XREADGROUP for message retrieval, XPENDING/XCLAIM for fault tolerance, parallel stream processing, and round-robin distribution.
+The subscriber strategy manages workflow run acquisition. Redis Streams is currently supported, using XREADGROUP for
+message retrieval, XPENDING/XCLAIM for fault tolerance, parallel stream processing, and round-robin distribution.
 
 ### Execution Engine
 
-The execution engine handles workflow execution by loading workflow definitions from the registry, executing tasks in sequence, tracking progress and state, reporting results to the server, and handling errors and retries.
+The execution engine handles workflow execution by loading workflow definitions from the registry, executing tasks in
+sequence, tracking progress and state, reporting results to the server, and handling errors and retries.
 
 ### Workflow Registry
 
@@ -44,7 +46,8 @@ Only workflows in the registry can be executed by this worker.
 
 ### Heartbeat System
 
-The heartbeat system monitors worker health by sending periodic heartbeats to the server at configurable intervals (default: 30s). This allows the server to detect dead workers and enables other workers to claim stuck workflows.
+The heartbeat system monitors worker health by sending periodic heartbeats to the server at configurable intervals
+(default: 30s). This allows the server to detect dead workers and enables other workers to claim stuck workflows.
 
 ## Message Flow
 
@@ -73,7 +76,7 @@ Workers process multiple streams in parallel:
 ```typescript
 // Parallel XREADGROUP across streams
 const results = await Promise.allSettled(
-  streams.map(stream => readFromStream(stream))
+	streams.map((stream) => readFromStream(stream)),
 );
 ```
 
@@ -83,13 +86,13 @@ const results = await Promise.allSettled(
 
 ```typescript
 const worker = await worker(client, {
-  id: "worker-1",
-  maxConcurrentWorkflowRuns: 5,
-  subscriber: {
-    type: "redis_streams",
-    claimMinIdleTimeMs: 60_000,
-    blockTimeMs: 1000
-  }
+	id: "worker-1",
+	maxConcurrentWorkflowRuns: 5,
+	subscriber: {
+		type: "redis_streams",
+		claimMinIdleTimeMs: 60_000,
+		blockTimeMs: 1000,
+	},
 });
 ```
 
@@ -97,18 +100,18 @@ const worker = await worker(client, {
 
 ```typescript
 const worker = await worker(client, {
-  id: "worker-prod-1",
-  maxConcurrentWorkflowRuns: 20,
-  subscriber: {
-    type: "redis_streams",
-    claimMinIdleTimeMs: 30_000,  // Claim after 30s
-    blockTimeMs: 2000            // Block 2s for new messages
-  },
-  workflowRun: {
-    heartbeatIntervalMs: 15_000  // Heartbeat every 15s
-  },
-  gracefulShutdownTimeoutMs: 30_000,  // 30s shutdown timeout
-  shardKeys: ["us-east", "us-west"]   // Process specific shards
+	id: "worker-prod-1",
+	maxConcurrentWorkflowRuns: 20,
+	subscriber: {
+		type: "redis_streams",
+		claimMinIdleTimeMs: 30_000, // Claim after 30s
+		blockTimeMs: 2000, // Block 2s for new messages
+	},
+	workflowRun: {
+		heartbeatIntervalMs: 15_000, // Heartbeat every 15s
+	},
+	gracefulShutdownTimeoutMs: 30_000, // 30s shutdown timeout
+	shardKeys: ["us-east", "us-west"], // Process specific shards
 });
 ```
 
@@ -137,9 +140,9 @@ Other Workers: Claim workflows from dead workers
 ```typescript
 // Handle SIGTERM
 process.on("SIGTERM", async () => {
-  await worker.stop();  // Waits for active workflows
-  await client.close();
-  process.exit(0);
+	await worker.stop(); // Waits for active workflows
+	await client.close();
+	process.exit(0);
 });
 ```
 
@@ -183,14 +186,14 @@ Deploy workers in different regions:
 ```typescript
 // US East worker
 const usEastWorker = await worker(client, {
-  id: "us-east-worker",
-  shardKeys: ["us-east"]
+	id: "us-east-worker",
+	shardKeys: ["us-east"],
 });
 
 // EU worker
 const euWorker = await worker(client, {
-  id: "eu-worker",
-  shardKeys: ["eu-west"]
+	id: "eu-worker",
+	shardKeys: ["eu-west"],
 });
 ```
 
@@ -216,8 +219,8 @@ Workers maintain local state:
 const activeRuns = new Set();
 
 if (activeRuns.size < maxConcurrentWorkflowRuns) {
-  // Accept new workflow
-  activeRuns.add(runId);
+	// Accept new workflow
+	activeRuns.add(runId);
 }
 ```
 
@@ -238,12 +241,12 @@ aiki_worker_heartbeat_failures_total
 ```typescript
 // Worker health endpoint
 app.get("/health", (req, res) => {
-  res.json({
-    status: "healthy",
-    workerId: worker.id,
-    activeWorkflows: worker.activeCount,
-    uptime: process.uptime()
-  });
+	res.json({
+		status: "healthy",
+		workerId: worker.id,
+		activeWorkflows: worker.activeCount,
+		uptime: process.uptime(),
+	});
 });
 ```
 

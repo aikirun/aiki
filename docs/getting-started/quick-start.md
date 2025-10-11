@@ -18,12 +18,12 @@ Tasks are units of work that can be retried independently:
 import { task } from "@aiki/task";
 
 const sendEmail = task({
-  name: "send-email",
-  exec(input: { email: string; message: string }) {
-    console.log(`Sending email to ${input.email}`);
-    // Your email sending logic here
-    return { sent: true, email: input.email };
-  }
+	name: "send-email",
+	exec(input: { email: string; message: string }) {
+		console.log(`Sending email to ${input.email}`);
+		// Your email sending logic here
+		return { sent: true, email: input.email };
+	},
 });
 ```
 
@@ -35,19 +35,19 @@ Workflows orchestrate multiple tasks:
 import { workflow } from "@aiki/workflow";
 
 const onboardingWorkflow = workflow({
-  name: "user-onboarding"
+	name: "user-onboarding",
 });
 
 const onboardingV1 = onboardingWorkflow.v("1.0.0", {
-  async exec(input: { email: string; name: string }, run) {
-    // Execute tasks in sequence
-    await sendEmail.start(run, {
-      email: input.email,
-      message: `Welcome ${input.name}!`
-    });
+	async exec(input: { email: string; name: string }, run) {
+		// Execute tasks in sequence
+		await sendEmail.start(run, {
+			email: input.email,
+			message: `Welcome ${input.name}!`,
+		});
 
-    return { success: true };
-  }
+		return { success: true };
+	},
 });
 ```
 
@@ -59,11 +59,11 @@ The client communicates with the Aiki server:
 import { client } from "@aiki/client";
 
 const aikiClient = await client({
-  url: "localhost:9090",
-  redis: {
-    host: "localhost",
-    port: 6379
-  }
+	url: "localhost:9090",
+	redis: {
+		host: "localhost",
+		port: 6379,
+	},
 });
 ```
 
@@ -75,12 +75,12 @@ Workers execute workflows in your infrastructure:
 import { worker } from "@aiki/worker";
 
 const aikiWorker = await worker(aikiClient, {
-  id: "worker-1",
-  maxConcurrentWorkflowRuns: 5,
-  subscriber: {
-    type: "redis_streams",
-    claimMinIdleTimeMs: 60_000
-  }
+	id: "worker-1",
+	maxConcurrentWorkflowRuns: 5,
+	subscriber: {
+		type: "redis_streams",
+		claimMinIdleTimeMs: 60_000,
+	},
 });
 
 // Register workflows
@@ -96,8 +96,8 @@ Execute your workflow:
 
 ```typescript
 const result = await onboardingV1.start(aikiClient, {
-  email: "user@example.com",
-  name: "Alice"
+	email: "user@example.com",
+	name: "Alice",
 });
 
 // Wait for completion
@@ -110,39 +110,39 @@ console.log("Workflow completed:", finalResult);
 Here's the full code:
 
 ```typescript
-import { client, worker, workflow, task } from "@aiki/sdk";
+import { client, task, worker, workflow } from "@aiki/sdk";
 
 // 1. Define task
 const sendEmail = task({
-  name: "send-email",
-  exec(input: { email: string; message: string }) {
-    console.log(`Sending email to ${input.email}`);
-    return { sent: true };
-  }
+	name: "send-email",
+	exec(input: { email: string; message: string }) {
+		console.log(`Sending email to ${input.email}`);
+		return { sent: true };
+	},
 });
 
 // 2. Define workflow
 const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 const onboardingV1 = onboardingWorkflow.v("1.0.0", {
-  async exec(input: { email: string; name: string }, run) {
-    await sendEmail.start(run, {
-      email: input.email,
-      message: `Welcome ${input.name}!`
-    });
-    return { success: true };
-  }
+	async exec(input: { email: string; name: string }, run) {
+		await sendEmail.start(run, {
+			email: input.email,
+			message: `Welcome ${input.name}!`,
+		});
+		return { success: true };
+	},
 });
 
 // 3. Set up client and worker
 const aikiClient = await client({
-  url: "localhost:9090",
-  redis: { host: "localhost", port: 6379 }
+	url: "localhost:9090",
+	redis: { host: "localhost", port: 6379 },
 });
 
 const aikiWorker = await worker(aikiClient, {
-  id: "worker-1",
-  subscriber: { type: "redis_streams" }
+	id: "worker-1",
+	subscriber: { type: "redis_streams" },
 });
 
 aikiWorker.workflowRegistry.add(onboardingWorkflow);
@@ -150,8 +150,8 @@ await aikiWorker.start();
 
 // 4. Execute workflow
 const result = await onboardingV1.start(aikiClient, {
-  email: "user@example.com",
-  name: "Alice"
+	email: "user@example.com",
+	name: "Alice",
 });
 
 const finalResult = await result.waitForCompletion();

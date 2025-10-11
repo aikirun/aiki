@@ -4,7 +4,10 @@ Aiki uses Redis Streams for high-performance, fault-tolerant message distributio
 
 ## Why Redis Streams?
 
-Redis Streams provides high performance capable of handling millions of messages per second. Built-in fault tolerance through message claiming (XPENDING/XCLAIM) ensures reliability. Consumer groups enable automatic work distribution across workers. Messages persist through Redis restarts, and the system supports parallel processing of multiple streams concurrently.
+Redis Streams provides high performance capable of handling millions of messages per second. Built-in fault tolerance
+through message claiming (XPENDING/XCLAIM) ensures reliability. Consumer groups enable automatic work distribution
+across workers. Messages persist through Redis restarts, and the system supports parallel processing of multiple streams
+concurrently.
 
 ## Stream Organization
 
@@ -52,6 +55,7 @@ XREADGROUP GROUP aiki-workers worker-1
 ```
 
 **Parameters:**
+
 - `GROUP`: Consumer group name
 - `worker-1`: Consumer ID (worker ID)
 - `BLOCK 1000`: Wait 1 second for messages
@@ -62,14 +66,20 @@ XREADGROUP GROUP aiki-workers worker-1
 
 ```typescript
 const results = await Promise.allSettled(
-  streams.map(stream =>
-    redis.xreadgroup(
-      "GROUP", "aiki-workers", workerId,
-      "BLOCK", blockTimeMs,
-      "COUNT", batchSize,
-      "STREAMS", stream, ">"
-    )
-  )
+	streams.map((stream) =>
+		redis.xreadgroup(
+			"GROUP",
+			"aiki-workers",
+			workerId,
+			"BLOCK",
+			blockTimeMs,
+			"COUNT",
+			batchSize,
+			"STREAMS",
+			stream,
+			">",
+		)
+	),
 );
 ```
 
@@ -84,6 +94,7 @@ XPENDING workflow:orders aiki-workers
 ```
 
 **Returns:**
+
 - Messages idle > `claimMinIdleTimeMs`
 - Consumer that claimed the message
 - Idle time for each message
@@ -93,14 +104,16 @@ XPENDING workflow:orders aiki-workers
 
 ```typescript
 const pendingResults = await Promise.allSettled(
-  streams.map(stream =>
-    redis.xpending(
-      stream,
-      "aiki-workers",
-      "-", "+", 100,
-      workerId
-    )
-  )
+	streams.map((stream) =>
+		redis.xpending(
+			stream,
+			"aiki-workers",
+			"-",
+			"+",
+			100,
+			workerId,
+		)
+	),
 );
 ```
 
@@ -114,21 +127,22 @@ XCLAIM workflow:orders aiki-workers worker-2
   <message-id>
 ```
 
-The claiming process finds stuck messages with XPENDING, filters by idle time, claims ownership with XCLAIM, and re-executes the workflow.
+The claiming process finds stuck messages with XPENDING, filters by idle time, claims ownership with XCLAIM, and
+re-executes the workflow.
 
 **Parallel claiming:**
 
 ```typescript
 const claimResults = await Promise.allSettled(
-  messagesToClaim.map(({ stream, messageId }) =>
-    redis.xclaim(
-      stream,
-      "aiki-workers",
-      workerId,
-      claimMinIdleTimeMs,
-      messageId
-    )
-  )
+	messagesToClaim.map(({ stream, messageId }) =>
+		redis.xclaim(
+			stream,
+			"aiki-workers",
+			workerId,
+			claimMinIdleTimeMs,
+			messageId,
+		)
+	),
 );
 ```
 
@@ -138,15 +152,15 @@ const claimResults = await Promise.allSettled(
 
 ```json
 {
-  "id": "run-123",
-  "workflowName": "order-processing",
-  "version": "1.0.0",
-  "payload": {
-    "orderId": "order-456",
-    "amount": 99.99
-  },
-  "idempotencyKey": "order-456-process",
-  "createdAt": 1234567890
+	"id": "run-123",
+	"workflowName": "order-processing",
+	"version": "1.0.0",
+	"payload": {
+		"orderId": "order-456",
+		"amount": 99.99
+	},
+	"idempotencyKey": "order-456-process",
+	"createdAt": 1234567890
 }
 ```
 
@@ -178,31 +192,33 @@ const claimResults = await Promise.allSettled(
 ```typescript
 // Find stuck messages
 const pending = await redis.xpending(
-  stream,
-  group,
-  "-", "+", 100
+	stream,
+	group,
+	"-",
+	"+",
+	100,
 );
 
 // Filter by idle time
-const stuckMessages = pending.filter(msg =>
-  msg.idle > claimMinIdleTimeMs
-);
+const stuckMessages = pending.filter((msg) => msg.idle > claimMinIdleTimeMs);
 
 // Claim messages
 for (const msg of stuckMessages) {
-  await redis.xclaim(
-    stream,
-    group,
-    workerId,
-    claimMinIdleTimeMs,
-    msg.id
-  );
+	await redis.xclaim(
+		stream,
+		group,
+		workerId,
+		claimMinIdleTimeMs,
+		msg.id,
+	);
 }
 ```
 
 ### Idempotency
 
-Messages may be processed multiple times if a worker crashes after processing but before acknowledging. When this happens, the message is claimed and re-processed by another worker. Idempotency keys prevent duplicate execution in these scenarios.
+Messages may be processed multiple times if a worker crashes after processing but before acknowledging. When this
+happens, the message is claimed and re-processed by another worker. Idempotency keys prevent duplicate execution in
+these scenarios.
 
 ## Performance Optimizations
 
@@ -228,11 +244,11 @@ Randomize stream order for fairness:
 
 ```typescript
 function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
+	for (let i = array.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[array[i], array[j]] = [array[j], array[i]];
+	}
+	return array;
 }
 
 const shuffledStreams = shuffleArray([...streams]);
@@ -244,8 +260,8 @@ Round-robin batch sizes:
 
 ```typescript
 const batchSizes = distributeBatchSize(
-  totalBatchSize,
-  streamCount
+	totalBatchSize,
+	streamCount,
 );
 
 // [5, 5] for totalBatchSize=10, streamCount=2
@@ -258,11 +274,11 @@ Reuse Redis connections:
 
 ```typescript
 const redis = new Redis({
-  host: "localhost",
-  port: 6379,
-  maxRetriesPerRequest: 3,
-  enableReadyCheck: true,
-  lazyConnect: false
+	host: "localhost",
+	port: 6379,
+	maxRetriesPerRequest: 3,
+	enableReadyCheck: true,
+	lazyConnect: false,
 });
 ```
 
@@ -273,9 +289,10 @@ const redis = new Redis({
 ```typescript
 // Publish workflow run
 await redis.xadd(
-  `workflow:${workflowName}`,
-  "*",
-  "data", JSON.stringify(workflowRun)
+	`workflow:${workflowName}`,
+	"*",
+	"data",
+	JSON.stringify(workflowRun),
 );
 ```
 
@@ -283,12 +300,12 @@ await redis.xadd(
 
 ```typescript
 const worker = await worker(client, {
-  subscriber: {
-    type: "redis_streams",
-    claimMinIdleTimeMs: 60_000,   // Claim after 60s
-    blockTimeMs: 1000,            // Block for 1s
-    batchSize: 10                 // Read 10 messages
-  }
+	subscriber: {
+		type: "redis_streams",
+		claimMinIdleTimeMs: 60_000, // Claim after 60s
+		blockTimeMs: 1000, // Block for 1s
+		batchSize: 10, // Read 10 messages
+	},
 });
 ```
 

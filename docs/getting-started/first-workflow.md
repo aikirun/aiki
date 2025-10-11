@@ -4,7 +4,9 @@ Build a complete order processing workflow that demonstrates Aiki's key features
 
 ## What We'll Build
 
-We'll create an order processing system that validates orders, processes payments, updates inventory, and sends confirmation emails. Each step will be a separate task, demonstrating how Aiki enables independent retry and monitoring of workflow components.
+We'll create an order processing system that validates orders, processes payments, updates inventory, and sends
+confirmation emails. Each step will be a separate task, demonstrating how Aiki enables independent retry and monitoring
+of workflow components.
 
 ## Step 1: Define Tasks
 
@@ -14,61 +16,61 @@ Each step is a separate task for independent retry and monitoring:
 import { task } from "@aiki/task";
 
 const validateOrder = task({
-  name: "validate-order",
-  exec(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
-    const { items, total } = input;
+	name: "validate-order",
+	exec(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
+		const { items, total } = input;
 
-    // Validation logic
-    if (items.length === 0) {
-      throw new Error("Order must have items");
-    }
+		// Validation logic
+		if (items.length === 0) {
+			throw new Error("Order must have items");
+		}
 
-    return {
-      valid: true,
-      orderId: `order-${Date.now()}`,
-      total
-    };
-  }
+		return {
+			valid: true,
+			orderId: `order-${Date.now()}`,
+			total,
+		};
+	},
 });
 
 const processPayment = task({
-  name: "process-payment",
-  exec(input: { orderId: string; amount: number }) {
-    const { orderId, amount } = input;
+	name: "process-payment",
+	exec(input: { orderId: string; amount: number }) {
+		const { orderId, amount } = input;
 
-    // Payment processing logic
-    console.log(`Processing payment for ${orderId}: $${amount}`);
+		// Payment processing logic
+		console.log(`Processing payment for ${orderId}: $${amount}`);
 
-    return {
-      paymentId: `pay-${Date.now()}`,
-      status: "completed"
-    };
-  }
+		return {
+			paymentId: `pay-${Date.now()}`,
+			status: "completed",
+		};
+	},
 });
 
 const updateInventory = task({
-  name: "update-inventory",
-  exec(input: { items: Array<{ id: string; quantity: number }> }) {
-    const { items } = input;
+	name: "update-inventory",
+	exec(input: { items: Array<{ id: string; quantity: number }> }) {
+		const { items } = input;
 
-    // Update inventory
-    items.forEach(item => {
-      console.log(`Updating inventory for ${item.id}`);
-    });
+		// Update inventory
+		items.forEach((item) => {
+			console.log(`Updating inventory for ${item.id}`);
+		});
 
-    return { updated: true };
-  }
+		return { updated: true };
+	},
 });
 
 const sendConfirmation = task({
-  name: "send-confirmation",
-  exec(input: { email: string; orderId: string }) {
-    const { email, orderId } = input;
+	name: "send-confirmation",
+	exec(input: { email: string; orderId: string }) {
+		const { email, orderId } = input;
 
-    console.log(`Sending confirmation to ${email} for order ${orderId}`);
+		console.log(`Sending confirmation to ${email} for order ${orderId}`);
 
-    return { sent: true };
-  }
+		return { sent: true };
+	},
 });
 ```
 
@@ -80,44 +82,44 @@ Orchestrate tasks in sequence:
 import { workflow } from "@aiki/workflow";
 
 const orderWorkflow = workflow({
-  name: "order-processing"
+	name: "order-processing",
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-  async exec(input: {
-    items: Array<{ id: string; quantity: number }>;
-    total: number;
-    email: string;
-  }, run) {
-    // Step 1: Validate order
-    const validation = await validateOrder.start(run, {
-      items: input.items,
-      total: input.total
-    });
+	async exec(input: {
+		items: Array<{ id: string; quantity: number }>;
+		total: number;
+		email: string;
+	}, run) {
+		// Step 1: Validate order
+		const validation = await validateOrder.start(run, {
+			items: input.items,
+			total: input.total,
+		});
 
-    // Step 2: Process payment
-    const payment = await processPayment.start(run, {
-      orderId: validation.orderId,
-      amount: validation.total
-    });
+		// Step 2: Process payment
+		const payment = await processPayment.start(run, {
+			orderId: validation.orderId,
+			amount: validation.total,
+		});
 
-    // Step 3: Update inventory
-    await updateInventory.start(run, {
-      items: input.items
-    });
+		// Step 3: Update inventory
+		await updateInventory.start(run, {
+			items: input.items,
+		});
 
-    // Step 4: Send confirmation
-    await sendConfirmation.start(run, {
-      email: input.email,
-      orderId: validation.orderId
-    });
+		// Step 4: Send confirmation
+		await sendConfirmation.start(run, {
+			email: input.email,
+			orderId: validation.orderId,
+		});
 
-    return {
-      success: true,
-      orderId: validation.orderId,
-      paymentId: payment.paymentId
-    };
-  }
+		return {
+			success: true,
+			orderId: validation.orderId,
+			paymentId: payment.paymentId,
+		};
+	},
 });
 ```
 
@@ -129,20 +131,20 @@ Create the client and worker:
 import { client, worker } from "@aiki/sdk";
 
 const aikiClient = await client({
-  url: "localhost:9090",
-  redis: {
-    host: "localhost",
-    port: 6379
-  }
+	url: "localhost:9090",
+	redis: {
+		host: "localhost",
+		port: 6379,
+	},
 });
 
 const aikiWorker = await worker(aikiClient, {
-  id: "order-worker-1",
-  maxConcurrentWorkflowRuns: 10,
-  subscriber: {
-    type: "redis_streams",
-    claimMinIdleTimeMs: 60_000
-  }
+	id: "order-worker-1",
+	maxConcurrentWorkflowRuns: 10,
+	subscriber: {
+		type: "redis_streams",
+		claimMinIdleTimeMs: 60_000,
+	},
 });
 
 // Register the workflow
@@ -158,12 +160,12 @@ Process an order:
 
 ```typescript
 const result = await orderWorkflowV1.start(aikiClient, {
-  items: [
-    { id: "item-1", quantity: 2 },
-    { id: "item-2", quantity: 1 }
-  ],
-  total: 99.99,
-  email: "customer@example.com"
+	items: [
+		{ id: "item-1", quantity: 2 },
+		{ id: "item-2", quantity: 1 },
+	],
+	total: 99.99,
+	email: "customer@example.com",
 });
 
 console.log("Workflow started:", result.id);
@@ -176,97 +178,97 @@ console.log("Order processed:", finalResult);
 ## Complete Code
 
 ```typescript
-import { client, worker, workflow, task } from "@aiki/sdk";
+import { client, task, worker, workflow } from "@aiki/sdk";
 
 // Define tasks
 const validateOrder = task({
-  name: "validate-order",
-  exec(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
-    if (input.items.length === 0) {
-      throw new Error("Order must have items");
-    }
-    return {
-      valid: true,
-      orderId: `order-${Date.now()}`,
-      total: input.total
-    };
-  }
+	name: "validate-order",
+	exec(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
+		if (input.items.length === 0) {
+			throw new Error("Order must have items");
+		}
+		return {
+			valid: true,
+			orderId: `order-${Date.now()}`,
+			total: input.total,
+		};
+	},
 });
 
 const processPayment = task({
-  name: "process-payment",
-  exec(input: { orderId: string; amount: number }) {
-    console.log(`Processing payment: $${input.amount}`);
-    return {
-      paymentId: `pay-${Date.now()}`,
-      status: "completed"
-    };
-  }
+	name: "process-payment",
+	exec(input: { orderId: string; amount: number }) {
+		console.log(`Processing payment: $${input.amount}`);
+		return {
+			paymentId: `pay-${Date.now()}`,
+			status: "completed",
+		};
+	},
 });
 
 const updateInventory = task({
-  name: "update-inventory",
-  exec(input: { items: Array<{ id: string; quantity: number }> }) {
-    input.items.forEach(item => {
-      console.log(`Updating inventory for ${item.id}`);
-    });
-    return { updated: true };
-  }
+	name: "update-inventory",
+	exec(input: { items: Array<{ id: string; quantity: number }> }) {
+		input.items.forEach((item) => {
+			console.log(`Updating inventory for ${item.id}`);
+		});
+		return { updated: true };
+	},
 });
 
 const sendConfirmation = task({
-  name: "send-confirmation",
-  exec(input: { email: string; orderId: string }) {
-    console.log(`Sending confirmation to ${input.email}`);
-    return { sent: true };
-  }
+	name: "send-confirmation",
+	exec(input: { email: string; orderId: string }) {
+		console.log(`Sending confirmation to ${input.email}`);
+		return { sent: true };
+	},
 });
 
 // Define workflow
 const orderWorkflow = workflow({ name: "order-processing" });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-  async exec(input: {
-    items: Array<{ id: string; quantity: number }>;
-    total: number;
-    email: string;
-  }, run) {
-    const validation = await validateOrder.start(run, {
-      items: input.items,
-      total: input.total
-    });
+	async exec(input: {
+		items: Array<{ id: string; quantity: number }>;
+		total: number;
+		email: string;
+	}, run) {
+		const validation = await validateOrder.start(run, {
+			items: input.items,
+			total: input.total,
+		});
 
-    const payment = await processPayment.start(run, {
-      orderId: validation.orderId,
-      amount: validation.total
-    });
+		const payment = await processPayment.start(run, {
+			orderId: validation.orderId,
+			amount: validation.total,
+		});
 
-    await updateInventory.start(run, {
-      items: input.items
-    });
+		await updateInventory.start(run, {
+			items: input.items,
+		});
 
-    await sendConfirmation.start(run, {
-      email: input.email,
-      orderId: validation.orderId
-    });
+		await sendConfirmation.start(run, {
+			email: input.email,
+			orderId: validation.orderId,
+		});
 
-    return {
-      success: true,
-      orderId: validation.orderId,
-      paymentId: payment.paymentId
-    };
-  }
+		return {
+			success: true,
+			orderId: validation.orderId,
+			paymentId: payment.paymentId,
+		};
+	},
 });
 
 // Set up client and worker
 const aikiClient = await client({
-  url: "localhost:9090",
-  redis: { host: "localhost", port: 6379 }
+	url: "localhost:9090",
+	redis: { host: "localhost", port: 6379 },
 });
 
 const aikiWorker = await worker(aikiClient, {
-  id: "order-worker",
-  subscriber: { type: "redis_streams" }
+	id: "order-worker",
+	subscriber: { type: "redis_streams" },
 });
 
 aikiWorker.workflowRegistry.add(orderWorkflow);
@@ -274,9 +276,9 @@ await aikiWorker.start();
 
 // Execute workflow
 const result = await orderWorkflowV1.start(aikiClient, {
-  items: [{ id: "item-1", quantity: 2 }],
-  total: 99.99,
-  email: "customer@example.com"
+	items: [{ id: "item-1", quantity: 2 }],
+	total: 99.99,
+	email: "customer@example.com",
 });
 
 console.log("Done:", await result.waitForCompletion());
@@ -284,7 +286,10 @@ console.log("Done:", await result.waitForCompletion());
 
 ## What's Happening?
 
-Each task executes independently, so if payment fails, only the payment task is retried rather than the entire workflow. The server persists state continuously, which means crashes don't lose progress. Idempotency ensures that the same order won't be processed twice, even if requests are duplicated. Workers provide fault tolerance by claiming stuck workflows from failed workers, ensuring your processes complete even when individual workers crash.
+Each task executes independently, so if payment fails, only the payment task is retried rather than the entire workflow.
+The server persists state continuously, which means crashes don't lose progress. Idempotency ensures that the same order
+won't be processed twice, even if requests are duplicated. Workers provide fault tolerance by claiming stuck workflows
+from failed workers, ensuring your processes complete even when individual workers crash.
 
 ## Next Steps
 

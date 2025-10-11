@@ -73,11 +73,11 @@ Create a simple test file to verify your setup:
 import { client } from "@aiki/client";
 
 const aikiClient = await client({
-  url: "localhost:9090",
-  redis: {
-    host: "localhost",
-    port: 6379
-  }
+	url: "localhost:9090",
+	redis: {
+		host: "localhost",
+		port: 6379,
+	},
 });
 
 console.log("✅ Aiki client connected successfully!");
