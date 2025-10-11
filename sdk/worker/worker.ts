@@ -3,7 +3,11 @@ import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay } from "@aiki/lib/async";
 import type { Client, SubscriberStrategy } from "../client/mod.ts";
-import type { ResolvedSubscriberStrategy } from "../client/subscribers/strategy-resolver.ts";
+import type {
+	ResolvedSubscriberStrategy,
+	SubscriberMessageMeta,
+	WorkflowRunBatch,
+} from "../client/subscribers/strategy-resolver.ts";
 import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
 import { initWorkflowRunHandle } from "../workflow/run/run-handle.ts";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
@@ -44,6 +48,7 @@ export interface Worker {
 interface ActiveWorkflowRun {
 	run: WorkflowRun<unknown, unknown>;
 	executionPromise: Promise<void>;
+	meta?: SubscriberMessageMeta;
 }
 
 class WorkerImpl<AppContext> implements Worker {
@@ -124,11 +129,11 @@ class WorkerImpl<AppContext> implements Worker {
 			}
 		}
 
-		const activeWorkflowRunsOnShutdown = Array.from(this.activeWorkflowRunsById.values());
-		if (activeWorkflowRunsOnShutdown.length > 0) {
-			const ids = activeWorkflowRunsOnShutdown.map((w) => w.run.id).join(", ");
+		const stillActive = Array.from(this.activeWorkflowRunsById.values());
+		if (stillActive.length > 0) {
+			const ids = stillActive.map((w) => w.run.id).join(", ");
 			this.logger.warn("Worker shutdown with active workflows", {
-				activeWorkflowRunIds: ids,
+				"aiki.activeWorkflowRunIds": ids,
 			});
 		}
 
@@ -166,12 +171,12 @@ class WorkerImpl<AppContext> implements Worker {
 
 			subscriberFailedAttempts = 0;
 
-			if (!isNonEmptyArray(nextBatchResult.ids)) {
+			if (!isNonEmptyArray(nextBatchResult.batch)) {
 				nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: false });
 				continue;
 			}
 
-			await this.enqueueWorkflowRunBatch(nextBatchResult.ids, abortSignal);
+			await this.enqueueWorkflowRunBatch(nextBatchResult.batch, abortSignal);
 			nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: true });
 		}
 	}
@@ -179,7 +184,7 @@ class WorkerImpl<AppContext> implements Worker {
 	private async fetchNextWorkflowRunBatch(
 		size: number,
 	): Promise<
-		| { success: true; ids: WorkflowRunId[] }
+		| { success: true; batch: WorkflowRunBatch[] }
 		| { success: false; error: Error }
 	> {
 		if (!this.subscriberStrategy) {
@@ -190,10 +195,10 @@ class WorkerImpl<AppContext> implements Worker {
 		}
 
 		try {
-			const workflowRunIds = await this.subscriberStrategy.getNextBatch(size);
+			const batch = await this.subscriberStrategy.getNextBatch(size);
 			return {
 				success: true,
-				ids: workflowRunIds,
+				batch,
 			};
 		} catch (error) {
 			this.logger.error("Error getting next workflow runs batch", {
@@ -208,10 +213,12 @@ class WorkerImpl<AppContext> implements Worker {
 	}
 
 	private async enqueueWorkflowRunBatch(
-		workflowRunIds: NonEmptyArray<WorkflowRunId>,
+		batch: NonEmptyArray<WorkflowRunBatch>,
 		abortSignal: AbortSignal,
 	): Promise<void> {
-		for (const workflowRunId of workflowRunIds) {
+		for (const { data, meta } of batch) {
+			const { workflowRunId } = data;
+
 			if (this.activeWorkflowRunsById.has(workflowRunId)) {
 				// Debug: Skip already in progress workflows
 				continue;
@@ -219,16 +226,21 @@ class WorkerImpl<AppContext> implements Worker {
 
 			const { run: workflowRun } = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
 			if (!workflowRun) {
-				// Debug: Workflow run not found in repository
+				if (meta && this.subscriberStrategy?.acknowledge) {
+					await this.subscriberStrategy.acknowledge(workflowRunId, meta).catch(() => {});
+				}
 				continue;
 			}
 
 			const workflow = this.workflowRegistry._internal.get(workflowRun.name as WorkflowName);
 			if (!workflow) {
 				this.logger.warn("Workflow not found in registry", {
-					workflowName: workflowRun.name,
-					workflowRunId: workflowRun.id,
+					"aiki.workflowName": workflowRun.name,
+					"aiki.workflowRunId": workflowRun.id,
 				});
+				if (meta && this.subscriberStrategy?.acknowledge) {
+					await this.subscriberStrategy.acknowledge(workflowRunId, meta).catch(() => {});
+				}
 				continue;
 			}
 
@@ -239,16 +251,20 @@ class WorkerImpl<AppContext> implements Worker {
 					workflowVersionId: workflowRun.versionId,
 					workflowRunId: workflowRun.id,
 				});
+				if (meta && this.subscriberStrategy?.acknowledge) {
+					await this.subscriberStrategy.acknowledge(workflowRunId, meta).catch(() => {});
+				}
 				continue;
 			}
 
 			if (abortSignal.aborted) break;
 
-			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion);
+			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, meta);
 
 			this.activeWorkflowRunsById.set(workflowRun.id, {
 				run: workflowRun,
 				executionPromise: workflowExecutionPromise,
+				meta,
 			});
 		}
 	}
@@ -256,17 +272,23 @@ class WorkerImpl<AppContext> implements Worker {
 	private async executeWorkflow(
 		workflowRun: WorkflowRun<unknown, unknown>,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
+		meta?: SubscriberMessageMeta,
 	): Promise<void> {
 		const workflowLogger = getChildLogger(this.logger, {
 			"aiki.component": "workflow-execution",
 			"aiki.workflowName": workflowRun.name,
 			"aiki.workflowVersionId": workflowRun.versionId,
 			"aiki.workflowRunId": workflowRun.id,
+			...(meta && {
+				"aiki.messageId": meta.messageId,
+			}),
 		});
 
 		workflowLogger.info("Executing workflow");
 
 		let heartbeatInterval: number | undefined;
+		let workflowSucceeded = false;
+
 		try {
 			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun);
 
@@ -274,15 +296,18 @@ class WorkerImpl<AppContext> implements Worker {
 				? await this.client._internal.contextFactory(workflowRun)
 				: null;
 
-			heartbeatInterval = setInterval(() => {
-				try {
-					// TODO: update heart beat via redis stream
-				} catch (error) {
-					workflowLogger.warn("Failed to update workflow heartbeat", {
-						error: error instanceof Error ? error.message : String(error),
-					});
-				}
-			}, this.params.workflowRun?.heartbeatIntervalMs ?? 30_000);
+			const heartbeat = this.subscriberStrategy?.heartbeat;
+			if (meta && heartbeat) {
+				heartbeatInterval = setInterval(() => {
+					try {
+						heartbeat(workflowRun.id as WorkflowRunId, meta);
+					} catch (error) {
+						workflowLogger.warn("Failed to send heartbeat", {
+							"aiki.error": error instanceof Error ? error.message : String(error),
+						});
+					}
+				}, this.params.workflowRun?.heartbeatIntervalMs ?? 30_000);
+			}
 
 			await workflowVersion._internal.exec(
 				this.client,
@@ -295,14 +320,32 @@ class WorkerImpl<AppContext> implements Worker {
 				appContext,
 			);
 
+			workflowSucceeded = true;
 			workflowLogger.info("Workflow execution completed");
 		} catch (error) {
 			workflowLogger.error("Workflow execution failed", {
-				error: error instanceof Error ? error.message : String(error),
-				stack: error instanceof Error ? error.stack : undefined,
+				"aiki.error": error instanceof Error ? error.message : String(error),
+				"aiki.stack": error instanceof Error ? error.stack : undefined,
 			});
 		} finally {
 			if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+			if (meta && this.subscriberStrategy?.acknowledge) {
+				if (workflowSucceeded) {
+					try {
+						await this.subscriberStrategy.acknowledge(workflowRun.id as WorkflowRunId, meta);
+						workflowLogger.info("Message acknowledged");
+					} catch (error) {
+						workflowLogger.error("Failed to acknowledge message, it may be reprocessed", {
+							"aiki.errorType": "MESSAGE_ACK_FAILED",
+							"aiki.error": error instanceof Error ? error.message : String(error),
+						});
+					}
+				} else {
+					workflowLogger.debug("Message left in PEL for retry");
+				}
+			}
+
 			this.activeWorkflowRunsById.delete(workflowRun.id);
 		}
 	}

@@ -22,10 +22,23 @@ export interface StrategyCallbacks {
 	onStop?: () => Promise<void>;
 }
 
+export interface SubscriberMessageMeta {
+	stream: string;
+	messageId: string;
+	consumerGroup: string;
+}
+
+export interface WorkflowRunBatch {
+	data: { workflowRunId: WorkflowRunId };
+	meta?: SubscriberMessageMeta;
+}
+
 export interface ResolvedSubscriberStrategy {
 	type: SubscriberStrategy["type"];
 	getNextDelay: (context: SubscriberDelayParams) => number;
-	getNextBatch: (size: number) => Promise<WorkflowRunId[]>;
+	getNextBatch: (size: number) => Promise<WorkflowRunBatch[]>;
+	heartbeat?: (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta) => Promise<void>;
+	acknowledge?: (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta) => Promise<void>;
 }
 
 export type SubscriberDelayParams =

@@ -5,7 +5,13 @@ import { getRetryParams } from "@aiki/lib/retry";
 import type { WorkflowName } from "@aiki/contract/workflow";
 import type { WorkflowRunId } from "@aiki/contract/workflow-run";
 import type { Client } from "../client.ts";
-import type { StrategyCallbacks, SubscriberDelayParams, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
+import type {
+	StrategyCallbacks,
+	SubscriberDelayParams,
+	SubscriberMessageMeta,
+	SubscriberStrategyBuilder,
+	WorkflowRunBatch,
+} from "./strategy-resolver.ts";
 import { getChildLogger, type Logger } from "../../logger/mod.ts";
 
 /**
@@ -161,6 +167,54 @@ export function createRedisStreamsStrategy(
 		}
 	};
 
+	const getHeartbeat =
+		(workerId: string) => async (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta): Promise<void> => {
+			try {
+				await redis.xclaim(
+					meta.stream,
+					meta.consumerGroup,
+					workerId,
+					0,
+					meta.messageId,
+					"JUSTID",
+				);
+				subscriberLogger.debug("Heartbeat sent", {
+					"aiki.workflowRunId": workflowRunId,
+					"aiki.messageId": meta.messageId,
+				});
+			} catch (error) {
+				subscriberLogger.warn("Heartbeat failed", {
+					"aiki.workflowRunId": workflowRunId,
+					"aiki.error": error instanceof Error ? error.message : String(error),
+				});
+			}
+		};
+
+	const acknowledge = async (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta): Promise<void> => {
+		try {
+			const result = await redis.xack(meta.stream, meta.consumerGroup, meta.messageId);
+
+			if (result === 0) {
+				subscriberLogger.warn("Message already acknowledged", {
+					"aiki.workflowRunId": workflowRunId,
+					"aiki.messageId": meta.messageId,
+				});
+			} else {
+				subscriberLogger.debug("Message acknowledged", {
+					"aiki.workflowRunId": workflowRunId,
+					"aiki.messageId": meta.messageId,
+				});
+			}
+		} catch (error) {
+			subscriberLogger.error("Failed to acknowledge message", {
+				"aiki.error": error instanceof Error ? error.message : String(error),
+				"aiki.workflowRunId": workflowRunId,
+				"aiki.messageId": meta.messageId,
+			});
+			throw error;
+		}
+	};
+
 	return {
 		async init(workerId: string, _callbacks: StrategyCallbacks) {
 			for (const [stream, consumerGroup] of streamConsumerGroupMap) {
@@ -187,6 +241,8 @@ export function createRedisStreamsStrategy(
 						blockTimeMs,
 						claimMinIdleTimeMs,
 					),
+				heartbeat: getHeartbeat(workerId),
+				acknowledge,
 			};
 		},
 	};
@@ -217,7 +273,7 @@ async function fetchRedisStreamMessages(
 	size: number,
 	blockTimeMs: number,
 	claimMinIdleTimeMs: number,
-): Promise<WorkflowRunId[]> {
+): Promise<WorkflowRunBatch[]> {
 	if (!isNonEmptyArray(streams)) {
 		return [];
 	}
@@ -266,13 +322,13 @@ async function fetchRedisStreamMessages(
 		}
 	}
 
-	const workflowRunIds = isNonEmptyArray(streamEntries)
+	const workflowRuns = isNonEmptyArray(streamEntries)
 		? await processRedisStreamMessages(redis, logger, streamConsumerGroupMap, streamEntries)
 		: [];
 
-	const remainingCapacity = size - workflowRunIds.length;
+	const remainingCapacity = size - workflowRuns.length;
 	if (remainingCapacity > 0 && claimMinIdleTimeMs > 0) {
-		const claimedWorkflowRunIds = await claimStuckRedisStreamMessages(
+		const claimedWorkflowRuns = await claimStuckRedisStreamMessages(
 			redis,
 			logger,
 			shuffledStreams,
@@ -281,12 +337,12 @@ async function fetchRedisStreamMessages(
 			remainingCapacity,
 			claimMinIdleTimeMs,
 		);
-		for (const workflowRunId of claimedWorkflowRunIds) {
-			workflowRunIds.push(workflowRunId);
+		for (const workflowRun of claimedWorkflowRuns) {
+			workflowRuns.push(workflowRun);
 		}
 	}
 
-	return workflowRunIds;
+	return workflowRuns;
 }
 
 async function processRedisStreamMessages(
@@ -294,8 +350,8 @@ async function processRedisStreamMessages(
 	logger: Logger,
 	streamConsumerGroupMap: Map<string, string>,
 	streamEntries: NonEmptyArray<unknown>,
-): Promise<WorkflowRunId[]> {
-	const workflowRunIds: WorkflowRunId[] = [];
+): Promise<WorkflowRunBatch[]> {
+	const workflowRuns: WorkflowRunBatch[] = [];
 
 	for (const streamEntry of streamEntries) {
 		const streamEntryResult = RedisStreamEntrySchema.safeParse(streamEntry);
@@ -324,7 +380,6 @@ async function processRedisStreamMessages(
 					"aiki.messageId": messageId,
 					"aiki.error": z.treeifyError(messageData.error),
 				});
-				// TODO: only acknoledge after message is truly processed
 				await redis.xack(stream, consumerGroup, messageId);
 				continue;
 			}
@@ -332,20 +387,24 @@ async function processRedisStreamMessages(
 			switch (messageData.data.type) {
 				case "workflow_run_ready": {
 					const { workflowRunId } = messageData.data.data;
-					workflowRunIds.push(workflowRunId);
+					workflowRuns.push({
+						data: { workflowRunId },
+						meta: {
+							stream,
+							messageId,
+							consumerGroup,
+						},
+					});
 					break;
 				}
 				default:
 					messageData.data.type satisfies never;
 					continue;
 			}
-
-			// TODO: only acknoledge after message is truly processed
-			await redis.xack(stream, consumerGroup, messageId);
 		}
 	}
 
-	return workflowRunIds;
+	return workflowRuns;
 }
 
 async function claimStuckRedisStreamMessages(
@@ -356,7 +415,7 @@ async function claimStuckRedisStreamMessages(
 	workerId: string,
 	maxClaim: number,
 	minIdleMs: number,
-): Promise<WorkflowRunId[]> {
+): Promise<WorkflowRunBatch[]> {
 	if (maxClaim <= 0 || minIdleMs <= 0) {
 		return [];
 	}
