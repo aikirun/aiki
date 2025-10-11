@@ -29,8 +29,8 @@ if (import.meta.main) {
 	workerB.workflowRegistry
 		.add(eveningRoutineWorkflow);
 
-	workerA.start();
-	workerB.start();
+	await workerA.start();
+	await workerB.start();
 
 	await delay(2_000);
 
