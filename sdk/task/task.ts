@@ -58,9 +58,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const input = isNonEmptyArray(args) ? args[0] : null as Input;
 		const path = await this.getPath(run, input);
 
-		const workflowRunInternal = run.handle._internal;
-
-		const preExistingResult = workflowRunInternal.getSubTaskRunResult<Output>(path);
+		const preExistingResult = run.handle._internal.getSubTaskRunResult<Output>(path);
 		if (preExistingResult.state === "completed") {
 			return preExistingResult.output;
 		}
@@ -69,20 +67,21 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		// if not update workflow state to failed and return
 		try {
 			const output = await this.params.exec(input);
-			await workflowRunInternal.addSubTaskRunResult(path, {
+			await run.handle._internal.addSubTaskRunResult(path, {
 				state: "completed",
 				output,
 			});
+			return output;
 		} catch (error) {
-			workflowRunInternal.addSubTaskRunResult(path, {
+			await run.handle._internal.addSubTaskRunResult(path, {
 				state: "failed",
 				// TODO: is error string?
 				reason: error as string,
 			});
-		}
 
-		// TODO: specify error type
-		throw new Error();
+			// TODO: specify error type. What to do in case of failed task exec?
+			throw new Error();
+		}
 	}
 
 	private async getPath<WorkflowInput, WorkflowOutput>(
