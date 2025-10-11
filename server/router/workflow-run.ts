@@ -16,8 +16,8 @@ const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 	return {
 		run: {
 			id: input.id,
-			name: "test-workflow",
-			versionId: "v1",
+			name: "evening-routine",
+			versionId: "1.0.0",
 			input: null,
 			options: {},
 			result: { state: "running" },

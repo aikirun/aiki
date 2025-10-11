@@ -1,6 +1,7 @@
 import { worker } from "@aiki/sdk/worker";
 import { Aiki } from "@aiki/sdk";
 import { eveningRoutineWorkflow, morningWorkflow } from "../workflow/example.ts";
+import { delay } from "@aiki/lib/async";
 
 if (import.meta.main) {
 	const client = await Aiki.client({ url: "http://localhost:3000" });
@@ -24,6 +25,8 @@ if (import.meta.main) {
 
 	workerA.start();
 	workerB.start();
+
+	await delay(2_000);
 
 	await workerA.stop();
 	await workerB.stop();

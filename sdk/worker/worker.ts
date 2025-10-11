@@ -37,8 +37,7 @@ export interface WorkerParams {
 export interface Worker {
 	id: string;
 	workflowRegistry: WorkflowRegistry;
-	// TODO: this should not return a promise
-	start: () => Promise<void>;
+	start: () => void;
 	stop: () => Promise<void>;
 }
 
@@ -67,12 +66,16 @@ class WorkerImpl<AppContext> implements Worker {
 		this.logger.info("Worker initialized");
 	}
 
-	public async start(): Promise<void> {
+	public start(): void {
 		this.logger.info("Worker starting");
 
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
 
+		this.initAndStartPolling(abortSignal);
+	}
+
+	private async initAndStartPolling(abortSignal: AbortSignal): Promise<void> {
 		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
 			this.params.subscriber ?? { type: "polling" },
 			this.workflowRegistry._internal.getAll().map((workflow) => workflow.name),
@@ -84,7 +87,18 @@ class WorkerImpl<AppContext> implements Worker {
 			onStop: () => this.stop(),
 		});
 
-		await this.startPolling(abortSignal);
+		try {
+			await this.startPolling(abortSignal);
+		} catch (error) {
+			if (abortSignal.aborted) {
+				this.logger.debug("Worker stopped due to abort signal");
+				return;
+			}
+
+			this.logger.error("Unexpected error", {
+				"aiki.error": error instanceof Error ? error.message : String(error),
+			});
+		}
 	}
 
 	public async stop(): Promise<void> {
