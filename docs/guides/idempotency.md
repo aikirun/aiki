@@ -18,17 +18,15 @@ When starting workflows, you can provide an idempotency key to prevent duplicate
 
 ```typescript
 // Start a workflow with idempotency key
-const resultHandle = await orderWorkflowV1.start(client, {
-  payload: { orderId: "order-123", items: [...] },
-  idempotencyKey: "order-123-process" // Unique key for this order
-});
+const resultHandle = await orderWorkflowV1
+  .withOptions({ idempotencyKey: "order-123-process" })
+  .start(client, { orderId: "order-123", items: [...] });
 
 // If this exact same call is made again with the same idempotency key,
 // it will return the same workflow run instead of creating a duplicate
-const duplicateHandle = await orderWorkflowV1.start(client, {
-  payload: { orderId: "order-123", items: [...] },
-  idempotencyKey: "order-123-process" // Same key
-});
+const duplicateHandle = await orderWorkflowV1
+  .withOptions({ idempotencyKey: "order-123-process" })
+  .start(client, { orderId: "order-123", items: [...] });
 
 // duplicateHandle.id === resultHandle.id (same workflow run)
 ```
@@ -41,19 +39,19 @@ multiple times, it will only execute once and return the cached result:
 ```typescript
 const sendEmail = task({
 	name: "send-welcome-email",
-	run({ payload }) {
-		return sendEmailToUser(payload.email, welcomeTemplate);
+	exec(input) {
+		return sendEmailToUser(input.email, welcomeTemplate);
 	},
 });
 
 // First call: Actually executes the task
-await sendEmail.start(workflowRun, {
-	payload: { email: "user@example.com" },
+await sendEmail.start(run, {
+	email: "user@example.com"
 });
 
-// Second call with same payload: Returns cached result, doesn't execute again
-await sendEmail.start(workflowRun, {
-	payload: { email: "user@example.com" },
+// Second call with same input: Returns cached result, doesn't execute again
+await sendEmail.start(run, {
+	email: "user@example.com"
 });
 ```
 
@@ -101,20 +99,21 @@ Sometimes you want the same task executed multiple times for different reasons:
 ```typescript
 const sendEmail = task({
 	name: "send-email",
-	run({ payload }) {
-		return sendEmailToUser(payload.email, payload.content);
+	exec(input) {
+		return sendEmailToUser(input.email, input.content);
 	},
 });
 
 // First call: Send welcome email
-await sendEmail.start(workflowRun, {
-	payload: { email: "user@example.com", content: "Welcome!" },
+await sendEmail.start(run, {
+	email: "user@example.com",
+	content: "Welcome!"
 });
 
 // Second call: Send reminder email (same email, different intent)
-await sendEmail.start(workflowRun, {
-	payload: { email: "user@example.com", content: "Welcome!" },
-	idempotencyKey: "reminder-email-user-123", // Forces re-execution
+await sendEmail.withOptions({ idempotencyKey: "reminder-email-user-123" }).start(run, {
+	email: "user@example.com",
+	content: "Welcome!"
 });
 ```
 

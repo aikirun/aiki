@@ -19,15 +19,16 @@ Here's a simple example:
 // ✅ Deterministic task
 const calculateTax = task({
 	name: "calculate-tax",
-	run({ payload }) {
-		const { amount, taxRate } = payload;
+	exec(input) {
+		const { amount, taxRate } = input;
 		return { tax: amount * taxRate, total: amount * (1 + taxRate) };
 	},
 });
 
 // This will always return { tax: 10, total: 110 } for the same input
-const result = await calculateTax.start(workflowRun, {
-	payload: { amount: 100, taxRate: 0.1 },
+const result = await calculateTax.start(run, {
+	amount: 100,
+	taxRate: 0.1
 });
 ```
 
@@ -48,20 +49,20 @@ Let me illustrate this with a cautionary tale:
 // ❌ Non-deterministic task - dangerous with duplicate execution
 const badTask = task({
 	name: "create-user",
-	run({ payload }) {
+	exec(input) {
 		// This could create duplicate users if executed twice
 		const userId = generateRandomId(); // Different each time!
-		return createUserInDatabase(userId, payload.userData);
+		return createUserInDatabase(userId, input.userData);
 	},
 });
 
 // ✅ Deterministic task - safe with duplicate execution
 const goodTask = task({
 	name: "create-user",
-	run({ payload }) {
+	exec(input) {
 		// Same input always produces same result
-		const userId = generateIdFromEmail(payload.email); // Deterministic!
-		return createUserInDatabase(userId, payload.userData);
+		const userId = generateIdFromEmail(input.email); // Deterministic!
+		return createUserInDatabase(userId, input.userData);
 	},
 });
 ```
@@ -79,7 +80,7 @@ has the same effect as running it once.
 // ✅ Idempotent task - safe to run multiple times
 const sendEmail = task({
 	name: "send-welcome-email",
-	run({ payload }) {
+	exec(input) {
 		const { userId, email } = payload;
 
 		// Check if email was already sent
@@ -98,7 +99,7 @@ const sendEmail = task({
 // ✅ Idempotent payment processing
 const processPayment = task({
 	name: "process-payment",
-	run({ payload }) {
+	exec(input) {
 		const { paymentId, amount } = payload;
 
 		// Check if payment was already processed
@@ -122,7 +123,7 @@ debugging and recovery.
 // ❌ Non-deterministic task
 const badTask = task({
 	name: "bad-task",
-	run({ payload }) {
+	exec(input) {
 		// This will produce different results on each run
 		const randomId = Math.random();
 		const timestamp = Date.now();
@@ -133,9 +134,9 @@ const badTask = task({
 // ✅ Deterministic task
 const goodTask = task({
 	name: "good-task",
-	run({ payload }) {
+	exec(input) {
 		// Same input always produces same output
-		const userId = payload.userId;
+		const userId = input.userId;
 		const email = `${userId}@example.com`;
 		return { email, userId };
 	},
@@ -152,15 +153,15 @@ const orderWorkflow = workflow({
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async run(ctx, payload: any) {
+	async exec(input: any, run) {
 		// If this workflow crashes after validateOrder completes,
 		// it will resume here with the same result
-		const validation = await validateOrder.start(ctx, {
+		const validation = await validateOrder.start(run, {
 			payload,
 		});
 
 		// This will always produce the same result for the same order
-		const payment = await processPayment.start(ctx, {
+		const payment = await processPayment.start(run, {
 			payload: { orderId: validation.orderId, amount: validation.amount },
 		});
 	},
@@ -175,7 +176,7 @@ Deterministic tasks make workflows easier to debug and test:
 // Easy to test - same input, same output
 const testTask = task({
 	name: "calculate-tax",
-	run({ payload }) {
+	exec(input) {
 		const { amount, taxRate } = payload;
 		return { tax: amount * taxRate, total: amount * (1 + taxRate) };
 	},
@@ -198,7 +199,7 @@ Here are the common pitfalls to avoid:
 // ❌ Avoid these in tasks:
 const badPractices = task({
 	name: "bad-practices",
-	run({ payload }) {
+	exec(input) {
 		// Don't use random numbers
 		const random = Math.random();
 
@@ -218,15 +219,15 @@ const badPractices = task({
 // ✅ Use deterministic alternatives:
 const goodPractices = task({
 	name: "good-practices",
-	run({ payload }) {
+	exec(input) {
 		// Use provided IDs or generate from input
 		const id = generateIdFromInput(payload);
 
 		// Use provided timestamps or calculate from input
-		const calculatedTime = payload.createdAt + payload.duration;
+		const calculatedTime = input.createdAt + payload.duration;
 
 		// Use provided data or fetch once and store
-		const userData = payload.userData;
+		const userData = input.userData;
 
 		// Use local state based on input
 		const localCounter = payload.sequenceNumber;
@@ -248,7 +249,7 @@ For tasks that need external data, make them deterministic by:
 // ✅ Good: External data passed as input
 const sendEmail = task({
 	name: "send-email",
-	run({ payload }) {
+	exec(input) {
 		// Email content is deterministic based on input
 		const { recipient, template, variables } = payload;
 		const emailContent = generateEmail(template, variables);
@@ -261,7 +262,7 @@ const sendEmail = task({
 // ✅ Good: Store external state in workflow
 const processPayment = task({
 	name: "process-payment",
-	run({ payload, workflowRun }) {
+	exec(input) {
 		// Use workflow state to ensure determinism
 		const paymentId = workflowRun.params.paymentId;
 		const amount = workflowRun.params.amount;
@@ -280,7 +281,7 @@ const processPayment = task({
 // ❌ Bad: Random numbers
 const badTask = task({
 	name: "generate-id",
-	run({ payload }) {
+	exec(input) {
 		return { id: Math.random().toString(36) };
 	},
 });
@@ -288,7 +289,7 @@ const badTask = task({
 // ✅ Good: Deterministic ID generation
 const goodTask = task({
 	name: "generate-id",
-	run({ payload }) {
+	exec(input) {
 		const { userId, timestamp } = payload;
 		return { id: `${userId}-${timestamp}` };
 	},
@@ -301,7 +302,7 @@ const goodTask = task({
 // ❌ Bad: Current timestamp
 const badTask = task({
 	name: "create-record",
-	run({ payload }) {
+	exec(input) {
 		return createRecord({ ...payload, createdAt: Date.now() });
 	},
 });
@@ -309,8 +310,8 @@ const badTask = task({
 // ✅ Good: Use provided timestamp
 const goodTask = task({
 	name: "create-record",
-	run({ payload }) {
-		return createRecord({ ...payload, createdAt: payload.createdAt });
+	exec(input) {
+		return createRecord({ ...payload, createdAt: input.createdAt });
 	},
 });
 ```
@@ -321,15 +322,15 @@ const goodTask = task({
 // ❌ Bad: External API that might change
 const badTask = task({
 	name: "get-exchange-rate",
-	run({ payload }) {
-		return fetchExchangeRate(payload.currency);
+	exec(input) {
+		return fetchExchangeRate(input.currency);
 	},
 });
 
 // ✅ Good: Pass rate as input or use idempotent lookup
 const goodTask = task({
 	name: "get-exchange-rate",
-	run({ payload }) {
+	exec(input) {
 		const { currency, rate } = payload;
 		return { currency, rate };
 	},
@@ -343,7 +344,7 @@ const goodTask = task({
 let globalCounter = 0;
 const badTask = task({
 	name: "increment-counter",
-	run({ payload }) {
+	exec(input) {
 		globalCounter++;
 		return { counter: globalCounter };
 	},
@@ -352,8 +353,8 @@ const badTask = task({
 // ✅ Good: Pass counter as input
 const goodTask = task({
 	name: "increment-counter",
-	run({ payload }) {
-		return { counter: payload.currentCounter + 1 };
+	exec(input) {
+		return { counter: input.currentCounter + 1 };
 	},
 });
 ```
