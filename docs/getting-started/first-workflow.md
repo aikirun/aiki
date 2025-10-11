@@ -128,7 +128,8 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 Create the client and worker:
 
 ```typescript
-import { client, worker } from "@aiki/sdk";
+import { client } from "@aiki/client";
+import { worker } from "@aiki/worker";
 
 const aikiClient = await client({
 	url: "localhost:9090",
@@ -178,7 +179,10 @@ console.log("Order processed:", finalResult);
 ## Complete Code
 
 ```typescript
-import { client, task, worker, workflow } from "@aiki/sdk";
+import { client } from "@aiki/client";
+import { task } from "@aiki/task";
+import { worker } from "@aiki/worker";
+import { workflow } from "@aiki/workflow";
 
 // Define tasks
 const validateOrder = task({

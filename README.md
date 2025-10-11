@@ -21,7 +21,10 @@ npm install @aiki/client @aiki/worker @aiki/workflow @aiki/task
 ```
 
 ```typescript
-import { client, worker, workflow, task } from "@aiki/sdk";
+import { client } from "@aiki/client";
+import { task } from "@aiki/task";
+import { worker } from "@aiki/worker";
+import { workflow } from "@aiki/workflow";
 
 // Define a task
 const sendEmail = task({

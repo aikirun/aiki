@@ -125,7 +125,9 @@ This closes the Redis connection and cleans up resources.
 ## Complete Example
 
 ```typescript
-import { client, task, workflow } from "@aiki/sdk";
+import { client } from "@aiki/client";
+import { task } from "@aiki/task";
+import { workflow } from "@aiki/workflow";
 
 // Define task and workflow
 const sendEmail = task({

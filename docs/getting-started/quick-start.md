@@ -110,7 +110,9 @@ console.log("Workflow completed:", finalResult);
 Here's the full code:
 
 ```typescript
-import { client, task, worker, workflow } from "@aiki/sdk";
+import { client } from "@aiki/client";
+import { task } from "@aiki/task";
+import { worker } from "@aiki/worker";
 
 // 1. Define task
 const sendEmail = task({

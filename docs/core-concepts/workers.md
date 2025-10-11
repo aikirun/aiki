@@ -196,7 +196,8 @@ Failed workflows are automatically retried according to the configured strategy.
 ## Example: Complete Worker Setup
 
 ```typescript
-import { client, worker } from "@aiki/sdk";
+import { client } from "@aiki/client";
+import { worker } from "@aiki/worker";
 
 // Create client
 const aikiClient = await client({
