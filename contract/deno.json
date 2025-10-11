@@ -3,7 +3,6 @@
 	"version": "0.1.0",
 	"exports": {
 		".": "./contract.ts",
-		"./common": "./common/mod.ts",
 		"./task-run": "./task-run/mod.ts",
 		"./workflow-run": "./workflow-run/mod.ts"
 	},

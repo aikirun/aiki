@@ -5,7 +5,7 @@ import { workflowOptionsSchema, workflowRunResultSchema, workflowRunSchema, work
 import type { EmptyRecord } from "@aiki/lib/object";
 import type { TaskRunResult } from "@aiki/types/task-run";
 import { taskRunResultSchema } from "../task-run/schema.ts";
-import type { ContractProcedure } from "../common/procedure.ts";
+import type { ContractProcedure } from "../helpers/procedure.ts";
 
 export interface GetReadyIdsRequestV1 {
 	size: number;

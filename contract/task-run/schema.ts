@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { TaskRunResult } from "@aiki/types/task-run";
-import type { zT } from "../common/schema.ts";
+import type { zT } from "../helpers/schema.ts";
 
 export const taskRunResultSchema: zT<TaskRunResult<unknown>> = z.discriminatedUnion(
 	"state",
