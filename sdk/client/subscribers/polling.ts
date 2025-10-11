@@ -1,5 +1,4 @@
 import { getRetryParams } from "@aiki/lib/retry";
-import type { WorkflowRunId } from "@aiki/types/workflow-run";
 import type {
 	Client,
 	PollingSubscriberStrategy,
@@ -10,7 +9,7 @@ import type {
 } from "@aiki/types/client";
 
 export function createPollingStrategy(
-	client: Client<unknown>,
+	_client: Client<unknown>,
 	strategy: PollingSubscriberStrategy,
 ): SubscriberStrategyBuilder {
 	const intervalMs = strategy.intervalMs ?? 100;
@@ -41,12 +40,8 @@ export function createPollingStrategy(
 		}
 	};
 
-	const getNextBatch = async (size: number): Promise<WorkflowRunBatch[]> => {
-		const response = await client.api.workflowRun.getReadyIdsV1({ size });
-		return response.ids.map((id) => ({
-			data: { workflowRunId: id as WorkflowRunId },
-			meta: undefined,
-		}));
+	const getNextBatch = (_size: number): Promise<WorkflowRunBatch[]> => {
+		return Promise.resolve([]);
 	};
 
 	return {

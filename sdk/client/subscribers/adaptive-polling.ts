@@ -1,5 +1,4 @@
 import { AdaptivePollingStrategy } from "@aiki/lib/polling";
-import type { WorkflowRunId } from "@aiki/types/workflow-run";
 import type {
 	AdaptivePollingSubscriberStrategy,
 	Client,
@@ -10,7 +9,7 @@ import type {
 } from "@aiki/types/client";
 
 export function createAdaptivePollingStrategy(
-	client: Client<unknown>,
+	_client: Client<unknown>,
 	strategy: AdaptivePollingSubscriberStrategy,
 ): SubscriberStrategyBuilder {
 	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;
@@ -32,12 +31,8 @@ export function createAdaptivePollingStrategy(
 		}
 	};
 
-	const getNextBatch = async (size: number): Promise<WorkflowRunBatch[]> => {
-		const response = await client.api.workflowRun.getReadyIdsV1({ size });
-		return response.ids.map((id) => ({
-			data: { workflowRunId: id as WorkflowRunId },
-			meta: undefined,
-		}));
+	const getNextBatch = (_size: number): Promise<WorkflowRunBatch[]> => {
+		return Promise.resolve([]);
 	};
 
 	return {

@@ -2,14 +2,6 @@ import { baseImplementer } from "./base.ts";
 
 const os = baseImplementer.workflowRun;
 
-const getReadyIdsV1 = os.getReadyIdsV1.handler(({ input }) => {
-	// deno-lint-ignore no-console
-	console.log(`Fetching ready ids size: ${input.size}`);
-	return {
-		ids: ["1"],
-	};
-});
-
 const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 	// deno-lint-ignore no-console
 	console.log(`Fetching workflow run by id: ${input.id}`);
@@ -65,7 +57,6 @@ const updateStateV1 = os.updateStateV1.handler(({ input: _input }) => {
 });
 
 export const workflowRunRouter = os.router({
-	getReadyIdsV1,
 	getByIdV1,
 	getResultV1,
 	createV1,

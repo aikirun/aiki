@@ -3,14 +3,6 @@ import type { TaskRunResult } from "./task-run.ts";
 
 export type EmptyRecord = Record<string, never>;
 
-export interface GetReadyIdsRequestV1 {
-	size: number;
-}
-
-export interface GetReadyIdsResponseV1 {
-	ids: string[];
-}
-
 export interface GetByIdRequestV1 {
 	id: string;
 }
@@ -54,7 +46,6 @@ export interface UpdateStateRequestV1 {
 export type UpdateStateResponseV2 = EmptyRecord;
 
 export interface WorkflowRunApi {
-	getReadyIdsV1: (input: GetReadyIdsRequestV1) => Promise<GetReadyIdsResponseV1>;
 	getByIdV1: (input: GetByIdRequestV1) => Promise<GetByIdResponseV1>;
 	getResultV1: (input: GetResultRequestV1) => Promise<GetResultResponseV1>;
 	createV1: (input: CreateRequestV1) => Promise<CreateResponseV1>;

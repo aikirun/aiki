@@ -10,8 +10,6 @@ import type {
 	CreateResponseV1,
 	GetByIdRequestV1,
 	GetByIdResponseV1,
-	GetReadyIdsRequestV1,
-	GetReadyIdsResponseV1,
 	GetResultRequestV1,
 	GetResultResponseV1,
 	UpdateStateRequestV1,
@@ -19,14 +17,6 @@ import type {
 	WorkflowRunApi,
 } from "@aiki/types/workflow-run-api";
 import type { Equal, ExpectTrue } from "@aiki/lib/testing/expect";
-
-const getReadyIdsV1: ContractProcedure<GetReadyIdsRequestV1, GetReadyIdsResponseV1> = oc
-	.input(z.object({
-		size: z.number().int().positive(),
-	}))
-	.output(z.object({
-		ids: z.array(z.string()),
-	}));
 
 const getByIdV1: ContractProcedure<GetByIdRequestV1, GetByIdResponseV1> = oc
 	.input(z.object({
@@ -71,7 +61,6 @@ const updateStateV1: ContractProcedure<UpdateStateRequestV1, UpdateStateResponse
 	.output(z.object({}));
 
 export const workflowRunContract = {
-	getReadyIdsV1,
 	getByIdV1,
 	getResultV1,
 	createV1,
