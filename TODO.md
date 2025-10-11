@@ -230,4 +230,3 @@ Exploratory work for future capabilities.
 - Workers check cancellation status before updating storage with results
 - Focus on maintaining backward compatibility during feature additions
 - Redis Streams will be the primary/only subscriber strategy going forward
-- Package splitting should maintain API compatibility where possible
