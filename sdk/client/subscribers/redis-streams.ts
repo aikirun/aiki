@@ -4,8 +4,9 @@ import { z } from "zod";
 import { getRetryParams } from "@aiki/lib/retry";
 import type { WorkflowName } from "@aiki/contract/workflow";
 import type { WorkflowRunId } from "@aiki/contract/workflow-run";
-import type { RedisStreamsConnection } from "../client.ts";
+import type { Client } from "../client.ts";
 import type { StrategyCallbacks, SubscriberDelayParams, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
+import { getChildLogger, type Logger } from "../../logger/mod.ts";
 
 /**
  * Redis Streams subscriber strategy configuration
@@ -116,12 +117,16 @@ interface ClaimableRedisStreamMessage {
 }
 
 export function createRedisStreamsStrategy(
-	redisStreams: RedisStreamsConnection,
+	client: Client<unknown>,
 	strategy: RedisStreamsSubscriberStrategy,
 	workflowNames: WorkflowName[],
 	workerShards?: string[],
 ): SubscriberStrategyBuilder {
-	const redis = redisStreams.getConnection();
+	const redis = client._internal.redisStreams.getConnection();
+
+	const subscriberLogger = getChildLogger(client._internal.logger, {
+		"aiki.component": "redis-subscriber",
+	});
 
 	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflowNames, workerShards);
 	const streams = Array.from(streamConsumerGroupMap.keys());
@@ -174,6 +179,7 @@ export function createRedisStreamsStrategy(
 				getNextBatch: (size: number) =>
 					fetchRedisStreamMessages(
 						redis,
+						subscriberLogger,
 						streams,
 						streamConsumerGroupMap,
 						workerId,
@@ -204,6 +210,7 @@ function getRedisStreamConsumerGroupMap(workflowNames: WorkflowName[], shardKeys
 
 async function fetchRedisStreamMessages(
 	redis: Redis,
+	logger: Logger,
 	streams: string[],
 	streamConsumerGroupMap: Map<string, string>,
 	workerId: string,
@@ -260,13 +267,14 @@ async function fetchRedisStreamMessages(
 	}
 
 	const workflowRunIds = isNonEmptyArray(streamEntries)
-		? await processRedisStreamMessages(redis, streamConsumerGroupMap, streamEntries)
+		? await processRedisStreamMessages(redis, logger, streamConsumerGroupMap, streamEntries)
 		: [];
 
 	const remainingCapacity = size - workflowRunIds.length;
 	if (remainingCapacity > 0 && claimMinIdleTimeMs > 0) {
 		const claimedWorkflowRunIds = await claimStuckRedisStreamMessages(
 			redis,
+			logger,
 			shuffledStreams,
 			streamConsumerGroupMap,
 			workerId,
@@ -283,6 +291,7 @@ async function fetchRedisStreamMessages(
 
 async function processRedisStreamMessages(
 	redis: Redis,
+	logger: Logger,
 	streamConsumerGroupMap: Map<string, string>,
 	streamEntries: NonEmptyArray<unknown>,
 ): Promise<WorkflowRunId[]> {
@@ -291,8 +300,9 @@ async function processRedisStreamMessages(
 	for (const streamEntry of streamEntries) {
 		const streamEntryResult = RedisStreamEntrySchema.safeParse(streamEntry);
 		if (!streamEntryResult.success) {
-			// deno-lint-ignore no-console
-			console.error("Invalid Redis stream entry structure:", streamEntryResult.error.format());
+			logger.error("Invalid Redis stream entry structure", {
+				"aiki.error": streamEntryResult.error.format(),
+			});
 			continue;
 		}
 
@@ -300,19 +310,20 @@ async function processRedisStreamMessages(
 
 		const consumerGroup = streamConsumerGroupMap.get(stream);
 		if (!consumerGroup) {
-			// deno-lint-ignore no-console
-			console.error(`No consumer group found for stream: ${stream}`);
+			logger.error("No consumer group found for stream", {
+				"aiki.stream": stream,
+			});
 			continue;
 		}
 
 		for (const [messageId, rawMessageData] of messages) {
 			const messageData = RedisMessageDataSchema.safeParse(rawMessageData);
 			if (!messageData.success) {
-				// deno-lint-ignore no-console
-				console.warn(
-					`Invalid message structure in ${stream}/${messageId}:`,
-					messageData.error.format(),
-				);
+				logger.warn("Invalid message structure", {
+					"aiki.stream": stream,
+					"aiki.messageId": messageId,
+					"aiki.error": messageData.error.format(),
+				});
 				// TODO: only acknoledge after message is truly processed
 				await redis.xack(stream, consumerGroup, messageId);
 				continue;
@@ -339,6 +350,7 @@ async function processRedisStreamMessages(
 
 async function claimStuckRedisStreamMessages(
 	redis: Redis,
+	logger: Logger,
 	shuffledStreams: string[],
 	streamConsumerGroupMap: Map<string, string>,
 	workerId: string,
@@ -351,6 +363,7 @@ async function claimStuckRedisStreamMessages(
 
 	const claimableMessages = await findClaimableRedisStreamMessages(
 		redis,
+		logger,
 		shuffledStreams,
 		streamConsumerGroupMap,
 		workerId,
@@ -386,22 +399,24 @@ async function claimStuckRedisStreamMessages(
 
 			// Handle specific Redis errors gracefully
 			if (errorMessage.includes("NOGROUP")) {
-				// deno-lint-ignore no-console
-				console.warn(`Consumer group does not exist for stream ${stream}, skipping claim operation`);
+				logger.warn("Consumer group does not exist for stream, skipping claim operation", {
+					"aiki.stream": stream,
+				});
 			} else if (errorMessage.includes("BUSYGROUP")) {
-				// deno-lint-ignore no-console
-				console.warn(`Consumer group busy for stream ${stream}, skipping claim operation`);
+				logger.warn("Consumer group busy for stream, skipping claim operation", {
+					"aiki.stream": stream,
+				});
 			} else if (errorMessage.includes("NOSCRIPT")) {
-				// deno-lint-ignore no-console
-				console.warn(`Redis script not loaded for stream ${stream}, skipping claim operation`);
+				logger.warn("Redis script not loaded for stream, skipping claim operation", {
+					"aiki.stream": stream,
+				});
 			} else {
-				// Log unexpected errors with more context
-				// deno-lint-ignore no-console
-				console.error(`Failed to claim messages from stream ${stream}:`, {
-					error: errorMessage,
-					messageIds: messageIds.length,
-					workerId,
-					consumerGroup,
+				logger.error("Failed to claim messages from stream", {
+					"aiki.error": errorMessage,
+					"aiki.messageIds": messageIds.length,
+					"aiki.workerId": workerId,
+					"aiki.consumerGroup": consumerGroup,
+					"aiki.stream": stream,
 				});
 			}
 			return null;
@@ -422,11 +437,12 @@ async function claimStuckRedisStreamMessages(
 		return [];
 	}
 
-	return await processRedisStreamMessages(redis, streamConsumerGroupMap, claimedStreamEntries);
+	return await processRedisStreamMessages(redis, logger, streamConsumerGroupMap, claimedStreamEntries);
 }
 
 async function findClaimableRedisStreamMessages(
 	redis: Redis,
+	logger: Logger,
 	shuffledStreams: string[],
 	streamConsumerGroupMap: Map<string, string>,
 	workerId: string,
@@ -478,8 +494,10 @@ async function findClaimableRedisStreamMessages(
 
 		const parsedResult = RedisStreamPendingMessagesSchema.safeParse(result);
 		if (!parsedResult.success) {
-			// deno-lint-ignore no-console
-			console.error(`Invalid XPENDING response for ${stream}:`, parsedResult.error.format());
+			logger.error("Invalid XPENDING response", {
+				"aiki.stream": stream,
+				"aiki.error": parsedResult.error.format(),
+			});
 			continue;
 		}
 

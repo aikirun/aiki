@@ -80,8 +80,11 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			await this.params.exec(input, run, context);
 			// TODO: persists workflow run result
 		} catch (error) {
-			// deno-lint-ignore no-console
-			console.error(`Error while executing workflow ${run.id}`, error);
+			run.logger.error("Error while executing workflow", {
+				"aiki.workflowRunId": run.id,
+				"aiki.error": error instanceof Error ? error.message : String(error),
+				"aiki.stack": error instanceof Error ? error.stack : undefined,
+			});
 
 			await client.api.workflowRun.updateStateV1({ id: run.id, state: "failed" });
 

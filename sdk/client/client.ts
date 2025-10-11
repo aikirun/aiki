@@ -79,8 +79,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 			subscriber: {
 				create: (strategy, workflowNames, workerShards) =>
 					resolveSubscriberStrategy(
-						this.api,
-						this._internal.redisStreams,
+						this,
 						strategy,
 						workflowNames,
 						workerShards,
