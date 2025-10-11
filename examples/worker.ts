@@ -5,7 +5,7 @@ import { delay } from "@aiki/lib/async";
 
 if (import.meta.main) {
 	const aikiClient = await client({
-		url: "http://localhost:3000",
+		url: "http://localhost:9090",
 		redis: {
 			host: "localhost",
 			port: 6379,

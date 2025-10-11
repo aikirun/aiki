@@ -3,7 +3,7 @@ import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows.ts";
 
 if (import.meta.main) {
 	const aikiClient = await client({
-		url: "http://localhost:3000",
+		url: "http://localhost:9090",
 		redis: {
 			host: "localhost",
 			port: 6379,
