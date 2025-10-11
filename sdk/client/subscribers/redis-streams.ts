@@ -47,7 +47,7 @@ export interface RedisStreamsSubscriberStrategy {
 	/**
 	 * Minimum idle time before claiming abandoned messages (ms)
 	 * Set to 0 to disable message claiming entirely
-	 * @default 60_000
+	 * @default 180_000
 	 */
 	claimMinIdleTimeMs?: number;
 }
@@ -141,7 +141,7 @@ export function createRedisStreamsStrategy(
 	const maxRetryIntervalMs = strategy.maxRetryIntervalMs ?? 30_000;
 	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;
 	const blockTimeMs = strategy.blockTimeMs ?? 1_000;
-	const claimMinIdleTimeMs = strategy.claimMinIdleTimeMs ?? 60_000;
+	const claimMinIdleTimeMs = strategy.claimMinIdleTimeMs ?? 180_000;
 
 	const getNextDelay = (params: SubscriberDelayParams) => {
 		switch (params.type) {
