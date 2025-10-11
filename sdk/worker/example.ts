@@ -7,12 +7,12 @@ if (import.meta.main) {
 
 	const workerA = worker(client, {
 		id: "worker-A",
-		subscriber: { type: "redis_streams" },
+		subscriber: { type: "polling" },
 	});
 
 	const workerB = worker(client, {
 		id: "worker-B",
-		subscriber: { type: "redis_streams" },
+		subscriber: { type: "adaptive_polling" },
 	});
 
 	workerA.workflowRegistry
