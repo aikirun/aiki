@@ -301,7 +301,7 @@ async function processRedisStreamMessages(
 		const streamEntryResult = RedisStreamEntrySchema.safeParse(streamEntry);
 		if (!streamEntryResult.success) {
 			logger.error("Invalid Redis stream entry structure", {
-				"aiki.error": streamEntryResult.error.format(),
+				"aiki.error": z.treeifyError(streamEntryResult.error),
 			});
 			continue;
 		}
@@ -322,7 +322,7 @@ async function processRedisStreamMessages(
 				logger.warn("Invalid message structure", {
 					"aiki.stream": stream,
 					"aiki.messageId": messageId,
-					"aiki.error": messageData.error.format(),
+					"aiki.error": z.treeifyError(messageData.error),
 				});
 				// TODO: only acknoledge after message is truly processed
 				await redis.xack(stream, consumerGroup, messageId);
@@ -496,7 +496,7 @@ async function findClaimableRedisStreamMessages(
 		if (!parsedResult.success) {
 			logger.error("Invalid XPENDING response", {
 				"aiki.stream": stream,
-				"aiki.error": parsedResult.error.format(),
+				"aiki.error": z.treeifyError(parsedResult.error),
 			});
 			continue;
 		}
