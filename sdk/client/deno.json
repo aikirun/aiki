@@ -9,5 +9,6 @@
 		"@orpc/client/*": "npm:@orpc/client@^1.9.3/*",
 		"redis": "npm:ioredis@^5.4.1",
 		"zod": "npm:zod@^4.1.12"
-	}
+	},
+	"license": "MIT"
 }

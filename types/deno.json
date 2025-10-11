@@ -10,5 +10,6 @@
 		"./workflow-run-api": "./workflow-run-api.ts",
 		"./task": "./task.ts",
 		"./task-run": "./task-run.ts"
-	}
+	},
+	"license": "MIT"
 }
