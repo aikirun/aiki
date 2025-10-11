@@ -10,8 +10,8 @@ import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
 import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
 import { getChildLogger, type Logger } from "../logger/mod.ts";
 
-export function worker(
-	client: Client,
+export function worker<AppContext>(
+	client: Client<AppContext>,
 	params: WorkerParams,
 ): Worker {
 	return new WorkerImpl(client, params);
@@ -47,7 +47,7 @@ interface ActiveWorkflowRun {
 	executionPromise: Promise<void>;
 }
 
-class WorkerImpl implements Worker {
+class WorkerImpl<AppContext> implements Worker {
 	public readonly id: string;
 	public readonly workflowRegistry: WorkflowRegistry;
 	private readonly logger: Logger;
@@ -55,7 +55,7 @@ class WorkerImpl implements Worker {
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 
-	constructor(private readonly client: Client, private readonly params: WorkerParams) {
+	constructor(private readonly client: Client<AppContext>, private readonly params: WorkerParams) {
 		this.id = params.id ?? crypto.randomUUID();
 		this.workflowRegistry = initWorkflowRegistry();
 
@@ -241,7 +241,7 @@ class WorkerImpl implements Worker {
 
 	private async executeWorkflow(
 		workflowRun: WorkflowRunRow<unknown, unknown>,
-		workflowVersion: WorkflowVersion<unknown, unknown>,
+		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 	): Promise<void> {
 		const workflowLogger = getChildLogger(this.logger, {
 			"aiki.component": "workflow-execution",
@@ -256,6 +256,10 @@ class WorkerImpl implements Worker {
 		try {
 			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun);
 
+			const appContext = this.client._internal.contextFactory
+				? await this.client._internal.contextFactory(workflowRun)
+				: null;
+
 			heartbeatInterval = setInterval(() => {
 				try {
 					// TODO: update heart beat via redis stream
@@ -268,12 +272,13 @@ class WorkerImpl implements Worker {
 
 			await workflowVersion._internal.exec(
 				this.client,
+				workflowRun.input,
 				{
 					...workflowRun,
 					handle: workflowRunHandle,
 					logger: workflowLogger,
 				},
-				workflowRun.input,
+				appContext,
 			);
 
 			workflowLogger.info("Workflow execution completed");

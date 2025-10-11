@@ -5,40 +5,42 @@ import type { WorkflowRunContext } from "../run/context.ts";
 import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
 
-export interface WorkflowVersionParams<Input, Output> {
+export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
 		input: Input,
-		runCtx: WorkflowRunContext<Input, Output>,
+		run: WorkflowRunContext<Input, Output>,
+		context: AppContext,
 	) => Promise<Output>;
 }
 
-export interface WorkflowVersion<Input, Output> {
+export interface WorkflowVersion<Input, Output, AppContext> {
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
 
-	withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output>;
+	withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext>;
 
 	start: (
-		client: Client,
+		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
 	) => Promise<WorkflowRunResultHandle<Output>>;
 
 	_internal: {
 		exec: (
-			client: Client,
-			runCtx: WorkflowRunContext<Input, Output>,
+			client: Client<AppContext>,
 			input: Input,
+			run: WorkflowRunContext<Input, Output>,
+			context: AppContext,
 		) => Promise<void>;
 	};
 }
 
-export class WorkflowVersionImpl<Input, Output> implements WorkflowVersion<Input, Output> {
-	public readonly _internal: WorkflowVersion<Input, Output>["_internal"];
+export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowVersion<Input, Output, AppContext> {
+	public readonly _internal: WorkflowVersion<Input, Output, AppContext>["_internal"];
 
 	constructor(
 		public readonly name: WorkflowName,
 		public readonly versionId: WorkflowVersionId,
-		private readonly params: WorkflowVersionParams<Input, Output>,
+		private readonly params: WorkflowVersionParams<Input, Output, AppContext>,
 		private readonly options?: WorkflowOptions,
 	) {
 		this._internal = {
@@ -46,7 +48,7 @@ export class WorkflowVersionImpl<Input, Output> implements WorkflowVersion<Input
 		};
 	}
 
-	public withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output> {
+	public withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext> {
 		return new WorkflowVersionImpl(
 			this.name,
 			this.versionId,
@@ -56,7 +58,7 @@ export class WorkflowVersionImpl<Input, Output> implements WorkflowVersion<Input
 	}
 
 	public async start(
-		client: Client,
+		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<WorkflowRunResultHandle<Output>> {
 		const response = await client.api.workflowRun.createV1({
@@ -69,18 +71,19 @@ export class WorkflowVersionImpl<Input, Output> implements WorkflowVersion<Input
 	}
 
 	private async exec(
-		client: Client,
-		runCtx: WorkflowRunContext<Input, Output>,
+		client: Client<AppContext>,
 		input: Input,
+		run: WorkflowRunContext<Input, Output>,
+		context: AppContext,
 	): Promise<void> {
 		try {
-			await this.params.exec(input, runCtx);
+			await this.params.exec(input, run, context);
 			// TODO: persists workflow run result
 		} catch (error) {
 			// deno-lint-ignore no-console
-			console.error(`Error while executing workflow ${runCtx.id}`, error);
+			console.error(`Error while executing workflow ${run.id}`, error);
 
-			await client.api.workflowRun.updateStateV1({ id: runCtx.id, state: "failed" });
+			await client.api.workflowRun.updateStateV1({ id: run.id, state: "failed" });
 
 			throw error;
 		}

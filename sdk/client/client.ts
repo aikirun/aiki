@@ -1,4 +1,5 @@
 import type { WorkflowName } from "@aiki/contract/workflow";
+import type { WorkflowRunRow } from "@aiki/contract/workflow-run";
 import { Redis } from "redis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -12,14 +13,15 @@ import {
 import type { Logger } from "../logger/mod.ts";
 import { ConsoleLogger } from "../logger/mod.ts";
 
-export function client(params: ClientParams): Promise<Client> {
+export function client<AppContext = null>(params: ClientParams<AppContext>): Promise<Client<AppContext>> {
 	return Promise.resolve(new ClientImpl(params));
 }
 
-export interface ClientParams {
+export interface ClientParams<AppContext> {
 	url: string;
 	redisStreams?: RedisConfig;
 	logger?: Logger;
+	contextFactory?: (run: WorkflowRunRow<unknown, unknown>) => AppContext | Promise<AppContext>;
 }
 
 export interface RedisConfig {
@@ -32,8 +34,15 @@ export interface RedisConfig {
 	connectTimeoutMs?: number;
 }
 
-export interface Client {
-	api: ContractRouterClient<Contract>;
+export type ApiClient = ContractRouterClient<Contract>;
+
+export interface RedisStreamsConnection {
+	getConnection: () => Redis;
+	closeConnection: () => Promise<void>;
+}
+
+export interface Client<AppContext> {
+	api: ApiClient;
 	_internal: {
 		subscriber: {
 			create: (
@@ -42,21 +51,19 @@ export interface Client {
 				workerShards?: string[],
 			) => SubscriberStrategyBuilder;
 		};
-		redisStreams: {
-			getConnection: () => Redis;
-			closeConnection: () => Promise<void>;
-		};
+		redisStreams: RedisStreamsConnection;
 		logger: Logger;
+		contextFactory?: (run: WorkflowRunRow<unknown, unknown>) => AppContext | Promise<AppContext>;
 	};
 }
 
-class ClientImpl implements Client {
-	public readonly api: ContractRouterClient<Contract>;
-	public readonly _internal: Client["_internal"];
+class ClientImpl<AppContext> implements Client<AppContext> {
+	public readonly api: ApiClient;
+	public readonly _internal: Client<AppContext>["_internal"];
 	private readonly logger: Logger;
 	private redisStreamsConnection?: Redis;
 
-	constructor(private readonly params: ClientParams) {
+	constructor(private readonly params: ClientParams<AppContext>) {
 		this.logger = params.logger ?? new ConsoleLogger();
 
 		const rpcLink = new RPCLink({
@@ -71,13 +78,20 @@ class ClientImpl implements Client {
 		this._internal = {
 			subscriber: {
 				create: (strategy, workflowNames, workerShards) =>
-					resolveSubscriberStrategy(this, strategy, workflowNames, workerShards),
+					resolveSubscriberStrategy(
+						this.api,
+						this._internal.redisStreams,
+						strategy,
+						workflowNames,
+						workerShards,
+					),
 			},
 			redisStreams: {
 				getConnection: () => this.getRedisStreamsConnection(),
 				closeConnection: () => this.closeRedisStreamsConnection(),
 			},
 			logger: this.logger,
+			contextFactory: this.params.contextFactory,
 		};
 	}
 

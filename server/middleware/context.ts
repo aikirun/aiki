@@ -6,7 +6,7 @@ export interface ServerContext {
 	};
 }
 
-export function createContext(req: Request): ServerContext {
+export function contextFactory(req: Request): ServerContext {
 	return {
 		request: {
 			headers: req.headers,

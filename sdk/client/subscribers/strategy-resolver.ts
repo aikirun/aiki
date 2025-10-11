@@ -1,6 +1,6 @@
 import type { WorkflowName } from "@aiki/contract/workflow";
 import type { WorkflowRunId } from "@aiki/contract/workflow-run";
-import type { Client } from "../client.ts";
+import type { ApiClient, RedisStreamsConnection } from "../client.ts";
 import type { PollingSubscriberStrategy } from "./polling.ts";
 import type { AdaptivePollingSubscriberStrategy } from "./adaptive-polling.ts";
 import type { RedisStreamsSubscriberStrategy } from "./redis-streams.ts";
@@ -35,18 +35,19 @@ export type SubscriberDelayParams =
 	| { type: "at_capacity" };
 
 export function resolveSubscriberStrategy(
-	client: Client,
+	api: ApiClient,
+	redisStreams: RedisStreamsConnection,
 	strategy: SubscriberStrategy,
 	workflowNames: WorkflowName[],
 	workerShards?: string[],
 ): SubscriberStrategyBuilder {
 	switch (strategy.type) {
 		case "polling":
-			return createPollingStrategy(client, strategy);
+			return createPollingStrategy(api, strategy);
 		case "adaptive_polling":
-			return createAdaptivePollingStrategy(client, strategy);
+			return createAdaptivePollingStrategy(api, strategy);
 		case "redis_streams":
-			return createRedisStreamsStrategy(client, strategy, workflowNames, workerShards);
+			return createRedisStreamsStrategy(redisStreams, strategy, workflowNames, workerShards);
 		default:
 			return strategy satisfies never;
 	}

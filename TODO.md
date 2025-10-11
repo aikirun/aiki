@@ -94,18 +94,4 @@ This document tracks planned features and improvements for the Aiki durable work
 - Consider using webhooks for serverless worker deployments
 - Focus on maintaining backward compatibility during feature additions
 
-### Add create ctx to worker 
-// 3. Worker with context factory
-  const worker = await worker(client, {
-    createContext: (workflowRun) => ({
-      requestId: workflowRun.id,
-      userId: workflowRun.params.payload.userId,
-      tenantId: workflowRun.params.payload.tenantId,
-    })
-  });
-
-  OR maybe add it to workflow level? for better type safety.
-
-  Actually, we should support both!
-
   ### workflow, task etc should be independently installable packages

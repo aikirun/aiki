@@ -6,11 +6,11 @@ import type {
 	WorkflowRunResultInComplete,
 	WorkflowRunState,
 } from "@aiki/contract/workflow-run";
-import type { Client } from "../../client/client.ts";
+import type { ApiClient } from "../../client/client.ts";
 
 export function initWorkflowRunResultHandle<Output>(
 	id: WorkflowRunId,
-	api: Client["api"],
+	api: ApiClient,
 ): WorkflowRunResultHandle<Output> {
 	return new WorkflowRunResultHandleImpl<Output>(id, api);
 }
@@ -35,7 +35,7 @@ export interface WorkflowRunResultHandle<Output> {
 class WorkflowRunResultHandleImpl<Output> implements WorkflowRunResultHandle<Output> {
 	constructor(
 		public readonly id: string,
-		private readonly api: Client["api"],
+		private readonly api: ApiClient,
 	) {}
 
 	public async getResult(): Promise<WorkflowRunResult<Output>> {

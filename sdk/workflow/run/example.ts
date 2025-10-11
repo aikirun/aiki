@@ -2,13 +2,17 @@ import { Aiki } from "@aiki/sdk";
 import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "../example.ts";
 
 if (import.meta.main) {
-	const client = await Aiki.client({ url: "localhost:9090" });
+	const client = await Aiki.client({
+		url: "http://localhost:9090",
+		contextFactory: (run) => ({
+			traceId: "123456789",
+			workflowRunId: run.id,
+		}),
+	});
 
 	const resultHandle = await morningWorkflowV2.start(client, { a: "1", b: 1 });
 
-	const { output } = await resultHandle.waitForState("completed", {
-		maxDurationMs: 10_000,
-	});
+	const { output } = await resultHandle.waitForState("completed", { maxDurationMs: 10_000 });
 	// deno-lint-ignore no-console
 	console.log(`id = ${resultHandle.id}; output = ${output}`);
 

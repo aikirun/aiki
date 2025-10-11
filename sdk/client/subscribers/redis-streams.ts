@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getRetryParams } from "@aiki/lib/retry";
 import type { WorkflowName } from "@aiki/contract/workflow";
 import type { WorkflowRunId } from "@aiki/contract/workflow-run";
-import type { Client } from "../client.ts";
+import type { RedisStreamsConnection } from "../client.ts";
 import type { StrategyCallbacks, SubscriberDelayParams, SubscriberStrategyBuilder } from "./strategy-resolver.ts";
 
 /**
@@ -116,12 +116,12 @@ interface ClaimableRedisStreamMessage {
 }
 
 export function createRedisStreamsStrategy(
-	client: Client,
+	redisStreams: RedisStreamsConnection,
 	strategy: RedisStreamsSubscriberStrategy,
 	workflowNames: WorkflowName[],
 	workerShards?: string[],
 ): SubscriberStrategyBuilder {
-	const redis = client._internal.redisStreams.getConnection();
+	const redis = redisStreams.getConnection();
 
 	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflowNames, workerShards);
 	const streams = Array.from(streamConsumerGroupMap.keys());

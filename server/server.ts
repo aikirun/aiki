@@ -1,6 +1,6 @@
 import { loadConfig } from "./config/mod.ts";
 import { RPCHandler } from "@orpc/server/fetch";
-import { createContext } from "./middleware/mod.ts";
+import { contextFactory } from "./middleware/mod.ts";
 import { router } from "./router/mod.ts";
 
 if (import.meta.main) {
@@ -16,7 +16,7 @@ if (import.meta.main) {
 	});
 
 	Deno.serve({ port: config.port }, async (req) => {
-		const context = createContext(req);
+		const context = contextFactory(req);
 
 		const result = await rpcHandler.handle(req, { context });
 

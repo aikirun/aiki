@@ -9,10 +9,15 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 	},
 });
 
+interface AppContext {
+	traceId: string;
+	workflowRunId: string;
+}
+
 export const morningWorkflowV2 = morningWorkflow
 	.v("2.0", {
-		async exec(input: { a: string; b: number }, run): Promise<string> {
-			run.logger.info("Starting morning routine", { song: input.a, duration: input.b });
+		async exec(input: { a: string; b: number }, run, context: AppContext): Promise<string> {
+			run.logger.info("Starting morning routine", { song: input.a, duration: input.b, traceId: context.traceId });
 
 			const alarmOutput = await ringAlarm.start(run, { song: input.a });
 			run.logger.debug("Alarm completed", { output: alarmOutput });
@@ -37,7 +42,7 @@ export const eveningRoutineWorkflow = workflow({ name: "evening-routine" });
 
 export const eveningRoutineWorkflowV1 = eveningRoutineWorkflow
 	.v("1.0.0", {
-		async exec(_, run) {
+		async exec(_, run, _context: AppContext) {
 			await sayPrayer.start(run);
 		},
 	});

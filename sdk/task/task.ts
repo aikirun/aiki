@@ -28,7 +28,7 @@ export interface Task<Input, Output> {
 	withOptions(options: TaskOptions): Task<Input, Output>;
 
 	start: <WorkflowInput, WorkflowOutput>(
-		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		...args: Input extends null ? [] : [Input]
 	) => Promise<Output>;
 }
@@ -51,14 +51,14 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	public async start<WorkflowInput, WorkflowOutput>(
-		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<Output> {
 		// this cast is okay cos if args is empty, Input must be of type null
 		const input = isNonEmptyArray(args) ? args[0] : null as Input;
-		const path = await this.getPath(runCtx, input);
+		const path = await this.getPath(run, input);
 
-		const workflowRunInternal = runCtx.handle._internal;
+		const workflowRunInternal = run.handle._internal;
 
 		const preExistingResult = workflowRunInternal.getSubTaskRunResult<Output>(path);
 		if (preExistingResult.state === "completed") {
@@ -86,10 +86,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async getPath<WorkflowInput, WorkflowOutput>(
-		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		input: Input,
 	): Promise<string> {
-		const workflowRunPath = `${runCtx.name}/${runCtx.versionId}/${runCtx.id}`;
+		const workflowRunPath = `${run.name}/${run.versionId}/${run.id}`;
 
 		const inputHash = await sha256(JSON.stringify(input));
 
