@@ -9,7 +9,7 @@ import { task } from "@aiki/task";
 
 const sendEmail = task({
   name: "send-email",
-  exec(input) {
+  exec(input: { email: string; message: string }) {
     // Your business logic
     return sendEmailToUser(input.email, input.message);
   }
@@ -31,7 +31,7 @@ The function that performs the actual work. It receives:
 ```typescript
 const processPayment = task({
   name: "process-payment",
-  exec(input) {
+  exec(input: { paymentId: string; amount: number }) {
     console.log(`Processing payment for ${input.paymentId}`);
 
     return processPaymentWithId(input.paymentId, input.amount);
@@ -45,7 +45,7 @@ Tasks are executed within workflows using `.start()`:
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-  async exec(input: any, run) {
+  async exec(input: { orderData: any }, run) {
     const validation = await validateOrder.start(run, {
       orderData: input.orderData
     });
@@ -68,7 +68,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 // This will be supported in a future version:
 const processPayment = task({
   name: "process-payment",
-  exec(input) {
+  exec(input: { paymentId: string; amount: number }) {
     return processPaymentWithId(input.paymentId, input.amount);
   }
   // retry: {
@@ -86,7 +86,7 @@ The task receives input directly:
 ```typescript
 const exampleTask = task({
   name: "example",
-  exec(input) {
+  exec(input: { data: string }) {
     // input: Input data for this task
     console.log("Task input:", input);
 
@@ -102,7 +102,7 @@ Tasks within a workflow are automatically idempotent - the same task with the sa
 ```typescript
 const sendEmail = task({
   name: "send-email",
-  exec(input) {
+  exec(input: { email: string; message: string }) {
     return sendEmailToUser(input.email, input.message);
   }
 });
@@ -134,9 +134,8 @@ await sendEmail.withOptions({ idempotencyKey: "second-email" }).start(run, {
 
 1. **Keep tasks focused** - One responsibility per task
 2. **Make tasks deterministic** - Same input → same output
-3. **Handle errors gracefully** - Return error states, don't just throw
-4. **Avoid side effects** - Be careful with external state
-5. **Use meaningful names** - Clear, descriptive task names
+3. **Avoid side effects** - Be careful with external state
+4. **Use meaningful names** - Clear, descriptive task names
 
 ## Common Patterns
 
@@ -145,7 +144,7 @@ await sendEmail.withOptions({ idempotencyKey: "second-email" }).start(run, {
 ```typescript
 const validateOrder = task({
   name: "validate-order",
-  exec(input) {
+  exec(input: { items: Array<{ id: string; quantity: number }> }) {
     if (input.items.length === 0) {
       throw new Error("Order must have items");
     }
@@ -163,7 +162,7 @@ const validateOrder = task({
 ```typescript
 const fetchUserData = task({
   name: "fetch-user-data",
-  exec(input) {
+  exec(input: { userId: string }) {
     return fetch(`https://api.example.com/users/${input.userId}`)
       .then(res => res.json());
   }
@@ -175,7 +174,7 @@ const fetchUserData = task({
 ```typescript
 const updateInventory = task({
   name: "update-inventory",
-  exec(input) {
+  exec(input: { itemId: string; amount: number }) {
     return db.inventory.update({
       where: { id: input.itemId },
       data: { quantity: { decrement: input.amount } }

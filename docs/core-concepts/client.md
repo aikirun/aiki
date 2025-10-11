@@ -57,12 +57,7 @@ const resultHandle = await workflowVersion.start(aikiClient, {
 });
 ```
 
-**Parameters:**
-- `payload` - Input data for the workflow
-- `idempotencyKey` - Optional key to prevent duplicate executions
-
-**Returns:**
-- Result handle for monitoring and retrieving results
+The `payload` parameter contains the input data for your workflow, while the optional `idempotencyKey` prevents duplicate executions. The method returns a result handle that you can use for monitoring and retrieving results.
 
 ### Monitoring Workflow Runs
 
@@ -134,7 +129,7 @@ import { client, workflow, task } from "@aiki/sdk";
 // Define task and workflow
 const sendEmail = task({
   name: "send-email",
-  exec(input) {
+  exec(input: { email: string }) {
     console.log(`Sending email to ${input.email}`);
     return { sent: true };
   }
@@ -213,9 +208,8 @@ See the [Client API Reference](../api/client.md) for complete API documentation.
 
 1. **Reuse clients** - Create one client and reuse it across your application
 2. **Use idempotency keys** - Prevent duplicate workflow executions
-3. **Handle errors** - Always handle workflow start and execution errors
-4. **Close clients** - Always close clients to release resources
-5. **Set timeouts** - Use timeouts when waiting for completion
+3. **Close clients** - Always close clients to release resources
+4. **Set timeouts** - Use timeouts when waiting for completion
 
 ## Next Steps
 

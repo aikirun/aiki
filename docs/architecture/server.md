@@ -6,31 +6,19 @@ The Aiki Server is the central orchestration component that manages workflow lif
 
 ### Workflow Management
 
-- Store and version workflow definitions
-- Create and track workflow runs
-- Manage workflow state transitions
-- Coordinate workflow execution
+The server stores and versions workflow definitions, creates and tracks workflow runs, manages workflow state transitions, and coordinates workflow execution.
 
 ### Task Management
 
-- Track task execution status
-- Store task results and metadata
-- Handle task dependencies
-- Manage task retries
+Task management involves tracking task execution status, storing task results and metadata, handling task dependencies, and managing task retries.
 
 ### State Persistence
 
-- Persist workflow definitions
-- Store workflow run state
-- Maintain task execution history
-- Provide audit trail
+The server persists workflow definitions, stores workflow run state, maintains task execution history, and provides an audit trail.
 
 ### Queue Coordination
 
-- Distribute work to available workers
-- Monitor worker health
-- Track execution metrics
-- Manage message delivery
+Queue coordination distributes work to available workers, monitors worker health, tracks execution metrics, and manages message delivery.
 
 ## Components
 
@@ -42,12 +30,7 @@ Manages workflow lifecycle:
 Workflow Start → Validation → State Creation → Queue Publish → Monitoring
 ```
 
-**Key operations:**
-- Validate workflow definitions
-- Create workflow run records
-- Publish to Redis Streams
-- Track workflow state
-- Handle completions and failures
+The orchestration engine validates workflow definitions, creates workflow run records, publishes to Redis Streams, tracks workflow state, and handles completions and failures.
 
 ### Task Management
 
@@ -57,27 +40,13 @@ Tracks task execution:
 Task Start → Record Creation → Execution Tracking → Result Storage
 ```
 
-**Key operations:**
-- Record task attempts
-- Store task results
-- Track task failures
-- Manage retry logic
+Task management records task attempts, stores task results, tracks task failures, and manages retry logic.
 
 ### Storage Layer
 
 Persists all state:
 
-**Stored Data:**
-- Workflow definitions and versions
-- Workflow run instances
-- Task execution records
-- Worker heartbeats
-- Audit logs
-
-**Storage Options:**
-- PostgreSQL (recommended)
-- MySQL
-- Other relational databases
+The storage layer maintains workflow definitions and versions, workflow run instances, task execution records, worker heartbeats, and audit logs. PostgreSQL is recommended, though MySQL and other relational databases are also supported.
 
 ## API Endpoints
 
@@ -162,11 +131,7 @@ pending → running → completed
                  → cancelled
 ```
 
-**State transitions:**
-- `pending` → `running`: Worker picks up workflow
-- `running` → `completed`: All tasks succeed
-- `running` → `failed`: Unrecoverable error
-- `any` → `cancelled`: Manual cancellation
+Workflow runs transition from `pending` to `running` when a worker picks them up, from `running` to `completed` when all tasks succeed, from `running` to `failed` on unrecoverable errors, and from any state to `cancelled` on manual cancellation.
 
 ### Task States
 
@@ -175,10 +140,7 @@ pending → running → completed
                  → failed → retrying → running
 ```
 
-**Retry logic:**
-- Exponential backoff
-- Maximum retry attempts
-- Task-level retry configuration (planned)
+Task retry uses exponential backoff with maximum retry attempts. Task-level retry configuration is planned for a future release.
 
 ## Monitoring
 
@@ -237,19 +199,11 @@ headers: {
 
 ### Authorization
 
-Role-based access control:
-
-```
-- admin: Full access
-- worker: Start/update workflow runs
-- client: Start workflows, read status
-```
+The system uses role-based access control with three levels: admin for full access, worker for starting and updating workflow runs, and client for starting workflows and reading status.
 
 ### Encryption
 
-- TLS for all network traffic
-- Database encryption at rest
-- Redis encryption in transit
+All network traffic uses TLS, databases are encrypted at rest, and Redis uses encryption in transit.
 
 ## Deployment
 
@@ -295,24 +249,15 @@ spec:
 
 ### Server Redundancy
 
-- Run multiple server instances
-- Use load balancer for distribution
-- Session affinity not required
-- Stateless server design
+Achieve server redundancy by running multiple server instances behind a load balancer. Session affinity isn't required due to the stateless server design.
 
 ### Database
 
-- Use managed database service
-- Configure read replicas
-- Enable automatic backups
-- Set up failover
+Use a managed database service with read replicas, automatic backups, and failover configured for high availability.
 
 ### Redis
 
-- Use Redis Cluster
-- Configure persistence (AOF/RDB)
-- Enable replication
-- Monitor memory usage
+Deploy Redis Cluster with persistence configured (AOF/RDB), replication enabled, and memory usage monitored.
 
 ## Next Steps
 

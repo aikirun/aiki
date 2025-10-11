@@ -36,18 +36,9 @@ Deep dive into system design:
 - **[Workers](./architecture/workers.md)** - Execution engine details
 - **[Redis Streams](./architecture/redis-streams.md)** - Message distribution and fault tolerance
 
-## 📖 API Reference
-
-Complete API documentation:
-
-- **[Workflow API](./api/workflow.md)** - Workflow definition and execution
-- **[Task API](./api/task.md)** - Task definition and configuration
-- **[Worker API](./api/worker.md)** - Worker configuration and lifecycle
-- **[Client API](./api/client.md)** - Client methods and options
-
 ## 🔗 Quick Links
 
-- [GitHub Repository](https://github.com/your-username/aiki)
+- [GitHub Repository](https://github.com/shobande-femi/aiki)
 - [Examples](../examples/)
 - [Contributing Guide](../CONTRIBUTING.md)
 - [License](../LICENSE)

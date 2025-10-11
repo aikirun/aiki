@@ -115,7 +115,7 @@ import { client, worker, workflow, task } from "@aiki/sdk";
 // 1. Define task
 const sendEmail = task({
   name: "send-email",
-  exec(input) {
+  exec(input: { email: string; message: string }) {
     console.log(`Sending email to ${input.email}`);
     return { sent: true };
   }

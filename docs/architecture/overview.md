@@ -51,66 +51,39 @@ Aiki follows a distributed architecture where workflow orchestration is separate
 
 ### 1. Your Application
 
-Uses the Aiki SDK to:
-- Define workflows and tasks
-- Start workflow runs
-- Monitor execution status
-- Retrieve results
+Your application uses the Aiki SDK to define workflows and tasks, start workflow runs, monitor execution status, and retrieve results.
 
 ### 2. Aiki Server
 
-Orchestrates workflows and manages state:
-- **Workflow Orchestration** - Manages workflow lifecycle
-- **Task Management** - Tracks task execution
-- **Storage Layer** - Persists state and history
+The Aiki Server orchestrates workflows and manages state through three key functions: workflow orchestration manages the workflow lifecycle, task management tracks task execution, and the storage layer persists state and history.
 
 ### 3. Redis Streams
 
-High-performance message distribution:
-- Consumer groups for work distribution
-- Message claiming for fault tolerance
-- Parallel stream processing
-- Round-robin work allocation
+Redis Streams provides high-performance message distribution using consumer groups for work distribution, message claiming for fault tolerance, parallel stream processing, and round-robin work allocation.
 
 ⚠️ **Note**: Redis Streams is currently the only fully implemented subscriber strategy.
 
 ### 4. Workers
 
-Execute workflows in your infrastructure:
-- Poll for workflow runs
-- Execute tasks in sequence
-- Report results to server
-- Handle retries and failures
+Workers execute workflows in your infrastructure by polling for workflow runs, executing tasks in sequence, reporting results to the server, and handling retries and failures.
 
 ## Design Principles
 
 ### Separation of Concerns
 
-- **Orchestration**: Handled by Aiki Server
-- **Execution**: Handled by Workers in your environment
-- **State Management**: Centralized in storage
-- **Communication**: Through Redis Streams
+Aiki separates orchestration (handled by the Aiki Server), execution (handled by workers in your environment), state management (centralized in storage), and communication (through Redis Streams).
 
 ### Security by Design
 
-- **Execution in Your Environment** - Code runs on your infrastructure
-- **No Code Execution in Aiki** - Server never executes your code
-- **Secure Communication** - TLS encryption for all traffic
-- **Data Control** - Your data never leaves your environment
+Security is built into the architecture: your code runs exclusively on your infrastructure, the Aiki server never executes your code, all traffic uses TLS encryption, and your data never leaves your environment.
 
 ### Fault Tolerance
 
-- **State Persistence** - Workflows survive restarts
-- **Message Claiming** - Workers claim stuck workflows
-- **Automatic Retries** - Failed tasks are retried
-- **Graceful Degradation** - System continues with reduced capacity
+The system achieves fault tolerance through state persistence that allows workflows to survive restarts, message claiming that lets workers claim stuck workflows, automatic retries for failed tasks, and graceful degradation that keeps the system running with reduced capacity.
 
 ### Event-Driven Architecture
 
-- Components communicate through events
-- Loose coupling between server and workers
-- Scalable message distribution
-- Reliable event delivery
+Components communicate through events, creating loose coupling between server and workers. This enables scalable message distribution and reliable event delivery.
 
 ## Data Flow
 
@@ -157,76 +130,39 @@ Worker ←→ Server ←→ Storage
 
 ### Self-Hosted
 
-Deploy all components in your infrastructure:
-- Full control over deployment
-- Custom security policies
-- Integration with existing systems
-- No vendor lock-in
-
-**Components:**
-- Aiki Server (Docker/VM)
-- Redis (for streams)
-- PostgreSQL (for storage)
-- Workers (your infrastructure)
+Deploy all components in your infrastructure for full control over deployment, custom security policies, integration with existing systems, and no vendor lock-in. This requires running the Aiki Server (Docker/VM), Redis for streams, PostgreSQL for storage, and workers in your infrastructure.
 
 ### Cloud-Based
 
-Use managed Aiki service:
-- Managed server and Redis
-- Automatic scaling
-- Built-in monitoring
-- Reduced operational overhead
-
-**Your responsibility:**
-- Workers (in your cloud account)
-- Your storage (optional)
+Use a managed Aiki service that handles the server and Redis with automatic scaling, built-in monitoring, and reduced operational overhead. You're responsible for running workers in your cloud account and optionally managing your storage.
 
 ### Hybrid
 
-Mix of self-hosted and managed:
-- Flexibility in deployment
-- Cost optimization
-- Compliance requirements
-- Geographic distribution
+Combine self-hosted and managed components for flexibility in deployment, cost optimization, meeting compliance requirements, and geographic distribution.
 
 ## Scalability
 
 ### Horizontal Scaling
 
-- **Workers** - Add more workers to increase throughput
-- **Server** - Scale server instances for high availability
-- **Redis** - Use Redis Cluster for distributed streams
-- **Storage** - Implement read replicas and sharding
+Scale horizontally by adding more workers to increase throughput, scaling server instances for high availability, using Redis Cluster for distributed streams, and implementing read replicas and sharding for storage.
 
 ### Performance Optimization
 
-- **Caching** - Cache frequently accessed data
-- **Connection Pooling** - Reuse database connections
-- **Batch Processing** - Process multiple items together
-- **Async Processing** - Non-blocking operations
+Optimize performance by caching frequently accessed data, using connection pooling to reuse database connections, batch processing multiple items together, and leveraging async processing for non-blocking operations.
 
 ## Security Considerations
 
 ### Network Security
 
-- TLS encryption for all communication
-- Authentication for API access
-- Role-based access control
-- Network isolation (VPC/firewall)
+Protect network communications with TLS encryption for all communication, authentication for API access, role-based access control, and network isolation through VPC or firewall rules.
 
 ### Data Security
 
-- Encryption at rest for stored data
-- Encryption in transit for network traffic
-- Data residency controls
-- Access logging and auditing
+Secure data with encryption at rest for stored data, encryption in transit for network traffic, data residency controls, and access logging and auditing.
 
 ### Execution Security
 
-- Code isolation in worker environments
-- Resource limits to prevent exhaustion
-- Sandboxing to limit system access
-- Regular security updates
+Ensure execution security through code isolation in worker environments, resource limits to prevent exhaustion, sandboxing to limit system access, and regular security updates.
 
 ## Next Steps
 

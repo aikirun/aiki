@@ -26,23 +26,11 @@ Workers execute workflows in your infrastructure, providing the execution layer 
 
 ### Subscriber Strategy
 
-Manages workflow run acquisition:
-
-- **Redis Streams** (currently supported)
-  - XREADGROUP for message retrieval
-  - XPENDING/XCLAIM for fault tolerance
-  - Parallel stream processing
-  - Round-robin distribution
+The subscriber strategy manages workflow run acquisition. Redis Streams is currently supported, using XREADGROUP for message retrieval, XPENDING/XCLAIM for fault tolerance, parallel stream processing, and round-robin distribution.
 
 ### Execution Engine
 
-Handles workflow execution:
-
-1. Load workflow definition from registry
-2. Execute tasks in sequence
-3. Track progress and state
-4. Report results to server
-5. Handle errors and retries
+The execution engine handles workflow execution by loading workflow definitions from the registry, executing tasks in sequence, tracking progress and state, reporting results to the server, and handling errors and retries.
 
 ### Workflow Registry
 
@@ -56,12 +44,7 @@ Only workflows in the registry can be executed by this worker.
 
 ### Heartbeat System
 
-Monitors worker health:
-
-- Periodic heartbeats to server
-- Configurable interval (default: 30s)
-- Server detects dead workers
-- Enables workflow claiming
+The heartbeat system monitors worker health by sending periodic heartbeats to the server at configurable intervals (default: 30s). This allows the server to detect dead workers and enables other workers to claim stuck workflows.
 
 ## Message Flow
 

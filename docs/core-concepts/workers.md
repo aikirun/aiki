@@ -55,8 +55,8 @@ subscriber: {
 ```
 
 **Options:**
-- `claimMinIdleTimeMs` - Time before claiming stuck workflows
-- `blockTimeMs` - How long to block waiting for new workflows
+- `claimMinIdleTimeMs` - How long a workflow must be idle before the worker can claim it from a failed worker
+- `blockTimeMs` - How long the worker should wait for new workflows before checking again
 
 ### workflowRun
 
@@ -109,11 +109,7 @@ Gracefully stops the worker, allowing active workflows to complete within the co
 
 ## How Workers Process Workflows
 
-1. **Poll for work** - Worker polls the queue for available workflow runs
-2. **Load definition** - Worker loads the workflow definition from its registry
-3. **Execute tasks** - Worker executes tasks in sequence, reporting progress
-4. **Handle errors** - Worker manages retries and error reporting
-5. **Report completion** - Worker sends final result to the server
+Workers begin by polling the queue for available workflow runs. Once a run is received, the worker loads the workflow definition from its registry and executes tasks in sequence while reporting progress. The worker manages retries and error reporting for failed tasks, then sends the final result to the server upon completion.
 
 ## Worker Distribution
 

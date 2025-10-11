@@ -4,11 +4,7 @@ Aiki uses Redis Streams for high-performance, fault-tolerant message distributio
 
 ## Why Redis Streams?
 
-- **High Performance** - Millions of messages per second
-- **Fault Tolerance** - Built-in message claiming (XPENDING/XCLAIM)
-- **Consumer Groups** - Automatic work distribution
-- **Persistence** - Messages survive Redis restarts
-- **Parallel Processing** - Multiple streams processed concurrently
+Redis Streams provides high performance capable of handling millions of messages per second. Built-in fault tolerance through message claiming (XPENDING/XCLAIM) ensures reliability. Consumer groups enable automatic work distribution across workers. Messages persist through Redis restarts, and the system supports parallel processing of multiple streams concurrently.
 
 ## Stream Organization
 
@@ -118,11 +114,7 @@ XCLAIM workflow:orders aiki-workers worker-2
   <message-id>
 ```
 
-**Process:**
-1. Find stuck messages with XPENDING
-2. Filter by idle time
-3. Claim ownership with XCLAIM
-4. Re-execute workflow
+The claiming process finds stuck messages with XPENDING, filters by idle time, claims ownership with XCLAIM, and re-executes the workflow.
 
 **Parallel claiming:**
 
@@ -210,11 +202,7 @@ for (const msg of stuckMessages) {
 
 ### Idempotency
 
-Messages may be processed multiple times:
-
-- Worker crashes after processing but before ACK
-- Message is claimed and re-processed
-- Idempotency keys prevent duplicate execution
+Messages may be processed multiple times if a worker crashes after processing but before acknowledging. When this happens, the message is claimed and re-processed by another worker. Idempotency keys prevent duplicate execution in these scenarios.
 
 ## Performance Optimizations
 

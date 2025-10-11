@@ -5,12 +5,7 @@ you to safely retry operations without creating duplicates, even when the same r
 
 ## What are Idempotency Keys?
 
-An idempotency key is a unique identifier that:
-
-- Is provided by the client when starting a workflow or task
-- Is stored with the workflow/task execution
-- Prevents duplicate executions when the same key is used
-- Allows safe retries of failed operations
+An idempotency key is a unique identifier provided by the client when starting a workflow or task. The system stores this key with the workflow or task execution to prevent duplicate executions when the same key is used again, allowing safe retries of failed operations.
 
 ## Workflow Idempotency
 
@@ -39,7 +34,7 @@ multiple times, it will only execute once and return the cached result:
 ```typescript
 const sendEmail = task({
 	name: "send-welcome-email",
-	exec(input) {
+	exec(input: { email: string }) {
 		return sendEmailToUser(input.email, welcomeTemplate);
 	},
 });
@@ -99,7 +94,7 @@ Sometimes you want the same task executed multiple times for different reasons:
 ```typescript
 const sendEmail = task({
 	name: "send-email",
-	exec(input) {
+	exec(input: { email: string; content: string }) {
 		return sendEmailToUser(input.email, input.content);
 	},
 });
@@ -130,25 +125,12 @@ you can control when to use cached results vs. fresh execution.
 
 ## Benefits of Idempotency Keys
 
-1. **Force Re-execution**: Allow the same task with same payload to execute multiple times when needed
-2. **Different Contexts**: Enable the same operation to happen in different execution contexts
-3. **Intentional Duplicates**: Support scenarios where you want the same operation to occur multiple times
-4. **Flexible Control**: Provide explicit control over when to bypass automatic idempotency
+Idempotency keys allow the same task with the same payload to execute multiple times when needed, enabling force re-execution. They let the same operation happen in different execution contexts and support scenarios where you want the same operation to occur multiple times intentionally. This provides explicit control over when to bypass automatic idempotency.
 
 ## When to Use Idempotency Keys
 
-- **Multiple Executions**: When you need the same operation to happen multiple times (emails, notifications)
-- **Different Contexts**: Processing the same data for different purposes (audit, compliance, retry)
-- **Intentional Retries**: When you want to retry an operation with the same input but track it separately
-- **Bypass Cache**: When you need fresh execution even with the same payload
+Use idempotency keys when you need the same operation to happen multiple times, such as sending emails or notifications. They're valuable for processing the same data for different purposes like auditing, compliance, or retries. Use them when you want to retry an operation with the same input but track it separately, or when you need fresh execution even with the same payload to bypass automatic caching.
 
 ## Summary
 
-Determinism, automatic idempotency, and idempotency keys work together to provide flexible execution control:
-
-- **Determinism** ensures your task logic is reliable and predictable
-- **Automatic Idempotency** prevents accidental duplicate executions by default
-- **Idempotency keys** give you explicit control when you need the same operation to happen multiple times
-
-Together, they provide the foundation for building robust, efficient, and maintainable workflows that can handle both
-the need for consistency and the flexibility for intentional re-execution.
+Determinism, automatic idempotency, and idempotency keys work together to provide flexible execution control. Determinism ensures your task logic is reliable and predictable. Automatic idempotency prevents accidental duplicate executions by default. Idempotency keys give you explicit control when you need the same operation to happen multiple times. Together, they provide the foundation for building robust, efficient, and maintainable workflows that can handle both the need for consistency and the flexibility for intentional re-execution.

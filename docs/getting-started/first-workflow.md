@@ -4,11 +4,7 @@ Build a complete order processing workflow that demonstrates Aiki's key features
 
 ## What We'll Build
 
-An order processing system that:
-1. Validates the order
-2. Processes payment
-3. Updates inventory
-4. Sends confirmation email
+We'll create an order processing system that validates orders, processes payments, updates inventory, and sends confirmation emails. Each step will be a separate task, demonstrating how Aiki enables independent retry and monitoring of workflow components.
 
 ## Step 1: Define Tasks
 
@@ -19,7 +15,7 @@ import { task } from "@aiki/task";
 
 const validateOrder = task({
   name: "validate-order",
-  exec(input) {
+  exec(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
     const { items, total } = input;
 
     // Validation logic
@@ -37,7 +33,7 @@ const validateOrder = task({
 
 const processPayment = task({
   name: "process-payment",
-  exec(input) {
+  exec(input: { orderId: string; amount: number }) {
     const { orderId, amount } = input;
 
     // Payment processing logic
@@ -52,7 +48,7 @@ const processPayment = task({
 
 const updateInventory = task({
   name: "update-inventory",
-  exec(input) {
+  exec(input: { items: Array<{ id: string; quantity: number }> }) {
     const { items } = input;
 
     // Update inventory
@@ -66,7 +62,7 @@ const updateInventory = task({
 
 const sendConfirmation = task({
   name: "send-confirmation",
-  exec(input) {
+  exec(input: { email: string; orderId: string }) {
     const { email, orderId } = input;
 
     console.log(`Sending confirmation to ${email} for order ${orderId}`);
@@ -185,7 +181,7 @@ import { client, worker, workflow, task } from "@aiki/sdk";
 // Define tasks
 const validateOrder = task({
   name: "validate-order",
-  exec(input) {
+  exec(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
     if (input.items.length === 0) {
       throw new Error("Order must have items");
     }
@@ -199,7 +195,7 @@ const validateOrder = task({
 
 const processPayment = task({
   name: "process-payment",
-  exec(input) {
+  exec(input: { orderId: string; amount: number }) {
     console.log(`Processing payment: $${input.amount}`);
     return {
       paymentId: `pay-${Date.now()}`,
@@ -210,7 +206,7 @@ const processPayment = task({
 
 const updateInventory = task({
   name: "update-inventory",
-  exec(input) {
+  exec(input: { items: Array<{ id: string; quantity: number }> }) {
     input.items.forEach(item => {
       console.log(`Updating inventory for ${item.id}`);
     });
@@ -220,7 +216,7 @@ const updateInventory = task({
 
 const sendConfirmation = task({
   name: "send-confirmation",
-  exec(input) {
+  exec(input: { email: string; orderId: string }) {
     console.log(`Sending confirmation to ${input.email}`);
     return { sent: true };
   }
@@ -230,7 +226,11 @@ const sendConfirmation = task({
 const orderWorkflow = workflow({ name: "order-processing" });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-  async exec(input, run) {
+  async exec(input: {
+    items: Array<{ id: string; quantity: number }>;
+    total: number;
+    email: string;
+  }, run) {
     const validation = await validateOrder.start(run, {
       items: input.items,
       total: input.total
@@ -284,10 +284,7 @@ console.log("Done:", await result.waitForCompletion());
 
 ## What's Happening?
 
-1. **Each task executes independently** - If payment fails, only payment is retried
-2. **State is persisted** - Server crashes don't lose progress
-3. **Idempotency** - Same order won't be processed twice
-4. **Fault tolerance** - Workers can claim stuck workflows from failed workers
+Each task executes independently, so if payment fails, only the payment task is retried rather than the entire workflow. The server persists state continuously, which means crashes don't lose progress. Idempotency ensures that the same order won't be processed twice, even if requests are duplicated. Workers provide fault tolerance by claiming stuck workflows from failed workers, ensuring your processes complete even when individual workers crash.
 
 ## Next Steps
 

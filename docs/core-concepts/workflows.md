@@ -51,13 +51,7 @@ The main orchestration function that:
 
 ## Workflow Logic
 
-The `exec` function can contain:
-
-- **Task execution**: Call tasks using `.start()`
-- **Conditional logic**: Different paths based on data
-- **Data transformation**: Process data between steps
-- **Business logic**: Application-specific calculations
-- **Error handling**: Custom error recovery
+The `exec` function orchestrates your workflow by calling tasks using `.start()`, implementing conditional logic to choose different paths based on data, transforming data between steps, applying application-specific business logic, and handling errors with custom recovery strategies.
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
@@ -125,12 +119,6 @@ const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
 });
 ```
 
-**Key points:**
-- Existing runs continue with their version
-- New runs use the latest version by default
-- Multiple versions can run simultaneously
-- Gradual migration to new versions
-
 ## Starting Workflows
 
 Execute workflows using the version's `.start()` method:
@@ -173,9 +161,8 @@ The result handle provides:
 
 1. **Keep workflows focused** - One business process per workflow
 2. **Use versions** - Version workflows as requirements change
-3. **Handle errors** - Add try-catch for graceful degradation
-4. **Deterministic logic** - Workflow logic should be predictable
-5. **Document versions** - Comment what changed between versions
+3. **Deterministic logic** - Workflow logic should be predictable
+4. **Document versions** - Comment what changed between versions
 
 ## Next Steps
 
