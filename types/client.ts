@@ -115,10 +115,9 @@ export interface RedisStreamsSubscriberStrategy {
 	claimMinIdleTimeMs?: number;
 }
 
-export type SubscriberStrategy =
-	| PollingSubscriberStrategy
-	| AdaptivePollingSubscriberStrategy
-	| RedisStreamsSubscriberStrategy;
+export type SubscriberStrategy = // | PollingSubscriberStrategy
+	// | AdaptivePollingSubscriberStrategy
+	RedisStreamsSubscriberStrategy;
 
 export interface SubscriberStrategyBuilder {
 	init: (workerId: string, callbacks: StrategyCallbacks) => Promise<ResolvedSubscriberStrategy>;

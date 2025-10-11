@@ -8,12 +8,12 @@ if (import.meta.main) {
 
 	const workerA = worker(aikiClient, {
 		id: "worker-A",
-		subscriber: { type: "polling" },
+		subscriber: { type: "redis_streams" },
 	});
 
 	const workerB = worker(aikiClient, {
 		id: "worker-B",
-		subscriber: { type: "adaptive_polling" },
+		subscriber: { type: "redis_streams" },
 	});
 
 	workerA.workflowRegistry

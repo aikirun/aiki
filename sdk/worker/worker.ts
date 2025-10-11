@@ -77,7 +77,7 @@ class WorkerImpl<AppContext> implements Worker {
 
 	private async initAndStartPolling(abortSignal: AbortSignal): Promise<void> {
 		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
-			this.params.subscriber ?? { type: "polling" },
+			this.params.subscriber ?? { type: "redis_streams" },
 			this.workflowRegistry._internal.getAll().map((workflow) => workflow.name),
 			this.params.shardKeys,
 		);
