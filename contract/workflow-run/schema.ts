@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { WorkflowOptions, WorkflowRunResult, WorkflowRun, WorkflowRunState } from "./types.ts";
+import type { WorkflowOptions, WorkflowRun, WorkflowRunResult, WorkflowRunState } from "./types.ts";
 import type { UnionToRecord } from "@aiki/lib/object";
 import { taskRunResultSchema } from "../task-run/schema.ts";
 import type { zT } from "../common/schema.ts";

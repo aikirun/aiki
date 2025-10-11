@@ -1,4 +1,4 @@
-import type { WorkflowRunId, WorkflowRun } from "@aiki/contract/workflow-run";
+import type { WorkflowRun, WorkflowRunId } from "@aiki/contract/workflow-run";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay } from "@aiki/lib/async";
