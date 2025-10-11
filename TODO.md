@@ -31,14 +31,8 @@ This document tracks planned features and improvements for the Aiki durable work
 - [ ] **Workflow Pausing**: Support for pausing workflows mid-execution
 - [ ] **Webhook Integration**: Pause workflow execution until external webhook is called
 
-## Worker Management
-
-### Worker Coordination
-- [ ] **Heartbeat Monitoring**: Detect and handle workers that haven't sent heartbeats
-
 ### Worker Deployment
 - [ ] **Lambda Support**: Explore using AWS Lambda as workers with webhook triggers
-- [ ] **Multi-runtime Support**: Abstract Deno-specific features to support Node.js and other runtimes
 
 ## Security & Data Protection
 
@@ -90,3 +84,5 @@ This document tracks planned features and improvements for the Aiki durable work
 - Focus on maintaining backward compatibility during feature additions
 
 ## Workflow, task etc should be independently installable packages
+
+## Figure out how to stream workflow result, events etc down the sdk
