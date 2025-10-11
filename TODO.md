@@ -34,9 +34,6 @@ This document tracks planned features and improvements for the Aiki durable work
 ## Worker Management
 
 ### Worker Coordination
-- [ ] **Work Stealing**: Allow workers to claim workflows from other workers
-- [ ] **Task Reassignment**: Automatically reassign tasks to workers with appropriate handlers
-- [ ] **Adaptive Polling**: Implement intelligent polling based on workload
 - [ ] **Heartbeat Monitoring**: Detect and handle workers that haven't sent heartbeats
 
 ### Worker Deployment
@@ -61,7 +58,6 @@ This document tracks planned features and improvements for the Aiki durable work
 
 ### Code Quality
 - [ ] **Linting Rules**: Add `no-return-await` lint rule
-- [ ] **Branded Types**: Use branded types for IDs to improve type safety
 - [ ] **Documentation**: Improve API documentation and examples
 
 ## Architecture Improvements
@@ -78,7 +74,6 @@ This document tracks planned features and improvements for the Aiki durable work
 
 ### Advanced Features
 - [ ] **Event Sourcing**: Explore event sourcing patterns for workflow state
-- [ ] **Saga Pattern**: Research integration with saga pattern for distributed transactions
 - [ ] **Machine Learning**: Investigate ML-based workflow optimization
 
 ### Integration
@@ -94,4 +89,4 @@ This document tracks planned features and improvements for the Aiki durable work
 - Consider using webhooks for serverless worker deployments
 - Focus on maintaining backward compatibility during feature additions
 
-  ### workflow, task etc should be independently installable packages
+## Workflow, task etc should be independently installable packages
