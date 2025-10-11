@@ -218,7 +218,6 @@ Exploratory work for future capabilities.
 ## Code Quality 🧹
 
 ### Linting & Standards
-- [ ] **Linting Rules**: Add `no-return-await` lint rule
 - [ ] **Code Cleanup**: Remove completed TODOs
 
 ---
