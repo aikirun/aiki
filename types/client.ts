@@ -4,6 +4,29 @@ import type { WorkflowRunId } from "./workflow-run.ts";
 import type { Contract } from "@aiki/contract";
 import type { ContractRouterClient } from "@orpc/contract";
 
+export interface ClientParams<AppContext> {
+	url: string;
+	redisStreams?: RedisConfig;
+	logger?: Logger;
+	contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
+}
+
+export interface Client<AppContext> {
+	api: ApiClient;
+	_internal: {
+		subscriber: {
+			create: (
+				strategy: SubscriberStrategy,
+				workflowNames: WorkflowName[],
+				workerShards?: string[],
+			) => SubscriberStrategyBuilder;
+		};
+		redisStreams: RedisStreamsConnection;
+		logger: Logger;
+		contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
+	};
+}
+
 export interface Logger {
 	info(message: string, metadata?: Record<string, unknown>): void;
 	debug(message: string, metadata?: Record<string, unknown>): void;
@@ -12,6 +35,8 @@ export interface Logger {
 	trace(message: string, metadata?: Record<string, unknown>): void;
 	child?(bindings: Record<string, unknown>): Logger;
 }
+
+export type ApiClient = ContractRouterClient<Contract>;
 
 export interface RedisClient {
 	xclaim(...args: unknown[]): Promise<unknown>;
@@ -31,14 +56,6 @@ export interface RedisConfig {
 	retryDelayOnFailoverMs?: number;
 	connectTimeoutMs?: number;
 }
-
-export interface ClientParams<AppContext> {
-	url: string;
-	redisStreams?: RedisConfig;
-	logger?: Logger;
-	contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
-}
-export type ApiClient = ContractRouterClient<Contract>;
 
 export interface RedisStreamsConnection {
 	getConnection: () => RedisClient;
@@ -109,20 +126,4 @@ export interface SubscriberStrategyBuilder {
 export interface StrategyCallbacks {
 	onError?: (error: Error) => void;
 	onStop?: () => Promise<void>;
-}
-
-export interface Client<AppContext> {
-	api: ApiClient;
-	_internal: {
-		subscriber: {
-			create: (
-				strategy: SubscriberStrategy,
-				workflowNames: WorkflowName[],
-				workerShards?: string[],
-			) => SubscriberStrategyBuilder;
-		};
-		redisStreams: RedisStreamsConnection;
-		logger: Logger;
-		contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
-	};
 }
