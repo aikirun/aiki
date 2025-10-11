@@ -13,6 +13,51 @@ Build reliable, long-running business processes that survive failures, restarts,
 - **🎯 Type-Safe** - Full TypeScript support with end-to-end type safety
 - **🛡️ Built-in Fault Tolerance** - Message claiming, automatic retries, graceful recovery
 
+## Quick Start
+
+```bash
+# Install packages
+npm install @aiki/client @aiki/worker @aiki/workflow @aiki/task
+```
+
+```typescript
+import { client, worker, workflow, task } from "@aiki/sdk";
+
+// Define a task
+const sendEmail = task({
+  name: "send-email",
+  exec(input: { email: string; message: string }) {
+    return sendEmailTo(input.email, input.message);
+  }
+});
+
+// Define a workflow
+const onboardingWorkflow = workflow({ name: "user-onboarding" });
+
+const onboardingV1 = onboardingWorkflow.v("1.0.0", {
+  async exec(input: { email: string }, run) {
+    await sendEmail.start(run, { email: input.email, message: "Welcome!" });
+  }
+});
+
+// Set up client and worker
+const aikiClient = await client({
+  url: "localhost:9090",
+  redis: { host: "localhost", port: 6379 }
+});
+
+const aikiWorker = await worker(aikiClient, {
+  id: "worker-1",
+  subscriber: { type: "redis_streams" }
+});
+
+aikiWorker.workflowRegistry.add(onboardingWorkflow);
+await aikiWorker.start();
+
+// Start a workflow
+const result = await onboardingV1.start(aikiClient, { email: "user@example.com" });
+```
+
 ## Architecture
 
 ```
@@ -59,51 +104,6 @@ Build reliable, long-running business processes that survive failures, restarts,
 ```
 
 Aiki's server orchestrates workflows and manages state, while workers execute tasks in your environment. This separation gives you durability and observability without sacrificing control over where your code runs.
-
-## Quick Start
-
-```bash
-# Install packages
-npm install @aiki/client @aiki/worker @aiki/workflow @aiki/task
-```
-
-```typescript
-import { client, worker, workflow, task } from "@aiki/sdk";
-
-// Define a task
-const sendEmail = task({
-  name: "send-email",
-  exec(input: { email: string; message: string }) {
-    return sendEmailTo(input.email, input.message);
-  }
-});
-
-// Define a workflow
-const onboardingWorkflow = workflow({ name: "user-onboarding" });
-
-const onboardingV1 = onboardingWorkflow.v("1.0.0", {
-  async exec(input: { email: string }, run) {
-    await sendEmail.start(run, { email: input.email, message: "Welcome!" });
-  }
-});
-
-// Set up client and worker
-const aikiClient = await client({
-  url: "localhost:9090",
-  redis: { host: "localhost", port: 6379 }
-});
-
-const aikiWorker = await worker(aikiClient, {
-  id: "worker-1",
-  subscriber: { type: "redis_streams" }
-});
-
-aikiWorker.workflowRegistry.add(onboardingWorkflow);
-await aikiWorker.start();
-
-// Start a workflow
-const result = await onboardingV1.start(aikiClient, { email: "user@example.com" });
-```
 
 ## Documentation
 
