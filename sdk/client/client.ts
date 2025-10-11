@@ -18,10 +18,8 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 	constructor(private readonly params: ClientParams<AppContext>) {
 		this.logger = params.logger ?? new ConsoleLogger();
 
-		const rpcLink = new RPCLink({
-			url: `${params.url}`,
-		});
-		this.api = createORPCClient(rpcLink);
+		const rpcLink = new RPCLink({ url: `${params.url}` });
+		this.api = createORPCClient(rpcLink) as unknown as ApiClient;
 
 		this.logger.info("Aiki client initialized", {
 			"aiki.url": params.url,

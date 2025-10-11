@@ -2,7 +2,7 @@ import { z } from "zod";
 import { oc } from "@orpc/contract";
 import { workflowOptionsSchema, workflowRunResultSchema, workflowRunSchema, workflowRunStateSchema } from "./schema.ts";
 import { taskRunResultSchema } from "../task-run/schema.ts";
-import type { ContractProcedure } from "../helpers/procedure.ts";
+import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure.ts";
 import type {
 	AddSubTaskRunResultRequestV1,
 	AddSubTaskRunResultResponseV1,
@@ -16,7 +16,9 @@ import type {
 	GetResultResponseV1,
 	UpdateStateRequestV1,
 	UpdateStateResponseV2,
+	WorkflowRunApi,
 } from "@aiki/types/workflow-run-api";
+import type { Equal, ExpectTrue } from "@aiki/lib/testing/expect";
 
 const getReadyIdsV1: ContractProcedure<GetReadyIdsRequestV1, GetReadyIdsResponseV1> = oc
 	.input(z.object({
@@ -78,3 +80,5 @@ export const workflowRunContract = {
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;
+
+type _ContractSatisfiesApi = ExpectTrue<Equal<ContractProcedureToApi<WorkflowRunContract>, WorkflowRunApi>>;

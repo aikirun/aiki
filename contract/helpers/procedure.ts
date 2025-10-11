@@ -6,3 +6,7 @@ export type ContractProcedure<I, O> = ORPCContractProcedure<
 	Record<never, never>,
 	Record<never, never>
 >;
+
+export type ContractProcedureToApi<C> = {
+	[K in keyof C]: C[K] extends ContractProcedure<infer In, infer Out> ? (i: In) => Promise<Out> : never;
+};
