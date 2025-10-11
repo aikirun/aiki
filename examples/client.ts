@@ -19,4 +19,6 @@ if (import.meta.main) {
 	await eveningRoutineWorkflowV1
 		.withOptions({ idempotencyKey: "some-key" })
 		.start(aikiClient);
+
+	await aikiClient.close();
 }
