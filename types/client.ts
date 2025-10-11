@@ -1,8 +1,7 @@
 import type { WorkflowName } from "./workflow.ts";
 import type { WorkflowRun } from "./workflow-run.ts";
 import type { WorkflowRunId } from "./workflow-run.ts";
-import type { Contract } from "@aiki/contract";
-import type { ContractRouterClient } from "@orpc/contract";
+import type { WorkflowRunApi } from "./workflow-run-api.ts";
 
 export interface ClientParams<AppContext> {
 	url: string;
@@ -36,7 +35,9 @@ export interface Logger {
 	child?(bindings: Record<string, unknown>): Logger;
 }
 
-export type ApiClient = ContractRouterClient<Contract>;
+export interface ApiClient {
+	workflowRun: WorkflowRunApi;
+}
 
 export interface RedisClient {
 	xclaim(...args: unknown[]): Promise<unknown>;

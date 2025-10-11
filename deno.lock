@@ -283,12 +283,6 @@
           "npm:@orpc/server@^1.9.3",
           "npm:zod@^4.1.12"
         ]
-      },
-      "types": {
-        "dependencies": [
-          "jsr:@aiki/contract@0.1",
-          "npm:@orpc/contract@^1.9.3"
-        ]
       }
     }
   }
