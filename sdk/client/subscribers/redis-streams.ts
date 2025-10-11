@@ -460,7 +460,7 @@ async function claimStuckRedisStreamMessages(
 		return [];
 	}
 
-	return await processRedisStreamMessages(redis, logger, streamConsumerGroupMap, claimedStreamEntries);
+	return processRedisStreamMessages(redis, logger, streamConsumerGroupMap, claimedStreamEntries);
 }
 
 async function findClaimableRedisStreamMessages(
