@@ -1,5 +1,5 @@
-import { workflow } from "@aiki/sdk/workflow";
-import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "../task/example.ts";
+import { workflow } from "@aiki/workflow";
+import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "./tasks.ts";
 
 export const morningWorkflow = workflow({ name: "morning-routine" });
 

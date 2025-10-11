@@ -10,8 +10,8 @@ import {
 	type SubscriberStrategy,
 	type SubscriberStrategyBuilder,
 } from "./subscribers/strategy-resolver.ts";
-import type { Logger } from "../logger/mod.ts";
-import { ConsoleLogger } from "../logger/mod.ts";
+import type { Logger } from "./logger/mod.ts";
+import { ConsoleLogger } from "./logger/mod.ts";
 
 export function client<AppContext = null>(params: ClientParams<AppContext>): Promise<Client<AppContext>> {
 	return Promise.resolve(new ClientImpl(params));

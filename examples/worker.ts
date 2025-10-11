@@ -1,17 +1,17 @@
-import { worker } from "@aiki/sdk/worker";
-import { Aiki } from "@aiki/sdk";
-import { eveningRoutineWorkflow, morningWorkflow } from "../workflow/example.ts";
+import { worker } from "@aiki/worker";
+import { client } from "@aiki/client";
+import { eveningRoutineWorkflow, morningWorkflow } from "./workflows.ts";
 import { delay } from "@aiki/lib/async";
 
 if (import.meta.main) {
-	const client = await Aiki.client({ url: "http://localhost:3000" });
+	const aikiClient = await client({ url: "http://localhost:3000" });
 
-	const workerA = worker(client, {
+	const workerA = worker(aikiClient, {
 		id: "worker-A",
 		subscriber: { type: "polling" },
 	});
 
-	const workerB = worker(client, {
+	const workerB = worker(aikiClient, {
 		id: "worker-B",
 		subscriber: { type: "adaptive_polling" },
 	});

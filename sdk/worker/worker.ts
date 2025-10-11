@@ -2,17 +2,12 @@ import type { WorkflowRun, WorkflowRunId } from "@aiki/contract/workflow-run";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay } from "@aiki/lib/async";
-import type { Client, SubscriberStrategy } from "../client/mod.ts";
-import type {
-	ResolvedSubscriberStrategy,
-	SubscriberMessageMeta,
-	WorkflowRunBatch,
-} from "../client/subscribers/strategy-resolver.ts";
-import { initWorkflowRegistry, type WorkflowRegistry } from "../workflow/registry.ts";
-import { initWorkflowRunHandle } from "../workflow/run/run-handle.ts";
+import type { Client, Logger, SubscriberStrategy } from "@aiki/client";
+import { getChildLogger } from "@aiki/client";
+import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aiki/client";
+import { initWorkflowRegistry, initWorkflowRunHandle, type WorkflowRegistry } from "@aiki/workflow";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
-import type { WorkflowVersion } from "../workflow/version/workflow-version.ts";
-import { getChildLogger, type Logger } from "../logger/mod.ts";
+import type { WorkflowVersion } from "@aiki/workflow";
 
 export function worker<AppContext>(
 	client: Client<AppContext>,

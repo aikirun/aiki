@@ -12,7 +12,7 @@ import type {
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
 } from "./strategy-resolver.ts";
-import { getChildLogger, type Logger } from "../../logger/mod.ts";
+import { getChildLogger, type Logger } from "../logger/mod.ts";
 
 /**
  * Redis Streams subscriber strategy configuration
