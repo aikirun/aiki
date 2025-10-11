@@ -1,5 +1,5 @@
 import type { WorkflowName } from "@aiki/contract/workflow";
-import type { WorkflowRunRow } from "@aiki/contract/workflow-run";
+import type { WorkflowRun } from "@aiki/contract/workflow-run";
 import { Redis } from "redis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -21,7 +21,7 @@ export interface ClientParams<AppContext> {
 	url: string;
 	redisStreams?: RedisConfig;
 	logger?: Logger;
-	contextFactory?: (run: WorkflowRunRow<unknown, unknown>) => AppContext | Promise<AppContext>;
+	contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
 }
 
 export interface RedisConfig {
@@ -53,7 +53,7 @@ export interface Client<AppContext> {
 		};
 		redisStreams: RedisStreamsConnection;
 		logger: Logger;
-		contextFactory?: (run: WorkflowRunRow<unknown, unknown>) => AppContext | Promise<AppContext>;
+		contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
 	};
 }
 

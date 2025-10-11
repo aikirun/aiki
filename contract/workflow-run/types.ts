@@ -38,7 +38,7 @@ export type WorkflowRunResult<Output> =
 	| WorkflowRunResultInComplete
 	| WorkflowRunResultComplete<Output>;
 
-export interface WorkflowRunRow<Input, Output> {
+export interface WorkflowRun<Input, Output> {
 	id: string;
 	name: string;
 	versionId: string;

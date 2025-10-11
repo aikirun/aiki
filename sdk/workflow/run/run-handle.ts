@@ -1,16 +1,16 @@
-import type { WorkflowRunRow, WorkflowRunState } from "@aiki/contract/workflow-run";
+import type { WorkflowRun, WorkflowRunState } from "@aiki/contract/workflow-run";
 import type { ApiClient } from "../../client/client.ts";
 import type { TaskRunResult } from "@aiki/contract/task-run";
 
 export function initWorkflowRunHandle<Input, Output>(
 	api: ApiClient,
-	run: WorkflowRunRow<Input, Output>,
+	run: WorkflowRun<Input, Output>,
 ): WorkflowRunHandle<Input, Output> {
 	return new WorkflowRunHandleImpl(api, run);
 }
 
 export interface WorkflowRunHandle<Input, Output> {
-	run: WorkflowRunRow<Input, Output>;
+	run: WorkflowRun<Input, Output>;
 
 	updateState: (state: WorkflowRunState) => Promise<void>;
 
@@ -25,7 +25,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 
 	constructor(
 		private readonly api: ApiClient,
-		public readonly run: WorkflowRunRow<Input, Output>,
+		public readonly run: WorkflowRun<Input, Output>,
 	) {
 		this._internal = {
 			getSubTaskRunResult: this.getSubTaskRunResult.bind(this),

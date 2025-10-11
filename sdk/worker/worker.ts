@@ -1,4 +1,4 @@
-import type { WorkflowRunId, WorkflowRunRow } from "@aiki/contract/workflow-run";
+import type { WorkflowRunId, WorkflowRun } from "@aiki/contract/workflow-run";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay } from "@aiki/lib/async";
@@ -43,7 +43,7 @@ export interface Worker {
 }
 
 interface ActiveWorkflowRun {
-	run: WorkflowRunRow<unknown, unknown>;
+	run: WorkflowRun<unknown, unknown>;
 	executionPromise: Promise<void>;
 }
 
@@ -240,7 +240,7 @@ class WorkerImpl<AppContext> implements Worker {
 	}
 
 	private async executeWorkflow(
-		workflowRun: WorkflowRunRow<unknown, unknown>,
+		workflowRun: WorkflowRun<unknown, unknown>,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 	): Promise<void> {
 		const workflowLogger = getChildLogger(this.logger, {
