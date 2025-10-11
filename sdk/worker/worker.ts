@@ -1,7 +1,7 @@
 import type { WorkflowRun, WorkflowRunId } from "@aiki/types/workflow-run";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
-import { delay } from "@aiki/lib/async";
+import { delay, fireAndForget } from "@aiki/lib/async";
 import type { Client, Logger, SubscriberStrategy } from "@aiki/client";
 import { getChildLogger } from "@aiki/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aiki/client";
@@ -36,7 +36,7 @@ export interface WorkerParams {
 export interface Worker {
 	id: string;
 	workflowRegistry: WorkflowRegistry;
-	start: () => void;
+	start: () => Promise<void>;
 	stop: () => Promise<void>;
 }
 
@@ -66,39 +66,29 @@ class WorkerImpl<AppContext> implements Worker {
 		this.logger.info("Worker initialized");
 	}
 
-	public start(): void {
+	public async start(): Promise<void> {
 		this.logger.info("Worker starting");
 
-		this.abortController = new AbortController();
-		const abortSignal = this.abortController.signal;
-
-		this.initAndStartPolling(abortSignal);
-	}
-
-	private async initAndStartPolling(abortSignal: AbortSignal): Promise<void> {
 		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
 			this.workflowRegistry._internal.getAll().map((workflow) => workflow.name),
 			this.params.shardKeys,
 		);
-
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
 			onError: (error: Error) => this.handleNotificationError(error),
 			onStop: () => this.stop(),
 		});
 
-		try {
-			await this.startPolling(abortSignal);
-		} catch (error) {
-			if (abortSignal.aborted) {
-				this.logger.debug("Worker stopped due to abort signal");
-				return;
-			}
+		this.abortController = new AbortController();
+		const abortSignal = this.abortController.signal;
 
-			this.logger.error("Unexpected error", {
-				"aiki.error": error instanceof Error ? error.message : String(error),
-			});
-		}
+		fireAndForget(this.poll(abortSignal), (error) => {
+			if (!abortSignal.aborted) {
+				this.logger.error("Unexpected error", {
+					"aiki.error": error.message,
+				});
+			}
+		});
 	}
 
 	public async stop(): Promise<void> {
@@ -135,7 +125,7 @@ class WorkerImpl<AppContext> implements Worker {
 		this.activeWorkflowRunsById.clear();
 	}
 
-	private async startPolling(abortSignal: AbortSignal): Promise<void> {
+	private async poll(abortSignal: AbortSignal): Promise<void> {
 		if (!this.subscriberStrategy) {
 			throw new Error("Subscriber strategy not initialized");
 		}
