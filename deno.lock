@@ -246,11 +246,6 @@
           "npm:zod@^4.1.12"
         ]
       },
-      "lib": {
-        "dependencies": [
-          "npm:zod@^4.1.12"
-        ]
-      },
       "sdk/client": {
         "dependencies": [
           "jsr:@aiki/contract@0.1",
