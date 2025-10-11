@@ -22,7 +22,4 @@ if (import.meta.main) {
 
 		return result.response ?? new Response("Not Found", { status: 404 });
 	});
-
-	// deno-lint-ignore no-console
-	console.log(`Aiki Server listening on http://localhost:${config.port}`);
 }
