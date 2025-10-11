@@ -1,6 +1,6 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { WorkflowOptions, WorkflowRunId } from "@aiki/types/workflow-run";
-import type { Client } from "@aiki/client";
+import type { Client } from "@aiki/types/client";
 import type { WorkflowRunContext } from "../run/context.ts";
 import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";

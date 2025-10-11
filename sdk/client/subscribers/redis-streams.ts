@@ -1,56 +1,20 @@
-import type { Redis } from "redis";
 import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aiki/lib/array";
 import { z } from "zod";
 import { getRetryParams } from "@aiki/lib/retry";
 import type { WorkflowName } from "@aiki/types/workflow";
 import type { WorkflowRunId } from "@aiki/types/workflow-run";
-import type { Client } from "../client.ts";
 import type {
+	Client,
+	Logger,
+	RedisClient,
+	RedisStreamsSubscriberStrategy,
 	StrategyCallbacks,
 	SubscriberDelayParams,
 	SubscriberMessageMeta,
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
-} from "./strategy-resolver.ts";
-import { getChildLogger, type Logger } from "../logger/mod.ts";
-
-/**
- * Redis Streams subscriber strategy configuration
- */
-export interface RedisStreamsSubscriberStrategy {
-	type: "redis_streams";
-
-	/**
-	 * Polling interval in milliseconds for Redis streams
-	 * @default 50
-	 */
-	intervalMs?: number;
-
-	/**
-	 * Maximum retry interval in milliseconds when Redis fails
-	 * @default 30_000
-	 */
-	maxRetryIntervalMs?: number;
-
-	/**
-	 * Polling interval when at capacity (milliseconds)
-	 * @default 50
-	 */
-	atCapacityIntervalMs?: number;
-
-	/**
-	 * How long to wait for new messages (ms)
-	 * @default 1_000
-	 */
-	blockTimeMs?: number;
-
-	/**
-	 * Minimum idle time before claiming abandoned messages (ms)
-	 * Set to 0 to disable message claiming entirely
-	 * @default 180_000
-	 */
-	claimMinIdleTimeMs?: number;
-}
+} from "@aiki/types/client";
+import { getChildLogger } from "../logger/mod.ts";
 
 const WorkflowRunReadyMessageDataSchema = z.object({
 	type: z.literal("workflow_run_ready"),
@@ -265,7 +229,7 @@ function getRedisStreamConsumerGroupMap(workflowNames: WorkflowName[], shardKeys
 }
 
 async function fetchRedisStreamMessages(
-	redis: Redis,
+	redis: RedisClient,
 	logger: Logger,
 	streams: string[],
 	streamConsumerGroupMap: Map<string, string>,
@@ -346,7 +310,7 @@ async function fetchRedisStreamMessages(
 }
 
 async function processRedisStreamMessages(
-	redis: Redis,
+	redis: RedisClient,
 	logger: Logger,
 	streamConsumerGroupMap: Map<string, string>,
 	streamEntries: NonEmptyArray<unknown>,
@@ -408,7 +372,7 @@ async function processRedisStreamMessages(
 }
 
 async function claimStuckRedisStreamMessages(
-	redis: Redis,
+	redis: RedisClient,
 	logger: Logger,
 	shuffledStreams: string[],
 	streamConsumerGroupMap: Map<string, string>,
@@ -500,7 +464,7 @@ async function claimStuckRedisStreamMessages(
 }
 
 async function findClaimableRedisStreamMessages(
-	redis: Redis,
+	redis: RedisClient,
 	logger: Logger,
 	shuffledStreams: string[],
 	streamConsumerGroupMap: Map<string, string>,

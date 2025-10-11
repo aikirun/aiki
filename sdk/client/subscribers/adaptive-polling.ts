@@ -1,25 +1,13 @@
-import { type AdaptivePollingConfig, AdaptivePollingStrategy } from "@aiki/lib/polling";
+import { AdaptivePollingStrategy } from "@aiki/lib/polling";
 import type { WorkflowRunId } from "@aiki/types/workflow-run";
-import type { Client } from "../client.ts";
 import type {
+	AdaptivePollingSubscriberStrategy,
+	Client,
 	StrategyCallbacks,
 	SubscriberDelayParams,
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
-} from "./strategy-resolver.ts";
-
-/**
- * Adaptive polling subscriber strategy configuration
- */
-export interface AdaptivePollingSubscriberStrategy extends AdaptivePollingConfig {
-	type: "adaptive_polling";
-
-	/**
-	 * Polling interval when at capacity (milliseconds)
-	 * @default 50
-	 */
-	atCapacityIntervalMs?: number;
-}
+} from "@aiki/types/client";
 
 export function createAdaptivePollingStrategy(
 	client: Client<unknown>,

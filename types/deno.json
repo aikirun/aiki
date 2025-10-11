@@ -2,11 +2,16 @@
 	"name": "@aiki/types",
 	"version": "0.1.0",
 	"exports": {
+		"./client": "./client.ts",
 		"./serializable": "./serializable.ts",
 		"./trigger": "./trigger.ts",
 		"./workflow": "./workflow.ts",
 		"./workflow-run": "./workflow-run.ts",
 		"./task": "./task.ts",
 		"./task-run": "./task-run.ts"
+	},
+	"imports": {
+		"@aiki/contract": "jsr:@aiki/contract@^0.1.0",
+		"@orpc/contract": "npm:@orpc/contract@^1.9.3"
 	}
 }

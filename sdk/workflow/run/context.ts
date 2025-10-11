@@ -1,5 +1,5 @@
 import type { WorkflowRun } from "@aiki/types/workflow-run";
-import type { Logger } from "@aiki/client";
+import type { Logger } from "@aiki/types/client";
 import type { WorkflowRunHandle } from "./run-handle.ts";
 
 export interface WorkflowRunContext<Input, Output>

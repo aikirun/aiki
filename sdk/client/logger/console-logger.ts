@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-console
-import type { Logger } from "./logger.ts";
+import type { Logger } from "@aiki/types/client";
 
 export class ConsoleLogger implements Logger {
 	constructor(private readonly context: Record<string, unknown> = {}) {}

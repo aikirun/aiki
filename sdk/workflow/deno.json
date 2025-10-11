@@ -3,7 +3,6 @@
 	"version": "0.1.0",
 	"exports": "./mod.ts",
 	"imports": {
-		"@aiki/client": "jsr:@aiki/client@^0.1.0",
 		"@aiki/types/*": "jsr:@aiki/types@^0.1.0/*",
 		"@aiki/lib/*": "jsr:@aiki/lib@^0.1.0/*"
 	}

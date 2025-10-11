@@ -1,5 +1,5 @@
 import type { WorkflowRun, WorkflowRunState } from "@aiki/types/workflow-run";
-import type { ApiClient } from "@aiki/client";
+import type { ApiClient } from "@aiki/types/client";
 import type { TaskRunResult } from "@aiki/types/task-run";
 
 export function initWorkflowRunHandle<Input, Output>(

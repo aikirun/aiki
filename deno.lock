@@ -279,7 +279,6 @@
       },
       "sdk/workflow": {
         "dependencies": [
-          "jsr:@aiki/client@0.1",
           "jsr:@aiki/lib@0.1",
           "jsr:@aiki/types@0.1"
         ]
@@ -290,6 +289,12 @@
           "jsr:@std/dotenv@0.225",
           "npm:@orpc/server@^1.9.3",
           "npm:zod@^4.1.12"
+        ]
+      },
+      "types": {
+        "dependencies": [
+          "jsr:@aiki/contract@0.1",
+          "npm:@orpc/contract@^1.9.3"
         ]
       }
     }

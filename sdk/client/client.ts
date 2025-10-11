@@ -1,60 +1,12 @@
-import type { WorkflowName } from "@aiki/types/workflow";
-import type { WorkflowRun } from "@aiki/types/workflow-run";
+import type { ApiClient, Client, ClientParams, Logger } from "@aiki/types/client";
 import { Redis } from "redis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import type { Contract } from "@aiki/contract";
-import type { ContractRouterClient } from "@orpc/contract";
-import {
-	resolveSubscriberStrategy,
-	type SubscriberStrategy,
-	type SubscriberStrategyBuilder,
-} from "./subscribers/strategy-resolver.ts";
-import type { Logger } from "./logger/mod.ts";
+import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver.ts";
 import { ConsoleLogger } from "./logger/mod.ts";
 
 export function client<AppContext = null>(params: ClientParams<AppContext>): Promise<Client<AppContext>> {
 	return Promise.resolve(new ClientImpl(params));
-}
-
-export interface ClientParams<AppContext> {
-	url: string;
-	redisStreams?: RedisConfig;
-	logger?: Logger;
-	contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
-}
-
-export interface RedisConfig {
-	host: string;
-	port: number;
-	password?: string;
-	db?: number;
-	maxRetriesPerRequest?: number;
-	retryDelayOnFailoverMs?: number;
-	connectTimeoutMs?: number;
-}
-
-export type ApiClient = ContractRouterClient<Contract>;
-
-export interface RedisStreamsConnection {
-	getConnection: () => Redis;
-	closeConnection: () => Promise<void>;
-}
-
-export interface Client<AppContext> {
-	api: ApiClient;
-	_internal: {
-		subscriber: {
-			create: (
-				strategy: SubscriberStrategy,
-				workflowNames: WorkflowName[],
-				workerShards?: string[],
-			) => SubscriberStrategyBuilder;
-		};
-		redisStreams: RedisStreamsConnection;
-		logger: Logger;
-		contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
-	};
 }
 
 class ClientImpl<AppContext> implements Client<AppContext> {
