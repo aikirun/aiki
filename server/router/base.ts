@@ -1,5 +1,5 @@
 import { implement } from "@orpc/server";
-import { contract } from "@aiki/contract";
+import { contract } from "../contract/mod.ts";
 import { type ServerContext, withErrorHandler } from "../middleware/mod.ts";
 
 export const baseImplementer = implement(contract)
