@@ -51,7 +51,7 @@ class WorkflowRunResultHandleImpl<Output> implements WorkflowRunResultHandle<Out
 		const delayMs = params.pollIntervalMs ?? 100;
 
 		const { result } = await withRetry(
-			this.getResult,
+			this.getResult.bind(this),
 			{
 				type: "fixed",
 				maxAttempts: Math.ceil(params.maxDurationMs / delayMs),
