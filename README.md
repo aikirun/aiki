@@ -118,7 +118,7 @@ Aiki's server orchestrates workflows and manages state, while workers execute ta
 
 ## Requirements
 
-- **Server**: Node.js 18+ or Deno 1.30+
+- **Server**: Deno 1.30+
 - **Redis**: 6.2+ (for Redis Streams)
 - **Database**: PostgreSQL 14+ (for state persistence)
 
