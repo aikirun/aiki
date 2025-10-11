@@ -1,8 +1,7 @@
-import type { BrandedString } from "@aiki/lib/string";
-import type { TriggerStrategy } from "@aiki/lib/trigger";
-import type { TaskRunResult } from "../task-run/types.ts";
+import type { TaskRunResult } from "./task-run.ts";
+import type { TriggerStrategy } from "./trigger.ts";
 
-export type WorkflowRunId = BrandedString<"workflow_run_id">;
+export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 
 // TODO: revise these states
 export type WorkflowRunState =

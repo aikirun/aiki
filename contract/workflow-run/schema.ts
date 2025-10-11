@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { WorkflowOptions, WorkflowRun, WorkflowRunResult, WorkflowRunState } from "./types.ts";
+import type { WorkflowOptions, WorkflowRun, WorkflowRunResult, WorkflowRunState } from "@aiki/types/workflow-run";
+import type { TriggerStrategy } from "@aiki/types/trigger";
 import type { UnionToRecord } from "@aiki/lib/object";
 import { taskRunResultSchema } from "../task-run/schema.ts";
 import type { zT } from "../common/schema.ts";
-import type { TriggerStrategy } from "@aiki/lib/trigger";
 
 export const workflowRunStateSchema: z.ZodEnum<UnionToRecord<WorkflowRunState>> = z.enum([
 	"scheduled",

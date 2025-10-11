@@ -5,7 +5,7 @@ import type {
 	WorkflowRunResultComplete,
 	WorkflowRunResultInComplete,
 	WorkflowRunState,
-} from "@aiki/contract/workflow-run";
+} from "@aiki/types/workflow-run";
 import type { ApiClient } from "@aiki/client";
 
 export function initWorkflowRunResultHandle<Output>(

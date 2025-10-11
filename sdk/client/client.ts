@@ -1,5 +1,5 @@
-import type { WorkflowName } from "@aiki/contract/workflow";
-import type { WorkflowRun } from "@aiki/contract/workflow-run";
+import type { WorkflowName } from "@aiki/types/workflow";
+import type { WorkflowRun } from "@aiki/types/workflow-run";
 import { Redis } from "redis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";

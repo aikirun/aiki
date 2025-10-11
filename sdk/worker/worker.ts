@@ -1,4 +1,4 @@
-import type { WorkflowRun, WorkflowRunId } from "@aiki/contract/workflow-run";
+import type { WorkflowRun, WorkflowRunId } from "@aiki/types/workflow-run";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay } from "@aiki/lib/async";
@@ -6,7 +6,7 @@ import type { Client, Logger, SubscriberStrategy } from "@aiki/client";
 import { getChildLogger } from "@aiki/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aiki/client";
 import { initWorkflowRegistry, initWorkflowRunHandle, type WorkflowRegistry } from "@aiki/workflow";
-import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { WorkflowVersion } from "@aiki/workflow";
 
 export function worker<AppContext>(

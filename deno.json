@@ -32,6 +32,7 @@
 	},
 	"workspace": [
 		"./lib",
+		"./types",
 		"./contract",
 		"./server",
 		"./sdk/client",

@@ -1,4 +1,4 @@
-import type { WorkflowRun } from "@aiki/contract/workflow-run";
+import type { WorkflowRun } from "@aiki/types/workflow-run";
 import type { Logger } from "@aiki/client";
 import type { WorkflowRunHandle } from "./run-handle.ts";
 

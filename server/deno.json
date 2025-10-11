@@ -5,9 +5,10 @@
 		".": "./mod.ts"
 	},
 	"imports": {
+		"@aiki/contract": "jsr:@aiki/contract@^0.1.0",
 		"@std/dotenv": "jsr:@std/dotenv@^0.225",
-		"@orpc/contract": "npm:@orpc/contract@^1.9.3",
 		"@orpc/server": "npm:@orpc/server@^1.9.3",
+		"@orpc/server/*": "npm:@orpc/server@^1.9.3/*",
 		"zod": "npm:zod@^4.1.12"
 	}
 }

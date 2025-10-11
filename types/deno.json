@@ -1,0 +1,12 @@
+{
+	"name": "@aiki/types",
+	"version": "0.1.0",
+	"exports": {
+		"./serializable": "./serializable.ts",
+		"./trigger": "./trigger.ts",
+		"./workflow": "./workflow.ts",
+		"./workflow-run": "./workflow-run.ts",
+		"./task": "./task.ts",
+		"./task-run": "./task-run.ts"
+	}
+}

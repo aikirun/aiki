@@ -1,5 +1,5 @@
 import { type AdaptivePollingConfig, AdaptivePollingStrategy } from "@aiki/lib/polling";
-import type { WorkflowRunId } from "@aiki/contract/workflow-run";
+import type { WorkflowRunId } from "@aiki/types/workflow-run";
 import type { Client } from "../client.ts";
 import type {
 	StrategyCallbacks,

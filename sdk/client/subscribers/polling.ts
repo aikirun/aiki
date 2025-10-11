@@ -1,5 +1,5 @@
 import { getRetryParams } from "@aiki/lib/retry";
-import type { WorkflowRunId } from "@aiki/contract/workflow-run";
+import type { WorkflowRunId } from "@aiki/types/workflow-run";
 import type { Client } from "../client.ts";
 import type {
 	StrategyCallbacks,

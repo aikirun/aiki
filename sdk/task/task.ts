@@ -1,7 +1,7 @@
 import { sha256 } from "@aiki/lib/crypto";
 import type { RetryStrategy } from "@aiki/lib/retry";
-import type { SerializableInput } from "@aiki/contract/common";
-import type { TaskName } from "@aiki/contract/task";
+import type { SerializableInput } from "@aiki/types/serializable";
+import type { TaskName } from "@aiki/types/task";
 import type { WorkflowRunContext } from "@aiki/workflow";
 import { isNonEmptyArray } from "@aiki/lib/array";
 

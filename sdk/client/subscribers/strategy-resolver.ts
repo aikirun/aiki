@@ -1,5 +1,5 @@
-import type { WorkflowName } from "@aiki/contract/workflow";
-import type { WorkflowRunId } from "@aiki/contract/workflow-run";
+import type { WorkflowName } from "@aiki/types/workflow";
+import type { WorkflowRunId } from "@aiki/types/workflow-run";
 import type { Client } from "../client.ts";
 import type { PollingSubscriberStrategy } from "./polling.ts";
 import type { AdaptivePollingSubscriberStrategy } from "./adaptive-polling.ts";

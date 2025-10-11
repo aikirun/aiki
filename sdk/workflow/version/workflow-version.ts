@@ -1,5 +1,5 @@
-import type { WorkflowName, WorkflowVersionId } from "@aiki/contract/workflow";
-import type { WorkflowOptions, WorkflowRunId } from "@aiki/contract/workflow-run";
+import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
+import type { WorkflowOptions, WorkflowRunId } from "@aiki/types/workflow-run";
 import type { Client } from "@aiki/client";
 import type { WorkflowRunContext } from "../run/context.ts";
 import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
