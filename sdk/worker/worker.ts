@@ -124,7 +124,7 @@ class WorkerImpl<AppContext> implements Worker {
 				]);
 			} catch (error) {
 				this.logger.warn("Error during graceful shutdown", {
-					error: error instanceof Error ? error.message : String(error),
+					"aiki.error": error instanceof Error ? error.message : String(error),
 				});
 			}
 		}
@@ -202,7 +202,7 @@ class WorkerImpl<AppContext> implements Worker {
 			};
 		} catch (error) {
 			this.logger.error("Error getting next workflow runs batch", {
-				error: error instanceof Error ? error.message : String(error),
+				"aiki.error": error instanceof Error ? error.message : String(error),
 			});
 
 			return {
@@ -247,9 +247,9 @@ class WorkerImpl<AppContext> implements Worker {
 			const workflowVersion = workflow._internal.getVersion(workflowRun.versionId as WorkflowVersionId);
 			if (!workflowVersion) {
 				this.logger.warn("Workflow version not found", {
-					workflowName: workflowRun.name,
-					workflowVersionId: workflowRun.versionId,
-					workflowRunId: workflowRun.id,
+					"aiki.workflowName": workflowRun.name,
+					"aiki.workflowVersionId": workflowRun.versionId,
+					"aiki.workflowRunId": workflowRun.id,
 				});
 				if (meta && this.subscriberStrategy?.acknowledge) {
 					await this.subscriberStrategy.acknowledge(workflowRunId, meta).catch(() => {});
@@ -352,8 +352,8 @@ class WorkerImpl<AppContext> implements Worker {
 
 	private handleNotificationError(error: Error): void {
 		this.logger.warn("Notification error, falling back to polling", {
-			error: error.message,
-			stack: error.stack,
+			"aiki.error": error.message,
+			"aiki.stack": error.stack,
 		});
 
 		// TODO: remove
