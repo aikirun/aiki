@@ -126,6 +126,8 @@ class WorkerImpl<AppContext> implements Worker {
 	}
 
 	private async poll(abortSignal: AbortSignal): Promise<void> {
+		this.logger.info("Worker started");
+
 		if (!this.subscriberStrategy) {
 			throw new Error("Subscriber strategy not initialized");
 		}
