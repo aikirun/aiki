@@ -4,7 +4,13 @@ import { eveningRoutineWorkflow, morningWorkflow } from "./workflows.ts";
 import { delay } from "@aiki/lib/async";
 
 if (import.meta.main) {
-	const aikiClient = await client({ url: "http://localhost:3000" });
+	const aikiClient = await client({
+		url: "http://localhost:3000",
+		redisStreams: {
+			host: "localhost",
+			port: 6379,
+		},
+	});
 
 	const workerA = worker(aikiClient, {
 		id: "worker-A",

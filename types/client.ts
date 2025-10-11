@@ -5,7 +5,7 @@ import type { WorkflowRunApi } from "./workflow-run-api.ts";
 
 export interface ClientParams<AppContext> {
 	url: string;
-	redisStreams?: RedisConfig;
+	redisStreams: RedisConfig;
 	logger?: Logger;
 	contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
 }

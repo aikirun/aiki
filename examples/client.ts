@@ -4,6 +4,10 @@ import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows.ts";
 if (import.meta.main) {
 	const aikiClient = await client({
 		url: "http://localhost:3000",
+		redisStreams: {
+			host: "localhost",
+			port: 6379,
+		},
 		contextFactory: (run) => ({
 			traceId: "123456789",
 			workflowRunId: run.id,
