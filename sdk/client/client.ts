@@ -46,6 +46,11 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 		};
 	}
 
+	public async close(): Promise<void> {
+		this.logger.info("Closing Aiki client");
+		await this.closeRedisStreamsConnection();
+	}
+
 	private getRedisStreamsConnection(): Redis {
 		if (!this.redisStreamsConnection) {
 			if (!this.params.redisStreams) {

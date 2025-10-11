@@ -12,6 +12,7 @@ export interface ClientParams<AppContext> {
 
 export interface Client<AppContext> {
 	api: ApiClient;
+	close: () => Promise<void>;
 	_internal: {
 		subscriber: {
 			create: (

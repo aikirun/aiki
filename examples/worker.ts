@@ -30,4 +30,6 @@ if (import.meta.main) {
 
 	await workerA.stop();
 	await workerB.stop();
+
+	await aikiClient.close();
 }
