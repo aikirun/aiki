@@ -229,4 +229,3 @@ Exploratory work for future capabilities.
 - Task cancellation is implemented by updating task status in storage rather than interrupting running tasks
 - Workers check cancellation status before updating storage with results
 - Focus on maintaining backward compatibility during feature additions
-- Redis Streams will be the primary/only subscriber strategy going forward
