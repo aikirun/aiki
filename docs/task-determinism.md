@@ -26,7 +26,7 @@ const calculateTax = task({
 });
 
 // This will always return { tax: 10, total: 110 } for the same input
-const result = await calculateTax.run(workflowRun, {
+const result = await calculateTax.start(workflowRun, {
 	payload: { amount: 100, taxRate: 0.1 },
 });
 ```
@@ -155,12 +155,12 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	async run(ctx, payload: any) {
 		// If this workflow crashes after validateOrder completes,
 		// it will resume here with the same result
-		const validation = await validateOrder.run(ctx, {
+		const validation = await validateOrder.start(ctx, {
 			payload,
 		});
 
 		// This will always produce the same result for the same order
-		const payment = await processPayment.run(ctx, {
+		const payment = await processPayment.start(ctx, {
 			payload: { orderId: validation.orderId, amount: validation.amount },
 		});
 	},
@@ -182,7 +182,7 @@ const testTask = task({
 });
 
 // Test case
-const result = await testTask.run(mockWorkflowRun, {
+const result = await testTask.start(mockWorkflowRun, {
 	payload: { amount: 100, taxRate: 0.1 },
 });
 // result will always be { tax: 10, total: 110 }
@@ -368,9 +368,9 @@ describe("calculateTax task", () => {
 		const payload = { amount: 100, taxRate: 0.1 };
 
 		// Run the same task multiple times
-		const result1 = await calculateTax.run(mockWorkflowRun, { payload });
-		const result2 = await calculateTax.run(mockWorkflowRun, { payload });
-		const result3 = await calculateTax.run(mockWorkflowRun, { payload });
+		const result1 = await calculateTax.start(mockWorkflowRun, { payload });
+		const result2 = await calculateTax.start(mockWorkflowRun, { payload });
+		const result3 = await calculateTax.start(mockWorkflowRun, { payload });
 
 		// All results should be identical
 		expect(result1).toEqual(result2);
@@ -386,15 +386,15 @@ describe("calculateTax task", () => {
 describe("order processing workflow", () => {
   it("should produce same result on replay", async () => {
     const orderData = { orderId: "123", items: [...] };
-    
+
     // Run workflow
-    const result1 = await orderWorkflow.enqueue(client, { payload: orderData });
+    const result1 = await orderWorkflowV1.start(client, { payload: orderData });
     const finalResult1 = await result1.waitForCompletion();
-    
+
     // Simulate replay by running again with same input
-    const result2 = await orderWorkflow.enqueue(client, { payload: orderData });
+    const result2 = await orderWorkflowV1.start(client, { payload: orderData });
     const finalResult2 = await result2.waitForCompletion();
-    
+
     // Results should be identical
     expect(finalResult1).toEqual(finalResult2);
   });

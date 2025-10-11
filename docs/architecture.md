@@ -17,7 +17,7 @@ design provides several key benefits:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Your Application                               │
-│                    (Uses Aiki SDK to enqueue workflows)                     │
+│                    (Uses Aiki SDK to start workflows)                       │
 └─────────────────────┬───────────────────────────────────────────────────────┘
                       │
                       │ SDK Client
@@ -69,7 +69,7 @@ design provides several key benefits:
 Your application uses the Aiki SDK to:
 
 - Define workflows and tasks
-- Enqueue workflow runs
+- Start workflow runs
 - Monitor workflow execution status
 - Retrieve workflow results
 
@@ -85,7 +85,7 @@ The SDK client provides a high-level interface for interacting with the Aiki Ser
 
 **Responsibilities:**
 
-- Workflow enqueueing
+- Workflow execution
 - Status monitoring
 - Result retrieval
 - Idempotency key management
@@ -134,49 +134,37 @@ The Aiki Server is the central orchestration component that manages workflow lif
 
 ### 4. Queue System & Subscriber Strategies
 
-Aiki supports multiple queue systems and subscriber strategies, allowing you to choose the right approach for your
-performance and reliability requirements.
+Aiki uses Redis Streams for high-performance, fault-tolerant message distribution between the server and workers.
+
+⚠️ **Note**: While the architecture supports pluggable subscriber strategies (simple polling, adaptive polling), Redis Streams is currently the only fully implemented and tested subscriber strategy.
 
 #### Subscriber Strategy Architecture
 
-Workers use pluggable subscriber strategies to fetch work from the queue system:
+Workers use subscriber strategies to fetch work from the queue system:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
 │                    Worker Process                          │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │            Subscriber Strategy                       │  │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐ │  │
-│  │  │   Simple    │ │  Adaptive   │ │ Redis Streams   │ │  │
-│  │  │   Polling   │ │   Polling   │ │ (Recommended)   │ │  │
-│  │  └─────────────┘ └─────────────┘ └─────────────────┘ │  │
+│  │  ┌─────────────────┐                                 │  │
+│  │  │ Redis Streams   │  (Currently Implemented)        │  │
+│  │  │                 │                                 │  │
+│  │  └─────────────────┘                                 │  │
 │  └──────────────────────────────────────────────────────┘  │
 │                           │                                │
 └───────────────────────────┼────────────────────────────────┘
                             │
                             ▼
             ┌─────────────────────────────────┐
-            │        Queue Backend            │
-            │   (Database, Redis, etc.)       │
+            │        Redis Cluster            │
+            │   (Streams & Consumer Groups)   │
             └─────────────────────────────────┘
 ```
 
-#### Strategy Types
+#### Redis Streams Strategy
 
-**1. Simple Polling Strategy**
-
-- Basic polling with fixed intervals
-- Suitable for development and low-volume scenarios
-- Uses repository-based polling with configurable intervals
-
-**2. Adaptive Polling Strategy**
-
-- Intelligent polling that adapts to workload
-- Backs off exponentially when no work is found
-- Speeds up when work is consistently available
-- Includes jitter to prevent thundering herd problems
-
-**3. Redis Streams Strategy (Recommended for Production)**
+The Redis Streams subscriber strategy provides:
 
 - High-performance Redis Streams integration
 - Built-in fault tolerance with message claiming
@@ -402,7 +390,7 @@ The storage layer provides durability and persistence for workflow state.
 
 ## Data Flow
 
-### 1. Workflow Enqueueing
+### 1. Workflow Execution
 
 ```
 Application → SDK Client → Aiki Server → Storage
@@ -410,7 +398,7 @@ Application → SDK Client → Aiki Server → Storage
                                  Queue System
 ```
 
-1. Application calls `workflow.enqueue()`
+1. Application calls `workflowVersion.start()`
 2. SDK client sends request to Aiki Server
 3. Server validates workflow and creates workflow run
 4. Server stores workflow run in storage

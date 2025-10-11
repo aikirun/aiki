@@ -12,7 +12,7 @@ the order, charging the customer, updating inventory, and sending a confirmation
 Here's how you define a workflow in Aiki:
 
 ```typescript
-import { workflow } from "@aiki/sdk/workflow";
+import { workflow } from "@aiki/workflow";
 
 const morningRoutineWorkflow = workflow({
 	name: "morning-routine",
@@ -20,11 +20,11 @@ const morningRoutineWorkflow = workflow({
 
 const morningRoutineV1 = morningRoutineWorkflow.v("1.0.0", {
 	async run(ctx, payload: { duration?: number }) {
-		const alarmResult = await ringAlarm.run(ctx, {
+		const alarmResult = await ringAlarm.start(ctx, {
 			payload: { song: "Wake up!" },
 		});
 
-		const stretchResult = await stretch.run(ctx, {
+		const stretchResult = await stretch.start(ctx, {
 			payload: { duration: payload.duration || 300 },
 		});
 
@@ -53,7 +53,7 @@ const orderProcessingV1 = orderProcessingWorkflow.v("1.0.0", {
 		const { orderData } = payload;
 
 		// Validate order
-		const validation = await validateOrder.run(ctx, {
+		const validation = await validateOrder.start(ctx, {
 			payload: { orderData },
 		});
 
@@ -64,23 +64,23 @@ const orderProcessingV1 = orderProcessingWorkflow.v("1.0.0", {
 		}
 
 		// Process payment with calculated amount
-		const payment = await processPayment.run(ctx, {
+		const payment = await processPayment.start(ctx, {
 			payload: { paymentId: validation.paymentId, amount: finalAmount },
 		});
 
 		// Conditional logic: Only update inventory if payment succeeded
 		if (payment.success) {
-			await updateInventory.run(ctx, {
+			await updateInventory.start(ctx, {
 				payload: { items: orderData.items },
 			});
 
 			// Send confirmation
-			await sendConfirmation.run(ctx, {
+			await sendConfirmation.start(ctx, {
 				payload: { email: orderData.email, amount: finalAmount },
 			});
 		} else {
 			// Handle payment failure
-			await sendPaymentFailureNotification.run(ctx, {
+			await sendPaymentFailureNotification.start(ctx, {
 				payload: { email: orderData.email, reason: payment.error },
 			});
 		}
@@ -137,7 +137,7 @@ const userOnboardingWorkflow = workflow({
 // Version 1.0.0 - Simple user onboarding
 const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
 	async run(ctx, payload: { userId: string }) {
-		await sendWelcomeEmail.run(ctx, {
+		await sendWelcomeEmail.start(ctx, {
 			payload: { userId: payload.userId },
 		});
 	},
@@ -146,10 +146,10 @@ const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
 // Version 2.0.0 - Add profile creation step
 const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
 	async run(ctx, payload: { userId: string }) {
-		await sendWelcomeEmail.run(ctx, {
+		await sendWelcomeEmail.start(ctx, {
 			payload: { userId: payload.userId },
 		});
-		await createUserProfile.run(ctx, {
+		await createUserProfile.start(ctx, {
 			payload: { userId: payload.userId },
 		});
 	},
@@ -167,19 +167,21 @@ independently. This is a fundamental concept because it allows you to handle fai
 Here's a simple task definition:
 
 ```typescript
-import { task } from "@aiki/sdk/task";
+import { task } from "@aiki/task";
 
 const ringAlarm = task({
 	name: "ring-alarm",
 	run({ payload }) {
 		// Your business logic here
 		return Promise.resolve(payload.song);
-	},
-	retry: {
-		type: "fixed",
-		maxAttempts: 3,
-		delayMs: 1000,
-	},
+	}
+	// ⚠️ Note: Task-level retry configuration is not yet implemented.
+	// Retry logic is currently handled at the workflow level.
+	// retry: {
+	//   type: "fixed",
+	//   maxAttempts: 3,
+	//   delayMs: 1000,
+	// },
 });
 ```
 
@@ -236,8 +238,8 @@ Workflow runs go through several states during their lifecycle:
 Here's how you typically interact with workflow runs:
 
 ```typescript
-// Create a workflow run
-const resultHandle = await workflow.enqueue(client, {
+// Start a workflow run
+const resultHandle = await workflowVersion.start(client, {
 	payload: { userId: "123", email: "user@example.com" },
 });
 
@@ -263,15 +265,15 @@ in Aiki - your business logic never leaves your controlled environment.
 Here's how you create and configure a worker:
 
 ```typescript
-import { worker } from "@aiki/sdk/worker";
+import { worker } from "@aiki/worker";
 
 const workerInstance = await worker(client, {
 	id: "worker-1",
 	maxConcurrentWorkflowRuns: 5,
-	workflowRunSubscriber: {
-		pollIntervalMs: 100,
-		maxBatchSize: 10,
-		maxRetryDelayMs: 30000,
+	subscriber: {
+		type: "redis_streams",
+		claimMinIdleTimeMs: 60_000,
+		blockTimeMs: 1000
 	},
 	workflowRun: {
 		heartbeatIntervalMs: 30000,
@@ -287,8 +289,7 @@ Let me break down these configuration options:
 - **maxConcurrentWorkflowRuns**: How many workflows this worker can execute simultaneously. This is significant for
   resource management.
 
-- **workflowRunSubscriber**: Configuration for how the worker polls for new workflow runs. The polling interval and
-  batch size affect performance and responsiveness.
+- **subscriber**: Configuration for how the worker receives workflow run notifications. Redis Streams is currently the only fully implemented subscriber strategy, providing high-performance message distribution with fault tolerance.
 
 - **workflowRun**: Configuration for workflow execution, including how often to send heartbeats.
 
@@ -299,7 +300,7 @@ Let me break down these configuration options:
 Workers maintain a registry of workflows they can execute. This is how the worker knows what workflows are available:
 
 ```typescript
-workerInstance.registry
+workerInstance.workflowRegistry
 	.add(morningRoutineWorkflow)
 	.add(eveningRoutineWorkflow)
 	.add(onboardingWorkflow);
@@ -314,9 +315,10 @@ Workers have a simple lifecycle:
 
 ```typescript
 // Start the worker
-workerInstance.start();
+await workerInstance.start();
 
 // The worker is now polling for workflow runs and executing them
+// Note: start() returns a Promise<void> that resolves when the worker stops
 
 // Stop the worker gracefully
 await workerInstance.stop();
@@ -397,12 +399,18 @@ It's the primary interface that your application uses to interact with Aiki.
 Here are the main operations you can perform with the client:
 
 ```typescript
-import { createClient } from "@aiki/sdk/client";
+import { client } from "@aiki/client";
 
-const client = await createClient({ url: "localhost:9090" });
+const aikiClient = await client({
+	baseUrl: "localhost:9090",
+	redis: {
+		host: "localhost",
+		port: 6379
+	}
+});
 
-// Enqueue a workflow run
-const resultHandle = await workflow.enqueue(client, {
+// Start a workflow run
+const resultHandle = await workflowVersion.start(aikiClient, {
 	payload: { userId: "123" },
 	idempotencyKey: "user-123-onboarding",
 });
@@ -418,7 +426,7 @@ const result = await resultHandle.waitForCompletion();
 
 The client provides several valuable features:
 
-- **Workflow Enqueueing**: Start new workflow executions
+- **Workflow Execution**: Start new workflow runs
 - **Status Monitoring**: Check workflow run status
 - **Result Retrieval**: Get workflow execution results
 - **Idempotency Support**: Prevent duplicate workflow runs
@@ -430,7 +438,7 @@ isn't performed multiple times.
 
 Now that we've covered all the core concepts, let me show you how they work together in a typical scenario:
 
-1. **Your application** uses the client to enqueue a workflow run
+1. **Your application** uses the client to start a workflow run
 2. **The Aiki Server** receives the request and stores the workflow run in the storage layer
 3. **The server** publishes a message to the queue system
 4. **A worker** polls the queue and receives the workflow run

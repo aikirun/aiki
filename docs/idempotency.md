@@ -7,25 +7,25 @@ you to safely retry operations without creating duplicates, even when the same r
 
 An idempotency key is a unique identifier that:
 
-- Is provided by the client when enqueueing a workflow or task
+- Is provided by the client when starting a workflow or task
 - Is stored with the workflow/task execution
 - Prevents duplicate executions when the same key is used
 - Allows safe retries of failed operations
 
 ## Workflow Idempotency
 
-When enqueueing workflows, you can provide an idempotency key to prevent duplicate workflow runs:
+When starting workflows, you can provide an idempotency key to prevent duplicate workflow runs:
 
 ```typescript
-// Enqueue a workflow with idempotency key
-const resultHandle = await orderWorkflow.enqueue(client, {
+// Start a workflow with idempotency key
+const resultHandle = await orderWorkflowV1.start(client, {
   payload: { orderId: "order-123", items: [...] },
   idempotencyKey: "order-123-process" // Unique key for this order
 });
 
 // If this exact same call is made again with the same idempotency key,
 // it will return the same workflow run instead of creating a duplicate
-const duplicateHandle = await orderWorkflow.enqueue(client, {
+const duplicateHandle = await orderWorkflowV1.start(client, {
   payload: { orderId: "order-123", items: [...] },
   idempotencyKey: "order-123-process" // Same key
 });
@@ -47,12 +47,12 @@ const sendEmail = task({
 });
 
 // First call: Actually executes the task
-await sendEmail.run(workflowRun, {
+await sendEmail.start(workflowRun, {
 	payload: { email: "user@example.com" },
 });
 
 // Second call with same payload: Returns cached result, doesn't execute again
-await sendEmail.run(workflowRun, {
+await sendEmail.start(workflowRun, {
 	payload: { email: "user@example.com" },
 });
 ```
@@ -61,7 +61,7 @@ await sendEmail.run(workflowRun, {
 
 ### Workflow Level
 
-When you provide an `idempotencyKey` when enqueueing a workflow, the system checks if a workflow run with that key
+When you provide an `idempotencyKey` when starting a workflow, the system checks if a workflow run with that key
 already exists. If it does, it returns the existing workflow run instead of creating a new one.
 
 ### Task Level
@@ -107,12 +107,12 @@ const sendEmail = task({
 });
 
 // First call: Send welcome email
-await sendEmail.run(workflowRun, {
+await sendEmail.start(workflowRun, {
 	payload: { email: "user@example.com", content: "Welcome!" },
 });
 
 // Second call: Send reminder email (same email, different intent)
-await sendEmail.run(workflowRun, {
+await sendEmail.start(workflowRun, {
 	payload: { email: "user@example.com", content: "Welcome!" },
 	idempotencyKey: "reminder-email-user-123", // Forces re-execution
 });

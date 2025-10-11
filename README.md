@@ -56,7 +56,7 @@ Aiki introduces the concept of **durable workflows** - long-running business pro
 Here's how the same order processing looks with Aiki:
 
 ```typescript
-import { workflow, task, worker, createClient } from "@aiki/sdk";
+import { workflow, task, worker, client } from "@aiki/sdk";
 
 // Define individual tasks - each one is focused and can be retried independently
 const validateOrder = task({
@@ -70,12 +70,14 @@ const processPayment = task({
   name: "process-payment",
   run({ payload }) {
     return processPaymentWithId(payload.paymentId, payload.amount);
-  },
-  retry: {
-    type: "exponential",
-    maxAttempts: 3,
-    baseDelayMs: 1000
   }
+  // ⚠️ Note: Task-level retry configuration is not yet implemented.
+  // Retry logic is currently handled at the workflow level.
+  // retry: {
+  //   type: "exponential",
+  //   maxAttempts: 3,
+  //   baseDelayMs: 1000
+  // }
 });
 
 const updateInventory = task({
@@ -100,19 +102,19 @@ const orderProcessingWorkflow = workflow({
 const orderProcessingWorkflowV1 = orderProcessingWorkflow.v("1.0.0", {
   async run(ctx, payload: { orderData: any; email: string }) {
     // Each step is a separate task that can be retried independently
-    const validation = await validateOrder.run(ctx, {
+    const validation = await validateOrder.start(ctx, {
       payload: { orderData: payload.orderData }
     });
 
-    const payment = await processPayment.run(ctx, {
+    const payment = await processPayment.start(ctx, {
       payload: { paymentId: validation.paymentId, amount: validation.amount }
     });
 
-    await updateInventory.run(ctx, {
+    await updateInventory.start(ctx, {
       payload: { items: payload.orderData.items }
     });
 
-    await sendConfirmation.run(ctx, {
+    await sendConfirmation.start(ctx, {
       payload: { email: payload.email }
     });
 
@@ -223,14 +225,14 @@ const workerInstance = await worker(aikiClient, {
 workerInstance.workflowRegistry.add(orderProcessingWorkflow);
 
 // Start processing workflows
-workerInstance.start();
+await workerInstance.start();
 
-// Note: workerInstance.start() runs indefinitely in a polling loop.
-// Don't await it unless you want your application to block until the worker stops.
+// Note: workerInstance.start() returns a Promise<void> that resolves when the worker stops.
+// The worker runs indefinitely in a polling loop until stop() is called.
 
-// Enqueue a workflow run
-const resultHandle = await orderProcessingWorkflowV1.enqueue(aikiClient, {
-  payload: { 
+// Start a workflow run
+const resultHandle = await orderProcessingWorkflowV1.start(aikiClient, {
+  payload: {
     orderData: {
       items: [{ id: "item-1", quantity: 2 }],
       customerEmail: "customer@example.com"
@@ -256,35 +258,9 @@ console.log("Order processing completed:", result);
 
 ## Subscriber Strategies & Fault Tolerance
 
-Aiki supports multiple subscriber strategies for different performance and reliability requirements:
+Aiki supports multiple subscriber strategies for different performance and reliability requirements.
 
-### Simple Polling
-Basic polling strategy suitable for development and low-volume scenarios:
-
-```typescript
-const workerInstance = await worker(client, {
-  subscriber: {
-    type: "polling",
-    intervalMs: 1000
-  }
-});
-```
-
-### Adaptive Polling
-Intelligent polling that adapts to workload, backing off when idle and speeding up when busy:
-
-```typescript
-const workerInstance = await worker(client, {
-  subscriber: {
-    type: "adaptive_polling",
-    minPollIntervalMs: 50,      // Fast polling when busy
-    maxPollIntervalMs: 5000,    // Slow polling when idle
-    emptyPollThreshold: 3       // Start backing off after 3 empty polls
-  }
-});
-```
-
-### Redis Streams (Recommended for Production)
+### Redis Streams (Recommended)
 High-performance strategy with built-in fault tolerance and message claiming:
 
 ```typescript
