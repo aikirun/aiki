@@ -92,7 +92,7 @@ export function createRedisStreamsStrategy(
 	workflowNames: WorkflowName[],
 	workerShards?: string[],
 ): SubscriberStrategyBuilder {
-	const redis = client._internal.redisStreams.getConnection();
+	const redis = client._internal.redis.getConnection();
 
 	const subscriberLogger = getChildLogger(client._internal.logger, {
 		"aiki.component": "redis-subscriber",

@@ -13,7 +13,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 	public readonly api: ApiClient;
 	public readonly _internal: Client<AppContext>["_internal"];
 	private readonly logger: Logger;
-	private redisStreamsConnection?: Redis;
+	private redisConnection?: Redis;
 
 	constructor(private readonly params: ClientParams<AppContext>) {
 		this.logger = params.logger ?? new ConsoleLogger();
@@ -37,9 +37,9 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 						workerShards,
 					),
 			},
-			redisStreams: {
-				getConnection: () => this.getRedisStreamsConnection(),
-				closeConnection: () => this.closeRedisStreamsConnection(),
+			redis: {
+				getConnection: () => this.getRedisConnection(),
+				closeConnection: () => this.closeRedisConnection(),
 			},
 			logger: this.logger,
 			contextFactory: this.params.contextFactory,
@@ -48,25 +48,25 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 
 	public async close(): Promise<void> {
 		this.logger.info("Closing Aiki client");
-		await this.closeRedisStreamsConnection();
+		await this.closeRedisConnection();
 	}
 
-	private getRedisStreamsConnection(): Redis {
-		if (!this.redisStreamsConnection) {
-			if (!this.params.redisStreams) {
+	private getRedisConnection(): Redis {
+		if (!this.redisConnection) {
+			if (!this.params.redis) {
 				throw new Error(
-					"Redis Streams configuration not provided to client. Add 'redisStreams' to ClientParams.",
+					"Redis configuration not provided to client. Add 'redis' to ClientParams.",
 				);
 			}
-			this.redisStreamsConnection = new Redis(this.params.redisStreams);
+			this.redisConnection = new Redis(this.params.redis);
 		}
-		return this.redisStreamsConnection;
+		return this.redisConnection;
 	}
 
-	private async closeRedisStreamsConnection(): Promise<void> {
-		if (this.redisStreamsConnection) {
-			await this.redisStreamsConnection.quit();
-			this.redisStreamsConnection = undefined;
+	private async closeRedisConnection(): Promise<void> {
+		if (this.redisConnection) {
+			await this.redisConnection.quit();
+			this.redisConnection = undefined;
 		}
 	}
 }

@@ -5,7 +5,7 @@ import type { WorkflowRunApi } from "./workflow-run-api.ts";
 
 export interface ClientParams<AppContext> {
 	url: string;
-	redisStreams: RedisConfig;
+	redis: RedisConfig;
 	logger?: Logger;
 	contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
 }
@@ -21,7 +21,7 @@ export interface Client<AppContext> {
 				workerShards?: string[],
 			) => SubscriberStrategyBuilder;
 		};
-		redisStreams: RedisStreamsConnection;
+		redis: RedisConnection;
 		logger: Logger;
 		contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
 	};
@@ -59,7 +59,7 @@ export interface RedisConfig {
 	connectTimeoutMs?: number;
 }
 
-export interface RedisStreamsConnection {
+export interface RedisConnection {
 	getConnection: () => RedisClient;
 	closeConnection: () => Promise<void>;
 }
