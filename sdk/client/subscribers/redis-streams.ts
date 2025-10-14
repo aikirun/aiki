@@ -94,7 +94,7 @@ export function createRedisStreamsStrategy(
 ): SubscriberStrategyBuilder {
 	const redis = client._internal.redis.getConnection();
 
-	const subscriberLogger = getChildLogger(client._internal.logger, {
+	const logger = getChildLogger(client._internal.logger, {
 		"aiki.component": "redis-subscriber",
 	});
 
@@ -142,12 +142,12 @@ export function createRedisStreamsStrategy(
 					meta.messageId,
 					"JUSTID",
 				);
-				subscriberLogger.debug("Heartbeat sent", {
+				logger.debug("Heartbeat sent", {
 					"aiki.workflowRunId": workflowRunId,
 					"aiki.messageId": meta.messageId,
 				});
 			} catch (error) {
-				subscriberLogger.warn("Heartbeat failed", {
+				logger.warn("Heartbeat failed", {
 					"aiki.workflowRunId": workflowRunId,
 					"aiki.error": error instanceof Error ? error.message : String(error),
 				});
@@ -159,18 +159,18 @@ export function createRedisStreamsStrategy(
 			const result = await redis.xack(meta.stream, meta.consumerGroup, meta.messageId);
 
 			if (result === 0) {
-				subscriberLogger.warn("Message already acknowledged", {
+				logger.warn("Message already acknowledged", {
 					"aiki.workflowRunId": workflowRunId,
 					"aiki.messageId": meta.messageId,
 				});
 			} else {
-				subscriberLogger.debug("Message acknowledged", {
+				logger.debug("Message acknowledged", {
 					"aiki.workflowRunId": workflowRunId,
 					"aiki.messageId": meta.messageId,
 				});
 			}
 		} catch (error) {
-			subscriberLogger.error("Failed to acknowledge message", {
+			logger.error("Failed to acknowledge message", {
 				"aiki.error": error instanceof Error ? error.message : String(error),
 				"aiki.workflowRunId": workflowRunId,
 				"aiki.messageId": meta.messageId,
@@ -197,7 +197,7 @@ export function createRedisStreamsStrategy(
 				getNextBatch: (size: number) =>
 					fetchRedisStreamMessages(
 						redis,
-						subscriberLogger,
+						logger,
 						streams,
 						streamConsumerGroupMap,
 						workerId,

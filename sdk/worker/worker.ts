@@ -261,7 +261,7 @@ class WorkerImpl<AppContext> implements Worker {
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 		meta?: SubscriberMessageMeta,
 	): Promise<void> {
-		const workflowLogger = getChildLogger(this.logger, {
+		const logger = getChildLogger(this.logger, {
 			"aiki.component": "workflow-execution",
 			"aiki.workflowName": workflowRun.name,
 			"aiki.workflowVersionId": workflowRun.versionId,
@@ -271,7 +271,7 @@ class WorkerImpl<AppContext> implements Worker {
 			}),
 		});
 
-		workflowLogger.info("Executing workflow");
+		logger.info("Executing workflow");
 
 		let heartbeatInterval: number | undefined;
 		let workflowSucceeded = false;
@@ -289,7 +289,7 @@ class WorkerImpl<AppContext> implements Worker {
 					try {
 						heartbeat(workflowRun.id as WorkflowRunId, meta);
 					} catch (error) {
-						workflowLogger.warn("Failed to send heartbeat", {
+						logger.warn("Failed to send heartbeat", {
 							"aiki.error": error instanceof Error ? error.message : String(error),
 						});
 					}
@@ -302,15 +302,15 @@ class WorkerImpl<AppContext> implements Worker {
 				{
 					...workflowRun,
 					handle: workflowRunHandle,
-					logger: workflowLogger,
+					logger: logger,
 				},
 				appContext,
 			);
 
 			workflowSucceeded = true;
-			workflowLogger.info("Workflow execution completed");
+			logger.info("Workflow execution completed");
 		} catch (error) {
-			workflowLogger.error("Workflow execution failed", {
+			logger.error("Workflow execution failed", {
 				"aiki.error": error instanceof Error ? error.message : String(error),
 				"aiki.stack": error instanceof Error ? error.stack : undefined,
 			});
@@ -321,15 +321,15 @@ class WorkerImpl<AppContext> implements Worker {
 				if (workflowSucceeded) {
 					try {
 						await this.subscriberStrategy.acknowledge(workflowRun.id as WorkflowRunId, meta);
-						workflowLogger.info("Message acknowledged");
+						logger.info("Message acknowledged");
 					} catch (error) {
-						workflowLogger.error("Failed to acknowledge message, it may be reprocessed", {
+						logger.error("Failed to acknowledge message, it may be reprocessed", {
 							"aiki.errorType": "MESSAGE_ACK_FAILED",
 							"aiki.error": error instanceof Error ? error.message : String(error),
 						});
 					}
 				} else {
-					workflowLogger.debug("Message left in PEL for retry");
+					logger.debug("Message left in PEL for retry");
 				}
 			}
 
