@@ -12,11 +12,6 @@ These items block production adoption and must be implemented first.
   - Need server API endpoint and database schema for output storage
   - Required for `WorkflowRunResultHandle` to actually return results
 
-### Type Safety
-- [ ] **Task Result Type Validation**: Runtime validation of pre-existing task results
-  - Currently TODO in `sdk/workflow/run/run-handle.ts` (search for type validation)
-  - Add Zod schema validation or runtime type checks
-
 ---
 
 ## Priority 1: Core Features 🎯
