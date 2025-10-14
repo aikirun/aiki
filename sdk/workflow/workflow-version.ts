@@ -87,7 +87,10 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				"aiki.stack": error instanceof Error ? error.stack : undefined,
 			});
 
-			await client.api.workflowRun.transitionStateV1({ id: run.id, status: "failed" });
+			await client.api.workflowRun.transitionStateV1({
+				id: run.id,
+				state: {status: "failed"}, 
+			});
 
 			throw error;
 		}

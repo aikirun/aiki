@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { oc } from "@orpc/contract";
-import { workflowOptionsSchema, workflowRunSchema, workflowRunStateSchema, workflowRunStatusSchema } from "./schema.ts";
+import { workflowOptionsSchema, workflowRunSchema, workflowRunStateSchema } from "./schema.ts";
 import { taskStateSchema } from "../task/schema.ts";
 import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure.ts";
 import type {
@@ -45,6 +45,13 @@ const createV1: ContractProcedure<CreateRequestV1, CreateResponseV1> = oc
 		run: workflowRunSchema,
 	}));
 
+const transitionStateV1: ContractProcedure<TransitionStateRequestV1, TransitionStateResponseV1> = oc
+	.input(z.object({
+		id: z.string().min(1),
+		state: workflowRunStateSchema,
+	}))
+	.output(z.object({}));
+
 const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, TransitionTaskStateResponseV1> = oc
 	.input(z.object({
 		id: z.string(),
@@ -53,19 +60,12 @@ const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, Tra
 	}))
 	.output(z.object({}));
 
-const transitionStateV1: ContractProcedure<TransitionStateRequestV1, TransitionStateResponseV1> = oc
-	.input(z.object({
-		id: z.string().min(1),
-		status: workflowRunStatusSchema,
-	}))
-	.output(z.object({}));
-
 export const workflowRunContract = {
 	getByIdV1,
 	getStateV1,
 	createV1,
-	transitionTaskStateV1,
 	transitionStateV1,
+	transitionTaskStateV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

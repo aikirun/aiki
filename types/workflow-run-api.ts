@@ -1,4 +1,4 @@
-import type { WorkflowOptions, WorkflowRun, WorkflowRunState, WorkflowRunStatus } from "./workflow-run.ts";
+import type { WorkflowOptions, WorkflowRun, WorkflowRunState } from "./workflow-run.ts";
 import type { TaskState } from "./task.ts";
 
 export type EmptyRecord = Record<string, never>;
@@ -30,6 +30,13 @@ export interface CreateResponseV1 {
 	run: WorkflowRun<unknown, unknown>;
 }
 
+export interface TransitionStateRequestV1 {
+	id: string;
+	state: WorkflowRunState<unknown>;
+}
+
+export type TransitionStateResponseV1 = EmptyRecord;
+
 export interface TransitionTaskStateRequestV1 {
 	id: string;
 	taskPath: string;
@@ -38,17 +45,10 @@ export interface TransitionTaskStateRequestV1 {
 
 export type TransitionTaskStateResponseV1 = EmptyRecord;
 
-export interface TransitionStateRequestV1 {
-	id: string;
-	status: WorkflowRunStatus;
-}
-
-export type TransitionStateResponseV1 = EmptyRecord;
-
 export interface WorkflowRunApi {
 	getByIdV1: (input: GetByIdRequestV1) => Promise<GetByIdResponseV1>;
 	getStateV1: (input: GetStateRequestV1) => Promise<GetStateResponseV1>;
 	createV1: (input: CreateRequestV1) => Promise<CreateResponseV1>;
-	transitionTaskStateV1: (input: TransitionTaskStateRequestV1) => Promise<TransitionTaskStateResponseV1>;
 	transitionStateV1: (input: TransitionStateRequestV1) => Promise<TransitionStateResponseV1>;
+	transitionTaskStateV1: (input: TransitionTaskStateRequestV1) => Promise<TransitionTaskStateResponseV1>;
 }
