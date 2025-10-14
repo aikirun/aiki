@@ -33,20 +33,19 @@ These items block production adoption and must be implemented first.
 Essential features for workflow orchestration.
 
 ### Workflow Primitives
-- [ ] **Durable Sleep/Timers**: Add `sleep()` and scheduled task execution
-  - Required for delayed workflows, rate limiting, polling patterns
-  - Must survive worker restarts
+- [ ] **Cron/Scheduled Workflows**: Add cron-based and time-based workflow scheduling
+  - Support recurring schedules (cron expressions)
+  - Support one-time delayed execution
+  - Major blocker - most production use cases need scheduled workflows
+- [ ] **Durable Sleep/Timers**: Add `run.sleep()` for durable delays
 - [ ] **Workflow Timeouts**: Add maximum execution time limits for workflows
   - Prevent infinite loops and runaway workflows
 - [ ] **Workflow Cancellation**: Allow cancellation of workflows and tasks in progress
   - Need graceful cancellation with cleanup handlers
 
 ### Event System (Redis Streams Based)
-- [ ] **Signal/Event System**: Send events to running workflows (Redis Streams based)
-  - Enable human-in-the-loop workflows (approvals, reviews)
-  - Support external event handling
-  - Use Redis Streams for event delivery
-  - Required for long-running workflows
+- [ ] **Event-Driven Triggers**: Enable workflows triggered by events
+- [ ] **Signals for External Communication**: Send signals to running workflows
 - [ ] **Eliminate Polling Strategies**: Remove polling and adaptive polling subscriber strategies
   - Keep only Redis Streams strategy
   - Reduces implementation complexity and maintenance burden
@@ -56,9 +55,6 @@ Essential features for workflow orchestration.
 - [ ] **Sub-workflows**: Enable workflows to trigger and orchestrate other workflows
   - Parent-child relationship tracking
   - Parallel sub-workflow execution
-- [ ] **Workflow Scheduling**: Add cron-based and time-based workflow scheduling
-  - Support one-time delayed execution
-  - Support recurring schedules (cron expressions)
 
 ---
 
@@ -66,17 +62,24 @@ Essential features for workflow orchestration.
 
 Improvements to make Aiki easier to use and debug.
 
+### CLI & Developer Tooling
+- [ ] **Dev CLI**: Command-line tool for local development and workflow management
+  - `aiki dev` - Start local development environment with hot reload
+  - `aiki runs list` - List workflow runs
+  - `aiki runs inspect <run-id>` - Inspect workflow execution details
+  - `aiki workflows trigger <name>` - Trigger workflows from CLI
+  - Local test mode without full server setup
+  - Hot reload support for workflow/task code changes
+
 ### Testing & Debugging
-- [ ] **Testing Utilities**: Add test helpers and mocks for workflow testing
-  - Mock task execution
-  - Time travel for timer testing
-  - Local test mode without server
+- [ ] **Testing Utilities Package**: Add `@aiki/testing` for workflow testing e.g. mock tasks execution, time travel
 - [ ] **Workflow History/Timeline**: Visualize workflow execution history
   - Show task execution order, durations, retries
   - Debug failed workflows
   - Export execution traces
 
 ### Observability
+- [ ] **Web Dashboard**: Web UI for workflow monitoring
 - [ ] **Enhanced Workflow Status**: Provide detailed view of tasks executed within a workflow
   - Real-time task completion tracking
   - Progress indicators
@@ -86,27 +89,34 @@ Improvements to make Aiki easier to use and debug.
   - Actionable error messages
 
 ### Documentation
+- [ ] **Go-to-Market Documentation**: Strategic documentation for adoption
+  - **Comparison Guides**: "Aiki vs Temporal"
+    - When to choose each platform
+    - Feature comparison matrices
+    - Migration considerations
+  - **Migration Guides**: "Migrating from BullMQ to Aiki", "Migrating from job queues"
+    - Step-by-step migration paths
+    - Code transformation examples
+    - Common patterns translation
+  - **Real-World Examples**: Production-ready workflow examples
+    - E-commerce order processing workflow
+    - Payment processing with retries and reconciliation
+    - Multi-tenant SaaS workflows with isolation
+    - User onboarding flows with delays and events
+  - **Best Practices**: Workflow versioning strategies
+    - When to create new versions vs update existing
+    - Managing long-running workflow migrations
+    - Testing versioned workflows
 - [ ] **API Documentation**: Comprehensive API docs with examples
   - Getting started guide
   - API reference
-  - Best practices
-- [ ] **Code Examples**: Real-world workflow examples
-  - Common patterns (retries, approvals, fan-out/fan-in)
-  - Integration examples
+  - Architecture deep-dives
 
 ---
 
 ## Priority 3: Package Architecture 📦
 
 Modularization for better tree-shaking and deployment flexibility.
-
-### Independent Packages
-- [ ] **Split into separate packages**: Enable independent installation
-  - `@aiki/workflow` - Workflow definition APIs
-  - `@aiki/task` - Task definition and execution
-  - `@aiki/worker` - Worker infrastructure
-  - `@aiki/client` - Client SDK for starting workflows
-  - Benefits: Tree-shaking, smaller bundles, clearer dependencies
 
 ### Streaming & Real-time
 - [ ] **Result Streaming**: Stream workflow results and events down to SDK (Redis Streams based)
@@ -151,7 +161,7 @@ Type safety and validation improvements.
 
 ### Input/Output Validation
 - [ ] **Schema Validation**: Implement schema validation for workflow and task payloads
-  - Support Zod, JSON Schema, or TypeBox
+  - Support Zod
   - Runtime validation at workflow/task boundaries
 - [ ] **Enhanced Type Safety**: Comprehensive TypeScript type checking for payloads and results
 
@@ -177,6 +187,19 @@ Security features for sensitive workflows.
 ## Priority 7: Performance & Optimization ⚡
 
 Performance improvements for high-scale deployments.
+
+### Concurrency Control
+- [ ] **Advanced Concurrency Control**: Workflow and task-specific limits
+    Note: Worker-level concurrency (maxConcurrentWorkflowRuns) already exists.
+    This item is about workflow limits.
+
+    - Per-workflow concurrency limits
+      - Limit max instances of a specific workflow across all workers
+      - Use case: Video processing, resource-intensive workflows
+
+    - Queue throttling
+      - Limit workflow start rate at worker level
+      - Use case: Prevent stampeding herd on system startup
 
 ### Storage & Persistence
 - [ ] **Enhanced Storage**: Improve workflow run result persistence
@@ -212,6 +235,21 @@ Exploratory work for future capabilities.
 - [ ] **Monitoring**: Enhanced monitoring and observability features
   - Metrics export (Prometheus)
   - Distributed tracing (OpenTelemetry)
+
+### Compliance & Audit (Strategic Differentiator)
+- [ ] **Built-in Compliance Features**: Compliance-ready features for regulated industries
+  - **Audit Logging**: Automatic audit trail for all workflow executions
+    - Who triggered workflow, when, with what input
+    - All state changes and task executions
+    - Immutable event log for compliance
+  - **Data Retention Policies**: Configurable retention periods
+    - Workflow-level retention configuration
+    - Automatic archival of old runs
+    - GDPR/compliance-friendly data lifecycle
+  - **PII Field Marking**: Mark sensitive fields in workflows
+    - Automatic encryption of PII fields
+    - Redaction in logs and observability
+    - Compliance reporting for data access
 
 ---
 
