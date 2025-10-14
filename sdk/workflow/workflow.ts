@@ -13,6 +13,7 @@ export interface WorkflowParams {
 export interface Workflow {
 	name: WorkflowName;
 
+	// TODO: maybe flatten out exec? accept exect directly
 	v: <Input extends SerializableInput = null, Output = void, AppContext = null>(
 		versionId: string,
 		params: WorkflowVersionParams<Input, Output, AppContext>,
