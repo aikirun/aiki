@@ -51,7 +51,9 @@ const transitionStateV1: ContractProcedure<TransitionStateRequestV1, TransitionS
 		state: workflowRunStateSchema,
 		expectedRevision: z.number(),
 	}))
-	.output(z.object({}));
+	.output(z.object({
+		newRevision: z.number(),
+	}));
 
 const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, TransitionTaskStateResponseV1> = oc
 	.input(z.object({
@@ -60,7 +62,9 @@ const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, Tra
 		taskState: taskStateSchema,
 		expectedRevision: z.number(),
 	}))
-	.output(z.object({}));
+	.output(z.object({
+		newRevision: z.number(),
+	}));
 
 export const workflowRunContract = {
 	getByIdV1,

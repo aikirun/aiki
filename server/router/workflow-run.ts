@@ -72,7 +72,7 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
 	run.state = input.state;
 	run.revision++;
 
-	return {};
+	return { newRevision: run.revision };
 });
 
 const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
@@ -95,7 +95,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
 	run.tasksState[input.taskPath] = input.taskState;
 	run.revision++;
 
-	return {};
+	return { newRevision: run.revision };
 });
 
 export const workflowRunRouter = os.router({

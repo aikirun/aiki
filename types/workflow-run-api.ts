@@ -36,7 +36,9 @@ export interface TransitionStateRequestV1 {
 	expectedRevision: number;
 }
 
-export type TransitionStateResponseV1 = EmptyRecord;
+export interface TransitionStateResponseV1 {
+	newRevision: number;
+}
 
 export interface TransitionTaskStateRequestV1 {
 	id: string;
@@ -45,7 +47,9 @@ export interface TransitionTaskStateRequestV1 {
 	expectedRevision: number;
 }
 
-export type TransitionTaskStateResponseV1 = EmptyRecord;
+export interface TransitionTaskStateResponseV1 {
+	newRevision: number;
+}
 
 export interface WorkflowRunApi {
 	getByIdV1: (input: GetByIdRequestV1) => Promise<GetByIdResponseV1>;
