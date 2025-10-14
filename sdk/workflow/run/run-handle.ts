@@ -1,6 +1,6 @@
 import type { WorkflowRun, WorkflowRunState } from "@aiki/types/workflow-run";
 import type { ApiClient } from "@aiki/types/client";
-import type { TaskRunResult } from "@aiki/types/task-run";
+import type { TaskState } from "@aiki/types/task";
 
 export function initWorkflowRunHandle<Input, Output>(
 	api: ApiClient,
@@ -15,8 +15,8 @@ export interface WorkflowRunHandle<Input, Output> {
 	updateState: (state: WorkflowRunState) => Promise<void>;
 
 	_internal: {
-		getSubTaskRunResult: (taskPath: string) => TaskRunResult<unknown>;
-		addSubTaskRunResult: (taskPath: string, taskRunResult: TaskRunResult<unknown>) => Promise<void>;
+		getTaskState: (taskPath: string) => TaskState<unknown>;
+		transitionTaskState: (taskPath: string, taskState: TaskState<unknown>) => Promise<void>;
 	};
 }
 
@@ -28,8 +28,8 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		public readonly run: WorkflowRun<Input, Output>,
 	) {
 		this._internal = {
-			getSubTaskRunResult: this.getSubTaskRunResult.bind(this),
-			addSubTaskRunResult: this.addSubTaskRunResult.bind(this),
+			getTaskState: this.getTaskState.bind(this),
+			transitionTaskState: this.transitionTaskState.bind(this),
 		};
 	}
 
@@ -37,22 +37,18 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		await this.api.workflowRun.updateStateV1({ id: this.run.id, state });
 	}
 
-	private getSubTaskRunResult(taskPath: string): TaskRunResult<unknown> {
-		return this.run.subTasksRunResult[taskPath] ?? {
+	private getTaskState(taskPath: string): TaskState<unknown> {
+		return this.run.tasksState[taskPath] ?? {
 			state: "none",
 		};
 	}
 
-	private async addSubTaskRunResult(
-		taskPath: string,
-		taskRunResult: TaskRunResult<unknown>,
-	): Promise<void> {
-		// todo: one task can have multiple results
-		await this.api.workflowRun.addSubTaskRunResultV1({
+	private async transitionTaskState(taskPath: string, taskState: TaskState<unknown>): Promise<void> {
+		await this.api.workflowRun.transitionTaskStateV1({
 			id: this.run.id,
 			taskPath,
-			taskRunResult,
+			taskState: taskState,
 		});
-		this.run.subTasksRunResult[taskPath] = taskRunResult;
+		this.run.tasksState[taskPath] = taskState;
 	}
 }

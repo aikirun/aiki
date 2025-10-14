@@ -13,7 +13,7 @@ const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 			input: null,
 			options: {},
 			result: { state: "running" },
-			subTasksRunResult: {},
+			tasksState: {},
 			subWorkflowsRunResult: {},
 		},
 	};
@@ -42,13 +42,13 @@ const createV1 = os.createV1.handler(({ input }) => {
 			input: input.input,
 			options: input.options ?? {},
 			result: { state: "queued" },
-			subTasksRunResult: {},
+			tasksState: {},
 			subWorkflowsRunResult: {},
 		},
 	};
 });
 
-const addSubTaskRunResultV1 = os.addSubTaskRunResultV1.handler(({ input: _input }) => {
+const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input: _input }) => {
 	return {};
 });
 
@@ -60,6 +60,6 @@ export const workflowRunRouter = os.router({
 	getByIdV1,
 	getResultV1,
 	createV1,
-	addSubTaskRunResultV1,
+	transitionTaskStateV1,
 	updateStateV1,
 });

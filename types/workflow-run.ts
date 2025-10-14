@@ -1,4 +1,4 @@
-import type { TaskRunResult } from "./task-run.ts";
+import type { TaskState } from "./task.ts";
 import type { TriggerStrategy } from "./trigger.ts";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
@@ -44,6 +44,6 @@ export interface WorkflowRun<Input, Output> {
 	input: Input;
 	options: WorkflowOptions;
 	result: WorkflowRunResult<Output>;
-	subTasksRunResult: Record<string, TaskRunResult<unknown>>;
+	tasksState: Record<string, TaskState<unknown>>;
 	subWorkflowsRunResult: Record<string, WorkflowRunResult<unknown>>;
 }

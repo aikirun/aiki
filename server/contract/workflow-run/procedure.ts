@@ -1,17 +1,17 @@
 import { z } from "zod";
 import { oc } from "@orpc/contract";
 import { workflowOptionsSchema, workflowRunResultSchema, workflowRunSchema, workflowRunStateSchema } from "./schema.ts";
-import { taskRunResultSchema } from "../task-run/schema.ts";
+import { taskStateSchema } from "../task/schema.ts";
 import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure.ts";
 import type {
-	AddSubTaskRunResultRequestV1,
-	AddSubTaskRunResultResponseV1,
 	CreateRequestV1,
 	CreateResponseV1,
 	GetByIdRequestV1,
 	GetByIdResponseV1,
 	GetResultRequestV1,
 	GetResultResponseV1,
+	TransitionTaskStateRequestV1,
+	TransitionTaskStateResponseV1,
 	UpdateStateRequestV1,
 	UpdateStateResponseV2,
 	WorkflowRunApi,
@@ -45,11 +45,11 @@ const createV1: ContractProcedure<CreateRequestV1, CreateResponseV1> = oc
 		run: workflowRunSchema,
 	}));
 
-const addSubTaskRunResultV1: ContractProcedure<AddSubTaskRunResultRequestV1, AddSubTaskRunResultResponseV1> = oc
+const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, TransitionTaskStateResponseV1> = oc
 	.input(z.object({
 		id: z.string(),
 		taskPath: z.string(),
-		taskRunResult: taskRunResultSchema,
+		taskState: taskStateSchema,
 	}))
 	.output(z.object({}));
 
@@ -64,7 +64,7 @@ export const workflowRunContract = {
 	getByIdV1,
 	getResultV1,
 	createV1,
-	addSubTaskRunResultV1,
+	transitionTaskStateV1,
 	updateStateV1,
 };
 

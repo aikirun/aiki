@@ -8,7 +8,7 @@ import type { WorkflowRunContext } from "@aiki/workflow";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { getChildLogger, type Logger } from "@aiki/client";
-import type { TaskRunResultFailed } from "@aiki/types/task-run";
+import type { TaskStateFailed } from "@aiki/types/task";
 import { TaskFailedError } from "./error.ts";
 
 export function task<
@@ -64,40 +64,50 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const input = isNonEmptyArray(args) ? args[0] : null as Input;
 		const path = await this.getPath(run, input);
 
-		const existingResult = run.handle._internal.getSubTaskRunResult(path);
-		if (existingResult.state === "completed") {
-			return existingResult.output as Output;
+		const currentState = run.handle._internal.getTaskState(path);
+		if (currentState.state === "completed") {
+			return currentState.output as Output;
 		}
 
-		const taskRunLogger = getChildLogger(run.logger, {
+		const logger = getChildLogger(run.logger, {
 			"aiki.component": "task-execution",
 			"aiki.taskName": this.name,
+			"aiki.taskPath": path,
 		});
 
 		let attempts = 0;
 		const retryStrategy = this.options?.retry ?? { type: "never" };
 
-		if (existingResult.state === "failed") {
-			attempts = existingResult.attempts;
-			await this.delayIfNecessary(existingResult, retryStrategy, taskRunLogger);
+		if (currentState.state === "in_progress") {
+			logger.warn("Task crashed during last attempt. Retrying task.", {
+				"aiki.attemptToRetry": currentState.attempts,
+			});
+			attempts = currentState.attempts - 1;
+		} else if (currentState.state === "failed") {
+			this.assertRetryAllowed(currentState, retryStrategy, logger);
+			logger.info("Task failed last attempt. Retrying.", {
+				"aiki.attempts": currentState.attempts,
+			});
+
+			await this.delayIfNecessary(currentState);
+			attempts = currentState.attempts;
 		}
 
 		while (true) {
 			attempts++;
 			const now = Date.now();
 
+			await run.handle._internal.transitionTaskState(path, { state: "in_progress", attempts });
+
 			try {
 				const output = await this.params.exec(input);
-				await run.handle._internal.addSubTaskRunResult(path, {
-					state: "completed",
-					output,
-				});
+				await run.handle._internal.transitionTaskState(path, { state: "completed", output });
 
-				taskRunLogger.info("Task completed", { attempts });
+				logger.info("Task completed", { "aiki.attempts": attempts });
 				return output;
 			} catch (error) {
 				const serializableError = createSerializableError(error);
-				const taskRunResult: TaskRunResultFailed = {
+				const taskState: TaskStateFailed = {
 					state: "failed",
 					reason: serializableError.message,
 					attempts,
@@ -107,26 +117,23 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {
-					await run.handle._internal.addSubTaskRunResult(path, taskRunResult);
+					await run.handle._internal.transitionTaskState(path, taskState);
 
-					taskRunLogger.error("Task failed", {
-						attempts,
-						reason: taskRunResult.reason,
+					logger.error("Task failed", {
+						"aiki.attempts": attempts,
+						"aiki.reason": taskState.reason,
 					});
-					throw new TaskFailedError(this.name, attempts, taskRunResult.reason);
+					throw new TaskFailedError(this.name, attempts, taskState.reason);
 				}
 
 				const nextAttemptAt = now + retryParams.delayMs;
 
-				await run.handle._internal.addSubTaskRunResult(path, {
-					...taskRunResult,
-					nextAttemptAt,
-				});
+				await run.handle._internal.transitionTaskState(path, { ...taskState, nextAttemptAt });
 
-				taskRunLogger.debug("Task failed. Retrying", {
+				logger.debug("Task failed. Retrying", {
 					attempts,
 					nextAttemptAt,
-					reason: taskRunResult.reason,
+					reason: taskState.reason,
 				});
 
 				await delay(retryParams.delayMs);
@@ -134,24 +141,26 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private async delayIfNecessary(
-		existingResult: TaskRunResultFailed,
+	private assertRetryAllowed(
+		taskState: TaskStateFailed,
 		retryStrategy: RetryStrategy,
 		logger: Logger,
-	): Promise<void> {
-		const retryParams = getRetryParams(existingResult.attempts, retryStrategy);
+	): void {
+		const retryParams = getRetryParams(taskState.attempts, retryStrategy);
 
 		if (!retryParams.retriesLeft) {
 			logger.error("Task failed", {
-				attempts: existingResult.attempts,
-				reason: existingResult.reason,
+				"aiki.attempts": taskState.attempts,
+				"aiki.reason": taskState.reason,
 			});
-			throw new TaskFailedError(this.name, existingResult.attempts, existingResult.reason);
+			throw new TaskFailedError(this.name, taskState.attempts, taskState.reason);
 		}
+	}
 
-		if (existingResult.nextAttemptAt !== undefined) {
+	private async delayIfNecessary(taskState: TaskStateFailed): Promise<void> {
+		if (taskState.nextAttemptAt !== undefined) {
 			const now = Date.now();
-			const remainingDelay = Math.max(0, existingResult.nextAttemptAt - now);
+			const remainingDelay = Math.max(0, taskState.nextAttemptAt - now);
 			if (remainingDelay > 0) {
 				await delay(remainingDelay);
 			}

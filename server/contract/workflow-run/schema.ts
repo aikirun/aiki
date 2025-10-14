@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { WorkflowOptions, WorkflowRun, WorkflowRunResult, WorkflowRunState } from "@aiki/types/workflow-run";
 import type { TriggerStrategy } from "@aiki/types/trigger";
 import type { UnionToRecord } from "@aiki/lib/object";
-import { taskRunResultSchema } from "../task-run/schema.ts";
+import { taskStateSchema } from "../task/schema.ts";
 import type { zT } from "../helpers/schema.ts";
 
 export const workflowRunStateSchema: z.ZodEnum<UnionToRecord<WorkflowRunState>> = z.enum([
@@ -51,6 +51,6 @@ export const workflowRunSchema: zT<WorkflowRun<unknown, unknown>> = z
 		input: z.unknown(),
 		options: workflowOptionsSchema,
 		result: workflowRunResultSchema,
-		subTasksRunResult: z.record(z.string(), taskRunResultSchema),
+		tasksState: z.record(z.string(), taskStateSchema),
 		subWorkflowsRunResult: z.record(z.string(), workflowRunResultSchema),
 	});
