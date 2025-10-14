@@ -4,16 +4,16 @@ import type { zT } from "../helpers/schema.ts";
 import { serializedErrorSchema } from "../serializable.ts";
 
 export const taskStateSchema: zT<TaskState<unknown>> = z.discriminatedUnion(
-	"state",
+	"status",
 	[
-		z.object({ state: z.literal("none") }),
+		z.object({ status: z.literal("none") }),
 		z.object({
-			state: z.literal("in_progress"),
+			status: z.literal("in_progress"),
 			attempts: z.number().int().positive(),
 		}),
-		z.object({ state: z.literal("completed"), output: z.unknown() }),
+		z.object({ status: z.literal("completed"), output: z.unknown() }),
 		z.object({
-			state: z.literal("failed"),
+			status: z.literal("failed"),
 			reason: z.string(),
 			attempts: z.number().int().positive(),
 			attemptedAt: z.number(),

@@ -39,7 +39,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 
 	private getTaskState(taskPath: string): TaskState<unknown> {
 		return this.run.tasksState[taskPath] ?? {
-			state: "none",
+			status: "none",
 		};
 	}
 

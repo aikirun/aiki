@@ -3,21 +3,21 @@ import type { SerializableError } from "./serializable.ts";
 export type TaskName = string & { _brand: "task_name" };
 
 export interface TaskStateNone {
-	state: "none";
+	status: "none";
 }
 
 export interface TaskStateInProgress {
-	state: "in_progress";
+	status: "in_progress";
 	attempts: number;
 }
 
 export interface TaskStateCompleted<Output> {
-	state: "completed";
+	status: "completed";
 	output: Output;
 }
 
 export interface TaskStateFailed {
-	state: "failed";
+	status: "failed";
 	reason: string;
 	attempts: number;
 	attemptedAt: number;
