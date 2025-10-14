@@ -52,7 +52,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input: _input 
 	return {};
 });
 
-const updateStateV1 = os.updateStateV1.handler(({ input: _input }) => {
+const transitionStateV1 = os.transitionStateV1.handler(({ input: _input }) => {
 	return {};
 });
 
@@ -61,5 +61,5 @@ export const workflowRunRouter = os.router({
 	getStateV1,
 	createV1,
 	transitionTaskStateV1,
-	updateStateV1,
+	transitionStateV1,
 });

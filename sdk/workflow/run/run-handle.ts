@@ -12,7 +12,7 @@ export function initWorkflowRunHandle<Input, Output>(
 export interface WorkflowRunHandle<Input, Output> {
 	run: WorkflowRun<Input, Output>;
 
-	updateState: (state: WorkflowRunStatus) => Promise<void>;
+	transitionState: (state: WorkflowRunStatus) => Promise<void>;
 
 	_internal: {
 		getTaskState: (taskPath: string) => TaskState<unknown>;
@@ -33,8 +33,8 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		};
 	}
 
-	public async updateState(state: WorkflowRunStatus): Promise<void> {
-		await this.api.workflowRun.updateStateV1({ id: this.run.id, state });
+	public async transitionState(state: WorkflowRunStatus): Promise<void> {
+		await this.api.workflowRun.transitionStateV1({ id: this.run.id, status: state });
 	}
 
 	private getTaskState(taskPath: string): TaskState<unknown> {

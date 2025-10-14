@@ -10,10 +10,10 @@ import type {
 	GetByIdResponseV1,
 	GetStateRequestV1,
 	GetStateResponseV1,
+	TransitionStateRequestV1,
+	TransitionStateResponseV1,
 	TransitionTaskStateRequestV1,
 	TransitionTaskStateResponseV1,
-	UpdateStateRequestV1,
-	UpdateStateResponseV2,
 	WorkflowRunApi,
 } from "@aiki/types/workflow-run-api";
 import type { Equal, ExpectTrue } from "@aiki/lib/testing/expect";
@@ -53,10 +53,10 @@ const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, Tra
 	}))
 	.output(z.object({}));
 
-const updateStateV1: ContractProcedure<UpdateStateRequestV1, UpdateStateResponseV2> = oc
+const transitionStateV1: ContractProcedure<TransitionStateRequestV1, TransitionStateResponseV1> = oc
 	.input(z.object({
 		id: z.string().min(1),
-		state: workflowRunStatusSchema,
+		status: workflowRunStatusSchema,
 	}))
 	.output(z.object({}));
 
@@ -65,7 +65,7 @@ export const workflowRunContract = {
 	getStateV1,
 	createV1,
 	transitionTaskStateV1,
-	updateStateV1,
+	transitionStateV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

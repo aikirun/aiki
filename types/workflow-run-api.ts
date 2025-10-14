@@ -38,17 +38,17 @@ export interface TransitionTaskStateRequestV1 {
 
 export type TransitionTaskStateResponseV1 = EmptyRecord;
 
-export interface UpdateStateRequestV1 {
+export interface TransitionStateRequestV1 {
 	id: string;
-	state: WorkflowRunStatus;
+	status: WorkflowRunStatus;
 }
 
-export type UpdateStateResponseV2 = EmptyRecord;
+export type TransitionStateResponseV1 = EmptyRecord;
 
 export interface WorkflowRunApi {
 	getByIdV1: (input: GetByIdRequestV1) => Promise<GetByIdResponseV1>;
 	getStateV1: (input: GetStateRequestV1) => Promise<GetStateResponseV1>;
 	createV1: (input: CreateRequestV1) => Promise<CreateResponseV1>;
 	transitionTaskStateV1: (input: TransitionTaskStateRequestV1) => Promise<TransitionTaskStateResponseV1>;
-	updateStateV1: (input: UpdateStateRequestV1) => Promise<UpdateStateResponseV2>;
+	transitionStateV1: (input: TransitionStateRequestV1) => Promise<TransitionStateResponseV1>;
 }
