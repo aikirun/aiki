@@ -1,8 +1,8 @@
 export { workflow } from "./workflow.ts";
 export type { Workflow, WorkflowParams } from "./workflow.ts";
 
-export { WorkflowVersionImpl } from "./version/workflow-version.ts";
-export type { WorkflowVersion, WorkflowVersionParams } from "./version/workflow-version.ts";
+export { WorkflowVersionImpl } from "./workflow-version.ts";
+export type { WorkflowVersion, WorkflowVersionParams } from "./workflow-version.ts";
 export type { WorkflowRunContext } from "./run/context.ts";
 
 export { initWorkflowRegistry } from "./registry.ts";

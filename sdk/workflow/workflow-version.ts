@@ -1,8 +1,8 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { WorkflowOptions, WorkflowRunId } from "@aiki/types/workflow-run";
 import type { Client } from "@aiki/types/client";
-import type { WorkflowRunContext } from "../run/context.ts";
-import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "../run/state-handle.ts";
+import type { WorkflowRunContext } from "./run/context.ts";
+import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {

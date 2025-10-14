@@ -1,6 +1,6 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { SerializableInput } from "@aiki/types/serializable";
-import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./version/workflow-version.ts";
+import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version.ts";
 
 export function workflow(params: WorkflowParams): Workflow {
 	return new WorkflowImpl(params);
