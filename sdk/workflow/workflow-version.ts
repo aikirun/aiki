@@ -28,7 +28,6 @@ export interface WorkflowVersion<Input, Output, AppContext> {
 
 	_internal: {
 		exec: (
-			client: Client<AppContext>,
 			input: Input,
 			run: WorkflowRunContext<Input, Output>,
 			context: AppContext,
@@ -73,21 +72,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	}
 
 	private async exec(
-		client: Client<AppContext>,
 		input: Input,
 		run: WorkflowRunContext<Input, Output>,
 		context: AppContext,
 	): Promise<void> {
 		try {
 			const output = await this.params.exec(input, run, context);
-
-			await client.api.workflowRun.transitionStateV1({
-				id: run.id,
-				state: {
-					status: "completed",
-					output,
-				},
-			});
+			await run.handle.transitionState({ status: "completed", output });
 
 			run.logger.info("Workflow completed successfully", {
 				"aiki.workflowRunId": run.id,
@@ -101,7 +92,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				...(failedState.cause === "task" && { "aiki.taskName": failedState.taskName }),
 			});
 
-			await client.api.workflowRun.transitionStateV1({ id: run.id, state: failedState });
+			await run.handle.transitionState(failedState);
 
 			throw error;
 		}

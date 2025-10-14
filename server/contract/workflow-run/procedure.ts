@@ -49,6 +49,7 @@ const transitionStateV1: ContractProcedure<TransitionStateRequestV1, TransitionS
 	.input(z.object({
 		id: z.string().min(1),
 		state: workflowRunStateSchema,
+		expectedRevision: z.number(),
 	}))
 	.output(z.object({}));
 
@@ -57,6 +58,7 @@ const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, Tra
 		id: z.string(),
 		taskPath: z.string(),
 		taskState: taskStateSchema,
+		expectedRevision: z.number(),
 	}))
 	.output(z.object({}));
 

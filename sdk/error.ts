@@ -13,3 +13,12 @@ export function createSerializableError(error: unknown): SerializableError {
 			name: "UnknownError",
 		};
 }
+
+export function isServerConflictError(error: unknown): boolean {
+	return (
+		error !== null &&
+		typeof error === "object" &&
+		"code" in error &&
+		error.code === "CONFLICT"
+	);
+}

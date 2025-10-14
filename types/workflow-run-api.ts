@@ -33,6 +33,7 @@ export interface CreateResponseV1 {
 export interface TransitionStateRequestV1 {
 	id: string;
 	state: WorkflowRunState<unknown>;
+	expectedRevision: number;
 }
 
 export type TransitionStateResponseV1 = EmptyRecord;
@@ -41,6 +42,7 @@ export interface TransitionTaskStateRequestV1 {
 	id: string;
 	taskPath: string;
 	taskState: TaskState<unknown>;
+	expectedRevision: number;
 }
 
 export type TransitionTaskStateResponseV1 = EmptyRecord;

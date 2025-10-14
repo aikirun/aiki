@@ -1,6 +1,6 @@
 import { baseImplementer } from "./base.ts";
 import type { WorkflowRun } from "@aiki/types/workflow-run";
-import { NotFoundError } from "../middleware/error-handler.ts";
+import { ConflictError, NotFoundError } from "../middleware/error-handler.ts";
 
 const os = baseImplementer.workflowRun;
 
@@ -39,6 +39,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 		id: runId,
 		name: input.name,
 		versionId: input.versionId,
+		revision: 0,
 		input: input.input,
 		options: input.options ?? {},
 		state: { status: "queued" },
@@ -60,7 +61,16 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
 		throw new NotFoundError(`Workflow run not found: ${input.id}`);
 	}
 
+	if (run.revision !== input.expectedRevision) {
+		throw new ConflictError(
+			`Revision conflict: expected ${input.expectedRevision}, current is ${run.revision}`,
+			run.revision,
+			input.expectedRevision,
+		);
+	}
+
 	run.state = input.state;
+	run.revision++;
 
 	return {};
 });
@@ -74,7 +84,16 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
 		throw new NotFoundError(`Workflow run not found: ${input.id}`);
 	}
 
+	if (run.revision !== input.expectedRevision) {
+		throw new ConflictError(
+			`Revision conflict: expected ${input.expectedRevision}, current is ${run.revision}`,
+			run.revision,
+			input.expectedRevision,
+		);
+	}
+
 	run.tasksState[input.taskPath] = input.taskState;
+	run.revision++;
 
 	return {};
 });

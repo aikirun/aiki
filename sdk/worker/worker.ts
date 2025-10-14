@@ -277,7 +277,7 @@ class WorkerImpl<AppContext> implements Worker {
 		let workflowSucceeded = false;
 
 		try {
-			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun);
+			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun, logger);
 
 			const appContext = this.client._internal.contextFactory
 				? await this.client._internal.contextFactory(workflowRun)
@@ -297,7 +297,6 @@ class WorkerImpl<AppContext> implements Worker {
 			}
 
 			await workflowVersion._internal.exec(
-				this.client,
 				workflowRun.input,
 				{
 					...workflowRun,

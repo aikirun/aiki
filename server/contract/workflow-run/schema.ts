@@ -67,6 +67,7 @@ export const workflowRunSchema: zT<WorkflowRun<unknown, unknown>> = z
 		id: z.string(),
 		name: z.string(),
 		versionId: z.string(),
+		revision: z.number(),
 		input: z.unknown(),
 		options: workflowOptionsSchema,
 		state: workflowRunStateSchema,

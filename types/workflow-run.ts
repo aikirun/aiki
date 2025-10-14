@@ -68,6 +68,7 @@ export interface WorkflowRun<Input, Output> {
 	id: string;
 	name: string;
 	versionId: string;
+	revision: number;
 	input: Input;
 	options: WorkflowOptions;
 	state: WorkflowRunState<Output>;
