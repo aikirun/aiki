@@ -35,6 +35,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 
 	public async transitionState(state: WorkflowRunState<Output>): Promise<void> {
 		await this.api.workflowRun.transitionStateV1({ id: this.run.id, state });
+		this.run.state = state;
 	}
 
 	private getTaskState(taskPath: string): TaskState<unknown> {
