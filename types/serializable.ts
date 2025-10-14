@@ -5,3 +5,10 @@ export type SerializableInput =
 	| boolean
 	| { [key: string]: SerializableInput }
 	| SerializableInput[];
+
+export interface SerializableError {
+	message: string;
+	name: string;
+	stack?: string;
+	cause?: SerializableError;
+}
