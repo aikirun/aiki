@@ -25,10 +25,10 @@ export const morningWorkflowV2 = morningWorkflow
 			const stretchOutput = await stretch.start(run, { duration: input.b });
 			run.logger.debug("Stretch completed", { output: stretchOutput });
 
-			const result = `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
-			run.logger.info("Morning routine completed", { result });
+			const response = `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
+			run.logger.info("Morning routine completed", { response });
 
-			return result;
+			return response;
 		},
 	})
 	.withOptions({

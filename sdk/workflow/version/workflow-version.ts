@@ -2,7 +2,7 @@ import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { WorkflowOptions, WorkflowRunId } from "@aiki/types/workflow-run";
 import type { Client } from "@aiki/types/client";
 import type { WorkflowRunContext } from "../run/context.ts";
-import { initWorkflowRunResultHandle, type WorkflowRunResultHandle } from "../run/result-handle.ts";
+import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "../run/state-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
@@ -22,7 +22,7 @@ export interface WorkflowVersion<Input, Output, AppContext> {
 	start: (
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
-	) => Promise<WorkflowRunResultHandle<Output>>;
+	) => Promise<WorkflowRunStateHandle<Output>>;
 
 	_internal: {
 		exec: (
@@ -60,14 +60,14 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	public async start(
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
-	): Promise<WorkflowRunResultHandle<Output>> {
+	): Promise<WorkflowRunStateHandle<Output>> {
 		const response = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : null,
 			options: this.options,
 		});
-		return initWorkflowRunResultHandle(response.run.id as WorkflowRunId, client.api);
+		return initWorkflowRunStateHandle(response.run.id as WorkflowRunId, client.api);
 	}
 
 	private async exec(
@@ -78,7 +78,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	): Promise<void> {
 		try {
 			await this.params.exec(input, run, context);
-			// TODO: persists workflow run result
+			// TODO: persists workflow run state
 		} catch (error) {
 			// TODO: check if it was caused by TaskFailedError
 			run.logger.error("Error while executing workflow", {

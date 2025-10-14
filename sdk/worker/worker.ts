@@ -145,8 +145,8 @@ class WorkerImpl<AppContext> implements Worker {
 				continue;
 			}
 
-			const nextBatchResult = await this.fetchNextWorkflowRunBatch(availableCapacity);
-			if (!nextBatchResult.success) {
+			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity);
+			if (!nextBatchResponse.success) {
 				subscriberFailedAttempts++;
 
 				nextDelayMs = this.subscriberStrategy.getNextDelay({
@@ -158,12 +158,12 @@ class WorkerImpl<AppContext> implements Worker {
 
 			subscriberFailedAttempts = 0;
 
-			if (!isNonEmptyArray(nextBatchResult.batch)) {
+			if (!isNonEmptyArray(nextBatchResponse.batch)) {
 				nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: false });
 				continue;
 			}
 
-			await this.enqueueWorkflowRunBatch(nextBatchResult.batch, abortSignal);
+			await this.enqueueWorkflowRunBatch(nextBatchResponse.batch, abortSignal);
 			nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: true });
 		}
 	}

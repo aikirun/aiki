@@ -12,20 +12,20 @@ const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 			versionId: "1.0.0",
 			input: null,
 			options: {},
-			result: { status: "running" },
+			state: { status: "running" },
 			tasksState: {},
-			subWorkflowsRunResult: {},
+			subWorkflowsRunState: {},
 		},
 	};
 });
 
-const getResultV1 = os.getResultV1.handler(({ input }) => {
+const getStateV1 = os.getStateV1.handler(({ input }) => {
 	// deno-lint-ignore no-console
-	console.log(`Fetching workflow run result for id: ${input.id}`);
+	console.log(`Fetching workflow run state for id: ${input.id}`);
 	return {
-		result: {
+		state: {
 			status: "completed",
-			output: { success: true, data: "mock result" },
+			output: { success: true, data: "mock data" },
 		},
 	};
 });
@@ -41,9 +41,9 @@ const createV1 = os.createV1.handler(({ input }) => {
 			versionId: input.versionId,
 			input: input.input,
 			options: input.options ?? {},
-			result: { status: "queued" },
+			state: { status: "queued" },
 			tasksState: {},
-			subWorkflowsRunResult: {},
+			subWorkflowsRunState: {},
 		},
 	};
 });
@@ -58,7 +58,7 @@ const updateStateV1 = os.updateStateV1.handler(({ input: _input }) => {
 
 export const workflowRunRouter = os.router({
 	getByIdV1,
-	getResultV1,
+	getStateV1,
 	createV1,
 	transitionTaskStateV1,
 	updateStateV1,

@@ -24,18 +24,18 @@ export interface WorkflowOptions {
 	shardKey?: string;
 }
 
-export interface WorkflowRunResultInComplete {
+export interface WorkflowRunStateInComplete {
 	status: Exclude<WorkflowRunStatus, "completed">;
 }
 
-export interface WorkflowRunResultComplete<Output> {
+export interface WorkflowRunStateComplete<Output> {
 	status: "completed";
 	output: Output;
 }
 
-export type WorkflowRunResult<Output> =
-	| WorkflowRunResultInComplete
-	| WorkflowRunResultComplete<Output>;
+export type WorkflowRunState<Output> =
+	| WorkflowRunStateInComplete
+	| WorkflowRunStateComplete<Output>;
 
 export interface WorkflowRun<Input, Output> {
 	id: string;
@@ -43,7 +43,7 @@ export interface WorkflowRun<Input, Output> {
 	versionId: string;
 	input: Input;
 	options: WorkflowOptions;
-	result: WorkflowRunResult<Output>;
+	state: WorkflowRunState<Output>;
 	tasksState: Record<string, TaskState<unknown>>;
-	subWorkflowsRunResult: Record<string, WorkflowRunResult<unknown>>;
+	subWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;
 }
