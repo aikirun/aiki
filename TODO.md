@@ -6,15 +6,6 @@ This document tracks planned features and improvements for the Aiki durable work
 
 These items block production adoption and must be implemented first.
 
-### Task Reliability
-- [ ] **Task Retry Logic**: Implement automatic retry with exponential backoff for failed tasks
-  - Currently TODO in `sdk/task/task.ts` (search for retry logic) - tasks fail permanently without retries
-  - Need to track retry attempts, implement backoff delays, persist retry state
-  - Critical for production reliability
-- [ ] **Error Serialization**: Proper error capture with stack traces and context
-  - Currently TODO in `sdk/task/task.ts` (search for error serialization) - errors cast to string without context
-  - Need to serialize Error objects with message, stack, cause, name
-
 ### Workflow Results
 - [ ] **Workflow Result Persistence**: Store and retrieve workflow execution results
   - Currently TODO in `sdk/workflow/version/workflow-version.ts` (search for result persistence)
