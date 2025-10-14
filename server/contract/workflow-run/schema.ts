@@ -4,6 +4,7 @@ import type { TriggerStrategy } from "@aiki/types/trigger";
 import type { UnionToRecord } from "@aiki/lib/object";
 import { taskStateSchema } from "../task/schema.ts";
 import type { zT } from "../helpers/schema.ts";
+import { serializedErrorSchema } from "../serializable.ts";
 
 export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>> = z.enum([
 	"scheduled",
@@ -35,11 +36,31 @@ export const workflowOptionsSchema: zT<WorkflowOptions> = z.object({
 export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 	.discriminatedUnion("status", [
 		z.object({
-			status: workflowRunStatusSchema.exclude(["completed"]),
+			status: workflowRunStatusSchema.exclude(["completed", "failed"]),
 		}),
 		z.object({
 			status: z.literal("completed"),
 			output: z.unknown(),
+		}),
+		z.object({
+			status: z.literal("failed"),
+			cause: z.literal("task"),
+			taskName: z.string(),
+			reason: z.string(),
+			error: serializedErrorSchema.optional(),
+		}),
+		z.object({
+			status: z.literal("failed"),
+			cause: z.literal("sub_workflow"),
+			subWorkflowName: z.string(),
+			reason: z.string(),
+			error: serializedErrorSchema.optional(),
+		}),
+		z.object({
+			status: z.literal("failed"),
+			cause: z.literal("self"),
+			reason: z.string(),
+			error: serializedErrorSchema.optional(),
 		}),
 	]);
 

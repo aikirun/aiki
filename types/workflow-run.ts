@@ -1,5 +1,6 @@
 import type { TaskState } from "./task.ts";
 import type { TriggerStrategy } from "./trigger.ts";
+import type { SerializableError } from "./serializable.ts";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 
@@ -25,7 +26,7 @@ export interface WorkflowOptions {
 }
 
 export interface WorkflowRunStateInComplete {
-	status: Exclude<WorkflowRunStatus, "completed">;
+	status: Exclude<WorkflowRunStatus, "completed" | "failed">;
 }
 
 export interface WorkflowRunStateComplete<Output> {
@@ -33,9 +34,35 @@ export interface WorkflowRunStateComplete<Output> {
 	output: Output;
 }
 
+interface WorkflowRunStateFailedBase {
+	status: "failed";
+	reason: string;
+	error?: SerializableError;
+}
+
+export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase {
+	cause: "task";
+	taskName: string;
+}
+
+export interface WorkflowRunStateFailedBySubWorkflow extends WorkflowRunStateFailedBase  {
+	cause: "sub_workflow";
+	subWorkflowName: string;
+}
+
+export interface WorkflowRunStateFailedBySelf extends WorkflowRunStateFailedBase {
+	cause: "self";
+}
+
+export type WorkflowRunStateFailed =
+	| WorkflowRunStateFailedByTask
+	| WorkflowRunStateFailedBySubWorkflow
+	| WorkflowRunStateFailedBySelf;
+
 export type WorkflowRunState<Output> =
 	| WorkflowRunStateInComplete
-	| WorkflowRunStateComplete<Output>;
+	| WorkflowRunStateComplete<Output>
+	| WorkflowRunStateFailed;
 
 export interface WorkflowRun<Input, Output> {
 	id: string;
