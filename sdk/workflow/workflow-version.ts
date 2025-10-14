@@ -77,19 +77,26 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		context: AppContext,
 	): Promise<void> {
 		try {
-			await this.params.exec(input, run, context);
-			// TODO: persists workflow run state
+			const output = await this.params.exec(input, run, context);
+
+			await client.api.workflowRun.transitionStateV1({
+				id: run.id,
+				state: {
+					status: "completed",
+					output,
+				},
+			});
+			run.logger.info("Workflow completed successfully");
 		} catch (error) {
 			// TODO: check if it was caused by TaskFailedError
 			run.logger.error("Error while executing workflow", {
-				"aiki.workflowRunId": run.id,
 				"aiki.error": error instanceof Error ? error.message : String(error),
 				"aiki.stack": error instanceof Error ? error.stack : undefined,
 			});
 
 			await client.api.workflowRun.transitionStateV1({
 				id: run.id,
-				state: {status: "failed"}, 
+				state: { status: "failed" },
 			});
 
 			throw error;
