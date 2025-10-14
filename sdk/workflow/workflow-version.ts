@@ -1,9 +1,11 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
-import type { WorkflowOptions, WorkflowRunId } from "@aiki/types/workflow-run";
+import type { WorkflowOptions, WorkflowRunId, WorkflowRunStateFailed } from "@aiki/types/workflow-run";
 import type { Client } from "@aiki/types/client";
 import type { WorkflowRunContext } from "./run/context.ts";
 import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
+import { createSerializableError } from "../error.ts";
+import { TaskFailedError } from "@aiki/task";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
@@ -86,20 +88,43 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 					output,
 				},
 			});
-			run.logger.info("Workflow completed successfully");
+
+			run.logger.info("Workflow completed successfully", {
+				"aiki.workflowRunId": run.id,
+			});
 		} catch (error) {
-			// TODO: check if it was caused by TaskFailedError
-			run.logger.error("Error while executing workflow", {
-				"aiki.error": error instanceof Error ? error.message : String(error),
-				"aiki.stack": error instanceof Error ? error.stack : undefined,
+			const failedState = this.createFailedState(error);
+
+			run.logger.error("Workflow failed", {
+				"aiki.failureCause": failedState.cause,
+				"aiki.reason": failedState.reason,
+				...(failedState.cause === "task" && { "aiki.taskName": failedState.taskName }),
 			});
 
-			await client.api.workflowRun.transitionStateV1({
-				id: run.id,
-				state: { status: "failed" },
-			});
+			await client.api.workflowRun.transitionStateV1({ id: run.id, state: failedState });
 
 			throw error;
 		}
+	}
+
+	private createFailedState(error: unknown): WorkflowRunStateFailed {
+		if (error instanceof TaskFailedError) {
+			return {
+				status: "failed",
+				cause: "task",
+				taskName: error.taskName,
+				reason: error.reason,
+			};
+		}
+
+		const serializableError = createSerializableError(error);
+
+		// TODO: check for other error types
+		return {
+			status: "failed",
+			cause: "self",
+			reason: serializableError.message,
+			error: serializableError,
+		};
 	}
 }

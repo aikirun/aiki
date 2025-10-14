@@ -37,7 +37,6 @@ export interface WorkflowRunStateComplete<Output> {
 interface WorkflowRunStateFailedBase {
 	status: "failed";
 	reason: string;
-	error?: SerializableError;
 }
 
 export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase {
@@ -45,13 +44,14 @@ export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase
 	taskName: string;
 }
 
-export interface WorkflowRunStateFailedBySubWorkflow extends WorkflowRunStateFailedBase  {
+export interface WorkflowRunStateFailedBySubWorkflow extends WorkflowRunStateFailedBase {
 	cause: "sub_workflow";
 	subWorkflowName: string;
 }
 
 export interface WorkflowRunStateFailedBySelf extends WorkflowRunStateFailedBase {
 	cause: "self";
+	error: SerializableError;
 }
 
 export type WorkflowRunStateFailed =

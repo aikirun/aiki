@@ -47,20 +47,18 @@ export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 			cause: z.literal("task"),
 			taskName: z.string(),
 			reason: z.string(),
-			error: serializedErrorSchema.optional(),
 		}),
 		z.object({
 			status: z.literal("failed"),
 			cause: z.literal("sub_workflow"),
 			subWorkflowName: z.string(),
 			reason: z.string(),
-			error: serializedErrorSchema.optional(),
 		}),
 		z.object({
 			status: z.literal("failed"),
 			cause: z.literal("self"),
 			reason: z.string(),
-			error: serializedErrorSchema.optional(),
+			error: serializedErrorSchema,
 		}),
 	]);
 
