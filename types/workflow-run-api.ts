@@ -1,4 +1,4 @@
-import type { WorkflowOptions, WorkflowRun, WorkflowRunResult, WorkflowRunState } from "./workflow-run.ts";
+import type { WorkflowOptions, WorkflowRun, WorkflowRunResult, WorkflowRunStatus } from "./workflow-run.ts";
 import type { TaskState } from "./task.ts";
 
 export type EmptyRecord = Record<string, never>;
@@ -40,7 +40,7 @@ export type TransitionTaskStateResponseV1 = EmptyRecord;
 
 export interface UpdateStateRequestV1 {
 	id: string;
-	state: WorkflowRunState;
+	state: WorkflowRunStatus;
 }
 
 export type UpdateStateResponseV2 = EmptyRecord;

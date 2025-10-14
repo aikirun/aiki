@@ -12,7 +12,7 @@ const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 			versionId: "1.0.0",
 			input: null,
 			options: {},
-			result: { state: "running" },
+			result: { status: "running" },
 			tasksState: {},
 			subWorkflowsRunResult: {},
 		},
@@ -24,7 +24,7 @@ const getResultV1 = os.getResultV1.handler(({ input }) => {
 	console.log(`Fetching workflow run result for id: ${input.id}`);
 	return {
 		result: {
-			state: "completed",
+			status: "completed",
 			output: { success: true, data: "mock result" },
 		},
 	};
@@ -41,7 +41,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 			versionId: input.versionId,
 			input: input.input,
 			options: input.options ?? {},
-			result: { state: "queued" },
+			result: { status: "queued" },
 			tasksState: {},
 			subWorkflowsRunResult: {},
 		},

@@ -16,7 +16,7 @@ if (import.meta.main) {
 
 	const resultHandle = await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
 
-	const { output } = await resultHandle.waitForState("completed", { maxDurationMs: 10_000 });
+	const { output } = await resultHandle.waitForStatus("completed", { maxDurationMs: 10_000 });
 	// deno-lint-ignore no-console
 	console.log(`id = ${resultHandle.id}; output = ${output}`);
 

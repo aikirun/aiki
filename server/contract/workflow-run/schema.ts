@@ -1,11 +1,11 @@
 import { z } from "zod";
-import type { WorkflowOptions, WorkflowRun, WorkflowRunResult, WorkflowRunState } from "@aiki/types/workflow-run";
+import type { WorkflowOptions, WorkflowRun, WorkflowRunResult, WorkflowRunStatus } from "@aiki/types/workflow-run";
 import type { TriggerStrategy } from "@aiki/types/trigger";
 import type { UnionToRecord } from "@aiki/lib/object";
 import { taskStateSchema } from "../task/schema.ts";
 import type { zT } from "../helpers/schema.ts";
 
-export const workflowRunStateSchema: z.ZodEnum<UnionToRecord<WorkflowRunState>> = z.enum([
+export const workflowRunStateSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>> = z.enum([
 	"scheduled",
 	"queued",
 	"starting",
@@ -33,12 +33,12 @@ export const workflowOptionsSchema: zT<WorkflowOptions> = z.object({
 });
 
 export const workflowRunResultSchema: zT<WorkflowRunResult<unknown>> = z
-	.discriminatedUnion("state", [
+	.discriminatedUnion("status", [
 		z.object({
-			state: workflowRunStateSchema.exclude(["completed"]),
+			status: workflowRunStateSchema.exclude(["completed"]),
 		}),
 		z.object({
-			state: z.literal("completed"),
+			status: z.literal("completed"),
 			output: z.unknown(),
 		}),
 	]);

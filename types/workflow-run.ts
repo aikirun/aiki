@@ -3,8 +3,8 @@ import type { TriggerStrategy } from "./trigger.ts";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 
-// TODO: revise these states
-export type WorkflowRunState =
+// TODO: revise these statuses
+export type WorkflowRunStatus =
 	| "scheduled"
 	| "queued"
 	| "starting"
@@ -25,11 +25,11 @@ export interface WorkflowOptions {
 }
 
 export interface WorkflowRunResultInComplete {
-	state: Exclude<WorkflowRunState, "completed">;
+	status: Exclude<WorkflowRunStatus, "completed">;
 }
 
 export interface WorkflowRunResultComplete<Output> {
-	state: "completed";
+	status: "completed";
 	output: Output;
 }
 

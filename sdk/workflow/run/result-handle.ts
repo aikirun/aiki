@@ -4,7 +4,7 @@ import type {
 	WorkflowRunResult,
 	WorkflowRunResultComplete,
 	WorkflowRunResultInComplete,
-	WorkflowRunState,
+	WorkflowRunStatus,
 } from "@aiki/types/workflow-run";
 import type { ApiClient } from "@aiki/types/client";
 
@@ -25,8 +25,8 @@ export interface WorkflowRunResultHandle<Output> {
 
 	getResult: () => Promise<WorkflowRunResult<Output>>;
 
-	waitForState<
-		T extends WorkflowRunState,
+	waitForStatus<
+		T extends WorkflowRunStatus,
 		U extends (T extends "completed" ? WorkflowRunResultComplete<Output>
 			: WorkflowRunResultInComplete),
 	>(state: T, params: WorkflowRunWaitSyncParams): Promise<U>;
@@ -43,11 +43,11 @@ class WorkflowRunResultHandleImpl<Output> implements WorkflowRunResultHandle<Out
 		return response.result as unknown as WorkflowRunResult<Output>;
 	}
 
-	public async waitForState<
-		T extends WorkflowRunState,
+	public async waitForStatus<
+		T extends WorkflowRunStatus,
 		U extends (T extends "completed" ? WorkflowRunResultComplete<Output>
 			: WorkflowRunResultInComplete),
-	>(state: T, params: WorkflowRunWaitSyncParams): Promise<U> {
+	>(status: T, params: WorkflowRunWaitSyncParams): Promise<U> {
 		const delayMs = params.pollIntervalMs ?? 100;
 
 		const { result } = await withRetry(
@@ -58,7 +58,7 @@ class WorkflowRunResultHandleImpl<Output> implements WorkflowRunResultHandle<Out
 				delayMs,
 			},
 			{
-				shouldRetryOnResult: (result) => Promise.resolve(result.state !== state),
+				shouldRetryOnResult: (result) => Promise.resolve(result.status !== status),
 			},
 		).run();
 

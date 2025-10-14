@@ -1,4 +1,4 @@
-import type { WorkflowRun, WorkflowRunState } from "@aiki/types/workflow-run";
+import type { WorkflowRun, WorkflowRunStatus } from "@aiki/types/workflow-run";
 import type { ApiClient } from "@aiki/types/client";
 import type { TaskState } from "@aiki/types/task";
 
@@ -12,7 +12,7 @@ export function initWorkflowRunHandle<Input, Output>(
 export interface WorkflowRunHandle<Input, Output> {
 	run: WorkflowRun<Input, Output>;
 
-	updateState: (state: WorkflowRunState) => Promise<void>;
+	updateState: (state: WorkflowRunStatus) => Promise<void>;
 
 	_internal: {
 		getTaskState: (taskPath: string) => TaskState<unknown>;
@@ -33,7 +33,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		};
 	}
 
-	public async updateState(state: WorkflowRunState): Promise<void> {
+	public async updateState(state: WorkflowRunStatus): Promise<void> {
 		await this.api.workflowRun.updateStateV1({ id: this.run.id, state });
 	}
 
