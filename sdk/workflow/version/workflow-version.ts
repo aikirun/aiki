@@ -80,6 +80,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			await this.params.exec(input, run, context);
 			// TODO: persists workflow run result
 		} catch (error) {
+			// TODO: check if it was caused by TaskFailedError
 			run.logger.error("Error while executing workflow", {
 				"aiki.workflowRunId": run.id,
 				"aiki.error": error instanceof Error ? error.message : String(error),
