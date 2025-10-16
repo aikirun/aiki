@@ -161,7 +161,7 @@ export function getRetryParams(
 				};
 			}
 			const base = strategy.baseDelayMs * Math.pow(strategy.jitterFactor ?? 2, attempts - 1);
-			const delayMs = base / 2 + Math.random() * base / 2;
+			const delayMs = Math.random() * base;
 			return {
 				retriesLeft: true,
 				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity),

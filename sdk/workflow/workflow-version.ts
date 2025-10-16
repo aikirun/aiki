@@ -6,6 +6,11 @@ import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/s
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { TaskFailedError } from "@aiki/task";
+import {
+	WorkflowCancelledError,
+	WorkflowNotExecutableError,
+	WorkflowPausedError,
+} from "./run/error.ts";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
@@ -77,6 +82,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		context: AppContext,
 	): Promise<void> {
 		try {
+			await run.handle.transitionState({ status: "running" });
 			const output = await this.params.exec(input, run, context);
 			await run.handle.transitionState({ status: "completed", output });
 
@@ -84,17 +90,32 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				"aiki.workflowRunId": run.id,
 			});
 		} catch (error) {
+			if (error instanceof WorkflowCancelledError) {
+				run.logger.info("Workflow was cancelled");
+				return;
+			}
+
+			if (error instanceof WorkflowPausedError) {
+				run.logger.info("Workflow was paused");
+				return;
+			}
+
+			if (error instanceof WorkflowNotExecutableError) {
+				run.logger.info("Workflow not executable", {
+					"aiki.currentState": error.currentState,
+				});
+				return;
+			}
+
 			const failedState = this.createFailedState(error);
 
-			run.logger.error("Workflow failed", {
+			run.logger.error("Workflow execution failed", {
 				"aiki.failureCause": failedState.cause,
 				"aiki.reason": failedState.reason,
 				...(failedState.cause === "task" && { "aiki.taskName": failedState.taskName }),
 			});
 
 			await run.handle.transitionState(failedState);
-
-			throw error;
 		}
 	}
 

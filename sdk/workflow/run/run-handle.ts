@@ -4,7 +4,12 @@ import type { TaskState } from "@aiki/types/task";
 import { delay } from "@aiki/lib/async";
 import { getRetryParams, type JitteredRetryStrategy } from "@aiki/lib/retry";
 import { isServerConflictError } from "../../error.ts";
-import { WorkflowRunConflictError } from "./error.ts";
+import {
+	WorkflowCancelledError,
+	WorkflowNotExecutableError,
+	WorkflowPausedError,
+	WorkflowRunConflictError,
+} from "./error.ts";
 
 export interface WorkflowRunHandleOptions {
 	maxRetryAttempts?: number;
@@ -54,17 +59,47 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		};
 	}
 
-	public async transitionState(state: WorkflowRunState<Output>): Promise<void> {
+	public async transitionState(targetState: WorkflowRunState<Output>): Promise<void> {
 		await this.withOptimisticRetry({
 			name: "state-transition",
+			maxAttempts: this.options.maxRetryAttempts,
 			fn: async (revision) => {
 				const { newRevision } = await this.api.workflowRun.transitionStateV1({
 					id: this.run.id,
-					state,
+					state: targetState,
 					expectedRevision: revision,
 				});
-				this.run.state = state;
+				this.run.state = targetState;
 				this.run.revision = newRevision;
+			},
+			shouldAbortOnConflict: (currentRun) => {
+				if (currentRun.state.status === "cancelled") {
+					throw new WorkflowCancelledError(this.run.id);
+				}
+				if (currentRun.state.status === "paused") {
+					throw new WorkflowPausedError(this.run.id);
+				}
+				if (
+					currentRun.state.status === "completed" ||
+					currentRun.state.status === "failed"
+				) {
+					if (currentRun.state.status === targetState.status) {
+						return true;
+					}
+					// trying to transition workflow away from a terminal state
+					throw new WorkflowNotExecutableError(this.run.id, currentRun.state.status);
+				}
+				if (
+					this.run.state.status === "queued" &&
+					targetState.status === "running" &&
+					currentRun.state.status === "running"
+				) {
+					// Race condition: Another worker started the workflow
+					throw new WorkflowNotExecutableError(this.run.id, currentRun.state.status);
+				}
+
+				// Retryable conflict: State changed but transition may still be valid
+				return false;
 			},
 		});
 	}
@@ -75,21 +110,47 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		};
 	}
 
-	private async transitionTaskState(taskPath: string, taskState: TaskState<unknown>): Promise<void> {
+	private async transitionTaskState(taskPath: string, targetTaskState: TaskState<unknown>): Promise<void> {
 		await this.withOptimisticRetry(
 			{
 				name: "task-state-transition",
+				maxAttempts: this.options.maxRetryAttempts,
 				fn: async (revision) => {
 					const { newRevision } = await this.api.workflowRun.transitionTaskStateV1({
 						id: this.run.id,
 						taskPath,
-						taskState,
+						taskState: targetTaskState,
 						expectedRevision: revision,
 					});
-					this.run.tasksState[taskPath] = taskState;
+					this.run.tasksState[taskPath] = targetTaskState;
 					this.run.revision = newRevision;
 				},
-				shouldAbort: (run) => run.tasksState[taskPath]?.status === "completed",
+				shouldAbortOnConflict: (currentRun) => {
+					if (currentRun.state.status !== "running") {
+						if (currentRun.state.status === "cancelled") {
+							throw new WorkflowCancelledError(this.run.id);
+						}
+						if (currentRun.state.status === "paused") {
+							throw new WorkflowPausedError(this.run.id);
+						}
+						throw new WorkflowNotExecutableError(this.run.id, currentRun.state.status);
+					}
+
+					const currentTaskState = currentRun.tasksState[taskPath];
+					if (currentTaskState?.status === "completed") {
+						return true;
+					}
+					if (
+						currentTaskState?.status === "running" &&
+						targetTaskState.status === "running" &&
+						currentTaskState.attempts >= targetTaskState.attempts
+					) {
+						// Another worker took over the task
+						return true;
+					}
+
+					return false;
+				},
 			},
 		);
 	}
@@ -97,13 +158,14 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 	private async withOptimisticRetry<T>(
 		operation: {
 			name: string;
+			maxAttempts: number;
 			fn: (revision: number) => Promise<T>;
-			shouldAbort?: (run: WorkflowRun<unknown, unknown>) => boolean;
+			shouldAbortOnConflict?: (currentRun: WorkflowRun<unknown, unknown>) => boolean;
 		},
 	): Promise<T | void> {
 		const retryStrategy: JitteredRetryStrategy = {
 			type: "jittered",
-			maxAttempts: this.options.maxRetryAttempts,
+			maxAttempts: operation.maxAttempts,
 			baseDelayMs: this.options.retryBaseDelayMs,
 			maxDelayMs: this.options.retryMaxDelayMs,
 		};
@@ -127,20 +189,25 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 					"aiki.operationName": operation.name,
 				});
 
-				const { run } = await this.api.workflowRun.getByIdV1({ id: this.run.id });
+				const { run: currentRun } = await this.api.workflowRun.getByIdV1({ id: this.run.id });
 
-				if (operation.shouldAbort && operation.shouldAbort(run)) {
-					this.logger.info("Operation aborted", {
-						"aiki.latestRevision": run.revision,
-						"aiki.operationName": operation.name,
-					});
-					return;
+				if (operation.shouldAbortOnConflict) {
+					try {
+						if (operation.shouldAbortOnConflict(currentRun)) {
+							this.logger.info("Operation aborted", {
+								"aiki.latestRevision": currentRun.revision,
+								"aiki.operationName": operation.name,
+							});
+							this.updateInMemoryRun(currentRun);
+							return;
+						}
+					} catch (error) {
+						this.updateInMemoryRun(currentRun);
+						throw error;
+					}
 				}
 
-				this.run.tasksState = run.tasksState;
-				this.run.state = run.state as WorkflowRunState<Output>;
-				this.run.subWorkflowsRunState = run.subWorkflowsRunState;
-				this.run.revision = run.revision;
+				this.updateInMemoryRun(currentRun);
 
 				const retryParams = getRetryParams(attempt, retryStrategy);
 				if (!retryParams.retriesLeft) {
@@ -148,7 +215,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 				}
 
 				this.logger.debug("Retrying operation with fresh state", {
-					"aiki.latestRevision": run.revision,
+					"aiki.latestRevision": currentRun.revision,
 					"aiki.attempt": attempt,
 					"aiki.operationName": operation.name,
 				});
@@ -162,5 +229,12 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 			"aiki.operationName": operation.name,
 		});
 		throw new WorkflowRunConflictError(this.run.id, operation.name, attempt);
+	}
+
+	private updateInMemoryRun(currentRun: WorkflowRun<unknown, unknown>) {
+		this.run.tasksState = currentRun.tasksState;
+		this.run.state = currentRun.state as WorkflowRunState<Output>;
+		this.run.subWorkflowsRunState = currentRun.subWorkflowsRunState;
+		this.run.revision = currentRun.revision;
 	}
 }

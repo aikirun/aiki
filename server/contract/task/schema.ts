@@ -8,7 +8,7 @@ export const taskStateSchema: zT<TaskState<unknown>> = z.discriminatedUnion(
 	[
 		z.object({ status: z.literal("none") }),
 		z.object({
-			status: z.literal("in_progress"),
+			status: z.literal("running"),
 			attempts: z.number().int().positive(),
 		}),
 		z.object({ status: z.literal("completed"), output: z.unknown() }),

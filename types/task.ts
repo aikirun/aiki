@@ -6,8 +6,8 @@ export interface TaskStateNone {
 	status: "none";
 }
 
-export interface TaskStateInProgress {
-	status: "in_progress";
+export interface TaskStateRunning {
+	status: "running";
 	attempts: number;
 }
 
@@ -27,6 +27,6 @@ export interface TaskStateFailed {
 
 export type TaskState<Output> =
 	| TaskStateNone
-	| TaskStateInProgress
+	| TaskStateRunning
 	| TaskStateCompleted<Output>
 	| TaskStateFailed;

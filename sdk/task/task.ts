@@ -78,7 +78,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		let attempts = 0;
 		const retryStrategy = this.options?.retry ?? { type: "never" };
 
-		if (currentState.status === "in_progress") {
+		if (currentState.status === "running") {
 			logger.warn("Task crashed during last attempt. Retrying task.", {
 				"aiki.attemptToRetry": currentState.attempts,
 			});
@@ -107,7 +107,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				return output;
 			} catch (error) {
 				const serializableError = createSerializableError(error);
-				const taskState: TaskStateFailed = {
+				const taskFailedState: TaskStateFailed = {
 					status: "failed",
 					reason: serializableError.message,
 					attempts,
@@ -117,23 +117,23 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {
-					await run.handle._internal.transitionTaskState(path, taskState);
+					await run.handle._internal.transitionTaskState(path, taskFailedState);
 
 					logger.error("Task failed", {
 						"aiki.attempts": attempts,
-						"aiki.reason": taskState.reason,
+						"aiki.reason": taskFailedState.reason,
 					});
-					throw new TaskFailedError(this.name, attempts, taskState.reason);
+					throw new TaskFailedError(this.name, attempts, taskFailedState.reason);
 				}
 
 				const nextAttemptAt = now + retryParams.delayMs;
 
-				await run.handle._internal.transitionTaskState(path, { ...taskState, nextAttemptAt });
+				await run.handle._internal.transitionTaskState(path, { ...taskFailedState, nextAttemptAt });
 
 				logger.debug("Task failed. Retrying", {
 					attempts,
 					nextAttemptAt,
-					reason: taskState.reason,
+					reason: taskFailedState.reason,
 				});
 
 				await delay(retryParams.delayMs);

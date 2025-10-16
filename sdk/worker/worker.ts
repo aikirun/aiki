@@ -102,16 +102,10 @@ class WorkerImpl<AppContext> implements Worker {
 		const timeoutMs = this.params.gracefulShutdownTimeoutMs ?? 5_000;
 
 		if (timeoutMs > 0) {
-			try {
-				await Promise.race([
-					Promise.all(activeWorkflowRuns.map((w) => w.executionPromise)),
-					delay(timeoutMs),
-				]);
-			} catch (error) {
-				this.logger.warn("Error during graceful shutdown", {
-					"aiki.error": error instanceof Error ? error.message : String(error),
-				});
-			}
+			await Promise.race([
+				Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)),
+				delay(timeoutMs),
+			]);
 		}
 
 		const stillActive = Array.from(this.activeWorkflowRunsById.values());
@@ -207,7 +201,7 @@ class WorkerImpl<AppContext> implements Worker {
 			const { workflowRunId } = data;
 
 			if (this.activeWorkflowRunsById.has(workflowRunId)) {
-				// Debug: Skip already in progress workflows
+				// Debug: Skip already running workflows
 				continue;
 			}
 
@@ -274,7 +268,7 @@ class WorkerImpl<AppContext> implements Worker {
 		logger.info("Executing workflow");
 
 		let heartbeatInterval: number | undefined;
-		let workflowSucceeded = false;
+		let shouldAcknowledge = false;
 
 		try {
 			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun, logger);
@@ -301,23 +295,24 @@ class WorkerImpl<AppContext> implements Worker {
 				{
 					...workflowRun,
 					handle: workflowRunHandle,
-					logger: logger,
+					logger,
 				},
 				appContext,
 			);
 
-			workflowSucceeded = true;
+			shouldAcknowledge = true;
 			logger.info("Workflow execution completed");
 		} catch (error) {
-			logger.error("Workflow execution failed", {
+			logger.error("Unexpected error during workflow execution", {
 				"aiki.error": error instanceof Error ? error.message : String(error),
 				"aiki.stack": error instanceof Error ? error.stack : undefined,
 			});
+			shouldAcknowledge = false;
 		} finally {
 			if (heartbeatInterval) clearInterval(heartbeatInterval);
 
 			if (meta && this.subscriberStrategy?.acknowledge) {
-				if (workflowSucceeded) {
+				if (shouldAcknowledge) {
 					try {
 						await this.subscriberStrategy.acknowledge(workflowRun.id as WorkflowRunId, meta);
 						logger.info("Message acknowledged");
