@@ -2,9 +2,15 @@ import { sha256 } from "@aiki/lib/crypto";
 import { delay } from "@aiki/lib/async";
 import { getRetryParams } from "@aiki/lib/retry";
 import type { RetryStrategy } from "@aiki/lib/retry";
+import { stableStringify } from "@aiki/lib/json";
 import type { SerializableInput } from "@aiki/types/serializable";
 import type { TaskName } from "@aiki/types/task";
-import type { WorkflowRunContext } from "@aiki/workflow";
+import {
+	WorkflowCancelledError,
+	WorkflowNotExecutableError,
+	WorkflowPausedError,
+	type WorkflowRunContext,
+} from "@aiki/workflow";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { getChildLogger, type Logger } from "@aiki/client";
@@ -97,7 +103,18 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			attempts++;
 			const now = Date.now();
 
-			await run.handle._internal.transitionTaskState(path, { status: "in_progress", attempts });
+			const workflowStatus = run.handle.run.state.status;
+			if (workflowStatus !== "running") {
+				if (workflowStatus === "cancelled") {
+					throw new WorkflowCancelledError(run.id);
+				}
+				if (workflowStatus === "paused") {
+					throw new WorkflowPausedError(run.id);
+				}
+				throw new WorkflowNotExecutableError(run.id, workflowStatus);
+			}
+
+			await run.handle._internal.transitionTaskState(path, { status: "running", attempts });
 
 			try {
 				const output = await this.params.exec(input);
@@ -106,6 +123,14 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				logger.info("Task completed", { "aiki.attempts": attempts });
 				return output;
 			} catch (error) {
+				if (
+					error instanceof WorkflowCancelledError ||
+					error instanceof WorkflowPausedError ||
+					error instanceof WorkflowNotExecutableError
+				) {
+					throw error;
+				}
+
 				const serializableError = createSerializableError(error);
 				const taskFailedState: TaskStateFailed = {
 					status: "failed",
@@ -173,7 +198,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	): Promise<string> {
 		const workflowRunPath = `${run.name}/${run.versionId}/${run.id}`;
 
-		const inputHash = await sha256(JSON.stringify(input));
+		const inputHash = await sha256(stableStringify(input));
 
 		return this.options?.idempotencyKey
 			? `${workflowRunPath}/${this.name}/${inputHash}/${this.options.idempotencyKey}`

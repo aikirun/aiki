@@ -5,6 +5,7 @@
 		"./array": "./array/mod.ts",
 		"./async": "./async/mod.ts",
 		"./crypto": "./crypto/mod.ts",
+		"./json": "./json/mod.ts",
 		"./object": "./object/mod.ts",
 		"./polling": "./polling/mod.ts",
 		"./process": "./process/mod.ts",
