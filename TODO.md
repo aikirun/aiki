@@ -42,6 +42,12 @@ Essential features for workflow orchestration.
   - Parent-child relationship tracking
   - Parallel sub-workflow execution
 
+### Streaming & Real-time
+- [ ] **Result Streaming**: Stream workflow results and events down to SDK (Redis Streams based)
+  - Real-time progress updates
+  - Event notifications
+  - Use Redis Streams XREAD for consumption
+
 ---
 
 ## Priority 2: Developer Experience 🛠️
@@ -97,18 +103,6 @@ Improvements to make Aiki easier to use and debug.
   - Getting started guide
   - API reference
   - Architecture deep-dives
-
----
-
-## Priority 3: Package Architecture 📦
-
-Modularization for better tree-shaking and deployment flexibility.
-
-### Streaming & Real-time
-- [ ] **Result Streaming**: Stream workflow results and events down to SDK (Redis Streams based)
-  - Real-time progress updates
-  - Event notifications
-  - Use Redis Streams XREAD for consumption
 
 ---
 
