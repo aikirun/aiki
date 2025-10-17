@@ -6,16 +6,17 @@ import { stableStringify } from "@aiki/lib/json";
 import type { SerializableInput } from "@aiki/types/serializable";
 import type { TaskName } from "@aiki/types/task";
 import {
-	WorkflowCancelledError,
-	WorkflowNotExecutableError,
-	WorkflowPausedError,
+	WorkflowRunCancelledError,
 	type WorkflowRunContext,
+	WorkflowRunNotExecutableError,
+	WorkflowRunPausedError,
 } from "@aiki/workflow";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { getChildLogger, type Logger } from "@aiki/client";
 import type { TaskStateFailed } from "@aiki/types/task";
 import { TaskFailedError } from "./error.ts";
+import type { WorkflowRunId } from "@aiki/types/workflow-run";
 
 export function task<
 	Input extends SerializableInput = null,
@@ -88,31 +89,21 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			logger.warn("Task crashed during last attempt. Retrying task.", {
 				"aiki.attemptToRetry": currentState.attempts,
 			});
-			attempts = currentState.attempts - 1;
+			attempts = currentState.attempts;
 		} else if (currentState.status === "failed") {
 			this.assertRetryAllowed(currentState, retryStrategy, logger);
 			logger.info("Task failed last attempt. Retrying.", {
 				"aiki.attempts": currentState.attempts,
 			});
-
-			await this.delayIfNecessary(currentState);
 			attempts = currentState.attempts;
+			await this.delayIfNecessary(currentState);
 		}
 
 		while (true) {
+			this.assertExecutionAllowed(run);
+
 			attempts++;
 			const now = Date.now();
-
-			const workflowStatus = run.handle.run.state.status;
-			if (workflowStatus !== "running") {
-				if (workflowStatus === "cancelled") {
-					throw new WorkflowCancelledError(run.id);
-				}
-				if (workflowStatus === "paused") {
-					throw new WorkflowPausedError(run.id);
-				}
-				throw new WorkflowNotExecutableError(run.id, workflowStatus);
-			}
 
 			await run.handle._internal.transitionTaskState(path, { status: "running", attempts });
 
@@ -123,11 +114,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				logger.info("Task completed", { "aiki.attempts": attempts });
 				return output;
 			} catch (error) {
-				if (
-					error instanceof WorkflowCancelledError ||
-					error instanceof WorkflowPausedError ||
-					error instanceof WorkflowNotExecutableError
-				) {
+				if (error instanceof WorkflowRunNotExecutableError) {
 					throw error;
 				}
 
@@ -180,6 +167,22 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			});
 			throw new TaskFailedError(this.name, taskState.attempts, taskState.reason);
 		}
+	}
+
+	private assertExecutionAllowed<WorkflowInput, WorkflowOutput>(
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+	): void {
+		const workflowStatus = run.handle.run.state.status;
+		if (workflowStatus === "running") {
+			return;
+		}
+		if (workflowStatus === "cancelled") {
+			throw new WorkflowRunCancelledError(run.id as WorkflowRunId);
+		}
+		if (workflowStatus === "paused") {
+			throw new WorkflowRunPausedError(run.id as WorkflowRunId);
+		}
+		throw new WorkflowRunNotExecutableError(run.id as WorkflowRunId, workflowStatus);
 	}
 
 	private async delayIfNecessary(taskState: TaskStateFailed): Promise<void> {
