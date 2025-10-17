@@ -92,10 +92,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			attempts = currentState.attempts;
 		} else if (currentState.status === "failed") {
 			this.assertRetryAllowed(currentState, retryStrategy, logger);
+			
 			logger.info("Task failed last attempt. Retrying.", {
 				"aiki.attempts": currentState.attempts,
 			});
 			attempts = currentState.attempts;
+			
 			await this.delayIfNecessary(currentState);
 		}
 
@@ -117,6 +119,9 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				if (error instanceof WorkflowRunNotExecutableError) {
 					throw error;
 				}
+
+				// what happens if the error was a conflic?
+				// possibly cos another worker updates the task to running state
 
 				const serializableError = createSerializableError(error);
 				const taskFailedState: TaskStateFailed = {
