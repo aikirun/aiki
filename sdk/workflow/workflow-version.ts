@@ -6,11 +6,7 @@ import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/s
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { TaskFailedError } from "@aiki/task";
-import {
-	WorkflowCancelledError,
-	WorkflowNotExecutableError,
-	WorkflowPausedError,
-} from "./run/error.ts";
+import { WorkflowRunCancelledError, WorkflowRunNotExecutableError, WorkflowRunPausedError } from "./run/error.ts";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
@@ -90,19 +86,19 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				"aiki.workflowRunId": run.id,
 			});
 		} catch (error) {
-			if (error instanceof WorkflowCancelledError) {
+			if (error instanceof WorkflowRunCancelledError) {
 				run.logger.info("Workflow was cancelled");
 				return;
 			}
 
-			if (error instanceof WorkflowPausedError) {
+			if (error instanceof WorkflowRunPausedError) {
 				run.logger.info("Workflow was paused");
 				return;
 			}
 
-			if (error instanceof WorkflowNotExecutableError) {
+			if (error instanceof WorkflowRunNotExecutableError) {
 				run.logger.info("Workflow not executable", {
-					"aiki.currentState": error.currentState,
+					"aiki.currentStatus": error.status,
 				});
 				return;
 			}

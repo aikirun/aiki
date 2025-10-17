@@ -1,14 +1,14 @@
-import type { WorkflowRun, WorkflowRunState } from "@aiki/types/workflow-run";
+import type { WorkflowRun, WorkflowRunId, WorkflowRunState } from "@aiki/types/workflow-run";
 import type { ApiClient, Logger } from "@aiki/types/client";
 import type { TaskState } from "@aiki/types/task";
 import { delay } from "@aiki/lib/async";
 import { getRetryParams, type JitteredRetryStrategy } from "@aiki/lib/retry";
 import { isServerConflictError } from "../../error.ts";
 import {
-	WorkflowCancelledError,
-	WorkflowNotExecutableError,
-	WorkflowPausedError,
+	WorkflowRunCancelledError,
 	WorkflowRunConflictError,
+	WorkflowRunNotExecutableError,
+	WorkflowRunPausedError,
 } from "./error.ts";
 
 export interface WorkflowRunHandleOptions {
@@ -74,10 +74,10 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 			},
 			shouldAbortOnConflict: (currentRun) => {
 				if (currentRun.state.status === "cancelled") {
-					throw new WorkflowCancelledError(this.run.id);
+					throw new WorkflowRunCancelledError(this.run.id as WorkflowRunId);
 				}
 				if (currentRun.state.status === "paused") {
-					throw new WorkflowPausedError(this.run.id);
+					throw new WorkflowRunPausedError(this.run.id as WorkflowRunId);
 				}
 				if (
 					currentRun.state.status === "completed" ||
@@ -87,7 +87,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 						return true;
 					}
 					// trying to transition workflow away from a terminal state
-					throw new WorkflowNotExecutableError(this.run.id, currentRun.state.status);
+					throw new WorkflowRunNotExecutableError(this.run.id as WorkflowRunId, currentRun.state.status);
 				}
 				if (
 					this.run.state.status === "queued" &&
@@ -95,7 +95,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 					currentRun.state.status === "running"
 				) {
 					// Race condition: Another worker started the workflow
-					throw new WorkflowNotExecutableError(this.run.id, currentRun.state.status);
+					throw new WorkflowRunNotExecutableError(this.run.id as WorkflowRunId, currentRun.state.status);
 				}
 
 				// Retryable conflict: State changed but transition may still be valid
@@ -128,12 +128,12 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 				shouldAbortOnConflict: (currentRun) => {
 					if (currentRun.state.status !== "running") {
 						if (currentRun.state.status === "cancelled") {
-							throw new WorkflowCancelledError(this.run.id);
+							throw new WorkflowRunCancelledError(this.run.id as WorkflowRunId);
 						}
 						if (currentRun.state.status === "paused") {
-							throw new WorkflowPausedError(this.run.id);
+							throw new WorkflowRunPausedError(this.run.id as WorkflowRunId);
 						}
-						throw new WorkflowNotExecutableError(this.run.id, currentRun.state.status);
+						throw new WorkflowRunNotExecutableError(this.run.id as WorkflowRunId, currentRun.state.status);
 					}
 
 					const currentTaskState = currentRun.tasksState[taskPath];
@@ -157,7 +157,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 
 	private async withOptimisticRetry<T>(
 		operation: {
-			name: string;
+			name: "state-transition" | "task-state-transition";
 			maxAttempts: number;
 			fn: (revision: number) => Promise<T>;
 			shouldAbortOnConflict?: (currentRun: WorkflowRun<unknown, unknown>) => boolean;
@@ -228,7 +228,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 			"aiki.attempts": attempt,
 			"aiki.operationName": operation.name,
 		});
-		throw new WorkflowRunConflictError(this.run.id, operation.name, attempt);
+		throw new WorkflowRunConflictError(this.run.id as WorkflowRunId, operation.name, attempt);
 	}
 
 	private updateInMemoryRun(currentRun: WorkflowRun<unknown, unknown>) {
