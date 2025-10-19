@@ -36,9 +36,8 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
 
     // Workflow pauses here until user clicks verification link - could be seconds or hours.
     // No resources consumed while waiting. If server crashes, resumes from this exact point.
-    const event = await run.waitForEvent("email_verified", {
-      timeout: { hours: 12 }
-    });
+    const event = await run.waitForEvent("email_verified", {timeout: { hours: 12 }});
+    
     if (!event.received) {
       await deactivateUser.start(run, {
         userId,
