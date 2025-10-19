@@ -10,5 +10,5 @@
 		"redis": "npm:ioredis@^5.4.1",
 		"zod": "npm:zod@^4.1.12"
 	},
-	"license": "MIT"
+	"license": "Apache-2.0"
 }

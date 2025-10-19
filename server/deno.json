@@ -14,5 +14,5 @@
 		"@orpc/contract": "npm:@orpc/contract@^1.9.3",
 		"zod": "npm:zod@^4.1.12"
 	},
-	"license": "MIT"
+	"license": "Apache-2.0"
 }

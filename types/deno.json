@@ -10,5 +10,5 @@
 		"./workflow-run-api": "./workflow-run-api.ts",
 		"./task": "./task.ts"
 	},
-	"license": "MIT"
+	"license": "Apache-2.0"
 }
