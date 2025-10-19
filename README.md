@@ -24,13 +24,13 @@ Here's an example user onboarding workflow spanning multiple days. Traditional j
 *Workflow definition `workflow.ts`*
 ```typescript
 import { workflow } from "@aiki/workflow";
-import {createUserProfile, sendVerificationEmail, deactivateUser, markUserVerified, sendFeatureHighlight} from "./task.ts";
+import {createUserProfile, sendVerificationEmail, deactivateUser, markUserVerified, sendUsageTips} from "./task.ts";
 
 export const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
   async exec(input: { email: string }, run) {
-    
+
     const { userId } = await createUserProfile.start(run, {email: input.email});
 
     await sendVerificationEmail.start(run, {email: input.email});
@@ -54,7 +54,7 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
     // If the server restarts during this time, workflow resumes exactly where it left off.
     await run.sleep({ days: 1 });
 
-    await sendFeatureHighlight.start(run, {email: input.email});
+    await sendUsageTips.start(run, {email: input.email});
 
     return { success: true, userId };
   }
@@ -146,8 +146,8 @@ export const markUserVerified = task({
   }
 });
 
-export const sendFeatureHighlight = task({
-  name: "send-features",
+export const sendUsageTips = task({
+  name: "send-usage-tips",
   exec(input: { email: string }) {
     return emailService.sendFeatures(input.email, {
       features: ["Advanced analytics"]
