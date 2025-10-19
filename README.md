@@ -16,50 +16,147 @@ Build reliable, long-running business processes that survive failures, restarts,
 ## Quick Start
 
 ```bash
-# Install packages
-npm install @aiki/client @aiki/worker @aiki/workflow @aiki/task
+npm install @aiki/task @aiki/workflow @aiki/client @aiki/worker
 ```
 
+Here's an example user onboarding workflow spanning multiple days. Traditional job queues would struggle with this. Aiki makes it trivial with durable state, event-driven waits, and automatic crash recovery.
+
+*Workflow definition `workflow.ts`*
+```typescript
+import { workflow } from "@aiki/workflow";
+import {createUserProfile, sendVerificationEmail, deactivateUser, markUserVerified, sendFeatureHighlight} from "./task.ts";
+
+export const onboardingWorkflow = workflow({ name: "user-onboarding" });
+
+export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
+  async exec(input: { email: string }, run) {
+    const { userId } = await createUserProfile.start(run, {email: input.email});
+
+    await sendVerificationEmail.start(run, {email: input.email});
+
+    // Workflow pauses here until user clicks verification link - could be seconds or hours.
+    // No resources consumed while waiting. If server crashes, resumes from this exact point.
+    const event = await run.waitForEvent("email_verified", {
+      timeout: { hours: 12 }
+    });
+    if (!event.received) {
+      await deactivateUser.start(run, {
+        userId,
+        reason: "email not verified"
+      });
+
+      return { success: false };
+    }
+
+    await markUserVerified.start(run, { userId });
+
+    // Sleeps for 24 hours without blocking workers or tying up resources.
+    // If the server restarts during this time, workflow resumes exactly where it left off.
+    await run.sleep({ days: 1 });
+
+    await sendFeatureHighlight.start(run, {email: input.email});
+
+    return { success: true, userId };
+  }
+});
+```
+
+*Setup worker `setup.ts`*
 ```typescript
 import { client } from "@aiki/client";
-import { task } from "@aiki/task";
 import { worker } from "@aiki/worker";
-import { workflow } from "@aiki/workflow";
+import { onboardingWorkflow } from "./workflow.ts";
 
-// Define a task
-const sendEmail = task({
-  name: "send-email",
-  exec(input: { email: string; message: string }) {
-    return sendEmailTo(input.email, input.message);
-  }
-});
-
-// Define a workflow
-const onboardingWorkflow = workflow({ name: "user-onboarding" });
-
-const onboardingV1 = onboardingWorkflow.v("1.0.0", {
-  async exec(input: { email: string }, run) {
-    await sendEmail.start(run, { email: input.email, message: "Welcome!" });
-  }
-});
-
-// Set up client and worker
-const aikiClient = await client({
+export const aikiClient = await client({
   url: "localhost:9090",
   redis: { host: "localhost", port: 6379 }
 });
 
 const aikiWorker = await worker(aikiClient, {
-  id: "worker-1",
   subscriber: { type: "redis_streams" }
 });
 
 aikiWorker.workflowRegistry.add(onboardingWorkflow);
-await aikiWorker.start();
 
-// Start a workflow
-const result = await onboardingV1.start(aikiClient, { email: "user@example.com" });
+// This worker can process workflows alongside other workers - Aiki handles distribution.
+// Scale horizontally by launching more workers pointing to the same Redis instance.
+await aikiWorker.start();
 ```
+
+*Start workflow `main.ts`*
+```typescript
+import { aikiClient } from "./setup.ts";
+import { onboardingWorkflowV1 } from "./workflow.ts";
+
+await onboardingWorkflowV1.start(aikiClient, {
+  email: "newuser@example.com"
+});
+```
+
+<details>
+<summary>Task definitions <code>task.ts</code> (click to expand)</summary>
+
+```typescript
+import { task } from "@aiki/task";
+
+export const createUserProfile = task({
+  name: "create-profile",
+  exec(input: { email: string }) {
+    const id = db.users.create({
+      email: input.email,
+      status: "pending_verification"
+    });
+    return { userId: id};
+  }
+});
+
+export const sendVerificationEmail = task({
+  name: "send-verification",
+  exec(input: { email: string }) {
+    return emailService.sendVerification(input.email);
+  }
+}).withOptions({
+  // If email sending fails it is retried up to 5 times with exponential backoff.
+  // If the worker crashes mid-retry, on recovery Aiki detects it and continues from the last attempt.
+  retry: {
+    type: "exponential",
+    maxAttempts: 5,
+    baseDelayMs: 1000,
+    maxDelayMs: 30000
+  }
+});
+
+export const deactivateUser = task({
+  name: "deactivate-user",
+  exec(input: { userId: string; reason: string }) {
+    return db.users.update({
+      where: { id: input.userId },
+      data: { status: "deactivated", deactivationReason: input.reason }
+    });
+  }
+});
+
+export const markUserVerified = task({
+  name: "mark-verified",
+  exec(input: { userId: string }) {
+    return db.users.update({
+      where: { id: input.userId },
+      data: { status: "active" }
+    });
+  }
+});
+
+export const sendFeatureHighlight = task({
+  name: "send-features",
+  exec(input: { email: string }) {
+    return emailService.sendFeatures(input.email, {
+      features: ["Advanced analytics"]
+    });
+  }
+});
+```
+
+</details>
 
 ## Architecture
 
