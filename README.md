@@ -76,7 +76,7 @@ const aikiWorker = await worker(aikiClient, {
   subscriber: { type: "redis_streams" }
 });
 
-aikiWorker.workflowRegistry.add(onboardingWorkflow);
+aikiWorker.registry.add(onboardingWorkflow);
 
 // This worker can process workflows alongside other workers - Aiki handles distribution.
 // Scale horizontally by launching more workers pointing to the same Redis instance.
