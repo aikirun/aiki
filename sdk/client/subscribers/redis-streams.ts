@@ -228,6 +228,7 @@ function getRedisStreamConsumerGroupMap(workflowNames: WorkflowName[], shardKeys
 	));
 }
 
+// TODO: attempt to claim stuck messages before fething newer ones
 async function fetchRedisStreamMessages(
 	redis: RedisClient,
 	logger: Logger,
