@@ -5,18 +5,12 @@ import type { RetryStrategy } from "@aiki/lib/retry";
 import { stableStringify } from "@aiki/lib/json";
 import type { SerializableInput } from "@aiki/types/serializable";
 import type { TaskName } from "@aiki/types/task";
-import {
-	WorkflowRunCancelledError,
-	type WorkflowRunContext,
-	WorkflowRunNotExecutableError,
-	WorkflowRunPausedError,
-} from "@aiki/workflow";
+import type { WorkflowRunContext } from "@aiki/workflow";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { getChildLogger, type Logger } from "@aiki/client";
 import type { TaskStateFailed } from "@aiki/types/task";
 import { TaskFailedError } from "./error.ts";
-import type { WorkflowRunId } from "@aiki/types/workflow-run";
 
 export function task<
 	Input extends SerializableInput = null,
@@ -67,13 +61,16 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<Output> {
-		// this cast is okay cos if args is empty, Input must be type null
-		const input = isNonEmptyArray(args) ? args[0] : null as Input;
+		const input = isNonEmptyArray(args)
+			? args[0]
+			// this cast is okay cos if args is empty, Input must be type null
+			: null as Input;
+
 		const path = await this.getPath(run, input);
 
-		const currentState = run.handle._internal.getTaskState(path);
-		if (currentState.status === "completed") {
-			return currentState.output as Output;
+		const taskState = run.handle._internal.getTaskState(path);
+		if (taskState.status === "completed") {
+			return taskState.output as Output;
 		}
 
 		const logger = getChildLogger(run.logger, {
@@ -85,44 +82,55 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		let attempts = 0;
 		const retryStrategy = this.options?.retry ?? { type: "never" };
 
-		if (currentState.status === "running") {
-			logger.warn("Task crashed during last attempt. Retrying task.", {
-				"aiki.attemptToRetry": currentState.attempts,
+		if ("attempts" in taskState) {
+			this.assertRetryAllowed(taskState.attempts, retryStrategy, logger);
+			logger.warn("Retrying task", {
+				"aiki.attempts": taskState.attempts,
+				"aiki.taskStatus": taskState.status,
 			});
-			attempts = currentState.attempts;
-		} else if (currentState.status === "failed") {
-			this.assertRetryAllowed(currentState, retryStrategy, logger);
-			
-			logger.info("Task failed last attempt. Retrying.", {
-				"aiki.attempts": currentState.attempts,
-			});
-			attempts = currentState.attempts;
-			
-			await this.delayIfNecessary(currentState);
+			attempts = taskState.attempts;
 		}
 
+		if (taskState.status === "failed") {
+			await this.delayIfNecessary(taskState);
+		}
+
+		attempts++;
+
+		logger.info("Starting task", { "aiki.attempts": attempts });
+		await run.handle._internal.transitionTaskState(path, { status: "running", attempts });
+
+		const { output, lastAttempt } = await this.tryExecuteTask(run, input, path, retryStrategy, attempts, logger);
+
+		await run.handle._internal.transitionTaskState(path, { status: "completed", output });
+		logger.info("Task complete", { "aiki.attempts": lastAttempt });
+
+		return output;
+	}
+
+	private async tryExecuteTask<WorkflowInput, WorkflowOutput>(
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		input: Input,
+		path: string,
+		retryStrategy: RetryStrategy,
+		currentAttempt: number,
+		logger: Logger,
+	): Promise<{ output: Output; lastAttempt: number }> {
+		let attempts = currentAttempt;
+
+		// TODO: Add test cases for this:
+		// Infra changes like transitioning of task state should not consume retry budged
+		// Even if task crashes while trying to transition state, it will be picked up
+		// by another worker, who will detect either fail the task if retry budget is
+		// exhaused or retry the task
+
 		while (true) {
-			this.assertExecutionAllowed(run);
-
-			attempts++;
 			const now = Date.now();
-
-			await run.handle._internal.transitionTaskState(path, { status: "running", attempts });
 
 			try {
 				const output = await this.params.exec(input);
-				await run.handle._internal.transitionTaskState(path, { status: "completed", output });
-
-				logger.info("Task completed", { "aiki.attempts": attempts });
-				return output;
+				return { output, lastAttempt: attempts };
 			} catch (error) {
-				if (error instanceof WorkflowRunNotExecutableError) {
-					throw error;
-				}
-
-				// what happens if the error was a conflic?
-				// possibly cos another worker updates the task to running state
-
 				const serializableError = createSerializableError(error);
 				const taskFailedState: TaskStateFailed = {
 					status: "failed",
@@ -135,7 +143,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {
 					await run.handle._internal.transitionTaskState(path, taskFailedState);
-
 					logger.error("Task failed", {
 						"aiki.attempts": attempts,
 						"aiki.reason": taskFailedState.reason,
@@ -146,48 +153,30 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				const nextAttemptAt = now + retryParams.delayMs;
 
 				await run.handle._internal.transitionTaskState(path, { ...taskFailedState, nextAttemptAt });
-
 				logger.debug("Task failed. Retrying", {
-					attempts,
-					nextAttemptAt,
-					reason: taskFailedState.reason,
+					"aiki.attempts": attempts,
+					"aiki.nextAttemptAt": nextAttemptAt,
+					"aiki.reason": taskFailedState.reason,
 				});
 
 				await delay(retryParams.delayMs);
+				attempts++;
 			}
 		}
 	}
 
 	private assertRetryAllowed(
-		taskState: TaskStateFailed,
+		attempts: number,
 		retryStrategy: RetryStrategy,
 		logger: Logger,
 	): void {
-		const retryParams = getRetryParams(taskState.attempts, retryStrategy);
-
+		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
-			logger.error("Task failed", {
-				"aiki.attempts": taskState.attempts,
-				"aiki.reason": taskState.reason,
+			logger.error("Retry not allowed", {
+				"aiki.attempts": attempts,
 			});
-			throw new TaskFailedError(this.name, taskState.attempts, taskState.reason);
+			throw new TaskFailedError(this.name, attempts, "Retry not allowed");
 		}
-	}
-
-	private assertExecutionAllowed<WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
-	): void {
-		const workflowStatus = run.handle.run.state.status;
-		if (workflowStatus === "running") {
-			return;
-		}
-		if (workflowStatus === "cancelled") {
-			throw new WorkflowRunCancelledError(run.id as WorkflowRunId);
-		}
-		if (workflowStatus === "paused") {
-			throw new WorkflowRunPausedError(run.id as WorkflowRunId);
-		}
-		throw new WorkflowRunNotExecutableError(run.id as WorkflowRunId, workflowStatus);
 	}
 
 	private async delayIfNecessary(taskState: TaskStateFailed): Promise<void> {
