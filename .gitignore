@@ -8,3 +8,5 @@ deno.lock
 .claude
 
 server/.env
+
+ideas.md
