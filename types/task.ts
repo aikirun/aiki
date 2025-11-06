@@ -2,21 +2,27 @@ import type { SerializableError } from "./serializable.ts";
 
 export type TaskName = string & { _brand: "task_name" };
 
-export interface TaskStateNone {
+export type TaskStatus = "none" | "running" | "completed" | "failed";
+
+interface TaskStateBase {
+	status: TaskStatus;
+}
+
+export interface TaskStateNone extends TaskStateBase {
 	status: "none";
 }
 
-export interface TaskStateRunning {
+export interface TaskStateRunning extends TaskStateBase {
 	status: "running";
 	attempts: number;
 }
 
-export interface TaskStateCompleted<Output> {
+export interface TaskStateCompleted<Output> extends TaskStateBase {
 	status: "completed";
 	output: Output;
 }
 
-export interface TaskStateFailed {
+export interface TaskStateFailed extends TaskStateBase {
 	status: "failed";
 	reason: string;
 	attempts: number;
