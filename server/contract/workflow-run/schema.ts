@@ -9,7 +9,6 @@ import { serializedErrorSchema } from "../serializable.ts";
 export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>> = z.enum([
 	"scheduled",
 	"queued",
-	"starting",
 	"running",
 	"paused",
 	"sleeping",
@@ -36,7 +35,16 @@ export const workflowOptionsSchema: zT<WorkflowOptions> = z.object({
 export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 	.discriminatedUnion("status", [
 		z.object({
-			status: workflowRunStatusSchema.exclude(["completed", "failed"]),
+			status: workflowRunStatusSchema.exclude(["queued", "completed", "failed"]),
+		}),
+		z.object({
+			status: z.literal("queued"),
+			reason: z.union([
+				z.literal("new"), 
+				z.literal("event"), 
+				z.literal("retry"), 
+				z.literal("awake")
+			]),
 		}),
 		z.object({
 			status: z.literal("completed"),

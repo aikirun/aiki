@@ -4,12 +4,10 @@ import type { SerializableError } from "./serializable.ts";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 
-// TODO: revise these statuses
 // TODO: rename sub to child
 export type WorkflowRunStatus =
 	| "scheduled"
 	| "queued"
-	| "starting"
 	| "running"
 	| "paused"
 	| "sleeping"
@@ -30,11 +28,16 @@ interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;
 }
 
-export interface WorkflowRunStateInComplete extends WorkflowRunStateBase {
-	status: Exclude<WorkflowRunStatus, "completed" | "failed">;
+export interface WorkflowRunStateOthers extends WorkflowRunStateBase {
+	status: Exclude<WorkflowRunStatus, "queued" | "completed" | "failed">;
 }
 
-export interface WorkflowRunStateComplete<Output> extends WorkflowRunStateBase {
+export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
+	status: "queued";
+	reason: "new" | "event" | "retry" | "awake";
+}
+
+export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {
 	status: "completed";
 	output: Output;
 }
@@ -65,8 +68,9 @@ export type WorkflowRunStateFailed =
 	| WorkflowRunStateFailedBySelf;
 
 export type WorkflowRunState<Output> =
-	| WorkflowRunStateInComplete
-	| WorkflowRunStateComplete<Output>
+	| WorkflowRunStateOthers
+	| WorkflowRunStateQueued
+	| WorkflowRunStateCompleted<Output>
 	| WorkflowRunStateFailed;
 
 // TODO: set default to unknown, unknown
