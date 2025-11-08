@@ -10,3 +10,4 @@ deno.lock
 server/.env
 
 ideas.md
+retry-plan.md
