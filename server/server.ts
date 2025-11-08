@@ -42,7 +42,7 @@ if (import.meta.main) {
 				console.error("Error transitioning scheduled workflows:", err);
 			});
 		},
-		500,
+		1_000,
 	);
 
 	const sleepingSchedulerInterval = setInterval(
@@ -55,7 +55,7 @@ if (import.meta.main) {
 				console.error("Error transitioning sleeping workflows:", err);
 			});
 		},
-		500,
+		1_000,
 	);
 
 	const retrySchedulerInterval = setInterval(
