@@ -129,8 +129,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		// exhaused or retry the task
 
 		while (true) {
-			const now = Date.now();
-
+			const attemptedAt = Date.now();
 			try {
 				const output = await this.params.exec(input);
 				return { output, lastAttempt: attempts };
@@ -140,7 +139,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					status: "failed",
 					reason: serializableError.message,
 					attempts,
-					attemptedAt: now,
+					attemptedAt,
 					error: serializableError,
 				};
 
@@ -154,7 +153,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					throw new TaskFailedError(this.name, attempts, taskFailedState.reason);
 				}
 
-				const nextAttemptAt = now + retryParams.delayMs;
+				const nextAttemptAt = Date.now() + retryParams.delayMs;
 
 				await runCtx.handle._internal.transitionTaskState(path, { ...taskFailedState, nextAttemptAt });
 				logger.debug("Task failed. Retrying", {
