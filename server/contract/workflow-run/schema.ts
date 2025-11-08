@@ -47,7 +47,7 @@ export const workflowOptionsSchema: zT<WorkflowOptions> = z.object({
 });
 
 export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
-	.discriminatedUnion("status", [
+	.union([
 		z.object({
 			status: workflowRunStatusSchema.exclude([
 				"scheduled",
