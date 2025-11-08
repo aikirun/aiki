@@ -76,6 +76,10 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
 	run.state = input.state;
 	run.revision++;
 
+	if (input.state.status === "running") {
+		run.attempts++;
+	}
+
 	return { newRevision: run.revision };
 });
 
@@ -132,11 +136,9 @@ export function transitionRetryableWorkflowsToQueued() {
 			reason: "retry",
 		};
 		run.revision++;
-		// TODO: Incrementing the attempt counter should be done when the workflow is transitioned into running state.
-		// run.attempts++;
 
 		// deno-lint-ignore no-console
-		console.log(`Transitioned workflow ${id} from awaiting_retry to queued`);
+		console.log(`Transitioned workflow ${id} from awaiting_retry to queued (attempt ${run.attempts})`);
 	}
 }
 
