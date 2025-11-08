@@ -1,12 +1,16 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
-import type { WorkflowOptions, WorkflowRunId, WorkflowRunState, WorkflowRunStateFailed, WorkflowRunStateQueued, WorkflowRunStateRunning } from "@aiki/types/workflow-run";
+import type {
+	WorkflowOptions,
+	WorkflowRunId,
+	WorkflowRunStateFailed,
+} from "@aiki/types/workflow-run";
 import type { Client } from "@aiki/types/client";
 import type { WorkflowRunContext } from "./run/context.ts";
 import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { TaskFailedError } from "@aiki/task";
-import { WorkflowRunFailedError, WorkflowRunNotExecutableError } from "./run/error.ts";
+import { WorkflowRunFailedError } from "./run/error.ts";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
@@ -77,16 +81,17 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		runCtx: WorkflowRunContext<Input, Output>,
 		context: AppContext,
 	): Promise<void> {
-		const workflowRunState = runCtx.handle.run.state;
-		this.assertExecutionAllowed(runCtx.id as WorkflowRunId, workflowRunState);
+		const { handle, logger } = runCtx;
 
-		runCtx.logger.info("Starting workflow");
-		await runCtx.handle.transitionState({ status: "running" });
+		await handle._internal.assertExecutionAllowed();
+
+		logger.info("Starting workflow");
+		await handle.transitionState({ status: "running" });
 
 		const output = await this.tryExecuteWorkflow(input, runCtx, context);
 
-		await runCtx.handle.transitionState({ status: "completed", output });
-		runCtx.logger.info("Workflow complete");
+		await handle.transitionState({ status: "completed", output });
+		logger.info("Workflow complete");
 	}
 
 	private async tryExecuteWorkflow(
@@ -109,16 +114,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 
 			throw new WorkflowRunFailedError(runCtx.id as WorkflowRunId);
 		}
-	}
-
-	private assertExecutionAllowed(
-		id: WorkflowRunId,
-		workflowRunState: WorkflowRunState<Output>,
-	): asserts workflowRunState is WorkflowRunStateQueued | WorkflowRunStateRunning {
-		if (workflowRunState.status === "queued" || workflowRunState.status === "running") {
-			return;
-		}
-		throw new WorkflowRunNotExecutableError(id as WorkflowRunId, workflowRunState.status);
 	}
 
 	private createFailedState(error: unknown): WorkflowRunStateFailed {

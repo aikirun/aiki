@@ -1,6 +1,7 @@
-import type { WorkflowRun, WorkflowRunState } from "@aiki/types/workflow-run";
+import type { WorkflowRun, WorkflowRunId, WorkflowRunState } from "@aiki/types/workflow-run";
 import type { ApiClient, Logger } from "@aiki/types/client";
 import type { TaskState } from "@aiki/types/task";
+import { WorkflowRunNotExecutableError } from "./error.ts";
 
 export function initWorkflowRunHandle<Input, Output>(
 	api: ApiClient,
@@ -22,6 +23,7 @@ export interface WorkflowRunHandle<Input, Output> {
 			taskPath: string,
 			taskState: TaskState<unknown>,
 		) => Promise<void>;
+		assertExecutionAllowed: () => Promise<void>;
 	};
 }
 
@@ -31,12 +33,13 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 	constructor(
 		private readonly api: ApiClient,
 		public readonly run: WorkflowRun<Input, Output>,
-		private readonly logger: Logger
+		private readonly logger: Logger,
 	) {
 		this._internal = {
 			refresh: this.refresh.bind(this),
 			getTaskState: this.getTaskState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
+			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
 		};
 	}
 
@@ -71,5 +74,14 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		});
 		this.run.revision = newRevision;
 		this.run.tasksState[taskPath] = taskState;
+	}
+
+	private async assertExecutionAllowed() {
+		await this.refresh();
+		const status = this.run.state.status;
+		if (status === "queued" || status === "running") {
+			return;
+		}
+		throw new WorkflowRunNotExecutableError(this.run.id as WorkflowRunId, status);
 	}
 }
