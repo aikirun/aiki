@@ -9,6 +9,11 @@ export async function loadConfig(): Promise<Config> {
 
 	const raw = {
 		port: Deno.env.get("PORT"),
+		redis: {
+			host: Deno.env.get("REDIS_HOST"),
+			port: Deno.env.get("REDIS_PORT"),
+			password: Deno.env.get("REDIS_PASSWORD"),
+		},
 	};
 
 	const result = configSchema.safeParse(raw);
