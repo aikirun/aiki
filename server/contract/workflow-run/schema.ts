@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { WorkflowOptions, WorkflowRun, WorkflowRunState, WorkflowRunStatus } from "@aiki/types/workflow-run";
 import type { TriggerStrategy } from "@aiki/types/trigger";
+import type { RetryStrategy } from "@aiki/lib/retry";
 import type { UnionToRecord } from "@aiki/lib/object";
 import { taskStateSchema } from "../task/schema.ts";
 import type { zT } from "../helpers/schema.ts";
@@ -26,25 +27,54 @@ export const triggerStrategySchema: zT<TriggerStrategy> = z.discriminatedUnion("
 	z.object({ type: z.literal("startAt"), startAt: z.number() }),
 ]);
 
+export const retryStrategySchema: zT<RetryStrategy> = z.discriminatedUnion("type", [
+	z.object({ type: z.literal("never") }),
+	z.object({ type: z.literal("fixed"), maxAttempts: z.number(), delayMs: z.number() }),
+	z.object({ type: z.literal("exponential"), maxAttempts: z.number(), baseDelayMs: z.number(), maxDelayMs: z.number() }),
+	z.object({ type: z.literal("jittered"), maxAttempts: z.number(), baseDelayMs: z.number(), maxDelayMs: z.number() }),
+]);
+
 export const workflowOptionsSchema: zT<WorkflowOptions> = z.object({
 	idempotencyKey: z.string().optional(),
 	trigger: triggerStrategySchema.optional(),
 	shardKey: z.string().optional(),
+	retry: retryStrategySchema.optional(),
 });
 
 export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 	.discriminatedUnion("status", [
 		z.object({
-			status: workflowRunStatusSchema.exclude(["queued", "completed", "failed"]),
+			status: workflowRunStatusSchema.exclude(["queued", "awaiting_retry", "completed", "failed"]),
 		}),
 		z.object({
 			status: z.literal("queued"),
 			reason: z.union([
-				z.literal("new"), 
-				z.literal("event"), 
-				z.literal("retry"), 
+				z.literal("new"),
+				z.literal("event"),
+				z.literal("retry"),
 				z.literal("awake")
 			]),
+		}),
+		z.object({
+			status: z.literal("awaiting_retry"),
+			cause: z.literal("task"),
+			reason: z.string(),
+			nextAttemptAt: z.number(),
+			taskName: z.string(),
+		}),
+		z.object({
+			status: z.literal("awaiting_retry"),
+			cause: z.literal("sub_workflow"),
+			reason: z.string(),
+			nextAttemptAt: z.number(),
+			subWorkflowRunId: z.string(),
+		}),
+		z.object({
+			status: z.literal("awaiting_retry"),
+			cause: z.literal("self"),
+			reason: z.string(),
+			nextAttemptAt: z.number(),
+			error: serializedErrorSchema,
 		}),
 		z.object({
 			status: z.literal("completed"),
@@ -53,14 +83,14 @@ export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 		z.object({
 			status: z.literal("failed"),
 			cause: z.literal("task"),
-			taskName: z.string(),
 			reason: z.string(),
+			taskName: z.string(),
 		}),
 		z.object({
 			status: z.literal("failed"),
 			cause: z.literal("sub_workflow"),
-			subWorkflowName: z.string(),
 			reason: z.string(),
+			subWorkflowRunId: z.string(),
 		}),
 		z.object({
 			status: z.literal("failed"),
@@ -76,6 +106,7 @@ export const workflowRunSchema: zT<WorkflowRun<unknown, unknown>> = z
 		name: z.string(),
 		versionId: z.string(),
 		revision: z.number(),
+		attempts: z.number(),
 		input: z.unknown(),
 		options: workflowOptionsSchema,
 		state: workflowRunStateSchema,

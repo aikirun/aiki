@@ -43,9 +43,11 @@ export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
 	status: "running";
 }
 
+export type WorkflowFailureCause = "task" | "sub_workflow" | "self";
+
 export interface WorkflowRunStateAwaitingBase extends WorkflowRunStateBase {
 	status: "awaiting_retry";
-	cause: "task" | "sub_workflow" | "self";
+	cause: WorkflowFailureCause;
 	reason: string;
 	nextAttemptAt: number;
 }
@@ -57,8 +59,7 @@ export interface WorkflowRunStateAwaitingRetryCausedByTask extends WorkflowRunSt
 
 export interface WorkflowRunStateAwaitingRetryCausedBySubWorkflow extends WorkflowRunStateAwaitingBase {
 	cause: "sub_workflow";
-	subWorkflowName: string;
-	subWorkflowVersionId: string;
+	subWorkflowRunId: string;
 }
 
 export interface WorkflowRunStateAwaitingRetryCausedBySelf extends WorkflowRunStateAwaitingBase {
@@ -78,7 +79,7 @@ export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase 
 
 interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
 	status: "failed";
-	cause: "task" | "sub_workflow" | "self";
+	cause: WorkflowFailureCause;
 	reason: string;
 }
 
@@ -89,8 +90,7 @@ export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase
 
 export interface WorkflowRunStateFailedBySubWorkflow extends WorkflowRunStateFailedBase {
 	cause: "sub_workflow";
-	subWorkflowName: string;
-	subWorkflowVersionId: string;
+	subWorkflowRunId: string;
 }
 
 export interface WorkflowRunStateFailedBySelf extends WorkflowRunStateFailedBase {
