@@ -21,6 +21,7 @@ export function createSerializableError(error: unknown): SerializableError {
  * - HTTP error with status 409
  * - ConflictError by name
  */
+// TODO: this might be improved
 export function isServerConflictError(error: unknown): boolean {
 	if (error === null || typeof error !== "object") {
 		return false;
