@@ -5,7 +5,13 @@ import { delay, fireAndForget } from "@aiki/lib/async";
 import type { Client, Logger, SubscriberStrategy } from "@aiki/client";
 import { getChildLogger } from "@aiki/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aiki/client";
-import { initWorkflowRegistry, initWorkflowRunHandle, type WorkflowRegistry } from "@aiki/workflow";
+import {
+	initWorkflowRegistry,
+	initWorkflowRunHandle,
+	type WorkflowRegistry,
+	WorkflowRunFailedError,
+	WorkflowRunNotExecutableError,
+} from "@aiki/workflow";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { WorkflowVersion } from "@aiki/workflow";
 
@@ -293,7 +299,10 @@ class WorkerImpl<AppContext> implements Worker {
 			await workflowVersion._internal.exec(
 				workflowRun.input,
 				{
-					...workflowRun,
+					id: workflowRun.id as WorkflowRunId,
+					name: workflowRun.name as WorkflowName,
+					versionId: workflowRun.versionId as WorkflowVersionId,
+					options: workflowRun.options,
 					handle: workflowRunHandle,
 					logger,
 				},

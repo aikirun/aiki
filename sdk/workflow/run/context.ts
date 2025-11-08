@@ -1,9 +1,13 @@
-import type { WorkflowRun } from "@aiki/types/workflow-run";
+import type { WorkflowOptions, WorkflowRunId } from "@aiki/types/workflow-run";
 import type { Logger } from "@aiki/types/client";
 import type { WorkflowRunHandle } from "./run-handle.ts";
+import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 
-export interface WorkflowRunContext<Input, Output>
-	extends Pick<WorkflowRun<Input, Output>, "id" | "name" | "versionId" | "options"> {
+export interface WorkflowRunContext<Input, Output> {
+	id: WorkflowRunId;
+	name: WorkflowName;
+	versionId: WorkflowVersionId;
+	options: WorkflowOptions;
 	handle: WorkflowRunHandle<Input, Output>;
 	logger: Logger;
 }

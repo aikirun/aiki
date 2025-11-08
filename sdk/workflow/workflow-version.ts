@@ -11,7 +11,7 @@ import { WorkflowRunFailedError, WorkflowRunNotExecutableError } from "./run/err
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
 		input: Input,
-		run: WorkflowRunContext<Input, Output>,
+		runContext: WorkflowRunContext<Input, Output>,
 		context: AppContext,
 	) => Promise<Output>;
 }
@@ -30,7 +30,7 @@ export interface WorkflowVersion<Input, Output, AppContext> {
 	_internal: {
 		exec: (
 			input: Input,
-			run: WorkflowRunContext<Input, Output>,
+			runContext: WorkflowRunContext<Input, Output>,
 			context: AppContext,
 		) => Promise<void>;
 	};
@@ -74,40 +74,40 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 
 	private async exec(
 		input: Input,
-		run: WorkflowRunContext<Input, Output>,
+		runCtx: WorkflowRunContext<Input, Output>,
 		context: AppContext,
 	): Promise<void> {
-		const workflowRunState = run.handle.run.state;
-		this.assertExecutionAllowed(run.id as WorkflowRunId, workflowRunState);
+		const workflowRunState = runCtx.handle.run.state;
+		this.assertExecutionAllowed(runCtx.id as WorkflowRunId, workflowRunState);
 
-		run.logger.info("Starting workflow");
-		await run.handle.transitionState({ status: "running" });
+		runCtx.logger.info("Starting workflow");
+		await runCtx.handle.transitionState({ status: "running" });
 
-		const output = await this.tryExecuteWorkflow(input, run, context);
+		const output = await this.tryExecuteWorkflow(input, runCtx, context);
 
-		await run.handle.transitionState({ status: "completed", output });
-		run.logger.info("Workflow complete");
+		await runCtx.handle.transitionState({ status: "completed", output });
+		runCtx.logger.info("Workflow complete");
 	}
 
 	private async tryExecuteWorkflow(
 		input: Input,
-		run: WorkflowRunContext<Input, Output>,
+		runCtx: WorkflowRunContext<Input, Output>,
 		context: AppContext,
 	): Promise<Output> {
 		try {
-			return await this.params.exec(input, run, context);
+			return await this.params.exec(input, runCtx, context);
 		} catch (error) {
 			const failedState = this.createFailedState(error);
 
-			await run.handle.transitionState(failedState);
+			await runCtx.handle.transitionState(failedState);
 
-			run.logger.error("Workflow failed", {
+			runCtx.logger.error("Workflow failed", {
 				"aiki.cause": failedState.cause,
 				"aiki.reason": failedState.reason,
 				...(failedState.cause === "task" && { "aiki.taskName": failedState.taskName }),
 			});
 
-			throw new WorkflowRunFailedError(run.id as WorkflowRunId);
+			throw new WorkflowRunFailedError(runCtx.id as WorkflowRunId);
 		}
 	}
 
