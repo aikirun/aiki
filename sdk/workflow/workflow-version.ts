@@ -161,10 +161,10 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		const attempts = runCtx.handle.run.attempts;
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
-			logger.error("Retry not allowed", {
+			logger.error("Workflow retry not allowed", {
 				"aiki.attempts": attempts,
 			});
-			throw new WorkflowRunFailedError(runCtx.id, attempts, "Retry not allowed");
+			throw new WorkflowRunFailedError(runCtx.id, attempts, "Workflow retry not allowed");
 		}
 	}
 

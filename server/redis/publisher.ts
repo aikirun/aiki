@@ -34,11 +34,7 @@ export async function publishWorkflowReadyBatch(
 
 		for (const [streamName, streamMessages] of messagesByStream.entries()) {
 			for (const message of streamMessages) {
-				const payload = JSON.stringify({
-					type: "workflow_run_ready",
-					data: { workflowRunId: message.workflowRunId },
-				});
-				pipeline.xadd(streamName, "*", "message", payload);
+				pipeline.xadd(streamName, "*", "type", "workflow_run_ready", "workflowRunId", message.workflowRunId);
 			}
 		}
 
@@ -47,11 +43,4 @@ export async function publishWorkflowReadyBatch(
 		// deno-lint-ignore no-console
 		console.error(`Failed to batch publish ${messages.length} workflow ready messages:`, error);
 	}
-}
-
-export interface WorkflowReadyMessage {
-	type: "workflow_run_ready";
-	data: {
-		workflowRunId: string;
-	};
 }

@@ -18,9 +18,7 @@ import { getChildLogger } from "../logger/mod.ts";
 
 const WorkflowRunReadyMessageDataSchema = z.object({
 	type: z.literal("workflow_run_ready"),
-	data: z.object({
-		workflowRunId: z.string().transform((id: string) => id as WorkflowRunId),
-	}),
+	workflowRunId: z.string().transform((id: string) => id as WorkflowRunId),
 });
 
 const RedisMessageDataSchema = z.discriminatedUnion("type", [
@@ -41,7 +39,7 @@ const RedisMessageRawDataSchema = z.array(z.unknown()).transform((rawFields: unk
 });
 
 const RedisStreamMessageSchema = z.tuple([
-	z.string(),
+	z.string(), // message-id
 	RedisMessageRawDataSchema,
 ]);
 
@@ -67,10 +65,13 @@ const RedisStreamMessageSchema = z.tuple([
  *   ]
  * ]
  */
+
 const RedisStreamEntrySchema = z.tuple([
-	z.string(),
+	z.string(), // stream
 	z.array(RedisStreamMessageSchema),
 ]);
+
+const RedisStreamEntriesSchema = z.array(RedisStreamEntrySchema);
 
 const RedisStreamPendingMessageSchema = z.tuple([
 	z.string(),
@@ -314,57 +315,63 @@ async function processRedisStreamMessages(
 	redis: RedisClient,
 	logger: Logger,
 	streamConsumerGroupMap: Map<string, string>,
-	streamEntries: NonEmptyArray<unknown>,
+	streamsEntries: NonEmptyArray<unknown>,
 ): Promise<WorkflowRunBatch[]> {
 	const workflowRuns: WorkflowRunBatch[] = [];
+	for (const streamEntriesRaw of streamsEntries) {
+		logger.info("Raw stream entries", { entries: streamEntriesRaw });
 
-	for (const streamEntry of streamEntries) {
-		const streamEntryResult = RedisStreamEntrySchema.safeParse(streamEntry);
-		if (!streamEntryResult.success) {
-			logger.error("Invalid Redis stream entry structure", {
-				"aiki.error": z.treeifyError(streamEntryResult.error),
+		const streamEntriesResult = RedisStreamEntriesSchema.safeParse(streamEntriesRaw);
+		if (!streamEntriesResult.success) {
+			logger.error("Invalid stream entries format", {
+				"aiki.error": z.treeifyError(streamEntriesResult.error),
 			});
 			continue;
 		}
+		logger.info("Parsed stream entries", {
+			entries: streamEntriesResult.data,
+		});
 
-		const [stream, messages] = streamEntryResult.data;
+		for (const streamEntry of streamEntriesResult.data) {
+			const [stream, messages] = streamEntry;
 
-		const consumerGroup = streamConsumerGroupMap.get(stream);
-		if (!consumerGroup) {
-			logger.error("No consumer group found for stream", {
-				"aiki.stream": stream,
-			});
-			continue;
-		}
-
-		for (const [messageId, rawMessageData] of messages) {
-			const messageData = RedisMessageDataSchema.safeParse(rawMessageData);
-			if (!messageData.success) {
-				logger.warn("Invalid message structure", {
+			const consumerGroup = streamConsumerGroupMap.get(stream);
+			if (!consumerGroup) {
+				logger.error("No consumer group found for stream", {
 					"aiki.stream": stream,
-					"aiki.messageId": messageId,
-					"aiki.error": z.treeifyError(messageData.error),
 				});
-				await redis.xack(stream, consumerGroup, messageId);
 				continue;
 			}
 
-			switch (messageData.data.type) {
-				case "workflow_run_ready": {
-					const { workflowRunId } = messageData.data.data;
-					workflowRuns.push({
-						data: { workflowRunId },
-						meta: {
-							stream,
-							messageId,
-							consumerGroup,
-						},
+			for (const [messageId, rawMessageData] of messages) {
+				const messageData = RedisMessageDataSchema.safeParse(rawMessageData);
+				if (!messageData.success) {
+					logger.warn("Invalid message structure", {
+						"aiki.stream": stream,
+						"aiki.messageId": messageId,
+						"aiki.error": z.treeifyError(messageData.error),
 					});
-					break;
-				}
-				default:
-					messageData.data.type satisfies never;
+					await redis.xack(stream, consumerGroup, messageId);
 					continue;
+				}
+
+				switch (messageData.data.type) {
+					case "workflow_run_ready": {
+						const { workflowRunId } = messageData.data;
+						workflowRuns.push({
+							data: { workflowRunId },
+							meta: {
+								stream,
+								messageId,
+								consumerGroup,
+							},
+						});
+						break;
+					}
+					default:
+						messageData.data.type satisfies never;
+						continue;
+				}
 			}
 		}
 	}

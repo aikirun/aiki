@@ -175,10 +175,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	): void {
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
-			logger.error("Retry not allowed", {
+			logger.error("Task retry not allowed", {
 				"aiki.attempts": attempts,
 			});
-			throw new TaskFailedError(this.name, attempts, "Retry not allowed");
+			throw new TaskFailedError(this.name, attempts, "Task retry not allowed");
 		}
 	}
 

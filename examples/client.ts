@@ -21,7 +21,7 @@ if (import.meta.main) {
 	const stateHandle = await eveningRoutineWorkflowV1
 		.withOptions({ idempotencyKey: "some-key" })
 		.start(aikiClient);
-		
+
 	const result = await stateHandle.wait(
 		{ type: "status", status: "completed" },
 		{ maxDurationMs: 30_000, pollIntervalMs: 5_000 },
