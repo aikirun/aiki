@@ -36,7 +36,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 	// deno-lint-ignore no-console
 	console.log(`Creating workflow run: ${input.name}/${input.versionId}`);
 
-	const runId = `workflow_run_${Date.now()}`;
+	const runId = `${Date.now()}`;
 
 	const trigger = input.options?.trigger;
 
@@ -141,7 +141,7 @@ export async function transitionScheduledWorkflowsToQueued(redis: Redis) {
 		run.revision++;
 
 		// deno-lint-ignore no-console
-		console.log(`Transitioned workflow ${run.id} from scheduled to queued`);
+		console.log(`Transitioned workflow ${run.name}/${run.versionId}/${run.id} from scheduled to queued`);
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
@@ -188,7 +188,7 @@ export async function transitionRetryableWorkflowsToQueued(redis: Redis) {
 		run.revision++;
 
 		// deno-lint-ignore no-console
-		console.log(`Transitioned workflow ${run.id} from awaiting_retry to queued (attempt ${run.attempts})`);
+		console.log(`Transitioned workflow ${run.name}/${run.versionId}/${run.id} from awaiting_retry to queued`);
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
@@ -228,7 +228,7 @@ export async function transitionSleepingWorkflowsToQueued(redis: Redis) {
 		run.revision++;
 
 		// deno-lint-ignore no-console
-		console.log(`Transitioned workflow ${run.id} from sleeping to queued`);
+		console.log(`Transitioned workflow ${run.name}/${run.versionId}/${run.id} from sleeping to queued`);
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
