@@ -7,9 +7,21 @@ import {
 	transitionScheduledWorkflowsToQueued,
 	transitionSleepingWorkflowsToQueued,
 } from "./router/workflow-run.ts";
+import { Redis } from "ioredis";
 
 if (import.meta.main) {
 	const config = await loadConfig();
+
+	const redis = new Redis({
+		host: config.redis.host,
+		port: config.redis.port,
+		password: config.redis.password,
+	});
+
+	redis.on("error", (err: Error) => {
+		// deno-lint-ignore no-console
+		console.error("Redis error:", err);
+	});
 
 	const rpcHandler = new RPCHandler(router, {
 		// onSuccess: async (output, context) => {
@@ -22,21 +34,30 @@ if (import.meta.main) {
 
 	const scheduledSchedulerInterval = setInterval(
 		() => {
-			transitionScheduledWorkflowsToQueued();
+			transitionScheduledWorkflowsToQueued(redis).catch((err) => {
+				// deno-lint-ignore no-console
+				console.error("Error transitioning scheduled workflows:", err);
+			});
 		},
 		500,
 	);
 
 	const sleepingSchedulerInterval = setInterval(
 		() => {
-			transitionSleepingWorkflowsToQueued();
+			transitionSleepingWorkflowsToQueued(redis).catch((err) => {
+				// deno-lint-ignore no-console
+				console.error("Error transitioning sleeping workflows:", err);
+			});
 		},
 		500,
 	);
 
 	const retrySchedulerInterval = setInterval(
 		() => {
-			transitionRetryableWorkflowsToQueued();
+			transitionRetryableWorkflowsToQueued(redis).catch((err) => {
+				// deno-lint-ignore no-console
+				console.error("Error transitioning retryable workflows:", err);
+			});
 		},
 		1_000,
 	);
@@ -49,9 +70,10 @@ if (import.meta.main) {
 		return result.response ?? new Response("Not Found", { status: 404 });
 	});
 
-	globalThis.addEventListener("beforeunload", () => {
+	globalThis.addEventListener("beforeunload", async () => {
 		clearInterval(scheduledSchedulerInterval);
 		clearInterval(sleepingSchedulerInterval);
 		clearInterval(retrySchedulerInterval);
+		await redis.quit();
 	});
 }

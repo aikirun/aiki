@@ -1,6 +1,8 @@
 import { baseImplementer } from "./base.ts";
 import type { WorkflowRun } from "@aiki/types/workflow-run";
 import { ConflictError, NotFoundError } from "../middleware/error-handler.ts";
+import { publishWorkflowReadyBatch } from "../redis/publisher.ts";
+import type { Redis } from "ioredis";
 
 const os = baseImplementer.workflowRun;
 
@@ -129,7 +131,8 @@ export function getScheduledWorkflows(): WorkflowRun[] {
 	return scheduled;
 }
 
-export function transitionScheduledWorkflowsToQueued() {
+export async function transitionScheduledWorkflowsToQueued(redis: Redis) {
+	const messagesToPublish = [];
 	for (const run of getScheduledWorkflows()) {
 		run.state = {
 			status: "queued",
@@ -139,6 +142,16 @@ export function transitionScheduledWorkflowsToQueued() {
 
 		// deno-lint-ignore no-console
 		console.log(`Transitioned workflow ${run.id} from scheduled to queued`);
+
+		messagesToPublish.push({
+			workflowRunId: run.id,
+			workflowName: run.name,
+			shardKey: run.options.shardKey,
+		});
+	}
+
+	if (messagesToPublish.length > 0) {
+		await publishWorkflowReadyBatch(redis, messagesToPublish);
 	}
 }
 
@@ -158,7 +171,8 @@ export function getRetryableWorkflows(): WorkflowRun[] {
 	return retryable;
 }
 
-export function transitionRetryableWorkflowsToQueued() {
+export async function transitionRetryableWorkflowsToQueued(redis: Redis) {
+	const messagesToPublish = [];
 	for (const run of getRetryableWorkflows()) {
 		// Reset all failed/running tasks atomically with state transition
 		for (const [path, taskState] of Object.entries(run.tasksState)) {
@@ -175,6 +189,16 @@ export function transitionRetryableWorkflowsToQueued() {
 
 		// deno-lint-ignore no-console
 		console.log(`Transitioned workflow ${run.id} from awaiting_retry to queued (attempt ${run.attempts})`);
+
+		messagesToPublish.push({
+			workflowRunId: run.id,
+			workflowName: run.name,
+			shardKey: run.options.shardKey,
+		});
+	}
+
+	if (messagesToPublish.length > 0) {
+		await publishWorkflowReadyBatch(redis, messagesToPublish);
 	}
 }
 
@@ -194,7 +218,8 @@ export function getSleepingWorkflows(): WorkflowRun[] {
 	return sleeping;
 }
 
-export function transitionSleepingWorkflowsToQueued() {
+export async function transitionSleepingWorkflowsToQueued(redis: Redis) {
+	const messagesToPublish = [];
 	for (const run of getSleepingWorkflows()) {
 		run.state = {
 			status: "queued",
@@ -204,6 +229,16 @@ export function transitionSleepingWorkflowsToQueued() {
 
 		// deno-lint-ignore no-console
 		console.log(`Transitioned workflow ${run.id} from sleeping to queued`);
+
+		messagesToPublish.push({
+			workflowRunId: run.id,
+			workflowName: run.name,
+			shardKey: run.options.shardKey,
+		});
+	}
+
+	if (messagesToPublish.length > 0) {
+		await publishWorkflowReadyBatch(redis, messagesToPublish);
 	}
 }
 
