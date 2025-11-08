@@ -47,26 +47,30 @@ type CompletedResult<Result> = {
 	attempts: number;
 };
 
-type AbortedResult = {
+interface TimeoutResult {
+	state: "timeout";
+}
+
+interface AbortedResult {
 	state: "aborted";
 	reason: unknown;
-};
+}
 
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
 	options?: WithRetryOptions<Result, false>,
-): { run: (...args: Args[]) => Promise<CompletedResult<Result>> };
+): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult> };
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
 	options: WithRetryOptions<Result, true>,
-): { run: (...args: Args[]) => Promise<CompletedResult<Result> | AbortedResult> };
+): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult | AbortedResult> };
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
 	options?: WithRetryOptions<Result, boolean>,
-): { run: (...args: Args[]) => Promise<CompletedResult<Result> | AbortedResult> } {
+): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult | AbortedResult> } {
 	return {
 		run: async (...args: Args[]) => {
 			let attempts = 0;
@@ -108,8 +112,9 @@ export function withRetry<Args, Result>(
 
 				const retryParams = getRetryParams(attempts, strategy);
 				if (!retryParams.retriesLeft) {
-					if (error) throw error;
-					throw new Error("Retry allowance has been exhausted");
+					return {
+						state: "timeout",
+					};
 				}
 
 				await delay(retryParams.delayMs, { abortSignal: options?.abortSignal });

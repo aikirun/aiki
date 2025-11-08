@@ -84,25 +84,25 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 							shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status),
 						},
 					).run();
-					if (maybeResult.state === "aborted") {
-						return {
-							success: false,
-							cause: "aborted",
-						};
+					if (maybeResult.state === "timeout" || maybeResult.state === "aborted") {
+						return { success: false, cause: maybeResult.state };
 					}
 					return {
 						success: true,
 						state: maybeResult.result as R,
 					};
 				} else {
-					const { result } = await withRetry(
+					const maybeResult = await withRetry(
 						this.getState.bind(this),
 						{ type: "fixed", maxAttempts, delayMs },
 						{ shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status) },
 					).run();
+					if (maybeResult.state === "timeout") {
+						return { success: false, cause: maybeResult.state };
+					}
 					return {
 						success: true,
-						state: result as R
+						state: maybeResult.result as R,
 					};
 				}
 			}
