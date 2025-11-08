@@ -34,6 +34,9 @@ if (import.meta.main) {
 
 	const scheduledSchedulerInterval = setInterval(
 		() => {
+			// deno-lint-ignore no-console
+			console.info("Checking for scheduled tasks");
+
 			transitionScheduledWorkflowsToQueued(redis).catch((err) => {
 				// deno-lint-ignore no-console
 				console.error("Error transitioning scheduled workflows:", err);
@@ -44,6 +47,9 @@ if (import.meta.main) {
 
 	const sleepingSchedulerInterval = setInterval(
 		() => {
+			// deno-lint-ignore no-console
+			console.info("Checking for sleeping tasks");
+
 			transitionSleepingWorkflowsToQueued(redis).catch((err) => {
 				// deno-lint-ignore no-console
 				console.error("Error transitioning sleeping workflows:", err);
@@ -54,6 +60,9 @@ if (import.meta.main) {
 
 	const retrySchedulerInterval = setInterval(
 		() => {
+			// deno-lint-ignore no-console
+			console.info("Checking for retryable tasks");
+
 			transitionRetryableWorkflowsToQueued(redis).catch((err) => {
 				// deno-lint-ignore no-console
 				console.error("Error transitioning retryable workflows:", err);
