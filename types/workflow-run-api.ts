@@ -8,7 +8,7 @@ export interface GetByIdRequestV1 {
 }
 
 export interface GetByIdResponseV1 {
-	run: WorkflowRun<unknown, unknown>;
+	run: WorkflowRun;
 }
 
 export interface GetStateRequestV1 {
@@ -27,7 +27,7 @@ export interface CreateRequestV1 {
 }
 
 export interface CreateResponseV1 {
-	run: WorkflowRun<unknown, unknown>;
+	run: WorkflowRun;
 }
 
 export interface TransitionStateRequestV1 {

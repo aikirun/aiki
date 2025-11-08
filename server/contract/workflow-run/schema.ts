@@ -105,7 +105,7 @@ export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 		}),
 	]);
 
-export const workflowRunSchema: zT<WorkflowRun<unknown, unknown>> = z
+export const workflowRunSchema: zT<WorkflowRun> = z
 	.object({
 		id: z.string(),
 		name: z.string(),

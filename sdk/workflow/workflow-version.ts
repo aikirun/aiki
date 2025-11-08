@@ -22,6 +22,7 @@ export interface WorkflowVersionParams<Input, Output, AppContext> {
 	) => Promise<Output>;
 }
 
+// TODO: set default to unknwon?
 export interface WorkflowVersion<Input, Output, AppContext> {
 	name: WorkflowName;
 	versionId: WorkflowVersionId;

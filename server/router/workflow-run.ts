@@ -4,7 +4,7 @@ import { ConflictError, NotFoundError } from "../middleware/error-handler.ts";
 
 const os = baseImplementer.workflowRun;
 
-const workflowRuns = new Map<string, WorkflowRun<unknown, unknown>>();
+const workflowRuns = new Map<string, WorkflowRun>();
 
 const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 	// deno-lint-ignore no-console
@@ -35,7 +35,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 	console.log(`Creating workflow run: ${input.name}/${input.versionId}`);
 
 	const runId = `workflow_run_${Date.now()}`;
-	const run: WorkflowRun<unknown, unknown> = {
+	const run: WorkflowRun = {
 		id: runId,
 		name: input.name,
 		versionId: input.versionId,
@@ -106,9 +106,9 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
 	return { newRevision: run.revision };
 });
 
-export function getRetryableWorkflows(): Array<{ id: string; run: WorkflowRun<unknown, unknown> }> {
+export function getRetryableWorkflows(): Array<{ id: string; run: WorkflowRun }> {
 	const now = Date.now();
-	const retryable: Array<{ id: string; run: WorkflowRun<unknown, unknown> }> = [];
+	const retryable: Array<{ id: string; run: WorkflowRun }> = [];
 
 	for (const [id, run] of workflowRuns.entries()) {
 		if (run.state.status === "awaiting_retry") {

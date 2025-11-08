@@ -7,7 +7,7 @@ export interface ClientParams<AppContext> {
 	url: string;
 	redis: RedisConfig;
 	logger?: Logger;
-	contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
+	contextFactory?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
 }
 
 export interface Client<AppContext> {
@@ -23,7 +23,7 @@ export interface Client<AppContext> {
 		};
 		redis: RedisConnection;
 		logger: Logger;
-		contextFactory?: (run: WorkflowRun<unknown, unknown>) => AppContext | Promise<AppContext>;
+		contextFactory?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
 	};
 }
 

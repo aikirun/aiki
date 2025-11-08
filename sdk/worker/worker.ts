@@ -49,7 +49,7 @@ export interface Worker {
 }
 
 interface ActiveWorkflowRun {
-	run: WorkflowRun<unknown, unknown>;
+	run: WorkflowRun;
 	executionPromise: Promise<void>;
 	meta?: SubscriberMessageMeta;
 }
@@ -259,7 +259,7 @@ class WorkerImpl<AppContext> implements Worker {
 	}
 
 	private async executeWorkflow(
-		workflowRun: WorkflowRun<unknown, unknown>,
+		workflowRun: WorkflowRun,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 		meta?: SubscriberMessageMeta,
 	): Promise<void> {

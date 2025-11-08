@@ -113,8 +113,7 @@ export type WorkflowRunState<Output> =
 	| WorkflowRunStateInComplete
 	| WorkflowRunStateCompleted<Output>;
 
-// TODO: set default to unknown, unknown
-export interface WorkflowRun<Input, Output> {
+export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;
 	name: string;
 	versionId: string;
