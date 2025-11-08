@@ -36,7 +36,7 @@ export async function publishWorkflowReadyBatch(
 			for (const message of streamMessages) {
 				const payload = JSON.stringify({
 					type: "workflow_run_ready",
-					data: {workflowRunId: message.workflowRunId},
+					data: { workflowRunId: message.workflowRunId },
 				});
 				pipeline.xadd(streamName, "*", "message", payload);
 			}
