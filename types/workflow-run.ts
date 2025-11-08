@@ -67,7 +67,7 @@ export interface WorkflowRunStateAwaitingRetryCausedBySelf extends WorkflowRunSt
 	error: SerializableError;
 }
 
-export type WorkflowRunStateAwaitingRetry = 
+export type WorkflowRunStateAwaitingRetry =
 	| WorkflowRunStateAwaitingRetryCausedByTask
 	| WorkflowRunStateAwaitingRetryCausedBySubWorkflow
 	| WorkflowRunStateAwaitingRetryCausedBySelf;
@@ -103,13 +103,16 @@ export type WorkflowRunStateFailed =
 	| WorkflowRunStateFailedBySubWorkflow
 	| WorkflowRunStateFailedBySelf;
 
-export type WorkflowRunState<Output> =
+export type WorkflowRunStateInComplete =
 	| WorkflowRunStateOthers
 	| WorkflowRunStateQueued
 	| WorkflowRunStateRunning
 	| WorkflowRunStateAwaitingRetry
-	| WorkflowRunStateCompleted<Output>
 	| WorkflowRunStateFailed;
+
+export type WorkflowRunState<Output> =
+	| WorkflowRunStateInComplete
+	| WorkflowRunStateCompleted<Output>;
 
 // TODO: set default to unknown, unknown
 export interface WorkflowRun<Input, Output> {

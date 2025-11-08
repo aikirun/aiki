@@ -16,9 +16,11 @@ if (import.meta.main) {
 
 	const stateHandle = await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
 
-	const { output } = await stateHandle.waitForStatus("completed", { maxDurationMs: 10_000 });
-	// deno-lint-ignore no-console
-	console.log(`id = ${stateHandle.id}; output = ${output}`);
+	const result = await stateHandle.wait({ type: "status", status: "completed" }, { maxDurationMs: 10_1000 });
+	if (result.success) {
+		// deno-lint-ignore no-console
+		console.log(`id = ${stateHandle.id}; output = ${result.state.output}`);
+	}
 
 	await eveningRoutineWorkflowV1
 		.withOptions({ idempotencyKey: "some-key" })
