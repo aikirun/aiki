@@ -32,7 +32,7 @@ if (import.meta.main) {
 	await workerA.start();
 	await workerB.start();
 
-	await delay(30_000);
+	await delay(60_000);
 
 	await workerA.stop();
 	await workerB.stop();
