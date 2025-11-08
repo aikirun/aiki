@@ -1,12 +1,12 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
-import type { WorkflowOptions, WorkflowRunId, WorkflowRunStateFailed } from "@aiki/types/workflow-run";
+import type { WorkflowOptions, WorkflowRunId, WorkflowRunState, WorkflowRunStateFailed, WorkflowRunStateQueued, WorkflowRunStateRunning } from "@aiki/types/workflow-run";
 import type { Client } from "@aiki/types/client";
 import type { WorkflowRunContext } from "./run/context.ts";
 import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { TaskFailedError } from "@aiki/task";
-import { WorkflowRunCancelledError, WorkflowRunNotExecutableError, WorkflowRunPausedError } from "./run/error.ts";
+import { WorkflowRunFailedError, WorkflowRunNotExecutableError } from "./run/error.ts";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
@@ -77,42 +77,48 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		run: WorkflowRunContext<Input, Output>,
 		context: AppContext,
 	): Promise<void> {
+		const workflowRunState = run.handle.run.state;
+		this.assertExecutionAllowed(run.id as WorkflowRunId, workflowRunState);
+
+		run.logger.info("Starting workflow");
+		await run.handle.transitionState({ status: "running" });
+
+		const output = await this.tryExecuteWorkflow(input, run, context);
+
+		await run.handle.transitionState({ status: "completed", output });
+		run.logger.info("Workflow complete");
+	}
+
+	private async tryExecuteWorkflow(
+		input: Input,
+		run: WorkflowRunContext<Input, Output>,
+		context: AppContext,
+	): Promise<Output> {
 		try {
-			await run.handle.transitionState({ status: "running" });
-			const output = await this.params.exec(input, run, context);
-			await run.handle.transitionState({ status: "completed", output });
-
-			run.logger.info("Workflow completed successfully", {
-				"aiki.workflowRunId": run.id,
-			});
+			return await this.params.exec(input, run, context);
 		} catch (error) {
-			if (error instanceof WorkflowRunCancelledError) {
-				run.logger.info("Workflow was cancelled");
-				return;
-			}
-
-			if (error instanceof WorkflowRunPausedError) {
-				run.logger.info("Workflow was paused");
-				return;
-			}
-
-			if (error instanceof WorkflowRunNotExecutableError) {
-				run.logger.info("Workflow not executable", {
-					"aiki.currentStatus": error.status,
-				});
-				return;
-			}
-
 			const failedState = this.createFailedState(error);
 
-			run.logger.error("Workflow execution failed", {
-				"aiki.failureCause": failedState.cause,
+			await run.handle.transitionState(failedState);
+
+			run.logger.error("Workflow failed", {
+				"aiki.cause": failedState.cause,
 				"aiki.reason": failedState.reason,
 				...(failedState.cause === "task" && { "aiki.taskName": failedState.taskName }),
 			});
 
-			await run.handle.transitionState(failedState);
+			throw new WorkflowRunFailedError(run.id as WorkflowRunId);
 		}
+	}
+
+	private assertExecutionAllowed(
+		id: WorkflowRunId,
+		workflowRunState: WorkflowRunState<Output>,
+	): asserts workflowRunState is WorkflowRunStateQueued | WorkflowRunStateRunning {
+		if (workflowRunState.status === "queued" || workflowRunState.status === "running") {
+			return;
+		}
+		throw new WorkflowRunNotExecutableError(id as WorkflowRunId, workflowRunState.status);
 	}
 
 	private createFailedState(error: unknown): WorkflowRunStateFailed {
