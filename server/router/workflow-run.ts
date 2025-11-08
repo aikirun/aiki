@@ -48,7 +48,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 			reason: "new",
 		},
 		tasksState: {},
-		subWorkflowsRunState: {},
+		childWorkflowsRunState: {},
 	};
 
 	workflowRuns.set(runId, run);

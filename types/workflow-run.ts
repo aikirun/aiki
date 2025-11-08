@@ -14,7 +14,7 @@ export type WorkflowRunStatus =
 	| "sleeping"
 	| "awaiting_event"
 	| "awaiting_retry"
-	| "awaiting_sub_workflow"
+	| "awaiting_child_workflow"
 	| "cancelled"
 	| "failed"
 	| "completed";
@@ -43,7 +43,7 @@ export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
 	status: "running";
 }
 
-export type WorkflowFailureCause = "task" | "sub_workflow" | "self";
+export type WorkflowFailureCause = "task" | "child_workflow" | "self";
 
 export interface WorkflowRunStateAwaitingBase extends WorkflowRunStateBase {
 	status: "awaiting_retry";
@@ -57,9 +57,9 @@ export interface WorkflowRunStateAwaitingRetryCausedByTask extends WorkflowRunSt
 	taskName: string;
 }
 
-export interface WorkflowRunStateAwaitingRetryCausedBySubWorkflow extends WorkflowRunStateAwaitingBase {
-	cause: "sub_workflow";
-	subWorkflowRunId: string;
+export interface WorkflowRunStateAwaitingRetryCausedByChildWorkflow extends WorkflowRunStateAwaitingBase {
+	cause: "child_workflow";
+	childWorkflowRunId: string;
 }
 
 export interface WorkflowRunStateAwaitingRetryCausedBySelf extends WorkflowRunStateAwaitingBase {
@@ -69,7 +69,7 @@ export interface WorkflowRunStateAwaitingRetryCausedBySelf extends WorkflowRunSt
 
 export type WorkflowRunStateAwaitingRetry =
 	| WorkflowRunStateAwaitingRetryCausedByTask
-	| WorkflowRunStateAwaitingRetryCausedBySubWorkflow
+	| WorkflowRunStateAwaitingRetryCausedByChildWorkflow
 	| WorkflowRunStateAwaitingRetryCausedBySelf;
 
 export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {
@@ -88,9 +88,9 @@ export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase
 	taskName: string;
 }
 
-export interface WorkflowRunStateFailedBySubWorkflow extends WorkflowRunStateFailedBase {
-	cause: "sub_workflow";
-	subWorkflowRunId: string;
+export interface WorkflowRunStateFailedByChildWorkflow extends WorkflowRunStateFailedBase {
+	cause: "child_workflow";
+	childWorkflowRunId: string;
 }
 
 export interface WorkflowRunStateFailedBySelf extends WorkflowRunStateFailedBase {
@@ -100,7 +100,7 @@ export interface WorkflowRunStateFailedBySelf extends WorkflowRunStateFailedBase
 
 export type WorkflowRunStateFailed =
 	| WorkflowRunStateFailedByTask
-	| WorkflowRunStateFailedBySubWorkflow
+	| WorkflowRunStateFailedByChildWorkflow
 	| WorkflowRunStateFailedBySelf;
 
 export type WorkflowRunStateInComplete =
@@ -125,5 +125,5 @@ export interface WorkflowRun<Input, Output> {
 	attempts: number;
 	state: WorkflowRunState<Output>;
 	tasksState: Record<string, TaskState<unknown>>;
-	subWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;
+	childWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;
 }

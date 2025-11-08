@@ -15,7 +15,7 @@ export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>
 	"sleeping",
 	"awaiting_event",
 	"awaiting_retry",
-	"awaiting_sub_workflow",
+	"awaiting_child_workflow",
 	"cancelled",
 	"failed",
 	"completed",
@@ -69,10 +69,10 @@ export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 		}),
 		z.object({
 			status: z.literal("awaiting_retry"),
-			cause: z.literal("sub_workflow"),
+			cause: z.literal("child_workflow"),
 			reason: z.string(),
 			nextAttemptAt: z.number(),
-			subWorkflowRunId: z.string(),
+			childWorkflowRunId: z.string(),
 		}),
 		z.object({
 			status: z.literal("awaiting_retry"),
@@ -93,9 +93,9 @@ export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 		}),
 		z.object({
 			status: z.literal("failed"),
-			cause: z.literal("sub_workflow"),
+			cause: z.literal("child_workflow"),
 			reason: z.string(),
-			subWorkflowRunId: z.string(),
+			childWorkflowRunId: z.string(),
 		}),
 		z.object({
 			status: z.literal("failed"),
@@ -116,5 +116,5 @@ export const workflowRunSchema: zT<WorkflowRun<unknown, unknown>> = z
 		options: workflowOptionsSchema,
 		state: workflowRunStateSchema,
 		tasksState: z.record(z.string(), taskStateSchema),
-		subWorkflowsRunState: z.record(z.string(), workflowRunStateSchema),
+		childWorkflowsRunState: z.record(z.string(), workflowRunStateSchema),
 	});
