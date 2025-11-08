@@ -14,6 +14,8 @@ import {
 } from "@aiki/workflow";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { WorkflowVersion } from "@aiki/workflow";
+import { TaskFailedError } from "@aiki/task";
+import { isServerConflictError } from "../error.ts";
 
 export function worker<AppContext>(
 	client: Client<AppContext>,
@@ -312,11 +314,20 @@ class WorkerImpl<AppContext> implements Worker {
 			shouldAcknowledge = true;
 			logger.info("Workflow execution completed");
 		} catch (error) {
-			logger.error("Unexpected error during workflow execution", {
-				"aiki.error": error instanceof Error ? error.message : String(error),
-				"aiki.stack": error instanceof Error ? error.stack : undefined,
-			});
-			shouldAcknowledge = false;
+			if (
+				error instanceof WorkflowRunNotExecutableError ||
+				error instanceof WorkflowRunFailedError ||
+				error instanceof TaskFailedError ||
+				isServerConflictError(error)
+			) {
+				shouldAcknowledge = true;
+			} else {
+				logger.error("Unexpected error during workflow execution", {
+					"aiki.error": error instanceof Error ? error.message : String(error),
+					"aiki.stack": error instanceof Error ? error.stack : undefined,
+				});
+				shouldAcknowledge = false;
+			}
 		} finally {
 			if (heartbeatInterval) clearInterval(heartbeatInterval);
 
