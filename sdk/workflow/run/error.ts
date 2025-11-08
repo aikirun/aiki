@@ -1,4 +1,4 @@
-import type { WorkflowRunId, WorkflowRunStatus } from "@aiki/types/workflow-run";
+import type { WorkflowFailureCause, WorkflowRunId, WorkflowRunStatus } from "@aiki/types/workflow-run";
 
 export class WorkflowRunConflictError extends Error {
 	constructor(
@@ -36,8 +36,13 @@ export class WorkflowRunCancelledError extends Error {
 }
 
 export class WorkflowRunFailedError extends Error {
-	constructor(id: WorkflowRunId) {
-		super(`Workflow ${id} failed`);
+	constructor(
+		public readonly id: WorkflowRunId,
+		public readonly attempts: number,
+		public readonly reason: string,
+		public readonly failureCause?: WorkflowFailureCause,
+	) {
+		super(`Workflow ${id} failed after ${attempts} attempt(s): ${reason}`);
 		this.name = "WorkflowRunFailedError";
 	}
 }
