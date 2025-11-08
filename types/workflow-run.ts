@@ -5,7 +5,6 @@ import type { SerializableError } from "./serializable.ts";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 
-// TODO: rename sub to child
 export type WorkflowRunStatus =
 	| "scheduled"
 	| "queued"

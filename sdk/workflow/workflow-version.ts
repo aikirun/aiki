@@ -91,7 +91,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		this.assertRetryAllowed(runCtx, retryStrategy, logger);
 
 		logger.info("Starting workflow");
-		// TODO: server should increment attempt counter
 		await handle.transitionState({ status: "running" });
 
 		const output = await this.tryExecuteWorkflow(input, runCtx, context, retryStrategy);
