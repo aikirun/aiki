@@ -21,16 +21,23 @@ export class WorkflowRunNotExecutableError extends Error {
 	}
 }
 
-export class WorkflowRunCancelledError extends WorkflowRunNotExecutableError {
+export class WorkflowRunPausedError extends Error {
 	constructor(id: WorkflowRunId) {
-		super(id, "cancelled");
+		super(`Workflow ${id} paused`);
+		this.name = "WorkflowRunPausedError";
+	}
+}
+
+export class WorkflowRunCancelledError extends Error {
+	constructor(id: WorkflowRunId) {
+		super(`Workflow ${id} cancelled`);
 		this.name = "WorkflowRunCancelledError";
 	}
 }
 
-export class WorkflowRunPausedError extends WorkflowRunNotExecutableError {
+export class WorkflowRunFailedError extends Error {
 	constructor(id: WorkflowRunId) {
-		super(id, "paused");
-		this.name = "WorkflowRunPausedError";
+		super(`Workflow ${id} failed`);
+		this.name = "WorkflowRunFailedError";
 	}
 }
