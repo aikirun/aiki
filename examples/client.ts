@@ -14,20 +14,23 @@ if (import.meta.main) {
 		}),
 	});
 
-	const stateHandle = await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
+	const logger = aikiClient.logger;
 
-	const result = await stateHandle.wait({ type: "status", status: "completed" }, { maxDurationMs: 10_000 });
-	if (result.success) {
-		// deno-lint-ignore no-console
-		console.log(`id = ${stateHandle.id}; output = ${result.state.output}`);
-	} else {
-		// deno-lint-ignore no-console
-		console.log("Could not get desired state", result.cause);
-	}
+	await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
 
-	await eveningRoutineWorkflowV1
+	const stateHandle = await eveningRoutineWorkflowV1
 		.withOptions({ idempotencyKey: "some-key" })
 		.start(aikiClient);
+		
+	const result = await stateHandle.wait(
+		{ type: "status", status: "completed" },
+		{ maxDurationMs: 30_000, pollIntervalMs: 5_000 },
+	);
+	if (result.success) {
+		logger.info("Workflow completed", { id: stateHandle.id });
+	} else {
+		logger.info("Could not get desired state", { cause: result.cause });
+	}
 
 	await aikiClient.close();
 }
