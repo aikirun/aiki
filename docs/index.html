@@ -780,8 +780,8 @@
     
     <span class="code-comment">// Wait for user to verify email - could be hours or days</span>
     <span class="code-comment">// No resources consumed while waiting</span>
-    <span class="code-keyword">const</span> event = <span class="code-keyword">await</span> run.<span class="code-function">waitForEvent</span>(<span class="code-string">"email_verified"</span>, { 
-      timeout: { hours: <span class="code-string">12</span> } 
+    <span class="code-keyword">const</span> event = <span class="code-keyword">await</span> run.<span class="code-function">wait</span>({ type: <span class="code-string">"event"</span>, event: <span class="code-string">"email_verified"</span> }, {
+      maxDurationMs: <span class="code-string">12</span> * <span class="code-string">60</span> * <span class="code-string">60</span> * <span class="code-string">1000</span>
     });
     
     <span class="code-keyword">if</span> (!event.received) {
