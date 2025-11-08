@@ -32,7 +32,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 
 	constructor(
 		private readonly api: ApiClient,
-		public readonly run: WorkflowRun<Input, Output>,
+		public _run: WorkflowRun<Input, Output>,
 		private readonly logger: Logger,
 	) {
 		this._internal = {
@@ -43,22 +43,22 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		};
 	}
 
+	public get run(): Readonly<WorkflowRun<Input, Output>> {
+		return this._run;
+	}
+
 	private async refresh() {
 		const { run: currentRun } = await this.api.workflowRun.getByIdV1({ id: this.run.id });
-		this.run.revision = currentRun.revision;
-		this.run.state = currentRun.state as WorkflowRunState<Output>;
-		this.run.tasksState = currentRun.tasksState;
-		this.run.subWorkflowsRunState = currentRun.subWorkflowsRunState;
+		this._run = currentRun as WorkflowRun<Input, Output>;
 	}
 
 	public async transitionState(targetState: WorkflowRunState<Output>): Promise<void> {
-		const { newRevision } = await this.api.workflowRun.transitionStateV1({
+		await this.api.workflowRun.transitionStateV1({
 			id: this.run.id,
 			state: targetState,
 			expectedRevision: this.run.revision,
 		});
-		this.run.revision = newRevision;
-		this.run.state = targetState;
+		await this.refresh();
 	}
 
 	private getTaskState(taskPath: string): TaskState<unknown> {
@@ -72,8 +72,8 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 			taskState,
 			expectedRevision: this.run.revision,
 		});
-		this.run.revision = newRevision;
-		this.run.tasksState[taskPath] = taskState;
+		this._run.revision = newRevision;
+		this._run.tasksState[taskPath] = taskState;
 	}
 
 	private async assertExecutionAllowed() {
