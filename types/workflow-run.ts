@@ -29,12 +29,16 @@ interface WorkflowRunStateBase {
 }
 
 export interface WorkflowRunStateOthers extends WorkflowRunStateBase {
-	status: Exclude<WorkflowRunStatus, "queued" | "completed" | "failed">;
+	status: Exclude<WorkflowRunStatus, "queued" | "running" | "completed" | "failed">;
 }
 
 export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
 	status: "queued";
 	reason: "new" | "event" | "retry" | "awake";
+}
+
+export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
+	status: "running";
 }
 
 export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {
@@ -70,6 +74,7 @@ export type WorkflowRunStateFailed =
 export type WorkflowRunState<Output> =
 	| WorkflowRunStateOthers
 	| WorkflowRunStateQueued
+	| WorkflowRunStateRunning
 	| WorkflowRunStateCompleted<Output>
 	| WorkflowRunStateFailed;
 
