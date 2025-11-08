@@ -10,4 +10,5 @@ export interface WorkflowRunContext<Input, Output> {
 	options: WorkflowOptions;
 	handle: WorkflowRunHandle<Input, Output>;
 	logger: Logger;
+	sleep(durationMs: number): Promise<void>;
 }

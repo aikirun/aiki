@@ -19,4 +19,5 @@ export {
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
 	WorkflowRunPausedError,
+	WorkflowSleepingError,
 } from "./run/error.ts";

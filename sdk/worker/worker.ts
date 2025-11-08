@@ -11,9 +11,10 @@ import {
 	type WorkflowRegistry,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
+	WorkflowSleepingError,
 } from "@aiki/workflow";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
-import type { WorkflowVersion } from "@aiki/workflow";
+import type { WorkflowRunHandle, WorkflowVersion } from "@aiki/workflow";
 import { TaskFailedError } from "@aiki/task";
 import { isServerConflictError } from "../error.ts";
 
@@ -307,6 +308,7 @@ class WorkerImpl<AppContext> implements Worker {
 					options: workflowRun.options,
 					handle: workflowRunHandle,
 					logger,
+					sleep: createWorkflowRunSleeper(workflowRunHandle, logger),
 				},
 				appContext,
 			);
@@ -318,6 +320,7 @@ class WorkerImpl<AppContext> implements Worker {
 				error instanceof WorkflowRunNotExecutableError ||
 				error instanceof WorkflowRunFailedError ||
 				error instanceof TaskFailedError ||
+				error instanceof WorkflowSleepingError ||
 				isServerConflictError(error)
 			) {
 				shouldAcknowledge = true;
@@ -357,4 +360,18 @@ class WorkerImpl<AppContext> implements Worker {
 			"aiki.stack": error.stack,
 		});
 	}
+}
+
+function createWorkflowRunSleeper(
+	workflowRunHandle: WorkflowRunHandle<unknown, unknown>,
+	logger: Logger,
+) {
+	return async (durationMs: number) => {
+		const awakeAt = Date.now() + durationMs;
+		logger.info("Workflow sleeping", { "aiki.durationMs": durationMs });
+
+		await workflowRunHandle.transitionState({ status: "sleeping", awakeAt });
+
+		throw new WorkflowSleepingError(workflowRunHandle.run.id as WorkflowRunId);
+	};
 }

@@ -46,3 +46,10 @@ export class WorkflowRunFailedError extends Error {
 		this.name = "WorkflowRunFailedError";
 	}
 }
+
+export class WorkflowSleepingError extends Error {
+	constructor(public readonly id: WorkflowRunId) {
+		super(`Workflow ${id} is sleeping until`);
+		this.name = "WorkflowSleepingError";
+	}
+}
