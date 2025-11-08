@@ -45,7 +45,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 		options: input.options ?? {},
 		state: {
 			status: "queued",
-			reason: "new"
+			reason: "new",
 		},
 		tasksState: {},
 		subWorkflowsRunState: {},

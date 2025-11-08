@@ -30,7 +30,12 @@ export const triggerStrategySchema: zT<TriggerStrategy> = z.discriminatedUnion("
 export const retryStrategySchema: zT<RetryStrategy> = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("never") }),
 	z.object({ type: z.literal("fixed"), maxAttempts: z.number(), delayMs: z.number() }),
-	z.object({ type: z.literal("exponential"), maxAttempts: z.number(), baseDelayMs: z.number(), maxDelayMs: z.number() }),
+	z.object({
+		type: z.literal("exponential"),
+		maxAttempts: z.number(),
+		baseDelayMs: z.number(),
+		maxDelayMs: z.number(),
+	}),
 	z.object({ type: z.literal("jittered"), maxAttempts: z.number(), baseDelayMs: z.number(), maxDelayMs: z.number() }),
 ]);
 
@@ -52,7 +57,7 @@ export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 				z.literal("new"),
 				z.literal("event"),
 				z.literal("retry"),
-				z.literal("awake")
+				z.literal("awake"),
 			]),
 		}),
 		z.object({

@@ -16,7 +16,7 @@ export type { WorkflowRunStateHandle } from "./run/state-handle.ts";
 export {
 	WorkflowRunCancelledError,
 	WorkflowRunConflictError,
+	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
 	WorkflowRunPausedError,
-	WorkflowRunFailedError,
 } from "./run/error.ts";

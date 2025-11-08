@@ -86,7 +86,6 @@ export function withRetry<Args, Result>(
 				attempts++;
 
 				let result: Result | undefined;
-				let error: unknown;
 
 				try {
 					result = await fn(...args);
@@ -107,7 +106,6 @@ export function withRetry<Args, Result>(
 					) {
 						throw err;
 					}
-					error = err;
 				}
 
 				const retryParams = getRetryParams(attempts, strategy);
