@@ -49,7 +49,11 @@ export const workflowOptionsSchema: zT<WorkflowOptions> = z.object({
 export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 	.discriminatedUnion("status", [
 		z.object({
-			status: workflowRunStatusSchema.exclude(["queued", "awaiting_retry", "completed", "failed"]),
+			status: workflowRunStatusSchema.exclude(["scheduled", "queued", "awaiting_retry", "completed", "failed"]),
+		}),
+		z.object({
+			status: z.literal("scheduled"),
+			scheduledAt: z.number(),
 		}),
 		z.object({
 			status: z.literal("queued"),

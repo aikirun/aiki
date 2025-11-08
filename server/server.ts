@@ -2,7 +2,10 @@ import { loadConfig } from "./config/mod.ts";
 import { RPCHandler } from "@orpc/server/fetch";
 import { contextFactory } from "./middleware/mod.ts";
 import { router } from "./router/mod.ts";
-import { transitionRetryableWorkflowsToQueued } from "./router/workflow-run.ts";
+import {
+	transitionRetryableWorkflowsToQueued,
+	transitionScheduledWorkflowsToQueued,
+} from "./router/workflow-run.ts";
 
 if (import.meta.main) {
 	const config = await loadConfig();
@@ -15,6 +18,13 @@ if (import.meta.main) {
 		//   console.error('Error:', { error, context });
 		// },
 	});
+
+	const scheduledSchedulerInterval = setInterval(
+		() => {
+			transitionScheduledWorkflowsToQueued();
+		},
+		500,
+	);
 
 	const retrySchedulerInterval = setInterval(
 		() => {
@@ -32,6 +42,7 @@ if (import.meta.main) {
 	});
 
 	globalThis.addEventListener("beforeunload", () => {
+		clearInterval(scheduledSchedulerInterval);
 		clearInterval(retrySchedulerInterval);
 	});
 }
