@@ -13,7 +13,8 @@
     "npm:@orpc/server@1.9.3": "1.9.3",
     "npm:@orpc/server@^1.9.3": "1.9.3",
     "npm:@types/node@*": "22.15.15",
-    "npm:ioredis@^5.4.1": "5.8.0",
+    "npm:ioredis@^5.3.0": "5.8.1",
+    "npm:ioredis@^5.4.1": "5.8.1",
     "npm:zod@^4.1.12": "4.1.12"
   },
   "jsr": {
@@ -141,8 +142,8 @@
     "denque@2.1.0": {
       "integrity": "sha512-HVQE3AAb/pxF8fQAoiqpvg9i3evqug3hoiwakOyZAwJm+6vZehbkYXZ0l4JxS+I3QxM97v5aaRNhj8v5oBhekw=="
     },
-    "ioredis@5.8.0": {
-      "integrity": "sha512-AUXbKn9gvo9hHKvk6LbZJQSKn/qIfkWXrnsyL9Yrf+oeXmla9Nmf6XEumOddyhM8neynpK5oAV6r9r99KBuwzA==",
+    "ioredis@5.8.1": {
+      "integrity": "sha512-Qho8TgIamqEPdgiMadJwzRMW3TudIg6vpg4YONokGDudy4eqRIJtDbVX72pfLBcWxvbn3qm/40TyGUObdW4tLQ==",
       "dependencies": [
         "@ioredis/commands",
         "cluster-key-slot",
@@ -275,6 +276,7 @@
           "jsr:@std/dotenv@0.225",
           "npm:@orpc/contract@^1.9.3",
           "npm:@orpc/server@^1.9.3",
+          "npm:ioredis@^5.3.0",
           "npm:zod@^4.1.12"
         ]
       }
