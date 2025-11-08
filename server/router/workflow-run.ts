@@ -102,6 +102,44 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
 	return { newRevision: run.revision };
 });
 
+export function getRetryableWorkflows(): Array<{ id: string; run: WorkflowRun<unknown, unknown> }> {
+	const now = Date.now();
+	const retryable: Array<{ id: string; run: WorkflowRun<unknown, unknown> }> = [];
+
+	for (const [id, run] of workflowRuns.entries()) {
+		if (run.state.status === "awaiting_retry") {
+			const awaitingRetryState = run.state;
+			if (awaitingRetryState.nextAttemptAt <= now) {
+				retryable.push({ id, run });
+			}
+		}
+	}
+
+	return retryable;
+}
+
+export function transitionRetryableWorkflowsToQueued() {
+	for (const { id, run } of getRetryableWorkflows()) {
+		// Reset all failed/running tasks atomically with state transition
+		for (const [path, taskState] of Object.entries(run.tasksState)) {
+			if (taskState.status === "failed" || taskState.status === "running") {
+				run.tasksState[path] = { status: "none" };
+			}
+		}
+
+		run.state = {
+			status: "queued",
+			reason: "retry",
+		};
+		run.revision++;
+		// TODO: Incrementing the attempt counter should be done when the workflow is transitioned into running state.
+		// run.attempts++;
+
+		// deno-lint-ignore no-console
+		console.log(`Transitioned workflow ${id} from awaiting_retry to queued`);
+	}
+}
+
 export const workflowRunRouter = os.router({
 	getByIdV1,
 	getStateV1,
