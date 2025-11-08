@@ -1,5 +1,6 @@
 import type { TaskState } from "./task.ts";
 import type { TriggerStrategy } from "./trigger.ts";
+import type { RetryStrategy } from "@aiki/lib/retry";
 import type { SerializableError } from "./serializable.ts";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
@@ -19,6 +20,7 @@ export type WorkflowRunStatus =
 	| "completed";
 
 export interface WorkflowOptions {
+	retry?: RetryStrategy;
 	idempotencyKey?: string;
 	trigger?: TriggerStrategy;
 	shardKey?: string;
@@ -29,7 +31,7 @@ interface WorkflowRunStateBase {
 }
 
 export interface WorkflowRunStateOthers extends WorkflowRunStateBase {
-	status: Exclude<WorkflowRunStatus, "queued" | "running" | "completed" | "failed">;
+	status: Exclude<WorkflowRunStatus, "queued" | "running" | "awaiting_retry" | "completed" | "failed">;
 }
 
 export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
@@ -41,6 +43,34 @@ export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
 	status: "running";
 }
 
+export interface WorkflowRunStateAwaitingBase extends WorkflowRunStateBase {
+	status: "awaiting_retry";
+	cause: "task" | "sub_workflow" | "self";
+	reason: string;
+	nextAttemptAt: number;
+}
+
+export interface WorkflowRunStateAwaitingRetryCausedByTask extends WorkflowRunStateAwaitingBase {
+	cause: "task";
+	taskName: string;
+}
+
+export interface WorkflowRunStateAwaitingRetryCausedBySubWorkflow extends WorkflowRunStateAwaitingBase {
+	cause: "sub_workflow";
+	subWorkflowName: string;
+	subWorkflowVersionId: string;
+}
+
+export interface WorkflowRunStateAwaitingRetryCausedBySelf extends WorkflowRunStateAwaitingBase {
+	cause: "self";
+	error: SerializableError;
+}
+
+export type WorkflowRunStateAwaitingRetry = 
+	| WorkflowRunStateAwaitingRetryCausedByTask
+	| WorkflowRunStateAwaitingRetryCausedBySubWorkflow
+	| WorkflowRunStateAwaitingRetryCausedBySelf;
+
 export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {
 	status: "completed";
 	output: Output;
@@ -48,6 +78,7 @@ export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase 
 
 interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
 	status: "failed";
+	cause: "task" | "sub_workflow" | "self";
 	reason: string;
 }
 
@@ -59,6 +90,7 @@ export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase
 export interface WorkflowRunStateFailedBySubWorkflow extends WorkflowRunStateFailedBase {
 	cause: "sub_workflow";
 	subWorkflowName: string;
+	subWorkflowVersionId: string;
 }
 
 export interface WorkflowRunStateFailedBySelf extends WorkflowRunStateFailedBase {
@@ -75,6 +107,7 @@ export type WorkflowRunState<Output> =
 	| WorkflowRunStateOthers
 	| WorkflowRunStateQueued
 	| WorkflowRunStateRunning
+	| WorkflowRunStateAwaitingRetry
 	| WorkflowRunStateCompleted<Output>
 	| WorkflowRunStateFailed;
 
@@ -86,6 +119,7 @@ export interface WorkflowRun<Input, Output> {
 	revision: number;
 	input: Input;
 	options: WorkflowOptions;
+	attempts: number;
 	state: WorkflowRunState<Output>;
 	tasksState: Record<string, TaskState<unknown>>;
 	subWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;
