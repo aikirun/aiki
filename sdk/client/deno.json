@@ -7,7 +7,7 @@
 		"@aiki/lib/*": "jsr:@aiki/lib@^0.1.0/*",
 		"@orpc/client": "npm:@orpc/client@^1.9.3",
 		"@orpc/client/*": "npm:@orpc/client@^1.9.3/*",
-		"redis": "npm:ioredis@^5.4.1",
+		"ioredis": "npm:ioredis@^5.4.1",
 		"zod": "npm:zod@^4.1.12"
 	},
 	"license": "Apache-2.0"

@@ -1,5 +1,5 @@
 import type { ApiClient, Client, ClientParams, Logger } from "@aiki/types/client";
-import { Redis } from "redis";
+import { Redis } from "ioredis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver.ts";
