@@ -40,9 +40,10 @@ const createV1 = os.createV1.handler(({ input }) => {
 		name: input.name,
 		versionId: input.versionId,
 		revision: 0,
+		attempts: 1,
 		input: input.input,
 		options: input.options ?? {},
-		state: { 
+		state: {
 			status: "queued",
 			reason: "new"
 		},
