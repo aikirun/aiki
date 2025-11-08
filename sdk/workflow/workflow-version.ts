@@ -1,6 +1,7 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type {
 	WorkflowOptions,
+	WorkflowRun,
 	WorkflowRunId,
 	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateFailed,
@@ -88,7 +89,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		await handle._internal.assertExecutionAllowed();
 
 		const retryStrategy = this.options?.retry ?? { type: "never" };
-		this.assertRetryAllowed(runCtx, retryStrategy, logger);
+		this.assertRetryAllowed(runCtx.handle.run, retryStrategy, logger);
 
 		logger.info("Starting workflow");
 		await handle.transitionState({ status: "running" });
@@ -154,17 +155,19 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	}
 
 	private assertRetryAllowed(
-		runCtx: WorkflowRunContext<Input, Output>,
+		run: WorkflowRun<Input, Output>,
 		retryStrategy: RetryStrategy,
 		logger: Logger,
 	): void {
-		const attempts = runCtx.handle.run.attempts;
-		const retryParams = getRetryParams(attempts, retryStrategy);
-		if (!retryParams.retriesLeft) {
-			logger.error("Workflow retry not allowed", {
-				"aiki.attempts": attempts,
-			});
-			throw new WorkflowRunFailedError(runCtx.id, attempts, "Workflow retry not allowed");
+		const { state } = run;
+		if (state.status === "queued" && state.reason === "retry") {
+			const retryParams = getRetryParams(run.attempts, retryStrategy);
+			if (!retryParams.retriesLeft) {
+				logger.error("Workflow retry not allowed", {
+					"aiki.attempts": run.attempts,
+				});
+				throw new WorkflowRunFailedError(run.id as WorkflowRunId, run.attempts, "Workflow retry not allowed");
+			}
 		}
 	}
 
