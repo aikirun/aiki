@@ -12,7 +12,7 @@ export function client<AppContext = null>(params: ClientParams<AppContext>): Pro
 class ClientImpl<AppContext> implements Client<AppContext> {
 	public readonly api: ApiClient;
 	public readonly _internal: Client<AppContext>["_internal"];
-	private readonly logger: Logger;
+	public readonly logger: Logger;
 	private redisConnection?: Redis;
 
 	constructor(private readonly params: ClientParams<AppContext>) {
@@ -41,7 +41,6 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 				getConnection: () => this.getRedisConnection(),
 				closeConnection: () => this.closeRedisConnection(),
 			},
-			logger: this.logger,
 			contextFactory: this.params.contextFactory,
 		};
 	}

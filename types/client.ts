@@ -12,6 +12,7 @@ export interface ClientParams<AppContext> {
 
 export interface Client<AppContext> {
 	api: ApiClient;
+	logger: Logger;
 	close: () => Promise<void>;
 	_internal: {
 		subscriber: {
@@ -22,7 +23,6 @@ export interface Client<AppContext> {
 			) => SubscriberStrategyBuilder;
 		};
 		redis: RedisConnection;
-		logger: Logger;
 		contextFactory?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
 	};
 }

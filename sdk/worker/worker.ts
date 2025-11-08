@@ -66,7 +66,7 @@ class WorkerImpl<AppContext> implements Worker {
 		this.id = params.id ?? crypto.randomUUID();
 		this.workflowRegistry = initWorkflowRegistry();
 
-		this.logger = getChildLogger(client._internal.logger, {
+		this.logger = getChildLogger(client.logger, {
 			"aiki.component": "worker",
 			"aiki.workerId": this.id,
 		});

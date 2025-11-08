@@ -94,7 +94,7 @@ export function createRedisStreamsStrategy(
 ): SubscriberStrategyBuilder {
 	const redis = client._internal.redis.getConnection();
 
-	const logger = getChildLogger(client._internal.logger, {
+	const logger = getChildLogger(client.logger, {
 		"aiki.component": "redis-subscriber",
 	});
 
