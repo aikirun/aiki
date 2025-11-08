@@ -2,15 +2,17 @@ import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type {
 	WorkflowOptions,
 	WorkflowRunId,
+	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateFailed,
 } from "@aiki/types/workflow-run";
-import type { Client } from "@aiki/types/client";
+import type { Client, Logger } from "@aiki/types/client";
 import type { WorkflowRunContext } from "./run/context.ts";
 import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { createSerializableError } from "../error.ts";
 import { TaskFailedError } from "@aiki/task";
 import { WorkflowRunFailedError } from "./run/error.ts";
+import { getRetryParams, type RetryStrategy } from "@aiki/lib/retry";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
@@ -85,10 +87,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 
 		await handle._internal.assertExecutionAllowed();
 
+		const retryStrategy = this.options?.retry ?? { type: "never" };
+		this.assertRetryAllowed(runCtx, retryStrategy, logger);
+
 		logger.info("Starting workflow");
 		await handle.transitionState({ status: "running" });
 
-		const output = await this.tryExecuteWorkflow(input, runCtx, context);
+		const output = await this.tryExecuteWorkflow(input, runCtx, context, retryStrategy);
 
 		await handle.transitionState({ status: "completed", output });
 		logger.info("Workflow complete");
@@ -98,21 +103,68 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		input: Input,
 		runCtx: WorkflowRunContext<Input, Output>,
 		context: AppContext,
+		retryStrategy: RetryStrategy,
 	): Promise<Output> {
-		try {
-			return await this.params.exec(input, runCtx, context);
-		} catch (error) {
-			const failedState = this.createFailedState(error);
+		while (true) {
+			try {
+				return await this.params.exec(input, runCtx, context);
+			} catch (error) {
+				const attempts = runCtx.handle.run.attempts;
+				const retryParams = getRetryParams(attempts, retryStrategy);
 
-			await runCtx.handle.transitionState(failedState);
+				if (!retryParams.retriesLeft) {
+					const failedState = this.createFailedState(error);
+					await runCtx.handle.transitionState(failedState);
 
-			runCtx.logger.error("Workflow failed", {
-				"aiki.cause": failedState.cause,
-				"aiki.reason": failedState.reason,
-				...(failedState.cause === "task" && { "aiki.taskName": failedState.taskName }),
+					const logMeta: Record<string, unknown> = {};
+					for (const [key, value] of Object.entries(failedState)) {
+						logMeta[`aiki.${key}`] = value;
+					}
+					runCtx.logger.error("Workflow failed", {
+						"aiki.attempts": attempts,
+						...logMeta,
+					});
+
+					throw new WorkflowRunFailedError(runCtx.id, attempts, failedState.reason, failedState.cause);
+				} else {
+					const nextAttemptAt = Date.now() + retryParams.delayMs;
+					const awaitingRetryState = this.createAwaitingRetryState(error, nextAttemptAt);
+					await runCtx.handle.transitionState(awaitingRetryState);
+
+					const logMeta: Record<string, unknown> = {};
+					for (const [key, value] of Object.entries(awaitingRetryState)) {
+						logMeta[`aiki.${key}`] = value;
+					}
+					runCtx.logger.info("Workflow failed. Scheduled for retry", {
+						"aiki.attempts": attempts,
+						"aiki.nextAttemptAt": nextAttemptAt,
+						"aiki.delayMs": retryParams.delayMs,
+						...logMeta,
+					});
+
+					throw new WorkflowRunFailedError(
+						runCtx.id,
+						attempts,
+						awaitingRetryState.reason,
+						awaitingRetryState.cause,
+					);
+				}
+			}
+		}
+	}
+
+	private assertRetryAllowed(
+		runCtx: WorkflowRunContext<Input, Output>,
+		retryStrategy: RetryStrategy,
+		logger: Logger,
+	): void {
+		const attempts = runCtx.handle.run.attempts;
+		const retryParams = getRetryParams(attempts, retryStrategy);
+		if (!retryParams.retriesLeft) {
+			logger.error("Retry not allowed", {
+				"aiki.attempts": attempts,
 			});
-
-			throw new WorkflowRunFailedError(runCtx.id as WorkflowRunId);
+			throw new WorkflowRunFailedError(runCtx.id, attempts, "Retry not allowed");
 		}
 	}
 
@@ -126,13 +178,39 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			};
 		}
 
-		const serializableError = createSerializableError(error);
+		// TODO: check for other error types, like child workflow failures
 
-		// TODO: check for other error types
+		const serializableError = createSerializableError(error);
 		return {
 			status: "failed",
 			cause: "self",
 			reason: serializableError.message,
+			error: serializableError,
+		};
+	}
+
+	private createAwaitingRetryState(
+		error: unknown,
+		nextAttemptAt: number,
+	): WorkflowRunStateAwaitingRetry {
+		if (error instanceof TaskFailedError) {
+			return {
+				status: "awaiting_retry",
+				cause: "task",
+				reason: error.reason,
+				nextAttemptAt: nextAttemptAt,
+				taskName: error.taskName,
+			};
+		}
+
+		// TODO: check for other error types, like child workflow failures
+
+		const serializableError = createSerializableError(error);
+		return {
+			status: "awaiting_retry",
+			cause: "self",
+			reason: serializableError.message,
+			nextAttemptAt: nextAttemptAt,
 			error: serializableError,
 		};
 	}
