@@ -178,6 +178,35 @@ export function transitionRetryableWorkflowsToQueued() {
 	}
 }
 
+export function getSleepingWorkflows(): WorkflowRun[] {
+	const now = Date.now();
+	const sleeping: WorkflowRun[] = [];
+
+	for (const run of workflowRuns.values()) {
+		if (run.state.status === "sleeping") {
+			const sleepingState = run.state;
+			if (sleepingState.awakeAt <= now) {
+				sleeping.push(run);
+			}
+		}
+	}
+
+	return sleeping;
+}
+
+export function transitionSleepingWorkflowsToQueued() {
+	for (const run of getSleepingWorkflows()) {
+		run.state = {
+			status: "queued",
+			reason: "awake",
+		};
+		run.revision++;
+
+		// deno-lint-ignore no-console
+		console.log(`Transitioned workflow ${run.id} from sleeping to queued`);
+	}
+}
+
 export const workflowRunRouter = os.router({
 	getByIdV1,
 	getStateV1,

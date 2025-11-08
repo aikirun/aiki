@@ -5,6 +5,7 @@ import { router } from "./router/mod.ts";
 import {
 	transitionRetryableWorkflowsToQueued,
 	transitionScheduledWorkflowsToQueued,
+	transitionSleepingWorkflowsToQueued,
 } from "./router/workflow-run.ts";
 
 if (import.meta.main) {
@@ -26,6 +27,13 @@ if (import.meta.main) {
 		500,
 	);
 
+	const sleepingSchedulerInterval = setInterval(
+		() => {
+			transitionSleepingWorkflowsToQueued();
+		},
+		500,
+	);
+
 	const retrySchedulerInterval = setInterval(
 		() => {
 			transitionRetryableWorkflowsToQueued();
@@ -43,6 +51,7 @@ if (import.meta.main) {
 
 	globalThis.addEventListener("beforeunload", () => {
 		clearInterval(scheduledSchedulerInterval);
+		clearInterval(sleepingSchedulerInterval);
 		clearInterval(retrySchedulerInterval);
 	});
 }

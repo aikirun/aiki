@@ -30,7 +30,10 @@ interface WorkflowRunStateBase {
 }
 
 export interface WorkflowRunStateOthers extends WorkflowRunStateBase {
-	status: Exclude<WorkflowRunStatus, "scheduled" | "queued" | "running" | "awaiting_retry" | "completed" | "failed">;
+	status: Exclude<
+		WorkflowRunStatus,
+		"scheduled" | "queued" | "running" | "sleeping" | "awaiting_retry" | "completed" | "failed"
+	>;
 }
 
 export interface WorkflowRunStateScheduled extends WorkflowRunStateBase {
@@ -45,6 +48,11 @@ export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
 	status: "running";
+}
+
+export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
+	status: "sleeping";
+	awakeAt: number;
 }
 
 export type WorkflowFailureCause = "task" | "child_workflow" | "self";
@@ -110,6 +118,7 @@ export type WorkflowRunStateFailed =
 export type WorkflowRunStateInComplete =
 	| WorkflowRunStateOthers
 	| WorkflowRunStateScheduled
+	| WorkflowRunStateSleeping
 	| WorkflowRunStateQueued
 	| WorkflowRunStateRunning
 	| WorkflowRunStateAwaitingRetry
