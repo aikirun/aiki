@@ -49,17 +49,17 @@ const ms4 = toMilliseconds({ days: 1, hours: 2 }); // 93600000ms
 import type { RetryStrategy } from "@aiki/lib/retry";
 
 const exponentialRetry: RetryStrategy = {
-  type: "exponential",
-  maxAttempts: 5,
-  baseDelayMs: 1000,
-  maxDelayMs: 30000,
-  factor: 2,
+	type: "exponential",
+	maxAttempts: 5,
+	baseDelayMs: 1000,
+	maxDelayMs: 30000,
+	factor: 2,
 };
 
 const fixedRetry: RetryStrategy = {
-  type: "fixed",
-  maxAttempts: 3,
-  delayMs: 1000,
+	type: "fixed",
+	maxAttempts: 3,
+	delayMs: 1000,
 };
 ```
 
