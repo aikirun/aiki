@@ -122,6 +122,46 @@ export function generateWorkspaceMappings(
 }
 
 /**
+ * Fix npm package exports to support both bare and /mod.js imports
+ * Transforms "./error/mod.js" exports to also support "./error" imports
+ */
+export async function fixPackageExports(packageDir: string): Promise<void> {
+	const packageJsonPath = `${packageDir}/npm/package.json`;
+
+	try {
+		const content = await Deno.readTextFile(packageJsonPath);
+		const packageJson = JSON.parse(content);
+
+		if (!packageJson.exports || typeof packageJson.exports !== "object") {
+			return;
+		}
+
+		const newExports: Record<string, unknown> = {};
+
+		// Process each export entry
+		for (const [key, value] of Object.entries(packageJson.exports)) {
+			// Add the original entry
+			newExports[key] = value;
+
+			// If the key ends with /mod.js, also add the base path without /mod.js
+			if (key.endsWith("/mod.js")) {
+				const basePath = key.slice(0, -"/mod.js".length);
+				// Only add if it doesn't already exist
+				if (!(basePath in packageJson.exports)) {
+					newExports[basePath] = value;
+				}
+			}
+		}
+
+		packageJson.exports = newExports;
+		await Deno.writeTextFile(packageJsonPath, JSON.stringify(packageJson, null, "\t"));
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		console.warn(`Warning: Could not fix package exports: ${errorMessage}`);
+	}
+}
+
+/**
  * Default postBuild: copy and transform README.md for npm distribution
  */
 export async function defaultPostBuild(

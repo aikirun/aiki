@@ -4,7 +4,7 @@
 import { build, emptyDir } from "https://deno.land/x/dnt@0.40.0/mod.ts";
 import { join, dirname } from "https://deno.land/std@0.224.0/path/mod.ts";
 import type { PackageBuildConfig } from "./build-config.ts";
-import { COMMON_CONFIG, resolveDependencies, defaultPostBuild } from "./build-config.ts";
+import { COMMON_CONFIG, resolveDependencies, fixPackageExports, defaultPostBuild } from "./build-config.ts";
 
 /**
  * Build a single package for npm using dnt
@@ -71,6 +71,9 @@ async function buildPackage(packageDir: string, config: PackageBuildConfig): Pro
 				},
 			},
 			async postBuild() {
+				// Fix package exports to support both bare and /mod.js imports
+				await fixPackageExports(packageDir);
+
 				// Use custom postBuild or default
 				if (config.postBuild) {
 					await config.postBuild();
