@@ -66,7 +66,7 @@ echo "Building npm packages with dnt (v${VERSION})..."
 echo ""
 
 echo "Step 1/6: Building and publishing @aiki/lib..."
-deno run --allow-read --allow-write --allow-net scripts/build-npm.ts lib/build.config.ts
+deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts lib/build.config.ts
 cd lib/npm
 npm publish
 cd ../..
@@ -74,7 +74,7 @@ echo "✅ @aiki/lib published"
 echo ""
 
 echo "Step 2/6: Building and publishing @aiki/types..."
-deno run --allow-read --allow-write --allow-net scripts/build-npm.ts types/build.config.ts
+deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts types/build.config.ts
 cd types/npm
 npm publish
 cd ../..
@@ -82,7 +82,7 @@ echo "✅ @aiki/types published"
 echo ""
 
 echo "Step 3/6: Building and publishing @aiki/workflow..."
-deno run --allow-read --allow-write --allow-net scripts/build-npm.ts sdk/workflow/build.config.ts
+deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/workflow/build.config.ts
 cd sdk/workflow/npm
 npm publish
 cd ../../..
@@ -90,7 +90,7 @@ echo "✅ @aiki/workflow published"
 echo ""
 
 echo "Step 4/6: Building and publishing @aiki/client..."
-deno run --allow-read --allow-write --allow-net scripts/build-npm.ts sdk/client/build.config.ts
+deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/client/build.config.ts
 cd sdk/client/npm
 npm publish
 cd ../../..
@@ -98,7 +98,7 @@ echo "✅ @aiki/client published"
 echo ""
 
 echo "Step 5/6: Building and publishing @aiki/task..."
-deno run --allow-read --allow-write --allow-net scripts/build-npm.ts sdk/task/build.config.ts
+deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/task/build.config.ts
 cd sdk/task/npm
 npm publish
 cd ../../..
@@ -106,7 +106,7 @@ echo "✅ @aiki/task published"
 echo ""
 
 echo "Step 6/6: Building and publishing @aiki/worker..."
-deno run --allow-read --allow-write --allow-net scripts/build-npm.ts sdk/worker/build.config.ts
+deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/worker/build.config.ts
 cd sdk/worker/npm
 npm publish
 cd ../../..

@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-net --allow-env
+#!/usr/bin/env -S deno run --allow-read --allow-write --allow-net --allow-env --allow-run
 // deno-lint-ignore-file no-console
 
 import { build, emptyDir } from "https://deno.land/x/dnt@0.40.0/mod.ts";
@@ -31,18 +31,25 @@ async function buildPackage(packageDir: string, config: PackageBuildConfig): Pro
 	// Resolve dependencies
 	const dependencies = resolveDependencies(config.dependencies, version);
 
+	// Mappings are used as-is (relative to package directory)
+
 	// Build npm directory path
 	const npmDir = join(packageDir, "npm");
 
 	console.log(`Building ${config.name} v${version}...`);
 
-	// Empty npm directory
-	await emptyDir(npmDir);
+	// Change to package directory for dnt to resolve paths correctly
+	const originalCwd = Deno.cwd();
+	Deno.chdir(packageDir);
 
-	// Build with dnt
-	await build({
-		entryPoints,
-		outDir: npmDir,
+	try {
+		// Empty npm directory
+		await emptyDir(npmDir);
+
+		// Build with dnt
+		await build({
+			entryPoints,
+			outDir: npmDir,
 		shims: {
 			deno: true,
 			...(config.undiciShim ? { undici: true } : {}),
@@ -70,9 +77,13 @@ async function buildPackage(packageDir: string, config: PackageBuildConfig): Pro
 				await defaultPostBuild(packageDir);
 			}
 		},
-	});
+		});
 
-	console.log(`✅ ${config.name} built successfully\n`);
+		console.log(`✅ ${config.name} built successfully\n`);
+	} finally {
+		// Restore original working directory
+		Deno.chdir(originalCwd);
+	}
 }
 
 /**
