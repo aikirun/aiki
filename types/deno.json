@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/types",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"exports": {
 		"./client": "./client.ts",
