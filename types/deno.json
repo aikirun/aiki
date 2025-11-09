@@ -11,5 +11,8 @@
 		"./workflow-run-api": "./workflow-run-api.ts",
 		"./task": "./task.ts"
 	},
+	"imports": {
+		"@aiki/lib/*": "jsr:@aiki/lib@^0.2.0/*"
+	},
 	"license": "Apache-2.0"
 }
