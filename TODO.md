@@ -240,6 +240,34 @@ Exploratory work for future capabilities.
 
 ---
 
+## Developer Experience
+
+### Automated Version Management
+- [ ] Evaluate version bumping tools:
+  - [ ] **changesets** - For managing versions and changelogs in monorepos
+  - [ ] **release-it** - For automated release management
+- [ ] Goal: Generate changelogs automatically
+
+### Documentation Improvements
+- [ ] Add API documentation site (typedoc or similar)
+- [ ] Create architecture decision records (ADRs)
+- [ ] Add troubleshooting guides for common issues
+- [ ] Create video tutorials
+
+### Developer Experience
+- [ ] Create issue templates for bug reports and features
+- [ ] Set up contribution guidelines
+- [ ] Add pre-commit hooks for linting/formatting
+- [ ] Create development setup documentation
+
+### Community
+- [ ] Create example projects using all packages
+- [ ] Set up discussions forum or Discord
+- [ ] Plan release announcements strategy
+- [ ] Consider official examples repository
+
+---
+
 ## Notes
 
 - Task cancellation is implemented by updating task status in storage rather than interrupting running tasks
