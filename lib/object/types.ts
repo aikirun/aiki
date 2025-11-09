@@ -26,7 +26,7 @@ export type EmptyRecord = Record<PropertyKey, never>;
 
 export type NonArrayObject<T> = T extends object ? (T extends ReadonlyArray<unknown> ? never : T) : never;
 //#region <NonArrayObject Tests>
-type TestNonArrayObjectPlanObject = ExpectTrue<Equal<NonArrayObject<EmptyRecord>, EmptyRecord>>;
+type TestNonArrayObjectPlainObject = ExpectTrue<Equal<NonArrayObject<EmptyRecord>, EmptyRecord>>;
 type TestNonArrayObjectFunction = ExpectTrue<Equal<NonArrayObject<() => unknown>, () => unknown>>;
 type TestNonArrayObjectArray = ExpectTrue<Equal<NonArrayObject<[]>, never>>;
 type TestNonArrayReadonlyArray = ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>;
@@ -64,3 +64,21 @@ type TestRequiredDeep = ExpectTrue<
 export type UnionToRecord<T extends string> = {
 	[K in T]: K;
 };
+
+export type RequireAtLeastOneOf<T, Keys extends keyof T> = {
+	[K in Keys]-?: Required<Pick<T, K>> & Omit<T, K>;
+}[Keys];
+//#region <RequireAtLeastOneOf Tests>
+type TestRequireAtLeastOneOfProducesUnion = ExpectTrue<
+	Equal<
+		RequireAtLeastOneOf<{ a?: string; b?: number; c?: boolean }, "a" | "b">,
+		{ a: string; b?: number; c?: boolean } | { a?: string; b: number; c?: boolean }
+	>
+>;
+type TestRequireAtLeastOneOfPreservesPreviouslyRequiredField = ExpectTrue<
+	Equal<
+		RequireAtLeastOneOf<{ a: string; b?: number; c?: boolean }, "a" | "b">,
+		{ a: string; b?: number; c?: boolean } | { a: string; b: number; c?: boolean }
+	>
+>;
+//#endregion

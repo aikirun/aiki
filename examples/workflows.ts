@@ -44,5 +44,6 @@ export const eveningRoutineWorkflowV1 = eveningRoutineWorkflow
 	.v("1.0.0", {
 		async exec(_, run, _context: AppContext) {
 			await sayPrayer.start(run);
+			await run.sleep({seconds: 5});
 		},
 	});

@@ -2,6 +2,8 @@ import type { WorkflowRun, WorkflowRunId } from "@aiki/types/workflow-run";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import type { NonEmptyArray } from "@aiki/lib/array";
 import { delay, fireAndForget } from "@aiki/lib/async";
+import { toMilliseconds } from "@aiki/lib/duration";
+import type { Duration } from "@aiki/lib/duration";
 import type { Client, Logger, SubscriberStrategy } from "@aiki/client";
 import { getChildLogger } from "@aiki/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aiki/client";
@@ -366,7 +368,8 @@ function createWorkflowRunSleeper(
 	workflowRunHandle: WorkflowRunHandle<unknown, unknown>,
 	logger: Logger,
 ) {
-	return async (durationMs: number) => {
+	return async (duration: Duration) => {
+		const durationMs = toMilliseconds(duration);
 		const awakeAt = Date.now() + durationMs;
 		logger.info("Workflow sleeping", { "aiki.durationMs": durationMs });
 
