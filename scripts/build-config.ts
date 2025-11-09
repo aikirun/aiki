@@ -43,9 +43,16 @@ export interface PackageBuildConfig {
 
 	/**
 	 * Custom postBuild hook
-	 * Defaults to copying README.md
+	 * Defaults to copying and transforming README.md for npm
 	 */
 	postBuild?: () => Promise<void>;
+
+	/**
+	 * Transform README for npm distribution
+	 * Converts JSR/Deno-specific instructions to npm-specific ones
+	 * Defaults to true
+	 */
+	transformReadmeForNpm?: boolean;
 }
 
 /**
@@ -90,16 +97,29 @@ export function resolveDependencies(
 }
 
 /**
- * Default postBuild: copy README.md to npm directory
+ * Default postBuild: copy and transform README.md for npm distribution
  */
-export async function defaultPostBuild(packageDir: string): Promise<void> {
+export async function defaultPostBuild(
+	packageDir: string,
+	config?: { transformReadme?: boolean; packageName?: string },
+): Promise<void> {
 	const readmePath = `${packageDir}/README.md`;
 	const npmReadmePath = `${packageDir}/npm/README.md`;
+	const shouldTransform = config?.transformReadme !== false;
 
 	try {
-		await Deno.copyFile(readmePath, npmReadmePath);
+		let content = await Deno.readTextFile(readmePath);
+
+		// Transform README for npm if enabled
+		if (shouldTransform) {
+			const { transformReadmeForNpm } = await import("./transform-readme.ts");
+			const packageName = config?.packageName || "@aikirun/lib";
+			content = transformReadmeForNpm(content, packageName);
+		}
+
+		await Deno.writeTextFile(npmReadmePath, content);
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.warn(`Warning: Could not copy README.md: ${errorMessage}`);
+		console.warn(`Warning: Could not process README.md: ${errorMessage}`);
 	}
 }

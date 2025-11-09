@@ -77,7 +77,10 @@ async function buildPackage(packageDir: string, config: PackageBuildConfig): Pro
 			if (config.postBuild) {
 				await config.postBuild();
 			} else {
-				await defaultPostBuild(packageDir);
+				await defaultPostBuild(packageDir, {
+					transformReadme: config.transformReadmeForNpm,
+					packageName: config.name,
+				});
 			}
 		},
 		});
