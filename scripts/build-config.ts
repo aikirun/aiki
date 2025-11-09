@@ -97,6 +97,31 @@ export function resolveDependencies(
 }
 
 /**
+ * Generate dnt mappings to convert workspace imports to npm package imports
+ * This ensures dnt treats internal packages as npm dependencies rather than workspace members
+ */
+export function generateWorkspaceMappings(
+	deps: Record<string, string> | undefined,
+): Record<string, string> {
+	const mappings: Record<string, string> = {};
+
+	if (!deps) return mappings;
+
+	// For each @aikirun/* dependency, map its bare imports to the package itself
+	// dnt will use the package.json dependencies we specify to resolve the version
+	for (const pkg of Object.keys(deps)) {
+		if (pkg.startsWith("@aikirun/")) {
+			// Map the base package name so dnt doesn't try to resolve it from workspace
+			mappings[pkg] = pkg;
+			// Also map subpath imports
+			mappings[pkg + "/*"] = pkg;
+		}
+	}
+
+	return mappings;
+}
+
+/**
  * Default postBuild: copy and transform README.md for npm distribution
  */
 export async function defaultPostBuild(

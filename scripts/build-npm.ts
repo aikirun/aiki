@@ -31,8 +31,6 @@ async function buildPackage(packageDir: string, config: PackageBuildConfig): Pro
 	// Resolve dependencies
 	const dependencies = resolveDependencies(config.dependencies, version);
 
-	// Mappings are used as-is (relative to package directory)
-
 	// Build npm directory path
 	const npmDir = join(packageDir, "npm");
 
@@ -50,39 +48,39 @@ async function buildPackage(packageDir: string, config: PackageBuildConfig): Pro
 		await build({
 			entryPoints,
 			outDir: npmDir,
-		shims: {
-			deno: true,
-			...(config.undiciShim ? { undici: true } : {}),
-		},
-		...(config.mappings ? { mappings: config.mappings } : {}),
-		package: {
-			name: config.name,
-			version,
-			description: config.description,
-			license: COMMON_CONFIG.license,
-			repository: {
-				...COMMON_CONFIG.repository,
-				directory: config.directory,
+			shims: {
+				deno: true,
+				...(config.undiciShim ? { undici: true } : {}),
 			},
-			homepage: COMMON_CONFIG.homepage,
-			keywords,
-			engines: COMMON_CONFIG.engines,
-			...(dependencies ? { dependencies } : {}),
-			publishConfig: {
-				access: "public",
+			...(config.mappings ? { mappings: config.mappings } : {}),
+			package: {
+				name: config.name,
+				version,
+				description: config.description,
+				license: COMMON_CONFIG.license,
+				repository: {
+					...COMMON_CONFIG.repository,
+					directory: config.directory,
+				},
+				homepage: COMMON_CONFIG.homepage,
+				keywords,
+				engines: COMMON_CONFIG.engines,
+				...(dependencies ? { dependencies } : {}),
+				publishConfig: {
+					access: "public",
+				},
 			},
-		},
-		async postBuild() {
-			// Use custom postBuild or default
-			if (config.postBuild) {
-				await config.postBuild();
-			} else {
-				await defaultPostBuild(packageDir, {
-					transformReadme: config.transformReadmeForNpm,
-					packageName: config.name,
-				});
-			}
-		},
+			async postBuild() {
+				// Use custom postBuild or default
+				if (config.postBuild) {
+					await config.postBuild();
+				} else {
+					await defaultPostBuild(packageDir, {
+						transformReadme: config.transformReadmeForNpm,
+						packageName: config.name,
+					});
+				}
+			},
 		});
 
 		console.log(`✅ ${config.name} built successfully\n`);
