@@ -1,7 +1,7 @@
 import { worker } from "@aiki/worker";
 import { client } from "@aiki/client";
 import { eveningRoutineWorkflow, morningWorkflow } from "./workflows.ts";
-import { delay } from "@aiki/lib/async";
+import { processWrapper } from "@aiki/lib/process";
 
 if (import.meta.main) {
 	const aikiClient = await client({
@@ -29,13 +29,16 @@ if (import.meta.main) {
 	workerB.workflowRegistry
 		.add(eveningRoutineWorkflow);
 
+	const shutdown = async () => {
+		await workerA.stop();
+		await workerB.stop();
+		await aikiClient.close();
+		processWrapper.exit(0);
+	};
+
+	processWrapper.addSignalListener("SIGINT", shutdown);
+	processWrapper.addSignalListener("SIGTERM", shutdown);
+
 	await workerA.start();
 	await workerB.start();
-
-	await delay(60_000);
-
-	await workerA.stop();
-	await workerB.stop();
-
-	await aikiClient.close();
 }
