@@ -22,7 +22,7 @@ export function transformReadmeForNpm(readme: string, packageName: string): stri
 	// Replaces with: [@aikirun/package-name](https://www.npmjs.com/package/@aikirun/package-name)
 	transformed = transformed.replace(
 		/\[@aikirun\/([^\]]+)\]\(https:\/\/jsr\.io\/@aikirun\/\1\)/g,
-		(match, packageName) => `[@aikirun/${packageName}](https://www.npmjs.com/package/@aikirun/${packageName})`,
+		(_match, packageName) => `[@aikirun/${packageName}](https://www.npmjs.com/package/@aikirun/${packageName})`,
 	);
 
 	return transformed;
