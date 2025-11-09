@@ -8,6 +8,7 @@ const config: PackageBuildConfig = {
 		"@aikirun/lib": "*",
 		"@aikirun/types": "*",
 		"@aikirun/workflow": "*",
+		"@aikirun/client": "*",
 	},
 	keywords: ["tasks", "retry"],
 };

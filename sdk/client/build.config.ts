@@ -7,6 +7,9 @@ const config: PackageBuildConfig = {
 	dependencies: {
 		"@aikirun/lib": "*",
 		"@aikirun/types": "*",
+		"@orpc/client": "^1.9.3",
+		"ioredis": "^5.4.1",
+		"zod": "^4.1.12",
 	},
 	keywords: ["client"],
 };
