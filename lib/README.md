@@ -13,7 +13,6 @@ deno add jsr:@aikirun/lib
 - **Duration API** - Convert and validate time durations with human-readable object syntax
   - Support for days, hours, minutes, seconds, and milliseconds
   - Validation for non-negative, finite values
-  - Maximum duration limits (e.g., 1 year)
 
 - **Retry Strategies** - Flexible retry configuration for transient failures
   - Never retry
