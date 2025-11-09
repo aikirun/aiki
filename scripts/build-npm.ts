@@ -1,7 +1,7 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write --allow-net --allow-env
 // deno-lint-ignore-file no-console
 
-import { build, emptyDir } from "https://deno.land/x/dnt@0.41.1/mod.ts";
+import { build, emptyDir } from "https://deno.land/x/dnt@0.40.0/mod.ts";
 import { join, dirname } from "https://deno.land/std@0.224.0/path/mod.ts";
 import type { PackageBuildConfig } from "./build-config.ts";
 import { COMMON_CONFIG, resolveDependencies, defaultPostBuild } from "./build-config.ts";
