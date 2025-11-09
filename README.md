@@ -50,7 +50,6 @@ export const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
   async exec(input: { email: string }, run) {
-
     const { userId } = await createUserProfile.start(run, {email: input.email});
     await sendWelcomeEmail.start(run, {email: input.email});
 
@@ -59,7 +58,6 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
     await run.sleep({ days: 1 });
 
     await sendUsageTips.start(run, {email: input.email});
-
     return { success: true, userId };
   }
 });
@@ -76,15 +74,15 @@ export const aiki = await client({
   redis: { host: "localhost", port: 6379 }
 });
 
-const aikiWorker = await worker(aiki, {
+const workerA = await worker(aiki, {
   subscriber: { type: "redis_streams" }
 });
 
-aikiWorker.registry.add(onboardingWorkflow);
+workerA.registry.add(onboardingWorkflow);
 
 // This worker can process workflows alongside other workers - Aiki handles distribution.
-// Scale horizontally by launching more workers pointing to the same Redis instance.
-await aikiWorker.start();
+// Scale horizontally by launching more workers pointing to the same stream.
+await workerA.start();
 ```
 
 *Start workflow `main.ts`*
@@ -92,9 +90,7 @@ await aikiWorker.start();
 import { aiki } from "./setup.ts";
 import { onboardingWorkflowV1 } from "./workflow.ts";
 
-await onboardingWorkflowV1.start(aiki, {
-  email: "newuser@example.com"
-});
+await onboardingWorkflowV1.start(aiki, { email: "newuser@example.com" });
 ```
 
 <details>
