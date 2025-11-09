@@ -68,6 +68,9 @@ async function buildPackage(packageDir: string, config: PackageBuildConfig): Pro
 			keywords,
 			engines: COMMON_CONFIG.engines,
 			...(dependencies ? { dependencies } : {}),
+			publishConfig: {
+				access: "public",
+			},
 		},
 		async postBuild() {
 			// Use custom postBuild or default
