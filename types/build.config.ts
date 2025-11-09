@@ -5,7 +5,6 @@ const config: PackageBuildConfig = {
 	description: "Core TypeScript type definitions for Aiki SDK",
 	directory: "types",
 	entryPoints: [
-		"./mod.ts",
 		"./client.ts",
 		"./trigger.ts",
 		"./workflow.ts",
