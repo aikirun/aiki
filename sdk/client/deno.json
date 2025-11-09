@@ -1,11 +1,11 @@
 {
 	"name": "@aikirun/client",
-	"version": "0.1.10",
+	"version": "0.1.11",
 	"description": "Client SDK for Aiki - connect to the server, start workflows, and manage execution",
 	"exports": "./mod.ts",
 	"imports": {
-		"@aikirun/types/*": "jsr:@aikirun/types@^0.1.10/*",
-		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.10/*",
+		"@aikirun/types/*": "jsr:@aikirun/types@^0.1.11/*",
+		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.11/*",
 		"@orpc/client": "npm:@orpc/client@^1.9.3",
 		"@orpc/client/*": "npm:@orpc/client@^1.9.3/*",
 		"ioredis": "npm:ioredis@^5.4.1",
