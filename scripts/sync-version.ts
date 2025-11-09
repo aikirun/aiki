@@ -218,8 +218,8 @@ async function main() {
 	console.log("Next steps:");
 	console.log("  1. Review changes: git diff");
 	console.log(`  2. Commit: git commit -m "Bump version to ${highestVersion}"`);
-	console.log("  3. Publish: JSR_TOKEN=<token> ./publish-to-jsr.sh");
-	console.log("  4. Tag: ./post-publish.sh");
+	console.log("  3. Publish: JSR_TOKEN=<token> deno task publish-jsr");
+	console.log("  4. Tag: deno task post-publish");
 }
 
 main().catch((error) => {
