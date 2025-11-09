@@ -6,8 +6,7 @@
 	"imports": {
 		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.8/*",
 		"@aikirun/types/*": "jsr:@aikirun/types@^0.1.8/*",
-		"@aikirun/workflow": "jsr:@aikirun/workflow@^0.1.8",
-		"@aikirun/client": "jsr:@aikirun/client@^0.1.8"
+		"@aikirun/workflow": "jsr:@aikirun/workflow@^0.1.8"
 	},
 	"license": "Apache-2.0"
 }
