@@ -39,11 +39,6 @@ services:
         condition: service_healthy
     networks:
       - aiki-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${AIKI_PORT:-9090}/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
     restart: unless-stopped
 
 networks:
