@@ -34,7 +34,7 @@ export const morningWorkflowV2 = morningWorkflow
 	.withOptions({
 		trigger: {
 			type: "delayed",
-			delayMs: 5_000,
+			delay: { seconds: 5 },
 		},
 	});
 

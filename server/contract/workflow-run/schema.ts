@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { WorkflowOptions, WorkflowRun, WorkflowRunState, WorkflowRunStatus } from "@aiki/types/workflow-run";
 import type { TriggerStrategy } from "@aiki/types/trigger";
 import type { RetryStrategy } from "@aiki/lib/retry";
+import type { DurationObject } from "@aiki/lib/duration";
 import type { UnionToRecord } from "@aiki/lib/object";
 import { taskStateSchema } from "../task/schema.ts";
 import type { zT } from "../helpers/schema.ts";
@@ -21,9 +22,48 @@ export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>
 	"completed",
 ]);
 
-export const triggerStrategySchema: zT<TriggerStrategy> = z.discriminatedUnion("type", [
+export const durationObjectSchema: zT<DurationObject> = z.union([
+	z.object({
+		days: z.number(),
+		hours: z.number().optional(),
+		minutes: z.number().optional(),
+		seconds: z.number().optional(),
+		milliseconds: z.number().optional(),
+	}),
+	z.object({
+		days: z.number().optional(),
+		hours: z.number(),
+		minutes: z.number().optional(),
+		seconds: z.number().optional(),
+		milliseconds: z.number().optional(),
+	}),
+	z.object({
+		days: z.number().optional(),
+		hours: z.number().optional(),
+		minutes: z.number(),
+		seconds: z.number().optional(),
+		milliseconds: z.number().optional(),
+	}),
+	z.object({
+		days: z.number().optional(),
+		hours: z.number().optional(),
+		minutes: z.number().optional(),
+		seconds: z.number(),
+		milliseconds: z.number().optional(),
+	}),
+	z.object({
+		days: z.number().optional(),
+		hours: z.number().optional(),
+		minutes: z.number().optional(),
+		seconds: z.number().optional(),
+		milliseconds: z.number(),
+	}),
+]);
+
+export const triggerStrategySchema: zT<TriggerStrategy> = z.union([
 	z.object({ type: z.literal("immediate") }),
 	z.object({ type: z.literal("delayed"), delayMs: z.number() }),
+	z.object({ type: z.literal("delayed"), delay: durationObjectSchema }),
 	z.object({ type: z.literal("startAt"), startAt: z.number() }),
 ]);
 

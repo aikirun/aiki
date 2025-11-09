@@ -2,6 +2,7 @@ import { baseImplementer } from "./base.ts";
 import type { WorkflowRun } from "@aiki/types/workflow-run";
 import { ConflictError, NotFoundError } from "../middleware/error-handler.ts";
 import { publishWorkflowReadyBatch } from "../redis/publisher.ts";
+import { toMilliseconds } from "@aiki/lib/duration";
 import type { Redis } from "ioredis";
 
 const os = baseImplementer.workflowRun;
@@ -53,7 +54,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 			scheduledAt: !trigger || trigger.type === "immediate"
 				? Date.now()
 				: trigger.type === "delayed"
-				? Date.now() + trigger.delayMs
+				? "delayMs" in trigger ? Date.now() + trigger.delayMs : Date.now() + toMilliseconds(trigger.delay)
 				: trigger.startAt,
 		},
 		tasksState: {},
