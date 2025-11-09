@@ -36,7 +36,7 @@
 			]
 		}
 	},
-	"exclude": ["scripts/build-npm.ts"],
+	"exclude": ["scripts/build-npm.ts", "**/npm/"],
 	"workspace": [
 		"./lib",
 		"./types",
