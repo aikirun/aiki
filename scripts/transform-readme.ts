@@ -17,10 +17,13 @@ export function transformReadmeForNpm(readme: string, packageName: string): stri
 		'import { $1 } from "@aikirun/$2"',
 	);
 
-	// Add npm-specific note at the top if not already present
-	if (!transformed.includes("npm install")) {
-		// Already handled by the replacements above
-	}
+	// Replace JSR package links with npm links in documentation
+	// Matches: [@aikirun/package-name](https://jsr.io/@aikirun/package-name)
+	// Replaces with: [@aikirun/package-name](https://www.npmjs.com/package/@aikirun/package-name)
+	transformed = transformed.replace(
+		/\[@aikirun\/([^\]]+)\]\(https:\/\/jsr\.io\/@aikirun\/\1\)/g,
+		(match, packageName) => `[@aikirun/${packageName}](https://www.npmjs.com/package/@aikirun/${packageName})`,
+	);
 
 	return transformed;
 }
