@@ -16,11 +16,11 @@ deno add jsr:@aikirun/client @aikirun/workflow @aikirun/task
 import { client } from "@aikirun/client";
 
 const aiki = await client({
-	url: "http://localhost:9090",
-	redis: {
-		host: "localhost",
-		port: 6379,
-	},
+  url: "http://localhost:9090",
+  redis: {
+    host: "localhost",
+    port: 6379,
+  },
 });
 ```
 
@@ -30,7 +30,7 @@ const aiki = await client({
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
 const stateHandle = await onboardingWorkflowV1.start(aiki, {
-	email: "user@example.com",
+  email: "user@example.com",
 });
 ```
 
@@ -38,14 +38,14 @@ const stateHandle = await onboardingWorkflowV1.start(aiki, {
 
 ```typescript
 const result = await stateHandle.wait(
-	{ type: "status", status: "completed" },
-	{ maxDurationMs: 60_000, pollIntervalMs: 5_000 },
+  { type: "status", status: "completed" },
+  { maxDurationMs: 60_000, pollIntervalMs: 5_000 },
 );
 
 if (result.success) {
-	console.log("Workflow completed!");
+  console.log("Workflow completed!");
 } else {
-	console.log("Workflow did not complete:", result.cause);
+  console.log("Workflow did not complete:", result.cause);
 }
 ```
 
@@ -71,18 +71,18 @@ console.log("Current status:", state.status);
 
 ```typescript
 interface ClientParams<AppContext> {
-	url: string; // Server URL
-	redis: {
-		host: string;
-		port: number;
-		password?: string;
-		db?: number;
-		maxRetriesPerRequest?: number;
-		retryDelayOnFailoverMs?: number;
-		connectTimeoutMs?: number;
-	};
-	contextFactory?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
-	logger?: Logger;
+  url: string; // Server URL
+  redis: {
+    host: string;
+    port: number;
+    password?: string;
+    db?: number;
+    maxRetriesPerRequest?: number;
+    retryDelayOnFailoverMs?: number;
+    connectTimeoutMs?: number;
+  };
+  contextFactory?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
+  logger?: Logger;
 }
 ```
 
@@ -90,13 +90,13 @@ interface ClientParams<AppContext> {
 
 ```typescript
 const aiki = await client({
-	url: "http://localhost:9090",
-	redis: { host: "localhost", port: 6379 },
-	contextFactory: (run) => ({
-		traceId: generateTraceId(),
-		workflowRunId: run.id,
-		userId: extractUserIdFromRun(run),
-	}),
+  url: "http://localhost:9090",
+  redis: { host: "localhost", port: 6379 },
+  contextFactory: (run) => ({
+    traceId: generateTraceId(),
+    workflowRunId: run.id,
+    userId: extractUserIdFromRun(run),
+  }),
 });
 ```
 

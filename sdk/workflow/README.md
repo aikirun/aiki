@@ -19,24 +19,24 @@ import { markUserVerified, sendVerificationEmail } from "./tasks.ts";
 export const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
-	async exec(input: { email: string }, run) {
-		run.logger.info("Starting onboarding", { email: input.email });
+  async exec(input: { email: string }, run) {
+    run.logger.info("Starting onboarding", { email: input.email });
 
-		// Execute a task to send verification email
-		await sendVerificationEmail.start(run, { email: input.email });
+    // Execute a task to send verification email
+    await sendVerificationEmail.start(run, { email: input.email });
 
-		// Execute task to mark user as verified
-		// (In a real scenario, this would be triggered by an external event)
-		await markUserVerified.start(run, { email: input.email });
+    // Execute task to mark user as verified
+    // (In a real scenario, this would be triggered by an external event)
+    await markUserVerified.start(run, { email: input.email });
 
-		// Sleep for 24 hours before sending tips
-		await run.sleep({ days: 1 });
+    // Sleep for 24 hours before sending tips
+    await run.sleep({ days: 1 });
 
-		// Send usage tips
-		await sendUsageTips.start(run, { email: input.email });
+    // Send usage tips
+    await sendUsageTips.start(run, { email: input.email });
 
-		return { success: true, userId: input.email };
-	},
+    return { success: true, userId: input.email };
+  },
 });
 ```
 
@@ -56,7 +56,7 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
 
 ```typescript
 const result = await createUserProfile.start(run, {
-	email: input.email,
+  email: input.email,
 });
 ```
 
@@ -92,12 +92,12 @@ run.logger.debug("User created", { userId: result.userId });
 
 ```typescript
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
-	// ... workflow definition
+  // ... workflow definition
 }).withOptions({
-	trigger: {
-		type: "delayed",
-		delay: { seconds: 5 }, // or: delay: 5000
-	},
+  trigger: {
+    type: "delayed",
+    delay: { seconds: 5 }, // or: delay: 5000
+  },
 });
 ```
 
@@ -105,14 +105,14 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 
 ```typescript
 export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
-	// ... workflow definition
+  // ... workflow definition
 }).withOptions({
-	retry: {
-		type: "exponential",
-		maxAttempts: 3,
-		baseDelayMs: 1000,
-		maxDelayMs: 10000,
-	},
+  retry: {
+    type: "exponential",
+    maxAttempts: 3,
+    baseDelayMs: 1000,
+    maxDelayMs: 10000,
+  },
 });
 ```
 
@@ -120,9 +120,9 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 
 ```typescript
 export const orderWorkflowV1 = orderWorkflow.v("1.0", {
-	// ... workflow definition
+  // ... workflow definition
 }).withOptions({
-	idempotencyKey: "order-${orderId}",
+  idempotencyKey: "order-${orderId}",
 });
 ```
 
@@ -135,24 +135,24 @@ import { client } from "@aikirun/client";
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
 const aiki = await client({
-	url: "http://localhost:9090",
-	redis: { host: "localhost", port: 6379 },
+  url: "http://localhost:9090",
+  redis: { host: "localhost", port: 6379 },
 });
 
 const stateHandle = await onboardingWorkflowV1.start(aiki, {
-	email: "user@example.com",
+  email: "user@example.com",
 });
 
 // Wait for completion
 const result = await stateHandle.wait(
-	{ type: "status", status: "completed" },
-	{ maxDurationMs: 60 * 1000, pollIntervalMs: 5_000 },
+  { type: "status", status: "completed" },
+  { maxDurationMs: 60 * 1000, pollIntervalMs: 5_000 },
 );
 
 if (result.success) {
-	console.log("Workflow completed!", result.state);
+  console.log("Workflow completed!", result.state);
 } else {
-	console.log("Workflow did not complete:", result.cause);
+  console.log("Workflow did not complete:", result.cause);
 }
 ```
 
@@ -162,7 +162,7 @@ With a worker:
 import { worker } from "@aikirun/worker";
 
 const aikiWorker = worker(aiki, {
-	maxConcurrentWorkflowRuns: 10,
+  maxConcurrentWorkflowRuns: 10,
 });
 
 aikiWorker.registry.add(onboardingWorkflow);
@@ -175,13 +175,13 @@ The `run` parameter provides access to:
 
 ```typescript
 interface WorkflowRunContext<Input, Output> {
-	id: WorkflowRunId; // Unique run ID
-	name: WorkflowName; // Workflow name
-	versionId: WorkflowVersionId; // Version ID
-	options: WorkflowOptions; // Execution options (trigger, retry, idempotencyKey)
-	handle: WorkflowRunHandle<Input, Output>; // Advanced state management
-	logger: Logger; // Logging (info, debug, warn, error, trace)
-	sleep(duration: Duration): Promise<void>; // Durable sleep
+  id: WorkflowRunId; // Unique run ID
+  name: WorkflowName; // Workflow name
+  versionId: WorkflowVersionId; // Version ID
+  options: WorkflowOptions; // Execution options (trigger, retry, idempotencyKey)
+  handle: WorkflowRunHandle<Input, Output>; // Advanced state management
+  logger: Logger; // Logging (info, debug, warn, error, trace)
+  sleep(duration: Duration): Promise<void>; // Durable sleep
 }
 ```
 
@@ -196,10 +196,10 @@ Workflows handle errors gracefully:
 
 ```typescript
 try {
-	await risky.start(run, input);
+  await risky.start(run, input);
 } catch (error) {
-	run.logger.error("Task failed", { error: error.message });
-	// Workflow can decide how to proceed
+  run.logger.error("Task failed", { error: error.message });
+  // Workflow can decide how to proceed
 }
 ```
 

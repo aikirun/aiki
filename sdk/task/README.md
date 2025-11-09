@@ -17,10 +17,10 @@ deno add jsr:@aikirun/task
 import { task } from "@aikirun/task";
 
 export const sendVerificationEmail = task({
-	name: "send-verification",
-	async exec(input: { email: string }) {
-		return emailService.sendVerification(input.email);
-	},
+  name: "send-verification",
+  async exec(input: { email: string }) {
+    return emailService.sendVerification(input.email);
+  },
 });
 ```
 
@@ -28,16 +28,16 @@ export const sendVerificationEmail = task({
 
 ```typescript
 export const ringAlarm = task({
-	name: "ring-alarm",
-	exec(input: { song: string }) {
-		return Promise.resolve(audioService.play(input.song));
-	},
+  name: "ring-alarm",
+  exec(input: { song: string }) {
+    return Promise.resolve(audioService.play(input.song));
+  },
 }).withOptions({
-	retry: {
-		type: "fixed",
-		maxAttempts: 3,
-		delayMs: 1000,
-	},
+  retry: {
+    type: "fixed",
+    maxAttempts: 3,
+    delayMs: 1000,
+  },
 });
 ```
 
@@ -49,10 +49,10 @@ import { workflow } from "@aikirun/workflow";
 export const morningWorkflow = workflow({ name: "morning-routine" });
 
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
-	async exec(input, run) {
-		const result = await ringAlarm.start(run, { song: "alarm.mp3" });
-		console.log("Task completed:", result);
-	},
+  async exec(input, run) {
+    const result = await ringAlarm.start(run, { song: "alarm.mp3" });
+    console.log("Task completed:", result);
+  },
 });
 ```
 
@@ -69,8 +69,8 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 
 ```typescript
 interface TaskOptions {
-	retry?: RetryStrategy; // Retry strategy
-	idempotencyKey?: string; // For deduplication
+  retry?: RetryStrategy; // Retry strategy
+  idempotencyKey?: string; // For deduplication
 }
 ```
 
@@ -130,18 +130,18 @@ Tasks are executed within a workflow's execution context. Logging happens in the
 
 ```typescript
 export const processPayment = task({
-	name: "process-payment",
-	async exec(input: { amount: number }) {
-		return { success: true, transactionId: "tx_123" };
-	},
+  name: "process-payment",
+  async exec(input: { amount: number }) {
+    return { success: true, transactionId: "tx_123" };
+  },
 });
 
 export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
-	async exec(input, run) {
-		run.logger.info("Processing payment", { amount: input.amount });
-		const result = await processPayment.start(run, { amount: input.amount });
-		run.logger.info("Payment complete", result);
-	},
+  async exec(input, run) {
+    run.logger.info("Processing payment", { amount: input.amount });
+    const result = await processPayment.start(run, { amount: input.amount });
+    run.logger.info("Payment complete", result);
+  },
 });
 ```
 
