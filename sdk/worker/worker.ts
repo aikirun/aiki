@@ -46,7 +46,7 @@ import { TaskFailedError } from "@aiki/types/task";
  * });
  *
  * // Register workflows
- * worker.workflowRegistry
+ * worker.registry
  *   .add(userOnboardingWorkflow)
  *   .add(paymentWorkflow);
  *
@@ -87,7 +87,7 @@ export interface WorkerParams {
 
 export interface Worker {
 	id: string;
-	workflowRegistry: WorkflowRegistry;
+	registry: WorkflowRegistry;
 	start: () => Promise<void>;
 	stop: () => Promise<void>;
 }
@@ -100,7 +100,7 @@ interface ActiveWorkflowRun {
 
 class WorkerImpl<AppContext> implements Worker {
 	public readonly id: string;
-	public readonly workflowRegistry: WorkflowRegistry;
+	public readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
@@ -108,7 +108,7 @@ class WorkerImpl<AppContext> implements Worker {
 
 	constructor(private readonly client: Client<AppContext>, private readonly params: WorkerParams) {
 		this.id = params.id ?? crypto.randomUUID();
-		this.workflowRegistry = initWorkflowRegistry();
+		this.registry = initWorkflowRegistry();
 
 		this.logger = getChildLogger(client.logger, {
 			"aiki.component": "worker",
@@ -123,7 +123,7 @@ class WorkerImpl<AppContext> implements Worker {
 
 		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
-			this.workflowRegistry._internal.getAll().map((workflow) => workflow.name),
+			this.registry._internal.getAll().map((workflow) => workflow.name),
 			this.params.shardKeys,
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
@@ -265,7 +265,7 @@ class WorkerImpl<AppContext> implements Worker {
 				continue;
 			}
 
-			const workflow = this.workflowRegistry._internal.get(workflowRun.name as WorkflowName);
+			const workflow = this.registry._internal.get(workflowRun.name as WorkflowName);
 			if (!workflow) {
 				this.logger.warn("Workflow not found in registry", {
 					"aiki.workflowName": workflowRun.name,

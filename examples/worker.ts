@@ -22,11 +22,11 @@ if (import.meta.main) {
 		subscriber: { type: "redis_streams" },
 	});
 
-	workerA.workflowRegistry
+	workerA.registry
 		.add(morningWorkflow)
 		.add(eveningRoutineWorkflow);
 
-	workerB.workflowRegistry
+	workerB.registry
 		.add(eveningRoutineWorkflow);
 
 	const shutdown = async () => {
