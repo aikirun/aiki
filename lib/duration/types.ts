@@ -7,7 +7,7 @@ export interface DurationFields {
 	hours?: number;
 	minutes?: number;
 	seconds?: number;
-	ms?: number;
+	milliseconds?: number;
 }
 
 export type DurationObject = RequireAtLeastOneOf<DurationFields, keyof DurationFields>;

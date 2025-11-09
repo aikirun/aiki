@@ -33,9 +33,9 @@ export function toMilliseconds(duration: Duration): number {
 		totalMs += duration.seconds * MS_PER_SECOND;
 	}
 
-	if (duration.ms !== undefined) {
-		assertIsPositiveNumber(duration.ms, "ms");
-		totalMs += duration.ms;
+	if (duration.milliseconds !== undefined) {
+		assertIsPositiveNumber(duration.milliseconds, "milliseconds");
+		totalMs += duration.milliseconds;
 	}
 
 	return totalMs;
