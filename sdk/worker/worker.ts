@@ -17,8 +17,8 @@ import {
 } from "@aiki/workflow";
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { WorkflowRunHandle, WorkflowVersion } from "@aiki/workflow";
-import { TaskFailedError } from "@aiki/task";
 import { isServerConflictError } from "@aiki/lib/error";
+import { TaskFailedError } from "@aiki/types/task";
 
 /**
  * Creates an Aiki worker for executing workflows and tasks.

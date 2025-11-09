@@ -4,12 +4,11 @@ import { getRetryParams } from "@aiki/lib/retry";
 import type { RetryStrategy } from "@aiki/lib/retry";
 import { stableStringify } from "@aiki/lib/json";
 import { createSerializableError, type SerializableInput } from "@aiki/lib/error";
-import type { TaskName } from "@aiki/types/task";
+import { TaskFailedError, type TaskName } from "@aiki/types/task";
 import type { WorkflowRunContext } from "@aiki/workflow";
 import { isNonEmptyArray } from "@aiki/lib/array";
 import { getChildLogger, type Logger } from "@aiki/client";
 import type { TaskStateFailed } from "@aiki/types/task";
-import { TaskFailedError } from "./error.ts";
 
 /**
  * Defines a durable task with deterministic execution and automatic retries.
