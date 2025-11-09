@@ -455,20 +455,49 @@
     "members": {
       "sdk/client": {
         "dependencies": [
+          "jsr:@aikirun/lib@*",
+          "jsr:@aikirun/types@*",
           "npm:@orpc/client@^1.9.3",
           "npm:ioredis@^5.4.1",
           "npm:zod@^4.1.12"
         ]
       },
+      "sdk/task": {
+        "dependencies": [
+          "jsr:@aikirun/client@*",
+          "jsr:@aikirun/lib@*",
+          "jsr:@aikirun/types@*",
+          "jsr:@aikirun/workflow@*"
+        ]
+      },
+      "sdk/worker": {
+        "dependencies": [
+          "jsr:@aikirun/client@*",
+          "jsr:@aikirun/lib@*",
+          "jsr:@aikirun/types@*",
+          "jsr:@aikirun/workflow@*"
+        ]
+      },
+      "sdk/workflow": {
+        "dependencies": [
+          "jsr:@aikirun/lib@*",
+          "jsr:@aikirun/types@*"
+        ]
+      },
       "server": {
         "dependencies": [
-          "jsr:@aikirun/lib@0.1",
-          "jsr:@aikirun/types@0.1",
+          "jsr:@aikirun/lib@*",
+          "jsr:@aikirun/types@*",
           "jsr:@std/dotenv@0.225",
           "npm:@orpc/contract@^1.9.3",
           "npm:@orpc/server@^1.9.3",
           "npm:ioredis@^5.3.0",
           "npm:zod@^4.1.12"
+        ]
+      },
+      "types": {
+        "dependencies": [
+          "jsr:@aikirun/lib@*"
         ]
       }
     }
