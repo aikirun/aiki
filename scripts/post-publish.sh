@@ -135,16 +135,13 @@ echo ""
 echo "Published packages on JSR:"
 for package in "${PACKAGES[@]}"; do
     scope=$(echo "$package" | cut -d'/' -f2)
-    scope_name=${scope#@}
-    name=$(echo "$package" | cut -d'/' -f3)
-    echo "  - https://jsr.io/${scope_name}/${name}@${VERSION}"
+    echo "  - https://jsr.io/@aikirun/${scope}@${VERSION}"
 done
 echo ""
 echo "Published packages on npm:"
 for package in "${PACKAGES[@]}"; do
     scope=$(echo "$package" | cut -d'/' -f2)
-    name=$(echo "$package" | cut -d'/' -f3)
-    echo "  - https://www.npmjs.com/package/${scope}/${name}/v/${VERSION}"
+    echo "  - https://www.npmjs.com/package/@aikirun/${scope}/v/${VERSION}"
 done
 echo ""
 echo "Git tag: https://github.com/aikirun/aiki/releases/tag/${TAG}"
