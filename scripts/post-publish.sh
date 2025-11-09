@@ -1,6 +1,6 @@
 #!/bin/bash
 # Post-publish verification and git tagging
-# Run this after all registry publish scripts (./scripts/publish-jsr.sh, ./scripts/publish-to-npm.sh, etc.)
+# Run this after all registry publish scripts (./scripts/publish-jsr.sh, ./scripts/publish-npm.sh, etc.)
 # Verifies packages are published, then creates and pushes git tag
 
 set -e
@@ -49,32 +49,66 @@ check_jsr_package() {
     fi
 }
 
-# Verify all packages are published
+# Function to check if a package exists on npm
+check_npm_package() {
+    local package=$1
+    local scope=$(echo "$package" | cut -d'/' -f2)
+    local name=$(echo "$package" | cut -d'/' -f3)
+
+    echo -n "Checking $package on npm... "
+
+    # Remove @ from scope and construct package name
+    local scope_name=${scope#@}
+
+    if curl -s "https://registry.npmjs.org/${scope}/${name}/${VERSION}" > /dev/null 2>&1; then
+        echo "✅"
+        return 0
+    else
+        echo "❌"
+        return 1
+    fi
+}
+
+# Verify all packages are published on JSR
 echo "Verifying packages on JSR..."
 echo ""
 
-all_published=true
+jsr_published=true
 
 for package in "${PACKAGES[@]}"; do
     if ! check_jsr_package "$package"; then
-        all_published=false
+        jsr_published=false
     fi
 done
 
 echo ""
 
-if [ "$all_published" = false ]; then
+# Verify all packages are published on npm
+echo "Verifying packages on npm..."
+echo ""
+
+npm_published=true
+
+for package in "${PACKAGES[@]}"; do
+    if ! check_npm_package "$package"; then
+        npm_published=false
+    fi
+done
+
+echo ""
+
+if [ "$jsr_published" = false ] || [ "$npm_published" = false ]; then
     echo "❌ Not all packages are published yet."
     echo ""
     echo "Please run the publish scripts first:"
     echo "  deno task publish-jsr"
-    echo "  deno task publish-to-npm (when available)"
+    echo "  deno task publish-npm"
     echo ""
     echo "Then run this script again."
     exit 1
 fi
 
-echo "✅ All packages verified on JSR!"
+echo "✅ All packages verified on JSR and npm!"
 echo ""
 
 # Check for uncommitted changes
@@ -98,12 +132,19 @@ git push origin "$TAG"
 echo ""
 echo "🎉 Release ${TAG} published and tagged successfully!"
 echo ""
-echo "Published packages:"
+echo "Published packages on JSR:"
 for package in "${PACKAGES[@]}"; do
     scope=$(echo "$package" | cut -d'/' -f2)
     scope_name=${scope#@}
     name=$(echo "$package" | cut -d'/' -f3)
     echo "  - https://jsr.io/${scope_name}/${name}@${VERSION}"
+done
+echo ""
+echo "Published packages on npm:"
+for package in "${PACKAGES[@]}"; do
+    scope=$(echo "$package" | cut -d'/' -f2)
+    name=$(echo "$package" | cut -d'/' -f3)
+    echo "  - https://www.npmjs.com/package/${scope}/${name}/v/${VERSION}"
 done
 echo ""
 echo "Git tag: https://github.com/aikirun/aiki/releases/tag/${TAG}"
