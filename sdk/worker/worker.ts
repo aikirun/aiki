@@ -20,6 +20,48 @@ import type { WorkflowRunHandle, WorkflowVersion } from "@aiki/workflow";
 import { TaskFailedError } from "@aiki/task";
 import { isServerConflictError } from "../error.ts";
 
+/**
+ * Creates an Aiki worker for executing workflows and tasks.
+ *
+ * Workers poll for workflow runs, execute them, and handle state persistence.
+ * Multiple workers can be started to scale workflow execution horizontally.
+ * All workers connect to the same Aiki server and Redis instance.
+ *
+ * @template AppContext - Type of application context passed to workflows
+ * @param client - Configured Aiki client instance
+ * @param params - Worker configuration parameters
+ * @param params.id - Optional unique worker ID (auto-generated if not provided)
+ * @param params.maxConcurrentWorkflowRuns - Maximum concurrent workflows to execute (default: 1)
+ * @param params.workflowRun.heartbeatIntervalMs - Heartbeat interval in milliseconds (default: 30000)
+ * @param params.gracefulShutdownTimeoutMs - Time to wait for active workflows during shutdown (default: 5000)
+ * @param params.subscriber - Message subscriber strategy (default: redis_streams)
+ * @param params.shardKeys - Optional shard keys for distributed work
+ * @returns Worker instance ready to be started
+ *
+ * @example
+ * ```typescript
+ * const worker = worker(aikiClient, {
+ *   id: "worker-1",
+ *   maxConcurrentWorkflowRuns: 10,
+ *   subscriber: { type: "redis_streams" },
+ * });
+ *
+ * // Register workflows
+ * worker.workflowRegistry
+ *   .add(userOnboardingWorkflow)
+ *   .add(paymentWorkflow);
+ *
+ * // Start execution
+ * await worker.start();
+ *
+ * // Handle graceful shutdown
+ * const shutdown = async () => {
+ *   await worker.stop();
+ *   await aikiClient.close();
+ * };
+ * processWrapper.addSignalListener("SIGINT", shutdown);
+ * ```
+ */
 export function worker<AppContext>(
 	client: Client<AppContext>,
 	params: WorkerParams,

@@ -12,6 +12,48 @@ import { getChildLogger, type Logger } from "@aiki/client";
 import type { TaskStateFailed } from "@aiki/types/task";
 import { TaskFailedError } from "./error.ts";
 
+/**
+ * Defines a durable task with deterministic execution and automatic retries.
+ *
+ * Tasks must be deterministic - the same input should always produce the same output.
+ * Tasks can be retried multiple times, so they should be idempotent when possible.
+ * Tasks execute within a workflow context and can access logging.
+ *
+ * @template Input - Type of task input (must be JSON serializable)
+ * @template Output - Type of task output (must be JSON serializable)
+ * @param params - Task configuration
+ * @param params.name - Unique task name used for execution tracking
+ * @param params.exec - Async function that executes the task logic
+ * @returns Task instance with retry and option configuration methods
+ *
+ * @example
+ * ```typescript
+ * // Simple task without retry
+ * export const sendEmail = task({
+ *   name: "send-email",
+ *   exec(input: { email: string; message: string }) {
+ *     return emailService.send(input.email, input.message);
+ *   },
+ * });
+ *
+ * // Task with retry configuration
+ * export const chargeCard = task({
+ *   name: "charge-card",
+ *   exec(input: { cardId: string; amount: number }) {
+ *     return paymentService.charge(input.cardId, input.amount);
+ *   },
+ * }).withOptions({
+ *   retry: {
+ *     type: "fixed",
+ *     maxAttempts: 3,
+ *     delayMs: 1000,
+ *   },
+ * });
+ *
+ * // Execute task in workflow
+ * const result = await chargeCard.start(run, { cardId: "123", amount: 9999 });
+ * ```
+ */
 export function task<
 	Input extends SerializableInput = null,
 	Output = void,

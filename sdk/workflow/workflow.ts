@@ -2,6 +2,53 @@ import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
 import type { SerializableInput } from "@aiki/types/serializable";
 import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version.ts";
 
+/**
+ * Defines a durable workflow with versioning and multiple task execution.
+ *
+ * Workflows are long-running business processes that can span hours, days, or longer.
+ * They automatically survive crashes, timeouts, and infrastructure failures.
+ * Multiple versions of a workflow can run simultaneously, allowing safe deployments.
+ *
+ * @param params - Workflow configuration
+ * @param params.name - Unique workflow name used for identification and routing
+ * @returns Workflow instance with version management methods
+ *
+ * @example
+ * ```typescript
+ * // Define a workflow
+ * export const userOnboarding = workflow({ name: "user-onboarding" });
+ *
+ * // Define version 1.0
+ * export const userOnboardingV1 = userOnboarding.v("1.0", {
+ *   async exec(input: { email: string }, run) {
+ *     run.logger.info("Starting onboarding", { email: input.email });
+ *
+ *     // Execute tasks
+ *     await sendWelcomeEmail.start(run, { email: input.email });
+ *     await createUserProfile.start(run, { email: input.email });
+ *
+ *     // Durable sleep
+ *     await run.sleep({ days: 1 });
+ *
+ *     // More tasks
+ *     await sendUsageTips.start(run, { email: input.email });
+ *
+ *     return { success: true };
+ *   },
+ * });
+ *
+ * // Deploy version 2.0 alongside 1.0 (no downtime)
+ * export const userOnboardingV2 = userOnboarding.v("2.0", {
+ *   async exec(input: { email: string; trial: boolean }, run) {
+ *     // Enhanced version with different logic
+ *     // Existing v1.0 workflows continue with their version
+ *     // New workflows use v2.0
+ *   },
+ * });
+ * ```
+ *
+ * @see {@link https://github.com/aikirun/aiki} for complete documentation
+ */
 export function workflow(params: WorkflowParams): Workflow {
 	return new WorkflowImpl(params);
 }

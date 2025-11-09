@@ -15,9 +15,19 @@ Build reliable, long-running business processes that survive failures, restarts,
 
 ## Quick Start
 
+Install the latest version from JSR (JavaScript Registry):
+
 ```bash
-npm install @aiki/task @aiki/workflow @aiki/client @aiki/worker
+deno add jsr:@aiki/task jsr:@aiki/workflow jsr:@aiki/client jsr:@aiki/worker
 ```
+
+**Package Links:**
+- [`@aiki/lib`](https://jsr.io/@aiki/lib) - Foundation utilities (duration, retry, async)
+- [`@aiki/types`](https://jsr.io/@aiki/types) - Core type definitions
+- [`@aiki/workflow`](https://jsr.io/@aiki/workflow) - Workflow SDK
+- [`@aiki/task`](https://jsr.io/@aiki/task) - Task SDK
+- [`@aiki/client`](https://jsr.io/@aiki/client) - Client SDK
+- [`@aiki/worker`](https://jsr.io/@aiki/worker) - Worker SDK
 
 Here's an example user onboarding workflow spanning multiple days. Traditional job queues would struggle with this. Aiki makes it trivial with durable state, event-driven waits, and automatic crash recovery.
 
@@ -79,7 +89,7 @@ const aikiWorker = await worker(aikiClient, {
   subscriber: { type: "redis_streams" }
 });
 
-aikiWorker.registry.add(onboardingWorkflow);
+aikiWorker.workflowRegistry.add(onboardingWorkflow);
 
 // This worker can process workflows alongside other workers - Aiki handles distribution.
 // Scale horizontally by launching more workers pointing to the same Redis instance.
@@ -104,7 +114,7 @@ import { task } from "@aiki/task";
 
 export const createUserProfile = task({
   name: "create-profile",
-  exec(input: { email: string }) {
+  async exec(input: { email: string }) {
     const id = db.users.create({
       email: input.email,
       status: "pending_verification"
@@ -115,7 +125,7 @@ export const createUserProfile = task({
 
 export const sendVerificationEmail = task({
   name: "send-verification",
-  exec(input: { email: string }) {
+  async exec(input: { email: string }) {
     return emailService.sendVerification(input.email);
   }
 }).withOptions({
@@ -131,7 +141,7 @@ export const sendVerificationEmail = task({
 
 export const deactivateUser = task({
   name: "deactivate-user",
-  exec(input: { userId: string; reason: string }) {
+  async exec(input: { userId: string; reason: string }) {
     return db.users.update({
       where: { id: input.userId },
       data: { status: "deactivated", deactivationReason: input.reason }
@@ -141,7 +151,7 @@ export const deactivateUser = task({
 
 export const markUserVerified = task({
   name: "mark-verified",
-  exec(input: { userId: string }) {
+  async exec(input: { userId: string }) {
     return db.users.update({
       where: { id: input.userId },
       data: { status: "active" }
@@ -151,7 +161,7 @@ export const markUserVerified = task({
 
 export const sendUsageTips = task({
   name: "send-usage-tips",
-  exec(input: { email: string }) {
+  async exec(input: { email: string }) {
     return emailService.sendFeatures(input.email, {
       features: ["Advanced analytics"]
     });

@@ -5,6 +5,47 @@ import { RPCLink } from "@orpc/client/fetch";
 import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver.ts";
 import { ConsoleLogger } from "./logger/mod.ts";
 
+/**
+ * Creates an Aiki client for starting and managing workflows.
+ *
+ * The client connects to the Aiki server via HTTP and Redis for state management.
+ * It provides methods to start workflows and monitor their execution.
+ *
+ * @template AppContext - Type of application context passed to workflows (default: null)
+ * @param params - Client configuration parameters
+ * @param params.url - HTTP URL of the Aiki server (e.g., "http://localhost:9090")
+ * @param params.redis - Redis connection configuration
+ * @param params.redis.host - Redis server hostname
+ * @param params.redis.port - Redis server port
+ * @param params.redis.password - Optional Redis password
+ * @param params.contextFactory - Optional function to create context for each workflow run
+ * @param params.logger - Optional custom logger (defaults to ConsoleLogger)
+ * @returns Promise resolving to a configured Client instance
+ *
+ * @example
+ * ```typescript
+ * const client = await client({
+ *   url: "http://localhost:9090",
+ *   redis: { host: "localhost", port: 6379 },
+ *   contextFactory: (run) => ({
+ *     traceId: generateTraceId(),
+ *     userId: extractUserId(run),
+ *   }),
+ * });
+ *
+ * // Start a workflow
+ * const stateHandle = await myWorkflow.start(client, { email: "user@example.com" });
+ *
+ * // Wait for completion
+ * const result = await stateHandle.wait(
+ *   { type: "status", status: "completed" },
+ *   { maxDurationMs: 60_000 }
+ * );
+ *
+ * // Cleanup
+ * await client.close();
+ * ```
+ */
 export function client<AppContext = null>(params: ClientParams<AppContext>): Promise<Client<AppContext>> {
 	return Promise.resolve(new ClientImpl(params));
 }

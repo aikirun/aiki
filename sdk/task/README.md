@@ -17,7 +17,7 @@ import { task } from "@aiki/task";
 
 export const sendVerificationEmail = task({
   name: "send-verification",
-  exec(input: { email: string }) {
+  async exec(input: { email: string }) {
     return emailService.sendVerification(input.email);
   },
 });
@@ -121,14 +121,21 @@ interface TaskOptions {
 
 ## Execution Context
 
-Within a task's `exec` function, you have access to the workflow run context:
+Tasks are executed within a workflow's execution context. Logging happens in the workflow:
 
 ```typescript
 export const processPayment = task({
   name: "process-payment",
-  async exec(input: { amount: number }, run) {
+  async exec(input: { amount: number }) {
+    return { success: true, transactionId: "tx_123" };
+  },
+});
+
+export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
+  async exec(input, run) {
     run.logger.info("Processing payment", { amount: input.amount });
-    // Task implementation
+    const result = await processPayment.start(run, { amount: input.amount });
+    run.logger.info("Payment complete", result);
   },
 });
 ```
