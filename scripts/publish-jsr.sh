@@ -1,15 +1,9 @@
 #!/bin/bash
 # Publish Aiki packages to JSR in dependency order
 # This script will automatically sync versions before publishing
-# Usage: JSR_TOKEN=<your-token> deno task publish-jsr
+# Usage: deno task publish-jsr
 
 set -e
-
-if [ -z "$JSR_TOKEN" ]; then
-    echo "Error: JSR_TOKEN environment variable is not set"
-    echo "Usage: JSR_TOKEN=<your-token> ./scripts/publish-jsr.sh"
-    exit 1
-fi
 
 echo "Pre-publication workflow..."
 echo ""
@@ -56,7 +50,7 @@ echo ""
 # 1. Publish @aiki/lib (no aiki dependencies)
 echo "Step 1/6: Publishing @aiki/lib..."
 cd lib
-deno publish --token "$JSR_TOKEN"
+deno publish
 cd ..
 echo "✅ @aiki/lib published"
 echo ""
@@ -64,7 +58,7 @@ echo ""
 # 2. Publish @aiki/types (depends on @aiki/lib)
 echo "Step 2/6: Publishing @aiki/types..."
 cd types
-deno publish --token "$JSR_TOKEN"
+deno publish
 cd ..
 echo "✅ @aiki/types published"
 echo ""
@@ -72,7 +66,7 @@ echo ""
 # 3. Publish @aiki/workflow (depends on @aiki/types, @aiki/lib)
 echo "Step 3/6: Publishing @aiki/workflow..."
 cd sdk/workflow
-deno publish --token "$JSR_TOKEN"
+deno publish
 cd ../..
 echo "✅ @aiki/workflow published"
 echo ""
@@ -80,7 +74,7 @@ echo ""
 # 4. Publish @aiki/client (depends on @aiki/types, @aiki/lib)
 echo "Step 4/6: Publishing @aiki/client..."
 cd sdk/client
-deno publish --token "$JSR_TOKEN"
+deno publish
 cd ../..
 echo "✅ @aiki/client published"
 echo ""
@@ -88,7 +82,7 @@ echo ""
 # 5. Publish @aiki/task (depends on @aiki/workflow, @aiki/types, @aiki/lib)
 echo "Step 5/6: Publishing @aiki/task..."
 cd sdk/task
-deno publish --token "$JSR_TOKEN"
+deno publish
 cd ../..
 echo "✅ @aiki/task published"
 echo ""
@@ -96,7 +90,7 @@ echo ""
 # 6. Publish @aiki/worker (depends on @aiki/client, @aiki/workflow, @aiki/types, @aiki/lib)
 echo "Step 6/6: Publishing @aiki/worker..."
 cd sdk/worker
-deno publish --token "$JSR_TOKEN"
+deno publish
 cd ../..
 echo "✅ @aiki/worker published"
 echo ""

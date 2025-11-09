@@ -67,8 +67,8 @@ if [ "$all_published" = false ]; then
     echo "❌ Not all packages are published yet."
     echo ""
     echo "Please run the publish scripts first:"
-    echo "  JSR_TOKEN=<token> ./scripts/publish-jsr.sh"
-    echo "  NPM_TOKEN=<token> ./scripts/publish-to-npm.sh (when available)"
+    echo "  deno task publish-jsr"
+    echo "  deno task publish-to-npm (when available)"
     echo ""
     echo "Then run this script again."
     exit 1
