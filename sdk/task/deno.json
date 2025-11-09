@@ -4,10 +4,10 @@
 	"description": "Task SDK for Aiki - define reliable tasks with automatic retries, idempotency, and error handling",
 	"exports": "./mod.ts",
 	"imports": {
-		"@aikirun/lib/*": "jsr:@aikirun/lib/*",
-		"@aikirun/types/*": "jsr:@aikirun/types/*",
-		"@aikirun/workflow": "jsr:@aikirun/workflow",
-		"@aikirun/client": "jsr:@aikirun/client"
+		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.5/*",
+		"@aikirun/types/*": "jsr:@aikirun/types@^0.1.5/*",
+		"@aikirun/workflow": "jsr:@aikirun/workflow@^0.1.5",
+		"@aikirun/client": "jsr:@aikirun/client@^0.1.5"
 	},
 	"license": "Apache-2.0"
 }
