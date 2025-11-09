@@ -1,6 +1,7 @@
 {
 	"name": "@aiki/types",
 	"version": "0.1.0",
+	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"exports": {
 		"./client": "./client.ts",
 		"./serializable": "./serializable.ts",

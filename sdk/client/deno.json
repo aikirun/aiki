@@ -1,6 +1,7 @@
 {
 	"name": "@aiki/client",
 	"version": "0.1.0",
+	"description": "Client SDK for Aiki - connect to the server, start workflows, and manage execution",
 	"exports": "./mod.ts",
 	"imports": {
 		"@aiki/types/*": "jsr:@aiki/types@^0.1.0/*",

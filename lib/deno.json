@@ -1,6 +1,7 @@
 {
 	"name": "@aiki/lib",
 	"version": "0.1.0",
+	"description": "Foundation utilities library for Aiki - including duration conversion, retry strategies, async helpers, and polling utilities",
 	"exports": {
 		"./array": "./array/mod.ts",
 		"./async": "./async/mod.ts",
