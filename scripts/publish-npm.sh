@@ -73,7 +73,7 @@ build_with_retry() {
 	while [ $retry -le $max_retries ]; do
 		echo "Building $package_name (attempt $retry/$max_retries)..."
 
-		if deno run --allow-read --allow-write --allow-net --allow-env --allow-run "$(pwd)/scripts/build-npm.ts" "$package_path/build.config.ts"; then
+		if deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts "$package_path/build.config.ts"; then
 			echo "✅ Built $package_name successfully"
 			return 0
 		fi
