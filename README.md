@@ -63,11 +63,7 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
     );
     
     if (!event.received) {
-      await deactivateUser.start(run, {
-        userId,
-        reason: "email not verified"
-      });
-
+      await deactivateUser.start(run, { userId, reason: "email not verified" });
       return { success: false };
     }
 
