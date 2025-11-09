@@ -769,34 +769,22 @@
 					<div class="code-content">
 						<pre>
 <code><span class="code-keyword">import</span> { workflow } <span class="code-keyword">from</span> <span class="code-string">"@aikirun/workflow"</span>;
+<span class="code-keyword">import</span> { createUserProfile, sendWelcomeEmail, sendUsageTips } <span class="code-keyword">from</span> <span class="code-string">"./tasks.ts"</span>;
 
-<span class="code-keyword">const</span> <span class="code-function">onboardingWorkflow</span> = <span class="code-function">workflow</span>({ name: <span class="code-string">"user-onboarding"</span> });
+<span class="code-keyword">export</span> <span class="code-keyword">const</span> onboardingWorkflow = <span class="code-function">workflow</span>({ name: <span class="code-string">"user-onboarding"</span> });
 
-<span class="code-keyword">export const</span> onboardingWorkflowV1 = onboardingWorkflow.<span class="code-function">v</span>(<span class="code-string">"1.0"</span>, {
+<span class="code-keyword">export</span> <span class="code-keyword">const</span> onboardingWorkflowV1 = onboardingWorkflow.<span class="code-function">v</span>(<span class="code-string">"1.0"</span>, {
   <span class="code-keyword">async</span> <span class="code-function">exec</span>(input: { email: string }, run) {
     <span class="code-keyword">const</span> { userId } = <span class="code-keyword">await</span> createUserProfile.<span class="code-function">start</span>(run, { email: input.email });
-    
-    <span class="code-keyword">await</span> sendVerificationEmail.<span class="code-function">start</span>(run, { email: input.email });
-    
-    <span class="code-comment">// Wait for user to verify email - could be hours or days</span>
-    <span class="code-comment">// No resources consumed while waiting</span>
-    <span class="code-keyword">const</span> event = <span class="code-keyword">await</span> run.<span class="code-function">wait</span>(
-      { type: <span class="code-string">"event"</span>, event: <span class="code-string">"email_verified"</span> },
-      { maxDurationMs: <span class="code-string">12</span> * <span class="code-string">60</span> * <span class="code-string">60</span> * <span class="code-string">1000</span> }
-    );
-    
-    <span class="code-keyword">if</span> (!event.received) {
-      <span class="code-keyword">await</span> deactivateUser.<span class="code-function">start</span>(run, { userId });
-      <span class="code-keyword">return</span> { success: <span class="code-keyword">false</span> };
-    }
-    
-    <span class="code-keyword">await</span> markUserVerified.<span class="code-function">start</span>(run, { userId });
-    
-    <span class="code-comment">// Sleep for 24 hours without blocking</span>
+
+    <span class="code-keyword">await</span> sendWelcomeEmail.<span class="code-function">start</span>(run, { email: input.email });
+
+    <span class="code-comment">// Sleeps for 24 hours without blocking workers or tying up resources.</span>
+    <span class="code-comment">// If the server restarts during this time, workflow resumes exactly where it left off.</span>
     <span class="code-keyword">await</span> run.<span class="code-function">sleep</span>({ days: <span class="code-string">1</span> });
-    
+
     <span class="code-keyword">await</span> sendUsageTips.<span class="code-function">start</span>(run, { email: input.email });
-    
+
     <span class="code-keyword">return</span> { success: <span class="code-keyword">true</span>, userId };
   }
 });</code></pre>
