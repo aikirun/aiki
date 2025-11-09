@@ -279,6 +279,11 @@
           "npm:ioredis@^5.3.0",
           "npm:zod@^4.1.12"
         ]
+      },
+      "types": {
+        "dependencies": [
+          "jsr:@aiki/lib@0.1"
+        ]
       }
     }
   }
