@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/types",
-	"version": "0.1.7",
+	"version": "0.1.8",
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"exports": {
 		"./client": "./client.ts",
@@ -11,7 +11,7 @@
 		"./task": "./task.ts"
 	},
 	"imports": {
-		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.7/*"
+		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.8/*"
 	},
 	"license": "Apache-2.0"
 }
