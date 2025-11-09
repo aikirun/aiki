@@ -1,0 +1,225 @@
+# @aiki/workflow
+
+Workflow SDK for Aiki durable execution engine - define durable workflows with tasks, sleeps, waits, and event handling.
+
+## Installation
+
+```bash
+deno add jsr:@aiki/workflow @aiki/task @aiki/client @aiki/worker
+```
+
+## Quick Start
+
+### Define a Workflow
+
+```typescript
+import { workflow } from "@aiki/workflow";
+import { sendVerificationEmail, markUserVerified } from "./tasks.ts";
+
+export const onboardingWorkflow = workflow({ name: "user-onboarding" });
+
+export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
+  async exec(input: { email: string }, run) {
+    run.logger.info("Starting onboarding", { email: input.email });
+
+    // Execute a task to send verification email
+    await sendVerificationEmail.start(run, { email: input.email });
+
+    // Execute task to mark user as verified
+    // (In a real scenario, this would be triggered by an external event)
+    await markUserVerified.start(run, { email: input.email });
+
+    // Sleep for 24 hours before sending tips
+    await run.sleep({ days: 1 });
+
+    // Send usage tips
+    await sendUsageTips.start(run, { email: input.email });
+
+    return { success: true, userId: input.email };
+  },
+});
+```
+
+## Features
+
+- **Durable Execution** - Automatically survives crashes and restarts
+- **Task Orchestration** - Coordinate multiple tasks in sequence
+- **Durable Sleep** - Sleep without consuming resources or blocking workers
+- **State Snapshots** - Automatically save state at each step
+- **Error Handling** - Built-in retry and recovery mechanisms
+- **Multiple Versions** - Run different workflow versions simultaneously
+- **Logging** - Built-in structured logging for debugging
+
+## Workflow Primitives
+
+### Execute Tasks
+
+```typescript
+const result = await createUserProfile.start(run, {
+  email: input.email,
+});
+```
+
+### Sleep for a Duration
+
+```typescript
+// Using duration object
+await run.sleep({ days: 1 });
+await run.sleep({ hours: 2, minutes: 30 });
+await run.sleep({ seconds: 30 });
+
+// Using milliseconds (backward compatible)
+await run.sleep(5000);
+```
+
+### Get Workflow State
+
+```typescript
+const { state } = await run.handle.getState();
+console.log("Workflow status:", state.status);
+```
+
+### Logging
+
+```typescript
+run.logger.info("Processing user", { email: input.email });
+run.logger.debug("User created", { userId: result.userId });
+```
+
+## Workflow Options
+
+### Delayed Trigger
+
+```typescript
+export const morningWorkflowV1 = morningWorkflow.v("1.0", {
+  // ... workflow definition
+}).withOptions({
+  trigger: {
+    type: "delayed",
+    delay: { seconds: 5 },  // or: delay: 5000
+  },
+});
+```
+
+### Retry Strategy
+
+```typescript
+export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
+  // ... workflow definition
+}).withOptions({
+  retry: {
+    type: "exponential",
+    maxAttempts: 3,
+    baseDelayMs: 1000,
+    maxDelayMs: 10000,
+  },
+});
+```
+
+### Idempotency Key
+
+```typescript
+export const orderWorkflowV1 = orderWorkflow.v("1.0", {
+  // ... workflow definition
+}).withOptions({
+  idempotencyKey: "order-${orderId}",
+});
+```
+
+## Running Workflows
+
+With the client:
+
+```typescript
+import { client } from "@aiki/client";
+import { onboardingWorkflowV1 } from "./workflows.ts";
+
+const aikiClient = await client({
+  url: "http://localhost:9090",
+  redis: { host: "localhost", port: 6379 },
+});
+
+const stateHandle = await onboardingWorkflowV1.start(aikiClient, {
+  email: "user@example.com",
+});
+
+// Wait for completion
+const result = await stateHandle.wait(
+  { type: "status", status: "completed" },
+  { maxDurationMs: 60 * 1000, pollIntervalMs: 5_000 }
+);
+
+if (result.success) {
+  console.log("Workflow completed!", result.state);
+} else {
+  console.log("Workflow did not complete:", result.cause);
+}
+```
+
+With a worker:
+
+```typescript
+import { worker } from "@aiki/worker";
+
+const aikiWorker = worker(aikiClient, {
+  maxConcurrentWorkflowRuns: 10,
+});
+
+aikiWorker.workflowRegistry.add(onboardingWorkflow);
+await aikiWorker.start();
+```
+
+## Execution Context
+
+The `run` parameter provides access to:
+
+```typescript
+interface WorkflowRunContext<Input, Output> {
+  id: WorkflowRunId;                        // Unique run ID
+  name: WorkflowName;                       // Workflow name
+  versionId: WorkflowVersionId;             // Version ID
+  options: WorkflowOptions;                 // Execution options (trigger, retry, idempotencyKey)
+  handle: WorkflowRunHandle<Input, Output>; // Advanced state management
+  logger: Logger;                           // Logging (info, debug, warn, error, trace)
+  sleep(duration: Duration): Promise<void>; // Durable sleep
+}
+```
+
+The `Duration` type accepts:
+- Raw milliseconds: `run.sleep(5000)`
+- Duration objects: `run.sleep({ days: 1 })`, `run.sleep({ hours: 2, minutes: 30 })`
+
+## Error Handling
+
+Workflows handle errors gracefully:
+
+```typescript
+try {
+  await risky.start(run, input);
+} catch (error) {
+  run.logger.error("Task failed", { error: error.message });
+  // Workflow can decide how to proceed
+}
+```
+
+Failed workflows transition to `awaiting_retry` state and are automatically retried by the server.
+
+## Best Practices
+
+1. **Keep Workflows Deterministic** - Same input should always produce same output
+2. **Expect Replays** - Code may execute multiple times during retries
+3. **Use Descriptive Events** - Name events clearly for debugging
+4. **Handle Timeouts** - Always check `event.received` after waiting
+5. **Log Strategically** - Use logger to track workflow progress
+6. **Version Your Workflows** - Deploy new versions alongside old ones
+
+## Related Packages
+
+- [@aiki/task](https://jsr.io/@aiki/task) - Define tasks
+- [@aiki/client](https://jsr.io/@aiki/client) - Start workflows
+- [@aiki/worker](https://jsr.io/@aiki/worker) - Execute workflows
+- [@aiki/lib](https://jsr.io/@aiki/lib) - Utilities
+
+## License
+
+Apache-2.0
