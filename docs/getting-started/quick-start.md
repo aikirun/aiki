@@ -2,13 +2,23 @@
 
 Get Aiki running in 5 minutes with this step-by-step guide.
 
+## Prerequisites
+
+Make sure you have the Aiki server and Redis running. The easiest way is with Docker Compose:
+
+```bash
+docker-compose up
+```
+
+See [Docker Setup Guide](../DOCKER_SETUP.md) for more details.
+
 ## 1. Install Dependencies
 
 ```bash
 npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
 ```
 
-Make sure you have Redis and the Aiki server running. See [Installation](./installation.md) if you need help with setup.
+Or with Deno, just import from JSR in your code.
 
 ## 2. Define a Task
 

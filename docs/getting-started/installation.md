@@ -1,12 +1,13 @@
 # Installation
 
-This guide will help you set up Aiki in your project.
+Get Aiki up and running in your project with these simple steps.
 
 ## Prerequisites
 
-- **Runtime**: Node.js 18+ or Deno 1.30+
-- **Redis**: 6.2+ (for Redis Streams)
-- **Database**: PostgreSQL 14+ (for the Aiki server)
+- **Docker & Docker Compose** (recommended for local development)
+  - See [Docker Setup Guide](../DOCKER_SETUP.md) to get started
+- **Runtime**: Node.js 18+ or Deno 1.30+ (for your application code)
+- **Redis**: 6.2+ (included in Docker Compose setup)
 
 ## Install SDK Packages
 
@@ -27,43 +28,34 @@ import { task } from "jsr:@aikirun/task@^0.1.0";
 
 ## Set Up Infrastructure
 
-### Redis
-
-Aiki requires Redis 6.2+ for message distribution.
-
-**Using Docker:**
+The easiest way to get started is with Docker Compose, which sets up both Redis and the Aiki server:
 
 ```bash
-docker run -d --name redis -p 6379:6379 redis:7-alpine
+docker-compose up
 ```
 
-**Using Homebrew (macOS):**
+This starts:
+- **Aiki Server** on `http://localhost:9090`
+- **Redis** on `localhost:6379`
+
+For more details, see the [Docker Setup Guide](../DOCKER_SETUP.md).
+
+### Configuration
+
+You can customize the ports using environment variables:
 
 ```bash
-brew install redis
-brew services start redis
+# Use different Aiki server port
+AIKI_PORT=8080 docker-compose up
+
+# Use different Redis port
+REDIS_PORT=7379 docker-compose up
+
+# Use both
+AIKI_PORT=8080 REDIS_PORT=7379 docker-compose up
 ```
 
-### Aiki Server
-
-The Aiki server handles workflow orchestration and state management.
-
-**Using Docker:**
-
-```bash
-docker run -d \
-  --name aiki-server \
-  -p 9090:9090 \
-  -e DATABASE_URL=postgresql://user:pass@localhost/aiki \
-  -e REDIS_URL=redis://localhost:6379 \
-  aiki/server:latest
-```
-
-**Environment Variables:**
-
-- `DATABASE_URL`: PostgreSQL connection string
-- `REDIS_URL`: Redis connection string
-- `AIKI_PORT`: Server port (default: 9090)
+Or create a `.env` file (see `.env.example`) to persist your configuration.
 
 ## Verify Installation
 
