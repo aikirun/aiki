@@ -72,7 +72,7 @@ export const COMMON_CONFIG = {
 		"durable-execution",
 		"typescript",
 	],
-	dntVersion: "0.41.1",
+	dntVersion: "0.40.0",
 } as const;
 
 /**

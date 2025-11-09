@@ -11,7 +11,7 @@
 		"./task": "./task.ts"
 	},
 	"imports": {
-		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.2/*"
+		"@aikirun/lib/*": "../lib/"
 	},
 	"license": "Apache-2.0"
 }
