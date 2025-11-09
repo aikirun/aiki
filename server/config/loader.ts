@@ -8,7 +8,7 @@ export async function loadConfig(): Promise<Config> {
 	});
 
 	const raw = {
-		port: Deno.env.get("PORT"),
+		port: Deno.env.get("AIKI_PORT"),
 		redis: {
 			host: Deno.env.get("REDIS_HOST"),
 			port: Deno.env.get("REDIS_PORT"),

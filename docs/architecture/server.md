@@ -93,8 +93,8 @@ GET /workers/:id/health
 
 ```bash
 # Server
-PORT=9090
-HOST=0.0.0.0
+AIKI_PORT=9090
+AIKI_HOST=0.0.0.0
 
 # Database
 DATABASE_URL=postgresql://user:pass@localhost/aiki

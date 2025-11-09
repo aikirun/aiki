@@ -63,7 +63,7 @@ docker run -d \
 
 - `DATABASE_URL`: PostgreSQL connection string
 - `REDIS_URL`: Redis connection string
-- `PORT`: Server port (default: 9090)
+- `AIKI_PORT`: Server port (default: 9090)
 
 ## Verify Installation
 
