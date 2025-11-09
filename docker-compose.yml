@@ -1,50 +1,50 @@
 version: "3.9"
 
 services:
-    redis:
-        image: redis:latest
-        container_name: aiki-redis
-        ports:
-            - "${REDIS_PORT:-6379}:6379"
-        command: redis-server --appendonly yes
-        volumes:
-            - redis_data:/data
-        healthcheck:
-            test: ["CMD", "redis-cli", "ping"]
-            interval: 5s
-            timeout: 3s
-            retries: 5
-        networks:
-            - aiki-network
-        environment:
-            TZ: UTC
+  redis:
+    image: redis:latest
+    container_name: aiki-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - aiki-network
+    environment:
+      TZ: UTC
 
-    server:
-        build:
-            context: .
-            dockerfile: Dockerfile
-            args:
-                AIKI_PORT: ${AIKI_PORT:-9090}
-        container_name: aiki-server
-        ports:
-            - "${AIKI_PORT:-9090}:${AIKI_PORT:-9090}"
-        environment:
-            AIKI_PORT: ${AIKI_PORT:-9090}
-            AIKI_HOST: 0.0.0.0
-            REDIS_HOST: redis
-            REDIS_PORT: ${REDIS_PORT:-6379}
-            LOG_LEVEL: ${LOG_LEVEL:-info}
-        depends_on:
-            redis:
-                condition: service_healthy
-        networks:
-            - aiki-network
-        restart: unless-stopped
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        AIKI_PORT: ${AIKI_PORT:-9090}
+    container_name: aiki-server
+    ports:
+      - "${AIKI_PORT:-9090}:${AIKI_PORT:-9090}"
+    environment:
+      AIKI_PORT: ${AIKI_PORT:-9090}
+      AIKI_HOST: 0.0.0.0
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - aiki-network
+    restart: unless-stopped
 
 networks:
-    aiki-network:
-        driver: bridge
+  aiki-network:
+    driver: bridge
 
 volumes:
-    redis_data:
-        driver: local
+  redis_data:
+    driver: local

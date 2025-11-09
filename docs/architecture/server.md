@@ -235,25 +235,25 @@ docker run -d \
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: aiki-server
+  name: aiki-server
 spec:
-    replicas: 3
-    template:
-        spec:
-            containers:
-                - name: aiki-server
-                  image: aiki/server:latest
-                  env:
-                      - name: DATABASE_URL
-                        valueFrom:
-                            secretKeyRef:
-                                name: aiki-secrets
-                                key: database-url
-                      - name: REDIS_URL
-                        valueFrom:
-                            secretKeyRef:
-                                name: aiki-secrets
-                                key: redis-url
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: aiki-server
+          image: aiki/server:latest
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: aiki-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: aiki-secrets
+                  key: redis-url
 ```
 
 ## High Availability

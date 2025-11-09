@@ -18,7 +18,7 @@
 	"fmt": {
 		"useTabs": true,
 		"lineWidth": 120,
-		"indentWidth": 4,
+		"indentWidth": 2,
 		"trailingCommas": "onlyMultiLine",
 		"exclude": ["*.md"]
 	},

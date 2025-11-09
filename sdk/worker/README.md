@@ -20,15 +20,15 @@ import { onboardingWorkflow } from "./workflows.ts";
 
 // Initialize client
 const aiki = await client({
-  url: "http://localhost:9090",
-  redis: { host: "localhost", port: 6379 },
+	url: "http://localhost:9090",
+	redis: { host: "localhost", port: 6379 },
 });
 
 // Create worker
 const aikiWorker = worker(aiki, {
-  id: "worker-1",
-  maxConcurrentWorkflowRuns: 10,
-  subscriber: { type: "redis_streams" },
+	id: "worker-1",
+	maxConcurrentWorkflowRuns: 10,
+	subscriber: { type: "redis_streams" },
 });
 
 // Register workflows
@@ -45,9 +45,9 @@ import { processWrapper } from "@aikirun/lib/process";
 
 // Handle signals
 const shutdown = async () => {
-  await aikiWorker.stop();
-  await aiki.close();
-  processWrapper.exit(0);
+	await aikiWorker.stop();
+	await aiki.close();
+	processWrapper.exit(0);
 };
 
 processWrapper.addSignalListener("SIGINT", shutdown);
@@ -67,14 +67,14 @@ processWrapper.addSignalListener("SIGTERM", shutdown);
 
 ```typescript
 interface WorkerParams {
-  id?: string; // Unique worker ID
-  maxConcurrentWorkflowRuns?: number; // Concurrency limit (default: 1)
-  workflowRun?: {
-    heartbeatIntervalMs?: number; // Heartbeat interval (default: 30s)
-  };
-  gracefulShutdownTimeoutMs?: number; // Shutdown timeout (default: 5s)
-  subscriber?: SubscriberStrategy; // Message subscriber (default: redis_streams)
-  shardKeys?: string[]; // Optional shard keys for distributed work
+	id?: string; // Unique worker ID
+	maxConcurrentWorkflowRuns?: number; // Concurrency limit (default: 1)
+	workflowRun?: {
+		heartbeatIntervalMs?: number; // Heartbeat interval (default: 30s)
+	};
+	gracefulShutdownTimeoutMs?: number; // Shutdown timeout (default: 5s)
+	subscriber?: SubscriberStrategy; // Message subscriber (default: redis_streams)
+	shardKeys?: string[]; // Optional shard keys for distributed work
 }
 ```
 
@@ -84,9 +84,9 @@ Workers execute workflows registered in their registry:
 
 ```typescript
 aikiWorker.registry
-  .add(workflowV1)
-  .add(workflowV2)
-  .add(anotherWorkflow);
+	.add(workflowV1)
+	.add(workflowV2)
+	.add(anotherWorkflow);
 ```
 
 The worker automatically discovers and executes available workflow versions.
