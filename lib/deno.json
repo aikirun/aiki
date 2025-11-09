@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/lib",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"description": "Foundation utilities library for Aiki - including duration conversion, retry strategies, async helpers, and polling utilities",
 	"exports": {
 		"./array": "./array/mod.ts",
