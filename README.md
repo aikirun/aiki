@@ -44,7 +44,7 @@ Here's an example user onboarding workflow spanning multiple days. Traditional j
 *Workflow definition `workflow.ts`*
 ```typescript
 import { workflow } from "@aikirun/workflow";
-import {createUserProfile, sendVerificationEmail, deactivateUser, markUserVerified, sendUsageTips} from "./task.ts";
+import {createUserProfile, sendWelcomeEmail, sendUsageTips} from "./task.ts";
 
 export const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
@@ -52,22 +52,7 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
   async exec(input: { email: string }, run) {
 
     const { userId } = await createUserProfile.start(run, {email: input.email});
-
-    await sendVerificationEmail.start(run, {email: input.email});
-
-    // Workflow pauses here until user clicks verification link - could be seconds or hours.
-    // No resources consumed while waiting. If server crashes, resumes from this exact point.
-    const event = await run.wait(
-      { type: "event", event: "email_verified" },
-      { maxDurationMs: 12 * 60 * 60 * 1000 }
-    );
-    
-    if (!event.received) {
-      await deactivateUser.start(run, { userId, reason: "email not verified" });
-      return { success: false };
-    }
-
-    await markUserVerified.start(run, { userId });
+    await sendWelcomeEmail.start(run, {email: input.email});
 
     // Sleeps for 24 hours without blocking workers or tying up resources.
     // If the server restarts during this time, workflow resumes exactly where it left off.
@@ -121,18 +106,15 @@ import { task } from "@aikirun/task";
 export const createUserProfile = task({
   name: "create-profile",
   async exec(input: { email: string }) {
-    const id = db.users.create({
-      email: input.email,
-      status: "pending_verification"
-    });
+    const id = db.users.create({ email: input.email });
     return { userId: id};
   }
 });
 
-export const sendVerificationEmail = task({
-  name: "send-verification",
+export const sendWelcomeEmail = task({
+  name: "send-welcome",
   async exec(input: { email: string }) {
-    return emailService.sendVerification(input.email);
+    return emailService.sendWelcome(input.email);
   }
 }).withOptions({
   // If email sending fails it is retried up to 5 times with exponential backoff.
@@ -142,26 +124,6 @@ export const sendVerificationEmail = task({
     maxAttempts: 5,
     baseDelayMs: 1000,
     maxDelayMs: 30000
-  }
-});
-
-export const deactivateUser = task({
-  name: "deactivate-user",
-  async exec(input: { userId: string; reason: string }) {
-    return db.users.update({
-      where: { id: input.userId },
-      data: { status: "deactivated", deactivationReason: input.reason }
-    });
-  }
-});
-
-export const markUserVerified = task({
-  name: "mark-verified",
-  async exec(input: { userId: string }) {
-    return db.users.update({
-      where: { id: input.userId },
-      data: { status: "active" }
-    });
   }
 });
 
