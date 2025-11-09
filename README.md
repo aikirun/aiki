@@ -50,6 +50,7 @@ export const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
   async exec(input: { email: string }, run) {
+    
     const { userId } = await createUserProfile.start(run, {email: input.email});
     await sendWelcomeEmail.start(run, {email: input.email});
 
