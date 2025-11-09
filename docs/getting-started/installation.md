@@ -35,6 +35,7 @@ docker-compose up
 ```
 
 This starts:
+
 - **Aiki Server** on `http://localhost:9090`
 - **Redis** on `localhost:6379`
 

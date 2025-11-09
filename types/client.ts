@@ -33,7 +33,7 @@ export interface Logger {
 	warn(message: string, metadata?: Record<string, unknown>): void;
 	error(message: string, metadata?: Record<string, unknown>): void;
 	trace(message: string, metadata?: Record<string, unknown>): void;
-	child?(bindings: Record<string, unknown>): Logger;
+	child(bindings: Record<string, unknown>): Logger;
 }
 
 export interface ApiClient {

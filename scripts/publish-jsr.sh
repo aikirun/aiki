@@ -68,18 +68,18 @@ cd ../..
 echo "✅ @aikirun/workflow published"
 echo ""
 
-echo "Step 4/6: Publishing @aikirun/client..."
-cd sdk/client
-deno publish
-cd ../..
-echo "✅ @aikirun/client published"
-echo ""
-
-echo "Step 5/6: Publishing @aikirun/task..."
+echo "Step 4/6: Publishing @aikirun/task..."
 cd sdk/task
 deno publish
 cd ../..
 echo "✅ @aikirun/task published"
+echo ""
+
+echo "Step 5/6: Publishing @aikirun/client..."
+cd sdk/client
+deno publish
+cd ../..
+echo "✅ @aikirun/client published"
 echo ""
 
 echo "Step 6/6: Publishing @aikirun/worker..."
@@ -99,16 +99,16 @@ if command -v jq &> /dev/null; then
     echo "  - jsr:@aikirun/lib@${PUBLISHED_VERSION}"
     echo "  - jsr:@aikirun/types@${PUBLISHED_VERSION}"
     echo "  - jsr:@aikirun/workflow@${PUBLISHED_VERSION}"
-    echo "  - jsr:@aikirun/client@${PUBLISHED_VERSION}"
     echo "  - jsr:@aikirun/task@${PUBLISHED_VERSION}"
+    echo "  - jsr:@aikirun/client@${PUBLISHED_VERSION}"
     echo "  - jsr:@aikirun/worker@${PUBLISHED_VERSION}"
 else
     echo "Published packages:"
     echo "  - jsr:@aikirun/lib"
     echo "  - jsr:@aikirun/types"
     echo "  - jsr:@aikirun/workflow"
-    echo "  - jsr:@aikirun/client"
     echo "  - jsr:@aikirun/task"
+    echo "  - jsr:@aikirun/client"
     echo "  - jsr:@aikirun/worker"
 fi
 echo ""

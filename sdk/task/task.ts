@@ -7,8 +7,8 @@ import { createSerializableError, type SerializableInput } from "@aikirun/lib/er
 import { TaskFailedError, type TaskName } from "@aikirun/types/task";
 import type { WorkflowRunContext } from "@aikirun/workflow";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import { getChildLogger, type Logger } from "@aikirun/client";
 import type { TaskStateFailed } from "@aikirun/types/task";
+import type { Logger } from "@aikirun/types/client";
 
 /**
  * Defines a durable task with deterministic execution and automatic retries.
@@ -117,7 +117,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			return taskState.output as Output;
 		}
 
-		const logger = getChildLogger(runCtx.logger, {
+		const logger = runCtx.logger.child({
 			"aiki.component": "task-execution",
 			"aiki.taskName": this.name,
 			"aiki.taskPath": path,
