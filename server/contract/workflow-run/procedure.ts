@@ -15,8 +15,8 @@ import type {
 	TransitionTaskStateRequestV1,
 	TransitionTaskStateResponseV1,
 	WorkflowRunApi,
-} from "@aiki/types/workflow-run-api";
-import type { Equal, ExpectTrue } from "@aiki/lib/testing/expect";
+} from "@aikirun/types/workflow-run-api";
+import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
 
 const getByIdV1: ContractProcedure<GetByIdRequestV1, GetByIdResponseV1> = oc
 	.input(z.object({

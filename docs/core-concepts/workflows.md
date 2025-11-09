@@ -11,7 +11,7 @@ Workflows are created in two steps:
 2. **Add versions** with implementation logic
 
 ```typescript
-import { workflow } from "@aiki/workflow";
+import { workflow } from "@aikirun/workflow";
 
 // Step 1: Create workflow definition
 const orderWorkflow = workflow({

@@ -5,7 +5,7 @@ Get Aiki running in 5 minutes with this step-by-step guide.
 ## 1. Install Dependencies
 
 ```bash
-npm install @aiki/client @aiki/worker @aiki/workflow @aiki/task
+npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
 ```
 
 Make sure you have Redis and the Aiki server running. See [Installation](./installation.md) if you need help with setup.
@@ -15,7 +15,7 @@ Make sure you have Redis and the Aiki server running. See [Installation](./insta
 Tasks are units of work that can be retried independently:
 
 ```typescript
-import { task } from "@aiki/task";
+import { task } from "@aikirun/task";
 
 const sendEmail = task({
 	name: "send-email",
@@ -32,7 +32,7 @@ const sendEmail = task({
 Workflows orchestrate multiple tasks:
 
 ```typescript
-import { workflow } from "@aiki/workflow";
+import { workflow } from "@aikirun/workflow";
 
 const onboardingWorkflow = workflow({
 	name: "user-onboarding",
@@ -56,7 +56,7 @@ const onboardingV1 = onboardingWorkflow.v("1.0.0", {
 The client communicates with the Aiki server:
 
 ```typescript
-import { client } from "@aiki/client";
+import { client } from "@aikirun/client";
 
 const aikiClient = await client({
 	url: "localhost:9090",
@@ -72,7 +72,7 @@ const aikiClient = await client({
 Workers execute workflows in your infrastructure:
 
 ```typescript
-import { worker } from "@aiki/worker";
+import { worker } from "@aikirun/worker";
 
 const aikiWorker = await worker(aikiClient, {
 	id: "worker-1",
@@ -110,9 +110,9 @@ console.log("Workflow completed:", finalResult);
 Here's the full code:
 
 ```typescript
-import { client } from "@aiki/client";
-import { task } from "@aiki/task";
-import { worker } from "@aiki/worker";
+import { client } from "@aikirun/client";
+import { task } from "@aikirun/task";
+import { worker } from "@aikirun/worker";
 
 // 1. Define task
 const sendEmail = task({

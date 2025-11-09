@@ -1,4 +1,4 @@
-# @aiki/worker
+# @aikirun/worker
 
 Worker SDK for Aiki durable execution engine - execute workflows and tasks with durable state management and automatic
 recovery.
@@ -6,7 +6,7 @@ recovery.
 ## Installation
 
 ```bash
-deno add jsr:@aiki/worker @aiki/client @aiki/workflow @aiki/task
+deno add jsr:@aikirun/worker @aikirun/client @aikirun/workflow @aikirun/task
 ```
 
 ## Quick Start
@@ -14,8 +14,8 @@ deno add jsr:@aiki/worker @aiki/client @aiki/workflow @aiki/task
 ### Create and Start a Worker
 
 ```typescript
-import { worker } from "@aiki/worker";
-import { client } from "@aiki/client";
+import { worker } from "@aikirun/worker";
+import { client } from "@aikirun/client";
 import { onboardingWorkflow } from "./workflows.ts";
 
 // Initialize client
@@ -41,7 +41,7 @@ await aikiWorker.start();
 ### Graceful Shutdown
 
 ```typescript
-import { processWrapper } from "@aiki/lib/process";
+import { processWrapper } from "@aikirun/lib/process";
 
 // Handle signals
 const shutdown = async () => {
@@ -104,10 +104,10 @@ This allows workflows to resume from the exact point of failure.
 
 ## Related Packages
 
-- [@aiki/client](https://jsr.io/@aiki/client) - Start workflows
-- [@aiki/workflow](https://jsr.io/@aiki/workflow) - Define workflows
-- [@aiki/task](https://jsr.io/@aiki/task) - Define tasks
-- [@aiki/lib](https://jsr.io/@aiki/lib) - Utility functions
+- [@aikirun/client](https://jsr.io/@aikirun/client) - Start workflows
+- [@aikirun/workflow](https://jsr.io/@aikirun/workflow) - Define workflows
+- [@aikirun/task](https://jsr.io/@aikirun/task) - Define tasks
+- [@aikirun/lib](https://jsr.io/@aikirun/lib) - Utility functions
 
 ## License
 

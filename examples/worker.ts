@@ -1,7 +1,7 @@
-import { worker } from "@aiki/worker";
-import { client } from "@aiki/client";
+import { worker } from "@aikirun/worker";
+import { client } from "@aikirun/client";
 import { eveningRoutineWorkflow, morningWorkflow } from "./workflows.ts";
-import { processWrapper } from "@aiki/lib/process";
+import { processWrapper } from "@aikirun/lib/process";
 
 if (import.meta.main) {
 	const aikiClient = await client({

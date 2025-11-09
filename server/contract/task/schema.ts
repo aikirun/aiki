@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { TaskState } from "@aiki/types/task";
+import type { TaskState } from "@aikirun/types/task";
 import type { zT } from "../helpers/schema.ts";
 import { serializedErrorSchema } from "../serializable.ts";
 

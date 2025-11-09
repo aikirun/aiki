@@ -18,22 +18,22 @@ Build reliable, long-running business processes that survive failures, restarts,
 Install the latest version from JSR (JavaScript Registry):
 
 ```bash
-deno add jsr:@aiki/task jsr:@aiki/workflow jsr:@aiki/client jsr:@aiki/worker
+deno add jsr:@aikirun/task jsr:@aikirun/workflow jsr:@aikirun/client jsr:@aikirun/worker
 ```
 
 **Package Links:**
-- [`@aiki/lib`](https://jsr.io/@aiki/lib) - Foundation utilities (duration, retry, async)
-- [`@aiki/types`](https://jsr.io/@aiki/types) - Core type definitions
-- [`@aiki/workflow`](https://jsr.io/@aiki/workflow) - Workflow SDK
-- [`@aiki/task`](https://jsr.io/@aiki/task) - Task SDK
-- [`@aiki/client`](https://jsr.io/@aiki/client) - Client SDK
-- [`@aiki/worker`](https://jsr.io/@aiki/worker) - Worker SDK
+- [`@aikirun/lib`](https://jsr.io/@aikirun/lib) - Foundation utilities (duration, retry, async)
+- [`@aikirun/types`](https://jsr.io/@aikirun/types) - Core type definitions
+- [`@aikirun/workflow`](https://jsr.io/@aikirun/workflow) - Workflow SDK
+- [`@aikirun/task`](https://jsr.io/@aikirun/task) - Task SDK
+- [`@aikirun/client`](https://jsr.io/@aikirun/client) - Client SDK
+- [`@aikirun/worker`](https://jsr.io/@aikirun/worker) - Worker SDK
 
 Here's an example user onboarding workflow spanning multiple days. Traditional job queues would struggle with this. Aiki makes it trivial with durable state, event-driven waits, and automatic crash recovery.
 
 *Workflow definition `workflow.ts`*
 ```typescript
-import { workflow } from "@aiki/workflow";
+import { workflow } from "@aikirun/workflow";
 import {createUserProfile, sendVerificationEmail, deactivateUser, markUserVerified, sendUsageTips} from "./task.ts";
 
 export const onboardingWorkflow = workflow({ name: "user-onboarding" });
@@ -76,8 +76,8 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
 
 *Setup worker `setup.ts`*
 ```typescript
-import { client } from "@aiki/client";
-import { worker } from "@aiki/worker";
+import { client } from "@aikirun/client";
+import { worker } from "@aikirun/worker";
 import { onboardingWorkflow } from "./workflow.ts";
 
 export const aikiClient = await client({
@@ -110,7 +110,7 @@ await onboardingWorkflowV1.start(aikiClient, {
 <summary>Task definitions <code>task.ts</code> (click to expand)</summary>
 
 ```typescript
-import { task } from "@aiki/task";
+import { task } from "@aikirun/task";
 
 export const createUserProfile = task({
   name: "create-profile",

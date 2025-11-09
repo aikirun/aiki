@@ -1,8 +1,8 @@
-import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aiki/lib/array";
+import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aikirun/lib/array";
 import { z } from "zod";
-import { getRetryParams } from "@aiki/lib/retry";
-import type { WorkflowName } from "@aiki/types/workflow";
-import type { WorkflowRunId } from "@aiki/types/workflow-run";
+import { getRetryParams } from "@aikirun/lib/retry";
+import type { WorkflowName } from "@aikirun/types/workflow";
+import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type {
 	Client,
 	Logger,
@@ -13,7 +13,7 @@ import type {
 	SubscriberMessageMeta,
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
-} from "@aiki/types/client";
+} from "@aikirun/types/client";
 import { getChildLogger } from "../logger/mod.ts";
 
 const WorkflowRunReadyMessageDataSchema = z.object({

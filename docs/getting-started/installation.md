@@ -13,16 +13,16 @@ This guide will help you set up Aiki in your project.
 ### Using npm
 
 ```bash
-npm install @aiki/client @aiki/worker @aiki/workflow @aiki/task
+npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
 ```
 
 ### Using Deno
 
 ```typescript
-import { client } from "jsr:@aiki/client@^0.1.0";
-import { worker } from "jsr:@aiki/worker@^0.1.0";
-import { workflow } from "jsr:@aiki/workflow@^0.1.0";
-import { task } from "jsr:@aiki/task@^0.1.0";
+import { client } from "jsr:@aikirun/client@^0.1.0";
+import { worker } from "jsr:@aikirun/worker@^0.1.0";
+import { workflow } from "jsr:@aikirun/workflow@^0.1.0";
+import { task } from "jsr:@aikirun/task@^0.1.0";
 ```
 
 ## Set Up Infrastructure
@@ -70,7 +70,7 @@ docker run -d \
 Create a simple test file to verify your setup:
 
 ```typescript
-import { client } from "@aiki/client";
+import { client } from "@aikirun/client";
 
 const aikiClient = await client({
 	url: "localhost:9090",

@@ -1,11 +1,11 @@
-# @aiki/client
+# @aikirun/client
 
 Client SDK for Aiki durable execution engine - connect to the Aiki server, start workflows, and manage execution.
 
 ## Installation
 
 ```bash
-deno add jsr:@aiki/client @aiki/workflow @aiki/task
+deno add jsr:@aikirun/client @aikirun/workflow @aikirun/task
 ```
 
 ## Quick Start
@@ -13,7 +13,7 @@ deno add jsr:@aiki/client @aiki/workflow @aiki/task
 ### Initialize the Client
 
 ```typescript
-import { client } from "@aiki/client";
+import { client } from "@aikirun/client";
 
 const aikiClient = await client({
 	url: "http://localhost:9090",
@@ -106,9 +106,9 @@ See the [Aiki documentation](https://github.com/aikirun/aiki) for comprehensive 
 
 ## Related Packages
 
-- [@aiki/workflow](https://jsr.io/@aiki/workflow) - Define workflows
-- [@aiki/task](https://jsr.io/@aiki/task) - Define tasks
-- [@aiki/worker](https://jsr.io/@aiki/worker) - Execute workflows
+- [@aikirun/workflow](https://jsr.io/@aikirun/workflow) - Define workflows
+- [@aikirun/task](https://jsr.io/@aikirun/task) - Define tasks
+- [@aikirun/worker](https://jsr.io/@aikirun/worker) - Execute workflows
 
 ## License
 

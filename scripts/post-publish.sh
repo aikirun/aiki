@@ -6,12 +6,12 @@
 set -e
 
 PACKAGES=(
-    "@aiki/lib"
-    "@aiki/types"
-    "@aiki/workflow"
-    "@aiki/client"
-    "@aiki/task"
-    "@aiki/worker"
+    "@aikirun/lib"
+    "@aikirun/types"
+    "@aikirun/workflow"
+    "@aikirun/client"
+    "@aikirun/task"
+    "@aikirun/worker"
 )
 
 # Read version from lib/deno.json

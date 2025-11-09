@@ -1,12 +1,12 @@
 import type { PackageBuildConfig } from "../../scripts/build-config.ts";
 
 const config: PackageBuildConfig = {
-	name: "@aiki/workflow",
+	name: "@aikirun/workflow",
 	description: "Workflow SDK for defining durable workflows",
 	directory: "sdk/workflow",
 	dependencies: {
-		"@aiki/lib": "*",
-		"@aiki/types": "*",
+		"@aikirun/lib": "*",
+		"@aikirun/types": "*",
 	},
 	keywords: ["workflows"],
 };

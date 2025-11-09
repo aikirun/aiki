@@ -1,7 +1,7 @@
 import type { PackageBuildConfig } from "../scripts/build-config.ts";
 
 const config: PackageBuildConfig = {
-	name: "@aiki/types",
+	name: "@aikirun/types",
 	description: "Core TypeScript type definitions for Aiki SDK",
 	directory: "types",
 	entryPoints: [
@@ -13,7 +13,7 @@ const config: PackageBuildConfig = {
 		"./task.ts",
 	],
 	dependencies: {
-		"@aiki/lib": "*",
+		"@aikirun/lib": "*",
 	},
 	keywords: ["types", "workflows"],
 };

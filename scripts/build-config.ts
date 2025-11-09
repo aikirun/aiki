@@ -4,7 +4,7 @@
  * Package build configuration for dnt builds
  */
 export interface PackageBuildConfig {
-	/** Package name (e.g., "@aiki/lib") */
+	/** Package name (e.g., "@aikirun/lib") */
 	name: string;
 
 	/** Package description */
@@ -22,7 +22,7 @@ export interface PackageBuildConfig {
 
 	/**
 	 * NPM dependencies
-	 * Use special syntax "@aiki/*": "*" to auto-resolve to current version
+	 * Use special syntax "@aikirun/*": "*" to auto-resolve to current version
 	 */
 	dependencies?: Record<string, string>;
 
@@ -69,7 +69,7 @@ export const COMMON_CONFIG = {
 } as const;
 
 /**
- * Resolve @aiki/* dependencies to current package version
+ * Resolve @aikirun/* dependencies to current package version
  */
 export function resolveDependencies(
 	deps: Record<string, string> | undefined,
@@ -79,8 +79,8 @@ export function resolveDependencies(
 
 	const resolved: Record<string, string> = {};
 	for (const [pkg, ver] of Object.entries(deps)) {
-		// Auto-resolve @aiki/* packages to current version
-		if (pkg.startsWith("@aiki/") && ver === "*") {
+		// Auto-resolve @aikirun/* packages to current version
+		if (pkg.startsWith("@aikirun/") && ver === "*") {
 			resolved[pkg] = version;
 		} else {
 			resolved[pkg] = ver;

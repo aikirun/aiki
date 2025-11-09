@@ -1,11 +1,11 @@
-# @aiki/lib
+# @aikirun/lib
 
 Foundation utilities library for Aiki - a durable execution engine.
 
 ## Installation
 
 ```bash
-deno add jsr:@aiki/lib
+deno add jsr:@aikirun/lib
 ```
 
 ## Features
@@ -34,7 +34,7 @@ deno add jsr:@aiki/lib
 ### Duration Conversion
 
 ```typescript
-import { toMilliseconds } from "@aiki/lib/duration";
+import { toMilliseconds } from "@aikirun/lib/duration";
 
 // Convert duration objects to milliseconds
 const ms1 = toMilliseconds(5000); // 5000ms
@@ -46,7 +46,7 @@ const ms4 = toMilliseconds({ days: 1, hours: 2 }); // 93600000ms
 ### Retry Strategies
 
 ```typescript
-import type { RetryStrategy } from "@aiki/lib/retry";
+import type { RetryStrategy } from "@aikirun/lib/retry";
 
 const exponentialRetry: RetryStrategy = {
 	type: "exponential",
@@ -66,7 +66,7 @@ const fixedRetry: RetryStrategy = {
 ### Async Utilities
 
 ```typescript
-import { delay } from "@aiki/lib/async";
+import { delay } from "@aikirun/lib/async";
 
 // Wait for a duration
 await delay(1000);

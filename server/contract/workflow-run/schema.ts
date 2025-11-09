@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { WorkflowOptions, WorkflowRun, WorkflowRunState, WorkflowRunStatus } from "@aiki/types/workflow-run";
-import type { TriggerStrategy } from "@aiki/types/trigger";
-import type { RetryStrategy } from "@aiki/lib/retry";
-import type { DurationObject } from "@aiki/lib/duration";
-import type { UnionToRecord } from "@aiki/lib/object";
+import type { WorkflowOptions, WorkflowRun, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { TriggerStrategy } from "@aikirun/types/trigger";
+import type { RetryStrategy } from "@aikirun/lib/retry";
+import type { DurationObject } from "@aikirun/lib/duration";
+import type { UnionToRecord } from "@aikirun/lib/object";
 import { taskStateSchema } from "../task/schema.ts";
 import type { zT } from "../helpers/schema.ts";
 import { serializedErrorSchema } from "../serializable.ts";

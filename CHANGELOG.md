@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial release of Aiki SDK - a durable execution engine
-- **@aiki/lib** - Foundation utilities including:
+- **@aikirun/lib** - Foundation utilities including:
   - Duration API with human-readable time syntax (days, hours, minutes, seconds)
   - Retry strategies (never, fixed, exponential, jittered)
   - Async helpers (delay, fireAndForget)
@@ -19,33 +19,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - JSON serialization utilities
   - Array and object utilities
   - Polling with adaptive backoff
-- **@aiki/types** - Core type definitions for:
+- **@aikirun/types** - Core type definitions for:
   - Workflow and task execution
   - Workflow run states and transitions
   - Trigger strategies (immediate, delayed, startAt)
   - Retry configuration
   - Event handling
   - Client interfaces
-- **@aiki/workflow** - Workflow SDK with:
+- **@aikirun/workflow** - Workflow SDK with:
   - Workflow definition and versioning
   - Multiple workflow versions running simultaneously
   - Task execution coordination
   - Durable sleep functionality
   - Structured logging
   - Type-safe workflow execution
-- **@aiki/client** - Client SDK for:
+- **@aikirun/client** - Client SDK for:
   - Connecting to Aiki server
   - Starting workflow executions
   - Polling workflow state changes
   - Type-safe input/output handling
   - Custom logger support
-- **@aiki/task** - Task SDK for:
+- **@aikirun/task** - Task SDK for:
   - Deterministic task definition
   - Automatic retry with multiple strategies
   - Idempotency keys for deduplication
   - Structured error handling
   - Task execution within workflows
-- **@aiki/worker** - Worker SDK for:
+- **@aikirun/worker** - Worker SDK for:
   - Executing workflows and tasks
   - Horizontal scaling across multiple workers
   - Durable state management and recovery

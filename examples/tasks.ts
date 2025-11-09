@@ -1,4 +1,4 @@
-import { task } from "@aiki/task";
+import { task } from "@aikirun/task";
 
 export const ringAlarm = task({
 	name: "ring-alarm",

@@ -1,4 +1,4 @@
-import { getRetryParams } from "@aiki/lib/retry";
+import { getRetryParams } from "@aikirun/lib/retry";
 import type {
 	Client,
 	PollingSubscriberStrategy,
@@ -6,7 +6,7 @@ import type {
 	SubscriberDelayParams,
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
-} from "@aiki/types/client";
+} from "@aikirun/types/client";
 
 export function createPollingStrategy(
 	_client: Client<unknown>,

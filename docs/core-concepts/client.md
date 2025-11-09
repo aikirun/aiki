@@ -5,7 +5,7 @@ The Aiki client provides the interface for starting workflows, monitoring execut
 ## Creating a Client
 
 ```typescript
-import { client } from "@aiki/client";
+import { client } from "@aikirun/client";
 
 const aikiClient = await client({
 	url: "localhost:9090",
@@ -125,9 +125,9 @@ This closes the Redis connection and cleans up resources.
 ## Complete Example
 
 ```typescript
-import { client } from "@aiki/client";
-import { task } from "@aiki/task";
-import { workflow } from "@aiki/workflow";
+import { client } from "@aikirun/client";
+import { task } from "@aikirun/task";
+import { workflow } from "@aikirun/workflow";
 
 // Define task and workflow
 const sendEmail = task({

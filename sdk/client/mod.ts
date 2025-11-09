@@ -13,6 +13,6 @@ export type {
 	SubscriberMessageMeta,
 	SubscriberStrategy,
 	WorkflowRunBatch,
-} from "@aiki/types/client";
+} from "@aikirun/types/client";
 
 export { ConsoleLogger, getChildLogger } from "./logger/mod.ts";

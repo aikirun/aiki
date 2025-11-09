@@ -1,4 +1,4 @@
-import type { SerializableError } from "@aiki/lib/error";
+import type { SerializableError } from "@aikirun/lib/error";
 
 export type TaskName = string & { _brand: "task_name" };
 

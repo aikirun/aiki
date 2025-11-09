@@ -1,4 +1,4 @@
-# @aiki/types
+# @aikirun/types
 
 Core type definitions for Aiki durable execution engine.
 
@@ -8,7 +8,7 @@ directly, but imported by other Aiki packages.
 ## Installation
 
 ```bash
-deno add jsr:@aiki/types
+deno add jsr:@aikirun/types
 ```
 
 ## Exports
@@ -55,17 +55,17 @@ Types for serializable error handling.
 These types are primarily used by other Aiki packages:
 
 ```typescript
-import type { WorkflowOptions } from "@aiki/types/workflow-run";
-import type { TriggerStrategy } from "@aiki/types/trigger";
+import type { WorkflowOptions } from "@aikirun/types/workflow-run";
+import type { TriggerStrategy } from "@aikirun/types/trigger";
 ```
 
 ## Related Packages
 
-- [@aiki/lib](https://jsr.io/@aiki/lib) - Foundation utilities
-- [@aiki/client](https://jsr.io/@aiki/client) - Client SDK
-- [@aiki/workflow](https://jsr.io/@aiki/workflow) - Workflow SDK
-- [@aiki/task](https://jsr.io/@aiki/task) - Task SDK
-- [@aiki/worker](https://jsr.io/@aiki/worker) - Worker SDK
+- [@aikirun/lib](https://jsr.io/@aikirun/lib) - Foundation utilities
+- [@aikirun/client](https://jsr.io/@aikirun/client) - Client SDK
+- [@aikirun/workflow](https://jsr.io/@aikirun/workflow) - Workflow SDK
+- [@aikirun/task](https://jsr.io/@aikirun/task) - Task SDK
+- [@aikirun/worker](https://jsr.io/@aikirun/worker) - Worker SDK
 
 ## License
 

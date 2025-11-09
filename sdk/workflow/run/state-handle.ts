@@ -1,12 +1,12 @@
-import { withRetry } from "@aiki/lib/retry";
+import { withRetry } from "@aikirun/lib/retry";
 import type {
 	WorkflowRunId,
 	WorkflowRunState,
 	WorkflowRunStateCompleted,
 	WorkflowRunStateInComplete,
 	WorkflowRunStatus,
-} from "@aiki/types/workflow-run";
-import type { ApiClient } from "@aiki/types/client";
+} from "@aikirun/types/workflow-run";
+import type { ApiClient } from "@aikirun/types/client";
 
 export function initWorkflowRunStateHandle<Output>(
 	id: WorkflowRunId,

@@ -1,4 +1,4 @@
-import { AdaptivePollingStrategy } from "@aiki/lib/polling";
+import { AdaptivePollingStrategy } from "@aikirun/lib/polling";
 import type {
 	AdaptivePollingSubscriberStrategy,
 	Client,
@@ -6,7 +6,7 @@ import type {
 	SubscriberDelayParams,
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
-} from "@aiki/types/client";
+} from "@aikirun/types/client";
 
 export function createAdaptivePollingStrategy(
 	_client: Client<unknown>,

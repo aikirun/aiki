@@ -1,7 +1,7 @@
 import type { PackageBuildConfig } from "../scripts/build-config.ts";
 
 const config: PackageBuildConfig = {
-	name: "@aiki/lib",
+	name: "@aikirun/lib",
 	description: "Foundation utilities library for Aiki SDK",
 	directory: "lib",
 	entryPoints: [

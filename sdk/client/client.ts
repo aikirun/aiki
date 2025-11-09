@@ -1,4 +1,4 @@
-import type { ApiClient, Client, ClientParams, Logger } from "@aiki/types/client";
+import type { ApiClient, Client, ClientParams, Logger } from "@aikirun/types/client";
 import { Redis } from "ioredis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";

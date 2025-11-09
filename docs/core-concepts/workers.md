@@ -6,7 +6,7 @@ back to the server.
 ## Creating a Worker
 
 ```typescript
-import { worker } from "@aiki/worker";
+import { worker } from "@aikirun/worker";
 
 const aikiWorker = await worker(client, {
 	id: "worker-1",
@@ -196,8 +196,8 @@ Failed workflows are automatically retried according to the configured strategy.
 ## Example: Complete Worker Setup
 
 ```typescript
-import { client } from "@aiki/client";
-import { worker } from "@aiki/worker";
+import { client } from "@aikirun/client";
+import { worker } from "@aikirun/worker";
 
 // Create client
 const aikiClient = await client({

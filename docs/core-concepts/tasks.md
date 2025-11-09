@@ -6,7 +6,7 @@ independently.
 ## Defining a Task
 
 ```typescript
-import { task } from "@aiki/task";
+import { task } from "@aikirun/task";
 
 const sendEmail = task({
 	name: "send-email",

@@ -1,5 +1,5 @@
 import type { Redis } from "ioredis";
-import { isNonEmptyArray } from "@aiki/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/array";
 
 export interface WorkflowMessageToPublish {
 	workflowRunId: string;

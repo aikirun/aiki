@@ -1,14 +1,14 @@
 import type { PackageBuildConfig } from "../../scripts/build-config.ts";
 
 const config: PackageBuildConfig = {
-	name: "@aiki/worker",
+	name: "@aikirun/worker",
 	description: "Worker SDK for executing workflows and tasks",
 	directory: "sdk/worker",
 	dependencies: {
-		"@aiki/lib": "*",
-		"@aiki/types": "*",
-		"@aiki/client": "*",
-		"@aiki/workflow": "*",
+		"@aikirun/lib": "*",
+		"@aikirun/types": "*",
+		"@aikirun/client": "*",
+		"@aikirun/workflow": "*",
 	},
 	keywords: ["worker", "scaling"],
 };

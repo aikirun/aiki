@@ -1,6 +1,6 @@
-import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version.ts";
-import type { SerializableInput } from "@aiki/lib/error";
+import type { SerializableInput } from "@aikirun/lib/error";
 
 /**
  * Defines a durable workflow with versioning and multiple task execution.

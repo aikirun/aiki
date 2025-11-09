@@ -1,4 +1,4 @@
-# @aiki/task
+# @aikirun/task
 
 Task SDK for Aiki durable execution engine - define reliable tasks with automatic retries, idempotency, and error
 handling.
@@ -6,7 +6,7 @@ handling.
 ## Installation
 
 ```bash
-deno add jsr:@aiki/task
+deno add jsr:@aikirun/task
 ```
 
 ## Quick Start
@@ -14,7 +14,7 @@ deno add jsr:@aiki/task
 ### Define a Simple Task
 
 ```typescript
-import { task } from "@aiki/task";
+import { task } from "@aikirun/task";
 
 export const sendVerificationEmail = task({
 	name: "send-verification",
@@ -44,7 +44,7 @@ export const ringAlarm = task({
 ### Execute Task in a Workflow
 
 ```typescript
-import { workflow } from "@aiki/workflow";
+import { workflow } from "@aikirun/workflow";
 
 export const morningWorkflow = workflow({ name: "morning-routine" });
 
@@ -155,10 +155,10 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 
 ## Related Packages
 
-- [@aiki/workflow](https://jsr.io/@aiki/workflow) - Use tasks in workflows
-- [@aiki/worker](https://jsr.io/@aiki/worker) - Execute tasks in workers
-- [@aiki/client](https://jsr.io/@aiki/client) - Manage task execution
-- [@aiki/lib](https://jsr.io/@aiki/lib) - Retry utilities
+- [@aikirun/workflow](https://jsr.io/@aikirun/workflow) - Use tasks in workflows
+- [@aikirun/worker](https://jsr.io/@aikirun/worker) - Execute tasks in workers
+- [@aikirun/client](https://jsr.io/@aikirun/client) - Manage task execution
+- [@aikirun/lib](https://jsr.io/@aikirun/lib) - Retry utilities
 
 ## License
 

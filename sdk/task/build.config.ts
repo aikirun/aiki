@@ -1,13 +1,13 @@
 import type { PackageBuildConfig } from "../../scripts/build-config.ts";
 
 const config: PackageBuildConfig = {
-	name: "@aiki/task",
+	name: "@aikirun/task",
 	description: "Task SDK for defining reliable, deterministic tasks",
 	directory: "sdk/task",
 	dependencies: {
-		"@aiki/lib": "*",
-		"@aiki/types": "*",
-		"@aiki/workflow": "*",
+		"@aikirun/lib": "*",
+		"@aikirun/types": "*",
+		"@aikirun/workflow": "*",
 	},
 	keywords: ["tasks", "retry"],
 };

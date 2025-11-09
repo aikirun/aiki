@@ -1,4 +1,4 @@
-import { client } from "@aiki/client";
+import { client } from "@aikirun/client";
 import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows.ts";
 
 if (import.meta.main) {

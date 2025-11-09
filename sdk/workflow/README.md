@@ -1,11 +1,11 @@
-# @aiki/workflow
+# @aikirun/workflow
 
 Workflow SDK for Aiki durable execution engine - define durable workflows with tasks, sleeps, waits, and event handling.
 
 ## Installation
 
 ```bash
-deno add jsr:@aiki/workflow @aiki/task @aiki/client @aiki/worker
+deno add jsr:@aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
 
 ## Quick Start
@@ -13,7 +13,7 @@ deno add jsr:@aiki/workflow @aiki/task @aiki/client @aiki/worker
 ### Define a Workflow
 
 ```typescript
-import { workflow } from "@aiki/workflow";
+import { workflow } from "@aikirun/workflow";
 import { markUserVerified, sendVerificationEmail } from "./tasks.ts";
 
 export const onboardingWorkflow = workflow({ name: "user-onboarding" });
@@ -131,7 +131,7 @@ export const orderWorkflowV1 = orderWorkflow.v("1.0", {
 With the client:
 
 ```typescript
-import { client } from "@aiki/client";
+import { client } from "@aikirun/client";
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
 const aikiClient = await client({
@@ -159,7 +159,7 @@ if (result.success) {
 With a worker:
 
 ```typescript
-import { worker } from "@aiki/worker";
+import { worker } from "@aikirun/worker";
 
 const aikiWorker = worker(aikiClient, {
 	maxConcurrentWorkflowRuns: 10,
@@ -216,10 +216,10 @@ Failed workflows transition to `awaiting_retry` state and are automatically retr
 
 ## Related Packages
 
-- [@aiki/task](https://jsr.io/@aiki/task) - Define tasks
-- [@aiki/client](https://jsr.io/@aiki/client) - Start workflows
-- [@aiki/worker](https://jsr.io/@aiki/worker) - Execute workflows
-- [@aiki/lib](https://jsr.io/@aiki/lib) - Utilities
+- [@aikirun/task](https://jsr.io/@aikirun/task) - Define tasks
+- [@aikirun/client](https://jsr.io/@aikirun/client) - Start workflows
+- [@aikirun/worker](https://jsr.io/@aikirun/worker) - Execute workflows
+- [@aikirun/lib](https://jsr.io/@aikirun/lib) - Utilities
 
 ## License
 

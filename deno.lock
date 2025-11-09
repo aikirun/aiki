@@ -394,8 +394,8 @@
     "members": {
       "sdk/client": {
         "dependencies": [
-          "jsr:@aiki/lib@~0.1.1",
-          "jsr:@aiki/types@~0.1.1",
+          "jsr:@aikirun/lib@~0.1.1",
+          "jsr:@aikirun/types@~0.1.1",
           "npm:@orpc/client@^1.9.3",
           "npm:ioredis@^5.4.1",
           "npm:zod@^4.1.12"
@@ -403,29 +403,29 @@
       },
       "sdk/task": {
         "dependencies": [
-          "jsr:@aiki/lib@~0.1.1",
-          "jsr:@aiki/types@~0.1.1",
-          "jsr:@aiki/workflow@~0.1.1"
+          "jsr:@aikirun/lib@~0.1.1",
+          "jsr:@aikirun/types@~0.1.1",
+          "jsr:@aikirun/workflow@~0.1.1"
         ]
       },
       "sdk/worker": {
         "dependencies": [
-          "jsr:@aiki/client@~0.1.1",
-          "jsr:@aiki/lib@~0.1.1",
-          "jsr:@aiki/types@~0.1.1",
-          "jsr:@aiki/workflow@~0.1.1"
+          "jsr:@aikirun/client@~0.1.1",
+          "jsr:@aikirun/lib@~0.1.1",
+          "jsr:@aikirun/types@~0.1.1",
+          "jsr:@aikirun/workflow@~0.1.1"
         ]
       },
       "sdk/workflow": {
         "dependencies": [
-          "jsr:@aiki/lib@~0.1.1",
-          "jsr:@aiki/types@~0.1.1"
+          "jsr:@aikirun/lib@~0.1.1",
+          "jsr:@aikirun/types@~0.1.1"
         ]
       },
       "server": {
         "dependencies": [
-          "jsr:@aiki/lib@0.1",
-          "jsr:@aiki/types@0.1",
+          "jsr:@aikirun/lib@0.1",
+          "jsr:@aikirun/types@0.1",
           "jsr:@std/dotenv@0.225",
           "npm:@orpc/contract@^1.9.3",
           "npm:@orpc/server@^1.9.3",
@@ -435,7 +435,7 @@
       },
       "types": {
         "dependencies": [
-          "jsr:@aiki/lib@~0.1.1"
+          "jsr:@aikirun/lib@~0.1.1"
         ]
       }
     }

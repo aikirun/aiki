@@ -1,14 +1,14 @@
-import { sha256 } from "@aiki/lib/crypto";
-import { delay } from "@aiki/lib/async";
-import { getRetryParams } from "@aiki/lib/retry";
-import type { RetryStrategy } from "@aiki/lib/retry";
-import { stableStringify } from "@aiki/lib/json";
-import { createSerializableError, type SerializableInput } from "@aiki/lib/error";
-import { TaskFailedError, type TaskName } from "@aiki/types/task";
-import type { WorkflowRunContext } from "@aiki/workflow";
-import { isNonEmptyArray } from "@aiki/lib/array";
-import { getChildLogger, type Logger } from "@aiki/client";
-import type { TaskStateFailed } from "@aiki/types/task";
+import { sha256 } from "@aikirun/lib/crypto";
+import { delay } from "@aikirun/lib/async";
+import { getRetryParams } from "@aikirun/lib/retry";
+import type { RetryStrategy } from "@aikirun/lib/retry";
+import { stableStringify } from "@aikirun/lib/json";
+import { createSerializableError, type SerializableInput } from "@aikirun/lib/error";
+import { TaskFailedError, type TaskName } from "@aikirun/types/task";
+import type { WorkflowRunContext } from "@aikirun/workflow";
+import { isNonEmptyArray } from "@aikirun/lib/array";
+import { getChildLogger, type Logger } from "@aikirun/client";
+import type { TaskStateFailed } from "@aikirun/types/task";
 
 /**
  * Defines a durable task with deterministic execution and automatic retries.

@@ -13,7 +13,7 @@ of workflow components.
 Each step is a separate task for independent retry and monitoring:
 
 ```typescript
-import { task } from "@aiki/task";
+import { task } from "@aikirun/task";
 
 const validateOrder = task({
 	name: "validate-order",
@@ -79,7 +79,7 @@ const sendConfirmation = task({
 Orchestrate tasks in sequence:
 
 ```typescript
-import { workflow } from "@aiki/workflow";
+import { workflow } from "@aikirun/workflow";
 
 const orderWorkflow = workflow({
 	name: "order-processing",
@@ -128,8 +128,8 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 Create the client and worker:
 
 ```typescript
-import { client } from "@aiki/client";
-import { worker } from "@aiki/worker";
+import { client } from "@aikirun/client";
+import { worker } from "@aikirun/worker";
 
 const aikiClient = await client({
 	url: "localhost:9090",
@@ -179,10 +179,10 @@ console.log("Order processed:", finalResult);
 ## Complete Code
 
 ```typescript
-import { client } from "@aiki/client";
-import { task } from "@aiki/task";
-import { worker } from "@aiki/worker";
-import { workflow } from "@aiki/workflow";
+import { client } from "@aikirun/client";
+import { task } from "@aikirun/task";
+import { worker } from "@aikirun/worker";
+import { workflow } from "@aikirun/workflow";
 
 // Define tasks
 const validateOrder = task({

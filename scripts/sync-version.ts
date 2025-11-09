@@ -72,12 +72,12 @@ async function discoverPackages(): Promise<PackageInfo[]> {
 			const dependencies = new Set<string>();
 			if (denoJson.imports) {
 				for (const importValue of Object.values(denoJson.imports)) {
-					// Match patterns like: jsr:@aiki/lib@^0.1.0, jsr:@aiki/types@^0.1.0/*
-					const matches = importValue.match(/jsr:@aiki\/(\w+)@/g);
+					// Match patterns like: jsr:@aikirun/lib@^0.1.0, jsr:@aikirun/types@^0.1.0/*
+					const matches = importValue.match(/jsr:@aikirun\/(\w+)@/g);
 					if (matches) {
 						for (const match of matches) {
-							// Extract package name from: jsr:@aiki/lib@
-							const pkgName = match.replace(/jsr:@aiki\/(\w+)@/, "@aiki/$1");
+							// Extract package name from: jsr:@aikirun/lib@
+							const pkgName = match.replace(/jsr:@aikirun\/(\w+)@/, "@aikirun/$1");
 							dependencies.add(pkgName);
 						}
 					}
@@ -188,7 +188,7 @@ async function main() {
 			for (const [importKey, importValue] of Object.entries(pkg.denoJson.imports)) {
 				let updated = importValue;
 				for (const depName of pkg.dependencies) {
-					// Match: jsr:@aiki/lib@^0.1.0 or jsr:@aiki/lib@^0.1.0/*
+					// Match: jsr:@aikirun/lib@^0.1.0 or jsr:@aikirun/lib@^0.1.0/*
 					const regex = new RegExp(`(jsr:${depName.replace(/\//g, "\\/")}@)\\^[\\d.]+`);
 					if (regex.test(updated)) {
 						updated = updated.replace(regex, `$1^${highestVersion}`);

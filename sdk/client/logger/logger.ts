@@ -1,4 +1,4 @@
-import type { Logger } from "@aiki/types/client";
+import type { Logger } from "@aikirun/types/client";
 
 export function getChildLogger(
 	logger: Logger,

@@ -65,63 +65,63 @@ export PKG_VERSION="$VERSION"
 echo "Building npm packages with dnt (v${VERSION})..."
 echo ""
 
-echo "Step 1/6: Building and publishing @aiki/lib..."
+echo "Step 1/6: Building and publishing @aikirun/lib..."
 deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts lib/build.config.ts
 cd lib/npm
 npm publish
 cd ../..
-echo "✅ @aiki/lib published"
+echo "✅ @aikirun/lib published"
 echo ""
 
-echo "Step 2/6: Building and publishing @aiki/types..."
+echo "Step 2/6: Building and publishing @aikirun/types..."
 deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts types/build.config.ts
 cd types/npm
 npm publish
 cd ../..
-echo "✅ @aiki/types published"
+echo "✅ @aikirun/types published"
 echo ""
 
-echo "Step 3/6: Building and publishing @aiki/workflow..."
+echo "Step 3/6: Building and publishing @aikirun/workflow..."
 deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/workflow/build.config.ts
 cd sdk/workflow/npm
 npm publish
 cd ../../..
-echo "✅ @aiki/workflow published"
+echo "✅ @aikirun/workflow published"
 echo ""
 
-echo "Step 4/6: Building and publishing @aiki/client..."
+echo "Step 4/6: Building and publishing @aikirun/client..."
 deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/client/build.config.ts
 cd sdk/client/npm
 npm publish
 cd ../../..
-echo "✅ @aiki/client published"
+echo "✅ @aikirun/client published"
 echo ""
 
-echo "Step 5/6: Building and publishing @aiki/task..."
+echo "Step 5/6: Building and publishing @aikirun/task..."
 deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/task/build.config.ts
 cd sdk/task/npm
 npm publish
 cd ../../..
-echo "✅ @aiki/task published"
+echo "✅ @aikirun/task published"
 echo ""
 
-echo "Step 6/6: Building and publishing @aiki/worker..."
+echo "Step 6/6: Building and publishing @aikirun/worker..."
 deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/worker/build.config.ts
 cd sdk/worker/npm
 npm publish
 cd ../../..
-echo "✅ @aiki/worker published"
+echo "✅ @aikirun/worker published"
 echo ""
 
 echo "🎉 All packages built and published successfully to npm!"
 echo ""
 echo "Published packages (v${VERSION}):"
-echo "  - npm:@aiki/lib@${VERSION}"
-echo "  - npm:@aiki/types@${VERSION}"
-echo "  - npm:@aiki/workflow@${VERSION}"
-echo "  - npm:@aiki/client@${VERSION}"
-echo "  - npm:@aiki/task@${VERSION}"
-echo "  - npm:@aiki/worker@${VERSION}"
+echo "  - npm:@aikirun/lib@${VERSION}"
+echo "  - npm:@aikirun/types@${VERSION}"
+echo "  - npm:@aikirun/workflow@${VERSION}"
+echo "  - npm:@aikirun/client@${VERSION}"
+echo "  - npm:@aikirun/task@${VERSION}"
+echo "  - npm:@aikirun/worker@${VERSION}"
 echo ""
 echo "View packages on npm at: https://www.npmjs.com/org/aiki"
 echo ""
