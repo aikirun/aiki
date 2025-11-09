@@ -4,7 +4,6 @@
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"exports": {
 		"./client": "./client.ts",
-		"./serializable": "./serializable.ts",
 		"./trigger": "./trigger.ts",
 		"./workflow": "./workflow.ts",
 		"./workflow-run": "./workflow-run.ts",

@@ -1,19 +1,3 @@
-import type { SerializableError } from "@aiki/types/serializable";
-
-export function createSerializableError(error: unknown): SerializableError {
-	return error instanceof Error
-		? {
-			message: error.message,
-			name: error.name,
-			stack: error.stack,
-			cause: error.cause ? createSerializableError(error.cause) : undefined,
-		}
-		: {
-			message: String(error),
-			name: "UnknownError",
-		};
-}
-
 /**
  * Type guard to detect conflict errors from the ORPC server.
  * Handles multiple error formats for robustness:

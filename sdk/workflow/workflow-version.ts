@@ -10,10 +10,10 @@ import type { Client, Logger } from "@aiki/types/client";
 import type { WorkflowRunContext } from "./run/context.ts";
 import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
-import { createSerializableError } from "../error.ts";
 import { TaskFailedError } from "@aiki/task";
 import { WorkflowRunFailedError } from "./run/error.ts";
 import { getRetryParams, type RetryStrategy } from "@aiki/lib/retry";
+import { createSerializableError } from "@aiki/lib/error";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (
