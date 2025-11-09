@@ -54,6 +54,35 @@ wait_for_npm_package() {
 	return 1
 }
 
+# Helper function to build a package with retry logic for dependency resolution
+# Packages that depend on other packages may fail if dependencies haven't propagated yet
+build_with_retry() {
+	local package_path=$1
+	local package_name=$2
+	local version=$3
+	local max_retries=3
+	local retry=1
+
+	while [ $retry -le $max_retries ]; do
+		echo "Building $package_name (attempt $retry/$max_retries)..."
+
+		if deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts "$package_path/build.config.ts"; then
+			echo "✅ Built $package_name successfully"
+			return 0
+		fi
+
+		if [ $retry -lt $max_retries ]; then
+			echo "⚠️  Build failed, waiting 30s for dependencies to propagate..."
+			sleep 30
+		fi
+
+		retry=$((retry + 1))
+	done
+
+	echo "❌ Error: Failed to build $package_name after $max_retries attempts"
+	return 1
+}
+
 # Check 1: No uncommitted changes before syncing versions
 echo "Checking for uncommitted changes (pre-sync)..."
 if [ -n "$(git status --porcelain)" ]; then
@@ -98,7 +127,7 @@ echo "Building npm packages with dnt (v${VERSION})..."
 echo ""
 
 echo "Step 1/6: Building and publishing @aikirun/lib..."
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts lib/build.config.ts
+build_with_retry "lib" "@aikirun/lib" "${VERSION}" || exit 1
 cd lib/npm
 if npm view "@aikirun/lib@${VERSION}" > /dev/null 2>&1; then
     echo "✅ @aikirun/lib@${VERSION} already published, skipping..."
@@ -113,7 +142,7 @@ cd ../..
 echo ""
 
 echo "Step 2/6: Building and publishing @aikirun/types..."
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts types/build.config.ts
+build_with_retry "types" "@aikirun/types" "${VERSION}" || exit 1
 cd types/npm
 if npm view "@aikirun/types@${VERSION}" > /dev/null 2>&1; then
     echo "✅ @aikirun/types@${VERSION} already published, skipping..."
@@ -128,7 +157,7 @@ cd ../..
 echo ""
 
 echo "Step 3/6: Building and publishing @aikirun/workflow..."
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/workflow/build.config.ts
+build_with_retry "sdk/workflow" "@aikirun/workflow" "${VERSION}" || exit 1
 cd sdk/workflow/npm
 if npm view "@aikirun/workflow@${VERSION}" > /dev/null 2>&1; then
     echo "✅ @aikirun/workflow@${VERSION} already published, skipping..."
@@ -143,7 +172,7 @@ cd ../../..
 echo ""
 
 echo "Step 4/6: Building and publishing @aikirun/client..."
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/client/build.config.ts
+build_with_retry "sdk/client" "@aikirun/client" "${VERSION}" || exit 1
 cd sdk/client/npm
 if npm view "@aikirun/client@${VERSION}" > /dev/null 2>&1; then
     echo "✅ @aikirun/client@${VERSION} already published, skipping..."
@@ -158,7 +187,7 @@ cd ../../..
 echo ""
 
 echo "Step 5/6: Building and publishing @aikirun/task..."
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/task/build.config.ts
+build_with_retry "sdk/task" "@aikirun/task" "${VERSION}" || exit 1
 cd sdk/task/npm
 if npm view "@aikirun/task@${VERSION}" > /dev/null 2>&1; then
     echo "✅ @aikirun/task@${VERSION} already published, skipping..."
@@ -173,7 +202,7 @@ cd ../../..
 echo ""
 
 echo "Step 6/6: Building and publishing @aikirun/worker..."
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run scripts/build-npm.ts sdk/worker/build.config.ts
+build_with_retry "sdk/worker" "@aikirun/worker" "${VERSION}" || exit 1
 cd sdk/worker/npm
 if npm view "@aikirun/worker@${VERSION}" > /dev/null 2>&1; then
     echo "✅ @aikirun/worker@${VERSION} already published, skipping..."

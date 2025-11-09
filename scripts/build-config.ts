@@ -122,8 +122,10 @@ export function generateWorkspaceMappings(
 }
 
 /**
- * Fix npm package exports to support both bare and /mod.js imports
- * Transforms "./error/mod.js" exports to also support "./error" imports
+ * Fix npm package exports to support both bare and file-specific imports
+ * Handles two patterns:
+ * 1. ./error/mod.js → ./error (nested /mod.js pattern)
+ * 2. ./workflow.js → ./workflow (flat file pattern)
  */
 export async function fixPackageExports(packageDir: string): Promise<void> {
 	const packageJsonPath = `${packageDir}/npm/package.json`;
@@ -137,24 +139,36 @@ export async function fixPackageExports(packageDir: string): Promise<void> {
 		}
 
 		const newExports: Record<string, unknown> = {};
+		let addedCount = 0;
 
 		// Process each export entry
 		for (const [key, value] of Object.entries(packageJson.exports)) {
 			// Add the original entry
 			newExports[key] = value;
 
-			// If the key ends with /mod.js, also add the base path without /mod.js
+			// Pattern 1: Handle /mod.js pattern: "./error/mod.js" → "./error"
 			if (key.endsWith("/mod.js")) {
 				const basePath = key.slice(0, -"/mod.js".length);
-				// Only add if it doesn't already exist
-				if (!(basePath in packageJson.exports)) {
+				if (!(basePath in newExports)) {
 					newExports[basePath] = value;
+					addedCount++;
+				}
+			}
+			// Pattern 2: Handle bare .js pattern: "./workflow.js" → "./workflow"
+			// Only for top-level files (no "/" after the initial "./")
+			else if (key.endsWith(".js") && !key.includes("/", 2)) {
+				const basePath = key.slice(0, -".js".length);
+				// Avoid creating duplicate root exports
+				if (basePath !== "." && !(basePath in newExports)) {
+					newExports[basePath] = value;
+					addedCount++;
 				}
 			}
 		}
 
 		packageJson.exports = newExports;
 		await Deno.writeTextFile(packageJsonPath, JSON.stringify(packageJson, null, "\t"));
+		console.log(`✓ Fixed package exports: added ${addedCount} bare import paths`);
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		console.warn(`Warning: Could not fix package exports: ${errorMessage}`);
