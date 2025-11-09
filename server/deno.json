@@ -1,18 +1,18 @@
 {
 	"name": "@aikirun/server",
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"exports": {
 		".": "./mod.ts"
 	},
 	"imports": {
-		"@aikirun/types": "jsr:@aikirun/types@^0.1.5",
-		"@aikirun/types/*": "jsr:@aikirun/types@^0.1.5/*",
-		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.5/*",
+		"@aikirun/types": "jsr:@aikirun/types@^0.1.6",
+		"@aikirun/types/*": "jsr:@aikirun/types@^0.1.6/*",
+		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.6/*",
 		"@std/dotenv": "jsr:@std/dotenv@^0.225",
 		"@orpc/server": "npm:@orpc/server@^1.9.3",
 		"@orpc/server/*": "npm:@orpc/server@^1.9.3/*",
 		"@orpc/contract": "npm:@orpc/contract@^1.9.3",
-		"ioredis": "npm:ioredis@^5.3.0",
+		"ioredis": "npm:ioredis@^5.4.1",
 		"zod": "npm:zod@^4.1.12"
 	},
 	"license": "Apache-2.0"

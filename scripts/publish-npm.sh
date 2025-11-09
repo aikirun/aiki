@@ -22,32 +22,39 @@ fi
 echo "✅ jq is installed"
 echo ""
 
-# Helper function to wait for npm package propagation
-# Waits up to 1 minute (12 attempts × 5 seconds) for a package to be available on npm
+# Helper function to wait for npm package propagation with exponential backoff
+# Waits up to ~60 seconds for a package to be available on npm
+# Uses exponential backoff: 1, 2, 4, 8, 16, 32 seconds (much faster than constant 5-second intervals)
 wait_for_npm_package() {
 	local package_name=$1
 	local version=$2
-	local max_attempts=12
+	local max_attempts=10
 	local attempt=1
-	local poll_interval=5
+	local poll_interval=1
 
 	echo "Waiting for $package_name@$version to propagate to npm registry..."
 
 	while [ $attempt -le $max_attempts ]; do
 		if npm view "$package_name@$version" > /dev/null 2>&1; then
-			echo "✅ $package_name@$version is now available on npm"
+			echo "✅ $package_name@$version is now available on npm (attempt $attempt)"
 			return 0
 		fi
 
 		if [ $attempt -lt $max_attempts ]; then
 			echo "  (attempt $attempt/$max_attempts) Waiting ${poll_interval}s before checking again..."
 			sleep $poll_interval
+
+			# Exponential backoff: 1, 2, 4, 8, 16, 32... capped at 30 seconds
+			poll_interval=$((poll_interval * 2))
+			if [ $poll_interval -gt 30 ]; then
+				poll_interval=30
+			fi
 		fi
 
 		attempt=$((attempt + 1))
 	done
 
-	echo "❌ Error: $package_name@$version did not propagate within 1 minute (60 seconds)"
+	echo "❌ Error: $package_name@$version did not propagate within timeout"
 	echo ""
 	echo "This can happen if npm is experiencing delays or high load."
 	echo "Try running the publish script again after waiting a few minutes."
@@ -81,6 +88,31 @@ build_with_retry() {
 
 	echo "❌ Error: Failed to build $package_name after $max_retries attempts"
 	return 1
+}
+
+# Helper function to build and publish a package
+publish_package() {
+	local path=$1
+	local name=$2
+	local version=$3
+	local step=$4
+	local total=$5
+
+	echo "Step ${step}/${total}: Building and publishing ${name}..."
+	build_with_retry "${path}" "${name}" "${version}" || exit 1
+
+	cd "${path}/npm"
+	if npm view "${name}@${version}" > /dev/null 2>&1; then
+		echo "✅ ${name}@${version} already published, skipping..."
+	else
+		npm publish
+		echo "✅ ${name} published"
+		cd ../../
+		wait_for_npm_package "${name}" "${version}" || exit 1
+		cd "${path}/npm"
+	fi
+	cd ../../
+	echo ""
 }
 
 # Check 1: No uncommitted changes before syncing versions
@@ -119,101 +151,46 @@ fi
 echo "✅ All versions synced and committed"
 echo ""
 
+# Check 3: Validate version source file exists
+if [ ! -f "lib/deno.json" ]; then
+    echo "❌ Error: lib/deno.json not found"
+    echo ""
+    echo "This script must be run from the root of the Aiki repository."
+    exit 1
+fi
+
 # Get version for use in dnt builds
-VERSION=$(jq -r '.version' lib/deno.json)
+VERSION=$(jq -r '.version' lib/deno.json 2>/dev/null)
+
+# Check 4: Validate version extraction succeeded
+if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+    echo "❌ Error: Could not read version from lib/deno.json"
+    echo ""
+    echo "Please ensure lib/deno.json has a 'version' field:"
+    echo '  "version": "0.1.6"'
+    exit 1
+fi
+
+# Check 5: Validate version format (X.Y.Z)
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "❌ Error: Invalid version format: $VERSION"
+    echo ""
+    echo "Version must be in format X.Y.Z (e.g., 0.1.6)"
+    exit 1
+fi
+
 export PKG_VERSION="$VERSION"
 
 echo "Building npm packages with dnt (v${VERSION})..."
 echo ""
 
-echo "Step 1/6: Building and publishing @aikirun/lib..."
-build_with_retry "lib" "@aikirun/lib" "${VERSION}" || exit 1
-cd lib/npm
-if npm view "@aikirun/lib@${VERSION}" > /dev/null 2>&1; then
-    echo "✅ @aikirun/lib@${VERSION} already published, skipping..."
-else
-    npm publish
-    echo "✅ @aikirun/lib published"
-    cd ../..
-    wait_for_npm_package "@aikirun/lib" "${VERSION}" || exit 1
-    cd lib/npm
-fi
-cd ../..
-echo ""
-
-echo "Step 2/6: Building and publishing @aikirun/types..."
-build_with_retry "types" "@aikirun/types" "${VERSION}" || exit 1
-cd types/npm
-if npm view "@aikirun/types@${VERSION}" > /dev/null 2>&1; then
-    echo "✅ @aikirun/types@${VERSION} already published, skipping..."
-else
-    npm publish
-    echo "✅ @aikirun/types published"
-    cd ../..
-    wait_for_npm_package "@aikirun/types" "${VERSION}" || exit 1
-    cd types/npm
-fi
-cd ../..
-echo ""
-
-echo "Step 3/6: Building and publishing @aikirun/workflow..."
-build_with_retry "sdk/workflow" "@aikirun/workflow" "${VERSION}" || exit 1
-cd sdk/workflow/npm
-if npm view "@aikirun/workflow@${VERSION}" > /dev/null 2>&1; then
-    echo "✅ @aikirun/workflow@${VERSION} already published, skipping..."
-else
-    npm publish
-    echo "✅ @aikirun/workflow published"
-    cd ../../..
-    wait_for_npm_package "@aikirun/workflow" "${VERSION}" || exit 1
-    cd sdk/workflow/npm
-fi
-cd ../../..
-echo ""
-
-echo "Step 4/6: Building and publishing @aikirun/client..."
-build_with_retry "sdk/client" "@aikirun/client" "${VERSION}" || exit 1
-cd sdk/client/npm
-if npm view "@aikirun/client@${VERSION}" > /dev/null 2>&1; then
-    echo "✅ @aikirun/client@${VERSION} already published, skipping..."
-else
-    npm publish
-    echo "✅ @aikirun/client published"
-    cd ../../..
-    wait_for_npm_package "@aikirun/client" "${VERSION}" || exit 1
-    cd sdk/client/npm
-fi
-cd ../../..
-echo ""
-
-echo "Step 5/6: Building and publishing @aikirun/task..."
-build_with_retry "sdk/task" "@aikirun/task" "${VERSION}" || exit 1
-cd sdk/task/npm
-if npm view "@aikirun/task@${VERSION}" > /dev/null 2>&1; then
-    echo "✅ @aikirun/task@${VERSION} already published, skipping..."
-else
-    npm publish
-    echo "✅ @aikirun/task published"
-    cd ../../..
-    wait_for_npm_package "@aikirun/task" "${VERSION}" || exit 1
-    cd sdk/task/npm
-fi
-cd ../../..
-echo ""
-
-echo "Step 6/6: Building and publishing @aikirun/worker..."
-build_with_retry "sdk/worker" "@aikirun/worker" "${VERSION}" || exit 1
-cd sdk/worker/npm
-if npm view "@aikirun/worker@${VERSION}" > /dev/null 2>&1; then
-    echo "✅ @aikirun/worker@${VERSION} already published, skipping..."
-else
-    npm publish
-    echo "✅ @aikirun/worker published"
-    cd ../../..
-    wait_for_npm_package "@aikirun/worker" "${VERSION}" || exit 1
-    cd sdk/worker/npm
-fi
-cd ../../..
+# Publish packages in dependency order
+publish_package "lib" "@aikirun/lib" "${VERSION}" "1" "6"
+publish_package "types" "@aikirun/types" "${VERSION}" "2" "6"
+publish_package "sdk/workflow" "@aikirun/workflow" "${VERSION}" "3" "6"
+publish_package "sdk/client" "@aikirun/client" "${VERSION}" "4" "6"
+publish_package "sdk/task" "@aikirun/task" "${VERSION}" "5" "6"
+publish_package "sdk/worker" "@aikirun/worker" "${VERSION}" "6" "6"
 echo ""
 
 echo "🎉 All packages built and published successfully to npm!"

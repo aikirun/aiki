@@ -181,9 +181,10 @@ export async function fixPackageExports(packageDir: string): Promise<void> {
 
 		// Add export for main entry point if it's not already there
 		// e.g., if root export points to client.js, also export ./client
-		if (mainFileName && !(`./` + mainFileName in newExports)) {
+		const mainKey = `./${mainFileName}`;
+		if (mainFileName && !(mainKey in newExports)) {
 			const mainExportValue = newExports["."];
-			newExports["./" + mainFileName] = mainExportValue;
+			newExports[mainKey] = mainExportValue;
 			addedCount++;
 		}
 

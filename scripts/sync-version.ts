@@ -54,17 +54,38 @@ async function writeDenoJson(path: string, data: DenoJson): Promise<void> {
 async function discoverPackages(): Promise<PackageInfo[]> {
 	const packages: PackageInfo[] = [];
 
-	// Find all deno.json files (lib, types, sdk/*)
-	const possiblePaths = [
+	// Dynamically discover packages from root deno.json workspace config
+	let workspacePaths: string[] = [
 		"lib/deno.json",
 		"types/deno.json",
 		"sdk/client/deno.json",
 		"sdk/worker/deno.json",
 		"sdk/task/deno.json",
 		"sdk/workflow/deno.json",
+		"server/deno.json",
 	];
 
-	for (const path of possiblePaths) {
+	try {
+		const rootDenoJson = await readDenoJson("./deno.json");
+		const workspace = (rootDenoJson as Record<string, unknown>).workspace;
+		if (Array.isArray(workspace) && workspace.length > 0) {
+			workspacePaths = workspace
+				.map((dir) => {
+					const dirStr = String(dir);
+					return dirStr.replace(/^\.\//, "") + "/deno.json";
+				});
+			console.log(`Discovered ${workspacePaths.length} packages from root deno.json workspace config`);
+		}
+	} catch (error) {
+		// If we can't read root deno.json, use hardcoded fallback
+		if (error instanceof Deno.errors.NotFound) {
+			console.warn("Warning: Could not read workspace from root deno.json, using hardcoded paths");
+		} else {
+			throw error;
+		}
+	}
+
+	for (const path of workspacePaths) {
 		try {
 			const denoJson = await readDenoJson(path);
 

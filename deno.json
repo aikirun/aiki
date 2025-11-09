@@ -15,10 +15,6 @@
 		"post-publish": "bash scripts/post-publish.sh",
 		"release": "deno task publish-jsr && deno task publish-npm && deno task post-publish"
 	},
-	"imports": {
-		"@std/assert": "jsr:@std/assert@^1.0.13",
-		"@std/async": "jsr:@std/async@^1.0.12"
-	},
 	"fmt": {
 		"useTabs": true,
 		"lineWidth": 120,
