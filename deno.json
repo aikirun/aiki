@@ -11,7 +11,8 @@
 		"example": "sh -c 'deno run --allow-net --allow-read --allow-env examples/$0.ts'",
 		"sync-version": "deno run --allow-read --allow-write scripts/sync-version.ts",
 		"publish-jsr": "bash scripts/publish-jsr.sh",
-		"post-publish": "bash scripts/post-publish.sh"
+		"post-publish": "bash scripts/post-publish.sh",
+		"release": "deno task publish-jsr && deno task post-publish"
 	},
 	"imports": {
 		"@std/assert": "jsr:@std/assert@^1.0.13",
