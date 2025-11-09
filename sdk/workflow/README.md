@@ -165,7 +165,7 @@ const aikiWorker = worker(aikiClient, {
 	maxConcurrentWorkflowRuns: 10,
 });
 
-aikiWorker.workflowRegistry.add(onboardingWorkflow);
+aikiWorker.registry.add(onboardingWorkflow);
 await aikiWorker.start();
 ```
 

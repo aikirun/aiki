@@ -83,7 +83,7 @@ gracefulShutdownTimeoutMs: 5000; // 5 seconds
 Workers maintain a registry of workflows they can execute:
 
 ```typescript
-aikiWorker.workflowRegistry
+aikiWorker.registry
 	.add(orderWorkflow)
 	.add(userWorkflow)
 	.add(notificationWorkflow);
@@ -127,7 +127,7 @@ const worker1 = await worker(client, {
 	maxConcurrentWorkflowRuns: 5,
 	subscriber: { type: "redis_streams" },
 });
-worker1.workflowRegistry.add(orderWorkflow);
+worker1.registry.add(orderWorkflow);
 
 // Worker 2
 const worker2 = await worker(client, {
@@ -135,7 +135,7 @@ const worker2 = await worker(client, {
 	maxConcurrentWorkflowRuns: 5,
 	subscriber: { type: "redis_streams" },
 });
-worker2.workflowRegistry.add(orderWorkflow);
+worker2.registry.add(orderWorkflow);
 
 // Both workers process the same workflows
 await Promise.all([
@@ -154,14 +154,14 @@ const paymentWorker = await worker(client, {
 	id: "payment-worker",
 	subscriber: { type: "redis_streams" },
 });
-paymentWorker.workflowRegistry.add(paymentWorkflow);
+paymentWorker.registry.add(paymentWorkflow);
 
 // Email worker - handles email workflows
 const emailWorker = await worker(client, {
 	id: "email-worker",
 	subscriber: { type: "redis_streams" },
 });
-emailWorker.workflowRegistry.add(emailWorkflow);
+emailWorker.registry.add(emailWorkflow);
 
 await Promise.all([
 	paymentWorker.start(),
@@ -217,7 +217,7 @@ const aikiWorker = await worker(aikiClient, {
 });
 
 // Register workflows
-aikiWorker.workflowRegistry
+aikiWorker.registry
 	.add(orderWorkflow)
 	.add(userWorkflow);
 

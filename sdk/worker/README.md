@@ -32,7 +32,7 @@ const aikiWorker = worker(aikiClient, {
 });
 
 // Register workflows
-aikiWorker.workflowRegistry.add(onboardingWorkflow);
+aikiWorker.registry.add(onboardingWorkflow);
 
 // Start worker
 await aikiWorker.start();
@@ -83,7 +83,7 @@ interface WorkerParams {
 Workers execute workflows registered in their registry:
 
 ```typescript
-aikiWorker.workflowRegistry
+aikiWorker.registry
 	.add(workflowV1)
 	.add(workflowV2)
 	.add(anotherWorkflow);

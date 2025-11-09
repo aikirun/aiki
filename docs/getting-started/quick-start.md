@@ -84,7 +84,7 @@ const aikiWorker = await worker(aikiClient, {
 });
 
 // Register workflows
-aikiWorker.workflowRegistry.add(onboardingWorkflow);
+aikiWorker.registry.add(onboardingWorkflow);
 
 // Start processing
 await aikiWorker.start();
@@ -147,7 +147,7 @@ const aikiWorker = await worker(aikiClient, {
 	subscriber: { type: "redis_streams" },
 });
 
-aikiWorker.workflowRegistry.add(onboardingWorkflow);
+aikiWorker.registry.add(onboardingWorkflow);
 await aikiWorker.start();
 
 // 4. Execute workflow

@@ -39,7 +39,7 @@ sequence, tracking progress and state, reporting results to the server, and hand
 Maintains available workflows:
 
 ```typescript
-worker.workflowRegistry.add(workflow1).add(workflow2);
+worker.registry.add(workflow1).add(workflow2);
 ```
 
 Only workflows in the registry can be executed by this worker.
@@ -172,11 +172,11 @@ Dedicate workers to specific workflows:
 ```typescript
 // Payment worker
 const paymentWorker = await worker(client, { id: "payment-worker" });
-paymentWorker.workflowRegistry.add(paymentWorkflow);
+paymentWorker.registry.add(paymentWorkflow);
 
 // Email worker
 const emailWorker = await worker(client, { id: "email-worker" });
-emailWorker.workflowRegistry.add(emailWorkflow);
+emailWorker.registry.add(emailWorkflow);
 ```
 
 ### Geographic Distribution
