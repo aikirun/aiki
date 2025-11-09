@@ -1,6 +1,6 @@
 # Aiki (This is still work in progress)
 
-**A durable workflow engine that runs in your infrastructure.**
+**A durable execution engine that runs in your infrastructure.**
 
 Build reliable, long-running business processes that survive failures, restarts, and infrastructure changes. Aiki separates workflow orchestration from execution, giving you durability without giving up control.
 

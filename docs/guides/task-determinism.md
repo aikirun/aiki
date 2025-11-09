@@ -1,6 +1,6 @@
 # Task Determinism
 
-When I first started working with durable workflows, I was puzzled by the emphasis on task determinism. Why does it
+When I first started working with durable execution, I was puzzled by the emphasis on task determinism. Why does it
 matter if a task produces the same result every time? After all, isn't the whole point of workflows to handle dynamic,
 real-world scenarios?
 
@@ -36,7 +36,7 @@ const result = await calculateTax.start(run, {
 
 ### 1. Best Effort Once Execution
 
-This is the most important reason. Tasks in durable workflows are executed with **best effort once** semantics, not
+This is the most important reason. Tasks in durable executions are executed with **best effort once** semantics, not
 exactly once. This means:
 
 - Tasks may be executed multiple times due to retries, restarts, or network issues
