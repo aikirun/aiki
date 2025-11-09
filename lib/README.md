@@ -1,6 +1,6 @@
 # @aiki/lib
 
-Foundation utilities library for Aiki - a durable execution engine for TypeScript.
+Foundation utilities library for Aiki - a durable execution engine.
 
 ## Installation
 
