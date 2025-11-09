@@ -107,11 +107,12 @@ publish_package() {
 	else
 		npm publish
 		echo "✅ ${name} published"
-		cd ../../
+		cd "$(git rev-parse --show-toplevel)"
 		wait_for_npm_package "${name}" "${version}" || exit 1
 		cd "${path}/npm"
 	fi
-	cd ../../
+
+	cd "$(git rev-parse --show-toplevel)"
 	echo ""
 }
 
