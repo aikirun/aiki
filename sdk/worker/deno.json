@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/worker",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"description": "Worker SDK for Aiki - execute workflows and tasks with durable state management and automatic recovery",
 	"exports": "./mod.ts",
 	"imports": {

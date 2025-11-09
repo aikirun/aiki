@@ -153,8 +153,7 @@ export async function fixPackageExports(packageDir: string): Promise<void> {
 					newExports[basePath] = value;
 					addedCount++;
 				}
-			}
-			// Pattern 2: Handle bare .js pattern: "./workflow.js" → "./workflow"
+			} // Pattern 2: Handle bare .js pattern: "./workflow.js" → "./workflow"
 			// Only for top-level files (no "/" after the initial "./")
 			else if (key.endsWith(".js") && !key.includes("/", 2)) {
 				const basePath = key.slice(0, -".js".length);
