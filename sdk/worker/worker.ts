@@ -319,7 +319,9 @@ class WorkerImpl<AppContext> implements Worker {
 
 		logger.info("Executing workflow");
 
-		let heartbeatInterval: number | undefined;
+		// Using any cos setInterval returns different types on Deno and Node
+		// deno-lint-ignore no-explicit-any
+		let heartbeatInterval: any | undefined;
 		let shouldAcknowledge = false;
 
 		try {
