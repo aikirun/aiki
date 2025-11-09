@@ -141,6 +141,20 @@ export async function fixPackageExports(packageDir: string): Promise<void> {
 		const newExports: Record<string, unknown> = {};
 		let addedCount = 0;
 
+		// If there's a root export (.), extract the filename to create a matching subpath export
+		const rootExport = packageJson.exports["."];
+		let mainFileName: string | null = null;
+		if (rootExport && typeof rootExport === "object") {
+			const importValue = (rootExport as Record<string, unknown>)["import"];
+			if (typeof importValue === "string") {
+				// Extract filename from path like "./esm/client.js"
+				const match = importValue.match(/\/([^/]+)\.js$/);
+				if (match && match[1]) {
+					mainFileName = match[1]; // e.g., "client"
+				}
+			}
+		}
+
 		// Process each export entry
 		for (const [key, value] of Object.entries(packageJson.exports)) {
 			// Add the original entry
@@ -163,6 +177,14 @@ export async function fixPackageExports(packageDir: string): Promise<void> {
 					addedCount++;
 				}
 			}
+		}
+
+		// Add export for main entry point if it's not already there
+		// e.g., if root export points to client.js, also export ./client
+		if (mainFileName && !(`./` + mainFileName in newExports)) {
+			const mainExportValue = newExports["."];
+			newExports["./" + mainFileName] = mainExportValue;
+			addedCount++;
 		}
 
 		packageJson.exports = newExports;
