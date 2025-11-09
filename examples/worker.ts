@@ -4,7 +4,7 @@ import { eveningRoutineWorkflow, morningWorkflow } from "./workflows.ts";
 import { processWrapper } from "@aikirun/lib/process";
 
 if (import.meta.main) {
-	const aikiClient = await client({
+	const aiki = await client({
 		url: "http://localhost:9090",
 		redis: {
 			host: "localhost",
@@ -12,12 +12,12 @@ if (import.meta.main) {
 		},
 	});
 
-	const workerA = worker(aikiClient, {
+	const workerA = worker(aiki, {
 		id: "worker-A",
 		subscriber: { type: "redis_streams" },
 	});
 
-	const workerB = worker(aikiClient, {
+	const workerB = worker(aiki, {
 		id: "worker-B",
 		subscriber: { type: "redis_streams" },
 	});
@@ -32,7 +32,7 @@ if (import.meta.main) {
 	const shutdown = async () => {
 		await workerA.stop();
 		await workerB.stop();
-		await aikiClient.close();
+		await aiki.close();
 		processWrapper.exit(0);
 	};
 

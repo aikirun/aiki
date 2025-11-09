@@ -15,7 +15,7 @@ deno add jsr:@aikirun/client @aikirun/workflow @aikirun/task
 ```typescript
 import { client } from "@aikirun/client";
 
-const aikiClient = await client({
+const aiki = await client({
 	url: "http://localhost:9090",
 	redis: {
 		host: "localhost",
@@ -29,7 +29,7 @@ const aikiClient = await client({
 ```typescript
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
-const stateHandle = await onboardingWorkflowV1.start(aikiClient, {
+const stateHandle = await onboardingWorkflowV1.start(aiki, {
 	email: "user@example.com",
 });
 ```
@@ -89,7 +89,7 @@ interface ClientParams<AppContext> {
 ### Context Factory Example
 
 ```typescript
-const aikiClient = await client({
+const aiki = await client({
 	url: "http://localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 	contextFactory: (run) => ({

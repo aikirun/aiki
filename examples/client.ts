@@ -2,7 +2,7 @@ import { client } from "@aikirun/client";
 import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows.ts";
 
 if (import.meta.main) {
-	const aikiClient = await client({
+	const aiki = await client({
 		url: "http://localhost:9090",
 		redis: {
 			host: "localhost",
@@ -14,13 +14,13 @@ if (import.meta.main) {
 		}),
 	});
 
-	const logger = aikiClient.logger;
+	const logger = aiki.logger;
 
-	await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
+	await morningWorkflowV2.start(aiki, { a: "1", b: 1 });
 
 	const stateHandle = await eveningRoutineWorkflowV1
 		.withOptions({ idempotencyKey: "some-key" })
-		.start(aikiClient);
+		.start(aiki);
 
 	const result = await stateHandle.wait(
 		{ type: "status", status: "completed" },
@@ -32,5 +32,5 @@ if (import.meta.main) {
 		logger.info("Could not get desired state", { cause: result.cause });
 	}
 
-	await aikiClient.close();
+	await aiki.close();
 }

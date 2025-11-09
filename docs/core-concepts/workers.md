@@ -200,13 +200,13 @@ import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 
 // Create client
-const aikiClient = await client({
+const aiki = await client({
 	url: "localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
 
 // Create worker
-const aikiWorker = await worker(aikiClient, {
+const aikiWorker = await worker(aiki, {
 	id: `worker-${process.env.WORKER_ID || 1}`,
 	maxConcurrentWorkflowRuns: 10,
 	subscriber: {
@@ -225,7 +225,7 @@ aikiWorker.registry
 process.on("SIGTERM", async () => {
 	console.log("Shutting down worker...");
 	await aikiWorker.stop();
-	await aikiClient.close();
+	await aiki.close();
 	process.exit(0);
 });
 

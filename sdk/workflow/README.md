@@ -134,12 +134,12 @@ With the client:
 import { client } from "@aikirun/client";
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
-const aikiClient = await client({
+const aiki = await client({
 	url: "http://localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
 
-const stateHandle = await onboardingWorkflowV1.start(aikiClient, {
+const stateHandle = await onboardingWorkflowV1.start(aiki, {
 	email: "user@example.com",
 });
 
@@ -161,7 +161,7 @@ With a worker:
 ```typescript
 import { worker } from "@aikirun/worker";
 
-const aikiWorker = worker(aikiClient, {
+const aikiWorker = worker(aiki, {
 	maxConcurrentWorkflowRuns: 10,
 });
 

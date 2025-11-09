@@ -68,7 +68,7 @@ The client communicates with the Aiki server:
 ```typescript
 import { client } from "@aikirun/client";
 
-const aikiClient = await client({
+const aiki = await client({
 	url: "localhost:9090",
 	redis: {
 		host: "localhost",
@@ -84,7 +84,7 @@ Workers execute workflows in your infrastructure:
 ```typescript
 import { worker } from "@aikirun/worker";
 
-const aikiWorker = await worker(aikiClient, {
+const aikiWorker = await worker(aiki, {
 	id: "worker-1",
 	maxConcurrentWorkflowRuns: 5,
 	subscriber: {
@@ -105,7 +105,7 @@ await aikiWorker.start();
 Execute your workflow:
 
 ```typescript
-const result = await onboardingV1.start(aikiClient, {
+const result = await onboardingV1.start(aiki, {
 	email: "user@example.com",
 	name: "Alice",
 });
@@ -147,12 +147,12 @@ const onboardingV1 = onboardingWorkflow.v("1.0.0", {
 });
 
 // 3. Set up client and worker
-const aikiClient = await client({
+const aiki = await client({
 	url: "localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
 
-const aikiWorker = await worker(aikiClient, {
+const aikiWorker = await worker(aiki, {
 	id: "worker-1",
 	subscriber: { type: "redis_streams" },
 });
@@ -161,7 +161,7 @@ aikiWorker.registry.add(onboardingWorkflow);
 await aikiWorker.start();
 
 // 4. Execute workflow
-const result = await onboardingV1.start(aikiClient, {
+const result = await onboardingV1.start(aiki, {
 	email: "user@example.com",
 	name: "Alice",
 });

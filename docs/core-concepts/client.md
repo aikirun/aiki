@@ -7,7 +7,7 @@ The Aiki client provides the interface for starting workflows, monitoring execut
 ```typescript
 import { client } from "@aikirun/client";
 
-const aikiClient = await client({
+const aiki = await client({
 	url: "localhost:9090",
 	redis: {
 		host: "localhost",
@@ -48,7 +48,7 @@ redis: {
 Use the workflow version's `.start()` method:
 
 ```typescript
-const resultHandle = await workflowVersion.start(aikiClient, {
+const resultHandle = await workflowVersion.start(aiki, {
 	payload: {
 		userId: "123",
 		email: "user@example.com",
@@ -98,13 +98,13 @@ Prevent duplicate workflow executions using idempotency keys:
 
 ```typescript
 // First call - starts the workflow
-const result1 = await workflowVersion.start(aikiClient, {
+const result1 = await workflowVersion.start(aiki, {
 	payload: { orderId: "order-123" },
 	idempotencyKey: "order-123-process",
 });
 
 // Second call with same key - returns existing workflow run
-const result2 = await workflowVersion.start(aikiClient, {
+const result2 = await workflowVersion.start(aiki, {
 	payload: { orderId: "order-123" },
 	idempotencyKey: "order-123-process",
 });
@@ -117,7 +117,7 @@ const result2 = await workflowVersion.start(aikiClient, {
 Always close the client when done to release resources:
 
 ```typescript
-await aikiClient.close();
+await aiki.close();
 ```
 
 This closes the Redis connection and cleans up resources.
@@ -148,7 +148,7 @@ const onboardingV1 = onboardingWorkflow.v("1.0.0", {
 });
 
 // Create client
-const aikiClient = await client({
+const aiki = await client({
 	url: "localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
@@ -156,7 +156,7 @@ const aikiClient = await client({
 // Start workflow
 const result = await onboardingV1
 	.withOptions({ idempotencyKey: "user-onboarding-123" })
-	.start(aikiClient, { email: "user@example.com" });
+	.start(aiki, { email: "user@example.com" });
 
 // Monitor progress
 console.log("Workflow started:", result.id);
@@ -169,7 +169,7 @@ const finalResult = await result.waitForCompletion();
 console.log("Completed:", finalResult);
 
 // Clean up
-await aikiClient.close();
+await aiki.close();
 ```
 
 ## Error Handling
@@ -178,7 +178,7 @@ Handle errors when starting workflows:
 
 ```typescript
 try {
-	const result = await workflowVersion.start(aikiClient, {
+	const result = await workflowVersion.start(aiki, {
 		payload: { userId: "123" },
 	});
 
@@ -201,8 +201,8 @@ The client provides direct API access for advanced use cases:
 
 ```typescript
 // Low-level API access
-const workflows = await aikiClient.api.listWorkflows();
-const workflowRun = await aikiClient.api.getWorkflowRun(runId);
+const workflows = await aiki.api.listWorkflows();
+const workflowRun = await aiki.api.getWorkflowRun(runId);
 ```
 
 See the [Client API Reference](../api/client.md) for complete API documentation.

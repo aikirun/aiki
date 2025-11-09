@@ -64,7 +64,7 @@ Create a simple test file to verify your setup:
 ```typescript
 import { client } from "@aikirun/client";
 
-const aikiClient = await client({
+const aiki = await client({
 	url: "localhost:9090",
 	redis: {
 		host: "localhost",
@@ -74,7 +74,7 @@ const aikiClient = await client({
 
 console.log("✅ Aiki client connected successfully!");
 
-await aikiClient.close();
+await aiki.close();
 ```
 
 Run it:

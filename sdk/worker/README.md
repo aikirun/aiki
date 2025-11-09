@@ -19,13 +19,13 @@ import { client } from "@aikirun/client";
 import { onboardingWorkflow } from "./workflows.ts";
 
 // Initialize client
-const aikiClient = await client({
+const aiki = await client({
 	url: "http://localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
 
 // Create worker
-const aikiWorker = worker(aikiClient, {
+const aikiWorker = worker(aiki, {
 	id: "worker-1",
 	maxConcurrentWorkflowRuns: 10,
 	subscriber: { type: "redis_streams" },
@@ -46,7 +46,7 @@ import { processWrapper } from "@aikirun/lib/process";
 // Handle signals
 const shutdown = async () => {
 	await aikiWorker.stop();
-	await aikiClient.close();
+	await aiki.close();
 	processWrapper.exit(0);
 };
 

@@ -39,7 +39,7 @@ import { TaskFailedError } from "@aikirun/types/task";
  *
  * @example
  * ```typescript
- * const worker = worker(aikiClient, {
+ * const worker = worker(aiki, {
  *   id: "worker-1",
  *   maxConcurrentWorkflowRuns: 10,
  *   subscriber: { type: "redis_streams" },
@@ -56,7 +56,7 @@ import { TaskFailedError } from "@aikirun/types/task";
  * // Handle graceful shutdown
  * const shutdown = async () => {
  *   await worker.stop();
- *   await aikiClient.close();
+ *   await aiki.close();
  * };
  * processWrapper.addSignalListener("SIGINT", shutdown);
  * ```
