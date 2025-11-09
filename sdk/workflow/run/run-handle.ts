@@ -1,7 +1,11 @@
-import type { WorkflowRun, WorkflowRunId, WorkflowRunState } from "@aiki/types/workflow-run";
+import {
+	type WorkflowRun,
+	type WorkflowRunId,
+	WorkflowRunNotExecutableError,
+	type WorkflowRunState,
+} from "@aiki/types/workflow-run";
 import type { ApiClient, Logger } from "@aiki/types/client";
 import type { TaskState } from "@aiki/types/task";
-import { WorkflowRunNotExecutableError } from "./error.ts";
 
 export function initWorkflowRunHandle<Input, Output>(
 	api: ApiClient,

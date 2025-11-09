@@ -1,16 +1,16 @@
 import type { WorkflowName, WorkflowVersionId } from "@aiki/types/workflow";
-import type {
-	WorkflowOptions,
-	WorkflowRun,
-	WorkflowRunId,
-	WorkflowRunStateAwaitingRetry,
-	WorkflowRunStateFailed,
+import {
+	type WorkflowOptions,
+	type WorkflowRun,
+	WorkflowRunFailedError,
+	type WorkflowRunId,
+	type WorkflowRunStateAwaitingRetry,
+	type WorkflowRunStateFailed,
 } from "@aiki/types/workflow-run";
 import type { Client, Logger } from "@aiki/types/client";
 import type { WorkflowRunContext } from "./run/context.ts";
 import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle.ts";
 import { isNonEmptyArray } from "@aiki/lib/array";
-import { WorkflowRunFailedError } from "./run/error.ts";
 import { getRetryParams, type RetryStrategy } from "@aiki/lib/retry";
 import { createSerializableError } from "@aiki/lib/error";
 import { TaskFailedError } from "@aiki/types/task";
