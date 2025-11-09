@@ -9,6 +9,6 @@ deno.lock
 
 server/.env
 
-ideas.md
-retry-plan.md
+IDEAS.md
+RETRY-PLAN.md
 TODO.md
