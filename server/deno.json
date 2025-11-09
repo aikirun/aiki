@@ -1,13 +1,13 @@
 {
 	"name": "@aikirun/server",
-	"version": "0.1.0",
+	"version": "0.1.5",
 	"exports": {
 		".": "./mod.ts"
 	},
 	"imports": {
-		"@aikirun/types": "jsr:@aikirun/types@^0.1.0",
-		"@aikirun/types/*": "jsr:@aikirun/types@^0.1.0/*",
-		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.0/*",
+		"@aikirun/types": "jsr:@aikirun/types",
+		"@aikirun/types/*": "jsr:@aikirun/types/*",
+		"@aikirun/lib/*": "jsr:@aikirun/lib/*",
 		"@std/dotenv": "jsr:@std/dotenv@^0.225",
 		"@orpc/server": "npm:@orpc/server@^1.9.3",
 		"@orpc/server/*": "npm:@orpc/server@^1.9.3/*",

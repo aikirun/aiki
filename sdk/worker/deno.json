@@ -4,10 +4,10 @@
 	"description": "Worker SDK for Aiki - execute workflows and tasks with durable state management and automatic recovery",
 	"exports": "./mod.ts",
 	"imports": {
-		"@aikirun/client": "jsr:@aikirun/client",
-		"@aikirun/workflow": "jsr:@aikirun/workflow",
+		"@aikirun/lib/*": "jsr:@aikirun/lib/*",
 		"@aikirun/types/*": "jsr:@aikirun/types/*",
-		"@aikirun/lib/*": "jsr:@aikirun/lib/*"
+		"@aikirun/client": "jsr:@aikirun/client",
+		"@aikirun/workflow": "jsr:@aikirun/workflow"
 	},
 	"license": "Apache-2.0"
 }
