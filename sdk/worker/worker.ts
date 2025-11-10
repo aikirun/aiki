@@ -381,7 +381,6 @@ class WorkerImpl<AppContext> implements Worker {
 				if (shouldAcknowledge) {
 					try {
 						await this.subscriberStrategy.acknowledge(workflowRun.id as WorkflowRunId, meta);
-						logger.info("Message acknowledged");
 					} catch (error) {
 						logger.error("Failed to acknowledge message, it may be reprocessed", {
 							"aiki.errorType": "MESSAGE_ACK_FAILED",

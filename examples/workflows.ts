@@ -20,12 +20,11 @@ export const morningWorkflowV2 = morningWorkflow
 			run.logger.info("Starting morning routine", { song: input.a, duration: input.b, traceId: context.traceId });
 
 			const alarmOutput = await ringAlarm.start(run, { song: input.a });
-			run.logger.debug("Alarm completed", { output: alarmOutput });
 
 			const stretchOutput = await stretch.start(run, { duration: input.b });
-			run.logger.debug("Stretch completed", { output: stretchOutput });
 
 			const response = `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
+
 			run.logger.info("Morning routine completed", { response });
 
 			return response;
