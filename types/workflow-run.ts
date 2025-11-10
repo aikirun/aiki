@@ -190,7 +190,7 @@ export class WorkflowRunFailedError extends Error {
 
 export class WorkflowSleepingError extends Error {
 	constructor(public readonly id: WorkflowRunId) {
-		super(`Workflow ${id} is sleeping until`);
+		super(`Workflow ${id} is sleeping`);
 		this.name = "WorkflowSleepingError";
 	}
 }

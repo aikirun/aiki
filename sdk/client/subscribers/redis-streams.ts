@@ -319,7 +319,7 @@ async function processRedisStreamMessages(
 ): Promise<WorkflowRunBatch[]> {
 	const workflowRuns: WorkflowRunBatch[] = [];
 	for (const streamEntriesRaw of streamsEntries) {
-		logger.info("Raw stream entries", { entries: streamEntriesRaw });
+		logger.debug("Raw stream entries", { entries: streamEntriesRaw });
 
 		const streamEntriesResult = RedisStreamEntriesSchema.safeParse(streamEntriesRaw);
 		if (!streamEntriesResult.success) {
@@ -328,9 +328,6 @@ async function processRedisStreamMessages(
 			});
 			continue;
 		}
-		logger.info("Parsed stream entries", {
-			entries: streamEntriesResult.data,
-		});
 
 		for (const streamEntry of streamEntriesResult.data) {
 			const [stream, messages] = streamEntry;
