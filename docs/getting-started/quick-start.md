@@ -55,11 +55,11 @@ const run = await helloV1.start(aiki, { name: "Alice" });
 
 // Wait for completion
 const result = await run.wait(
-  { type: "status", status: "completed" },
-  { maxDurationMs: 60_000 }
+	{ type: "status", status: "completed" },
+	{ maxDurationMs: 60_000 },
 );
 if (result.success) {
-  console.log("Workflow result:", result.state.output);
+	console.log("Workflow result:", result.state.output);
 }
 
 // Cleanup
@@ -84,7 +84,8 @@ Starting workflow...
 Workflow result: { success: true, greeting: { greeted: true, name: "Alice" } }
 ```
 
-Note: The workflow completes within 60 seconds (`maxDurationMs: 60_000`). If you want to wait longer or shorter, adjust this value accordingly.
+Note: The workflow completes within 60 seconds (`maxDurationMs: 60_000`). If you want to wait longer or shorter, adjust
+this value accordingly.
 
 ## What Just Happened?
 

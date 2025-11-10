@@ -78,7 +78,8 @@ import { task } from "jsr:@aikirun/task@^0.1.0";
 
 ## Step 4: You're Ready!
 
-Your Aiki infrastructure is now running and you have the SDK packages installed. Proceed to the [Quick Start](./quick-start.md) guide to create your first workflow.
+Your Aiki infrastructure is now running and you have the SDK packages installed. Proceed to the
+[Quick Start](./quick-start.md) guide to create your first workflow.
 
 ## Troubleshooting
 
