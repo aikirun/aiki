@@ -3,20 +3,18 @@ FROM denoland/deno:latest
 ARG AIKI_PORT=9090
 ENV AIKI_PORT=${AIKI_PORT}
 
-WORKDIR /app
+WORKDIR /server
 
-COPY server/ ./server/
-COPY lib/ ./lib/
-COPY types/ ./types/
-COPY deno.json ./
-COPY deno.lock ./
+COPY server/ ./
 
-RUN deno check server/server.ts
+RUN deno add jsr:@aikirun/lib jsr:@aikirun/types
 
-RUN useradd -m -u 1000 deno
-RUN chown -R deno:deno /app
+RUN deno check server.ts
+
+RUN id deno > /dev/null 2>&1 || useradd -m -u 1000 deno
+RUN chown -R deno:deno /server
 USER deno
 
 EXPOSE ${AIKI_PORT}
 
-CMD ["deno", "run", "--allow-net", "--allow-read", "--allow-env", "server/server.ts"]
+CMD ["deno", "run", "--allow-net", "--allow-read", "--allow-env", "server.ts"]
