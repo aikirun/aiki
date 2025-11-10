@@ -1,4 +1,4 @@
-import { aiki } from "./client.ts";
+import { aiki } from "./setup.ts";
 import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows.ts";
 
 const logger = aiki.logger;
@@ -11,12 +11,10 @@ const stateHandle = await eveningRoutineWorkflowV1
 
 const result = await stateHandle.wait(
 	{ type: "status", status: "completed" },
-	{ maxDurationMs: 30_000, pollIntervalMs: 5_000 },
+	{ maxDurationMs: 30_000 },
 );
 if (result.success) {
 	logger.info("Workflow completed", { id: stateHandle.id });
 } else {
 	logger.info("Could not get desired state", { cause: result.cause });
 }
-
-await aiki.close();

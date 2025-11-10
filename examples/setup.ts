@@ -1,7 +1,19 @@
 import { worker } from "@aikirun/worker";
 import { eveningRoutineWorkflow, morningWorkflow } from "./workflows.ts";
 import { processWrapper } from "@aikirun/lib/process";
-import { aiki } from "./client.ts";
+import { client } from "../sdk/client/client.ts";
+
+export const aiki = await client({
+	url: "http://localhost:9090",
+	redis: {
+		host: "localhost",
+		port: 6379,
+	},
+	contextFactory: (run) => ({
+		traceId: "123456789",
+		workflowRunId: run.id,
+	}),
+});
 
 export const workerA = worker(aiki, {
 	id: "worker-A",
