@@ -6,6 +6,7 @@ import {
 	type WorkflowRunId,
 	type WorkflowRunStateAwaitingRetry,
 	type WorkflowRunStateFailed,
+	WorkflowSleepingError,
 } from "@aikirun/types/workflow-run";
 import type { Client, Logger } from "@aikirun/types/client";
 import type { WorkflowRunContext } from "./run/context.ts";
@@ -121,11 +122,12 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 					for (const [key, value] of Object.entries(failedState)) {
 						logMeta[`aiki.${key}`] = value;
 					}
-					runCtx.logger.error("Workflow failed", {
-						"aiki.attempts": attempts,
-						...logMeta,
-					});
-
+					if (!(error instanceof WorkflowSleepingError)) {
+						runCtx.logger.error("Workflow failed", {
+							"aiki.attempts": attempts,
+							...logMeta,
+						});
+					}
 					throw new WorkflowRunFailedError(runCtx.id, attempts, failedState.reason, failedState.cause);
 				} else {
 					const nextAttemptAt = Date.now() + retryParams.delayMs;
@@ -136,12 +138,14 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 					for (const [key, value] of Object.entries(awaitingRetryState)) {
 						logMeta[`aiki.${key}`] = value;
 					}
-					runCtx.logger.info("Workflow failed. Scheduled for retry", {
-						"aiki.attempts": attempts,
-						"aiki.nextAttemptAt": nextAttemptAt,
-						"aiki.delayMs": retryParams.delayMs,
-						...logMeta,
-					});
+					if (!(error instanceof WorkflowSleepingError)) {
+						runCtx.logger.info("Workflow failed. Scheduled for retry", {
+							"aiki.attempts": attempts,
+							"aiki.nextAttemptAt": nextAttemptAt,
+							"aiki.delayMs": retryParams.delayMs,
+							...logMeta,
+						});
+					}
 
 					throw new WorkflowRunFailedError(
 						runCtx.id,
