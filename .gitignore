@@ -9,8 +9,6 @@ deno.lock
 
 server/.env
 
-IDEAS.md
-RETRY-PLAN.md
-TODO.md
+todo/
 
 **/npm/
