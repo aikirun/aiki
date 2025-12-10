@@ -147,6 +147,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 						});
 					}
 
+					// TODO: if delay is small enough, it might be more profitable to spin
 					throw new WorkflowRunFailedError(
 						runCtx.id,
 						attempts,
