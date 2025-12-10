@@ -136,6 +136,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 
 		if (taskState.status === "failed") {
+			// TODO: this is spin based delay, if the delay is large enough, 
+			// it might be more profitable to add task to waiting queue,
+			// letting the serve schedule it at a later time.
+			// Thefore, releasing worker resources
 			await this.delayIfNecessary(taskState);
 		}
 
