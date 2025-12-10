@@ -50,7 +50,7 @@ If you need different ports, use environment variables:
 
 ```bash
 # Use different ports
-AIKI_PORT=8080 REDIS_PORT=7379 docker-compose up
+AIKI_PORT=9090 REDIS_PORT=7379 docker-compose up
 ```
 
 Or create a `.env` file at the repository root. See `server/.env.example` for available configuration options.
@@ -100,7 +100,7 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 **Port already in use**
 
-- Use different ports: `AIKI_PORT=8080 docker-compose up`
+- Use different ports: `AIKI_PORT=9090 docker-compose up`
 - Or stop other services using those ports
 
 ## Next Steps
