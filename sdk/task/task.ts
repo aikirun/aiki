@@ -90,7 +90,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	public withOptions(options: TaskOptions): Task<Input, Output> {
-		return new TaskImpl(this.params, { ...this.options, ...options });
+		return new TaskImpl(this.params, this.options ? { ...this.options, ...options } : options);
 	}
 
 	public async start<WorkflowInput, WorkflowOutput>(

@@ -51,7 +51,12 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	}
 
 	public withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext> {
-		return new WorkflowVersionImpl(this.id, this.versionId, this.params, { ...this.options, ...options });
+		return new WorkflowVersionImpl(
+			this.id,
+			this.versionId,
+			this.params,
+			this.options ? { ...this.options, ...options } : options
+		);
 	}
 
 	public async start(
