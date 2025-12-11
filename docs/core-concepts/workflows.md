@@ -15,7 +15,7 @@ import { workflow } from "@aikirun/workflow";
 
 // Step 1: Create workflow definition
 const orderWorkflow = workflow({
-	name: "order-processing",
+	id: "order-processing",
 });
 
 // Step 2: Create a version
@@ -98,7 +98,7 @@ Versioning allows safe updates to workflows without breaking existing runs.
 
 ```typescript
 const userOnboardingWorkflow = workflow({
-	name: "user-onboarding",
+	id: "user-onboarding",
 });
 
 // Version 1.0.0: Simple onboarding

@@ -13,7 +13,7 @@ import type { Duration } from "@aikirun/lib/duration";
 import type { Client, Logger, SubscriberStrategy } from "@aikirun/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aikirun/client";
 import { initWorkflowRegistry, initWorkflowRunHandle, type WorkflowRegistry } from "@aikirun/workflow";
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunHandle, WorkflowVersion } from "@aikirun/workflow";
 import { isServerConflictError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
@@ -74,8 +74,8 @@ export interface WorkerParams {
 	subscriber?: SubscriberStrategy;
 	/**
 	 * Optional array of shardKeys this worker should process.
-	 * When provided, the worker will only subscribe to sharded streams: workflow:${workflowName}:${Key}
-	 * When omitted, the worker subscribes to default streams: workflow:${workflowName}
+	 * When provided, the worker will only subscribe to sharded streams: workflow:${workflowId}:${Key}
+	 * When omitted, the worker subscribes to default streams: workflow:${workflowId}
 	 * Cannot be combined with non-sharded workflows in the same worker instance.
 	 */
 	shardKeys?: string[];
@@ -122,7 +122,7 @@ class WorkerImpl<AppContext> implements Worker {
 
 		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
-			this.registry._internal.getAll().map((workflow) => workflow.name),
+			this.registry._internal.getAll().map((workflow) => workflow.id),
 			this.params.shardKeys
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
@@ -258,10 +258,10 @@ class WorkerImpl<AppContext> implements Worker {
 				continue;
 			}
 
-			const workflow = this.registry._internal.get(workflowRun.name as WorkflowName);
+			const workflow = this.registry._internal.get(workflowRun.workflowId as WorkflowId);
 			if (!workflow) {
 				this.logger.warn("Workflow not found in registry", {
-					"aiki.workflowName": workflowRun.name,
+					"aiki.workflowId": workflowRun.workflowId,
 					"aiki.workflowRunId": workflowRun.id,
 				});
 				if (meta && this.subscriberStrategy?.acknowledge) {
@@ -273,7 +273,7 @@ class WorkerImpl<AppContext> implements Worker {
 			const workflowVersion = workflow._internal.getVersion(workflowRun.versionId as WorkflowVersionId);
 			if (!workflowVersion) {
 				this.logger.warn("Workflow version not found", {
-					"aiki.workflowName": workflowRun.name,
+					"aiki.workflowId": workflowRun.workflowId,
 					"aiki.workflowVersionId": workflowRun.versionId,
 					"aiki.workflowRunId": workflowRun.id,
 				});
@@ -302,7 +302,7 @@ class WorkerImpl<AppContext> implements Worker {
 	): Promise<void> {
 		const logger = this.logger.child({
 			"aiki.component": "workflow-execution",
-			"aiki.workflowName": workflowRun.name,
+			"aiki.workflowId": workflowRun.workflowId,
 			"aiki.workflowVersionId": workflowRun.versionId,
 			"aiki.workflowRunId": workflowRun.id,
 			...(meta && {
@@ -337,7 +337,7 @@ class WorkerImpl<AppContext> implements Worker {
 				workflowRun.input,
 				{
 					id: workflowRun.id as WorkflowRunId,
-					name: workflowRun.name as WorkflowName,
+					workflowId: workflowRun.workflowId as WorkflowId,
 					versionId: workflowRun.versionId as WorkflowVersionId,
 					options: workflowRun.options,
 					handle: workflowRunHandle,

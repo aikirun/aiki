@@ -38,7 +38,7 @@ const listV1: ContractProcedure<ListRequestV1, ListResponseV1> = oc
 					workflows: z
 						.array(
 							z.object({
-								name: z.string().optional(),
+								id: z.string().optional(),
 								versionId: z.string().optional(),
 							})
 						)
@@ -59,7 +59,7 @@ const listV1: ContractProcedure<ListRequestV1, ListResponseV1> = oc
 			runs: z.array(
 				z.object({
 					id: z.string(),
-					name: z.string(),
+					workflowId: z.string(),
 					versionId: z.string(),
 					createdAt: z.number(),
 					status: workflowRunStatusSchema,
@@ -96,7 +96,7 @@ const getStateV1: ContractProcedure<GetStateRequestV1, GetStateResponseV1> = oc
 const createV1: ContractProcedure<CreateRequestV1, CreateResponseV1> = oc
 	.input(
 		z.object({
-			name: z.string().min(1),
+			workflowId: z.string().min(1),
 			versionId: z.string().min(1),
 			input: z.unknown(),
 			options: workflowOptionsSchema.optional(),

@@ -36,7 +36,7 @@ Here's an example user onboarding workflow spanning multiple days. Traditional j
 import { workflow } from "@aikirun/workflow";
 import {createUserProfile, sendWelcomeEmail, sendUsageTips} from "./task.ts";
 
-export const onboardingWorkflow = workflow({ name: "user-onboarding" });
+export const onboardingWorkflow = workflow({ id: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
   async exec(input: { email: string }, run) {
@@ -91,7 +91,7 @@ await onboardingWorkflowV1.start(aikiClient, { email: "newuser@example.com" });
 import { task } from "@aikirun/task";
 
 export const createUserProfile = task({
-  name: "create-profile",
+  id: "create-profile",
   async exec(input: { email: string }) {
     const id = db.users.create({ email: input.email });
     return { userId: id};
@@ -99,7 +99,7 @@ export const createUserProfile = task({
 });
 
 export const sendWelcomeEmail = task({
-  name: "send-welcome",
+  id: "send-welcome",
   async exec(input: { email: string }) {
     return emailService.sendWelcome(input.email);
   }
@@ -115,7 +115,7 @@ export const sendWelcomeEmail = task({
 });
 
 export const sendUsageTips = task({
-  name: "send-usage-tips",
+  id: "send-usage-tips",
   async exec(input: { email: string }) {
     return emailService.sendFeatures(input.email, {
       features: ["Advanced analytics"]

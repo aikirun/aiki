@@ -1,4 +1,4 @@
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version";
 import type { SerializableInput } from "@aikirun/lib/error";
 
@@ -10,13 +10,13 @@ import type { SerializableInput } from "@aikirun/lib/error";
  * Multiple versions of a workflow can run simultaneously, allowing safe deployments.
  *
  * @param params - Workflow configuration
- * @param params.name - Unique workflow name used for identification and routing
+ * @param params.id - Unique workflow id used for identification and routing
  * @returns Workflow instance with version management methods
  *
  * @example
  * ```typescript
  * // Define a workflow
- * export const userOnboarding = workflow({ name: "user-onboarding" });
+ * export const userOnboarding = workflow({ id: "user-onboarding" });
  *
  * // Define version 1.0
  * export const userOnboardingV1 = userOnboarding.v("1.0", {
@@ -54,11 +54,11 @@ export function workflow(params: WorkflowParams): Workflow {
 }
 
 export interface WorkflowParams {
-	name: string;
+	id: string;
 }
 
 export interface Workflow {
-	name: WorkflowName;
+	id: WorkflowId;
 
 	v: <Input extends SerializableInput = null, Output = void, AppContext = null>(
 		versionId: string,
@@ -72,12 +72,12 @@ export interface Workflow {
 }
 
 class WorkflowImpl implements Workflow {
-	public readonly name: WorkflowName;
+	public readonly id: WorkflowId;
 	public readonly _internal: Workflow["_internal"];
 	private workflowVersions = new Map<WorkflowVersionId, WorkflowVersion<unknown, unknown, unknown>>();
 
 	constructor(params: WorkflowParams) {
-		this.name = params.name as WorkflowName;
+		this.id = params.id as WorkflowId;
 		this._internal = {
 			getAllVersions: this.getAllVersions.bind(this),
 			getVersion: this.getVersion.bind(this),
@@ -89,10 +89,10 @@ class WorkflowImpl implements Workflow {
 		params: WorkflowVersionParams<Input, Output, AppContext>
 	): WorkflowVersion<Input, Output, AppContext> {
 		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
-			throw new Error(`Workflow "${this.name}/${versionId}" already exists`);
+			throw new Error(`Workflow "${this.id}/${versionId}" already exists`);
 		}
 
-		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
+		const workflowVersion = new WorkflowVersionImpl(this.id, versionId as WorkflowVersionId, params);
 		this.workflowVersions.set(
 			versionId as WorkflowVersionId,
 			workflowVersion as unknown as WorkflowVersion<unknown, unknown, unknown>

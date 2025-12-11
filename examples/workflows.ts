@@ -1,7 +1,7 @@
 import { workflow } from "@aikirun/workflow";
 import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "./tasks";
 
-export const morningWorkflow = workflow({ name: "morning-routine" });
+export const morningWorkflow = workflow({ id: "morning-routine" });
 
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 	async exec(input: { a: boolean }, run) {
@@ -37,7 +37,7 @@ export const morningWorkflowV2 = morningWorkflow
 		},
 	});
 
-export const eveningRoutineWorkflow = workflow({ name: "evening-routine" });
+export const eveningRoutineWorkflow = workflow({ id: "evening-routine" });
 
 export const eveningRoutineWorkflowV1 = eveningRoutineWorkflow.v("1.0.0", {
 	async exec(_, run, _context: AppContext) {

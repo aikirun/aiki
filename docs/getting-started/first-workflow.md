@@ -16,7 +16,7 @@ Each step is a separate task for independent retry and monitoring:
 import { task } from "@aikirun/task";
 
 const validateOrder = task({
-	name: "validate-order",
+	id: "validate-order",
 	exec(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
 		const { items, total } = input;
 
@@ -34,7 +34,7 @@ const validateOrder = task({
 });
 
 const processPayment = task({
-	name: "process-payment",
+	id: "process-payment",
 	exec(input: { orderId: string; amount: number }) {
 		const { orderId, amount } = input;
 
@@ -49,7 +49,7 @@ const processPayment = task({
 });
 
 const updateInventory = task({
-	name: "update-inventory",
+	id: "update-inventory",
 	exec(input: { items: Array<{ id: string; quantity: number }> }) {
 		const { items } = input;
 
@@ -63,7 +63,7 @@ const updateInventory = task({
 });
 
 const sendConfirmation = task({
-	name: "send-confirmation",
+	id: "send-confirmation",
 	exec(input: { email: string; orderId: string }) {
 		const { email, orderId } = input;
 
@@ -82,7 +82,7 @@ Orchestrate tasks in sequence:
 import { workflow } from "@aikirun/workflow";
 
 const orderWorkflow = workflow({
-	name: "order-processing",
+	id: "order-processing",
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
@@ -186,7 +186,7 @@ import { workflow } from "@aikirun/workflow";
 
 // Define tasks
 const validateOrder = task({
-	name: "validate-order",
+	id: "validate-order",
 	exec(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
 		if (input.items.length === 0) {
 			throw new Error("Order must have items");
@@ -200,7 +200,7 @@ const validateOrder = task({
 });
 
 const processPayment = task({
-	name: "process-payment",
+	id: "process-payment",
 	exec(input: { orderId: string; amount: number }) {
 		console.log(`Processing payment: $${input.amount}`);
 		return {
@@ -211,7 +211,7 @@ const processPayment = task({
 });
 
 const updateInventory = task({
-	name: "update-inventory",
+	id: "update-inventory",
 	exec(input: { items: Array<{ id: string; quantity: number }> }) {
 		input.items.forEach((item) => {
 			console.log(`Updating inventory for ${item.id}`);
@@ -221,7 +221,7 @@ const updateInventory = task({
 });
 
 const sendConfirmation = task({
-	name: "send-confirmation",
+	id: "send-confirmation",
 	exec(input: { email: string; orderId: string }) {
 		console.log(`Sending confirmation to ${input.email}`);
 		return { sent: true };
@@ -229,7 +229,7 @@ const sendConfirmation = task({
 });
 
 // Define workflow
-const orderWorkflow = workflow({ name: "order-processing" });
+const orderWorkflow = workflow({ id: "order-processing" });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	async exec(input: {

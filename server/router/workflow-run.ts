@@ -1,6 +1,6 @@
 import { baseImplementer } from "./base";
 import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import { ConflictError, NotFoundError } from "../errors";
 import { publishWorkflowReadyBatch } from "../redis/publisher";
 import { toMilliseconds } from "@aikirun/lib/duration";
@@ -11,7 +11,7 @@ import type { Logger } from "../logger/index";
 const os = baseImplementer.workflowRun;
 
 const workflowRuns = new Map<WorkflowRunId, WorkflowRun>();
-const workflowRunsIdempotencyMap = new Map<WorkflowName, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
+const workflowRunsIdempotencyMap = new Map<WorkflowId, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
 const workflowRunTransitions = new Map<WorkflowRunId, WorkflowRunTransition[]>();
 
 const listV1 = os.listV1.handler(({ input }) => {
@@ -23,7 +23,9 @@ const listV1 = os.listV1.handler(({ input }) => {
 		if (
 			filters?.workflows &&
 			isNonEmptyArray(filters.workflows) &&
-			filters.workflows.every((w) => (w.name && w.name !== run.name) || (w.versionId && w.versionId !== run.versionId))
+			filters.workflows.every(
+				(w) => (w.id && w.id !== run.workflowId) || (w.versionId && w.versionId !== run.versionId)
+			)
 		) {
 			continue;
 		}
@@ -41,7 +43,7 @@ const listV1 = os.listV1.handler(({ input }) => {
 			.slice(offset, offset + limit)
 			.map((run) => ({
 				id: run.id,
-				name: run.name,
+				workflowId: run.workflowId,
 				versionId: run.versionId,
 				createdAt: run.createdAt,
 				status: run.state.status,
@@ -85,18 +87,18 @@ const getStateV1 = os.getStateV1.handler(({ input, context }) => {
 const createV1 = os.createV1.handler(({ input, context }) => {
 	context.logger.info(
 		{
-			workflowName: input.name,
+			workflowId: input.workflowId,
 			workflowVersionId: input.versionId,
 		},
 		"Creating workflow run"
 	);
 
-	const name = input.name as WorkflowName;
+	const workflowId = input.workflowId as WorkflowId;
 	const versionId = input.versionId as WorkflowVersionId;
 	const idempotencyKey = input.options?.idempotencyKey;
 
 	if (idempotencyKey) {
-		const existingRunId = workflowRunsIdempotencyMap.get(name)?.get(versionId)?.get(idempotencyKey);
+		const existingRunId = workflowRunsIdempotencyMap.get(workflowId)?.get(versionId)?.get(idempotencyKey);
 		if (existingRunId) {
 			context.logger.info(
 				{
@@ -120,7 +122,7 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 
 	const run: WorkflowRun = {
 		id: runId,
-		name: input.name,
+		workflowId: input.workflowId,
 		versionId: input.versionId,
 		createdAt: now,
 		revision: 0,
@@ -145,10 +147,10 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 	workflowRuns.set(runId, run);
 
 	if (idempotencyKey) {
-		let versionMap = workflowRunsIdempotencyMap.get(name);
+		let versionMap = workflowRunsIdempotencyMap.get(workflowId);
 		if (!versionMap) {
 			versionMap = new Map();
-			workflowRunsIdempotencyMap.set(name, versionMap);
+			workflowRunsIdempotencyMap.set(workflowId, versionMap);
 		}
 
 		let idempotencyKeyMap = versionMap.get(versionId);
@@ -300,7 +302,7 @@ export async function transitionScheduledWorkflowsToQueued(redis: Redis, logger:
 
 		logger.info(
 			{
-				workflowName: run.name,
+				workflowId: run.workflowId,
 				workflowVersionId: run.versionId,
 				workflowRunId: run.id,
 			},
@@ -309,7 +311,7 @@ export async function transitionScheduledWorkflowsToQueued(redis: Redis, logger:
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
-			workflowName: run.name,
+			workflowId: run.workflowId,
 			shardKey: run.options.shardKey,
 		});
 	}
@@ -353,7 +355,7 @@ export async function transitionRetryableWorkflowsToQueued(redis: Redis, logger:
 
 		logger.info(
 			{
-				workflowName: run.name,
+				workflowId: run.workflowId,
 				workflowVersionId: run.versionId,
 				workflowRunId: run.id,
 			},
@@ -362,7 +364,7 @@ export async function transitionRetryableWorkflowsToQueued(redis: Redis, logger:
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
-			workflowName: run.name,
+			workflowId: run.workflowId,
 			shardKey: run.options.shardKey,
 		});
 	}
@@ -399,7 +401,7 @@ export async function transitionSleepingWorkflowsToQueued(redis: Redis, logger: 
 
 		logger.info(
 			{
-				workflowName: run.name,
+				workflowId: run.workflowId,
 				workflowVersionId: run.versionId,
 				workflowRunId: run.id,
 			},
@@ -408,7 +410,7 @@ export async function transitionSleepingWorkflowsToQueued(redis: Redis, logger: 
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
-			workflowName: run.name,
+			workflowId: run.workflowId,
 			shardKey: run.options.shardKey,
 		});
 	}

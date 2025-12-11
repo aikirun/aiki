@@ -1,6 +1,6 @@
 import type { SerializableError } from "@aikirun/lib/error";
 
-export type TaskName = string & { _brand: "task_name" };
+export type TaskId = string & { _brand: "task_id" };
 
 export type TaskStatus = "none" | "running" | "completed" | "failed";
 
@@ -35,11 +35,11 @@ export type TaskState<Output> = TaskStateNone | TaskStateRunning | TaskStateComp
 
 export class TaskFailedError extends Error {
 	constructor(
-		public readonly taskName: TaskName,
+		public readonly taskId: TaskId,
 		public readonly attempts: number,
 		public readonly reason: string
 	) {
-		super(`Task ${taskName} failed after ${attempts} attempts. Reason: ${reason}`);
+		super(`Task ${taskId} failed after ${attempts} attempts. Reason: ${reason}`);
 		this.name = "TaskFailedError";
 	}
 }

@@ -21,7 +21,7 @@ import { workflow } from "@aikirun/workflow";
 
 // 1. Define a task (unit of work)
 const greet = task({
-	name: "greet",
+	id: "greet",
 	async exec(input: { name: string }) {
 		console.log(`👋 Hello, ${input.name}!`);
 		return { greeted: true, name: input.name };
@@ -29,7 +29,7 @@ const greet = task({
 });
 
 // 2. Define a workflow (orchestrates tasks)
-const helloWorkflow = workflow({ name: "hello" });
+const helloWorkflow = workflow({ id: "hello" });
 
 const helloV1 = helloWorkflow.v("1.0.0", {
 	async exec(input: { name: string }, run) {
@@ -51,7 +51,7 @@ await myWorker.start();
 
 // 5. Execute your workflow
 console.log("Starting workflow...");
-const run = await helloV1.start(aiki, { name: "Alice" });
+const run = await helloV1.start(aiki, { id: "Alice" });
 
 // Wait for completion
 const result = await run.wait(
@@ -81,7 +81,7 @@ bun run my-first-workflow.ts
 ```
 Starting workflow...
 👋 Hello, Alice!
-Workflow result: { success: true, greeting: { greeted: true, name: "Alice" } }
+Workflow result: { success: true, greeting: { greeted: true, id: "Alice" } }
 ```
 
 Note: The workflow completes within 60 seconds (`maxDurationMs: 60_000`). If you want to wait longer or shorter, adjust

@@ -17,7 +17,7 @@ npm install @aikirun/task
 import { task } from "@aikirun/task";
 
 export const sendVerificationEmail = task({
-	name: "send-verification",
+	id: "send-verification",
 	async exec(input: { email: string }) {
 		return emailService.sendVerification(input.email);
 	},
@@ -28,7 +28,7 @@ export const sendVerificationEmail = task({
 
 ```typescript
 export const ringAlarm = task({
-	name: "ring-alarm",
+	id: "ring-alarm",
 	exec(input: { song: string }) {
 		return Promise.resolve(audioService.play(input.song));
 	},
@@ -46,7 +46,7 @@ export const ringAlarm = task({
 ```typescript
 import { workflow } from "@aikirun/workflow";
 
-export const morningWorkflow = workflow({ name: "morning-routine" });
+export const morningWorkflow = workflow({ id: "morning-routine" });
 
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 	async exec(input, run) {
@@ -130,7 +130,7 @@ Tasks are executed within a workflow's execution context. Logging happens in the
 
 ```typescript
 export const processPayment = task({
-	name: "process-payment",
+	id: "process-payment",
 	async exec(input: { amount: number }) {
 		return { success: true, transactionId: "tx_123" };
 	},

@@ -70,8 +70,8 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 
 		this._internal = {
 			subscriber: {
-				create: (strategy, workflowNames, workerShards) =>
-					resolveSubscriberStrategy(this, strategy, workflowNames, workerShards),
+				create: (strategy, workflowIds, workerShards) =>
+					resolveSubscriberStrategy(this, strategy, workflowIds, workerShards),
 			},
 			redis: {
 				getConnection: () => this.getRedisConnection(),

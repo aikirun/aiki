@@ -9,7 +9,7 @@ independently.
 import { task } from "@aikirun/task";
 
 const sendEmail = task({
-	name: "send-email",
+	id: "send-email",
 	exec(input: { email: string; message: string }) {
 		// Your business logic
 		return sendEmailToUser(input.email, input.message);
@@ -31,7 +31,7 @@ The function that performs the actual work. It receives:
 
 ```typescript
 const processPayment = task({
-	name: "process-payment",
+	id: "process-payment",
 	exec(input: { paymentId: string; amount: number }) {
 		console.log(`Processing payment for ${input.paymentId}`);
 
@@ -69,7 +69,7 @@ level.
 ```typescript
 // This will be supported in a future version:
 const processPayment = task({
-	name: "process-payment",
+	id: "process-payment",
 	exec(input: { paymentId: string; amount: number }) {
 		return processPaymentWithId(input.paymentId, input.amount);
 	},
@@ -87,7 +87,7 @@ The task receives input directly:
 
 ```typescript
 const exampleTask = task({
-	name: "example",
+	id: "example",
 	exec(input: { data: string }) {
 		// input: Input data for this task
 		console.log("Task input:", input);
@@ -103,7 +103,7 @@ Tasks within a workflow are automatically idempotent - the same task with the sa
 
 ```typescript
 const sendEmail = task({
-	name: "send-email",
+	id: "send-email",
 	exec(input: { email: string; message: string }) {
 		return sendEmailToUser(input.email, input.message);
 	},
@@ -145,7 +145,7 @@ await sendEmail.withOptions({ idempotencyKey: "second-email" }).start(run, {
 
 ```typescript
 const validateOrder = task({
-	name: "validate-order",
+	id: "validate-order",
 	exec(input: { items: Array<{ id: string; quantity: number }> }) {
 		if (input.items.length === 0) {
 			throw new Error("Order must have items");
@@ -163,7 +163,7 @@ const validateOrder = task({
 
 ```typescript
 const fetchUserData = task({
-	name: "fetch-user-data",
+	id: "fetch-user-data",
 	exec(input: { userId: string }) {
 		return fetch(`https://api.example.com/users/${input.userId}`)
 			.then((res) => res.json());
@@ -175,7 +175,7 @@ const fetchUserData = task({
 
 ```typescript
 const updateInventory = task({
-	name: "update-inventory",
+	id: "update-inventory",
 	exec(input: { itemId: string; amount: number }) {
 		return db.inventory.update({
 			where: { id: input.itemId },

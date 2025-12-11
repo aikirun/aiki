@@ -4,7 +4,7 @@ import type { Logger } from "../logger/index";
 
 export interface WorkflowMessageToPublish {
 	workflowRunId: string;
-	workflowName: string;
+	workflowId: string;
 	shardKey?: string;
 }
 
@@ -22,8 +22,8 @@ export async function publishWorkflowReadyBatch(
 		for (const message of messages) {
 			const streamName =
 				message.shardKey !== undefined
-					? `workflow:${message.workflowName}:${message.shardKey}`
-					: `workflow:${message.workflowName}`;
+					? `workflow:${message.workflowId}:${message.shardKey}`
+					: `workflow:${message.workflowId}`;
 
 			const streamMessages = messagesByStream.get(streamName);
 			if (streamMessages === undefined) {

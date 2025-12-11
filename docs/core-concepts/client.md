@@ -131,14 +131,14 @@ import { workflow } from "@aikirun/workflow";
 
 // Define task and workflow
 const sendEmail = task({
-	name: "send-email",
+	id: "send-email",
 	exec(input: { email: string }) {
 		console.log(`Sending email to ${input.email}`);
 		return { sent: true };
 	},
 });
 
-const onboardingWorkflow = workflow({ name: "user-onboarding" });
+const onboardingWorkflow = workflow({ id: "user-onboarding" });
 
 const onboardingV1 = onboardingWorkflow.v("1.0.0", {
 	async exec(input: { email: string }, run) {

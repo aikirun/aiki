@@ -1,4 +1,4 @@
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowOptions,
 	type WorkflowRun,
@@ -21,7 +21,7 @@ export interface WorkflowVersionParams<Input, Output, AppContext> {
 }
 
 export interface WorkflowVersion<Input, Output, AppContext> {
-	name: WorkflowName;
+	id: WorkflowId;
 	versionId: WorkflowVersionId;
 
 	withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext>;
@@ -40,7 +40,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	public readonly _internal: WorkflowVersion<Input, Output, AppContext>["_internal"];
 
 	constructor(
-		public readonly name: WorkflowName,
+		public readonly id: WorkflowId,
 		public readonly versionId: WorkflowVersionId,
 		private readonly params: WorkflowVersionParams<Input, Output, AppContext>,
 		private readonly options?: WorkflowOptions
@@ -51,7 +51,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	}
 
 	public withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext> {
-		return new WorkflowVersionImpl(this.name, this.versionId, this.params, { ...this.options, ...options });
+		return new WorkflowVersionImpl(this.id, this.versionId, this.params, { ...this.options, ...options });
 	}
 
 	public async start(
@@ -59,7 +59,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		...args: Input extends null ? [] : [Input]
 	): Promise<WorkflowRunStateHandle<Output>> {
 		const response = await client.api.workflowRun.createV1({
-			name: this.name,
+			workflowId: this.id,
 			versionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : null,
 			options: this.options,
@@ -155,7 +155,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			return {
 				status: "failed",
 				cause: "task",
-				taskName: error.taskName,
+				taskId: error.taskId,
 				reason: error.reason,
 			};
 		}
@@ -178,7 +178,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				cause: "task",
 				reason: error.reason,
 				nextAttemptAt: nextAttemptAt,
-				taskName: error.taskName,
+				taskId: error.taskId,
 			};
 		}
 

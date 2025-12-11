@@ -1,11 +1,11 @@
-import type { WorkflowName } from "@aikirun/types/workflow";
+import type { WorkflowId } from "@aikirun/types/workflow";
 import type { Client, SubscriberStrategy, SubscriberStrategyBuilder } from "@aikirun/types/client";
 import { createRedisStreamsStrategy } from "./redis-streams";
 
 export function resolveSubscriberStrategy(
 	client: Client<unknown>,
 	strategy: SubscriberStrategy,
-	workflowNames: WorkflowName[],
+	workflowIds: WorkflowId[],
 	workerShards?: string[]
 ): SubscriberStrategyBuilder {
 	switch (strategy.type) {
@@ -14,7 +14,7 @@ export function resolveSubscriberStrategy(
 		// case "adaptive_polling":
 		// 	return createAdaptivePollingStrategy(client, strategy);
 		case "redis_streams":
-			return createRedisStreamsStrategy(client, strategy, workflowNames, workerShards);
+			return createRedisStreamsStrategy(client, strategy, workflowIds, workerShards);
 		default:
 			return strategy.type satisfies never;
 	}

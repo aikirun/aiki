@@ -4,7 +4,7 @@ import { getRetryParams } from "@aikirun/lib/retry";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { stableStringify } from "@aikirun/lib/json";
 import { createSerializableError, type SerializableInput } from "@aikirun/lib/error";
-import { TaskFailedError, type TaskName } from "@aikirun/types/task";
+import { TaskFailedError, type TaskId } from "@aikirun/types/task";
 import type { WorkflowRunContext } from "@aikirun/workflow";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { TaskStateFailed } from "@aikirun/types/task";
@@ -20,7 +20,7 @@ import type { Logger } from "@aikirun/types/client";
  * @template Input - Type of task input (must be JSON serializable)
  * @template Output - Type of task output (must be JSON serializable)
  * @param params - Task configuration
- * @param params.name - Unique task name used for execution tracking
+ * @param params.id - Unique task id used for execution tracking
  * @param params.exec - Async function that executes the task logic
  * @returns Task instance with retry and option configuration methods
  *
@@ -28,7 +28,7 @@ import type { Logger } from "@aikirun/types/client";
  * ```typescript
  * // Simple task without retry
  * export const sendEmail = task({
- *   name: "send-email",
+ *   id: "send-email",
  *   exec(input: { email: string; message: string }) {
  *     return emailService.send(input.email, input.message);
  *   },
@@ -36,7 +36,7 @@ import type { Logger } from "@aikirun/types/client";
  *
  * // Task with retry configuration
  * export const chargeCard = task({
- *   name: "charge-card",
+ *   id: "charge-card",
  *   exec(input: { cardId: string; amount: number }) {
  *     return paymentService.charge(input.cardId, input.amount);
  *   },
@@ -59,7 +59,7 @@ export function task<Input extends SerializableInput = null, Output = void>(
 }
 
 export interface TaskParams<Input, Output> {
-	name: string;
+	id: string;
 	exec: (input: Input) => Promise<Output>;
 }
 
@@ -69,7 +69,7 @@ export interface TaskOptions {
 }
 
 export interface Task<Input, Output> {
-	name: TaskName;
+	id: TaskId;
 
 	withOptions(options: TaskOptions): Task<Input, Output>;
 
@@ -80,13 +80,13 @@ export interface Task<Input, Output> {
 }
 
 class TaskImpl<Input, Output> implements Task<Input, Output> {
-	public readonly name: TaskName;
+	public readonly id: TaskId;
 
 	constructor(
 		private readonly params: TaskParams<Input, Output>,
 		private readonly options?: TaskOptions
 	) {
-		this.name = params.name as TaskName;
+		this.id = params.id as TaskId;
 	}
 
 	public withOptions(options: TaskOptions): Task<Input, Output> {
@@ -115,7 +115,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const logger = runCtx.logger.child({
 			"aiki.component": "task-execution",
-			"aiki.taskName": this.name,
+			"aiki.taskId": this.id,
 			"aiki.taskPath": path,
 		});
 
@@ -190,7 +190,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						"aiki.attempts": attempts,
 						"aiki.reason": taskFailedState.reason,
 					});
-					throw new TaskFailedError(this.name, attempts, taskFailedState.reason);
+					throw new TaskFailedError(this.id, attempts, taskFailedState.reason);
 				}
 
 				const nextAttemptAt = Date.now() + retryParams.delayMs;
@@ -214,7 +214,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			logger.error("Task retry not allowed", {
 				"aiki.attempts": attempts,
 			});
-			throw new TaskFailedError(this.name, attempts, "Task retry not allowed");
+			throw new TaskFailedError(this.id, attempts, "Task retry not allowed");
 		}
 	}
 
@@ -232,12 +232,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		input: Input
 	): Promise<string> {
-		const workflowRunPath = `${runCtx.name}/${runCtx.versionId}/${runCtx.id}`;
+		const workflowRunPath = `${runCtx.workflowId}/${runCtx.versionId}/${runCtx.id}`;
 
 		const inputHash = await sha256(stableStringify(input));
 
 		return this.options?.idempotencyKey
-			? `${workflowRunPath}/${this.name}/${inputHash}/${this.options.idempotencyKey}`
-			: `${workflowRunPath}/${this.name}/${inputHash}`;
+			? `${workflowRunPath}/${this.id}/${inputHash}/${this.options.idempotencyKey}`
+			: `${workflowRunPath}/${this.id}/${inputHash}`;
 	}
 }

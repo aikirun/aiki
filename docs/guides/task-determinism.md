@@ -18,7 +18,7 @@ Here's a simple example:
 ```typescript
 // ✅ Deterministic task
 const calculateTax = task({
-	name: "calculate-tax",
+	id: "calculate-tax",
 	exec(input: { amount: number; taxRate: number }) {
 		const { amount, taxRate } = input;
 		return { tax: amount * taxRate, total: amount * (1 + taxRate) };
@@ -48,7 +48,7 @@ Let me illustrate this with a cautionary tale:
 ```typescript
 // ❌ Non-deterministic task - dangerous with duplicate execution
 const badTask = task({
-	name: "create-user",
+	id: "create-user",
 	exec(input: { email: string; userData: any }) {
 		// This could create duplicate users if executed twice
 		const userId = generateRandomId(); // Different each time!
@@ -58,7 +58,7 @@ const badTask = task({
 
 // ✅ Deterministic task - safe with duplicate execution
 const goodTask = task({
-	name: "create-user",
+	id: "create-user",
 	exec(input: { email: string; userData: any }) {
 		// Same input always produces same result
 		const userId = generateIdFromEmail(input.email); // Deterministic!
@@ -79,7 +79,7 @@ has the same effect as running it once.
 ```typescript
 // ✅ Idempotent task - safe to run multiple times
 const sendEmail = task({
-	name: "send-welcome-email",
+	id: "send-welcome-email",
 	exec(input: { userId: string; email: string }) {
 		const { userId, email } = input;
 
@@ -98,7 +98,7 @@ const sendEmail = task({
 
 // ✅ Idempotent payment processing
 const processPayment = task({
-	name: "process-payment",
+	id: "process-payment",
 	exec(input: { paymentId: string; amount: number }) {
 		const { paymentId, amount } = input;
 
@@ -122,7 +122,7 @@ debugging and recovery.
 ```typescript
 // ❌ Non-deterministic task
 const badTask = task({
-	name: "bad-task",
+	id: "bad-task",
 	exec(input: {}) {
 		// This will produce different results on each run
 		const randomId = Math.random();
@@ -133,7 +133,7 @@ const badTask = task({
 
 // ✅ Deterministic task
 const goodTask = task({
-	name: "good-task",
+	id: "good-task",
 	exec(input: { userId: string }) {
 		// Same input always produces same output
 		const userId = input.userId;
@@ -149,7 +149,7 @@ If a workflow crashes after completing some tasks, deterministic tasks ensure th
 
 ```typescript
 const orderWorkflow = workflow({
-	name: "process-order",
+	id: "process-order",
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
@@ -174,7 +174,7 @@ Deterministic tasks make workflows easier to debug and test:
 ```typescript
 // Easy to test - same input, same output
 const testTask = task({
-	name: "calculate-tax",
+	id: "calculate-tax",
 	exec(input: { amount: number; taxRate: number }) {
 		const { amount, taxRate } = input;
 		return { tax: amount * taxRate, total: amount * (1 + taxRate) };
@@ -198,7 +198,7 @@ Here are the common pitfalls to avoid:
 ```typescript
 // ❌ Avoid these in tasks:
 const badPractices = task({
-	name: "bad-practices",
+	id: "bad-practices",
 	exec(input: {}) {
 		// Don't use random numbers
 		const random = Math.random();
@@ -218,7 +218,7 @@ const badPractices = task({
 
 // ✅ Use deterministic alternatives:
 const goodPractices = task({
-	name: "good-practices",
+	id: "good-practices",
 	exec(input: { createdAt: number; duration: number; userData: any; sequenceNumber: number }) {
 		// Use provided IDs or generate from input
 		const id = generateIdFromInput(input);
@@ -248,7 +248,7 @@ For tasks that need external data, make them deterministic by:
 ```typescript
 // ✅ Good: External data passed as input
 const sendEmail = task({
-	name: "send-email",
+	id: "send-email",
 	exec(input: { recipient: string; template: string; variables: Record<string, any> }) {
 		// Email content is deterministic based on input
 		const { recipient, template, variables } = input;
@@ -261,7 +261,7 @@ const sendEmail = task({
 
 // ✅ Good: Store external state in workflow
 const processPayment = task({
-	name: "process-payment",
+	id: "process-payment",
 	exec(input: { paymentId: string; amount: number }) {
 		// Use input parameters to ensure determinism
 		const { paymentId, amount } = input;
@@ -279,7 +279,7 @@ const processPayment = task({
 ```typescript
 // ❌ Bad: Random numbers
 const badTask = task({
-	name: "generate-id",
+	id: "generate-id",
 	exec(input: {}) {
 		return { id: Math.random().toString(36) };
 	},
@@ -287,7 +287,7 @@ const badTask = task({
 
 // ✅ Good: Deterministic ID generation
 const goodTask = task({
-	name: "generate-id",
+	id: "generate-id",
 	exec(input: { userId: string; timestamp: number }) {
 		const { userId, timestamp } = input;
 		return { id: `${userId}-${timestamp}` };
@@ -300,7 +300,7 @@ const goodTask = task({
 ```typescript
 // ❌ Bad: Current timestamp
 const badTask = task({
-	name: "create-record",
+	id: "create-record",
 	exec(input: { data: any }) {
 		return createRecord({ ...input.data, createdAt: Date.now() });
 	},
@@ -308,7 +308,7 @@ const badTask = task({
 
 // ✅ Good: Use provided timestamp
 const goodTask = task({
-	name: "create-record",
+	id: "create-record",
 	exec(input: { data: any; createdAt: number }) {
 		return createRecord({ ...input.data, createdAt: input.createdAt });
 	},
@@ -320,7 +320,7 @@ const goodTask = task({
 ```typescript
 // ❌ Bad: External API that might change
 const badTask = task({
-	name: "get-exchange-rate",
+	id: "get-exchange-rate",
 	exec(input: { currency: string }) {
 		return fetchExchangeRate(input.currency);
 	},
@@ -328,7 +328,7 @@ const badTask = task({
 
 // ✅ Good: Pass rate as input or use idempotent lookup
 const goodTask = task({
-	name: "get-exchange-rate",
+	id: "get-exchange-rate",
 	exec(input: { currency: string; rate: number }) {
 		const { currency, rate } = input;
 		return { currency, rate };
@@ -342,7 +342,7 @@ const goodTask = task({
 // ❌ Bad: Global counter
 let globalCounter = 0;
 const badTask = task({
-	name: "increment-counter",
+	id: "increment-counter",
 	exec(input: {}) {
 		globalCounter++;
 		return { counter: globalCounter };
@@ -351,7 +351,7 @@ const badTask = task({
 
 // ✅ Good: Pass counter as input
 const goodTask = task({
-	name: "increment-counter",
+	id: "increment-counter",
 	exec(input: { currentCounter: number }) {
 		return { counter: input.currentCounter + 1 };
 	},

@@ -1,4 +1,4 @@
-import type { WorkflowName } from "./workflow";
+import type { WorkflowId } from "./workflow";
 import type { WorkflowRun } from "./workflow-run";
 import type { WorkflowRunId } from "./workflow-run";
 import type { WorkflowRunApi } from "./workflow-run-api";
@@ -18,7 +18,7 @@ export interface Client<AppContext> {
 		subscriber: {
 			create: (
 				strategy: SubscriberStrategy,
-				workflowNames: WorkflowName[],
+				workflowIds: WorkflowId[],
 				workerShards?: string[]
 			) => SubscriberStrategyBuilder;
 		};

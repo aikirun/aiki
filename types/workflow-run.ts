@@ -66,7 +66,7 @@ export interface WorkflowRunStateAwaitingBase extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateAwaitingRetryCausedByTask extends WorkflowRunStateAwaitingBase {
 	cause: "task";
-	taskName: string;
+	taskId: string;
 }
 
 export interface WorkflowRunStateAwaitingRetryCausedByChildWorkflow extends WorkflowRunStateAwaitingBase {
@@ -97,7 +97,7 @@ interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase {
 	cause: "task";
-	taskName: string;
+	taskId: string;
 }
 
 export interface WorkflowRunStateFailedByChildWorkflow extends WorkflowRunStateFailedBase {
@@ -128,7 +128,7 @@ export type WorkflowRunState<Output> = WorkflowRunStateInComplete | WorkflowRunS
 
 export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;
-	name: string;
+	workflowId: string;
 	versionId: string;
 	createdAt: number;
 	revision: number;

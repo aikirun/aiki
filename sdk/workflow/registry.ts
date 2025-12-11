@@ -1,4 +1,4 @@
-import type { WorkflowName } from "@aikirun/types/workflow";
+import type { WorkflowId } from "@aikirun/types/workflow";
 import type { Workflow } from "./workflow";
 
 export function initWorkflowRegistry(): WorkflowRegistry {
@@ -14,13 +14,13 @@ export interface WorkflowRegistry {
 
 	_internal: {
 		getAll(): Workflow[];
-		get: (name: WorkflowName) => Workflow | undefined;
+		get: (id: WorkflowId) => Workflow | undefined;
 	};
 }
 
 class WorkflowRegistryImpl implements WorkflowRegistry {
 	public readonly _internal: WorkflowRegistry["_internal"];
-	private workflowsByName: Map<WorkflowName, Workflow> = new Map();
+	private workflowsById: Map<WorkflowId, Workflow> = new Map();
 
 	constructor() {
 		this._internal = {
@@ -30,10 +30,10 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 	}
 
 	public add(workflow: Workflow): WorkflowRegistry {
-		if (this.workflowsByName.has(workflow.name)) {
-			throw new Error(`Workflow "${workflow.name}" is already registered`);
+		if (this.workflowsById.has(workflow.id)) {
+			throw new Error(`Workflow "${workflow.id}" is already registered`);
 		}
-		this.workflowsByName.set(workflow.name, workflow);
+		this.workflowsById.set(workflow.id, workflow);
 		return this;
 	}
 
@@ -45,7 +45,7 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 	}
 
 	public remove(workflow: Workflow): WorkflowRegistry {
-		this.workflowsByName.delete(workflow.name);
+		this.workflowsById.delete(workflow.id);
 		return this;
 	}
 
@@ -57,15 +57,15 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 	}
 
 	public removeAll(): WorkflowRegistry {
-		this.workflowsByName.clear();
+		this.workflowsById.clear();
 		return this;
 	}
 
 	private getAll(): Workflow[] {
-		return Array.from(this.workflowsByName.values());
+		return Array.from(this.workflowsById.values());
 	}
 
-	private get(name: WorkflowName): Workflow | undefined {
-		return this.workflowsByName.get(name);
+	private get(id: WorkflowId): Workflow | undefined {
+		return this.workflowsById.get(id);
 	}
 }

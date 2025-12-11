@@ -22,7 +22,7 @@ export interface ListRequestV1 {
 	offset?: number;
 	filters?: {
 		workflows?: {
-			name?: string;
+			id?: string;
 			versionId?: string;
 		}[];
 		status?: WorkflowRunStatus[];
@@ -35,7 +35,7 @@ export interface ListRequestV1 {
 
 export interface WorkflowRunListItem {
 	id: string;
-	name: string;
+	workflowId: string;
 	versionId: string;
 	createdAt: number;
 	status: WorkflowRunStatus;
@@ -63,7 +63,7 @@ export interface GetStateResponseV1 {
 }
 
 export interface CreateRequestV1 {
-	name: string;
+	workflowId: string;
 	versionId: string;
 	input: unknown;
 	options?: WorkflowOptions;

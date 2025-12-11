@@ -120,7 +120,7 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 		cause: z.literal("task"),
 		reason: z.string(),
 		nextAttemptAt: z.number(),
-		taskName: z.string(),
+		taskId: z.string(),
 	}),
 	z.object({
 		status: z.literal("awaiting_retry"),
@@ -144,7 +144,7 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 		status: z.literal("failed"),
 		cause: z.literal("task"),
 		reason: z.string(),
-		taskName: z.string(),
+		taskId: z.string(),
 	}),
 	z.object({
 		status: z.literal("failed"),
@@ -162,7 +162,7 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 
 export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	id: z.string(),
-	name: z.string(),
+	workflowId: z.string(),
 	versionId: z.string(),
 	createdAt: z.number(),
 	revision: z.number(),
