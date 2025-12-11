@@ -11,6 +11,5 @@ server/.env
 
 todo/
 
-**/npm/
 **/dist/
 node_modules/

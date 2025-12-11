@@ -3,8 +3,6 @@
 	"version": "0.1.12",
 	"description": "Foundation utilities library for Aiki - including duration conversion, retry strategies, async helpers, and polling utilities",
 	"type": "module",
-	"main": "./dist/array/index.js",
-	"types": "./dist/array/index.d.ts",
 	"exports": {
 		"./array": {
 			"types": "./dist/array/index.d.ts",
