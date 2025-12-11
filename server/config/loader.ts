@@ -23,7 +23,9 @@ export async function loadConfig(): Promise<Config> {
 
 	const result = configSchema.safeParse(raw);
 	if (!result.success) {
+		// biome-ignore lint/suspicious/noConsole: <explanation>
 		console.error("Invalid configuration:");
+		// biome-ignore lint/suspicious/noConsole: <explanation>
 		console.error(result.error.issues);
 		process.exit(1);
 	}

@@ -132,7 +132,7 @@ export function getRetryParams(attempts: number, strategy: RetryStrategy): Retry
 					retriesLeft: false,
 				};
 			}
-			const delayMs = strategy.baseDelayMs * Math.pow(strategy.factor ?? 2, attempts - 1);
+			const delayMs = strategy.baseDelayMs * (strategy.factor ?? 2) ** (attempts - 1);
 			return {
 				retriesLeft: true,
 				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Number.POSITIVE_INFINITY),
@@ -144,7 +144,7 @@ export function getRetryParams(attempts: number, strategy: RetryStrategy): Retry
 					retriesLeft: false,
 				};
 			}
-			const base = strategy.baseDelayMs * Math.pow(strategy.jitterFactor ?? 2, attempts - 1);
+			const base = strategy.baseDelayMs * (strategy.jitterFactor ?? 2) ** (attempts - 1);
 			const delayMs = Math.random() * base;
 			return {
 				retriesLeft: true,

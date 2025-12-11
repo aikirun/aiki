@@ -66,7 +66,7 @@ export function toMilliseconds(duration: Duration): number {
 }
 
 function assertIsPositiveNumber(value: number, field?: keyof DurationFields): void {
-	if (!isFinite(value)) {
+	if (!Number.isFinite(value)) {
 		throw new Error(
 			field !== undefined
 				? `'${field}' duration must be finite. Received: ${value}`

@@ -1,26 +1,30 @@
-// deno-lint-ignore-file no-console
 import type { Logger } from "@aikirun/types/client";
 
 export class ConsoleLogger implements Logger {
 	constructor(private readonly context: Record<string, unknown> = {}) {}
 
 	trace(message: string, metadata?: Record<string, unknown>): void {
+		// biome-ignore lint/suspicious/noConsole: <explanation>
 		console.debug(this.format("TRACE", message, metadata));
 	}
 
 	debug(message: string, metadata?: Record<string, unknown>): void {
+		// biome-ignore lint/suspicious/noConsole: <explanation>
 		console.debug(this.format("DEBUG", message, metadata));
 	}
 
 	info(message: string, metadata?: Record<string, unknown>): void {
+		// biome-ignore lint/suspicious/noConsole: <explanation>
 		console.info(this.format("INFO", message, metadata));
 	}
 
 	warn(message: string, metadata?: Record<string, unknown>): void {
+		// biome-ignore lint/suspicious/noConsole: <explanation>
 		console.warn(this.format("WARN", message, metadata));
 	}
 
 	error(message: string, metadata?: Record<string, unknown>): void {
+		// biome-ignore lint/suspicious/noConsole: <explanation>
 		console.error(this.format("ERROR", message, metadata));
 	}
 
