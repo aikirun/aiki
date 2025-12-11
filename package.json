@@ -15,6 +15,7 @@
 		"test:coverage": "bun test --coverage",
 		"server": "bun run server/server.ts",
 		"server:watch": "bun --watch run server/server.ts",
+		"example": "bun run examples/${npm_config_name}.ts",
 		"changeset": "changeset",
 		"bump": "changeset version",
 		"clean": "rm -rf lib/dist types/dist sdk/*/dist",
@@ -23,8 +24,7 @@
 		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/client build && bun run --cwd sdk/task build && bun run --cwd sdk/worker build",
 		"build": "bun run build:lib && bun run build:types && bun run build:sdk",
 		"prepublishOnly": "bun run build",
-		"release": "changeset publish",
-		"example": "bun run examples/${npm_config_name}.ts"
+		"release": "changeset publish"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
