@@ -1,5 +1,11 @@
 import { z } from "zod";
-import type { WorkflowOptions, WorkflowRun, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type {
+	WorkflowOptions,
+	WorkflowRun,
+	WorkflowRunState,
+	WorkflowRunStatus,
+	WorkflowRunTransition,
+} from "@aikirun/types/workflow-run";
 import type { TriggerStrategy } from "@aikirun/types/trigger";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { DurationObject } from "@aikirun/lib/duration";
@@ -160,16 +166,30 @@ export const workflowRunStateSchema: zT<WorkflowRunState<unknown>> = z
 		}),
 	]);
 
-export const workflowRunSchema: zT<WorkflowRun> = z
-	.object({
-		id: z.string(),
-		name: z.string(),
-		versionId: z.string(),
-		revision: z.number(),
-		attempts: z.number(),
-		input: z.unknown(),
-		options: workflowOptionsSchema,
+export const workflowRunSchema: zT<WorkflowRun> = z.object({
+	id: z.string(),
+	name: z.string(),
+	versionId: z.string(),
+	createdAt: z.number(),
+	revision: z.number(),
+	input: z.unknown(),
+	options: workflowOptionsSchema,
+	attempts: z.number(),
+	state: workflowRunStateSchema,
+	tasksState: z.record(z.string(), taskStateSchema),
+	childWorkflowsRunState: z.record(z.string(), workflowRunStateSchema),
+});
+
+export const workflowRunTransitionSchema: zT<WorkflowRunTransition> = z.discriminatedUnion("type", [
+	z.object({
+		type: z.literal("state"),
+		createdAt: z.number(),
 		state: workflowRunStateSchema,
-		tasksState: z.record(z.string(), taskStateSchema),
-		childWorkflowsRunState: z.record(z.string(), workflowRunStateSchema),
-	});
+	}),
+	z.object({
+		type: z.literal("task_state"),
+		createdAt: z.number(),
+		taskPath: z.string(),
+		taskState: taskStateSchema,
+	}),
+]);

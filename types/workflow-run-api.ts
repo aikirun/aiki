@@ -1,7 +1,50 @@
-import type { WorkflowOptions, WorkflowRun, WorkflowRunState } from "./workflow-run.ts";
+import type {
+	WorkflowOptions,
+	WorkflowRun,
+	WorkflowRunState,
+	WorkflowRunStatus,
+	WorkflowRunTransition,
+} from "./workflow-run.ts";
 import type { TaskState } from "./task.ts";
 
-export type EmptyRecord = Record<string, never>;
+export interface WorkflowRunApi {
+	listV1: (input: ListRequestV1) => Promise<ListResponseV1>;
+	getByIdV1: (input: GetByIdRequestV1) => Promise<GetByIdResponseV1>;
+	getStateV1: (input: GetStateRequestV1) => Promise<GetStateResponseV1>;
+	createV1: (input: CreateRequestV1) => Promise<CreateResponseV1>;
+	transitionStateV1: (input: TransitionStateRequestV1) => Promise<TransitionStateResponseV1>;
+	transitionTaskStateV1: (input: TransitionTaskStateRequestV1) => Promise<TransitionTaskStateResponseV1>;
+	listTransitionsV1: (input: ListTransitionsRequestV1) => Promise<ListTransitionsResponseV1>;
+}
+
+export interface ListRequestV1 {
+	limit?: number;
+	offset?: number;
+	filters?: {
+		workflows?: {
+			name?: string;
+			versionId?: string;
+		}[];
+		status?: WorkflowRunStatus[];
+	};
+	sort?: {
+		field: "createdAt";
+		order: "asc" | "desc";
+	};
+}
+
+export interface WorkflowRunListItem {
+	id: string;
+	name: string;
+	versionId: string;
+	createdAt: number;
+	status: WorkflowRunStatus;
+}
+
+export interface ListResponseV1 {
+	runs: WorkflowRunListItem[];
+	total: number;
+}
 
 export interface GetByIdRequestV1 {
 	id: string;
@@ -51,10 +94,17 @@ export interface TransitionTaskStateResponseV1 {
 	newRevision: number;
 }
 
-export interface WorkflowRunApi {
-	getByIdV1: (input: GetByIdRequestV1) => Promise<GetByIdResponseV1>;
-	getStateV1: (input: GetStateRequestV1) => Promise<GetStateResponseV1>;
-	createV1: (input: CreateRequestV1) => Promise<CreateResponseV1>;
-	transitionStateV1: (input: TransitionStateRequestV1) => Promise<TransitionStateResponseV1>;
-	transitionTaskStateV1: (input: TransitionTaskStateRequestV1) => Promise<TransitionTaskStateResponseV1>;
+export interface ListTransitionsRequestV1 {
+	id: string;
+	limit?: number;
+	offset?: number;
+	sort?: {
+		field: "createdAt";
+		order: "asc" | "desc";
+	};
+}
+
+export interface ListTransitionsResponseV1 {
+	transitions: WorkflowRunTransition[];
+	total: number;
 }

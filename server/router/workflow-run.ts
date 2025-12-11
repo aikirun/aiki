@@ -1,15 +1,60 @@
 import { baseImplementer } from "./base.ts";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import { ConflictError, NotFoundError } from "../middleware/error-handler.ts";
 import { publishWorkflowReadyBatch } from "../redis/publisher.ts";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Redis } from "ioredis";
+import { isNonEmptyArray } from "@aikirun/lib/array";
 
 const os = baseImplementer.workflowRun;
 
 const workflowRuns = new Map<WorkflowRunId, WorkflowRun>();
 const workflowRunsIdempotencyMap = new Map<WorkflowName, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
+const workflowRunTransitions = new Map<WorkflowRunId, WorkflowRunTransition[]>();
+
+const listV1 = os.listV1.handler(({ input }) => {
+	const { filters, limit = 50, offset = 0, sort } = input;
+
+	const runs: WorkflowRun<unknown, unknown>[] = [];
+
+	for (const run of workflowRuns.values()) {
+		if (
+			filters?.workflows &&
+			isNonEmptyArray(filters.workflows) &&
+			filters.workflows.every((w) =>
+				(w.name && w.name !== run.name) ||
+				(w.versionId && w.versionId !== run.versionId)
+			)
+		) {
+			continue;
+		}
+
+		if (
+			filters?.status &&
+			isNonEmptyArray(filters.status) &&
+			filters.status.every((s) => (s !== run.state.status))
+		) {
+			continue;
+		}
+
+		runs.push(run);
+	}
+
+	return {
+		runs: runs
+			.sort((a, b) => sort?.order === "asc" ? a.createdAt - b.createdAt : b.createdAt - a.createdAt)
+			.slice(offset, offset + limit)
+			.map((run) => ({
+				id: run.id,
+				name: run.name,
+				versionId: run.versionId,
+				createdAt: run.createdAt,
+				status: run.state.status,
+			})),
+		total: runs.length,
+	};
+});
 
 const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 	// deno-lint-ignore no-console
@@ -53,7 +98,8 @@ const createV1 = os.createV1.handler(({ input }) => {
 		}
 	}
 
-	const runId = `${Date.now()}` as WorkflowRunId;
+	const now = Date.now();
+	const runId = `${now}` as WorkflowRunId;
 
 	const trigger = input.options?.trigger;
 
@@ -61,6 +107,7 @@ const createV1 = os.createV1.handler(({ input }) => {
 		id: runId,
 		name: input.name,
 		versionId: input.versionId,
+		createdAt: now,
 		revision: 0,
 		attempts: 0,
 		input: input.input,
@@ -68,9 +115,9 @@ const createV1 = os.createV1.handler(({ input }) => {
 		state: {
 			status: "scheduled",
 			scheduledAt: !trigger || trigger.type === "immediate"
-				? Date.now()
+				? now
 				: trigger.type === "delayed"
-				? "delayMs" in trigger ? Date.now() + trigger.delayMs : Date.now() + toMilliseconds(trigger.delay)
+				? "delayMs" in trigger ? now + trigger.delayMs : now + toMilliseconds(trigger.delay)
 				: trigger.startAt,
 		},
 		tasksState: {},
@@ -99,12 +146,14 @@ const createV1 = os.createV1.handler(({ input }) => {
 });
 
 const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
-	// deno-lint-ignore no-console
-	console.log(`Transitioning workflow run state: ${input.id} -> ${input.state.status}`);
+	const runId = input.id as WorkflowRunId;
 
-	const run = workflowRuns.get(input.id as WorkflowRunId);
+	// deno-lint-ignore no-console
+	console.log(`Transitioning workflow run state: ${runId} -> ${input.state.status}`);
+
+	const run = workflowRuns.get(runId);
 	if (!run) {
-		throw new NotFoundError(`Workflow run not found: ${input.id}`);
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
 
 	if (run.revision !== input.expectedRevision) {
@@ -113,6 +162,19 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
 			run.revision,
 			input.expectedRevision,
 		);
+	}
+
+	const transition: WorkflowRunTransition = {
+		type: "state",
+		createdAt: Date.now(),
+		state: input.state,
+	};
+
+	const transitions = workflowRunTransitions.get(runId);
+	if (!transitions) {
+		workflowRunTransitions.set(runId, [transition]);
+	} else {
+		transitions.push(transition);
 	}
 
 	run.state = input.state;
@@ -126,12 +188,14 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
 });
 
 const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
-	// deno-lint-ignore no-console
-	console.log(`Transitioning task state for workflow run: ${input.id}, task: ${input.taskPath}`);
+	const runId = input.id as WorkflowRunId;
 
-	const run = workflowRuns.get(input.id as WorkflowRunId);
+	// deno-lint-ignore no-console
+	console.log(`Transitioning task state for workflow run: ${runId}, task: ${input.taskPath}`);
+
+	const run = workflowRuns.get(runId);
 	if (!run) {
-		throw new NotFoundError(`Workflow run not found: ${input.id}`);
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
 
 	if (run.revision !== input.expectedRevision) {
@@ -142,10 +206,42 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
 		);
 	}
 
+	const transition: WorkflowRunTransition = {
+		type: "task_state",
+		createdAt: Date.now(),
+		taskPath: input.taskPath,
+		taskState: input.taskState,
+	};
+
+	const transitions = workflowRunTransitions.get(runId);
+	if (!transitions) {
+		workflowRunTransitions.set(runId, [transition]);
+	} else {
+		transitions.push(transition);
+	}
+
 	run.tasksState[input.taskPath] = input.taskState;
 	run.revision++;
 
 	return { newRevision: run.revision };
+});
+
+const listTransitionsV1 = os.listTransitionsV1.handler(({ input }) => {
+	const { id, limit = 50, offset = 0, sort } = input;
+
+	const run = workflowRuns.get(id as WorkflowRunId);
+	if (!run) {
+		throw new NotFoundError(`Workflow run not found: ${id}`);
+	}
+
+	const transitions = workflowRunTransitions.get(id as WorkflowRunId) ?? [];
+
+	return {
+		transitions: [...transitions]
+			.sort((a, b) => sort?.order === "asc" ? a.createdAt - b.createdAt : b.createdAt - a.createdAt)
+			.slice(offset, offset + limit),
+		total: transitions.length,
+	};
 });
 
 export function getScheduledWorkflows(): WorkflowRun[] {
@@ -276,9 +372,11 @@ export async function transitionSleepingWorkflowsToQueued(redis: Redis) {
 }
 
 export const workflowRunRouter = os.router({
+	listV1,
 	getByIdV1,
 	getStateV1,
 	createV1,
-	transitionTaskStateV1,
 	transitionStateV1,
+	transitionTaskStateV1,
+	listTransitionsV1,
 });

@@ -132,14 +132,34 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;
 	name: string;
 	versionId: string;
+	createdAt: number;
 	revision: number;
 	input: Input;
 	options: WorkflowOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;
+	// TODO: maybe loading tasks and child workflow states should be optional
 	tasksState: Record<string, TaskState<unknown>>;
 	childWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;
 }
+
+export interface WorkflowRunTransitionBase {
+	createdAt: number;
+	type: "state" | "task_state";
+}
+
+export interface WorkflowRunStateTransition extends WorkflowRunTransitionBase {
+	type: "state";
+	state: WorkflowRunState<unknown>;
+}
+
+export interface WorkflowRunTaskStateTransition extends WorkflowRunTransitionBase {
+	type: "task_state";
+	taskPath: string;
+	taskState: TaskState<unknown>;
+}
+
+export type WorkflowRunTransition = WorkflowRunStateTransition | WorkflowRunTaskStateTransition;
 
 export class WorkflowRunConflictError extends Error {
 	constructor(
