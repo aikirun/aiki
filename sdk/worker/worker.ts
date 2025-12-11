@@ -65,7 +65,7 @@ export function worker<AppContext>(client: Client<AppContext>, params: WorkerPar
 }
 
 export interface WorkerParams {
-	id?: string;
+	id: string;
 	maxConcurrentWorkflowRuns?: number;
 	workflowRun?: {
 		heartbeatIntervalMs?: number;
@@ -106,7 +106,7 @@ class WorkerImpl<AppContext> implements Worker {
 		private readonly client: Client<AppContext>,
 		private readonly params: WorkerParams
 	) {
-		this.id = params.id ?? crypto.randomUUID();
+		this.id = params.id;
 		this.registry = initWorkflowRegistry();
 
 		this.logger = client.logger.child({
