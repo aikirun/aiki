@@ -15,29 +15,19 @@ Build reliable, long-running business processes that survive failures, restarts,
 
 ## Quick Start
 
-Choose your package manager:
-
-### Deno
-Install the latest version from JSR (JavaScript Registry):
-
-```bash
-deno add jsr:@aikirun/task jsr:@aikirun/workflow jsr:@aikirun/client jsr:@aikirun/worker
-```
-
-### npm / Node.js
-Install from npm:
+Install the SDK packages:
 
 ```bash
 npm install @aikirun/task @aikirun/workflow @aikirun/client @aikirun/worker
 ```
 
 **Package Links:**
-- `@aikirun/lib` [jsr](https://jsr.io/@aikirun/lib), [npm](https://www.npmjs.com/package/@aikirun/lib) - Foundation utilities (duration, retry, async)
-- `@aikirun/types` [jsr](https://jsr.io/@aikirun/types), [npm](https://www.npmjs.com/package/@aikirun/types) - Core type definitions
-- `@aikirun/workflow` [jsr](https://jsr.io/@aikirun/workflow), [npm](https://www.npmjs.com/package/@aikirun/workflow) - Workflow SDK
-- `@aikirun/task` [jsr](https://jsr.io/@aikirun/task), [npm](https://www.npmjs.com/package/@aikirun/task) - Task SDK
-- `@aikirun/client` [jsr](https://jsr.io/@aikirun/client), [npm](https://www.npmjs.com/package/@aikirun/client) - Client SDK
-- `@aikirun/worker` [jsr](https://jsr.io/@aikirun/worker), [npm](https://www.npmjs.com/package/@aikirun/worker) - Worker SDK
+- [`@aikirun/lib`](https://www.npmjs.com/package/@aikirun/lib) - Foundation utilities (duration, retry, async)
+- [`@aikirun/types`](https://www.npmjs.com/package/@aikirun/types) - Core type definitions
+- [`@aikirun/workflow`](https://www.npmjs.com/package/@aikirun/workflow) - Workflow SDK
+- [`@aikirun/task`](https://www.npmjs.com/package/@aikirun/task) - Task SDK
+- [`@aikirun/client`](https://www.npmjs.com/package/@aikirun/client) - Client SDK
+- [`@aikirun/worker`](https://www.npmjs.com/package/@aikirun/worker) - Worker SDK
 
 Here's an example user onboarding workflow spanning multiple days. Traditional job queues would struggle with this. Aiki makes it trivial with durable state, event-driven waits, and automatic crash recovery.
 
@@ -192,7 +182,7 @@ Aiki's server orchestrates workflows and manages state, while workers execute ta
 
 ## Requirements
 
-- **Server**: Deno 1.30+
+- **Runtime**: Node.js 18+ or Bun 1.0+
 - **Redis**: 6.2+ (for Redis Streams)
 - **Database**: PostgreSQL 14+ (for state persistence)
 

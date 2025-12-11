@@ -11,15 +11,15 @@ Before you begin, make sure you have the required tools installed:
 docker --version
 docker-compose --version
 
-# Check Node.js (v18+) or Deno (v1.30+)
-node --version      # or: deno --version
+# Check Node.js (v18+) or Bun (v1.0+)
+node --version      # or: bun --version
 ```
 
 If any of these are missing:
 
 - **Docker**: https://docs.docker.com/get-docker/
 - **Node.js**: https://nodejs.org/en/
-- **Deno**: https://docs.deno.com/runtime/manual/getting_started/installation/
+- **Bun**: https://bun.sh/docs/installation
 
 ## Step 2: Start the Aiki Server and Redis
 
@@ -59,21 +59,21 @@ Or create a `.env` file at the repository root. See `server/.env.example` for av
 
 In a new terminal, install the Aiki packages for your project:
 
-### Using npm
-
 ```bash
 npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
 ```
 
-### Using Deno
+Or with other package managers:
 
-Add imports directly in your code (no installation needed):
+```bash
+# Using Bun
+bun add @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
 
-```typescript
-import { client } from "jsr:@aikirun/client@^0.1.0";
-import { worker } from "jsr:@aikirun/worker@^0.1.0";
-import { workflow } from "jsr:@aikirun/workflow@^0.1.0";
-import { task } from "jsr:@aikirun/task@^0.1.0";
+# Using pnpm
+pnpm add @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
+
+# Using yarn
+yarn add @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
 ```
 
 ## Step 4: You're Ready!

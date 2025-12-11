@@ -5,7 +5,7 @@ Foundation utilities library for Aiki - a durable execution engine.
 ## Installation
 
 ```bash
-deno add jsr:@aikirun/lib
+npm install @aikirun/lib
 ```
 
 ## Features

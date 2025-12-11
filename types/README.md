@@ -8,7 +8,7 @@ directly, but imported by other Aiki packages.
 ## Installation
 
 ```bash
-deno add jsr:@aikirun/types
+npm install @aikirun/types
 ```
 
 ## Exports
@@ -61,11 +61,11 @@ import type { TriggerStrategy } from "@aikirun/types/trigger";
 
 ## Related Packages
 
-- [@aikirun/lib](https://jsr.io/@aikirun/lib) - Foundation utilities
-- [@aikirun/client](https://jsr.io/@aikirun/client) - Client SDK
-- [@aikirun/workflow](https://jsr.io/@aikirun/workflow) - Workflow SDK
-- [@aikirun/task](https://jsr.io/@aikirun/task) - Task SDK
-- [@aikirun/worker](https://jsr.io/@aikirun/worker) - Worker SDK
+- [@aikirun/lib](https://www.npmjs.com/package/@aikirun/lib) - Foundation utilities
+- [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Client SDK
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Workflow SDK
+- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Task SDK
+- [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Worker SDK
 
 ## License
 

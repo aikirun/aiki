@@ -5,7 +5,7 @@ Client SDK for Aiki durable execution engine - connect to the Aiki server, start
 ## Installation
 
 ```bash
-deno add jsr:@aikirun/client @aikirun/workflow @aikirun/task
+npm install @aikirun/client @aikirun/workflow @aikirun/task
 ```
 
 ## Quick Start
@@ -106,9 +106,9 @@ See the [Aiki documentation](https://github.com/aikirun/aiki) for comprehensive 
 
 ## Related Packages
 
-- [@aikirun/workflow](https://jsr.io/@aikirun/workflow) - Define workflows
-- [@aikirun/task](https://jsr.io/@aikirun/task) - Define tasks
-- [@aikirun/worker](https://jsr.io/@aikirun/worker) - Execute workflows
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows
+- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
+- [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute workflows
 
 ## License
 

@@ -5,7 +5,7 @@ Workflow SDK for Aiki durable execution engine - define durable workflows with t
 ## Installation
 
 ```bash
-deno add jsr:@aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
+npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
 
 ## Quick Start
@@ -216,10 +216,10 @@ Failed workflows transition to `awaiting_retry` state and are automatically retr
 
 ## Related Packages
 
-- [@aikirun/task](https://jsr.io/@aikirun/task) - Define tasks
-- [@aikirun/client](https://jsr.io/@aikirun/client) - Start workflows
-- [@aikirun/worker](https://jsr.io/@aikirun/worker) - Execute workflows
-- [@aikirun/lib](https://jsr.io/@aikirun/lib) - Utilities
+- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
+- [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Start workflows
+- [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute workflows
+- [@aikirun/lib](https://www.npmjs.com/package/@aikirun/lib) - Utilities
 
 ## License
 

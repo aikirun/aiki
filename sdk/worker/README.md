@@ -6,7 +6,7 @@ recovery.
 ## Installation
 
 ```bash
-deno add jsr:@aikirun/worker @aikirun/client @aikirun/workflow @aikirun/task
+npm install @aikirun/worker @aikirun/client @aikirun/workflow @aikirun/task
 ```
 
 ## Quick Start
@@ -104,10 +104,10 @@ This allows workflows to resume from the exact point of failure.
 
 ## Related Packages
 
-- [@aikirun/client](https://jsr.io/@aikirun/client) - Start workflows
-- [@aikirun/workflow](https://jsr.io/@aikirun/workflow) - Define workflows
-- [@aikirun/task](https://jsr.io/@aikirun/task) - Define tasks
-- [@aikirun/lib](https://jsr.io/@aikirun/lib) - Utility functions
+- [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Start workflows
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows
+- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
+- [@aikirun/lib](https://www.npmjs.com/package/@aikirun/lib) - Utility functions
 
 ## License
 
