@@ -1,0 +1,23 @@
+{
+	"name": "@aikirun/lib",
+	"version": "0.1.12",
+	"description": "Foundation utilities library for Aiki - including duration conversion, retry strategies, async helpers, and polling utilities",
+	"type": "module",
+	"main": "./index.ts",
+	"exports": {
+		"./array": "./array/index.ts",
+		"./async": "./async/index.ts",
+		"./crypto": "./crypto/index.ts",
+		"./duration": "./duration/index.ts",
+		"./error": "./error/index.ts",
+		"./json": "./json/index.ts",
+		"./object": "./object/index.ts",
+		"./polling": "./polling/index.ts",
+		"./retry": "./retry/index.ts",
+		"./testing/expect": "./testing/expect/index.ts"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"license": "Apache-2.0"
+}

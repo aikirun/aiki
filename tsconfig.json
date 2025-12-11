@@ -1,0 +1,47 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"useUnknownInCatchVariables": true,
+		"noImplicitOverride": true,
+		"noUncheckedIndexedAccess": true,
+
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"target": "ES2022",
+		"lib": ["ES2022"],
+
+		"baseUrl": ".",
+		"paths": {
+			"@aikirun/lib": ["./lib/index.ts"],
+			"@aikirun/lib/*": ["./lib/*/index.ts"],
+			"@aikirun/types": ["./types/index.ts"],
+			"@aikirun/types/*": ["./types/*.ts"],
+			"@aikirun/client": ["./sdk/client/index.ts"],
+			"@aikirun/workflow": ["./sdk/workflow/index.ts"],
+			"@aikirun/task": ["./sdk/task/index.ts"],
+			"@aikirun/worker": ["./sdk/worker/index.ts"]
+		},
+
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+
+		"noEmit": true,
+
+		"types": ["bun-types", "@types/node"]
+	},
+	"include": [
+		"lib/**/*",
+		"types/**/*",
+		"sdk/**/*",
+		"server/**/*",
+		"scripts/**/*",
+		"examples/**/*"
+	],
+	"exclude": [
+		"node_modules",
+		"**/npm",
+		"**/dist"
+	]
+}

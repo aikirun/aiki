@@ -1,0 +1,38 @@
+{
+	"name": "aiki",
+	"version": "0.1.12",
+	"private": true,
+	"type": "module",
+	"workspaces": [
+		"lib",
+		"types",
+		"server",
+		"sdk/client",
+		"sdk/worker",
+		"sdk/task",
+		"sdk/workflow"
+	],
+	"scripts": {
+		"server": "bun run server/server.ts",
+		"server:watch": "bun --watch run server/server.ts",
+		"example": "bun run examples/${npm_config_name}.ts",
+		"changeset": "changeset",
+		"bump": "changeset version",
+		"release": "changeset publish",
+		"check": "tsc --noEmit",
+		"fmt": "bunx @biomejs/biome format --write .",
+		"fmt:check": "bunx @biomejs/biome format .",
+		"lint": "bunx @biomejs/biome lint .",
+		"lint:fix": "bunx @biomejs/biome lint --write .",
+		"test": "bun test",
+		"test:watch": "bun test --watch",
+		"test:coverage": "bun test --coverage"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@changesets/cli": "^2.27.1",
+		"@types/node": "^22.10.2",
+		"bun-types": "^1.1.38",
+		"typescript": "^5.7.2"
+	}
+}

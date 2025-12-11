@@ -1,0 +1,19 @@
+{
+	"name": "@aikirun/client",
+	"version": "0.1.12",
+	"description": "Client SDK for Aiki - connect to the server, start workflows, and manage execution",
+	"type": "module",
+	"main": "./index.ts",
+	"exports": "./index.ts",
+	"dependencies": {
+		"@aikirun/lib": "workspace:*",
+		"@aikirun/types": "workspace:*",
+		"@orpc/client": "^1.9.3",
+		"ioredis": "^5.4.1",
+		"zod": "^4.1.12"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"license": "Apache-2.0"
+}

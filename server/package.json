@@ -1,0 +1,20 @@
+{
+	"name": "@aikirun/server",
+	"version": "0.1.12",
+	"private": true,
+	"type": "module",
+	"main": "./index.ts",
+	"exports": {
+		".": "./index.ts"
+	},
+	"dependencies": {
+		"@aikirun/lib": "workspace:*",
+		"@aikirun/types": "workspace:*",
+		"@orpc/server": "^1.9.3",
+		"@orpc/contract": "^1.9.3",
+		"ioredis": "^5.4.1",
+		"zod": "^4.1.12",
+		"dotenv": "^16.4.5"
+	},
+	"license": "Apache-2.0"
+}

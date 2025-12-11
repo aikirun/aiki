@@ -14,7 +14,7 @@ import type {
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
 } from "@aikirun/types/client";
-import { getChildLogger } from "../logger/mod.ts";
+import { getChildLogger } from "../logger/index.ts";
 
 const WorkflowRunReadyMessageDataSchema = z.object({
 	type: z.literal("workflow_run_ready"),

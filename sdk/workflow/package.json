@@ -2,10 +2,15 @@
 	"name": "@aikirun/workflow",
 	"version": "0.1.12",
 	"description": "Workflow SDK for Aiki - define durable workflows with tasks, sleeps, waits, and event handling",
-	"exports": "./mod.ts",
-	"imports": {
-		"@aikirun/types/*": "jsr:@aikirun/types@^0.1.12/*",
-		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.12/*"
+	"type": "module",
+	"main": "./index.ts",
+	"exports": "./index.ts",
+	"dependencies": {
+		"@aikirun/lib": "workspace:*",
+		"@aikirun/types": "workspace:*"
+	},
+	"publishConfig": {
+		"access": "public"
 	},
 	"license": "Apache-2.0"
 }

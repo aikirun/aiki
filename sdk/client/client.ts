@@ -3,7 +3,7 @@ import { Redis } from "ioredis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver.ts";
-import { ConsoleLogger } from "./logger/mod.ts";
+import { ConsoleLogger } from "./logger/index.ts";
 
 /**
  * Creates an Aiki client for starting and managing workflows.

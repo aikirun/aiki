@@ -1,6 +1,6 @@
+import process from "node:process";
 import { worker } from "@aikirun/worker";
 import { eveningRoutineWorkflow, morningWorkflow } from "./workflows.ts";
-import { processWrapper } from "@aikirun/lib/process";
 import { client } from "../sdk/client/client.ts";
 
 export const aiki = await client({
@@ -36,11 +36,11 @@ const shutdown = async () => {
 	await workerA.stop();
 	await workerB.stop();
 	await aiki.close();
-	processWrapper.exit(0);
+	process.exit(0);
 };
 
-processWrapper.addSignalListener("SIGINT", shutdown);
-processWrapper.addSignalListener("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 await workerA.start();
 await workerB.start();

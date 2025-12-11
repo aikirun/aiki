@@ -2,6 +2,8 @@
 	"name": "@aikirun/types",
 	"version": "0.1.12",
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
+	"type": "module",
+	"main": "./index.ts",
 	"exports": {
 		"./client": "./client.ts",
 		"./trigger": "./trigger.ts",
@@ -10,8 +12,11 @@
 		"./workflow-run-api": "./workflow-run-api.ts",
 		"./task": "./task.ts"
 	},
-	"imports": {
-		"@aikirun/lib/*": "jsr:@aikirun/lib@^0.1.12/*"
+	"dependencies": {
+		"@aikirun/lib": "workspace:*"
+	},
+	"publishConfig": {
+		"access": "public"
 	},
 	"license": "Apache-2.0"
 }

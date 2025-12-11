@@ -1,7 +1,8 @@
-import { loadConfig } from "./config/mod.ts";
+import process from "node:process";
+import { loadConfig } from "./config/index.ts";
 import { RPCHandler } from "@orpc/server/fetch";
-import { contextFactory } from "./middleware/mod.ts";
-import { router } from "./router/mod.ts";
+import { contextFactory } from "./middleware/index.ts";
+import { router } from "./router/index.ts";
 import {
 	transitionRetryableWorkflowsToQueued,
 	transitionScheduledWorkflowsToQueued,
@@ -9,7 +10,7 @@ import {
 } from "./router/workflow-run.ts";
 import { Redis } from "ioredis";
 
-if (import.meta.main) {
+if (import.meta.url === Bun.main) {
 	const config = await loadConfig();
 
 	const redis = new Redis({
@@ -62,18 +63,27 @@ if (import.meta.main) {
 		1_000,
 	);
 
-	Deno.serve({ port: config.port }, async (req) => {
-		const context = contextFactory(req);
+	Bun.serve({
+		port: config.port,
+		fetch: async (req) => {
+			const context = contextFactory(req);
 
-		const result = await rpcHandler.handle(req, { context });
+			const result = await rpcHandler.handle(req, { context });
 
-		return result.response ?? new Response("Not Found", { status: 404 });
+			return result.response ?? new Response("Not Found", { status: 404 });
+		},
 	});
 
-	globalThis.addEventListener("beforeunload", async () => {
+	const shutdown = async () => {
 		clearInterval(scheduledSchedulerInterval);
 		clearInterval(sleepingSchedulerInterval);
 		clearInterval(retrySchedulerInterval);
 		await redis.quit();
-	});
+		process.exit(0);
+	};
+
+	process.on("SIGTERM", shutdown);
+	process.on("SIGINT", shutdown);
+
+	console.log(`Server running on port ${config.port}`);
 }

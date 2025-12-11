@@ -15,4 +15,4 @@ export type {
 	WorkflowRunBatch,
 } from "@aikirun/types/client";
 
-export { ConsoleLogger, getChildLogger } from "./logger/mod.ts";
+export { ConsoleLogger, getChildLogger } from "./logger/index.ts";

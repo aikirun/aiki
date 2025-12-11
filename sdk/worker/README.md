@@ -41,17 +41,17 @@ await aikiWorker.start();
 ### Graceful Shutdown
 
 ```typescript
-import { processWrapper } from "@aikirun/lib/process";
+import process from "node:process";
 
 // Handle signals
 const shutdown = async () => {
 	await aikiWorker.stop();
 	await aiki.close();
-	processWrapper.exit(0);
+	process.exit(0);
 };
 
-processWrapper.addSignalListener("SIGINT", shutdown);
-processWrapper.addSignalListener("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 ```
 
 ## Features

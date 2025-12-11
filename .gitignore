@@ -12,3 +12,4 @@ server/.env
 todo/
 
 **/npm/
+node_modules/
