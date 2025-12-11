@@ -18,13 +18,20 @@
 		"lint:fix": "bunx @biomejs/biome lint --write .",
 		"test": "bun test",
 		"test:watch": "bun test --watch",
-		"test:coverage": "bun test --coverage"
+		"test:coverage": "bun test --coverage",
+		"build": "bun run build:lib && bun run build:types && bun run build:sdk",
+		"build:lib": "cd lib && bunx tsup",
+		"build:types": "cd types && bunx tsup",
+		"build:sdk": "cd sdk/client && bunx tsup && cd ../workflow && bunx tsup && cd ../task && bunx tsup && cd ../worker && bunx tsup",
+		"clean": "rm -rf lib/dist types/dist sdk/*/dist",
+		"prepublishOnly": "bun run build"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@changesets/cli": "^2.27.1",
 		"@types/node": "^22.10.2",
 		"bun-types": "^1.1.38",
+		"tsup": "^8.5.1",
 		"typescript": "^5.7.2"
 	}
 }

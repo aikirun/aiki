@@ -3,14 +3,37 @@
 	"version": "0.1.12",
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"type": "module",
-	"main": "./index.ts",
+	"main": "./dist/client.js",
+	"types": "./dist/client.d.ts",
 	"exports": {
-		"./client": "./client.ts",
-		"./trigger": "./trigger.ts",
-		"./workflow": "./workflow.ts",
-		"./workflow-run": "./workflow-run.ts",
-		"./workflow-run-api": "./workflow-run-api.ts",
-		"./task": "./task.ts"
+		"./client": {
+			"types": "./dist/client.d.ts",
+			"import": "./dist/client.js"
+		},
+		"./trigger": {
+			"types": "./dist/trigger.d.ts",
+			"import": "./dist/trigger.js"
+		},
+		"./workflow": {
+			"types": "./dist/workflow.d.ts",
+			"import": "./dist/workflow.js"
+		},
+		"./workflow-run": {
+			"types": "./dist/workflow-run.d.ts",
+			"import": "./dist/workflow-run.js"
+		},
+		"./workflow-run-api": {
+			"types": "./dist/workflow-run-api.d.ts",
+			"import": "./dist/workflow-run-api.js"
+		},
+		"./task": {
+			"types": "./dist/task.d.ts",
+			"import": "./dist/task.js"
+		}
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "tsup"
 	},
 	"dependencies": {
 		"@aikirun/lib": "workspace:*"

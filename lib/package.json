@@ -3,18 +3,53 @@
 	"version": "0.1.12",
 	"description": "Foundation utilities library for Aiki - including duration conversion, retry strategies, async helpers, and polling utilities",
 	"type": "module",
-	"main": "./index.ts",
+	"main": "./dist/array/index.js",
+	"types": "./dist/array/index.d.ts",
 	"exports": {
-		"./array": "./array/index.ts",
-		"./async": "./async/index.ts",
-		"./crypto": "./crypto/index.ts",
-		"./duration": "./duration/index.ts",
-		"./error": "./error/index.ts",
-		"./json": "./json/index.ts",
-		"./object": "./object/index.ts",
-		"./polling": "./polling/index.ts",
-		"./retry": "./retry/index.ts",
-		"./testing/expect": "./testing/expect/index.ts"
+		"./array": {
+			"types": "./dist/array/index.d.ts",
+			"import": "./dist/array/index.js"
+		},
+		"./async": {
+			"types": "./dist/async/index.d.ts",
+			"import": "./dist/async/index.js"
+		},
+		"./crypto": {
+			"types": "./dist/crypto/index.d.ts",
+			"import": "./dist/crypto/index.js"
+		},
+		"./duration": {
+			"types": "./dist/duration/index.d.ts",
+			"import": "./dist/duration/index.js"
+		},
+		"./error": {
+			"types": "./dist/error/index.d.ts",
+			"import": "./dist/error/index.js"
+		},
+		"./json": {
+			"types": "./dist/json/index.d.ts",
+			"import": "./dist/json/index.js"
+		},
+		"./object": {
+			"types": "./dist/object/index.d.ts",
+			"import": "./dist/object/index.js"
+		},
+		"./polling": {
+			"types": "./dist/polling/index.d.ts",
+			"import": "./dist/polling/index.js"
+		},
+		"./retry": {
+			"types": "./dist/retry/index.d.ts",
+			"import": "./dist/retry/index.js"
+		},
+		"./testing/expect": {
+			"types": "./dist/testing/expect/index.d.ts",
+			"import": "./dist/testing/expect/index.js"
+		}
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "tsup"
 	},
 	"publishConfig": {
 		"access": "public"
