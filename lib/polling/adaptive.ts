@@ -81,7 +81,7 @@ export class AdaptivePollingStrategy {
 			const backoffAttempts = this.consecutiveEmptyPolls - this.config.emptyPollThreshold;
 			const retryParams = getRetryParams(backoffAttempts, {
 				type: "exponential",
-				maxAttempts: Infinity,
+				maxAttempts: Number.POSITIVE_INFINITY,
 				baseDelayMs: this.config.minPollIntervalMs,
 				factor: this.config.backoffMultiplier,
 				maxDelayMs: this.config.maxPollIntervalMs,

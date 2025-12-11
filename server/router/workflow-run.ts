@@ -105,7 +105,10 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 				},
 				"Returning existing run from idempotency key"
 			);
-			const existingRun = workflowRuns.get(existingRunId)!;
+			const existingRun = workflowRuns.get(existingRunId);
+			if (!existingRun) {
+				throw new NotFoundError(`Workflow run not found: ${existingRunId}`);
+			}
 			return { run: existingRun };
 		}
 	}

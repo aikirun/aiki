@@ -11,7 +11,7 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { DurationObject } from "@aikirun/lib/duration";
 import type { UnionToRecord } from "@aikirun/lib/object";
 import { taskStateSchema } from "../task/schema.ts";
-import type { ZT } from "../helpers/schema.ts";
+import type { Zt } from "../helpers/schema.ts";
 import { serializedErrorSchema } from "../serializable.ts";
 
 export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>> = z.enum([
@@ -28,7 +28,7 @@ export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>
 	"completed",
 ]);
 
-export const durationObjectSchema: ZT<DurationObject> = z.union([
+export const durationObjectSchema: Zt<DurationObject> = z.union([
 	z.object({
 		days: z.number(),
 		hours: z.number().optional(),
@@ -66,14 +66,14 @@ export const durationObjectSchema: ZT<DurationObject> = z.union([
 	}),
 ]);
 
-export const triggerStrategySchema: ZT<TriggerStrategy> = z.union([
+export const triggerStrategySchema: Zt<TriggerStrategy> = z.union([
 	z.object({ type: z.literal("immediate") }),
 	z.object({ type: z.literal("delayed"), delayMs: z.number() }),
 	z.object({ type: z.literal("delayed"), delay: durationObjectSchema }),
 	z.object({ type: z.literal("startAt"), startAt: z.number() }),
 ]);
 
-export const retryStrategySchema: ZT<RetryStrategy> = z.discriminatedUnion("type", [
+export const retryStrategySchema: Zt<RetryStrategy> = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("never") }),
 	z.object({ type: z.literal("fixed"), maxAttempts: z.number(), delayMs: z.number() }),
 	z.object({
@@ -85,14 +85,14 @@ export const retryStrategySchema: ZT<RetryStrategy> = z.discriminatedUnion("type
 	z.object({ type: z.literal("jittered"), maxAttempts: z.number(), baseDelayMs: z.number(), maxDelayMs: z.number() }),
 ]);
 
-export const workflowOptionsSchema: ZT<WorkflowOptions> = z.object({
+export const workflowOptionsSchema: Zt<WorkflowOptions> = z.object({
 	idempotencyKey: z.string().optional(),
 	trigger: triggerStrategySchema.optional(),
 	shardKey: z.string().optional(),
 	retry: retryStrategySchema.optional(),
 });
 
-export const workflowRunStateSchema: ZT<WorkflowRunState<unknown>> = z.union([
+export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 	z.object({
 		status: workflowRunStatusSchema.exclude([
 			"scheduled",
@@ -160,7 +160,7 @@ export const workflowRunStateSchema: ZT<WorkflowRunState<unknown>> = z.union([
 	}),
 ]);
 
-export const workflowRunSchema: ZT<WorkflowRun> = z.object({
+export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	id: z.string(),
 	name: z.string(),
 	versionId: z.string(),
@@ -174,7 +174,7 @@ export const workflowRunSchema: ZT<WorkflowRun> = z.object({
 	childWorkflowsRunState: z.record(z.string(), workflowRunStateSchema),
 });
 
-export const workflowRunTransitionSchema: ZT<WorkflowRunTransition> = z.discriminatedUnion("type", [
+export const workflowRunTransitionSchema: Zt<WorkflowRunTransition> = z.discriminatedUnion("type", [
 	z.object({
 		type: z.literal("state"),
 		createdAt: z.number(),

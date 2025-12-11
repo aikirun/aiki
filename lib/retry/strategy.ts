@@ -135,7 +135,7 @@ export function getRetryParams(attempts: number, strategy: RetryStrategy): Retry
 			const delayMs = strategy.baseDelayMs * Math.pow(strategy.factor ?? 2, attempts - 1);
 			return {
 				retriesLeft: true,
-				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity),
+				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Number.POSITIVE_INFINITY),
 			};
 		}
 		case "jittered": {
@@ -148,7 +148,7 @@ export function getRetryParams(attempts: number, strategy: RetryStrategy): Retry
 			const delayMs = Math.random() * base;
 			return {
 				retriesLeft: true,
-				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Infinity),
+				delayMs: Math.min(delayMs, strategy.maxDelayMs ?? Number.POSITIVE_INFINITY),
 			};
 		}
 		default:

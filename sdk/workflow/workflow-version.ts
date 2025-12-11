@@ -112,8 +112,9 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 						});
 					}
 					throw new WorkflowRunFailedError(runCtx.id, attempts, failedState.reason, failedState.cause);
-				} else {
-					const nextAttemptAt = Date.now() + retryParams.delayMs;
+				}
+
+				const nextAttemptAt = Date.now() + retryParams.delayMs;
 					const awaitingRetryState = this.createAwaitingRetryState(error, nextAttemptAt);
 					await runCtx.handle.transitionState(awaitingRetryState);
 
@@ -132,7 +133,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 
 					// TODO: if delay is small enough, it might be more profitable to spin
 					throw new WorkflowRunFailedError(runCtx.id, attempts, awaitingRetryState.reason, awaitingRetryState.cause);
-				}
 			}
 		}
 	}

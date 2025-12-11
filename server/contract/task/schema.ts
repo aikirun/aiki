@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { TaskState } from "@aikirun/types/task";
-import type { ZT } from "../helpers/schema.ts";
+import type { Zt } from "../helpers/schema.ts";
 import { serializedErrorSchema } from "../serializable.ts";
 
-export const taskStateSchema: ZT<TaskState<unknown>> = z.discriminatedUnion("status", [
+export const taskStateSchema: Zt<TaskState<unknown>> = z.discriminatedUnion("status", [
 	z.object({ status: z.literal("none") }),
 	z.object({
 		status: z.literal("running"),

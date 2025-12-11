@@ -26,7 +26,7 @@ export function createPollingStrategy(
 			case "retry": {
 				const retryParams = getRetryParams(params.attemptNumber, {
 					type: "jittered",
-					maxAttempts: Infinity,
+					maxAttempts: Number.POSITIVE_INFINITY,
 					baseDelayMs: intervalMs,
 					maxDelayMs: maxRetryIntervalMs,
 				});
