@@ -41,6 +41,7 @@ services:
 
 networks:
   aiki-network:
+    name: aiki-network
     driver: bridge
 
 volumes:
