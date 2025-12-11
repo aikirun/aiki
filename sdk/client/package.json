@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/client",
-	"version": "0.1.12",
+	"version": "0.1.13",
 	"description": "Client SDK for Aiki - connect to the server, start workflows, and manage execution",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -11,7 +11,9 @@
 			"import": "./dist/index.js"
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsup"
 	},
