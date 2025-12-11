@@ -115,24 +115,24 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				}
 
 				const nextAttemptAt = Date.now() + retryParams.delayMs;
-					const awaitingRetryState = this.createAwaitingRetryState(error, nextAttemptAt);
-					await runCtx.handle.transitionState(awaitingRetryState);
+				const awaitingRetryState = this.createAwaitingRetryState(error, nextAttemptAt);
+				await runCtx.handle.transitionState(awaitingRetryState);
 
-					const logMeta: Record<string, unknown> = {};
-					for (const [key, value] of Object.entries(awaitingRetryState)) {
-						logMeta[`aiki.${key}`] = value;
-					}
-					if (!(error instanceof WorkflowSleepingError)) {
-						runCtx.logger.info("Workflow failed. Scheduled for retry", {
-							"aiki.attempts": attempts,
-							"aiki.nextAttemptAt": nextAttemptAt,
-							"aiki.delayMs": retryParams.delayMs,
-							...logMeta,
-						});
-					}
+				const logMeta: Record<string, unknown> = {};
+				for (const [key, value] of Object.entries(awaitingRetryState)) {
+					logMeta[`aiki.${key}`] = value;
+				}
+				if (!(error instanceof WorkflowSleepingError)) {
+					runCtx.logger.info("Workflow failed. Scheduled for retry", {
+						"aiki.attempts": attempts,
+						"aiki.nextAttemptAt": nextAttemptAt,
+						"aiki.delayMs": retryParams.delayMs,
+						...logMeta,
+					});
+				}
 
-					// TODO: if delay is small enough, it might be more profitable to spin
-					throw new WorkflowRunFailedError(runCtx.id, attempts, awaitingRetryState.reason, awaitingRetryState.cause);
+				// TODO: if delay is small enough, it might be more profitable to spin
+				throw new WorkflowRunFailedError(runCtx.id, attempts, awaitingRetryState.reason, awaitingRetryState.cause);
 			}
 		}
 	}
