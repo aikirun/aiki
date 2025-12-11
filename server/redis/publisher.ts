@@ -1,6 +1,6 @@
 import type { Redis } from "ioredis";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import type { Logger } from "./logger/index.ts";
+import type { Logger } from "../logger/index.ts";
 
 export interface WorkflowMessageToPublish {
 	workflowRunId: string;

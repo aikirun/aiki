@@ -9,10 +9,11 @@ import {
 	transitionSleepingWorkflowsToQueued,
 } from "./router/workflow-run.ts";
 import { Redis } from "ioredis";
-import { logger } from "./logger/index.ts";
+import { createLogger } from "./logger/index.ts";
 
 if (import.meta.url === Bun.main) {
 	const config = await loadConfig();
+	const logger = createLogger(config.logLevel);
 
 	const redis = new Redis({
 		host: config.redis.host,
