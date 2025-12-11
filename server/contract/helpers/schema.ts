@@ -1,3 +1,3 @@
 import type { z } from "zod";
 
-export type zT<Input, Output = Input> = z.ZodType<Input, Output>;
+export type ZT<Input, Output = Input> = z.ZodType<Input, Output>;

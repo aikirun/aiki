@@ -108,7 +108,7 @@ export function createRedisStreamsStrategy(
 			case "retry": {
 				const retryParams = getRetryParams(params.attemptNumber, {
 					type: "jittered",
-					maxAttempts: Infinity,
+					maxAttempts: Number.POSITIVE_INFINITY,
 					baseDelayMs: intervalMs,
 					maxDelayMs: maxRetryIntervalMs,
 				});

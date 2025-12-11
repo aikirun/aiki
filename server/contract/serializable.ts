@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { SerializableError } from "@aikirun/lib/error";
-import type { zT } from "./helpers/schema.ts";
+import type { ZT } from "./helpers/schema.ts";
 
-export const serializedErrorSchema: zT<SerializableError> = z.object({
+export const serializedErrorSchema: ZT<SerializableError> = z.object({
 	message: z.string(),
 	name: z.string(),
 	stack: z.string().optional(),

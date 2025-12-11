@@ -82,20 +82,20 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 						success: true,
 						state: maybeResult.result as R,
 					};
-				} else {
-					const maybeResult = await withRetry(
-						this.getState.bind(this),
-						{ type: "fixed", maxAttempts, delayMs },
-						{ shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status) }
-					).run();
-					if (maybeResult.state === "timeout") {
-						return { success: false, cause: maybeResult.state };
-					}
-					return {
-						success: true,
-						state: maybeResult.result as R,
-					};
 				}
+
+				const maybeResult = await withRetry(
+					this.getState.bind(this),
+					{ type: "fixed", maxAttempts, delayMs },
+					{ shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status) }
+				).run();
+				if (maybeResult.state === "timeout") {
+					return { success: false, cause: maybeResult.state };
+				}
+				return {
+					success: true,
+					state: maybeResult.result as R,
+				};
 			}
 			case "event": {
 				throw new Error("Event-based waiting is not yet implemented");
