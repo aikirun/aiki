@@ -158,7 +158,7 @@ export const sendUsageTips = task({
                                       │ Redis Streams
                                       ▼
                      ┌───────────────────────────────────┐
-                     │         Redis Cluster             │
+                     │              Redis                │
                      │  ┌─────────────────────────────┐  │
                      │  │  Stream 1: workflow:orders  │  │
                      │  │  Stream 2: workflow:users   │  │
