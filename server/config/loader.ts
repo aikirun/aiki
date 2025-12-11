@@ -2,7 +2,7 @@ import process from "node:process";
 import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
-import { type Config, configSchema } from "./schema.ts";
+import { type Config, configSchema } from "./schema";
 
 export async function loadConfig(): Promise<Config> {
 	const __filename = fileURLToPath(import.meta.url);

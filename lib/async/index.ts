@@ -1,2 +1,2 @@
-export * from "./delay.ts";
-export * from "./fire-and-forget.ts";
+export * from "./delay";
+export * from "./fire-and-forget";

@@ -1,4 +1,4 @@
-import type { Equal, ExpectTrue } from "../testing/expect/types.ts";
+import type { Equal, ExpectTrue } from "../testing/expect/types";
 
 export type UndefinedToPartial<T extends object> = {
 	[K in keyof T as undefined extends T[K] ? K : never]?: Exclude<T[K], undefined>;

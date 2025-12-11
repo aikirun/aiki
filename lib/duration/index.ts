@@ -1,2 +1,2 @@
-export type { Duration, DurationObject } from "./types.ts";
-export { toMilliseconds } from "./convert.ts";
+export type { Duration, DurationObject } from "./types";
+export { toMilliseconds } from "./convert";

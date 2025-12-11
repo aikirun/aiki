@@ -1,6 +1,6 @@
 import type { WorkflowName } from "@aikirun/types/workflow";
 import type { Client, SubscriberStrategy, SubscriberStrategyBuilder } from "@aikirun/types/client";
-import { createRedisStreamsStrategy } from "./redis-streams.ts";
+import { createRedisStreamsStrategy } from "./redis-streams";
 
 export function resolveSubscriberStrategy(
 	client: Client<unknown>,

@@ -4,8 +4,8 @@ import type {
 	WorkflowRunState,
 	WorkflowRunStatus,
 	WorkflowRunTransition,
-} from "./workflow-run.ts";
-import type { TaskState } from "./task.ts";
+} from "./workflow-run";
+import type { TaskState } from "./task";
 
 export interface WorkflowRunApi {
 	listV1: (input: ListRequestV1) => Promise<ListResponseV1>;

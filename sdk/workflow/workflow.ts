@@ -1,5 +1,5 @@
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version.ts";
+import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version";
 import type { SerializableInput } from "@aikirun/lib/error";
 
 /**

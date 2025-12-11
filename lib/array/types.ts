@@ -1,4 +1,4 @@
-import type { Equal, ExpectFalse, ExpectTrue } from "../testing/expect/types.ts";
+import type { Equal, ExpectFalse, ExpectTrue } from "../testing/expect/types";
 
 export type NonEmptyArray<T> = [T, ...T[]];
 //#region <NonEmptyArray Tests>

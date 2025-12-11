@@ -1,5 +1,5 @@
-import { aiki } from "./setup.ts";
-import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows.ts";
+import { aiki } from "./setup";
+import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows";
 
 const logger = aiki.logger;
 

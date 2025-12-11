@@ -1,4 +1,4 @@
-import { getRetryParams } from "../retry/index.ts";
+import { getRetryParams } from "../retry/index";
 
 export interface AdaptivePollingConfig {
 	/**

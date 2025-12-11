@@ -9,8 +9,8 @@ import {
 	WorkflowSleepingError,
 } from "@aikirun/types/workflow-run";
 import type { Client, Logger } from "@aikirun/types/client";
-import type { WorkflowRunContext } from "./run/context.ts";
-import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle.ts";
+import type { WorkflowRunContext } from "./run/context";
+import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import { createSerializableError } from "@aikirun/lib/error";

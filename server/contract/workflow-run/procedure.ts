@@ -6,9 +6,9 @@ import {
 	workflowRunStateSchema,
 	workflowRunStatusSchema,
 	workflowRunTransitionSchema,
-} from "./schema.ts";
-import { taskStateSchema } from "../task/schema.ts";
-import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure.ts";
+} from "./schema";
+import { taskStateSchema } from "../task/schema";
+import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure";
 import type {
 	CreateRequestV1,
 	CreateResponseV1,

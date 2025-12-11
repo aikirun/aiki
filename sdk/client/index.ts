@@ -1,4 +1,4 @@
-export { client } from "./client.ts";
+export { client } from "./client";
 
 export type {
 	AdaptivePollingSubscriberStrategy,
@@ -15,4 +15,4 @@ export type {
 	WorkflowRunBatch,
 } from "@aikirun/types/client";
 
-export { ConsoleLogger } from "./logger/index.ts";
+export { ConsoleLogger } from "./logger/index";

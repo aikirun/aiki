@@ -1,4 +1,4 @@
-import type { Logger } from "../logger/index.ts";
+import type { Logger } from "../logger/index";
 
 export interface ServerContext {
 	request: {

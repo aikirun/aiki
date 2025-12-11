@@ -1,2 +1,2 @@
-export { loadConfig } from "./loader.ts";
-export type { Config } from "./schema.ts";
+export { loadConfig } from "./loader";
+export type { Config } from "./schema";

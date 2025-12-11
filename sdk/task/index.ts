@@ -1,2 +1,2 @@
-export { task } from "./task.ts";
-export type { Task, TaskParams } from "./task.ts";
+export { task } from "./task";
+export type { Task, TaskParams } from "./task";

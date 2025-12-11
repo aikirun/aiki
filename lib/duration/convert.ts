@@ -1,4 +1,4 @@
-import type { Duration, DurationFields } from "./types.ts";
+import type { Duration, DurationFields } from "./types";
 
 const MS_PER_SECOND = 1000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;

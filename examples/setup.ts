@@ -1,7 +1,7 @@
 import process from "node:process";
 import { worker } from "@aikirun/worker";
-import { eveningRoutineWorkflow, morningWorkflow } from "./workflows.ts";
-import { client } from "../sdk/client/client.ts";
+import { eveningRoutineWorkflow, morningWorkflow } from "./workflows";
+import { client } from "../sdk/client/client";
 
 export const aiki = await client({
 	url: "http://localhost:9090",

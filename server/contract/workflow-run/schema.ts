@@ -10,9 +10,9 @@ import type { TriggerStrategy } from "@aikirun/types/trigger";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { DurationObject } from "@aikirun/lib/duration";
 import type { UnionToRecord } from "@aikirun/lib/object";
-import { taskStateSchema } from "../task/schema.ts";
-import type { Zt } from "../helpers/schema.ts";
-import { serializedErrorSchema } from "../serializable.ts";
+import { taskStateSchema } from "../task/schema";
+import type { Zt } from "../helpers/schema";
+import { serializedErrorSchema } from "../serializable";
 
 export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>> = z.enum([
 	"scheduled",

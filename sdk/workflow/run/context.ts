@@ -1,7 +1,7 @@
 import type { WorkflowOptions, WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { Logger } from "@aikirun/types/client";
 import type { Duration } from "@aikirun/lib/duration";
-import type { WorkflowRunHandle } from "./run-handle.ts";
+import type { WorkflowRunHandle } from "./run-handle";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
 export interface WorkflowRunContext<Input, Output> {

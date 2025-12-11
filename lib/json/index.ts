@@ -1,1 +1,1 @@
-export { stableStringify } from "./stable-stringify.ts";
+export { stableStringify } from "./stable-stringify";

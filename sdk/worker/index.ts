@@ -1,2 +1,2 @@
-export { worker } from "./worker.ts";
-export type { Worker, WorkerParams } from "./worker.ts";
+export { worker } from "./worker";
+export type { Worker, WorkerParams } from "./worker";

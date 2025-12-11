@@ -1,4 +1,4 @@
-import { workflowRunContract } from "./workflow-run/procedure.ts";
+import { workflowRunContract } from "./workflow-run/procedure";
 
 export const contract = {
 	workflowRun: workflowRunContract,

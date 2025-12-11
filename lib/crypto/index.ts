@@ -1,1 +1,1 @@
-export * from "./hash.ts";
+export * from "./hash";

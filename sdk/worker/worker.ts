@@ -11,7 +11,6 @@ import { delay, fireAndForget } from "@aikirun/lib/async";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Duration } from "@aikirun/lib/duration";
 import type { Client, Logger, SubscriberStrategy } from "@aikirun/client";
-import { getChildLogger } from "@aikirun/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aikirun/client";
 import { initWorkflowRegistry, initWorkflowRunHandle, type WorkflowRegistry } from "@aikirun/workflow";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -110,7 +109,7 @@ class WorkerImpl<AppContext> implements Worker {
 		this.id = params.id ?? crypto.randomUUID();
 		this.registry = initWorkflowRegistry();
 
-		this.logger = getChildLogger(client.logger, {
+		this.logger = client.logger.child({
 			"aiki.component": "worker",
 			"aiki.workerId": this.id,
 		});
@@ -301,7 +300,7 @@ class WorkerImpl<AppContext> implements Worker {
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 		meta?: SubscriberMessageMeta
 	): Promise<void> {
-		const logger = getChildLogger(this.logger, {
+		const logger = this.logger.child({
 			"aiki.component": "workflow-execution",
 			"aiki.workflowName": workflowRun.name,
 			"aiki.workflowVersionId": workflowRun.versionId,

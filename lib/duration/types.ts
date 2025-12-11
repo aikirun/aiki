@@ -1,4 +1,4 @@
-import type { RequireAtLeastOneOf } from "../object/types.ts";
+import type { RequireAtLeastOneOf } from "../object/types";
 
 type DurationMs = number;
 

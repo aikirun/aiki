@@ -1,15 +1,15 @@
 import process from "node:process";
-import { loadConfig } from "./config/index.ts";
+import { loadConfig } from "./config/index";
 import { RPCHandler } from "@orpc/server/fetch";
-import { contextFactory } from "./middleware/index.ts";
-import { router } from "./router/index.ts";
+import { contextFactory } from "./middleware/index";
+import { router } from "./router/index";
 import {
 	transitionRetryableWorkflowsToQueued,
 	transitionScheduledWorkflowsToQueued,
 	transitionSleepingWorkflowsToQueued,
-} from "./router/workflow-run.ts";
+} from "./router/workflow-run";
 import { Redis } from "ioredis";
-import { createLogger } from "./logger/index.ts";
+import { createLogger } from "./logger/index";
 
 if (import.meta.url === Bun.main) {
 	const config = await loadConfig();

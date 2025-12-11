@@ -1,4 +1,4 @@
-import { delay } from "../async/delay.ts";
+import { delay } from "../async/delay";
 
 export interface NeverRetryStrategy {
 	type: "never";

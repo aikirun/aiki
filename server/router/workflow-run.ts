@@ -1,12 +1,12 @@
-import { baseImplementer } from "./base.ts";
+import { baseImplementer } from "./base";
 import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import { ConflictError, NotFoundError } from "../middleware/error-handler.ts";
-import { publishWorkflowReadyBatch } from "../redis/publisher.ts";
+import { ConflictError, NotFoundError } from "../middleware/error-handler";
+import { publishWorkflowReadyBatch } from "../redis/publisher";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Redis } from "ioredis";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import type { Logger } from "../logger/index.ts";
+import type { Logger } from "../logger/index";
 
 const os = baseImplementer.workflowRun;
 

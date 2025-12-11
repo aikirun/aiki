@@ -1,7 +1,7 @@
-import type { WorkflowName } from "./workflow.ts";
-import type { WorkflowRun } from "./workflow-run.ts";
-import type { WorkflowRunId } from "./workflow-run.ts";
-import type { WorkflowRunApi } from "./workflow-run-api.ts";
+import type { WorkflowName } from "./workflow";
+import type { WorkflowRun } from "./workflow-run";
+import type { WorkflowRunId } from "./workflow-run";
+import type { WorkflowRunApi } from "./workflow-run-api";
 
 export interface ClientParams<AppContext> {
 	url: string;

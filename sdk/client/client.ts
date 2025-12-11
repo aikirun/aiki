@@ -2,8 +2,8 @@ import type { ApiClient, Client, ClientParams, Logger } from "@aikirun/types/cli
 import { Redis } from "ioredis";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver.ts";
-import { ConsoleLogger } from "./logger/index.ts";
+import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
+import { ConsoleLogger } from "./logger/index";
 
 /**
  * Creates an Aiki client for starting and managing workflows.

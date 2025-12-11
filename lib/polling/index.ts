@@ -1,1 +1,1 @@
-export * from "./adaptive.ts";
+export * from "./adaptive";
