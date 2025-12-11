@@ -22,7 +22,7 @@ import { workflow } from "@aikirun/workflow";
 // 1. Define a task (unit of work)
 const greet = task({
 	name: "greet",
-	exec(input: { name: string }) {
+	async exec(input: { name: string }) {
 		console.log(`👋 Hello, ${input.name}!`);
 		return { greeted: true, name: input.name };
 	},
@@ -72,8 +72,8 @@ await aiki.close();
 # Using npx and tsx (npm)
 npx tsx my-first-workflow.ts
 
-# Using Deno
-deno run --allow-net --allow-env my-first-workflow.ts
+# Using Bun
+bun run my-first-workflow.ts
 ```
 
 ## Expected Output
