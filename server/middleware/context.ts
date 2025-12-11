@@ -11,7 +11,6 @@ export interface ServerContext {
 
 export function contextFactory(req: Request, logger: Logger): ServerContext {
 	const requestLogger = logger.child({
-		component: "request",
 		method: req.method,
 		url: req.url,
 	});

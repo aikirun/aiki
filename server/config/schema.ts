@@ -11,6 +11,7 @@ export const configSchema = z.object({
 	port: z.coerce.number().int().positive().default(9090),
 	redis: redisConfigSchema,
 	logLevel: z.enum(logLevels).default("info"),
+	prettyLogs: z.coerce.boolean().default(false),
 });
 
 export type RedisConfig = z.infer<typeof redisConfigSchema>;

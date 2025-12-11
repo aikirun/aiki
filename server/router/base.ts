@@ -11,7 +11,6 @@ const withErrorHandler = base.middleware(async ({ context, next }) => {
 	} catch (error) {
 		context.logger.error(
 			{
-				component: "error-handler",
 				errorName: error instanceof Error ? error.name : "Unknown",
 				errorMessage: error instanceof Error ? error.message : String(error),
 				error,

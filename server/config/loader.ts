@@ -19,6 +19,7 @@ export async function loadConfig(): Promise<Config> {
 			password: process.env.REDIS_PASSWORD,
 		},
 		logLevel: process.env.LOG_LEVEL,
+		prettyLogs: process.env.PRETTY_LOGS,
 	};
 
 	const result = configSchema.safeParse(raw);

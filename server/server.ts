@@ -13,7 +13,7 @@ import { createLogger } from "./logger/index";
 
 if (import.meta.main) {
 	const config = await loadConfig();
-	const logger = createLogger(config.logLevel);
+	const logger = createLogger(config.logLevel, config.prettyLogs);
 
 	const redis = new Redis({
 		host: config.redis.host,
