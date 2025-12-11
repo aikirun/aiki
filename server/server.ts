@@ -11,7 +11,7 @@ import {
 import { Redis } from "ioredis";
 import { createLogger } from "./logger/index";
 
-if (import.meta.url === Bun.main) {
+if (import.meta.main) {
 	const config = await loadConfig();
 	const logger = createLogger(config.logLevel);
 
