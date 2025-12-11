@@ -5,12 +5,6 @@
 	"type": "module",
 	"workspaces": ["lib", "types", "server", "sdk/client", "sdk/worker", "sdk/task", "sdk/workflow"],
 	"scripts": {
-		"server": "bun run server/server.ts",
-		"server:watch": "bun --watch run server/server.ts",
-		"example": "bun run examples/${npm_config_name}.ts",
-		"changeset": "changeset",
-		"bump": "changeset version",
-		"release": "changeset publish",
 		"check": "tsc --noEmit",
 		"fmt": "bunx @biomejs/biome format --write .",
 		"fmt:check": "bunx @biomejs/biome format .",
@@ -19,12 +13,15 @@
 		"test": "bun test",
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage",
-		"build": "bun run build:lib && bun run build:types && bun run build:sdk",
-		"build:lib": "cd lib && bunx tsup",
-		"build:types": "cd types && bunx tsup",
-		"build:sdk": "cd sdk/client && bunx tsup && cd ../workflow && bunx tsup && cd ../task && bunx tsup && cd ../worker && bunx tsup",
+		"server": "bun run server/server.ts",
+		"server:watch": "bun --watch run server/server.ts",
+		"changeset": "changeset",
+		"bump": "changeset version",
 		"clean": "rm -rf lib/dist types/dist sdk/*/dist",
-		"prepublishOnly": "bun run build"
+		"build": "bun run build:lib && bun run build:types && bun run build:sdk",
+		"prepublishOnly": "bun run build",
+		"release": "changeset publish",
+		"example": "bun run examples/${npm_config_name}.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
