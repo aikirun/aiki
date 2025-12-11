@@ -9,6 +9,7 @@ import {
 	transitionSleepingWorkflowsToQueued,
 } from "./router/workflow-run.ts";
 import { Redis } from "ioredis";
+import { logger } from "./logger/index.ts";
 
 if (import.meta.url === Bun.main) {
 	const config = await loadConfig();
@@ -20,44 +21,72 @@ if (import.meta.url === Bun.main) {
 	});
 
 	redis.on("error", (err: Error) => {
-		// deno-lint-ignore no-console
-		console.error("Redis error:", err);
+		logger.error(
+			{
+				err,
+			},
+			"Redis connection error"
+		);
 	});
 
 	const rpcHandler = new RPCHandler(router, {
 		// onSuccess: async (output, context) => {
-		//   console.log('Success:', { output, context });
+		// 	logger.info(
+		// 		{
+		// 			output,
+		// 			context,
+		// 		},
+		// 		"Success"
+		// 	);
 		// },
 		// onError: async (error, context) => {
-		//   console.error('Error:', { error, context });
+		// 	logger.error(
+		// 		{
+		// 			error,
+		// 			context,
+		// 		},
+		// 		"Success"
+		// 	);
 		// },
 	});
 
 	const scheduledSchedulerInterval = setInterval(() => {
-		transitionScheduledWorkflowsToQueued(redis).catch((err) => {
-			// deno-lint-ignore no-console
-			console.error("Error transitioning scheduled workflows:", err);
+		transitionScheduledWorkflowsToQueued(redis, logger).catch((err) => {
+			logger.error(
+				{
+					err,
+				},
+				"Error transitioning scheduled workflows"
+			);
 		});
 	}, 1_000);
 
 	const sleepingSchedulerInterval = setInterval(() => {
-		transitionSleepingWorkflowsToQueued(redis).catch((err) => {
-			// deno-lint-ignore no-console
-			console.error("Error transitioning sleeping workflows:", err);
+		transitionSleepingWorkflowsToQueued(redis, logger).catch((err) => {
+			logger.error(
+				{
+					err,
+				},
+				"Error transitioning sleeping workflows"
+			);
 		});
 	}, 1_000);
 
 	const retrySchedulerInterval = setInterval(() => {
-		transitionRetryableWorkflowsToQueued(redis).catch((err) => {
-			// deno-lint-ignore no-console
-			console.error("Error transitioning retryable workflows:", err);
+		transitionRetryableWorkflowsToQueued(redis, logger).catch((err) => {
+			logger.error(
+				{
+					err,
+				},
+				"Error transitioning retryable workflows"
+			);
 		});
 	}, 1_000);
 
 	Bun.serve({
 		port: config.port,
 		fetch: async (req) => {
-			const context = contextFactory(req);
+			const context = contextFactory(req, logger);
 
 			const result = await rpcHandler.handle(req, { context });
 
@@ -76,5 +105,10 @@ if (import.meta.url === Bun.main) {
 	process.on("SIGTERM", shutdown);
 	process.on("SIGINT", shutdown);
 
-	console.log(`Server running on port ${config.port}`);
+	logger.info(
+		{
+			port: config.port,
+		},
+		"Server running"
+	);
 }

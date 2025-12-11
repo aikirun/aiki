@@ -14,7 +14,6 @@ import type {
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
 } from "@aikirun/types/client";
-import { getChildLogger } from "../logger/index.ts";
 
 const WorkflowRunReadyMessageDataSchema = z.object({
 	type: z.literal("workflow_run_ready"),
@@ -88,7 +87,7 @@ export function createRedisStreamsStrategy(
 ): SubscriberStrategyBuilder {
 	const redis = client._internal.redis.getConnection();
 
-	const logger = getChildLogger(client.logger, {
+	const logger = client.logger.child({
 		"aiki.component": "redis-subscriber",
 	});
 

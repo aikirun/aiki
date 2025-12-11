@@ -1,5 +1,6 @@
 import type { Redis } from "ioredis";
 import { isNonEmptyArray } from "@aikirun/lib/array";
+import { Logger } from "./logger/index.ts";
 
 export interface WorkflowMessageToPublish {
 	workflowRunId: string;
@@ -7,7 +8,11 @@ export interface WorkflowMessageToPublish {
 	shardKey?: string;
 }
 
-export async function publishWorkflowReadyBatch(redis: Redis, messages: WorkflowMessageToPublish[]): Promise<void> {
+export async function publishWorkflowReadyBatch(
+	redis: Redis,
+	messages: WorkflowMessageToPublish[],
+	logger: Logger
+): Promise<void> {
 	if (!isNonEmptyArray(messages)) {
 		return;
 	}
@@ -38,7 +43,12 @@ export async function publishWorkflowReadyBatch(redis: Redis, messages: Workflow
 
 		await pipeline.exec();
 	} catch (error) {
-		// deno-lint-ignore no-console
-		console.error(`Failed to batch publish ${messages.length} workflow ready messages:`, error);
+		logger.error(
+			{
+				messageCount: messages.length,
+				error,
+			},
+			"Failed to batch publish workflow ready messages"
+		);
 	}
 }

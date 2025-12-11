@@ -6,6 +6,7 @@ import { publishWorkflowReadyBatch } from "../redis/publisher.ts";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Redis } from "ioredis";
 import { isNonEmptyArray } from "@aikirun/lib/array";
+import type { Logger } from "../logger/index.ts";
 
 const os = baseImplementer.workflowRun;
 
@@ -49,9 +50,13 @@ const listV1 = os.listV1.handler(({ input }) => {
 	};
 });
 
-const getByIdV1 = os.getByIdV1.handler(({ input }) => {
-	// deno-lint-ignore no-console
-	console.log(`Fetching workflow run by id: ${input.id}`);
+const getByIdV1 = os.getByIdV1.handler(({ input, context }) => {
+	context.logger.info(
+		{
+			workflowRunId: input.id,
+		},
+		"Fetching workflow run by id"
+	);
 
 	const run = workflowRuns.get(input.id as WorkflowRunId);
 	if (!run) {
@@ -61,9 +66,13 @@ const getByIdV1 = os.getByIdV1.handler(({ input }) => {
 	return { run };
 });
 
-const getStateV1 = os.getStateV1.handler(({ input }) => {
-	// deno-lint-ignore no-console
-	console.log(`Fetching workflow run state for id: ${input.id}`);
+const getStateV1 = os.getStateV1.handler(({ input, context }) => {
+	context.logger.info(
+		{
+			workflowRunId: input.id,
+		},
+		"Fetching workflow run state"
+	);
 
 	const run = workflowRuns.get(input.id as WorkflowRunId);
 	if (!run) {
@@ -73,9 +82,14 @@ const getStateV1 = os.getStateV1.handler(({ input }) => {
 	return { state: run.state };
 });
 
-const createV1 = os.createV1.handler(({ input }) => {
-	// deno-lint-ignore no-console
-	console.log(`Creating workflow run: ${input.name}/${input.versionId}`);
+const createV1 = os.createV1.handler(({ input, context }) => {
+	context.logger.info(
+		{
+			workflowName: input.name,
+			workflowVersionId: input.versionId,
+		},
+		"Creating workflow run"
+	);
 
 	const name = input.name as WorkflowName;
 	const versionId = input.versionId as WorkflowVersionId;
@@ -84,8 +98,13 @@ const createV1 = os.createV1.handler(({ input }) => {
 	if (idempotencyKey) {
 		const existingRunId = workflowRunsIdempotencyMap.get(name)?.get(versionId)?.get(idempotencyKey);
 		if (existingRunId) {
-			// deno-lint-ignore no-console
-			console.log(`Returning existing run: ${existingRunId}`);
+			context.logger.info(
+				{
+					workflowRunId: existingRunId,
+					idempotencyKey,
+				},
+				"Returning existing run from idempotency key"
+			);
 			const existingRun = workflowRuns.get(existingRunId)!;
 			return { run: existingRun };
 		}
@@ -141,11 +160,16 @@ const createV1 = os.createV1.handler(({ input }) => {
 	return { run };
 });
 
-const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
+const transitionStateV1 = os.transitionStateV1.handler(({ input, context }) => {
 	const runId = input.id as WorkflowRunId;
 
-	// deno-lint-ignore no-console
-	console.log(`Transitioning workflow run state: ${runId} -> ${input.state.status}`);
+	context.logger.info(
+		{
+			workflowRunId: runId,
+			status: input.state.status,
+		},
+		"Transitioning workflow run state"
+	);
 
 	const run = workflowRuns.get(runId);
 	if (!run) {
@@ -183,11 +207,17 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
 	return { newRevision: run.revision };
 });
 
-const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
+const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context }) => {
 	const runId = input.id as WorkflowRunId;
 
-	// deno-lint-ignore no-console
-	console.log(`Transitioning task state for workflow run: ${runId}, task: ${input.taskPath}`);
+	context.logger.info(
+		{
+			workflowRunId: runId,
+			taskPath: input.taskPath,
+			taskStatus: input.taskState.status,
+		},
+		"Transitioning task state"
+	);
 
 	const run = workflowRuns.get(runId);
 	if (!run) {
@@ -256,7 +286,7 @@ export function getScheduledWorkflows(): WorkflowRun[] {
 	return scheduled;
 }
 
-export async function transitionScheduledWorkflowsToQueued(redis: Redis) {
+export async function transitionScheduledWorkflowsToQueued(redis: Redis, logger: Logger) {
 	const messagesToPublish = [];
 	for (const run of getScheduledWorkflows()) {
 		run.state = {
@@ -265,8 +295,14 @@ export async function transitionScheduledWorkflowsToQueued(redis: Redis) {
 		};
 		run.revision++;
 
-		// deno-lint-ignore no-console
-		console.log(`Transitioned workflow ${run.name}/${run.versionId}/${run.id} from scheduled to queued`);
+		logger.info(
+			{
+				workflowName: run.name,
+				workflowVersionId: run.versionId,
+				workflowRunId: run.id,
+			},
+			"Transitioned workflow from scheduled to queued"
+		);
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
@@ -276,7 +312,7 @@ export async function transitionScheduledWorkflowsToQueued(redis: Redis) {
 	}
 
 	if (messagesToPublish.length > 0) {
-		await publishWorkflowReadyBatch(redis, messagesToPublish);
+		await publishWorkflowReadyBatch(redis, messagesToPublish, logger);
 	}
 }
 
@@ -296,7 +332,7 @@ export function getRetryableWorkflows(): WorkflowRun[] {
 	return retryable;
 }
 
-export async function transitionRetryableWorkflowsToQueued(redis: Redis) {
+export async function transitionRetryableWorkflowsToQueued(redis: Redis, logger: Logger) {
 	const messagesToPublish = [];
 	for (const run of getRetryableWorkflows()) {
 		// Reset all failed/running tasks atomically with state transition
@@ -312,8 +348,14 @@ export async function transitionRetryableWorkflowsToQueued(redis: Redis) {
 		};
 		run.revision++;
 
-		// deno-lint-ignore no-console
-		console.log(`Transitioned workflow ${run.name}/${run.versionId}/${run.id} from awaiting_retry to queued`);
+		logger.info(
+			{
+				workflowName: run.name,
+				workflowVersionId: run.versionId,
+				workflowRunId: run.id,
+			},
+			"Transitioned workflow from awaiting_retry to queued"
+		);
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
@@ -323,7 +365,7 @@ export async function transitionRetryableWorkflowsToQueued(redis: Redis) {
 	}
 
 	if (messagesToPublish.length > 0) {
-		await publishWorkflowReadyBatch(redis, messagesToPublish);
+		await publishWorkflowReadyBatch(redis, messagesToPublish, logger);
 	}
 }
 
@@ -343,7 +385,7 @@ export function getSleepingWorkflows(): WorkflowRun[] {
 	return sleeping;
 }
 
-export async function transitionSleepingWorkflowsToQueued(redis: Redis) {
+export async function transitionSleepingWorkflowsToQueued(redis: Redis, logger: Logger) {
 	const messagesToPublish = [];
 	for (const run of getSleepingWorkflows()) {
 		run.state = {
@@ -352,8 +394,14 @@ export async function transitionSleepingWorkflowsToQueued(redis: Redis) {
 		};
 		run.revision++;
 
-		// deno-lint-ignore no-console
-		console.log(`Transitioned workflow ${run.name}/${run.versionId}/${run.id} from sleeping to queued`);
+		logger.info(
+			{
+				workflowName: run.name,
+				workflowVersionId: run.versionId,
+				workflowRunId: run.id,
+			},
+			"Transitioned workflow from sleeping to queued"
+		);
 
 		messagesToPublish.push({
 			workflowRunId: run.id,
@@ -363,7 +411,7 @@ export async function transitionSleepingWorkflowsToQueued(redis: Redis) {
 	}
 
 	if (messagesToPublish.length > 0) {
-		await publishWorkflowReadyBatch(redis, messagesToPublish);
+		await publishWorkflowReadyBatch(redis, messagesToPublish, logger);
 	}
 }
 

@@ -311,9 +311,7 @@ class WorkerImpl<AppContext> implements Worker {
 			}),
 		});
 
-		// Using any cos setInterval returns different types on Deno and Node
-		// deno-lint-ignore no-explicit-any
-		let heartbeatInterval: any | undefined;
+		let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
 		let shouldAcknowledge = false;
 
 		try {
