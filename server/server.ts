@@ -106,10 +106,5 @@ if (import.meta.main) {
 	process.on("SIGTERM", shutdown);
 	process.on("SIGINT", shutdown);
 
-	logger.info(
-		{
-			port: config.port,
-		},
-		"Server running"
-	);
+	logger.info(`Server running on port ${config.port}`);
 }
