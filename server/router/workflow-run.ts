@@ -1,7 +1,7 @@
 import { baseImplementer } from "./base";
 import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import { ConflictError, NotFoundError } from "../middleware/error-handler";
+import { ConflictError, NotFoundError } from "../errors";
 import { publishWorkflowReadyBatch } from "../redis/publisher";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Redis } from "ioredis";
