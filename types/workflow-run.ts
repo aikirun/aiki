@@ -129,7 +129,7 @@ export type WorkflowRunState<Output> = WorkflowRunStateInComplete | WorkflowRunS
 export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;
 	workflowId: string;
-	versionId: string;
+	workflowVersionId: string;
 	createdAt: number;
 	revision: number;
 	input: Input;

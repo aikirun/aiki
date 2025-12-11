@@ -60,7 +60,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	): Promise<WorkflowRunStateHandle<Output>> {
 		const response = await client.api.workflowRun.createV1({
 			workflowId: this.id,
-			versionId: this.versionId,
+			workflowVersionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : null,
 			options: this.options,
 		});

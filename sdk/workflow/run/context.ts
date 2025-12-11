@@ -7,7 +7,7 @@ import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 export interface WorkflowRunContext<Input, Output> {
 	id: WorkflowRunId;
 	workflowId: WorkflowId;
-	versionId: WorkflowVersionId;
+	workflowVersionId: WorkflowVersionId;
 	options: WorkflowOptions;
 	handle: WorkflowRunHandle<Input, Output>;
 	logger: Logger;

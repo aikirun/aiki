@@ -270,11 +270,11 @@ class WorkerImpl<AppContext> implements Worker {
 				continue;
 			}
 
-			const workflowVersion = workflow._internal.getVersion(workflowRun.versionId as WorkflowVersionId);
+			const workflowVersion = workflow._internal.getVersion(workflowRun.workflowVersionId as WorkflowVersionId);
 			if (!workflowVersion) {
 				this.logger.warn("Workflow version not found", {
 					"aiki.workflowId": workflowRun.workflowId,
-					"aiki.workflowVersionId": workflowRun.versionId,
+					"aiki.workflowVersionId": workflowRun.workflowVersionId,
 					"aiki.workflowRunId": workflowRun.id,
 				});
 				if (meta && this.subscriberStrategy?.acknowledge) {
@@ -303,7 +303,7 @@ class WorkerImpl<AppContext> implements Worker {
 		const logger = this.logger.child({
 			"aiki.component": "workflow-execution",
 			"aiki.workflowId": workflowRun.workflowId,
-			"aiki.workflowVersionId": workflowRun.versionId,
+			"aiki.workflowVersionId": workflowRun.workflowVersionId,
 			"aiki.workflowRunId": workflowRun.id,
 			...(meta && {
 				"aiki.messageId": meta.messageId,
@@ -338,7 +338,7 @@ class WorkerImpl<AppContext> implements Worker {
 				{
 					id: workflowRun.id as WorkflowRunId,
 					workflowId: workflowRun.workflowId as WorkflowId,
-					versionId: workflowRun.versionId as WorkflowVersionId,
+					workflowVersionId: workflowRun.workflowVersionId as WorkflowVersionId,
 					options: workflowRun.options,
 					handle: workflowRunHandle,
 					logger,

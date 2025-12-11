@@ -60,7 +60,7 @@ const listV1: ContractProcedure<ListRequestV1, ListResponseV1> = oc
 				z.object({
 					id: z.string(),
 					workflowId: z.string(),
-					versionId: z.string(),
+					workflowVersionId: z.string(),
 					createdAt: z.number(),
 					status: workflowRunStatusSchema,
 				})
@@ -97,7 +97,7 @@ const createV1: ContractProcedure<CreateRequestV1, CreateResponseV1> = oc
 	.input(
 		z.object({
 			workflowId: z.string().min(1),
-			versionId: z.string().min(1),
+			workflowVersionId: z.string().min(1),
 			input: z.unknown(),
 			options: workflowOptionsSchema.optional(),
 		})

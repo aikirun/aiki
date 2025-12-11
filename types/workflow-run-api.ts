@@ -36,7 +36,7 @@ export interface ListRequestV1 {
 export interface WorkflowRunListItem {
 	id: string;
 	workflowId: string;
-	versionId: string;
+	workflowVersionId: string;
 	createdAt: number;
 	status: WorkflowRunStatus;
 }
@@ -64,7 +64,7 @@ export interface GetStateResponseV1 {
 
 export interface CreateRequestV1 {
 	workflowId: string;
-	versionId: string;
+	workflowVersionId: string;
 	input: unknown;
 	options?: WorkflowOptions;
 }

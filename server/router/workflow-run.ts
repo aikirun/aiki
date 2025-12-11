@@ -24,7 +24,7 @@ const listV1 = os.listV1.handler(({ input }) => {
 			filters?.workflows &&
 			isNonEmptyArray(filters.workflows) &&
 			filters.workflows.every(
-				(w) => (w.id && w.id !== run.workflowId) || (w.versionId && w.versionId !== run.versionId)
+				(w) => (w.id && w.id !== run.workflowId) || (w.versionId && w.versionId !== run.workflowVersionId)
 			)
 		) {
 			continue;
@@ -44,7 +44,7 @@ const listV1 = os.listV1.handler(({ input }) => {
 			.map((run) => ({
 				id: run.id,
 				workflowId: run.workflowId,
-				versionId: run.versionId,
+				workflowVersionId: run.workflowVersionId,
 				createdAt: run.createdAt,
 				status: run.state.status,
 			})),
@@ -88,17 +88,17 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 	context.logger.info(
 		{
 			workflowId: input.workflowId,
-			workflowVersionId: input.versionId,
+			workflowVersionId: input.workflowVersionId,
 		},
 		"Creating workflow run"
 	);
 
 	const workflowId = input.workflowId as WorkflowId;
-	const versionId = input.versionId as WorkflowVersionId;
+	const workflowVersionId = input.workflowVersionId as WorkflowVersionId;
 	const idempotencyKey = input.options?.idempotencyKey;
 
 	if (idempotencyKey) {
-		const existingRunId = workflowRunsIdempotencyMap.get(workflowId)?.get(versionId)?.get(idempotencyKey);
+		const existingRunId = workflowRunsIdempotencyMap.get(workflowId)?.get(workflowVersionId)?.get(idempotencyKey);
 		if (existingRunId) {
 			context.logger.info(
 				{
@@ -123,7 +123,7 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 	const run: WorkflowRun = {
 		id: runId,
 		workflowId: input.workflowId,
-		versionId: input.versionId,
+		workflowVersionId: input.workflowVersionId,
 		createdAt: now,
 		revision: 0,
 		attempts: 0,
@@ -153,10 +153,10 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 			workflowRunsIdempotencyMap.set(workflowId, versionMap);
 		}
 
-		let idempotencyKeyMap = versionMap.get(versionId);
+		let idempotencyKeyMap = versionMap.get(workflowVersionId);
 		if (!idempotencyKeyMap) {
 			idempotencyKeyMap = new Map();
-			versionMap.set(versionId, idempotencyKeyMap);
+			versionMap.set(workflowVersionId, idempotencyKeyMap);
 		}
 
 		idempotencyKeyMap.set(idempotencyKey, runId);
@@ -303,7 +303,7 @@ export async function transitionScheduledWorkflowsToQueued(redis: Redis, logger:
 		logger.info(
 			{
 				workflowId: run.workflowId,
-				workflowVersionId: run.versionId,
+				workflowVersionId: run.workflowVersionId,
 				workflowRunId: run.id,
 			},
 			"Transitioned workflow from scheduled to queued"
@@ -356,7 +356,7 @@ export async function transitionRetryableWorkflowsToQueued(redis: Redis, logger:
 		logger.info(
 			{
 				workflowId: run.workflowId,
-				workflowVersionId: run.versionId,
+				workflowVersionId: run.workflowVersionId,
 				workflowRunId: run.id,
 			},
 			"Transitioned workflow from awaiting_retry to queued"
@@ -402,7 +402,7 @@ export async function transitionSleepingWorkflowsToQueued(redis: Redis, logger: 
 		logger.info(
 			{
 				workflowId: run.workflowId,
-				workflowVersionId: run.versionId,
+				workflowVersionId: run.workflowVersionId,
 				workflowRunId: run.id,
 			},
 			"Transitioned workflow from sleeping to queued"

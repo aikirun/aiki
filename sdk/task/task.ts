@@ -232,7 +232,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		input: Input
 	): Promise<string> {
-		const workflowRunPath = `${runCtx.workflowId}/${runCtx.versionId}/${runCtx.id}`;
+		const workflowRunPath = `${runCtx.workflowId}/${runCtx.workflowVersionId}/${runCtx.id}`;
 
 		const inputHash = await sha256(stableStringify(input));
 
