@@ -6,10 +6,10 @@
 	"workspaces": ["lib", "types", "server", "sdk/client", "sdk/worker", "sdk/task", "sdk/workflow"],
 	"scripts": {
 		"check": "tsc --noEmit",
-		"fmt": "bunx @biomejs/biome format .",
-		"fmt:fix": "bunx @biomejs/biome format --write .",
 		"lint": "bunx @biomejs/biome lint .",
 		"lint:fix": "bunx @biomejs/biome lint --write .",
+		"fmt": "bunx @biomejs/biome format .",
+		"fmt:fix": "bunx @biomejs/biome format --write .",
 		"test": "bun test",
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage",
