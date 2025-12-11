@@ -3,7 +3,7 @@ import { worker } from "@aikirun/worker";
 import { eveningRoutineWorkflow, morningWorkflow } from "./workflows";
 import { client } from "../sdk/client/client";
 
-export const aiki = await client({
+export const aikiClient = await client({
 	url: "http://localhost:9090",
 	redis: {
 		host: "localhost",
@@ -15,12 +15,12 @@ export const aiki = await client({
 	}),
 });
 
-export const workerA = worker(aiki, {
+export const workerA = worker(aikiClient, {
 	id: "worker-A",
 	subscriber: { type: "redis_streams" },
 });
 
-const workerB = worker(aiki, {
+const workerB = worker(aikiClient, {
 	id: "worker-B",
 	subscriber: { type: "redis_streams" },
 });
@@ -32,7 +32,7 @@ workerB.registry.add(eveningRoutineWorkflow);
 const shutdown = async () => {
 	await workerA.stop();
 	await workerB.stop();
-	await aiki.close();
+	await aikiClient.close();
 	process.exit(0);
 };
 

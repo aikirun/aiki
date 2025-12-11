@@ -1,11 +1,11 @@
-import { aiki } from "./setup";
+import { aikiClient } from "./setup";
 import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows";
 
-const logger = aiki.logger;
+const logger = aikiClient.logger;
 
-await morningWorkflowV2.start(aiki, { a: "1", b: 1 });
+await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
 
-const stateHandle = await eveningRoutineWorkflowV1.withOptions({ idempotencyKey: "some-key" }).start(aiki);
+const stateHandle = await eveningRoutineWorkflowV1.withOptions({ idempotencyKey: "some-key" }).start(aikiClient);
 
 const result = await stateHandle.wait({ type: "status", status: "completed" }, { maxDurationMs: 30_000 });
 if (result.success) {
