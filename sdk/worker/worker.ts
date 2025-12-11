@@ -257,7 +257,9 @@ class WorkerImpl<AppContext> implements Worker {
 			const { workflowRunId } = data;
 
 			if (this.activeWorkflowRunsById.has(workflowRunId)) {
-				// Debug: Skip already running workflows
+				this.logger.info("Workflow already running", {
+					"aiki.workflowRunId": workflowRunId,
+				});
 				continue;
 			}
 
