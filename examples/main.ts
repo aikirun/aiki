@@ -1,7 +1,7 @@
-import { aikiClient } from "./setup";
+import { aikiClient } from "./worker";
 import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./workflows";
 
-const logger = aikiClient.logger;
+const { logger } = aikiClient;
 
 await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
 

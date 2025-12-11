@@ -54,18 +54,18 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
 });
 ```
 
-*Setup worker `setup.ts`*
+*Setup worker `worker.ts`*
 ```typescript
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 import { onboardingWorkflow } from "./workflow.ts";
 
-export const aiki = await client({
+export const aikiClient = await client({
   url: "localhost:9090",
   redis: { host: "localhost", port: 6379 }
 });
 
-const workerA = await worker(aiki, {
+const workerA = await worker(aikiClient, {
   subscriber: { type: "redis_streams" }
 });
 
@@ -78,10 +78,10 @@ await workerA.start();
 
 *Start workflow `main.ts`*
 ```typescript
-import { aiki } from "./setup.ts";
+import { aikiClient } from "./worker.ts";
 import { onboardingWorkflowV1 } from "./workflow.ts";
 
-await onboardingWorkflowV1.start(aiki, { email: "newuser@example.com" });
+await onboardingWorkflowV1.start(aikiClient, { email: "newuser@example.com" });
 ```
 
 <details>
