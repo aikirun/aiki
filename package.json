@@ -15,7 +15,6 @@
 		"test:coverage": "bun test --coverage",
 		"server": "bun run server/server.ts",
 		"server:watch": "bun --watch run server/server.ts",
-		"example": "bun run examples/${npm_config_name}.ts",
 		"changeset": "changeset",
 		"bump": "changeset version",
 		"clean": "rm -rf lib/dist types/dist sdk/*/dist",
