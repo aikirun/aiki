@@ -3,7 +3,7 @@
 	"version": "0.1.12",
 	"private": true,
 	"type": "module",
-	"workspaces": ["lib", "types", "server", "sdk/client", "sdk/worker", "sdk/task", "sdk/workflow"],
+	"workspaces": ["lib", "types", "server", "sdk/workflow", "sdk/task", "sdk/client", "sdk/worker"],
 	"scripts": {
 		"check": "tsc --noEmit",
 		"lint": "bunx @biomejs/biome lint .",
@@ -18,10 +18,10 @@
 		"changeset": "changeset",
 		"bump": "changeset version",
 		"clean": "rm -rf lib/dist types/dist server/dist sdk/*/dist",
-		"build:server": "bun build server/server.ts --compile --outfile server/dist/aiki-server",
 		"build:lib": "bun run --cwd lib build",
 		"build:types": "bun run --cwd types build",
-		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/client build && bun run --cwd sdk/task build && bun run --cwd sdk/worker build",
+		"build:server": "bun build server/server.ts --compile --outfile server/dist/aiki-server",
+		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/task build && bun run --cwd sdk/client build && bun run --cwd sdk/worker build",
 		"prepublishOnly": "bun run build:lib && bun run build:types && bun run build:sdk",
 		"publish": "changeset publish && git push --follow-tags"
 	},
