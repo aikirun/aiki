@@ -37,6 +37,6 @@
 		}
 	},
 	"files": {
-		"ignore": ["*.md", "**/npm/**", "**/dist/**", "**/node_modules/**", "**/coverage/**"]
+		"ignore": ["*.md", "**/npm/**", "**/dist/**", "**/node_modules/**", "**/coverage/**", "**/package.json"]
 	}
 }
