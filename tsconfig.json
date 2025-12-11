@@ -31,5 +31,5 @@
 		"types": ["bun-types", "@types/node"]
 	},
 	"include": ["lib/**/*", "types/**/*", "sdk/**/*", "server/**/*", "scripts/**/*", "examples/**/*"],
-	"exclude": ["node_modules", "**/npm", "**/dist"]
+	"exclude": ["node_modules", "**/dist"]
 }
