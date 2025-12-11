@@ -26,20 +26,12 @@ export interface JitteredRetryStrategy {
 	maxDelayMs?: number;
 }
 
-export type RetryStrategy =
-	| NeverRetryStrategy
-	| FixedRetryStrategy
-	| ExponentialRetryStrategy
-	| JitteredRetryStrategy;
+export type RetryStrategy = NeverRetryStrategy | FixedRetryStrategy | ExponentialRetryStrategy | JitteredRetryStrategy;
 
-export type WithRetryOptions<Result, Abortable extends boolean> =
-	& {
-		shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>;
-		shouldNotRetryOnError?: (error: unknown) => Promise<boolean>;
-	}
-	& (
-		Abortable extends true ? { abortSignal: AbortSignal } : { abortSignal?: never }
-	);
+export type WithRetryOptions<Result, Abortable extends boolean> = {
+	shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>;
+	shouldNotRetryOnError?: (error: unknown) => Promise<boolean>;
+} & (Abortable extends true ? { abortSignal: AbortSignal } : { abortSignal?: never });
 
 type CompletedResult<Result> = {
 	state: "completed";
@@ -59,17 +51,17 @@ interface AbortedResult {
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
-	options?: WithRetryOptions<Result, false>,
+	options?: WithRetryOptions<Result, false>
 ): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult> };
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
-	options: WithRetryOptions<Result, true>,
+	options: WithRetryOptions<Result, true>
 ): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult | AbortedResult> };
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
-	options?: WithRetryOptions<Result, boolean>,
+	options?: WithRetryOptions<Result, boolean>
 ): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult | AbortedResult> } {
 	return {
 		run: async (...args: Args[]) => {
@@ -89,10 +81,7 @@ export function withRetry<Args, Result>(
 
 				try {
 					result = await fn(...args);
-					if (
-						options?.shouldRetryOnResult === undefined ||
-						!(await options.shouldRetryOnResult(result))
-					) {
+					if (options?.shouldRetryOnResult === undefined || !(await options.shouldRetryOnResult(result))) {
 						return {
 							state: "completed",
 							result,
@@ -100,10 +89,7 @@ export function withRetry<Args, Result>(
 						};
 					}
 				} catch (err) {
-					if (
-						options?.shouldNotRetryOnError !== undefined &&
-						(await options.shouldNotRetryOnError(err))
-					) {
+					if (options?.shouldNotRetryOnError !== undefined && (await options.shouldNotRetryOnError(err))) {
 						throw err;
 					}
 				}
@@ -121,14 +107,9 @@ export function withRetry<Args, Result>(
 	};
 }
 
-export type RetryParams =
-	| { retriesLeft: false }
-	| { retriesLeft: true; delayMs: number };
+export type RetryParams = { retriesLeft: false } | { retriesLeft: true; delayMs: number };
 
-export function getRetryParams(
-	attempts: number,
-	strategy: RetryStrategy,
-): RetryParams {
+export function getRetryParams(attempts: number, strategy: RetryStrategy): RetryParams {
 	const strategyType = strategy.type;
 	switch (strategyType) {
 		case "never":

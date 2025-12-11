@@ -25,12 +25,9 @@ const workerB = worker(aiki, {
 	subscriber: { type: "redis_streams" },
 });
 
-workerA.registry
-	.add(morningWorkflow)
-	.add(eveningRoutineWorkflow);
+workerA.registry.add(morningWorkflow).add(eveningRoutineWorkflow);
 
-workerB.registry
-	.add(eveningRoutineWorkflow);
+workerB.registry.add(eveningRoutineWorkflow);
 
 const shutdown = async () => {
 	await workerA.stop();

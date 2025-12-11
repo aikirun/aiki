@@ -71,12 +71,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 		this._internal = {
 			subscriber: {
 				create: (strategy, workflowNames, workerShards) =>
-					resolveSubscriberStrategy(
-						this,
-						strategy,
-						workflowNames,
-						workerShards,
-					),
+					resolveSubscriberStrategy(this, strategy, workflowNames, workerShards),
 			},
 			redis: {
 				getConnection: () => this.getRedisConnection(),
@@ -94,9 +89,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 	private getRedisConnection(): Redis {
 		if (!this.redisConnection) {
 			if (!this.params.redis) {
-				throw new Error(
-					"Redis configuration not provided to client. Add 'redis' to ClientParams.",
-				);
+				throw new Error("Redis configuration not provided to client. Add 'redis' to ClientParams.");
 			}
 			this.redisConnection = new Redis(this.params.redis);
 		}

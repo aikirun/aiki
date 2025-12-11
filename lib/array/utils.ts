@@ -2,7 +2,7 @@ import type { NonEmptyArray } from "./types.ts";
 
 export function groupBy<Item, Key, Value>(
 	items: Item[],
-	unwrap: (item: Item) => [Key, Value],
+	unwrap: (item: Item) => [Key, Value]
 ): Map<Key, NonEmptyArray<Value>> {
 	const result = new Map<Key, NonEmptyArray<Value>>();
 	for (const item of items) {

@@ -33,35 +33,26 @@ if (import.meta.url === Bun.main) {
 		// },
 	});
 
-	const scheduledSchedulerInterval = setInterval(
-		() => {
-			transitionScheduledWorkflowsToQueued(redis).catch((err) => {
-				// deno-lint-ignore no-console
-				console.error("Error transitioning scheduled workflows:", err);
-			});
-		},
-		1_000,
-	);
+	const scheduledSchedulerInterval = setInterval(() => {
+		transitionScheduledWorkflowsToQueued(redis).catch((err) => {
+			// deno-lint-ignore no-console
+			console.error("Error transitioning scheduled workflows:", err);
+		});
+	}, 1_000);
 
-	const sleepingSchedulerInterval = setInterval(
-		() => {
-			transitionSleepingWorkflowsToQueued(redis).catch((err) => {
-				// deno-lint-ignore no-console
-				console.error("Error transitioning sleeping workflows:", err);
-			});
-		},
-		1_000,
-	);
+	const sleepingSchedulerInterval = setInterval(() => {
+		transitionSleepingWorkflowsToQueued(redis).catch((err) => {
+			// deno-lint-ignore no-console
+			console.error("Error transitioning sleeping workflows:", err);
+		});
+	}, 1_000);
 
-	const retrySchedulerInterval = setInterval(
-		() => {
-			transitionRetryableWorkflowsToQueued(redis).catch((err) => {
-				// deno-lint-ignore no-console
-				console.error("Error transitioning retryable workflows:", err);
-			});
-		},
-		1_000,
-	);
+	const retrySchedulerInterval = setInterval(() => {
+		transitionRetryableWorkflowsToQueued(redis).catch((err) => {
+			// deno-lint-ignore no-console
+			console.error("Error transitioning retryable workflows:", err);
+		});
+	}, 1_000);
 
 	Bun.serve({
 		port: config.port,

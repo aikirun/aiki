@@ -6,7 +6,7 @@ export function resolveSubscriberStrategy(
 	client: Client<unknown>,
 	strategy: SubscriberStrategy,
 	workflowNames: WorkflowName[],
-	workerShards?: string[],
+	workerShards?: string[]
 ): SubscriberStrategyBuilder {
 	switch (strategy.type) {
 		// case "polling":

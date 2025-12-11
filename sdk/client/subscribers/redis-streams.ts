@@ -21,9 +21,7 @@ const WorkflowRunReadyMessageDataSchema = z.object({
 	workflowRunId: z.string().transform((id: string) => id as WorkflowRunId),
 });
 
-const RedisMessageDataSchema = z.discriminatedUnion("type", [
-	WorkflowRunReadyMessageDataSchema,
-]);
+const RedisMessageDataSchema = z.discriminatedUnion("type", [WorkflowRunReadyMessageDataSchema]);
 
 const RedisMessageRawDataSchema = z.array(z.unknown()).transform((rawFields: unknown[]) => {
 	const data: Record<string, unknown> = {};
@@ -73,12 +71,7 @@ const RedisStreamEntrySchema = z.tuple([
 
 const RedisStreamEntriesSchema = z.array(RedisStreamEntrySchema);
 
-const RedisStreamPendingMessageSchema = z.tuple([
-	z.string(),
-	z.string(),
-	z.number(),
-	z.number(),
-]);
+const RedisStreamPendingMessageSchema = z.tuple([z.string(), z.string(), z.number(), z.number()]);
 
 const RedisStreamPendingMessagesSchema = z.array(RedisStreamPendingMessageSchema);
 
@@ -91,7 +84,7 @@ export function createRedisStreamsStrategy(
 	client: Client<unknown>,
 	strategy: RedisStreamsSubscriberStrategy,
 	workflowNames: WorkflowName[],
-	workerShards?: string[],
+	workerShards?: string[]
 ): SubscriberStrategyBuilder {
 	const redis = client._internal.redis.getConnection();
 
@@ -133,16 +126,10 @@ export function createRedisStreamsStrategy(
 	};
 
 	const getHeartbeat =
-		(workerId: string) => async (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta): Promise<void> => {
+		(workerId: string) =>
+		async (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta): Promise<void> => {
 			try {
-				await redis.xclaim(
-					meta.stream,
-					meta.consumerGroup,
-					workerId,
-					0,
-					meta.messageId,
-					"JUSTID",
-				);
+				await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
 				logger.debug("Heartbeat sent", {
 					"aiki.workflowRunId": workflowRunId,
 					"aiki.messageId": meta.messageId,
@@ -204,7 +191,7 @@ export function createRedisStreamsStrategy(
 						workerId,
 						size,
 						blockTimeMs,
-						claimMinIdleTimeMs,
+						claimMinIdleTimeMs
 					),
 				heartbeat: getHeartbeat(workerId),
 				acknowledge,
@@ -215,18 +202,14 @@ export function createRedisStreamsStrategy(
 
 function getRedisStreamConsumerGroupMap(workflowNames: WorkflowName[], shardKeys?: string[]): Map<string, string> {
 	if (!shardKeys || !isNonEmptyArray(shardKeys)) {
-		return new Map(workflowNames.map((workflowName) => [
-			`workflow:${workflowName}`,
-			`worker:${workflowName}`,
-		]));
+		return new Map(workflowNames.map((workflowName) => [`workflow:${workflowName}`, `worker:${workflowName}`]));
 	}
 
-	return new Map(workflowNames.flatMap((workflowName) =>
-		shardKeys.map((shardKey) => [
-			`workflow:${workflowName}:${shardKey}`,
-			`worker:${workflowName}:${shardKey}`,
-		])
-	));
+	return new Map(
+		workflowNames.flatMap((workflowName) =>
+			shardKeys.map((shardKey) => [`workflow:${workflowName}:${shardKey}`, `worker:${workflowName}:${shardKey}`])
+		)
+	);
 }
 
 // TODO: attempt to claim stuck messages before fething newer ones
@@ -238,7 +221,7 @@ async function fetchRedisStreamMessages(
 	workerId: string,
 	size: number,
 	blockTimeMs: number,
-	claimMinIdleTimeMs: number,
+	claimMinIdleTimeMs: number
 ): Promise<WorkflowRunBatch[]> {
 	if (!isNonEmptyArray(streams)) {
 		return [];
@@ -274,7 +257,7 @@ async function fetchRedisStreamMessages(
 			blockTimeMs,
 			"STREAMS",
 			stream,
-			">",
+			">"
 		);
 		readPromises.push(readPromise);
 	}
@@ -301,7 +284,7 @@ async function fetchRedisStreamMessages(
 			streamConsumerGroupMap,
 			workerId,
 			remainingCapacity,
-			claimMinIdleTimeMs,
+			claimMinIdleTimeMs
 		);
 		for (const workflowRun of claimedWorkflowRuns) {
 			workflowRuns.push(workflowRun);
@@ -315,7 +298,7 @@ async function processRedisStreamMessages(
 	redis: RedisClient,
 	logger: Logger,
 	streamConsumerGroupMap: Map<string, string>,
-	streamsEntries: NonEmptyArray<unknown>,
+	streamsEntries: NonEmptyArray<unknown>
 ): Promise<WorkflowRunBatch[]> {
 	const workflowRuns: WorkflowRunBatch[] = [];
 	for (const streamEntriesRaw of streamsEntries) {
@@ -383,7 +366,7 @@ async function claimStuckRedisStreamMessages(
 	streamConsumerGroupMap: Map<string, string>,
 	workerId: string,
 	maxClaim: number,
-	minIdleMs: number,
+	minIdleMs: number
 ): Promise<WorkflowRunBatch[]> {
 	if (maxClaim <= 0 || minIdleMs <= 0) {
 		return [];
@@ -396,7 +379,7 @@ async function claimStuckRedisStreamMessages(
 		streamConsumerGroupMap,
 		workerId,
 		maxClaim,
-		minIdleMs,
+		minIdleMs
 	);
 
 	if (!isNonEmptyArray(claimableMessages)) {
@@ -414,13 +397,7 @@ async function claimStuckRedisStreamMessages(
 		const messageIds = messages.map((message) => message.messageId);
 
 		try {
-			const claimedMessages = await redis.xclaim(
-				stream,
-				consumerGroup,
-				workerId,
-				minIdleMs,
-				...messageIds,
-			);
+			const claimedMessages = await redis.xclaim(stream, consumerGroup, workerId, minIdleMs, ...messageIds);
 			return { stream, claimedMessages };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
@@ -475,7 +452,7 @@ async function findClaimableRedisStreamMessages(
 	streamConsumerGroupMap: Map<string, string>,
 	workerId: string,
 	maxClaim: number,
-	minIdleMs: number,
+	minIdleMs: number
 ): Promise<ClaimableRedisStreamMessage[]> {
 	const claimableMessages: ClaimableRedisStreamMessage[] = [];
 
@@ -499,15 +476,9 @@ async function findClaimableRedisStreamMessages(
 			continue;
 		}
 
-		const pendingPromise = redis.xpending(
-			stream,
-			consumerGroup,
-			"IDLE",
-			minIdleMs,
-			"-",
-			"+",
-			claimSize,
-		).then((result) => ({ stream, result }));
+		const pendingPromise = redis
+			.xpending(stream, consumerGroup, "IDLE", minIdleMs, "-", "+", claimSize)
+			.then((result) => ({ stream, result }));
 		pendingPromises.push(pendingPromise);
 	}
 

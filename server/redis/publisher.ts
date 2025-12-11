@@ -7,10 +7,7 @@ export interface WorkflowMessageToPublish {
 	shardKey?: string;
 }
 
-export async function publishWorkflowReadyBatch(
-	redis: Redis,
-	messages: WorkflowMessageToPublish[],
-): Promise<void> {
+export async function publishWorkflowReadyBatch(redis: Redis, messages: WorkflowMessageToPublish[]): Promise<void> {
 	if (!isNonEmptyArray(messages)) {
 		return;
 	}
@@ -18,9 +15,10 @@ export async function publishWorkflowReadyBatch(
 	try {
 		const messagesByStream = new Map<string, WorkflowMessageToPublish[]>();
 		for (const message of messages) {
-			const streamName = message.shardKey !== undefined
-				? `workflow:${message.workflowName}:${message.shardKey}`
-				: `workflow:${message.workflowName}`;
+			const streamName =
+				message.shardKey !== undefined
+					? `workflow:${message.workflowName}:${message.shardKey}`
+					: `workflow:${message.workflowName}`;
 
 			const streamMessages = messagesByStream.get(streamName);
 			if (streamMessages === undefined) {

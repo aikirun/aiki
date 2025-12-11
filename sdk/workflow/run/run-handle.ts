@@ -10,7 +10,7 @@ import type { TaskState } from "@aikirun/types/task";
 export function initWorkflowRunHandle<Input, Output>(
 	api: ApiClient,
 	run: WorkflowRun<Input, Output>,
-	logger: Logger,
+	logger: Logger
 ): WorkflowRunHandle<Input, Output> {
 	return new WorkflowRunHandleImpl(api, run, logger);
 }
@@ -23,10 +23,7 @@ export interface WorkflowRunHandle<Input, Output> {
 	_internal: {
 		refresh: () => Promise<void>;
 		getTaskState: (taskPath: string) => TaskState<unknown>;
-		transitionTaskState: (
-			taskPath: string,
-			taskState: TaskState<unknown>,
-		) => Promise<void>;
+		transitionTaskState: (taskPath: string, taskState: TaskState<unknown>) => Promise<void>;
 		assertExecutionAllowed: () => Promise<void>;
 	};
 }
@@ -37,7 +34,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 	constructor(
 		private readonly api: ApiClient,
 		public _run: WorkflowRun<Input, Output>,
-		private readonly logger: Logger,
+		private readonly logger: Logger
 	) {
 		this._internal = {
 			refresh: this.refresh.bind(this),

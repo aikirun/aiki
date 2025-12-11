@@ -70,7 +70,7 @@ function assertIsPositiveNumber(value: number, field?: keyof DurationFields): vo
 		throw new Error(
 			field !== undefined
 				? `'${field}' duration must be finite. Received: ${value}`
-				: `Duration must be finite. Received: ${value}`,
+				: `Duration must be finite. Received: ${value}`
 		);
 	}
 
@@ -78,7 +78,7 @@ function assertIsPositiveNumber(value: number, field?: keyof DurationFields): vo
 		throw new Error(
 			field !== undefined
 				? `'${field}' duration must be non-negative. Received: ${value}`
-				: `Duration must be non-negative. Received: ${value}`,
+				: `Duration must be non-negative. Received: ${value}`
 		);
 	}
 }

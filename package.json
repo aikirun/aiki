@@ -3,15 +3,7 @@
 	"version": "0.1.12",
 	"private": true,
 	"type": "module",
-	"workspaces": [
-		"lib",
-		"types",
-		"server",
-		"sdk/client",
-		"sdk/worker",
-		"sdk/task",
-		"sdk/workflow"
-	],
+	"workspaces": ["lib", "types", "server", "sdk/client", "sdk/worker", "sdk/task", "sdk/workflow"],
 	"scripts": {
 		"server": "bun run server/server.ts",
 		"server:watch": "bun --watch run server/server.ts",

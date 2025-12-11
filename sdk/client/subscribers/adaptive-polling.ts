@@ -10,7 +10,7 @@ import type {
 
 export function createAdaptivePollingStrategy(
 	_client: Client<unknown>,
-	strategy: AdaptivePollingSubscriberStrategy,
+	strategy: AdaptivePollingSubscriberStrategy
 ): SubscriberStrategyBuilder {
 	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;
 

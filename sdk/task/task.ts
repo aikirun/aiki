@@ -52,10 +52,9 @@ import type { Logger } from "@aikirun/types/client";
  * const result = await chargeCard.start(run, { cardId: "123", amount: 9999 });
  * ```
  */
-export function task<
-	Input extends SerializableInput = null,
-	Output = void,
->(params: TaskParams<Input, Output>): Task<Input, Output> {
+export function task<Input extends SerializableInput = null, Output = void>(
+	params: TaskParams<Input, Output>
+): Task<Input, Output> {
 	return new TaskImpl(params);
 }
 
@@ -85,16 +84,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 	constructor(
 		private readonly params: TaskParams<Input, Output>,
-		private readonly options?: TaskOptions,
+		private readonly options?: TaskOptions
 	) {
 		this.name = params.name as TaskName;
 	}
 
 	public withOptions(options: TaskOptions): Task<Input, Output> {
-		return new TaskImpl(
-			this.params,
-			{ ...this.options, ...options },
-		);
+		return new TaskImpl(this.params, { ...this.options, ...options });
 	}
 
 	public async start<WorkflowInput, WorkflowOutput>(
@@ -107,8 +103,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const input = isNonEmptyArray(args)
 			? args[0]
-			// this cast is okay cos if args is empty, Input must be type null
-			: null as Input;
+			: // this cast is okay cos if args is empty, Input must be type null
+				(null as Input);
 
 		const path = await this.getPath(runCtx, input);
 
@@ -162,7 +158,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		path: string,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
-		logger: Logger,
+		logger: Logger
 	): Promise<{ output: Output; lastAttempt: number }> {
 		let attempts = currentAttempt;
 
@@ -212,11 +208,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private assertRetryAllowed(
-		attempts: number,
-		retryStrategy: RetryStrategy,
-		logger: Logger,
-	): void {
+	private assertRetryAllowed(attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
 			logger.error("Task retry not allowed", {
@@ -238,7 +230,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 	private async getPath<WorkflowInput, WorkflowOutput>(
 		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
-		input: Input,
+		input: Input
 	): Promise<string> {
 		const workflowRunPath = `${runCtx.name}/${runCtx.versionId}/${runCtx.id}`;
 

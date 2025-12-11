@@ -61,10 +61,7 @@ import { TaskFailedError } from "@aikirun/types/task";
  * processWrapper.addSignalListener("SIGINT", shutdown);
  * ```
  */
-export function worker<AppContext>(
-	client: Client<AppContext>,
-	params: WorkerParams,
-): Worker {
+export function worker<AppContext>(client: Client<AppContext>, params: WorkerParams): Worker {
 	return new WorkerImpl(client, params);
 }
 
@@ -106,7 +103,10 @@ class WorkerImpl<AppContext> implements Worker {
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 
-	constructor(private readonly client: Client<AppContext>, private readonly params: WorkerParams) {
+	constructor(
+		private readonly client: Client<AppContext>,
+		private readonly params: WorkerParams
+	) {
 		this.id = params.id ?? crypto.randomUUID();
 		this.registry = initWorkflowRegistry();
 
@@ -124,7 +124,7 @@ class WorkerImpl<AppContext> implements Worker {
 		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
 			this.registry._internal.getAll().map((workflow) => workflow.name),
-			this.params.shardKeys,
+			this.params.shardKeys
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
 			onError: (error: Error) => this.handleNotificationError(error),
@@ -154,10 +154,7 @@ class WorkerImpl<AppContext> implements Worker {
 		const timeoutMs = this.params.gracefulShutdownTimeoutMs ?? 5_000;
 
 		if (timeoutMs > 0) {
-			await Promise.race([
-				Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)),
-				delay(timeoutMs),
-			]);
+			await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
 		}
 
 		const stillActive = Array.from(this.activeWorkflowRunsById.values());
@@ -215,11 +212,8 @@ class WorkerImpl<AppContext> implements Worker {
 	}
 
 	private async fetchNextWorkflowRunBatch(
-		size: number,
-	): Promise<
-		| { success: true; batch: WorkflowRunBatch[] }
-		| { success: false; error: Error }
-	> {
+		size: number
+	): Promise<{ success: true; batch: WorkflowRunBatch[] } | { success: false; error: Error }> {
 		if (!this.subscriberStrategy) {
 			return {
 				success: false,
@@ -247,7 +241,7 @@ class WorkerImpl<AppContext> implements Worker {
 
 	private async enqueueWorkflowRunBatch(
 		batch: NonEmptyArray<WorkflowRunBatch>,
-		abortSignal: AbortSignal,
+		abortSignal: AbortSignal
 	): Promise<void> {
 		for (const { data, meta } of batch) {
 			const { workflowRunId } = data;
@@ -305,7 +299,7 @@ class WorkerImpl<AppContext> implements Worker {
 	private async executeWorkflow(
 		workflowRun: WorkflowRun,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
-		meta?: SubscriberMessageMeta,
+		meta?: SubscriberMessageMeta
 	): Promise<void> {
 		const logger = getChildLogger(this.logger, {
 			"aiki.component": "workflow-execution",
@@ -353,7 +347,7 @@ class WorkerImpl<AppContext> implements Worker {
 					logger,
 					sleep: createWorkflowRunSleeper(workflowRunHandle, logger),
 				},
-				appContext,
+				appContext
 			);
 
 			shouldAcknowledge = true;
@@ -404,10 +398,7 @@ class WorkerImpl<AppContext> implements Worker {
 	}
 }
 
-function createWorkflowRunSleeper(
-	workflowRunHandle: WorkflowRunHandle<unknown, unknown>,
-	logger: Logger,
-) {
+function createWorkflowRunSleeper(workflowRunHandle: WorkflowRunHandle<unknown, unknown>, logger: Logger) {
 	return async (duration: Duration) => {
 		const durationMs = toMilliseconds(duration);
 		const awakeAt = Date.now() + durationMs;

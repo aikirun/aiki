@@ -19,7 +19,7 @@ export interface Client<AppContext> {
 			create: (
 				strategy: SubscriberStrategy,
 				workflowNames: WorkflowName[],
-				workerShards?: string[],
+				workerShards?: string[]
 			) => SubscriberStrategyBuilder;
 		};
 		redis: RedisConnection;

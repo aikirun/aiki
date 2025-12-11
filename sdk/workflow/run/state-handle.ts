@@ -8,10 +8,7 @@ import type {
 } from "@aikirun/types/workflow-run";
 import type { ApiClient } from "@aikirun/types/client";
 
-export function initWorkflowRunStateHandle<Output>(
-	id: WorkflowRunId,
-	api: ApiClient,
-): WorkflowRunStateHandle<Output> {
+export function initWorkflowRunStateHandle<Output>(id: WorkflowRunId, api: ApiClient): WorkflowRunStateHandle<Output> {
 	return new WorkflowRunStateHandleImpl<Output>(id, api);
 }
 
@@ -28,27 +25,24 @@ export interface WorkflowRunStateHandle<Output> {
 
 	wait<S extends WorkflowRunStatus>(
 		condition: { type: "status"; status: S },
-		params: WorkflowRunWaitSyncParams,
+		params: WorkflowRunWaitSyncParams
 	): Promise<
 		| { success: false; cause: "timeout" | "aborted" }
 		| {
-			success: true;
-			state: S extends "completed" ? WorkflowRunStateCompleted<Output> : WorkflowRunStateInComplete;
-		}
+				success: true;
+				state: S extends "completed" ? WorkflowRunStateCompleted<Output> : WorkflowRunStateInComplete;
+		  }
 	>;
 	wait(
 		condition: { type: "event"; event: string },
-		params: WorkflowRunWaitSyncParams,
-	): Promise<
-		| { success: false; cause: "timeout" | "aborted" }
-		| { success: true; state: WorkflowRunState<Output> }
-	>;
+		params: WorkflowRunWaitSyncParams
+	): Promise<{ success: false; cause: "timeout" | "aborted" } | { success: true; state: WorkflowRunState<Output> }>;
 }
 
 class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Output> {
 	constructor(
 		public readonly id: string,
-		private readonly api: ApiClient,
+		private readonly api: ApiClient
 	) {}
 
 	public async getState(): Promise<WorkflowRunState<Output>> {
@@ -58,14 +52,11 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 
 	public async wait<
 		S extends WorkflowRunStatus,
-		R extends (S extends "completed" ? WorkflowRunStateCompleted<Output> : WorkflowRunStateInComplete),
+		R extends S extends "completed" ? WorkflowRunStateCompleted<Output> : WorkflowRunStateInComplete,
 	>(
 		condition: { type: "status"; status: S } | { type: "event"; event: string },
-		params: WorkflowRunWaitSyncParams,
-	): Promise<
-		| { success: false; cause: "timeout" | "aborted" }
-		| { success: true; state: R }
-	> {
+		params: WorkflowRunWaitSyncParams
+	): Promise<{ success: false; cause: "timeout" | "aborted" } | { success: true; state: R }> {
 		if (params.abortSignal?.aborted) {
 			throw new Error("Wait operation aborted");
 		}
@@ -82,7 +73,7 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 						{
 							abortSignal: params.abortSignal,
 							shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status),
-						},
+						}
 					).run();
 					if (maybeResult.state === "timeout" || maybeResult.state === "aborted") {
 						return { success: false, cause: maybeResult.state };
@@ -95,7 +86,7 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 					const maybeResult = await withRetry(
 						this.getState.bind(this),
 						{ type: "fixed", maxAttempts, delayMs },
-						{ shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status) },
+						{ shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status) }
 					).run();
 					if (maybeResult.state === "timeout") {
 						return { success: false, cause: maybeResult.state };

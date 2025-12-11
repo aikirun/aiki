@@ -17,11 +17,7 @@ import { createSerializableError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
-	exec: (
-		input: Input,
-		runContext: WorkflowRunContext<Input, Output>,
-		context: AppContext,
-	) => Promise<Output>;
+	exec: (input: Input, runContext: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<Output>;
 }
 
 export interface WorkflowVersion<Input, Output, AppContext> {
@@ -36,11 +32,7 @@ export interface WorkflowVersion<Input, Output, AppContext> {
 	) => Promise<WorkflowRunStateHandle<Output>>;
 
 	_internal: {
-		exec: (
-			input: Input,
-			runContext: WorkflowRunContext<Input, Output>,
-			context: AppContext,
-		) => Promise<void>;
+		exec: (input: Input, runContext: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<void>;
 	};
 }
 
@@ -51,7 +43,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		public readonly name: WorkflowName,
 		public readonly versionId: WorkflowVersionId,
 		private readonly params: WorkflowVersionParams<Input, Output, AppContext>,
-		private readonly options?: WorkflowOptions,
+		private readonly options?: WorkflowOptions
 	) {
 		this._internal = {
 			exec: this.exec.bind(this),
@@ -59,12 +51,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	}
 
 	public withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext> {
-		return new WorkflowVersionImpl(
-			this.name,
-			this.versionId,
-			this.params,
-			{ ...this.options, ...options },
-		);
+		return new WorkflowVersionImpl(this.name, this.versionId, this.params, { ...this.options, ...options });
 	}
 
 	public async start(
@@ -80,11 +67,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		return initWorkflowRunStateHandle(response.run.id as WorkflowRunId, client.api);
 	}
 
-	private async exec(
-		input: Input,
-		runCtx: WorkflowRunContext<Input, Output>,
-		context: AppContext,
-	): Promise<void> {
+	private async exec(input: Input, runCtx: WorkflowRunContext<Input, Output>, context: AppContext): Promise<void> {
 		const { handle, logger } = runCtx;
 
 		await handle._internal.assertExecutionAllowed();
@@ -105,7 +88,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		input: Input,
 		runCtx: WorkflowRunContext<Input, Output>,
 		context: AppContext,
-		retryStrategy: RetryStrategy,
+		retryStrategy: RetryStrategy
 	): Promise<Output> {
 		while (true) {
 			try {
@@ -148,22 +131,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 					}
 
 					// TODO: if delay is small enough, it might be more profitable to spin
-					throw new WorkflowRunFailedError(
-						runCtx.id,
-						attempts,
-						awaitingRetryState.reason,
-						awaitingRetryState.cause,
-					);
+					throw new WorkflowRunFailedError(runCtx.id, attempts, awaitingRetryState.reason, awaitingRetryState.cause);
 				}
 			}
 		}
 	}
 
-	private assertRetryAllowed(
-		run: WorkflowRun<Input, Output>,
-		retryStrategy: RetryStrategy,
-		logger: Logger,
-	): void {
+	private assertRetryAllowed(run: WorkflowRun<Input, Output>, retryStrategy: RetryStrategy, logger: Logger): void {
 		const { state } = run;
 		if (state.status === "queued" && state.reason === "retry") {
 			const retryParams = getRetryParams(run.attempts, retryStrategy);
@@ -197,10 +171,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		};
 	}
 
-	private createAwaitingRetryState(
-		error: unknown,
-		nextAttemptAt: number,
-	): WorkflowRunStateAwaitingRetry {
+	private createAwaitingRetryState(error: unknown, nextAttemptAt: number): WorkflowRunStateAwaitingRetry {
 		if (error instanceof TaskFailedError) {
 			return {
 				status: "awaiting_retry",

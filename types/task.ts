@@ -31,17 +31,13 @@ export interface TaskStateFailed extends TaskStateBase {
 	error?: SerializableError;
 }
 
-export type TaskState<Output> =
-	| TaskStateNone
-	| TaskStateRunning
-	| TaskStateCompleted<Output>
-	| TaskStateFailed;
+export type TaskState<Output> = TaskStateNone | TaskStateRunning | TaskStateCompleted<Output> | TaskStateFailed;
 
 export class TaskFailedError extends Error {
 	constructor(
 		public readonly taskName: TaskName,
 		public readonly attempts: number,
-		public readonly reason: string,
+		public readonly reason: string
 	) {
 		super(`Task ${taskName} failed after ${attempts} attempts. Reason: ${reason}`);
 		this.name = "TaskFailedError";

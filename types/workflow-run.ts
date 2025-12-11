@@ -124,9 +124,7 @@ export type WorkflowRunStateInComplete =
 	| WorkflowRunStateAwaitingRetry
 	| WorkflowRunStateFailed;
 
-export type WorkflowRunState<Output> =
-	| WorkflowRunStateInComplete
-	| WorkflowRunStateCompleted<Output>;
+export type WorkflowRunState<Output> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
 
 export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;
@@ -165,7 +163,7 @@ export class WorkflowRunConflictError extends Error {
 	constructor(
 		public readonly id: WorkflowRunId,
 		public readonly operation: string,
-		public readonly attempts: number,
+		public readonly attempts: number
 	) {
 		super(`Conflict while performing ${operation} on workflow ${id} after ${attempts} attempts`);
 		this.name = "WorkflowRunConflictError";
@@ -175,7 +173,7 @@ export class WorkflowRunConflictError extends Error {
 export class WorkflowRunNotExecutableError extends Error {
 	constructor(
 		public readonly id: WorkflowRunId,
-		public readonly status: WorkflowRunStatus,
+		public readonly status: WorkflowRunStatus
 	) {
 		super(`Workflow ${id} is not executable while ${status}`);
 		this.name = "WorkflowRunNotExecutableError";
@@ -201,7 +199,7 @@ export class WorkflowRunFailedError extends Error {
 		public readonly id: WorkflowRunId,
 		public readonly attempts: number,
 		public readonly reason: string,
-		public readonly failureCause?: WorkflowFailureCause,
+		public readonly failureCause?: WorkflowFailureCause
 	) {
 		super(`Workflow ${id} failed after ${attempts} attempt(s): ${reason}`);
 		this.name = "WorkflowRunFailedError";

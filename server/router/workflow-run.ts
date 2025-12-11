@@ -22,19 +22,12 @@ const listV1 = os.listV1.handler(({ input }) => {
 		if (
 			filters?.workflows &&
 			isNonEmptyArray(filters.workflows) &&
-			filters.workflows.every((w) =>
-				(w.name && w.name !== run.name) ||
-				(w.versionId && w.versionId !== run.versionId)
-			)
+			filters.workflows.every((w) => (w.name && w.name !== run.name) || (w.versionId && w.versionId !== run.versionId))
 		) {
 			continue;
 		}
 
-		if (
-			filters?.status &&
-			isNonEmptyArray(filters.status) &&
-			filters.status.every((s) => (s !== run.state.status))
-		) {
+		if (filters?.status && isNonEmptyArray(filters.status) && filters.status.every((s) => s !== run.state.status)) {
 			continue;
 		}
 
@@ -43,7 +36,7 @@ const listV1 = os.listV1.handler(({ input }) => {
 
 	return {
 		runs: runs
-			.sort((a, b) => sort?.order === "asc" ? a.createdAt - b.createdAt : b.createdAt - a.createdAt)
+			.sort((a, b) => (sort?.order === "asc" ? a.createdAt - b.createdAt : b.createdAt - a.createdAt))
 			.slice(offset, offset + limit)
 			.map((run) => ({
 				id: run.id,
@@ -114,11 +107,14 @@ const createV1 = os.createV1.handler(({ input }) => {
 		options: input.options ?? {},
 		state: {
 			status: "scheduled",
-			scheduledAt: !trigger || trigger.type === "immediate"
-				? now
-				: trigger.type === "delayed"
-				? "delayMs" in trigger ? now + trigger.delayMs : now + toMilliseconds(trigger.delay)
-				: trigger.startAt,
+			scheduledAt:
+				!trigger || trigger.type === "immediate"
+					? now
+					: trigger.type === "delayed"
+						? "delayMs" in trigger
+							? now + trigger.delayMs
+							: now + toMilliseconds(trigger.delay)
+						: trigger.startAt,
 		},
 		tasksState: {},
 		childWorkflowsRunState: {},
@@ -160,7 +156,7 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input }) => {
 		throw new ConflictError(
 			`Revision conflict: expected ${input.expectedRevision}, current is ${run.revision}`,
 			run.revision,
-			input.expectedRevision,
+			input.expectedRevision
 		);
 	}
 
@@ -202,7 +198,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input }) => {
 		throw new ConflictError(
 			`Revision conflict: expected ${input.expectedRevision}, current is ${run.revision}`,
 			run.revision,
-			input.expectedRevision,
+			input.expectedRevision
 		);
 	}
 
@@ -238,7 +234,7 @@ const listTransitionsV1 = os.listTransitionsV1.handler(({ input }) => {
 
 	return {
 		transitions: [...transitions]
-			.sort((a, b) => sort?.order === "asc" ? a.createdAt - b.createdAt : b.createdAt - a.createdAt)
+			.sort((a, b) => (sort?.order === "asc" ? a.createdAt - b.createdAt : b.createdAt - a.createdAt))
 			.slice(offset, offset + limit),
 		total: transitions.length,
 	};

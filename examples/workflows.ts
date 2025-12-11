@@ -39,10 +39,9 @@ export const morningWorkflowV2 = morningWorkflow
 
 export const eveningRoutineWorkflow = workflow({ name: "evening-routine" });
 
-export const eveningRoutineWorkflowV1 = eveningRoutineWorkflow
-	.v("1.0.0", {
-		async exec(_, run, _context: AppContext) {
-			await sayPrayer.start(run);
-			await run.sleep({ seconds: 5 });
-		},
-	});
+export const eveningRoutineWorkflowV1 = eveningRoutineWorkflow.v("1.0.0", {
+	async exec(_, run, _context: AppContext) {
+		await sayPrayer.start(run);
+		await run.sleep({ seconds: 5 });
+	},
+});

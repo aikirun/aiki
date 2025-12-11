@@ -62,7 +62,7 @@ export interface Workflow {
 
 	v: <Input extends SerializableInput = null, Output = void, AppContext = null>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext>,
+		params: WorkflowVersionParams<Input, Output, AppContext>
 	) => WorkflowVersion<Input, Output, AppContext>;
 
 	_internal: {
@@ -86,7 +86,7 @@ class WorkflowImpl implements Workflow {
 
 	v<Input, Output, AppContext>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext>,
+		params: WorkflowVersionParams<Input, Output, AppContext>
 	): WorkflowVersion<Input, Output, AppContext> {
 		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
 			throw new Error(`Workflow "${this.name}/${versionId}" already exists`);
@@ -95,7 +95,7 @@ class WorkflowImpl implements Workflow {
 		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
 		this.workflowVersions.set(
 			versionId as WorkflowVersionId,
-			workflowVersion as unknown as WorkflowVersion<unknown, unknown, unknown>,
+			workflowVersion as unknown as WorkflowVersion<unknown, unknown, unknown>
 		);
 
 		return workflowVersion;

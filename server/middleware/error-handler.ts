@@ -25,7 +25,7 @@ export class ConflictError extends Error {
 	constructor(
 		message: string,
 		public readonly currentRevision: number,
-		public readonly expectedRevision: number,
+		public readonly expectedRevision: number
 	) {
 		super(message);
 		this.name = "ConflictError";

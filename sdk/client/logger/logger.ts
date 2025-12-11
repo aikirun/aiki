@@ -1,9 +1,6 @@
 import type { Logger } from "@aikirun/types/client";
 
-export function getChildLogger(
-	logger: Logger,
-	bindings: Record<string, unknown>,
-): Logger {
+export function getChildLogger(logger: Logger, bindings: Record<string, unknown>): Logger {
 	if (logger.child) {
 		return logger.child(bindings);
 	}

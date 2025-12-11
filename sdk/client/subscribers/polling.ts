@@ -10,7 +10,7 @@ import type {
 
 export function createPollingStrategy(
 	_client: Client<unknown>,
-	strategy: PollingSubscriberStrategy,
+	strategy: PollingSubscriberStrategy
 ): SubscriberStrategyBuilder {
 	const intervalMs = strategy.intervalMs ?? 100;
 	const maxRetryIntervalMs = strategy.maxRetryIntervalMs ?? 30_000;
