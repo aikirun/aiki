@@ -14,7 +14,7 @@ import type { Client, Logger, SubscriberStrategy } from "@aikirun/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aikirun/client";
 import { initWorkflowRegistry, initWorkflowRunHandle, type WorkflowRegistry } from "@aikirun/workflow";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRunHandle, WorkflowVersion } from "@aikirun/workflow";
+import type { Workflow, WorkflowRunHandle, WorkflowVersion } from "@aikirun/workflow";
 import { isServerConflictError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
 
@@ -66,6 +66,7 @@ export function worker<AppContext>(client: Client<AppContext>, params: WorkerPar
 
 export interface WorkerParams {
 	id: string;
+	workflows: Workflow[];
 	subscriber?: SubscriberStrategy;
 }
 
@@ -86,12 +87,11 @@ export interface WorkerOptions {
 
 export interface Worker {
 	id: string;
-	registry: WorkflowRegistry;
-
-	withOpts(options: WorkerOptions): Worker;
 
 	start: () => Promise<void>;
 	stop: () => Promise<void>;
+
+	withOpts(options: WorkerOptions): Worker;
 }
 
 interface ActiveWorkflowRun {
@@ -102,7 +102,7 @@ interface ActiveWorkflowRun {
 
 class WorkerImpl<AppContext> implements Worker {
 	public readonly id: string;
-	public readonly registry: WorkflowRegistry;
+	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
@@ -114,7 +114,7 @@ class WorkerImpl<AppContext> implements Worker {
 		private readonly options?: WorkerOptions
 	) {
 		this.id = params.id;
-		this.registry = initWorkflowRegistry();
+		this.registry = initWorkflowRegistry().addMany(this.params.workflows);
 
 		this.logger = client.logger.child({
 			"aiki.component": "worker",
