@@ -1,20 +1,24 @@
-FROM denoland/deno:latest
+FROM oven/bun:1
 
 ARG AIKI_PORT=9090
 ENV AIKI_PORT=${AIKI_PORT}
 
-WORKDIR /server
+WORKDIR /app
 
-COPY server/ ./
+COPY package.json bun.lock ./
+COPY lib/package.json ./lib/
+COPY types/package.json ./types/
+COPY server/package.json ./server/
 
-RUN deno add jsr:@aikirun/lib jsr:@aikirun/types
+RUN bun install --frozen-lockfile
 
-RUN deno check server.ts
+COPY lib/ ./lib/
+COPY types/ ./types/
+COPY server/ ./server/
+COPY tsconfig.json ./
 
-RUN id deno > /dev/null 2>&1 || useradd -m -u 1000 deno
-RUN chown -R deno:deno /server
-USER deno
+RUN bun run check
 
 EXPOSE ${AIKI_PORT}
 
-CMD ["deno", "run", "--allow-net", "--allow-read", "--allow-env", "server.ts"]
+CMD ["bun", "run", "server"]
