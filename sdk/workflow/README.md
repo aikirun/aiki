@@ -5,7 +5,7 @@ Workflow SDK for Aiki durable execution engine - define durable workflows with t
 ## Installation
 
 ```bash
-npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
+npm install @aikirun/workflow
 ```
 
 ## Quick Start

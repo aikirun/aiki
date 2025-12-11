@@ -5,7 +5,7 @@ Client SDK for Aiki durable execution engine - connect to the Aiki server, start
 ## Installation
 
 ```bash
-npm install @aikirun/client @aikirun/workflow @aikirun/task
+npm install @aikirun/client
 ```
 
 ## Quick Start

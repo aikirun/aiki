@@ -6,7 +6,7 @@ recovery.
 ## Installation
 
 ```bash
-npm install @aikirun/worker @aikirun/client @aikirun/workflow @aikirun/task
+npm install @aikirun/worker
 ```
 
 ## Quick Start
