@@ -6,8 +6,8 @@
 	"workspaces": ["lib", "types", "server", "sdk/client", "sdk/worker", "sdk/task", "sdk/workflow"],
 	"scripts": {
 		"check": "tsc --noEmit",
-		"fmt": "bunx @biomejs/biome format --write .",
-		"fmt:check": "bunx @biomejs/biome format .",
+		"fmt": "bunx @biomejs/biome format .",
+		"fmt:fix": "bunx @biomejs/biome format --write .",
 		"lint": "bunx @biomejs/biome lint .",
 		"lint:fix": "bunx @biomejs/biome lint --write .",
 		"test": "bun test",
