@@ -103,7 +103,7 @@ export const sendWelcomeEmail = task({
   async exec(input: { email: string }) {
     return emailService.sendWelcome(input.email);
   }
-}).withOptions({
+}).withOpts({
   // If email sending fails it is retried up to 5 times with exponential backoff.
   // If the worker crashes mid-retry, on recovery Aiki detects it and continues from the last attempt.
   retry: {

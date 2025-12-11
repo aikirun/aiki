@@ -5,7 +5,7 @@ const { logger } = aikiClient;
 
 await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
 
-const stateHandle = await eveningRoutineWorkflowV1.withOptions({ idempotencyKey: "some-key" }).start(aikiClient);
+const stateHandle = await eveningRoutineWorkflowV1.withOpts({ idempotencyKey: "some-key" }).start(aikiClient);
 
 const result = await stateHandle.wait({ type: "status", status: "completed" }, { maxDurationMs: 30_000 });
 if (result.success) {

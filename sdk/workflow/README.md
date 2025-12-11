@@ -93,7 +93,7 @@ run.logger.debug("User created", { userId: result.userId });
 ```typescript
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 	// ... workflow definition
-}).withOptions({
+}).withOpts({
 	trigger: {
 		type: "delayed",
 		delay: { seconds: 5 }, // or: delay: 5000
@@ -106,7 +106,7 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 ```typescript
 export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 	// ... workflow definition
-}).withOptions({
+}).withOpts({
 	retry: {
 		type: "exponential",
 		maxAttempts: 3,
@@ -121,7 +121,7 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 ```typescript
 export const orderWorkflowV1 = orderWorkflow.v("1.0", {
 	// ... workflow definition
-}).withOptions({
+}).withOpts({
 	idempotencyKey: "order-${orderId}",
 });
 ```

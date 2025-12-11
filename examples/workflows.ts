@@ -30,7 +30,7 @@ export const morningWorkflowV2 = morningWorkflow
 			return response;
 		},
 	})
-	.withOptions({
+	.withOpts({
 		trigger: {
 			type: "delayed",
 			delay: { seconds: 5 },

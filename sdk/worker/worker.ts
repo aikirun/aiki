@@ -88,7 +88,7 @@ export interface Worker {
 	id: string;
 	registry: WorkflowRegistry;
 
-	withOptions(options: WorkerOptions): Worker;
+	withOpts(options: WorkerOptions): Worker;
 
 	start: () => Promise<void>;
 	stop: () => Promise<void>;
@@ -124,7 +124,7 @@ class WorkerImpl<AppContext> implements Worker {
 		this.logger.info("Worker initialized");
 	}
 
-	public withOptions(options: WorkerOptions): Worker {
+	public withOpts(options: WorkerOptions): Worker {
 		return new WorkerImpl(this.client, this.params, this.options ? { ...this.options, ...options } : options);
 	}
 

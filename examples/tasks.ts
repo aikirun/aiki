@@ -5,7 +5,7 @@ export const ringAlarm = task({
 	exec(input: { song: string }) {
 		return Promise.resolve(input.song);
 	},
-}).withOptions({
+}).withOpts({
 	retry: {
 		type: "fixed",
 		maxAttempts: 3,

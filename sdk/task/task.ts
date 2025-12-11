@@ -40,7 +40,7 @@ import type { Logger } from "@aikirun/types/client";
  *   exec(input: { cardId: string; amount: number }) {
  *     return paymentService.charge(input.cardId, input.amount);
  *   },
- * }).withOptions({
+ * }).withOpts({
  *   retry: {
  *     type: "fixed",
  *     maxAttempts: 3,
@@ -71,7 +71,7 @@ export interface TaskOptions {
 export interface Task<Input, Output> {
 	id: TaskId;
 
-	withOptions(options: TaskOptions): Task<Input, Output>;
+	withOpts(options: TaskOptions): Task<Input, Output>;
 
 	start: <WorkflowInput, WorkflowOutput>(
 		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
@@ -89,7 +89,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		this.id = params.id as TaskId;
 	}
 
-	public withOptions(options: TaskOptions): Task<Input, Output> {
+	public withOpts(options: TaskOptions): Task<Input, Output> {
 		return new TaskImpl(this.params, this.options ? { ...this.options, ...options } : options);
 	}
 

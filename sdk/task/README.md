@@ -32,7 +32,7 @@ export const ringAlarm = task({
 	exec(input: { song: string }) {
 		return Promise.resolve(audioService.play(input.song));
 	},
-}).withOptions({
+}).withOpts({
 	retry: {
 		type: "fixed",
 		maxAttempts: 3,
@@ -79,7 +79,7 @@ interface TaskOptions {
 #### Never Retry
 
 ```typescript
-.withOptions({
+.withOpts({
   retry: { type: "never" },
 })
 ```
@@ -87,7 +87,7 @@ interface TaskOptions {
 #### Fixed Delay
 
 ```typescript
-.withOptions({
+.withOpts({
   retry: {
     type: "fixed",
     maxAttempts: 3,
@@ -99,7 +99,7 @@ interface TaskOptions {
 #### Exponential Backoff
 
 ```typescript
-.withOptions({
+.withOpts({
   retry: {
     type: "exponential",
     maxAttempts: 5,
@@ -113,7 +113,7 @@ interface TaskOptions {
 #### Jittered Exponential
 
 ```typescript
-.withOptions({
+.withOpts({
   retry: {
     type: "jittered",
     maxAttempts: 5,

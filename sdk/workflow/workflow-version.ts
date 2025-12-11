@@ -24,7 +24,7 @@ export interface WorkflowVersion<Input, Output, AppContext> {
 	id: WorkflowId;
 	versionId: WorkflowVersionId;
 
-	withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext>;
+	withOpts(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext>;
 
 	start: (
 		client: Client<AppContext>,
@@ -50,7 +50,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		};
 	}
 
-	public withOptions(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext> {
+	public withOpts(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext> {
 		return new WorkflowVersionImpl(
 			this.id,
 			this.versionId,

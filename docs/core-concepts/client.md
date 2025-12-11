@@ -155,7 +155,7 @@ const aiki = await client({
 
 // Start workflow
 const result = await onboardingV1
-	.withOptions({ idempotencyKey: "user-onboarding-123" })
+	.withOpts({ idempotencyKey: "user-onboarding-123" })
 	.start(aiki, { email: "user@example.com" });
 
 // Monitor progress
