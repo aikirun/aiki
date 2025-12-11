@@ -29,7 +29,7 @@ services:
     environment:
       AIKI_PORT: ${AIKI_PORT:-9090}
       AIKI_HOST: 0.0.0.0
-      REDIS_HOST: localhost
+      REDIS_HOST: redis
       REDIS_PORT: ${REDIS_PORT:-6379}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
