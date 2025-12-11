@@ -65,7 +65,7 @@ export const aikiClient = await client({
   redis: { host: "localhost", port: 6379 }
 });
 
-const workerA = await worker(aikiClient, {
+const workerA = worker(aikiClient, {
   subscriber: { type: "redis_streams" }
 });
 

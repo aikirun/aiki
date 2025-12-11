@@ -8,7 +8,7 @@ back to the server.
 ```typescript
 import { worker } from "@aikirun/worker";
 
-const aikiWorker = await worker(client, {
+const aikiWorker = worker(client, {
 	id: "worker-1",
 	maxConcurrentWorkflowRuns: 5,
 	subscriber: {
@@ -122,7 +122,7 @@ You can run multiple workers to scale horizontally:
 
 ```typescript
 // Worker 1
-const worker1 = await worker(client, {
+const worker1 = worker(client, {
 	id: "worker-1",
 	maxConcurrentWorkflowRuns: 5,
 	subscriber: { type: "redis_streams" },
@@ -130,7 +130,7 @@ const worker1 = await worker(client, {
 worker1.registry.add(orderWorkflow);
 
 // Worker 2
-const worker2 = await worker(client, {
+const worker2 = worker(client, {
 	id: "worker-2",
 	maxConcurrentWorkflowRuns: 5,
 	subscriber: { type: "redis_streams" },
@@ -150,14 +150,14 @@ You can create specialized workers for different workflow types:
 
 ```typescript
 // Payment worker - handles payment workflows
-const paymentWorker = await worker(client, {
+const paymentWorker = worker(client, {
 	id: "payment-worker",
 	subscriber: { type: "redis_streams" },
 });
 paymentWorker.registry.add(paymentWorkflow);
 
 // Email worker - handles email workflows
-const emailWorker = await worker(client, {
+const emailWorker = worker(client, {
 	id: "email-worker",
 	subscriber: { type: "redis_streams" },
 });
@@ -206,7 +206,7 @@ const aiki = await client({
 });
 
 // Create worker
-const aikiWorker = await worker(aiki, {
+const aikiWorker = worker(aiki, {
 	id: `worker-${process.env.WORKER_ID || 1}`,
 	maxConcurrentWorkflowRuns: 10,
 	subscriber: {

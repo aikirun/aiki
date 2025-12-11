@@ -45,7 +45,7 @@ const aiki = await client({
 });
 
 // 4. Create a worker (executes workflows)
-const myWorker = await worker(aiki, { id: "my-worker" });
+const myWorker = worker(aiki, { id: "my-worker" });
 myWorker.registry.add(helloWorkflow);
 await myWorker.start();
 

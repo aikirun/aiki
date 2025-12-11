@@ -85,7 +85,7 @@ const results = await Promise.allSettled(
 ### Basic Setup
 
 ```typescript
-const worker = await worker(client, {
+const worker = worker(client, {
 	id: "worker-1",
 	maxConcurrentWorkflowRuns: 5,
 	subscriber: {
@@ -99,7 +99,7 @@ const worker = await worker(client, {
 ### Advanced Configuration
 
 ```typescript
-const worker = await worker(client, {
+const worker = worker(client, {
 	id: "worker-prod-1",
 	maxConcurrentWorkflowRuns: 20,
 	subscriber: {
@@ -154,13 +154,13 @@ Add more workers:
 
 ```typescript
 // Worker 1
-const worker1 = await worker(client, { id: "worker-1" });
+const worker1 = worker(client, { id: "worker-1" });
 
 // Worker 2
-const worker2 = await worker(client, { id: "worker-2" });
+const worker2 = worker(client, { id: "worker-2" });
 
 // Worker 3
-const worker3 = await worker(client, { id: "worker-3" });
+const worker3 = worker(client, { id: "worker-3" });
 ```
 
 All workers share the workload automatically via consumer groups.
@@ -171,11 +171,11 @@ Dedicate workers to specific workflows:
 
 ```typescript
 // Payment worker
-const paymentWorker = await worker(client, { id: "payment-worker" });
+const paymentWorker = worker(client, { id: "payment-worker" });
 paymentWorker.registry.add(paymentWorkflow);
 
 // Email worker
-const emailWorker = await worker(client, { id: "email-worker" });
+const emailWorker = worker(client, { id: "email-worker" });
 emailWorker.registry.add(emailWorkflow);
 ```
 
@@ -185,13 +185,13 @@ Deploy workers in different regions:
 
 ```typescript
 // US East worker
-const usEastWorker = await worker(client, {
+const usEastWorker = worker(client, {
 	id: "us-east-worker",
 	shardKeys: ["us-east"],
 });
 
 // EU worker
-const euWorker = await worker(client, {
+const euWorker = worker(client, {
 	id: "eu-worker",
 	shardKeys: ["eu-west"],
 });

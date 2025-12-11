@@ -299,7 +299,7 @@ await redis.xadd(
 ### Worker-Side
 
 ```typescript
-const worker = await worker(client, {
+const worker = worker(client, {
 	subscriber: {
 		type: "redis_streams",
 		claimMinIdleTimeMs: 60_000, // Claim after 60s

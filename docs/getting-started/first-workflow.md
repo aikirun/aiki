@@ -139,7 +139,7 @@ const aiki = await client({
 	},
 });
 
-const aikiWorker = await worker(aiki, {
+const aikiWorker = worker(aiki, {
 	id: "order-worker-1",
 	maxConcurrentWorkflowRuns: 10,
 	subscriber: {
@@ -270,7 +270,7 @@ const aiki = await client({
 	redis: { host: "localhost", port: 6379 },
 });
 
-const aikiWorker = await worker(aiki, {
+const aikiWorker = worker(aiki, {
 	id: "order-worker",
 	subscriber: { type: "redis_streams" },
 });
