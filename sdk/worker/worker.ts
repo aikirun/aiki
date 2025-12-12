@@ -14,7 +14,7 @@ import type { Client, Logger, SubscriberStrategy } from "@aikirun/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aikirun/client";
 import { initWorkflowRegistry, initWorkflowRunHandle, type WorkflowRegistry } from "@aikirun/workflow";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { Workflow, WorkflowRunHandle, WorkflowVersion } from "@aikirun/workflow";
+import type { WorkflowRunHandle, WorkflowVersion } from "@aikirun/workflow";
 import { isServerConflictError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
 
@@ -66,7 +66,8 @@ export function worker<AppContext>(client: Client<AppContext>, params: WorkerPar
 
 export interface WorkerParams {
 	id: string;
-	workflows: Workflow[];
+	// biome-ignore lint/suspicious/noExplicitAny:
+	workflows: WorkflowVersion<any, any, any>[];
 	subscriber?: SubscriberStrategy;
 }
 
@@ -133,7 +134,7 @@ class WorkerImpl<AppContext> implements Worker {
 
 		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
-			this.registry._internal.getAll().map((workflow) => workflow.id),
+			this.registry.getAll(),
 			this.options?.shardKeys
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
@@ -271,19 +272,10 @@ class WorkerImpl<AppContext> implements Worker {
 				continue;
 			}
 
-			const workflow = this.registry._internal.get(workflowRun.workflowId as WorkflowId);
-			if (!workflow) {
-				this.logger.warn("Workflow not found in registry", {
-					"aiki.workflowId": workflowRun.workflowId,
-					"aiki.workflowRunId": workflowRun.id,
-				});
-				if (meta && this.subscriberStrategy?.acknowledge) {
-					await this.subscriberStrategy.acknowledge(workflowRunId, meta).catch(() => {});
-				}
-				continue;
-			}
-
-			const workflowVersion = workflow._internal.getVersion(workflowRun.workflowVersionId as WorkflowVersionId);
+			const workflowVersion = this.registry.get(
+				workflowRun.workflowId as WorkflowId,
+				workflowRun.workflowVersionId as WorkflowVersionId
+			);
 			if (!workflowVersion) {
 				this.logger.warn("Workflow version not found", {
 					"aiki.workflowId": workflowRun.workflowId,

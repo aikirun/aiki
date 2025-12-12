@@ -1,7 +1,7 @@
 import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aikirun/lib/array";
 import { z } from "zod";
 import { getRetryParams } from "@aikirun/lib/retry";
-import type { WorkflowId } from "@aikirun/types/workflow";
+import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type {
 	Client,
@@ -82,7 +82,7 @@ interface ClaimableRedisStreamMessage {
 export function createRedisStreamsStrategy(
 	client: Client<unknown>,
 	strategy: RedisStreamsSubscriberStrategy,
-	workflowIds: WorkflowId[],
+	workflows: WorkflowMeta[],
 	workerShards?: string[]
 ): SubscriberStrategyBuilder {
 	const redis = client._internal.redis.getConnection();
@@ -91,7 +91,7 @@ export function createRedisStreamsStrategy(
 		"aiki.component": "redis-subscriber",
 	});
 
-	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflowIds, workerShards);
+	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflows, workerShards);
 	const streams = Array.from(streamConsumerGroupMap.keys());
 
 	const intervalMs = strategy.intervalMs ?? 50;
@@ -199,14 +199,22 @@ export function createRedisStreamsStrategy(
 	};
 }
 
-function getRedisStreamConsumerGroupMap(workflowIds: WorkflowId[], shardKeys?: string[]): Map<string, string> {
+function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shardKeys?: string[]): Map<string, string> {
 	if (!shardKeys || !isNonEmptyArray(shardKeys)) {
-		return new Map(workflowIds.map((workflowId) => [`workflow:${workflowId}`, `worker:${workflowId}`]));
+		return new Map(
+			workflows.map((workflow) => [
+				`workflow/${workflow.id}/${workflow.versionId}`,
+				`worker/${workflow.id}/${workflow.versionId}`,
+			])
+		);
 	}
 
 	return new Map(
-		workflowIds.flatMap((workflowId) =>
-			shardKeys.map((shardKey) => [`workflow:${workflowId}:${shardKey}`, `worker:${workflowId}:${shardKey}`])
+		workflows.flatMap((workflow) =>
+			shardKeys.map((shardKey) => [
+				`workflow/${workflow.id}/${workflow.versionId}/${shardKey}`,
+				`worker/${workflow.id}/${workflow.versionId}/${shardKey}`,
+			])
 		)
 	);
 }

@@ -136,10 +136,10 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	options: WorkflowOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;
-	// TODO: 
+	// TODO:
 	// for workflows with a large number of tasks and/or deeply nested child workflows,
 	// prefetch all results might be problematic.
-	// Instead we might explore on-demand loading. 
+	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
 	tasksState: Record<string, TaskState<unknown>>;
 	childWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;

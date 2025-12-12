@@ -1,6 +1,6 @@
 import process from "node:process";
 import { worker } from "@aikirun/worker";
-import { eveningRoutineWorkflow, morningWorkflow, morningWorkflowV1, morningWorkflowV2 } from "./workflows";
+import { eveningRoutineWorkflowV1, morningWorkflowV1, morningWorkflowV2 } from "./workflows";
 import { client } from "../sdk/client/client";
 
 export const aikiClient = await client({
@@ -17,12 +17,12 @@ export const aikiClient = await client({
 
 export const workerA = worker(aikiClient, {
 	id: "worker-A",
-	workflows: [morningWorkflow, eveningRoutineWorkflow],
+	workflows: [morningWorkflowV1, morningWorkflowV2, eveningRoutineWorkflowV1],
 });
 
 const workerB = worker(aikiClient, {
 	id: "worker-B",
-	workflows: [eveningRoutineWorkflow],
+	workflows: [eveningRoutineWorkflowV1],
 });
 
 const shutdown = async () => {
