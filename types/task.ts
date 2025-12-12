@@ -33,6 +33,8 @@ export interface TaskStateFailed extends TaskStateBase {
 
 export type TaskState<Output> = TaskStateNone | TaskStateRunning | TaskStateCompleted<Output> | TaskStateFailed;
 
+// TODO: create Task interface. It should contain the input that was fed into the task
+
 export class TaskFailedError extends Error {
 	constructor(
 		public readonly taskId: TaskId,

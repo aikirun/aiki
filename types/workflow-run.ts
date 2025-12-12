@@ -15,8 +15,8 @@ export type WorkflowRunStatus =
 	| "awaiting_retry"
 	| "awaiting_child_workflow"
 	| "cancelled"
-	| "failed"
-	| "completed";
+	| "completed"
+	| "failed";
 
 export interface WorkflowOptions {
 	retry?: RetryStrategy;
@@ -136,7 +136,11 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	options: WorkflowOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;
-	// TODO: maybe loading tasks and child workflow states should be optional
+	// TODO: 
+	// for workflows with a large number of tasks and/or deeply nested child workflows,
+	// prefetch all results might be problematic.
+	// Instead we might explore on-demand loading. 
+	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
 	tasksState: Record<string, TaskState<unknown>>;
 	childWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;
 }
