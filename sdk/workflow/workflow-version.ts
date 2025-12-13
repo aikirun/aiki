@@ -12,6 +12,7 @@ import type { Client, Logger } from "@aikirun/types/client";
 import type { WorkflowRunContext } from "./run/context";
 import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle";
 import { isNonEmptyArray } from "@aikirun/lib/array";
+import { INTERNAL } from "@aikirun/lib/symbols";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import { createSerializableError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
@@ -31,13 +32,13 @@ export interface WorkflowVersion<Input, Output, AppContext> {
 		...args: Input extends null ? [] : [Input]
 	) => Promise<WorkflowRunStateHandle<Output>>;
 
-	_internal: {
+	[INTERNAL]: {
 		exec: (input: Input, runContext: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<void>;
 	};
 }
 
 export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowVersion<Input, Output, AppContext> {
-	public readonly _internal: WorkflowVersion<Input, Output, AppContext>["_internal"];
+	public readonly [INTERNAL]: WorkflowVersion<Input, Output, AppContext>[typeof INTERNAL];
 
 	constructor(
 		public readonly id: WorkflowId,
@@ -45,7 +46,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		private readonly params: WorkflowVersionParams<Input, Output, AppContext>,
 		private readonly options?: WorkflowOptions
 	) {
-		this._internal = {
+		this[INTERNAL] = {
 			exec: this.exec.bind(this),
 		};
 	}
@@ -75,7 +76,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	private async exec(input: Input, runCtx: WorkflowRunContext<Input, Output>, context: AppContext): Promise<void> {
 		const { handle, logger } = runCtx;
 
-		await handle._internal.assertExecutionAllowed();
+		await handle[INTERNAL].assertExecutionAllowed();
 
 		const retryStrategy = this.options?.retry ?? { type: "never" };
 		this.assertRetryAllowed(runCtx.handle.run, retryStrategy, logger);

@@ -7,4 +7,5 @@ export * from "./json/index";
 export * from "./object/index";
 export * from "./polling/index";
 export * from "./retry/index";
+export * from "./symbols/index";
 export * from "./testing/expect/index";

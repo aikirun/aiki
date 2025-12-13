@@ -40,6 +40,10 @@
 			"types": "./dist/retry/index.d.ts",
 			"import": "./dist/retry/index.js"
 		},
+		"./symbols": {
+			"types": "./dist/symbols/index.d.ts",
+			"import": "./dist/symbols/index.js"
+		},
 		"./testing/expect": {
 			"types": "./dist/testing/expect/index.d.ts",
 			"import": "./dist/testing/expect/index.js"

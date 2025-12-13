@@ -2,6 +2,7 @@ import type { WorkflowRun } from "@aikirun/types/workflow-run";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
+import { INTERNAL } from "@aikirun/lib/symbols";
 
 export interface ClientParams<AppContext> {
 	url: string;
@@ -14,7 +15,7 @@ export interface Client<AppContext> {
 	api: ApiClient;
 	logger: Logger;
 	close: () => Promise<void>;
-	_internal: {
+	[INTERNAL]: {
 		subscriber: {
 			create: (
 				strategy: SubscriberStrategy,

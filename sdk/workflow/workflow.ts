@@ -1,6 +1,7 @@
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version";
 import type { SerializableInput } from "@aikirun/lib/error";
+import { INTERNAL } from "@aikirun/lib/symbols";
 
 /**
  * Defines a durable workflow with versioning and multiple task execution.
@@ -65,7 +66,7 @@ export interface Workflow {
 		params: WorkflowVersionParams<Input, Output, AppContext>
 	) => WorkflowVersion<Input, Output, AppContext>;
 
-	_internal: {
+	[INTERNAL]: {
 		getAllVersions: () => WorkflowVersion<unknown, unknown, unknown>[];
 		getVersion: (versionId: WorkflowVersionId) => WorkflowVersion<unknown, unknown, unknown> | undefined;
 	};
@@ -73,12 +74,12 @@ export interface Workflow {
 
 class WorkflowImpl implements Workflow {
 	public readonly id: WorkflowId;
-	public readonly _internal: Workflow["_internal"];
+	public readonly [INTERNAL]: Workflow[typeof INTERNAL];
 	private workflowVersions = new Map<WorkflowVersionId, WorkflowVersion<unknown, unknown, unknown>>();
 
 	constructor(params: WorkflowParams) {
 		this.id = params.id as WorkflowId;
-		this._internal = {
+		this[INTERNAL] = {
 			getAllVersions: this.getAllVersions.bind(this),
 			getVersion: this.getVersion.bind(this),
 		};

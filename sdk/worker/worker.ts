@@ -7,6 +7,7 @@ import {
 } from "@aikirun/types/workflow-run";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { NonEmptyArray } from "@aikirun/lib/array";
+import { INTERNAL } from "@aikirun/lib/symbols";
 import { delay, fireAndForget } from "@aikirun/lib/async";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Duration } from "@aikirun/lib/duration";
@@ -135,7 +136,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	async _start(): Promise<void> {
 		this.logger.info("Worker starting");
 
-		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
+		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
 			this.registry.getAll(),
 			this.options?.shardKeys
@@ -324,8 +325,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		try {
 			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun, logger);
 
-			const appContext = this.client._internal.contextFactory
-				? await this.client._internal.contextFactory(workflowRun)
+			const appContext = this.client[INTERNAL].contextFactory
+				? await this.client[INTERNAL].contextFactory(workflowRun)
 				: null;
 
 			const heartbeat = this.subscriberStrategy?.heartbeat;
@@ -341,7 +342,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				}, this.options?.workflowRun?.heartbeatIntervalMs ?? 30_000);
 			}
 
-			await workflowVersion._internal.exec(
+			await workflowVersion[INTERNAL].exec(
 				workflowRun.input,
 				{
 					id: workflowRun.id as WorkflowRunId,

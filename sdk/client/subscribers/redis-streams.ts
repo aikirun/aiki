@@ -1,4 +1,5 @@
 import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aikirun/lib/array";
+import { INTERNAL } from "@aikirun/lib/symbols";
 import { z } from "zod";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
@@ -85,7 +86,7 @@ export function createRedisStreamsStrategy(
 	workflows: WorkflowMeta[],
 	workerShards?: string[]
 ): SubscriberStrategyBuilder {
-	const redis = client._internal.redis.getConnection();
+	const redis = client[INTERNAL].redis.getConnection();
 
 	const logger = client.logger.child({
 		"aiki.component": "redis-subscriber",

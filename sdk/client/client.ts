@@ -4,6 +4,7 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
 import { ConsoleLogger } from "./logger/index";
+import { INTERNAL } from "@aikirun/lib/symbols";
 
 /**
  * Creates an Aiki client for starting and managing workflows.
@@ -52,7 +53,7 @@ export function client<AppContext = null>(params: ClientParams<AppContext>): Pro
 
 class ClientImpl<AppContext> implements Client<AppContext> {
 	public readonly api: ApiClient;
-	public readonly _internal: Client<AppContext>["_internal"];
+	public readonly [INTERNAL]: Client<AppContext>[typeof INTERNAL];
 	public readonly logger: Logger;
 	private redisConnection?: Redis;
 
@@ -68,7 +69,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 			"aiki.url": params.url,
 		});
 
-		this._internal = {
+		this[INTERNAL] = {
 			subscriber: {
 				create: (strategy, workflows, workerShards) =>
 					resolveSubscriberStrategy(this, strategy, workflows, workerShards),

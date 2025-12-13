@@ -1,5 +1,6 @@
 import { sha256 } from "@aikirun/lib/crypto";
 import { delay } from "@aikirun/lib/async";
+import { INTERNAL } from "@aikirun/lib/symbols";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { stableStringify } from "@aikirun/lib/json";
@@ -99,7 +100,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	): Promise<Output> {
 		const handle = runCtx.handle;
 
-		await handle._internal.assertExecutionAllowed();
+		await handle[INTERNAL].assertExecutionAllowed();
 
 		const input = isNonEmptyArray(args)
 			? args[0]
@@ -108,7 +109,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const path = await this.getPath(runCtx, input);
 
-		const taskState = handle._internal.getTaskState(path);
+		const taskState = handle[INTERNAL].getTaskState(path);
 		if (taskState.status === "completed") {
 			return taskState.output as Output;
 		}
@@ -142,11 +143,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		attempts++;
 
 		logger.info("Starting task", { "aiki.attempts": attempts });
-		await handle._internal.transitionTaskState(path, { status: "running", attempts });
+		await handle[INTERNAL].transitionTaskState(path, { status: "running", attempts });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(runCtx, input, path, retryStrategy, attempts, logger);
 
-		await handle._internal.transitionTaskState(path, { status: "completed", output });
+		await handle[INTERNAL].transitionTaskState(path, { status: "completed", output });
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
@@ -185,7 +186,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {
-					await runCtx.handle._internal.transitionTaskState(path, taskFailedState);
+					await runCtx.handle[INTERNAL].transitionTaskState(path, taskFailedState);
 					logger.error("Task failed", {
 						"aiki.attempts": attempts,
 						"aiki.reason": taskFailedState.reason,
@@ -195,7 +196,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 				const nextAttemptAt = Date.now() + retryParams.delayMs;
 
-				await runCtx.handle._internal.transitionTaskState(path, { ...taskFailedState, nextAttemptAt });
+				await runCtx.handle[INTERNAL].transitionTaskState(path, { ...taskFailedState, nextAttemptAt });
 				logger.debug("Task failed. Retrying", {
 					"aiki.attempts": attempts,
 					"aiki.nextAttemptAt": nextAttemptAt,

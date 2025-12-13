@@ -6,6 +6,7 @@ import {
 } from "@aikirun/types/workflow-run";
 import type { ApiClient, Logger } from "@aikirun/types/client";
 import type { TaskState } from "@aikirun/types/task";
+import { INTERNAL } from "@aikirun/lib/symbols";
 
 export function initWorkflowRunHandle<Input, Output>(
 	api: ApiClient,
@@ -20,7 +21,7 @@ export interface WorkflowRunHandle<Input, Output> {
 
 	transitionState: (state: WorkflowRunState<Output>) => Promise<void>;
 
-	_internal: {
+	[INTERNAL]: {
 		refresh: () => Promise<void>;
 		getTaskState: (taskPath: string) => TaskState<unknown>;
 		transitionTaskState: (taskPath: string, taskState: TaskState<unknown>) => Promise<void>;
@@ -29,14 +30,14 @@ export interface WorkflowRunHandle<Input, Output> {
 }
 
 class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, Output> {
-	public readonly _internal: WorkflowRunHandle<Input, Output>["_internal"];
+	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output>[typeof INTERNAL];
 
 	constructor(
 		private readonly api: ApiClient,
 		public _run: WorkflowRun<Input, Output>,
 		private readonly logger: Logger
 	) {
-		this._internal = {
+		this[INTERNAL] = {
 			refresh: this.refresh.bind(this),
 			getTaskState: this.getTaskState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
