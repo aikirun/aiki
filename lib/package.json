@@ -46,9 +46,7 @@
 			"import": "./dist/testing/expect/index.js"
 		}
 	},
-	"files": [
-		"dist"
-	],
+	"files": ["dist"],
 	"scripts": {
 		"build": "tsup"
 	},

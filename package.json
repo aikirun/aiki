@@ -27,11 +27,8 @@
 		"prepare": "husky"
 	},
 	"lint-staged": {
-        "*.{ts,tsx,js,jsx,json}": [
-            "bunx @biomejs/biome format --write",
-            "bunx @biomejs/biome lint --write"
-        ]
-    },
+		"*.{ts,tsx,js,jsx,json}": ["bunx @biomejs/biome format --write", "bunx @biomejs/biome lint --write"]
+	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@changesets/cli": "^2.27.1",
