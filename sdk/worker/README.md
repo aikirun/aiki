@@ -24,8 +24,8 @@ const aiki = await client({
 	redis: { host: "localhost", port: 6379 },
 });
 
-// Create worker with workflows
-const aikiWorker = worker(aiki, {
+// Define worker
+const aikiWorker = worker({
 	id: "worker-1",
 	workflows: [onboardingWorkflowV1],
 	subscriber: { type: "redis_streams" },
@@ -34,7 +34,7 @@ const aikiWorker = worker(aiki, {
 });
 
 // Start worker
-await aikiWorker.start();
+const handle = await aikiWorker.start(aiki);
 ```
 
 ### Graceful Shutdown
@@ -44,7 +44,7 @@ import process from "node:process";
 
 // Handle signals
 const shutdown = async () => {
-	await aikiWorker.stop();
+	await handle.stop();
 	await aiki.close();
 	process.exit(0);
 };
@@ -92,7 +92,7 @@ interface WorkerOptions {
 Workers receive workflow versions through the `workflows` param:
 
 ```typescript
-const aikiWorker = worker(aiki, {
+const aikiWorker = worker({
 	id: "worker-1",
 	workflows: [workflowV1, workflowV2, anotherWorkflowV1],
 	subscriber: { type: "redis_streams" },

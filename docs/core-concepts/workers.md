@@ -14,17 +14,17 @@ const aiki = await client({
   redis: { host: "localhost", port: 6379 },
 });
 
-const aikiWorker = worker(aiki, {
+const aikiWorker = worker({
   id: "order-worker",
   workflows: [orderWorkflowV1, userWorkflowV1],
 }).withOpts({
   maxConcurrentWorkflowRuns: 10,
 });
 
-await aikiWorker.start();
+const handle = await aikiWorker.start(aiki);
 ```
 
-The `worker()` function takes two arguments: a client connection and configuration. The `id` uniquely identifies this worker instance. The `workflows` array specifies which workflow versions this worker can execute—it will only process workflows it knows about.
+Worker definitions are static and reusable. The `worker()` function creates a definition with an `id` that uniquely identifies the worker and a `workflows` array specifying which workflow versions it can execute. Call `start(client)` to begin execution—it returns a handle for controlling the running worker.
 
 ## How Workers Operate
 
@@ -41,8 +41,11 @@ Workers scale naturally. You can add capacity in several ways:
 **Run multiple instances** of the same worker to share load. Each gets a portion of the work automatically:
 
 ```typescript
-const worker1 = worker(aiki, { id: "worker-1", workflows: [orderWorkflowV1] });
-const worker2 = worker(aiki, { id: "worker-2", workflows: [orderWorkflowV1] });
+const worker1 = worker({ id: "worker-1", workflows: [orderWorkflowV1] });
+const worker2 = worker({ id: "worker-2", workflows: [orderWorkflowV1] });
+
+const handle1 = await worker1.start(aiki);
+const handle2 = await worker2.start(aiki);
 ```
 
 **Specialize workers** by registering different workflows on different workers. Each worker only handles the workflows it knows about.
@@ -55,13 +58,13 @@ Always handle shutdown signals to let active workflows complete:
 
 ```typescript
 process.on("SIGTERM", async () => {
-  await aikiWorker.stop();
+  await handle.stop();
   await aiki.close();
   process.exit(0);
 });
 ```
 
-The `stop()` method signals the worker to stop accepting new work, waits for active executions to finish (up to `gracefulShutdownTimeoutMs`), then returns. Any workflows that don't complete in time remain unacknowledged and will be claimed by other workers.
+The `stop()` method on the handle signals the worker to stop accepting new work, waits for active executions to finish (up to `gracefulShutdownTimeoutMs`), then returns. Any workflows that don't complete in time remain unacknowledged and will be claimed by other workers.
 
 ## Configuration Reference
 

@@ -19,43 +19,36 @@ import { isServerConflictError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
 
 /**
- * Creates an Aiki worker for executing workflows and tasks.
+ * Creates an Aiki worker definition for executing workflows.
  *
- * Workers poll for workflow runs, execute them, and handle state persistence.
- * Multiple workers can be started to scale workflow execution horizontally.
- * All workers connect to the same Aiki server and Redis instance.
+ * Worker definitions are static and reusable. Call `start(client)` to begin
+ * execution, which returns a handle for controlling the running worker.
  *
- * @template AppContext - Type of application context passed to workflows
- * @param client - Configured Aiki client instance
  * @param params - Worker configuration parameters
  * @param params.id - Unique worker ID for identification and monitoring
  * @param params.workflows - Array of workflow versions this worker can execute
  * @param params.subscriber - Message subscriber strategy (default: redis_streams)
- * @returns Worker instance ready to be started, use withOpts() to configure runtime options
+ * @returns Worker definition, call start(client) to begin execution
  *
  * @example
  * ```typescript
- * const aikiWorker = worker(aiki, {
- *   id: "worker-1",
- *   workflows: [userOnboardingV1, paymentWorkflowV1],
- *   subscriber: { type: "redis_streams" },
+ * export const myWorker = worker({
+ *   id: "order-worker",
+ *   workflows: [orderWorkflowV1, paymentWorkflowV1],
  * }).withOpts({
  *   maxConcurrentWorkflowRuns: 10,
  * });
  *
- * // Start execution
- * await aikiWorker.start();
+ * const handle = await myWorker.start(client);
  *
- * // Handle graceful shutdown
- * const shutdown = async () => {
- *   await aikiWorker.stop();
- *   await aiki.close();
- * };
- * process.on("SIGINT", shutdown);
+ * process.on("SIGINT", async () => {
+ *   await handle.stop();
+ *   await client.close();
+ * });
  * ```
  */
-export function worker<AppContext>(client: Client<AppContext>, params: WorkerParams): Worker {
-	return new WorkerImpl(client, params);
+export function worker(params: WorkerParams): Worker {
+	return new WorkerImpl(params);
 }
 
 export interface WorkerParams {
@@ -73,9 +66,8 @@ export interface WorkerOptions {
 	gracefulShutdownTimeoutMs?: number;
 	/**
 	 * Optional array of shardKeys this worker should process.
-	 * When provided, the worker will only subscribe to sharded streams: workflow:${workflowId}:${Key}
-	 * When omitted, the worker subscribes to default streams: workflow:${workflowId}
-	 * Cannot be combined with non-sharded workflows in the same worker instance.
+	 * When provided, the worker will only subscribe to sharded streams.
+	 * When omitted, the worker subscribes to default streams.
 	 */
 	shardKeys?: string[];
 }
@@ -83,10 +75,36 @@ export interface WorkerOptions {
 export interface Worker {
 	id: string;
 
-	start: () => Promise<void>;
-	stop: () => Promise<void>;
+	start: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
 
 	withOpts(options: WorkerOptions): Worker;
+}
+
+export interface WorkerHandle {
+	id: string;
+
+	stop: () => Promise<void>;
+}
+
+class WorkerImpl implements Worker {
+	public readonly id: string;
+
+	constructor(
+		private readonly params: WorkerParams,
+		private readonly options?: WorkerOptions
+	) {
+		this.id = params.id;
+	}
+
+	public withOpts(options: WorkerOptions): Worker {
+		return new WorkerImpl(this.params, this.options ? { ...this.options, ...options } : options);
+	}
+
+	public async start<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
+		const handle = new WorkerHandleImpl(client, this.params, this.options);
+		await handle._start();
+		return handle;
+	}
 }
 
 interface ActiveWorkflowRun {
@@ -95,7 +113,7 @@ interface ActiveWorkflowRun {
 	meta?: SubscriberMessageMeta;
 }
 
-class WorkerImpl<AppContext> implements Worker {
+class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	public readonly id: string;
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
@@ -115,15 +133,9 @@ class WorkerImpl<AppContext> implements Worker {
 			"aiki.component": "worker",
 			"aiki.workerId": this.id,
 		});
-
-		this.logger.info("Worker initialized");
 	}
 
-	public withOpts(options: WorkerOptions): Worker {
-		return new WorkerImpl(this.client, this.params, this.options ? { ...this.options, ...options } : options);
-	}
-
-	public async start(): Promise<void> {
+	async _start(): Promise<void> {
 		this.logger.info("Worker starting");
 
 		const subscriberStrategyBuilder = this.client._internal.subscriber.create(
