@@ -23,13 +23,22 @@
 		"build:server": "bun build server/server.ts --compile --outfile server/dist/aiki-server",
 		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/task build && bun run --cwd sdk/client build && bun run --cwd sdk/worker build",
 		"prepublishOnly": "bun run build:lib && bun run build:types && bun run build:sdk",
-		"publish": "changeset publish && git push --follow-tags"
+		"publish": "changeset publish && git push --follow-tags",
+		"prepare": "husky"
 	},
+	"lint-staged": {
+        "*.{ts,tsx,js,jsx,json}": [
+            "bunx @biomejs/biome format --write",
+            "bunx @biomejs/biome lint --write"
+        ]
+    },
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@changesets/cli": "^2.27.1",
 		"@types/node": "^22.10.2",
 		"bun-types": "^1.1.38",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.2.7",
 		"tsup": "^8.5.1",
 		"typescript": "^5.7.2"
 	}
