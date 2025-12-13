@@ -1,6 +1,6 @@
 import { sha256 } from "@aikirun/lib/crypto";
 import { delay } from "@aikirun/lib/async";
-import { INTERNAL } from "@aikirun/lib/symbols";
+import { INTERNAL } from "@aikirun/types/symbols";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { stableStringify } from "@aikirun/lib/json";

@@ -1,4 +1,4 @@
-import type { DurationObject } from "@aikirun/lib/duration";
+import type { DurationObject } from "./duration";
 
 export type TriggerStrategy =
 	| { type: "immediate" }

@@ -12,7 +12,7 @@ import type { Client, Logger } from "@aikirun/types/client";
 import type { WorkflowRunContext } from "./run/context";
 import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import { INTERNAL } from "@aikirun/lib/symbols";
+import { INTERNAL } from "@aikirun/types/symbols";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import { createSerializableError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";

@@ -4,7 +4,7 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
 import { ConsoleLogger } from "./logger/index";
-import { INTERNAL } from "@aikirun/lib/symbols";
+import { INTERNAL } from "@aikirun/types/symbols";
 
 /**
  * Creates an Aiki client for starting and managing workflows.

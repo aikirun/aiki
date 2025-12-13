@@ -2,7 +2,7 @@ import type { WorkflowRun } from "@aikirun/types/workflow-run";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
-import { INTERNAL } from "@aikirun/lib/symbols";
+import { INTERNAL } from "./symbols";
 
 export interface ClientParams<AppContext> {
 	url: string;

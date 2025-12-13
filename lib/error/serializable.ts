@@ -1,17 +1,4 @@
-export type SerializableInput =
-	| null
-	| string
-	| number
-	| boolean
-	| { [key: string]: SerializableInput }
-	| SerializableInput[];
-
-export interface SerializableError {
-	message: string;
-	name: string;
-	stack?: string;
-	cause?: SerializableError;
-}
+import type { SerializableError } from "@aikirun/types/error";
 
 export function createSerializableError(error: unknown): SerializableError {
 	return error instanceof Error

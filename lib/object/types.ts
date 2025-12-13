@@ -1,4 +1,6 @@
 import type { Equal, ExpectTrue } from "../testing/expect/types";
+import type { RequireAtLeastOneOf } from "@aikirun/types/utils";
+export type { RequireAtLeastOneOf };
 
 export type UndefinedToPartial<T extends object> = {
 	[K in keyof T as undefined extends T[K] ? K : never]?: Exclude<T[K], undefined>;
@@ -59,9 +61,6 @@ export type UnionToRecord<T extends string> = {
 	[K in T]: K;
 };
 
-export type RequireAtLeastOneOf<T, Keys extends keyof T> = {
-	[K in Keys]-?: Required<Pick<T, K>> & Omit<T, K>;
-}[Keys];
 //#region <RequireAtLeastOneOf Tests>
 type TestRequireAtLeastOneOfProducesUnion = ExpectTrue<
 	Equal<

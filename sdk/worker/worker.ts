@@ -7,7 +7,7 @@ import {
 } from "@aikirun/types/workflow-run";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { INTERNAL } from "@aikirun/lib/symbols";
+import { INTERNAL } from "@aikirun/types/symbols";
 import { delay, fireAndForget } from "@aikirun/lib/async";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Duration } from "@aikirun/lib/duration";

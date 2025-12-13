@@ -1,6 +1,4 @@
-import type { RequireAtLeastOneOf } from "../object/types";
-
-type DurationMs = number;
+import type { RequireAtLeastOneOf } from "./utils";
 
 export interface DurationFields {
 	days?: number;
@@ -11,5 +9,7 @@ export interface DurationFields {
 }
 
 export type DurationObject = RequireAtLeastOneOf<DurationFields, keyof DurationFields>;
+
+type DurationMs = number;
 
 export type Duration = DurationMs | DurationObject;

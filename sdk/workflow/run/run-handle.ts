@@ -6,7 +6,7 @@ import {
 } from "@aikirun/types/workflow-run";
 import type { ApiClient, Logger } from "@aikirun/types/client";
 import type { TaskState } from "@aikirun/types/task";
-import { INTERNAL } from "@aikirun/lib/symbols";
+import { INTERNAL } from "@aikirun/types/symbols";
 
 export function initWorkflowRunHandle<Input, Output>(
 	api: ApiClient,

@@ -1,7 +1,7 @@
-import type { SerializableError } from "@aikirun/lib/error";
+import type { SerializableError } from "./error";
 import type { TaskState } from "./task";
 import type { TriggerStrategy } from "./trigger";
-import type { RetryStrategy } from "@aikirun/lib/retry";
+import type { RetryStrategy } from "./retry";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 

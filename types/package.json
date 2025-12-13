@@ -4,6 +4,26 @@
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"type": "module",
 	"exports": {
+		"./utils": {
+			"types": "./dist/utils.d.ts",
+			"import": "./dist/utils.js"
+		},
+		"./symbols": {
+			"types": "./dist/symbols.d.ts",
+			"import": "./dist/symbols.js"
+		},
+		"./duration": {
+			"types": "./dist/duration.d.ts",
+			"import": "./dist/duration.js"
+		},
+		"./retry": {
+			"types": "./dist/retry.d.ts",
+			"import": "./dist/retry.js"
+		},
+		"./error": {
+			"types": "./dist/error.d.ts",
+			"import": "./dist/error.js"
+		},
 		"./client": {
 			"types": "./dist/client.d.ts",
 			"import": "./dist/client.js"
@@ -35,10 +55,7 @@
 	"scripts": {
 		"build": "tsup"
 	},
-	"dependencies": {
-		"@aikirun/lib": "workspace:*"
-	},
-	"publishConfig": {
+		"publishConfig": {
 		"access": "public"
 	},
 	"license": "Apache-2.0"

@@ -13,42 +13,15 @@ npm install @aikirun/types
 
 ## Exports
 
-### `/client`
-
-Types for the client package, including client configuration and response types.
-
-### `/trigger`
-
-Trigger strategy types for controlling when workflows should execute:
-
-- `immediate` - Execute immediately
-- `delayed` - Execute after a duration
-- `startAt` - Execute at a specific timestamp
-
-### `/workflow`
-
-Workflow definition types and interfaces.
-
-### `/task`
-
-Task definition and execution types.
-
-### `/workflow-run`
-
-Runtime state and execution types for workflow runs:
-
-- Workflow run states (scheduled, queued, running, sleeping, etc.)
-- Task execution states
-- Child workflow execution states
-- Event waiting conditions
-
-### `/workflow-run-api`
-
-API contract types for workflow run operations.
-
-### `/serializable`
-
-Types for serializable error handling.
+- `/client` - Client configuration and API types
+- `/workflow` - Workflow definition types
+- `/workflow-run` - Workflow execution state types
+- `/workflow-run-api` - API contract types
+- `/task` - Task definition and state types
+- `/trigger` - Trigger strategy types
+- `/duration` - Duration types
+- `/retry` - Retry strategy types
+- `/error` - Serializable error types
 
 ## Usage
 
@@ -61,7 +34,6 @@ import type { TriggerStrategy } from "@aikirun/types/trigger";
 
 ## Related Packages
 
-- [@aikirun/lib](https://www.npmjs.com/package/@aikirun/lib) - Foundation utilities
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Client SDK
 - [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Workflow SDK
 - [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Task SDK
