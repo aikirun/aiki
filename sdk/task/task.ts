@@ -62,6 +62,7 @@ export function task<Input extends SerializableInput = null, Output = void>(
 export interface TaskParams<Input, Output> {
 	id: string;
 	exec: (input: Input) => Promise<Output>;
+	opts?: TaskOptions;
 }
 
 export interface TaskOptions {
@@ -83,15 +84,15 @@ export interface Task<Input, Output> {
 class TaskImpl<Input, Output> implements Task<Input, Output> {
 	public readonly id: TaskId;
 
-	constructor(
-		private readonly params: TaskParams<Input, Output>,
-		private readonly options?: TaskOptions
-	) {
+	constructor(private readonly params: TaskParams<Input, Output>) {
 		this.id = params.id as TaskId;
 	}
 
 	public withOpts(options: TaskOptions): Task<Input, Output> {
-		return new TaskImpl(this.params, this.options ? { ...this.options, ...options } : options);
+		return new TaskImpl({
+			...this.params,
+			opts: this.params.opts ? { ...this.params.opts, ...options } : options,
+		});
 	}
 
 	public async start<WorkflowInput, WorkflowOutput>(
@@ -121,7 +122,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		});
 
 		let attempts = 0;
-		const retryStrategy = this.options?.retry ?? { type: "never" };
+		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
 
 		if ("attempts" in taskState) {
 			this.assertRetryAllowed(taskState.attempts, retryStrategy, logger);
@@ -237,8 +238,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const inputHash = await sha256(stableStringify(input));
 
-		return this.options?.idempotencyKey
-			? `${workflowRunPath}/${this.id}/${inputHash}/${this.options.idempotencyKey}`
+		return this.params.opts?.idempotencyKey
+			? `${workflowRunPath}/${this.id}/${inputHash}/${this.params.opts.idempotencyKey}`
 			: `${workflowRunPath}/${this.id}/${inputHash}`;
 	}
 }

@@ -14,28 +14,27 @@ interface AppContext {
 	workflowRunId: string;
 }
 
-export const morningWorkflowV2 = morningWorkflow
-	.v("2.0", {
-		async exec(input: { a: string; b: number }, run, context: AppContext): Promise<string> {
-			run.logger.info("Starting morning routine", { song: input.a, duration: input.b, traceId: context.traceId });
+export const morningWorkflowV2 = morningWorkflow.v("2.0", {
+	async exec(input: { a: string; b: number }, run, context: AppContext): Promise<string> {
+		run.logger.info("Starting morning routine", { song: input.a, duration: input.b, traceId: context.traceId });
 
-			const alarmOutput = await ringAlarm.start(run, { song: input.a });
+		const alarmOutput = await ringAlarm.start(run, { song: input.a });
 
-			const stretchOutput = await stretch.start(run, { duration: input.b });
+		const stretchOutput = await stretch.start(run, { duration: input.b });
 
-			const response = `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
+		const response = `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
 
-			run.logger.info("Morning routine completed", { response });
+		run.logger.info("Morning routine completed", { response });
 
-			return response;
-		},
-	})
-	.withOpts({
+		return response;
+	},
+	opts: {
 		trigger: {
 			type: "delayed",
 			delay: { seconds: 5 },
 		},
-	});
+	},
+});
 
 export const eveningRoutineWorkflow = workflow({ id: "evening-routine" });
 

@@ -19,6 +19,7 @@ import { TaskFailedError } from "@aikirun/types/task";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (input: Input, runContext: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<Output>;
+	opts?: WorkflowOptions;
 }
 
 export interface WorkflowVersion<Input, Output, AppContext> {
@@ -43,8 +44,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	constructor(
 		public readonly id: WorkflowId,
 		public readonly versionId: WorkflowVersionId,
-		private readonly params: WorkflowVersionParams<Input, Output, AppContext>,
-		private readonly options?: WorkflowOptions
+		private readonly params: WorkflowVersionParams<Input, Output, AppContext>
 	) {
 		this[INTERNAL] = {
 			exec: this.exec.bind(this),
@@ -52,12 +52,10 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	}
 
 	public withOpts(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext> {
-		return new WorkflowVersionImpl(
-			this.id,
-			this.versionId,
-			this.params,
-			this.options ? { ...this.options, ...options } : options
-		);
+		return new WorkflowVersionImpl(this.id, this.versionId, {
+			...this.params,
+			opts: this.params.opts ? { ...this.params.opts, ...options } : options,
+		});
 	}
 
 	public async start(
@@ -68,7 +66,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : null,
-			options: this.options,
+			options: this.params.opts,
 		});
 		return initWorkflowRunStateHandle(response.run.id as WorkflowRunId, client.api);
 	}
@@ -78,7 +76,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 
 		await handle[INTERNAL].assertExecutionAllowed();
 
-		const retryStrategy = this.options?.retry ?? { type: "never" };
+		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
 		this.assertRetryAllowed(runCtx.handle.run, retryStrategy, logger);
 
 		logger.info("Starting workflow");

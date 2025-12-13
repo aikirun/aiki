@@ -57,6 +57,7 @@ export interface WorkerParams {
 	// biome-ignore lint/suspicious/noExplicitAny:
 	workflows: WorkflowVersion<any, any, any>[];
 	subscriber?: SubscriberStrategy;
+	opts?: WorkerOptions;
 }
 
 export interface WorkerOptions {
@@ -87,19 +88,19 @@ export interface WorkerHandle {
 class WorkerImpl implements Worker {
 	public readonly id: string;
 
-	constructor(
-		private readonly params: WorkerParams,
-		private readonly options?: WorkerOptions
-	) {
+	constructor(private readonly params: WorkerParams) {
 		this.id = params.id;
 	}
 
 	public withOpts(options: WorkerOptions): Worker {
-		return new WorkerImpl(this.params, this.options ? { ...this.options, ...options } : options);
+		return new WorkerImpl({
+			...this.params,
+			opts: this.params.opts ? { ...this.params.opts, ...options } : options,
+		});
 	}
 
 	public async start<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
-		const handle = new WorkerHandleImpl(client, this.params, this.options);
+		const handle = new WorkerHandleImpl(client, this.params);
 		await handle._start();
 		return handle;
 	}
@@ -121,8 +122,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 	constructor(
 		private readonly client: Client<AppContext>,
-		private readonly params: WorkerParams,
-		private readonly options?: WorkerOptions
+		private readonly params: WorkerParams
 	) {
 		this.id = params.id;
 		this.registry = initWorkflowRegistry().addMany(this.params.workflows);
@@ -139,7 +139,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
 			this.registry.getAll(),
-			this.options?.shardKeys
+			this.params.opts?.shardKeys
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
 			onError: (error: Error) => this.handleNotificationError(error),
@@ -166,7 +166,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
 		if (activeWorkflowRuns.length === 0) return;
 
-		const timeoutMs = this.options?.gracefulShutdownTimeoutMs ?? 5_000;
+		const timeoutMs = this.params.opts?.gracefulShutdownTimeoutMs ?? 5_000;
 
 		if (timeoutMs > 0) {
 			await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
@@ -196,7 +196,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		while (!abortSignal.aborted) {
 			await delay(nextDelayMs, { abortSignal });
 
-			const availableCapacity = (this.options?.maxConcurrentWorkflowRuns ?? 1) - this.activeWorkflowRunsById.size;
+			const availableCapacity = (this.params.opts?.maxConcurrentWorkflowRuns ?? 1) - this.activeWorkflowRunsById.size;
 
 			if (availableCapacity <= 0) {
 				nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "at_capacity" });
@@ -339,7 +339,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 							"aiki.error": error instanceof Error ? error.message : String(error),
 						});
 					}
-				}, this.options?.workflowRun?.heartbeatIntervalMs ?? 30_000);
+				}, this.params.opts?.workflowRun?.heartbeatIntervalMs ?? 30_000);
 			}
 
 			await workflowVersion[INTERNAL].exec(
