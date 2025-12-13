@@ -18,12 +18,6 @@ import { worker } from "@aikirun/worker";
 import { client } from "@aikirun/client";
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
-// Initialize client
-const aiki = await client({
-	url: "http://localhost:9090",
-	redis: { host: "localhost", port: 6379 },
-});
-
 // Define worker
 const aikiWorker = worker({
 	id: "worker-1",
@@ -31,6 +25,12 @@ const aikiWorker = worker({
 	subscriber: { type: "redis_streams" },
 }).withOpts({
 	maxConcurrentWorkflowRuns: 10,
+});
+
+// Initialize client
+const aiki = await client({
+	url: "http://localhost:9090",
+	redis: { host: "localhost", port: 6379 },
 });
 
 // Start worker
@@ -42,7 +42,6 @@ const handle = await aikiWorker.start(aiki);
 ```typescript
 import process from "node:process";
 
-// Handle signals
 const shutdown = async () => {
 	await handle.stop();
 	await aiki.close();
@@ -61,6 +60,27 @@ process.on("SIGTERM", shutdown);
 - **Automatic Recovery** - Detect stuck workflows and retry automatically
 - **Polling Strategies** - Adaptive polling with configurable backoff
 - **Graceful Shutdown** - Clean worker termination with in-flight workflow handling
+
+## Horizontal Scaling
+
+Scale workers by creating separate definitions to isolate workflows or shard by key:
+
+```typescript
+// Separate workers by workflow type
+const orderWorker = worker({ id: "orders", workflows: [orderWorkflowV1] });
+const emailWorker = worker({ id: "emails", workflows: [emailWorkflowV1] });
+
+await orderWorker.start(client);
+await emailWorker.start(client);
+```
+
+```typescript
+// Shard workers by key
+const orderWorker = worker({ id: "order-processor", workflows: [orderWorkflowV1] });
+
+await orderWorker.withOpts({ shardKeys: ["us-east", "us-west"] }).start(client);
+await orderWorker.withOpts({ shardKeys: ["eu-west"] }).start(client);
+```
 
 ## Worker Configuration
 
@@ -117,7 +137,7 @@ This allows workflows to resume from the exact point of failure.
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Start workflows
 - [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows
 - [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
-- [@aikirun/lib](https://www.npmjs.com/package/@aikirun/lib) - Utility functions
+- [@aikirun/types](https://www.npmjs.com/package/@aikirun/types) - Type definitions
 
 ## License
 
