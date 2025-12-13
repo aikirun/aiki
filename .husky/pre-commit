@@ -1,5 +1,1 @@
-echo '#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-bun run check && bunx lint-staged' > .husky/pre-commit
-chmod +x .husky/pre-commit
+bun run check && bunx lint-staged
