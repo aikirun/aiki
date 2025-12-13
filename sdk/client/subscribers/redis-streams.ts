@@ -219,7 +219,7 @@ function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shardKeys?: s
 	);
 }
 
-// TODO: 
+// TODO:
 // - attempt to claim stuck messages before fething newer ones
 // - instead of processing streams randomly, try to priority I/O bound streams over CPU hogs
 async function fetchRedisStreamMessages(
