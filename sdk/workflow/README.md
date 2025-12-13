@@ -162,10 +162,12 @@ With a worker:
 import { worker } from "@aikirun/worker";
 
 const aikiWorker = worker(aiki, {
+	id: "my-worker",
+	workflows: [onboardingWorkflowV1],
+}).withOpts({
 	maxConcurrentWorkflowRuns: 10,
 });
 
-aikiWorker.registry.add(onboardingWorkflow);
 await aikiWorker.start();
 ```
 

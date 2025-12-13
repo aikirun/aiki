@@ -7,15 +7,18 @@ back to the server.
 
 ```typescript
 import { worker } from "@aikirun/worker";
+import { orderWorkflowV1 } from "./workflows";
 
 const aikiWorker = worker(client, {
 	id: "worker-1",
-	maxConcurrentWorkflowRuns: 5,
+	workflows: [orderWorkflowV1],
 	subscriber: {
 		type: "redis_streams",
 		claimMinIdleTimeMs: 60_000,
 		blockTimeMs: 1000,
 	},
+}).withOpts({
+	maxConcurrentWorkflowRuns: 5,
 	workflowRun: {
 		heartbeatIntervalMs: 30000,
 	},
@@ -78,18 +81,19 @@ How long to wait for active workflows to complete during shutdown:
 gracefulShutdownTimeoutMs: 5000; // 5 seconds
 ```
 
-## Workflow Registry
+## Registering Workflows
 
-Workers maintain a registry of workflows they can execute:
+Workers receive workflows through the `workflows` param. Pass an array of workflow versions:
 
 ```typescript
-aikiWorker.registry
-	.add(orderWorkflow)
-	.add(userWorkflow)
-	.add(notificationWorkflow);
+const aikiWorker = worker(client, {
+	id: "worker-1",
+	workflows: [orderWorkflowV1, userWorkflowV1, notificationWorkflowV1],
+	subscriber: { type: "redis_streams" },
+});
 ```
 
-You can register multiple workflows to a single worker. Workers will only process workflows in their registry.
+You can register multiple workflow versions to a single worker. Workers will only process workflows in their registry.
 
 ## Worker Lifecycle
 
@@ -124,18 +128,20 @@ You can run multiple workers to scale horizontally:
 // Worker 1
 const worker1 = worker(client, {
 	id: "worker-1",
-	maxConcurrentWorkflowRuns: 5,
+	workflows: [orderWorkflowV1],
 	subscriber: { type: "redis_streams" },
+}).withOpts({
+	maxConcurrentWorkflowRuns: 5,
 });
-worker1.registry.add(orderWorkflow);
 
 // Worker 2
 const worker2 = worker(client, {
 	id: "worker-2",
-	maxConcurrentWorkflowRuns: 5,
+	workflows: [orderWorkflowV1],
 	subscriber: { type: "redis_streams" },
+}).withOpts({
+	maxConcurrentWorkflowRuns: 5,
 });
-worker2.registry.add(orderWorkflow);
 
 // Both workers process the same workflows
 await Promise.all([
@@ -152,16 +158,16 @@ You can create specialized workers for different workflow types:
 // Payment worker - handles payment workflows
 const paymentWorker = worker(client, {
 	id: "payment-worker",
+	workflows: [paymentWorkflowV1],
 	subscriber: { type: "redis_streams" },
 });
-paymentWorker.registry.add(paymentWorkflow);
 
 // Email worker - handles email workflows
 const emailWorker = worker(client, {
 	id: "email-worker",
+	workflows: [emailWorkflowV1],
 	subscriber: { type: "redis_streams" },
 });
-emailWorker.registry.add(emailWorkflow);
 
 await Promise.all([
 	paymentWorker.start(),
@@ -198,6 +204,7 @@ Failed workflows are automatically retried according to the configured strategy.
 ```typescript
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
+import { orderWorkflowV1, userWorkflowV1 } from "./workflows";
 
 // Create client
 const aiki = await client({
@@ -208,18 +215,15 @@ const aiki = await client({
 // Create worker
 const aikiWorker = worker(aiki, {
 	id: `worker-${process.env.WORKER_ID || 1}`,
-	maxConcurrentWorkflowRuns: 10,
+	workflows: [orderWorkflowV1, userWorkflowV1],
 	subscriber: {
 		type: "redis_streams",
 		claimMinIdleTimeMs: 60_000,
 	},
+}).withOpts({
+	maxConcurrentWorkflowRuns: 10,
 	gracefulShutdownTimeoutMs: 10_000,
 });
-
-// Register workflows
-aikiWorker.registry
-	.add(orderWorkflow)
-	.add(userWorkflow);
 
 // Handle shutdown gracefully
 process.on("SIGTERM", async () => {

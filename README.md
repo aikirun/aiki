@@ -58,7 +58,7 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
 ```typescript
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
-import { onboardingWorkflow } from "./workflow.ts";
+import { onboardingWorkflowV1 } from "./workflow.ts";
 
 export const aikiClient = await client({
   url: "localhost:9090",
@@ -66,10 +66,10 @@ export const aikiClient = await client({
 });
 
 const workerA = worker(aikiClient, {
+  id: "worker-A",
+  workflows: [onboardingWorkflowV1],
   subscriber: { type: "redis_streams" }
 });
-
-workerA.registry.add(onboardingWorkflow);
 
 // This worker can process workflows alongside other workers - Aiki handles distribution.
 // Scale horizontally by launching more workers pointing to the same stream.

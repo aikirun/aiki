@@ -16,7 +16,7 @@ npm install @aikirun/worker
 ```typescript
 import { worker } from "@aikirun/worker";
 import { client } from "@aikirun/client";
-import { onboardingWorkflow } from "./workflows.ts";
+import { onboardingWorkflowV1 } from "./workflows.ts";
 
 // Initialize client
 const aiki = await client({
@@ -24,15 +24,14 @@ const aiki = await client({
 	redis: { host: "localhost", port: 6379 },
 });
 
-// Create worker
+// Create worker with workflows
 const aikiWorker = worker(aiki, {
 	id: "worker-1",
-	maxConcurrentWorkflowRuns: 10,
+	workflows: [onboardingWorkflowV1],
 	subscriber: { type: "redis_streams" },
+}).withOpts({
+	maxConcurrentWorkflowRuns: 10,
 });
-
-// Register workflows
-aikiWorker.registry.add(onboardingWorkflow);
 
 // Start worker
 await aikiWorker.start();
@@ -65,31 +64,42 @@ process.on("SIGTERM", shutdown);
 
 ## Worker Configuration
 
+### Params (required for worker identity)
+
 ```typescript
 interface WorkerParams {
-	id?: string; // Unique worker ID
+	id: string; // Unique worker ID
+	workflows: WorkflowVersion[]; // Workflow versions to execute
+	subscriber?: SubscriberStrategy; // Message subscriber (default: redis_streams)
+}
+```
+
+### Options (runtime tuning via withOpts)
+
+```typescript
+interface WorkerOptions {
 	maxConcurrentWorkflowRuns?: number; // Concurrency limit (default: 1)
 	workflowRun?: {
 		heartbeatIntervalMs?: number; // Heartbeat interval (default: 30s)
 	};
 	gracefulShutdownTimeoutMs?: number; // Shutdown timeout (default: 5s)
-	subscriber?: SubscriberStrategy; // Message subscriber (default: redis_streams)
 	shardKeys?: string[]; // Optional shard keys for distributed work
 }
 ```
 
 ## Workflow Registration
 
-Workers execute workflows registered in their registry:
+Workers receive workflow versions through the `workflows` param:
 
 ```typescript
-aikiWorker.registry
-	.add(workflowV1)
-	.add(workflowV2)
-	.add(anotherWorkflow);
+const aikiWorker = worker(aiki, {
+	id: "worker-1",
+	workflows: [workflowV1, workflowV2, anotherWorkflowV1],
+	subscriber: { type: "redis_streams" },
+});
 ```
 
-The worker automatically discovers and executes available workflow versions.
+The worker automatically discovers and executes the registered workflow versions.
 
 ## State Persistence
 

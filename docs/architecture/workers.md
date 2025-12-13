@@ -36,10 +36,13 @@ sequence, tracking progress and state, reporting results to the server, and hand
 
 ### Workflow Registry
 
-Maintains available workflows:
+Workflows are registered via the `workflows` param:
 
 ```typescript
-worker.registry.add(workflow1).add(workflow2);
+const aikiWorker = worker(client, {
+	id: "worker-1",
+	workflows: [workflowV1, workflowV2],
+});
 ```
 
 Only workflows in the registry can be executed by this worker.
@@ -85,28 +88,32 @@ const results = await Promise.allSettled(
 ### Basic Setup
 
 ```typescript
-const worker = worker(client, {
+const aikiWorker = worker(client, {
 	id: "worker-1",
-	maxConcurrentWorkflowRuns: 5,
+	workflows: [orderWorkflowV1],
 	subscriber: {
 		type: "redis_streams",
 		claimMinIdleTimeMs: 60_000,
 		blockTimeMs: 1000,
 	},
+}).withOpts({
+	maxConcurrentWorkflowRuns: 5,
 });
 ```
 
 ### Advanced Configuration
 
 ```typescript
-const worker = worker(client, {
+const aikiWorker = worker(client, {
 	id: "worker-prod-1",
-	maxConcurrentWorkflowRuns: 20,
+	workflows: [orderWorkflowV1, paymentWorkflowV1],
 	subscriber: {
 		type: "redis_streams",
 		claimMinIdleTimeMs: 30_000, // Claim after 30s
 		blockTimeMs: 2000, // Block 2s for new messages
 	},
+}).withOpts({
+	maxConcurrentWorkflowRuns: 20,
 	workflowRun: {
 		heartbeatIntervalMs: 15_000, // Heartbeat every 15s
 	},
@@ -154,13 +161,13 @@ Add more workers:
 
 ```typescript
 // Worker 1
-const worker1 = worker(client, { id: "worker-1" });
+const worker1 = worker(client, { id: "worker-1", workflows: [orderWorkflowV1] });
 
 // Worker 2
-const worker2 = worker(client, { id: "worker-2" });
+const worker2 = worker(client, { id: "worker-2", workflows: [orderWorkflowV1] });
 
 // Worker 3
-const worker3 = worker(client, { id: "worker-3" });
+const worker3 = worker(client, { id: "worker-3", workflows: [orderWorkflowV1] });
 ```
 
 All workers share the workload automatically via consumer groups.
@@ -171,12 +178,16 @@ Dedicate workers to specific workflows:
 
 ```typescript
 // Payment worker
-const paymentWorker = worker(client, { id: "payment-worker" });
-paymentWorker.registry.add(paymentWorkflow);
+const paymentWorker = worker(client, {
+	id: "payment-worker",
+	workflows: [paymentWorkflowV1],
+});
 
 // Email worker
-const emailWorker = worker(client, { id: "email-worker" });
-emailWorker.registry.add(emailWorkflow);
+const emailWorker = worker(client, {
+	id: "email-worker",
+	workflows: [emailWorkflowV1],
+});
 ```
 
 ### Geographic Distribution
@@ -187,12 +198,16 @@ Deploy workers in different regions:
 // US East worker
 const usEastWorker = worker(client, {
 	id: "us-east-worker",
+	workflows: [orderWorkflowV1],
+}).withOpts({
 	shardKeys: ["us-east"],
 });
 
 // EU worker
 const euWorker = worker(client, {
 	id: "eu-worker",
+	workflows: [orderWorkflowV1],
+}).withOpts({
 	shardKeys: ["eu-west"],
 });
 ```

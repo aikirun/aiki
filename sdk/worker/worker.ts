@@ -28,36 +28,30 @@ import { TaskFailedError } from "@aikirun/types/task";
  * @template AppContext - Type of application context passed to workflows
  * @param client - Configured Aiki client instance
  * @param params - Worker configuration parameters
- * @param params.id - Optional unique worker ID (auto-generated if not provided)
- * @param params.maxConcurrentWorkflowRuns - Maximum concurrent workflows to execute (default: 1)
- * @param params.workflowRun.heartbeatIntervalMs - Heartbeat interval in milliseconds (default: 30000)
- * @param params.gracefulShutdownTimeoutMs - Time to wait for active workflows during shutdown (default: 5000)
+ * @param params.id - Unique worker ID for identification and monitoring
+ * @param params.workflows - Array of workflow versions this worker can execute
  * @param params.subscriber - Message subscriber strategy (default: redis_streams)
- * @param params.shardKeys - Optional shard keys for distributed work
- * @returns Worker instance ready to be started
+ * @returns Worker instance ready to be started, use withOpts() to configure runtime options
  *
  * @example
  * ```typescript
- * const worker = worker(aiki, {
+ * const aikiWorker = worker(aiki, {
  *   id: "worker-1",
- *   maxConcurrentWorkflowRuns: 10,
+ *   workflows: [userOnboardingV1, paymentWorkflowV1],
  *   subscriber: { type: "redis_streams" },
+ * }).withOpts({
+ *   maxConcurrentWorkflowRuns: 10,
  * });
  *
- * // Register workflows
- * worker.registry
- *   .add(userOnboardingWorkflow)
- *   .add(paymentWorkflow);
- *
  * // Start execution
- * await worker.start();
+ * await aikiWorker.start();
  *
  * // Handle graceful shutdown
  * const shutdown = async () => {
- *   await worker.stop();
+ *   await aikiWorker.stop();
  *   await aiki.close();
  * };
- * processWrapper.addSignalListener("SIGINT", shutdown);
+ * process.on("SIGINT", shutdown);
  * ```
  */
 export function worker<AppContext>(client: Client<AppContext>, params: WorkerParams): Worker {

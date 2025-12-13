@@ -141,15 +141,14 @@ const aiki = await client({
 
 const aikiWorker = worker(aiki, {
 	id: "order-worker-1",
-	maxConcurrentWorkflowRuns: 10,
+	workflows: [orderWorkflowV1],
 	subscriber: {
 		type: "redis_streams",
 		claimMinIdleTimeMs: 60_000,
 	},
+}).withOpts({
+	maxConcurrentWorkflowRuns: 10,
 });
-
-// Register the workflow
-aikiWorker.registry.add(orderWorkflow);
 
 // Start processing
 await aikiWorker.start();
@@ -272,10 +271,10 @@ const aiki = await client({
 
 const aikiWorker = worker(aiki, {
 	id: "order-worker",
+	workflows: [orderWorkflowV1],
 	subscriber: { type: "redis_streams" },
 });
 
-aikiWorker.registry.add(orderWorkflow);
 await aikiWorker.start();
 
 // Execute workflow
