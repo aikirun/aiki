@@ -74,15 +74,12 @@ export interface WorkerOptions {
 
 export interface Worker {
 	id: string;
-
 	start: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
-
 	withOpts(options: WorkerOptions): Worker;
 }
 
 export interface WorkerHandle {
 	id: string;
-
 	stop: () => Promise<void>;
 }
 
