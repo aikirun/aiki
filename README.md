@@ -18,7 +18,7 @@ Build reliable, long-running business processes that survive failures, restarts,
 Install the SDK packages:
 
 ```bash
-npm install @aikirun/task @aikirun/workflow @aikirun/client @aikirun/worker
+npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
 
 **Package Links:**
