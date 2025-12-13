@@ -109,6 +109,7 @@ See the [Aiki documentation](https://github.com/aikirun/aiki) for comprehensive 
 - [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows
 - [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute workflows
+- [@aikirun/types](https://www.npmjs.com/package/@aikirun/types) - Type definitions
 
 ## License
 

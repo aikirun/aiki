@@ -221,7 +221,7 @@ Failed workflows transition to `awaiting_retry` state and are automatically retr
 - [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Start workflows
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute workflows
-- [@aikirun/lib](https://www.npmjs.com/package/@aikirun/lib) - Utilities
+- [@aikirun/types](https://www.npmjs.com/package/@aikirun/types) - Type definitions
 
 ## License
 

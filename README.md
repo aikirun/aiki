@@ -22,12 +22,11 @@ npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
 
 **Package Links:**
-- [`@aikirun/lib`](https://www.npmjs.com/package/@aikirun/lib) - Foundation utilities (duration, retry, async)
-- [`@aikirun/types`](https://www.npmjs.com/package/@aikirun/types) - Core type definitions
 - [`@aikirun/workflow`](https://www.npmjs.com/package/@aikirun/workflow) - Workflow SDK
 - [`@aikirun/task`](https://www.npmjs.com/package/@aikirun/task) - Task SDK
 - [`@aikirun/client`](https://www.npmjs.com/package/@aikirun/client) - Client SDK
 - [`@aikirun/worker`](https://www.npmjs.com/package/@aikirun/worker) - Worker SDK
+- [`@aikirun/types`](https://www.npmjs.com/package/@aikirun/types) - Type definitions
 
 Here's an example user onboarding workflow spanning multiple days. Traditional job queues would struggle with this. Aiki makes it trivial with durable state, event-driven waits, and automatic crash recovery.
 

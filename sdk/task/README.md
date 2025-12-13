@@ -158,7 +158,7 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 - [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Use tasks in workflows
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute tasks in workers
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Manage task execution
-- [@aikirun/lib](https://www.npmjs.com/package/@aikirun/lib) - Retry utilities
+- [@aikirun/types](https://www.npmjs.com/package/@aikirun/types) - Type definitions
 
 ## License
 
