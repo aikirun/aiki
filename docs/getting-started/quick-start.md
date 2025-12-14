@@ -39,18 +39,18 @@ const helloV1 = helloWorkflow.v("1.0.0", {
 });
 
 // 3. Set up the client (connects to Aiki server)
-const aiki = await client({
+const aikiClient = await client({
 	url: "localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
 
 // 4. Create a worker (executes workflows)
-const myWorker = worker(aiki, { id: "my-worker", workflows: [helloV1] });
+const myWorker = worker(aikiClient, { id: "my-worker", workflows: [helloV1] });
 await myWorker.start();
 
 // 5. Execute your workflow
 console.log("Starting workflow...");
-const run = await helloV1.start(aiki, { id: "Alice" });
+const run = await helloV1.start(aikiClient, { id: "Alice" });
 
 // Wait for completion
 const result = await run.wait(

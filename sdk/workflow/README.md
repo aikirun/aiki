@@ -93,10 +93,11 @@ run.logger.debug("User created", { userId: result.userId });
 ```typescript
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 	// ... workflow definition
-}).withOpts({
-	trigger: {
-		type: "delayed",
-		delay: { seconds: 5 }, // or: delay: 5000
+	opts: {
+		trigger: {
+			type: "delayed",
+			delay: { seconds: 5 }, // or: delay: 5000
+		},
 	},
 });
 ```
@@ -106,12 +107,13 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 ```typescript
 export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 	// ... workflow definition
-}).withOpts({
-	retry: {
-		type: "exponential",
-		maxAttempts: 3,
-		baseDelayMs: 1000,
-		maxDelayMs: 10000,
+	opts: {
+		retry: {
+			type: "exponential",
+			maxAttempts: 3,
+			baseDelayMs: 1000,
+			maxDelayMs: 10000,
+		},
 	},
 });
 ```
@@ -121,8 +123,9 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 ```typescript
 export const orderWorkflowV1 = orderWorkflow.v("1.0", {
 	// ... workflow definition
-}).withOpts({
-	idempotencyKey: "order-${orderId}",
+	opts: {
+		idempotencyKey: "order-${orderId}",
+	},
 });
 ```
 
@@ -134,12 +137,12 @@ With the client:
 import { client } from "@aikirun/client";
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
-const aiki = await client({
+const aikiClient = await client({
 	url: "http://localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
 
-const stateHandle = await onboardingWorkflowV1.start(aiki, {
+const stateHandle = await onboardingWorkflowV1.start(aikiClient, {
 	email: "user@example.com",
 });
 
@@ -161,14 +164,15 @@ With a worker:
 ```typescript
 import { worker } from "@aikirun/worker";
 
-const aikiWorker = worker(aiki, {
+const aikiWorker = worker({
 	id: "my-worker",
 	workflows: [onboardingWorkflowV1],
-}).withOpts({
-	maxConcurrentWorkflowRuns: 10,
+	opts: {
+		maxConcurrentWorkflowRuns: 10,
+	},
 });
 
-await aikiWorker.start();
+await aikiWorker.start(aiki);
 ```
 
 ## Execution Context

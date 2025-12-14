@@ -101,15 +101,16 @@ export const sendWelcomeEmail = task({
   id: "send-welcome",
   async exec(input: { email: string }) {
     return emailService.sendWelcome(input.email);
-  }
-}).withOpts({
+  },
   // If email sending fails it is retried up to 5 times with exponential backoff.
   // If the worker crashes mid-retry, on recovery Aiki detects it and continues from the last attempt.
-  retry: {
-    type: "exponential",
-    maxAttempts: 5,
-    baseDelayMs: 1000,
-    maxDelayMs: 30000
+  opts: {
+    retry: {
+      type: "exponential",
+      maxAttempts: 5,
+      baseDelayMs: 1000,
+      maxDelayMs: 30000
+    }
   }
 });
 

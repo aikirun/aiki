@@ -16,17 +16,26 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import { createSerializableError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
+import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (input: Input, runContext: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<Output>;
 	opts?: WorkflowOptions;
 }
 
+export interface WorkflowBuilder<Input, Output, AppContext> {
+	opt<Path extends PathFromObject<WorkflowOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkflowOptions, Path>
+	): WorkflowBuilder<Input, Output, AppContext>;
+	start: WorkflowVersion<Input, Output, AppContext>["start"];
+}
+
 export interface WorkflowVersion<Input, Output, AppContext> {
 	id: WorkflowId;
 	versionId: WorkflowVersionId;
 
-	withOpts(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext>;
+	with(): WorkflowBuilder<Input, Output, AppContext>;
 
 	start: (
 		client: Client<AppContext>,
@@ -51,11 +60,21 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		};
 	}
 
-	public withOpts(options: WorkflowOptions): WorkflowVersion<Input, Output, AppContext> {
-		return new WorkflowVersionImpl(this.id, this.versionId, {
-			...this.params,
-			opts: this.params.opts ? { ...this.params.opts, ...options } : options,
+	public with(): WorkflowBuilder<Input, Output, AppContext> {
+		const optsOverrider = objectOverrider(this.params.opts ?? {});
+
+		const createBuilder = (
+			optsBuilder: ReturnType<typeof optsOverrider>
+		): WorkflowBuilder<Input, Output, AppContext> => ({
+			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
+			start: (client, ...args) =>
+				new WorkflowVersionImpl(this.id, this.versionId, { ...this.params, opts: optsBuilder.build() }).start(
+					client,
+					...args
+				),
 		});
+
+		return createBuilder(optsOverrider());
 	}
 
 	public async start(

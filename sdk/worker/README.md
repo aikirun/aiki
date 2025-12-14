@@ -23,12 +23,13 @@ const aikiWorker = worker({
 	id: "worker-1",
 	workflows: [onboardingWorkflowV1],
 	subscriber: { type: "redis_streams" },
-}).withOpts({
-	maxConcurrentWorkflowRuns: 10,
+	opts: {
+		maxConcurrentWorkflowRuns: 10,
+	},
 });
 
 // Initialize client
-const aiki = await client({
+const aikiClient = await client({
 	url: "http://localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
@@ -75,11 +76,11 @@ await emailWorker.start(client);
 ```
 
 ```typescript
-// Shard workers by key
+// Shard workers by key (reuse base definition with different shards)
 const orderWorker = worker({ id: "order-processor", workflows: [orderWorkflowV1] });
 
-await orderWorker.withOpts({ shardKeys: ["us-east", "us-west"] }).start(client);
-await orderWorker.withOpts({ shardKeys: ["eu-west"] }).start(client);
+await orderWorker.with().opt("shardKeys", ["us-east", "us-west"]).start(client);
+await orderWorker.with().opt("shardKeys", ["eu-west"]).start(client);
 ```
 
 ## Worker Configuration
@@ -94,7 +95,7 @@ interface WorkerParams {
 }
 ```
 
-### Options (runtime tuning via withOpts)
+### Options (via `opts` param or `with()` builder)
 
 ```typescript
 interface WorkerOptions {

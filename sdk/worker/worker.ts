@@ -18,6 +18,7 @@ import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunHandle, WorkflowVersion } from "@aikirun/workflow";
 import { isServerConflictError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
+import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 
 /**
  * Creates an Aiki worker definition for executing workflows.
@@ -36,8 +37,9 @@ import { TaskFailedError } from "@aikirun/types/task";
  * export const myWorker = worker({
  *   id: "order-worker",
  *   workflows: [orderWorkflowV1, paymentWorkflowV1],
- * }).withOpts({
- *   maxConcurrentWorkflowRuns: 10,
+ *   opts: {
+ *     maxConcurrentWorkflowRuns: 10,
+ *   },
  * });
  *
  * const handle = await myWorker.start(client);
@@ -74,10 +76,18 @@ export interface WorkerOptions {
 	shardKeys?: string[];
 }
 
+export interface WorkerBuilder {
+	opt<Path extends PathFromObject<WorkerOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkerOptions, Path>
+	): WorkerBuilder;
+	start: Worker["start"];
+}
+
 export interface Worker {
 	id: string;
+	with(): WorkerBuilder;
 	start: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
-	withOpts(options: WorkerOptions): Worker;
 }
 
 export interface WorkerHandle {
@@ -92,11 +102,15 @@ class WorkerImpl implements Worker {
 		this.id = params.id;
 	}
 
-	public withOpts(options: WorkerOptions): Worker {
-		return new WorkerImpl({
-			...this.params,
-			opts: this.params.opts ? { ...this.params.opts, ...options } : options,
+	public with(): WorkerBuilder {
+		const optsOverrider = objectOverrider(this.params.opts ?? {});
+
+		const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): WorkerBuilder => ({
+			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
+			start: (client) => new WorkerImpl({ ...this.params, opts: optsBuilder.build() }).start(client),
 		});
+
+		return createBuilder(optsOverrider());
 	}
 
 	public async start<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {

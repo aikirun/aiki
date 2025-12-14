@@ -9,7 +9,7 @@ import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 import { orderWorkflowV1, userWorkflowV1 } from "./workflows";
 
-const aiki = await client({
+const aikiClient = await client({
   url: "localhost:9090",
   redis: { host: "localhost", port: 6379 },
 });
@@ -17,8 +17,9 @@ const aiki = await client({
 const aikiWorker = worker({
   id: "order-worker",
   workflows: [orderWorkflowV1, userWorkflowV1],
-}).withOpts({
-  maxConcurrentWorkflowRuns: 10,
+  opts: {
+    maxConcurrentWorkflowRuns: 10,
+  },
 });
 
 const handle = await aikiWorker.start(aiki);
@@ -78,7 +79,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 | `workflows` | Workflow versions this worker executes |
 | `subscriber` | Subscriber config (default: `{ type: "redis_streams" }`) |
 
-**Options** are passed via `withOpts()`:
+**Options** are passed via `opts` param or `with()` builder:
 
 | Option | Default | Description |
 |--------|---------|-------------|

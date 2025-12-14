@@ -7,7 +7,7 @@ The Aiki client provides the interface for starting workflows, monitoring execut
 ```typescript
 import { client } from "@aikirun/client";
 
-const aiki = await client({
+const aikiClient = await client({
 	url: "localhost:9090",
 	redis: {
 		host: "localhost",
@@ -48,7 +48,7 @@ redis: {
 Use the workflow version's `.start()` method:
 
 ```typescript
-const resultHandle = await workflowVersion.start(aiki, {
+const resultHandle = await workflowVersion.start(aikiClient, {
 	payload: {
 		userId: "123",
 		email: "user@example.com",
@@ -98,13 +98,13 @@ Prevent duplicate workflow executions using idempotency keys:
 
 ```typescript
 // First call - starts the workflow
-const result1 = await workflowVersion.start(aiki, {
+const result1 = await workflowVersion.start(aikiClient, {
 	payload: { orderId: "order-123" },
 	idempotencyKey: "order-123-process",
 });
 
 // Second call with same key - returns existing workflow run
-const result2 = await workflowVersion.start(aiki, {
+const result2 = await workflowVersion.start(aikiClient, {
 	payload: { orderId: "order-123" },
 	idempotencyKey: "order-123-process",
 });
@@ -148,15 +148,15 @@ const onboardingV1 = onboardingWorkflow.v("1.0.0", {
 });
 
 // Create client
-const aiki = await client({
+const aikiClient = await client({
 	url: "localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
 
-// Start workflow
+// Start workflow with idempotency key
 const result = await onboardingV1
-	.withOpts({ idempotencyKey: "user-onboarding-123" })
-	.start(aiki, { email: "user@example.com" });
+	.with().opt("idempotencyKey", "user-onboarding-123")
+	.start(aikiClient, { email: "user@example.com" });
 
 // Monitor progress
 console.log("Workflow started:", result.id);
@@ -178,7 +178,7 @@ Handle errors when starting workflows:
 
 ```typescript
 try {
-	const result = await workflowVersion.start(aiki, {
+	const result = await workflowVersion.start(aikiClient, {
 		payload: { userId: "123" },
 	});
 

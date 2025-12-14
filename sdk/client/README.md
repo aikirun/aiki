@@ -15,7 +15,7 @@ npm install @aikirun/client
 ```typescript
 import { client } from "@aikirun/client";
 
-const aiki = await client({
+const aikiClient = await client({
 	url: "http://localhost:9090",
 	redis: {
 		host: "localhost",
@@ -29,7 +29,7 @@ const aiki = await client({
 ```typescript
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
-const stateHandle = await onboardingWorkflowV1.start(aiki, {
+const stateHandle = await onboardingWorkflowV1.start(aikiClient, {
 	email: "user@example.com",
 });
 ```
@@ -89,7 +89,7 @@ interface ClientParams<AppContext> {
 ### Context Factory Example
 
 ```typescript
-const aiki = await client({
+const aikiClient = await client({
 	url: "http://localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 	contextFactory: (run) => ({

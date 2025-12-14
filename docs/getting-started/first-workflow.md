@@ -131,7 +131,7 @@ Create the client and worker:
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 
-const aiki = await client({
+const aikiClient = await client({
 	url: "localhost:9090",
 	redis: {
 		host: "localhost",
@@ -139,19 +139,20 @@ const aiki = await client({
 	},
 });
 
-const aikiWorker = worker(aiki, {
+const aikiWorker = worker({
 	id: "order-worker-1",
 	workflows: [orderWorkflowV1],
 	subscriber: {
 		type: "redis_streams",
 		claimMinIdleTimeMs: 60_000,
 	},
-}).withOpts({
-	maxConcurrentWorkflowRuns: 10,
+	opts: {
+		maxConcurrentWorkflowRuns: 10,
+	},
 });
 
 // Start processing
-await aikiWorker.start();
+await aikiWorker.start(aiki);
 ```
 
 ## Step 4: Execute the Workflow
@@ -159,7 +160,7 @@ await aikiWorker.start();
 Process an order:
 
 ```typescript
-const result = await orderWorkflowV1.start(aiki, {
+const result = await orderWorkflowV1.start(aikiClient, {
 	items: [
 		{ id: "item-1", quantity: 2 },
 		{ id: "item-2", quantity: 1 },
@@ -264,12 +265,12 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 });
 
 // Set up client and worker
-const aiki = await client({
+const aikiClient = await client({
 	url: "localhost:9090",
 	redis: { host: "localhost", port: 6379 },
 });
 
-const aikiWorker = worker(aiki, {
+const aikiWorker = worker(aikiClient, {
 	id: "order-worker",
 	workflows: [orderWorkflowV1],
 	subscriber: { type: "redis_streams" },
@@ -278,7 +279,7 @@ const aikiWorker = worker(aiki, {
 await aikiWorker.start();
 
 // Execute workflow
-const result = await orderWorkflowV1.start(aiki, {
+const result = await orderWorkflowV1.start(aikiClient, {
 	items: [{ id: "item-1", quantity: 2 }],
 	total: 99.99,
 	email: "customer@example.com",

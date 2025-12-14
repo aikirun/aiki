@@ -10,6 +10,7 @@ import type { WorkflowRunContext } from "@aikirun/workflow";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { TaskStateFailed } from "@aikirun/types/task";
 import type { Logger } from "@aikirun/types/client";
+import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 
 /**
  * Defines a durable task with deterministic execution and automatic retries.
@@ -41,11 +42,12 @@ import type { Logger } from "@aikirun/types/client";
  *   exec(input: { cardId: string; amount: number }) {
  *     return paymentService.charge(input.cardId, input.amount);
  *   },
- * }).withOpts({
- *   retry: {
- *     type: "fixed",
- *     maxAttempts: 3,
- *     delayMs: 1000,
+ *   opts: {
+ *     retry: {
+ *       type: "fixed",
+ *       maxAttempts: 3,
+ *       delayMs: 1000,
+ *     },
  *   },
  * });
  *
@@ -70,11 +72,17 @@ export interface TaskOptions {
 	idempotencyKey?: string;
 }
 
+export interface TaskBuilder<Input, Output> {
+	opt<Path extends PathFromObject<TaskOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<TaskOptions, Path>
+	): TaskBuilder<Input, Output>;
+	start: Task<Input, Output>["start"];
+}
+
 export interface Task<Input, Output> {
 	id: TaskId;
-
-	withOpts(options: TaskOptions): Task<Input, Output>;
-
+	with(): TaskBuilder<Input, Output>;
 	start: <WorkflowInput, WorkflowOutput>(
 		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		...args: Input extends null ? [] : [Input]
@@ -88,11 +96,15 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		this.id = params.id as TaskId;
 	}
 
-	public withOpts(options: TaskOptions): Task<Input, Output> {
-		return new TaskImpl({
-			...this.params,
-			opts: this.params.opts ? { ...this.params.opts, ...options } : options,
+	public with(): TaskBuilder<Input, Output> {
+		const optsOverrider = objectOverrider(this.params.opts ?? {});
+
+		const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): TaskBuilder<Input, Output> => ({
+			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
+			start: (runCtx, ...args) => new TaskImpl({ ...this.params, opts: optsBuilder.build() }).start(runCtx, ...args),
 		});
+
+		return createBuilder(optsOverrider());
 	}
 
 	public async start<WorkflowInput, WorkflowOutput>(

@@ -123,10 +123,10 @@ await sendEmail.start(run, {
 });
 ```
 
-To force re-execution, use the withOpts method:
+To force re-execution, use the `with()` builder:
 
 ```typescript
-await sendEmail.withOpts({ idempotencyKey: "second-email" }).start(run, {
+await sendEmail.with().opt("idempotencyKey", "second-email").start(run, {
 	email: "user@example.com",
 	message: "Hello",
 });

@@ -25,7 +25,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
  *
  * @example
  * ```typescript
- * const client = await client({
+ * const aikiClient = await client({
  *   url: "http://localhost:9090",
  *   redis: { host: "localhost", port: 6379 },
  *   contextFactory: (run) => ({
@@ -35,7 +35,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
  * });
  *
  * // Start a workflow
- * const stateHandle = await myWorkflow.start(client, { email: "user@example.com" });
+ * const stateHandle = await myWorkflow.start(aikiClient, { email: "user@example.com" });
  *
  * // Wait for completion
  * const result = await stateHandle.wait(
@@ -44,7 +44,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
  * );
  *
  * // Cleanup
- * await client.close();
+ * await aikiClient.close();
  * ```
  */
 export function client<AppContext = null>(params: ClientParams<AppContext>): Promise<Client<AppContext>> {

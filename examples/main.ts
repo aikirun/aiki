@@ -5,11 +5,11 @@ const { logger } = aikiClient;
 
 await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
 
-const stateHandle = await eveningRoutineWorkflowV1.withOpts({ idempotencyKey: "some-key" }).start(aikiClient);
+const handle = await eveningRoutineWorkflowV1.start(aikiClient);
 
-const result = await stateHandle.wait({ type: "status", status: "completed" }, { maxDurationMs: 30_000 });
+const result = await handle.wait({ type: "status", status: "completed" }, { maxDurationMs: 30_000 });
 if (result.success) {
-	logger.info("Workflow completed", { id: stateHandle.id });
+	logger.info("Workflow completed", { id: handle.id });
 } else {
 	logger.info("Could not get desired state", { cause: result.cause });
 }

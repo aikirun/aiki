@@ -16,13 +16,13 @@ When starting workflows, you can provide an idempotency key to prevent duplicate
 ```typescript
 // Start a workflow with idempotency key
 const resultHandle = await orderWorkflowV1
-  .withOpts({ idempotencyKey: "order-123-process" })
+  .with().opt("idempotencyKey", "order-123-process")
   .start(client, { orderId: "order-123", items: [...] });
 
 // If this exact same call is made again with the same idempotency key,
 // it will return the same workflow run instead of creating a duplicate
 const duplicateHandle = await orderWorkflowV1
-  .withOpts({ idempotencyKey: "order-123-process" })
+  .with().opt("idempotencyKey", "order-123-process")
   .start(client, { orderId: "order-123", items: [...] });
 
 // duplicateHandle.id === resultHandle.id (same workflow run)
@@ -108,7 +108,7 @@ await sendEmail.start(run, {
 });
 
 // Second call: Send reminder email (same email, different intent)
-await sendEmail.withOpts({ idempotencyKey: "reminder-email-user-123" }).start(run, {
+await sendEmail.with().opt("idempotencyKey", "reminder-email-user-123").start(run, {
 	email: "user@example.com",
 	content: "Welcome!",
 });

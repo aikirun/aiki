@@ -1,3 +1,4 @@
+import type { NonEmptyArray } from "../array";
 import type { Equal, ExpectTrue } from "../testing/expect/types";
 import type { RequireAtLeastOneOf } from "@aikirun/types/utils";
 export type { RequireAtLeastOneOf };
@@ -75,3 +76,54 @@ type TestRequireAtLeastOneOfPreservesPreviouslyRequiredField = ExpectTrue<
 	>
 >;
 //#endregion
+
+type IsSubtype<SubT, SuperT> = SubT extends SuperT ? true : false;
+type And<T extends NonEmptyArray<boolean>> = T extends [infer First, ...infer Rest]
+	? false extends First
+		? false
+		: Rest extends NonEmptyArray<boolean>
+			? And<Rest>
+			: true
+	: never;
+type Or<T extends NonEmptyArray<boolean>> = T extends [infer First, ...infer Rest]
+	? true extends First
+		? true
+		: Rest extends NonEmptyArray<boolean>
+			? Or<Rest>
+			: false
+	: never;
+
+export type PathFromObject<T, IncludeArrayKeys extends boolean = false> = T extends T
+	? PathFromObjectInternal<T, IncludeArrayKeys>
+	: never;
+
+type PathFromObjectInternal<T, IncludeArrayKeys extends boolean> = And<
+	[IsSubtype<T, object>, Or<[IncludeArrayKeys, NonArrayObject<T> extends never ? false : true]>]
+> extends true
+	? {
+			[K in Exclude<keyof T, symbol>]-?: And<
+				[
+					IsSubtype<NonNullable<T[K]>, object>,
+					Or<[IncludeArrayKeys, NonArrayObject<NonNullable<T[K]>> extends never ? false : true]>,
+				]
+			> extends true
+				? K | `${K}.${PathFromObjectInternal<NonNullable<T[K]>, IncludeArrayKeys>}`
+				: K;
+		}[Exclude<keyof T, symbol>]
+	: "";
+
+type ExtractObjectType<T> = T extends object ? T : never;
+
+export type TypeOfValueAtPath<T extends object, Path extends PathFromObject<T>> = Path extends keyof T
+	? T[Path]
+	: Path extends `${infer First}.${infer Rest}`
+		? First extends keyof T
+			? undefined extends T[First]
+				? Rest extends PathFromObject<ExtractObjectType<T[First]>>
+					? TypeOfValueAtPath<ExtractObjectType<T[First]>, Rest> | undefined
+					: never
+				: Rest extends PathFromObject<ExtractObjectType<T[First]>>
+					? TypeOfValueAtPath<ExtractObjectType<T[First]>, Rest>
+					: never
+			: never
+		: never;
