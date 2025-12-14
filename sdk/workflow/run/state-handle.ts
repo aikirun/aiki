@@ -37,17 +37,22 @@ export interface WorkflowRunStateHandle<Output> {
 		condition: { type: "event"; event: string },
 		params: WorkflowRunWaitSyncParams
 	): Promise<{ success: false; cause: "timeout" | "aborted" } | { success: true; state: WorkflowRunState<Output> }>;
+
+	cancel: (reason?: string) => Promise<void>;
 }
 
 class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Output> {
+	private revision: number | undefined;
+
 	constructor(
 		public readonly id: string,
 		private readonly api: ApiClient
 	) {}
 
 	public async getState(): Promise<WorkflowRunState<Output>> {
-		const response = await this.api.workflowRun.getStateV1({ id: this.id });
-		return response.state as unknown as WorkflowRunState<Output>;
+		const { run } = await this.api.workflowRun.getByIdV1({ id: this.id });
+		this.revision = run.revision;
+		return run.state as unknown as WorkflowRunState<Output>;
 	}
 
 	public async wait<
@@ -103,5 +108,18 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 			default:
 				return condition satisfies never;
 		}
+	}
+
+	public async cancel(reason?: string): Promise<void> {
+		if (this.revision === undefined) {
+			const { run } = await this.api.workflowRun.getByIdV1({ id: this.id });
+			this.revision = run.revision;
+		}
+
+		await this.api.workflowRun.transitionStateV1({
+			id: this.id,
+			state: { status: "cancelled", reason },
+			expectedRevision: this.revision,
+		});
 	}
 }

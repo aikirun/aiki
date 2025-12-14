@@ -1,7 +1,14 @@
 import { baseImplementer } from "./base";
-import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
+import {
+	isTerminalState,
+	type TerminalWorlfowRunState,
+	type WorkflowRun,
+	type WorkflowRunId,
+	type WorkflowRunStateCancelled,
+	type WorkflowRunTransition,
+} from "@aikirun/types/workflow-run";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
-import { ConflictError, NotFoundError } from "../errors";
+import { ConflictError, InvalidStateTransitionError, NotFoundError } from "../errors";
 import { publishWorkflowReadyBatch } from "../redis/publisher";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Redis } from "ioredis";
@@ -189,6 +196,10 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input, context }) => {
 		);
 	}
 
+	if (isTerminalState(input.state) && isTerminalState(run.state)) {
+		throw new InvalidStateTransitionError(runId, run.state.status, input.state.status);
+	}
+
 	const transition: WorkflowRunTransition = {
 		type: "state",
 		createdAt: Date.now(),
@@ -207,6 +218,10 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input, context }) => {
 
 	if (input.state.status === "running") {
 		run.attempts++;
+	}
+
+	if (input.state.status === "cancelled") {
+		cancelChildWorkflowRuns(run, input.state.reason);
 	}
 
 	return { newRevision: run.revision };
@@ -417,6 +432,49 @@ export async function transitionSleepingWorkflowsToQueued(redis: Redis, logger: 
 
 	if (messagesToPublish.length > 0) {
 		await publishWorkflowReadyBatch(redis, messagesToPublish, logger);
+	}
+}
+
+function cancelWorkflowRun(runId: WorkflowRunId, reason: string | undefined): TerminalWorlfowRunState<unknown> {
+	const run = workflowRuns.get(runId);
+	if (!run) {
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
+	}
+
+	if (isTerminalState(run.state)) {
+		return run.state;
+	}
+
+	const cancelledState: WorkflowRunStateCancelled = {
+		status: "cancelled",
+		reason,
+	};
+
+	const transition: WorkflowRunTransition = {
+		type: "state",
+		createdAt: Date.now(),
+		state: cancelledState,
+	};
+
+	const transitions = workflowRunTransitions.get(runId);
+	if (!transitions) {
+		workflowRunTransitions.set(runId, [transition]);
+	} else {
+		transitions.push(transition);
+	}
+
+	run.state = cancelledState;
+	run.revision++;
+
+	cancelChildWorkflowRuns(run, reason);
+
+	return cancelledState;
+}
+
+function cancelChildWorkflowRuns(run: WorkflowRun<unknown, unknown>, reason: string | undefined): void {
+	for (const childId of Object.keys(run.childWorkflowsRunState)) {
+		const cancelledChildState = cancelWorkflowRun(childId as WorkflowRunId, reason);
+		run.childWorkflowsRunState[childId] = cancelledChildState;
 	}
 }
 

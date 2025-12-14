@@ -1,5 +1,6 @@
 import {
 	type WorkflowRun,
+	WorkflowRunCancelledError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
@@ -375,6 +376,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		} catch (error) {
 			if (
 				error instanceof WorkflowRunNotExecutableError ||
+				error instanceof WorkflowRunCancelledError ||
 				error instanceof WorkflowRunFailedError ||
 				error instanceof TaskFailedError ||
 				error instanceof WorkflowSleepingError ||

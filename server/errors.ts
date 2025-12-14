@@ -29,3 +29,14 @@ export class ConflictError extends Error {
 		this.name = "ConflictError";
 	}
 }
+
+export class InvalidStateTransitionError extends Error {
+	constructor(
+		public readonly workflowRunId: string,
+		public readonly fromStatus: string,
+		public readonly toStatus: string
+	) {
+		super(`Cannot transition workflow ${workflowRunId} from ${fromStatus} to ${toStatus}`);
+		this.name = "InvalidStateTransitionError";
+	}
+}

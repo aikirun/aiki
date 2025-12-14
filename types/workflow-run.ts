@@ -18,6 +18,10 @@ export type WorkflowRunStatus =
 	| "completed"
 	| "failed";
 
+export type TerminalWorkflowRunStatus = "cancelled" | "completed" | "failed";
+
+export type NonTerminalWorkflowRunStatus = Exclude<WorkflowRunStatus, TerminalWorkflowRunStatus>;
+
 export interface WorkflowOptions {
 	retry?: RetryStrategy;
 	idempotencyKey?: string;
@@ -32,7 +36,7 @@ interface WorkflowRunStateBase {
 export interface WorkflowRunStateOthers extends WorkflowRunStateBase {
 	status: Exclude<
 		WorkflowRunStatus,
-		"scheduled" | "queued" | "running" | "sleeping" | "awaiting_retry" | "completed" | "failed"
+		"scheduled" | "queued" | "running" | "sleeping" | "awaiting_retry" | "cancelled" | "completed" | "failed"
 	>;
 }
 
@@ -84,6 +88,11 @@ export type WorkflowRunStateAwaitingRetry =
 	| WorkflowRunStateAwaitingRetryCausedByChildWorkflow
 	| WorkflowRunStateAwaitingRetryCausedBySelf;
 
+export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
+	status: "cancelled";
+	reason?: string;
+}
+
 export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {
 	status: "completed";
 	output: Output;
@@ -115,6 +124,19 @@ export type WorkflowRunStateFailed =
 	| WorkflowRunStateFailedByChildWorkflow
 	| WorkflowRunStateFailedBySelf;
 
+export type NonTerminalWorkflowRunState =
+	| WorkflowRunStateOthers
+	| WorkflowRunStateScheduled
+	| WorkflowRunStateSleeping
+	| WorkflowRunStateQueued
+	| WorkflowRunStateRunning
+	| WorkflowRunStateAwaitingRetry;
+
+export type TerminalWorlfowRunState<Output> =
+	| WorkflowRunStateCancelled
+	| WorkflowRunStateCompleted<Output>
+	| WorkflowRunStateFailed;
+
 export type WorkflowRunStateInComplete =
 	| WorkflowRunStateOthers
 	| WorkflowRunStateScheduled
@@ -122,9 +144,18 @@ export type WorkflowRunStateInComplete =
 	| WorkflowRunStateQueued
 	| WorkflowRunStateRunning
 	| WorkflowRunStateAwaitingRetry
+	| WorkflowRunStateCancelled
 	| WorkflowRunStateFailed;
 
-export type WorkflowRunState<Output> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
+export type WorkflowRunState<Output> = NonTerminalWorkflowRunState | TerminalWorlfowRunState<Output>;
+
+export function isTerminalStatus(status: WorkflowRunStatus): status is TerminalWorkflowRunStatus {
+	return status === "completed" || status === "failed" || status === "cancelled";
+}
+
+export function isTerminalState<Output>(state: WorkflowRunState<Output>): state is TerminalWorlfowRunState<Output> {
+	return isTerminalStatus(state.status);
+}
 
 export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;

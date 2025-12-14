@@ -99,6 +99,7 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 			"queued",
 			"sleeping",
 			"awaiting_retry",
+			"cancelled",
 			"completed",
 			"failed",
 		]),
@@ -135,6 +136,10 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 		reason: z.string(),
 		nextAttemptAt: z.number(),
 		error: serializedErrorSchema,
+	}),
+	z.object({
+		status: z.literal("cancelled"),
+		reason: z.string().optional(),
 	}),
 	z.object({
 		status: z.literal("completed"),
