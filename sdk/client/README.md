@@ -1,6 +1,6 @@
 # @aikirun/client
 
-Client SDK for Aiki durable execution engine - connect to the Aiki server, start workflows, and manage execution.
+Client SDK for Aiki durable execution platform - connect to the Aiki server, start workflows, and manage execution.
 
 ## Installation
 

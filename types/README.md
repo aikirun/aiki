@@ -1,6 +1,6 @@
 # @aikirun/types
 
-Core type definitions for Aiki durable execution engine.
+Core type definitions for Aiki durable execution platform.
 
 This package provides the foundational TypeScript types used throughout the Aiki ecosystem. It is typically not used
 directly, but imported by other Aiki packages.

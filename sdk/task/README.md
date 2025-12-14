@@ -1,6 +1,6 @@
 # @aikirun/task
 
-Task SDK for Aiki durable execution engine - define reliable tasks with automatic retries, idempotency, and error
+Task SDK for Aiki durable execution platform - define reliable tasks with automatic retries, idempotency, and error
 handling.
 
 ## Installation

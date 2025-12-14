@@ -1,6 +1,6 @@
 # @aikirun/workflow
 
-Workflow SDK for Aiki durable execution engine - define durable workflows with tasks, sleeps, waits, and event handling.
+Workflow SDK for Aiki durable execution platform - define durable workflows with tasks, sleeps, waits, and event handling.
 
 ## Installation
 

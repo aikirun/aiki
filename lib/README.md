@@ -1,6 +1,6 @@
 # @aikirun/lib
 
-Internal utilities library for Aiki - a durable execution engine.
+Internal utilities library for Aiki - a durable execution platform.
 
 > **Note:** This is a private internal package and is not published to npm. It is used by other Aiki packages.
 

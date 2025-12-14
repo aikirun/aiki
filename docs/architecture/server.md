@@ -35,7 +35,7 @@ Manages workflow lifecycle:
 Workflow Start → Validation → State Creation → Queue Publish → Monitoring
 ```
 
-The orchestration engine validates workflow definitions, creates workflow run records, publishes to Redis Streams,
+The orchestrator validates workflow definitions, creates workflow run records, publishes to Redis Streams,
 tracks workflow state, and handles completions and failures.
 
 ### Task Management

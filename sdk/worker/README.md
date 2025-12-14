@@ -1,6 +1,6 @@
 # @aikirun/worker
 
-Worker SDK for Aiki durable execution engine - execute workflows and tasks with durable state management and automatic
+Worker SDK for Aiki durable execution platform - execute workflows and tasks with durable state management and automatic
 recovery.
 
 ## Installation
