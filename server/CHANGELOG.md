@@ -1,5 +1,13 @@
 # @aikirun/server
 
+## 0.2.0
+
+### Patch Changes
+
+- Updated dependencies [dc82021]
+  - @aikirun/types@0.2.0
+  - @aikirun/lib@0.2.0
+
 ## 0.1.13
 
 ### Patch Changes
