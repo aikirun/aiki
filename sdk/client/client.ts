@@ -35,10 +35,10 @@ import { INTERNAL } from "@aikirun/types/symbols";
  * });
  *
  * // Start a workflow
- * const stateHandle = await myWorkflow.start(aikiClient, { email: "user@example.com" });
+ * const handle = await myWorkflow.start(aikiClient, { email: "user@example.com" });
  *
  * // Wait for completion
- * const result = await stateHandle.wait(
+ * const result = await handle.wait(
  *   { type: "status", status: "completed" },
  *   { maxDurationMs: 60_000 }
  * );

@@ -142,12 +142,12 @@ const aikiClient = await client({
 	redis: { host: "localhost", port: 6379 },
 });
 
-const stateHandle = await onboardingWorkflowV1.start(aikiClient, {
+const handle = await onboardingWorkflowV1.start(aikiClient, {
 	email: "user@example.com",
 });
 
 // Wait for completion
-const result = await stateHandle.wait(
+const result = await handle.wait(
 	{ type: "status", status: "completed" },
 	{ maxDurationMs: 60 * 1000, pollIntervalMs: 5_000 },
 );

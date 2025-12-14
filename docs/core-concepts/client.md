@@ -48,7 +48,7 @@ redis: {
 Use the workflow version's `.start()` method:
 
 ```typescript
-const resultHandle = await workflowVersion.start(aikiClient, {
+const handle = await workflowVersion.start(aikiClient, {
 	payload: {
 		userId: "123",
 		email: "user@example.com",
@@ -65,7 +65,7 @@ duplicate executions. The method returns a result handle that you can use for mo
 Check the status of a workflow run:
 
 ```typescript
-const status = await resultHandle.getStatus();
+const status = await handle.getStatus();
 
 console.log(status.id); // Workflow run ID
 console.log(status.state); // pending, running, completed, failed, cancelled
@@ -78,7 +78,7 @@ console.log(status.error); // Error if failed
 Block until the workflow completes:
 
 ```typescript
-const result = await resultHandle.waitForCompletion();
+const result = await handle.waitForCompletion();
 console.log("Workflow completed:", result);
 ```
 
@@ -89,7 +89,7 @@ This will wait indefinitely until the workflow finishes (successfully or with er
 Cancel a running workflow:
 
 ```typescript
-await resultHandle.cancel();
+await handle.cancel();
 ```
 
 ## Idempotency

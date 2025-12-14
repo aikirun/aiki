@@ -129,16 +129,16 @@ const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
 Execute workflows using the version's `.start()` method:
 
 ```typescript
-const resultHandle = await workflowVersion.start(client, {
+const handle = await workflowVersion.start(client, {
 	userId: "123",
 	email: "user@example.com",
 });
 
 // Check status
-const status = await resultHandle.getStatus();
+const status = await handle.getStatus();
 
 // Wait for completion
-const result = await resultHandle.waitForCompletion();
+const result = await handle.waitForCompletion();
 ```
 
 ## Workflow Runs

@@ -15,7 +15,7 @@ When starting workflows, you can provide an idempotency key to prevent duplicate
 
 ```typescript
 // Start a workflow with idempotency key
-const resultHandle = await orderWorkflowV1
+const handle = await orderWorkflowV1
   .with().opt("idempotencyKey", "order-123-process")
   .start(client, { orderId: "order-123", items: [...] });
 
@@ -25,7 +25,7 @@ const duplicateHandle = await orderWorkflowV1
   .with().opt("idempotencyKey", "order-123-process")
   .start(client, { orderId: "order-123", items: [...] });
 
-// duplicateHandle.id === resultHandle.id (same workflow run)
+// duplicateHandle.id === handle.id (same workflow run)
 ```
 
 ## Task Idempotency
