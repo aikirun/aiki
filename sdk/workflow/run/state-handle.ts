@@ -6,10 +6,14 @@ import type {
 	WorkflowRunStateInComplete,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow-run";
-import type { ApiClient } from "@aikirun/types/client";
+import type { ApiClient, Logger } from "@aikirun/types/client";
 
-export function initWorkflowRunStateHandle<Output>(id: WorkflowRunId, api: ApiClient): WorkflowRunStateHandle<Output> {
-	return new WorkflowRunStateHandleImpl<Output>(id, api);
+export function initWorkflowRunStateHandle<Output>(
+	id: WorkflowRunId,
+	api: ApiClient,
+	logger: Logger
+): WorkflowRunStateHandle<Output> {
+	return new WorkflowRunStateHandleImpl<Output>(id, api, logger);
 }
 
 export interface WorkflowRunWaitSyncParams {
@@ -38,7 +42,7 @@ export interface WorkflowRunStateHandle<Output> {
 		params: WorkflowRunWaitSyncParams
 	): Promise<{ success: false; cause: "timeout" | "aborted" } | { success: true; state: WorkflowRunState<Output> }>;
 
-	cancel: (reason?: string) => Promise<void>;
+	cancel: (reason?: string) => Promise<{ success: true } | { success: false }>;
 }
 
 class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Output> {
@@ -46,7 +50,8 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 
 	constructor(
 		public readonly id: string,
-		private readonly api: ApiClient
+		private readonly api: ApiClient,
+		private readonly logger: Logger
 	) {}
 
 	public async getState(): Promise<WorkflowRunState<Output>> {
@@ -110,16 +115,24 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 		}
 	}
 
-	public async cancel(reason?: string): Promise<void> {
-		if (this.revision === undefined) {
-			const { run } = await this.api.workflowRun.getByIdV1({ id: this.id });
-			this.revision = run.revision;
+	public async cancel(reason?: string): Promise<{ success: false } | { success: true }> {
+		try {
+			if (this.revision === undefined) {
+				const { run } = await this.api.workflowRun.getByIdV1({ id: this.id });
+				this.revision = run.revision;
+			}
+			await this.api.workflowRun.transitionStateV1({
+				id: this.id,
+				state: { status: "cancelled", reason },
+				expectedRevision: this.revision,
+			});
+			return { success: true };
+		} catch (error) {
+			this.logger.warn("Could not cancel workflow run", {
+				"aiki.workflowRunId": this.id,
+				"aiki.error": error instanceof Error ? error.message : String(error),
+			});
+			return { success: false };
 		}
-
-		await this.api.workflowRun.transitionStateV1({
-			id: this.id,
-			state: { status: "cancelled", reason },
-			expectedRevision: this.revision,
-		});
 	}
 }

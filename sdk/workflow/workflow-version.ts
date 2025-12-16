@@ -87,7 +87,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			input: isNonEmptyArray(args) ? args[0] : null,
 			options: this.params.opts,
 		});
-		return initWorkflowRunStateHandle(response.run.id as WorkflowRunId, client.api);
+		return initWorkflowRunStateHandle(response.run.id as WorkflowRunId, client.api, client.logger);
 	}
 
 	private async exec(input: Input, runCtx: WorkflowRunContext<Input, Output>, context: AppContext): Promise<void> {
