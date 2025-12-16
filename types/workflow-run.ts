@@ -244,9 +244,9 @@ export class WorkflowRunFailedError extends Error {
 	}
 }
 
-export class WorkflowSleepingError extends Error {
+export class WorkflowSuspendedError extends Error {
 	constructor(public readonly id: WorkflowRunId) {
-		super(`Workflow ${id} is sleeping`);
-		this.name = "WorkflowSleepingError";
+		super(`Workflow ${id} is suspended`);
+		this.name = "WorkflowSuspendedError";
 	}
 }

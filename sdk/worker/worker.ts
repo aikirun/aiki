@@ -4,7 +4,7 @@ import {
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
-	WorkflowSleepingError,
+	WorkflowSuspendedError,
 } from "@aikirun/types/workflow-run";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { NonEmptyArray } from "@aikirun/lib/array";
@@ -393,7 +393,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				error instanceof WorkflowRunCancelledError ||
 				error instanceof WorkflowRunFailedError ||
 				error instanceof TaskFailedError ||
-				error instanceof WorkflowSleepingError ||
+				error instanceof WorkflowSuspendedError ||
 				isServerConflictError(error)
 			) {
 				shouldAcknowledge = true;

@@ -3,7 +3,7 @@ import type { WorkflowRunHandle } from "./run-handle";
 import type { SleepParams, SleepStateNone } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { delay, toMilliseconds } from "@aikirun/lib";
-import { type WorkflowRunId, WorkflowSleepingError } from "@aikirun/types/workflow-run";
+import { type WorkflowRunId, WorkflowSuspendedError } from "@aikirun/types/workflow-run";
 
 interface SleeperOptions {
 	spinThresholdMs: number;
@@ -39,7 +39,7 @@ export function workflowRunSleeper(
 				"aiki.sleepId": sleepId,
 				"aiki.durationMs": durationMs,
 			});
-			throw new WorkflowSleepingError(workflowRunHandle.run.id as WorkflowRunId);
+			throw new WorkflowSuspendedError(workflowRunHandle.run.id as WorkflowRunId);
 		}
 		sleepState satisfies SleepStateNone;
 
@@ -59,6 +59,6 @@ export function workflowRunSleeper(
 			"aiki.durationMs": durationMs,
 		});
 
-		throw new WorkflowSleepingError(workflowRunHandle.run.id as WorkflowRunId);
+		throw new WorkflowSuspendedError(workflowRunHandle.run.id as WorkflowRunId);
 	};
 }

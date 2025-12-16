@@ -6,7 +6,7 @@ import {
 	type WorkflowRunId,
 	type WorkflowRunStateAwaitingRetry,
 	type WorkflowRunStateFailed,
-	WorkflowSleepingError,
+	WorkflowSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { Client, Logger } from "@aikirun/types/client";
 import type { WorkflowRunContext } from "./run/context";
@@ -117,7 +117,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			try {
 				return await this.params.exec(input, runCtx, context);
 			} catch (error) {
-				if (error instanceof WorkflowSleepingError) {
+				if (error instanceof WorkflowSuspendedError) {
 					throw error;
 				}
 
