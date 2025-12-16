@@ -42,7 +42,9 @@ export interface WorkflowRunStateHandle<Output> {
 		params: WorkflowRunWaitSyncParams
 	): Promise<{ success: false; cause: "timeout" | "aborted" } | { success: true; state: WorkflowRunState<Output> }>;
 
-	cancel: (reason?: string) => Promise<{ success: true } | { success: false }>;
+	cancel: (reason?: string) => Promise<{ success: boolean }>;
+
+	wake: () => Promise<{ success: boolean }>;
 }
 
 class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Output> {
@@ -120,6 +122,10 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 			if (this.revision === undefined) {
 				const { run } = await this.api.workflowRun.getByIdV1({ id: this.id });
 				this.revision = run.revision;
+
+				if (run.state.status === "cancelled") {
+					return { success: true };
+				}
 			}
 			await this.api.workflowRun.transitionStateV1({
 				id: this.id,
@@ -129,6 +135,27 @@ class WorkflowRunStateHandleImpl<Output> implements WorkflowRunStateHandle<Outpu
 			return { success: true };
 		} catch (error) {
 			this.logger.warn("Could not cancel workflow run", {
+				"aiki.workflowRunId": this.id,
+				"aiki.error": error instanceof Error ? error.message : String(error),
+			});
+			return { success: false };
+		}
+	}
+
+	public async wake(): Promise<{ success: boolean }> {
+		try {
+			if (this.revision === undefined) {
+				const { run } = await this.api.workflowRun.getByIdV1({ id: this.id });
+				this.revision = run.revision;
+			}
+			await this.api.workflowRun.transitionStateV1({
+				id: this.id,
+				state: { status: "scheduled", scheduledAt: Date.now() },
+				expectedRevision: this.revision,
+			});
+			return { success: true };
+		} catch (error) {
+			this.logger.warn("Could not wake workflow run", {
 				"aiki.workflowRunId": this.id,
 				"aiki.error": error instanceof Error ? error.message : String(error),
 			});

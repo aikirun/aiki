@@ -1,6 +1,6 @@
 import type { Logger } from "@aikirun/types/client";
 import type { WorkflowRunHandle } from "./run-handle";
-import type { SleepParams, SleepStateNone } from "@aikirun/types/sleep";
+import type { SleepParams, SleepResult, SleepStateNone } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { delay, toMilliseconds } from "@aikirun/lib";
 import { type WorkflowRunId, WorkflowSuspendedError } from "@aikirun/types/workflow-run";
@@ -16,7 +16,7 @@ export function workflowRunSleeper(
 	logger: Logger,
 	options: SleeperOptions
 ) {
-	return async (params: SleepParams) => {
+	return async (params: SleepParams): Promise<SleepResult> => {
 		const { id: sleepId, ...durationFields } = params;
 		const durationMs = toMilliseconds(durationFields);
 
@@ -32,7 +32,14 @@ export function workflowRunSleeper(
 				"aiki.sleepId": sleepId,
 				"aiki.durationMs": durationMs,
 			});
-			return;
+			return { cancelled: false };
+		}
+		if (sleepState.status === "cancelled") {
+			logger.debug("Sleep cancelled, skipping", {
+				"aiki.sleepId": sleepId,
+				"aiki.durationMs": durationMs,
+			});
+			return { cancelled: true };
 		}
 		if (sleepState.status === "sleeping") {
 			logger.debug("Already sleeping", {
@@ -49,7 +56,7 @@ export function workflowRunSleeper(
 				"aiki.durationMs": durationMs,
 			});
 			await delay(durationMs);
-			return;
+			return { cancelled: false };
 		}
 
 		await workflowRunHandle.transitionState({ status: "sleeping", sleepPath, durationMs });

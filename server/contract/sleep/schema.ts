@@ -12,4 +12,8 @@ export const sleepStateSchema: Zt<SleepState> = z.discriminatedUnion("status", [
 		status: z.literal("completed"),
 		completedAt: z.number(),
 	}),
+	z.object({
+		status: z.literal("cancelled"),
+		cancelledAt: z.number(),
+	}),
 ]);

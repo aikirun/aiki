@@ -215,6 +215,14 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input, context }) => {
 		transitions.push(transition);
 	}
 
+	if (run.state.status === "sleeping" && input.state.status === "scheduled") {
+		const sleepPath = run.state.sleepPath;
+		run.sleepsState[sleepPath] = {
+			status: "cancelled",
+			cancelledAt: Date.now(),
+		};
+	}
+
 	run.state = input.state;
 	run.revision++;
 
