@@ -246,6 +246,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		input: Input
 	): Promise<string> {
+		// TODO: we don't need workflowid in task path
 		const workflowRunPath = `${runCtx.workflowId}/${runCtx.workflowVersionId}/${runCtx.id}`;
 
 		const inputHash = await sha256(stableStringify(input));
