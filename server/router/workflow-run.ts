@@ -317,7 +317,7 @@ export function getScheduledWorkflows(): WorkflowRun[] {
 	return scheduled;
 }
 
-export async function transitionScheduledWorkflowsToQueued(redis: Redis, logger: Logger) {
+export async function transitionScheduledWorkflowRunsToQueued(redis: Redis, logger: Logger) {
 	const messagesToPublish = [];
 	for (const run of getScheduledWorkflows()) {
 		run.state = {
@@ -363,7 +363,7 @@ export function getRetryableWorkflows(): WorkflowRun[] {
 	return retryable;
 }
 
-export async function transitionRetryableWorkflowsToQueued(redis: Redis, logger: Logger) {
+export async function transitionRetryableWorkflowRunsToQueued(redis: Redis, logger: Logger) {
 	const messagesToPublish = [];
 	for (const run of getRetryableWorkflows()) {
 		// Reset all failed/running tasks atomically with state transition
@@ -400,27 +400,27 @@ export async function transitionRetryableWorkflowsToQueued(redis: Redis, logger:
 	}
 }
 
-export function getSleepingWorkflows(): WorkflowRun[] {
+export function getSleepingWorkflowRuns(): WorkflowRun[] {
 	const now = Date.now();
-	const sleeping: WorkflowRun[] = [];
+	const sleepingRuns: WorkflowRun[] = [];
 
 	for (const run of workflowRuns.values()) {
 		if (run.state.status === "sleeping") {
 			const sleepingState = run.state;
 			const sleepState = run.sleepsState[sleepingState.sleepPath];
 			if (sleepState?.status === "sleeping" && sleepState.awakeAt <= now) {
-				sleeping.push(run);
+				sleepingRuns.push(run);
 			}
 		}
 	}
 
-	return sleeping;
+	return sleepingRuns;
 }
 
-export async function transitionSleepingWorkflowsToQueued(redis: Redis, logger: Logger) {
+export async function transitionSleepingWorkflowRunsToQueued(redis: Redis, logger: Logger) {
 	const now = Date.now();
 	const messagesToPublish = [];
-	for (const run of getSleepingWorkflows()) {
+	for (const run of getSleepingWorkflowRuns()) {
 		const sleepPath = (run.state as WorkflowRunStateSleeping).sleepPath;
 		run.sleepsState[sleepPath] = {
 			status: "completed",

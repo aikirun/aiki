@@ -4,9 +4,9 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { contextFactory } from "./middleware/index";
 import { router } from "./router/index";
 import {
-	transitionRetryableWorkflowsToQueued,
-	transitionScheduledWorkflowsToQueued,
-	transitionSleepingWorkflowsToQueued,
+	transitionRetryableWorkflowRunsToQueued,
+	transitionScheduledWorkflowRunsToQueued,
+	transitionSleepingWorkflowRunsToQueued,
 } from "./router/workflow-run";
 import { Redis } from "ioredis";
 import { createLogger } from "./logger/index";
@@ -51,8 +51,8 @@ if (import.meta.main) {
 		// },
 	});
 
-	const scheduledSchedulerInterval = setInterval(() => {
-		transitionScheduledWorkflowsToQueued(redis, logger).catch((err) => {
+	const scheduledRunsSchedulerInterval = setInterval(() => {
+		transitionScheduledWorkflowRunsToQueued(redis, logger).catch((err) => {
 			logger.error(
 				{
 					err,
@@ -62,8 +62,8 @@ if (import.meta.main) {
 		});
 	}, 1_000);
 
-	const sleepingSchedulerInterval = setInterval(() => {
-		transitionSleepingWorkflowsToQueued(redis, logger).catch((err) => {
+	const sleepingRunsSchedulerInterval = setInterval(() => {
+		transitionSleepingWorkflowRunsToQueued(redis, logger).catch((err) => {
 			logger.error(
 				{
 					err,
@@ -73,8 +73,8 @@ if (import.meta.main) {
 		});
 	}, 1_000);
 
-	const retrySchedulerInterval = setInterval(() => {
-		transitionRetryableWorkflowsToQueued(redis, logger).catch((err) => {
+	const retryableRunsSchedulerInterval = setInterval(() => {
+		transitionRetryableWorkflowRunsToQueued(redis, logger).catch((err) => {
 			logger.error(
 				{
 					err,
@@ -96,9 +96,9 @@ if (import.meta.main) {
 	});
 
 	const shutdown = async () => {
-		clearInterval(scheduledSchedulerInterval);
-		clearInterval(sleepingSchedulerInterval);
-		clearInterval(retrySchedulerInterval);
+		clearInterval(scheduledRunsSchedulerInterval);
+		clearInterval(sleepingRunsSchedulerInterval);
+		clearInterval(retryableRunsSchedulerInterval);
 		await redis.quit();
 		process.exit(0);
 	};
