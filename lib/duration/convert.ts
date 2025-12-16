@@ -24,10 +24,6 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
  * toMilliseconds({ seconds: 5 }) // => 5000
  * toMilliseconds({ minutes: 1, seconds: 30 }) // => 90000
  * toMilliseconds({ days: 1, hours: 2 }) // => 93600000
- *
- * @example
- * // Using in workflows
- * await run.sleep({ hours: 2, minutes: 30 })
  */
 export function toMilliseconds(duration: Duration): number {
 	if (typeof duration === "number") {

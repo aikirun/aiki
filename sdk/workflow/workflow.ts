@@ -29,7 +29,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
  *     await createUserProfile.start(run, { email: input.email });
  *
  *     // Durable sleep
- *     await run.sleep({ days: 1 });
+ *     await run.sleep({ id: "onboarding-delay", days: 1 });
  *
  *     // More tasks
  *     await sendUsageTips.start(run, { email: input.email });

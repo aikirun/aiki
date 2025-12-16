@@ -30,7 +30,7 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
 		await markUserVerified.start(run, { email: input.email });
 
 		// Sleep for 24 hours before sending tips
-		await run.sleep({ days: 1 });
+		await run.sleep({ id: "onboarding-delay", days: 1 });
 
 		// Send usage tips
 		await sendUsageTips.start(run, { email: input.email });
@@ -63,13 +63,28 @@ const result = await createUserProfile.start(run, {
 ### Sleep for a Duration
 
 ```typescript
-// Using duration object
-await run.sleep({ days: 1 });
-await run.sleep({ hours: 2, minutes: 30 });
-await run.sleep({ seconds: 30 });
+// Sleep requires a unique id for memoization
+await run.sleep({ id: "daily-delay", days: 1 });
+await run.sleep({ id: "processing-delay", hours: 2, minutes: 30 });
+await run.sleep({ id: "short-pause", seconds: 30 });
+```
 
-// Using milliseconds (backward compatible)
-await run.sleep(5000);
+### Sleep Cancellation
+
+Sleeps can be cancelled externally via the `wake()` method:
+
+```typescript
+const handle = await myWorkflow.start(client, input);
+await handle.wake(); // Wakes the workflow if sleeping
+```
+
+The sleep returns a result indicating whether it was cancelled:
+
+```typescript
+const { cancelled } = await run.sleep({ id: "wait-period", hours: 1 });
+if (cancelled) {
+  // Handle early wake-up
+}
 ```
 
 ### Get Workflow State
@@ -187,14 +202,15 @@ interface WorkflowRunContext<Input, Output> {
 	options: WorkflowOptions; // Execution options (trigger, retry, idempotencyKey)
 	handle: WorkflowRunHandle<Input, Output>; // Advanced state management
 	logger: Logger; // Logging (info, debug, warn, error, trace)
-	sleep(duration: Duration): Promise<void>; // Durable sleep
+	sleep(params: SleepParams): Promise<SleepResult>; // Durable sleep
 }
 ```
 
-The `Duration` type accepts:
+Sleep parameters:
+- `id` (required): Unique identifier for memoization
+- Duration fields: `days`, `hours`, `minutes`, `seconds`, `milliseconds`
 
-- Raw milliseconds: `run.sleep(5000)`
-- Duration objects: `run.sleep({ days: 1 })`, `run.sleep({ hours: 2, minutes: 30 })`
+Example: `run.sleep({ id: "my-sleep", days: 1, hours: 2 })`
 
 ## Error Handling
 
@@ -210,6 +226,12 @@ try {
 ```
 
 Failed workflows transition to `awaiting_retry` state and are automatically retried by the server.
+
+### Expected Errors
+
+`WorkflowSuspendedError` is thrown when a workflow suspends (e.g., during sleep).
+This is expected behavior - the worker catches this error and the workflow resumes
+when the sleep completes. Do not catch this error in workflow code.
 
 ## Best Practices
 
