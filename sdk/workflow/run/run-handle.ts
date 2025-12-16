@@ -5,6 +5,7 @@ import {
 	type WorkflowRunState,
 } from "@aikirun/types/workflow-run";
 import type { ApiClient, Logger } from "@aikirun/types/client";
+import type { SleepState } from "@aikirun/types/sleep";
 import type { TaskState } from "@aikirun/types/task";
 import { INTERNAL } from "@aikirun/types/symbols";
 
@@ -25,6 +26,7 @@ export interface WorkflowRunHandle<Input, Output> {
 		refresh: () => Promise<void>;
 		getTaskState: (taskPath: string) => TaskState<unknown>;
 		transitionTaskState: (taskPath: string, taskState: TaskState<unknown>) => Promise<void>;
+		getSleepState: (sleepPath: string) => SleepState;
 		assertExecutionAllowed: () => Promise<void>;
 	};
 }
@@ -34,13 +36,14 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 
 	constructor(
 		private readonly api: ApiClient,
-		public _run: WorkflowRun<Input, Output>,
+		private _run: WorkflowRun<Input, Output>,
 		private readonly logger: Logger
 	) {
 		this[INTERNAL] = {
 			refresh: this.refresh.bind(this),
 			getTaskState: this.getTaskState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
+			getSleepState: this.getSleepState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
 		};
 	}
@@ -76,6 +79,10 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		});
 		this._run.revision = newRevision;
 		this._run.tasksState[taskPath] = taskState;
+	}
+
+	private getSleepState(sleepPath: string): SleepState {
+		return this.run.sleepsState[sleepPath] ?? { status: "none" };
 	}
 
 	private async assertExecutionAllowed() {

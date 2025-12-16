@@ -10,13 +10,16 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { delay, fireAndForget } from "@aikirun/lib/async";
-import { toMilliseconds } from "@aikirun/lib/duration";
-import type { Duration } from "@aikirun/lib/duration";
 import type { Client, Logger, SubscriberStrategy } from "@aikirun/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aikirun/client";
-import { initWorkflowRegistry, initWorkflowRunHandle, type WorkflowRegistry } from "@aikirun/workflow";
+import {
+	initWorkflowRegistry,
+	initWorkflowRunHandle,
+	workflowRunSleeper,
+	type WorkflowRegistry,
+} from "@aikirun/workflow";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRunHandle, WorkflowVersion } from "@aikirun/workflow";
+import type { WorkflowVersion } from "@aikirun/workflow";
 import { isServerConflictError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
@@ -67,6 +70,15 @@ export interface WorkerOptions {
 	maxConcurrentWorkflowRuns?: number;
 	workflowRun?: {
 		heartbeatIntervalMs?: number;
+		/**
+		 * Threshold for spinning vs persisting delays (default: 10ms).
+		 *
+		 * Delays <= threshold: In-memory wait (fast, no history, not durable)
+		 * Delays > threshold: Server state transition (history recorded, durable)
+		 *
+		 * Set to 0 to record all delays in transition history.
+		 */
+		spinThresholdMs?: number;
 	};
 	gracefulShutdownTimeoutMs?: number;
 	/**
@@ -366,7 +378,9 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					options: workflowRun.options,
 					handle: workflowRunHandle,
 					logger,
-					sleep: createWorkflowRunSleeper(workflowRunHandle, logger),
+					sleep: workflowRunSleeper(workflowRunHandle, logger, {
+						spinThresholdMs: this.params.opts?.workflowRun?.spinThresholdMs ?? 10,
+					}),
 				},
 				appContext
 			);
@@ -418,16 +432,4 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			"aiki.stack": error.stack,
 		});
 	}
-}
-
-function createWorkflowRunSleeper(workflowRunHandle: WorkflowRunHandle<unknown, unknown>, logger: Logger) {
-	return async (duration: Duration) => {
-		const durationMs = toMilliseconds(duration);
-		const awakeAt = Date.now() + durationMs;
-		logger.info("Workflow sleeping", { "aiki.durationMs": durationMs });
-
-		await workflowRunHandle.transitionState({ status: "sleeping", awakeAt });
-
-		throw new WorkflowSleepingError(workflowRunHandle.run.id as WorkflowRunId);
-	};
 }

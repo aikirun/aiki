@@ -1,6 +1,7 @@
 import { baseImplementer } from "./base";
 import {
 	isTerminalState,
+	type WorkflowRunStateSleeping,
 	type TerminalWorlfowRunState,
 	type WorkflowRun,
 	type WorkflowRunId,
@@ -148,6 +149,7 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 						: trigger.startAt,
 		},
 		tasksState: {},
+		sleepsState: {},
 		childWorkflowsRunState: {},
 	};
 
@@ -218,6 +220,15 @@ const transitionStateV1 = os.transitionStateV1.handler(({ input, context }) => {
 
 	if (input.state.status === "running") {
 		run.attempts++;
+	}
+
+	if (input.state.status === "sleeping") {
+		const sleepingState = input.state;
+		const awakeAt = Date.now() + sleepingState.durationMs;
+		run.sleepsState[sleepingState.sleepPath] = {
+			status: "sleeping",
+			awakeAt,
+		};
 	}
 
 	if (input.state.status === "cancelled") {
@@ -396,7 +407,8 @@ export function getSleepingWorkflows(): WorkflowRun[] {
 	for (const run of workflowRuns.values()) {
 		if (run.state.status === "sleeping") {
 			const sleepingState = run.state;
-			if (sleepingState.awakeAt <= now) {
+			const sleepState = run.sleepsState[sleepingState.sleepPath];
+			if (sleepState?.status === "sleeping" && sleepState.awakeAt <= now) {
 				sleeping.push(run);
 			}
 		}
@@ -406,8 +418,15 @@ export function getSleepingWorkflows(): WorkflowRun[] {
 }
 
 export async function transitionSleepingWorkflowsToQueued(redis: Redis, logger: Logger) {
+	const now = Date.now();
 	const messagesToPublish = [];
 	for (const run of getSleepingWorkflows()) {
+		const sleepPath = (run.state as WorkflowRunStateSleeping).sleepPath;
+		run.sleepsState[sleepPath] = {
+			status: "completed",
+			completedAt: now,
+		};
+
 		run.state = {
 			status: "queued",
 			reason: "awake",

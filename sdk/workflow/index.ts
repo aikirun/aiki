@@ -12,3 +12,5 @@ export { initWorkflowRunHandle } from "./run/run-handle";
 export type { WorkflowRunHandle } from "./run/run-handle";
 
 export type { WorkflowRunStateHandle } from "./run/state-handle";
+
+export { workflowRunSleeper } from "./run/sleeper";
