@@ -825,7 +825,7 @@
 		</footer>
 
 		<script>
-			document.getElementById("signup-form").addEventListener("submit", async function (e) {
+			document.getElementById("signup-form").addEventListener("submit", async (e) => {
 				e.preventDefault();
 				const email = document.getElementById("email-input").value;
 				const button = e.target.querySelector("button");
@@ -853,8 +853,7 @@
 						button.textContent = originalText;
 						button.disabled = false;
 					}
-				} catch (error) {
-					console.error("Error:", error);
+				} catch (_error) {
 					alert("Unable to connect. Please try again.");
 					button.textContent = originalText;
 					button.disabled = false;

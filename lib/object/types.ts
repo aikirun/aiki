@@ -1,3 +1,4 @@
+// biome-ignore-all lint/correctness/noUnusedVariables: the unused types are tests
 import type { NonEmptyArray } from "../array";
 import type { Equal, ExpectTrue } from "../testing/expect/types";
 import type { RequireAtLeastOneOf } from "@aikirun/types/utils";
@@ -28,11 +29,12 @@ type TestNonArrayObjectArray = ExpectTrue<Equal<NonArrayObject<[]>, never>>;
 type TestNonArrayReadonlyArray = ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>;
 //#endregion
 
-export type RequiredDeep<T> = NonArrayObject<T> extends never
-	? T
-	: {
-			[K in keyof T]-?: RequiredDeep<T[K]>;
-		};
+export type RequiredDeep<T> =
+	NonArrayObject<T> extends never
+		? T
+		: {
+				[K in keyof T]-?: RequiredDeep<T[K]>;
+			};
 //#region <RequiredDeep Tests>
 type TestRequiredDeep = ExpectTrue<
 	Equal<

@@ -32,7 +32,7 @@ export function shuffleArray<T>(array: readonly T[]): T[] {
 	const shuffledArray = Array.from(array);
 	for (let i = shuffledArray.length - 1; i > 0; i--) {
 		const j = Math.floor(Math.random() * (i + 1));
-		// biome-ignore lint/style/noNonNullAssertion: <explanation>
+		// biome-ignore lint/style/noNonNullAssertion: index exists
 		[shuffledArray[i], shuffledArray[j]] = [shuffledArray[j]!, shuffledArray[i]!];
 	}
 	return shuffledArray;
@@ -49,7 +49,7 @@ export function distributeRoundRobin(totalSize: number, itemCount: number): numb
 
 	const distribution = Array(itemCount).fill(0);
 	for (let i = 0; i < totalSize; i++) {
-		// biome-ignore lint/style/noNonNullAssertion: <explanation>
+		// biome-ignore lint/style/noNonNullAssertion: index exists
 		distribution[i % itemCount]!++;
 	}
 	return distribution;

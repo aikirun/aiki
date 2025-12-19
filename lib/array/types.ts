@@ -1,3 +1,4 @@
+// biome-ignore-all lint/correctness/noUnusedVariables: the unused types are tests
 import type { Equal, ExpectFalse, ExpectTrue } from "../testing/expect/types";
 
 export type NonEmptyArray<T> = [T, ...T[]];

@@ -354,6 +354,7 @@ function getWorkflowRunsWithElapsedSchedule(): WorkflowRun[] {
 export async function queueScheduledWorkflowRuns(context: ServerContext, redis: Redis) {
 	const runs = getWorkflowRunsWithElapsedSchedule();
 
+	// TODO: workflow state might have changed before it is queued. We might need try/catch
 	for (const run of runs) {
 		if (run.state.status === "scheduled") {
 			await transitionStateV1.callable({ context })({
@@ -382,7 +383,7 @@ function getRetryableWorkflows(): WorkflowRun[] {
 	return retryableRuns;
 }
 
-export async function scheduleRetryableWorkflowRuns(context: ServerContext, redis: Redis) {
+export async function scheduleRetryableWorkflowRuns(context: ServerContext) {
 	const runs = getRetryableWorkflows();
 	const now = Date.now();
 
@@ -418,7 +419,7 @@ function getSleepingWorkflowRuns(): WorkflowRun[] {
 	return sleepingRuns;
 }
 
-export async function scheduleSleepingWorkflowRuns(context: ServerContext, redis: Redis) {
+export async function scheduleSleepingWorkflowRuns(context: ServerContext) {
 	const runs = getSleepingWorkflowRuns();
 	const now = Date.now();
 

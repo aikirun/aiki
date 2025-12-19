@@ -68,7 +68,7 @@ if (import.meta.main) {
 			name: "scheduleSleepingWorkflowRuns",
 			logger,
 		});
-		scheduleSleepingWorkflowRuns(context, redis).catch((err) => {
+		scheduleSleepingWorkflowRuns(context).catch((err) => {
 			logger.error({ err }, "Error scheduling sleeping workflows");
 		});
 	}, 1_000);
@@ -79,7 +79,7 @@ if (import.meta.main) {
 			name: "scheduleRetryableWorkflowRuns",
 			logger,
 		});
-		scheduleRetryableWorkflowRuns(context, redis).catch((err) => {
+		scheduleRetryableWorkflowRuns(context).catch((err) => {
 			logger.error({ err }, "Error scheduling retryable workflows");
 		});
 	}, 1_000);

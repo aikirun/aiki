@@ -49,7 +49,9 @@
 			"import": "./dist/task.js"
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsup"
 	},

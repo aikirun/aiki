@@ -3,7 +3,15 @@
 	"version": "0.1.12",
 	"private": true,
 	"type": "module",
-	"workspaces": ["lib", "types", "server", "sdk/workflow", "sdk/task", "sdk/client", "sdk/worker"],
+	"workspaces": [
+		"lib",
+		"types",
+		"server",
+		"sdk/workflow",
+		"sdk/task",
+		"sdk/client",
+		"sdk/worker"
+	],
 	"scripts": {
 		"check": "tsc --noEmit",
 		"lint": "bunx @biomejs/biome lint .",
@@ -31,10 +39,13 @@
 		"prepare": "husky"
 	},
 	"lint-staged": {
-		"*.{ts,tsx,js,jsx,json}": ["bunx @biomejs/biome format --write", "bunx @biomejs/biome lint --write"]
+		"*.{ts,tsx,js,jsx,json}": [
+			"bunx @biomejs/biome format --write",
+			"bunx @biomejs/biome lint --write"
+		]
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^1.9.4",
+		"@biomejs/biome": "^2.3.10",
 		"@changesets/cli": "^2.27.1",
 		"@types/node": "^22.10.2",
 		"bun-types": "^1.1.38",

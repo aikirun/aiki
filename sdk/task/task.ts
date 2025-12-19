@@ -241,7 +241,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private async getPath<WorkflowInput, WorkflowOutput>(input: Input): Promise<TaskPath> {
+	private async getPath(input: Input): Promise<TaskPath> {
 		const inputHash = await sha256(stableStringify(input));
 
 		const taskPath = this.params.opts?.idempotencyKey
