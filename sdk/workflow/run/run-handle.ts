@@ -3,10 +3,8 @@ import {
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
 	type WorkflowRunState,
-	type WorkflowRunStateCancelled,
 	type WorkflowRunStateCompleted,
 	type WorkflowRunStateInComplete,
-	type WorkflowRunStatePaused,
 	type WorkflowRunStatus,
 } from "@aikirun/types/workflow-run";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
@@ -76,7 +74,6 @@ export interface WorkflowRunWaitOptions {
 	abortSignal?: AbortSignal;
 }
 
-// TODO: check how frequently we refresh. Maybe we don't have to all the time
 class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, Output> {
 	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output>[typeof INTERNAL];
 
@@ -163,54 +160,34 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 	}
 
 	public async cancel(reason?: string): Promise<void> {
-		const state: WorkflowRunStateCancelled = { status: "cancelled", reason };
-		const { newRevision } = await this.api.workflowRun.transitionStateV1({
-			id: this.run.id,
-			state,
-			expectedRevision: this.run.revision,
-		});
-		this._run.state = state;
-		this._run.revision = newRevision;
+		return this.transitionState({ status: "cancelled", reason });
 	}
 
 	public async pause(): Promise<void> {
-		const state: WorkflowRunStatePaused = { status: "paused", pausedAt: Date.now() };
-		const { newRevision } = await this.api.workflowRun.transitionStateV1({
-			id: this.run.id,
-			state,
-			expectedRevision: this.run.revision,
-		});
-		this._run.state = state;
-		this._run.revision = newRevision;
+		return this.transitionState({ status: "paused", pausedAt: Date.now() });
 	}
 
 	public async resume(): Promise<void> {
-		await this.api.workflowRun.transitionStateV1({
-			id: this.run.id,
-			state: { status: "scheduled", scheduledAt: Date.now(), reason: "resume" },
-			expectedRevision: this.run.revision,
-		});
-		await this.refresh();
+		return this.transitionState({ status: "scheduled", scheduledAt: Date.now(), reason: "resume" });
 	}
 
 	private async transitionState(targetState: WorkflowRunState<Output>): Promise<void> {
-		await this.api.workflowRun.transitionStateV1({
+		const { run } = await this.api.workflowRun.transitionStateV1({
 			id: this.run.id,
 			state: targetState,
 			expectedRevision: this.run.revision,
 		});
-		await this.refresh();
+		this._run = run as WorkflowRun<Input, Output>;
 	}
 
 	private async transitionTaskState(taskPath: TaskPath, taskState: TaskState<unknown>): Promise<void> {
-		const { newRevision } = await this.api.workflowRun.transitionTaskStateV1({
+		const { run } = await this.api.workflowRun.transitionTaskStateV1({
 			id: this.run.id,
 			taskPath,
 			taskState,
 			expectedRevision: this.run.revision,
 		});
-		this._run.tasksState[taskPath] = taskState;
-		this._run.revision = newRevision;
+		this._run = run as WorkflowRun<Input, Output>;
 	}
 
 	private assertExecutionAllowed() {

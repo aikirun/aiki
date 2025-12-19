@@ -265,7 +265,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		}
 	}
 
-	return { newRevision: run.revision };
+	return { run };
 });
 
 const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context }) => {
@@ -312,7 +312,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context
 	run.tasksState[taskPath] = taskState;
 	run.revision++;
 
-	return { newRevision: run.revision };
+	return { run };
 });
 
 const listTransitionsV1 = os.listTransitionsV1.handler(({ input }) => {

@@ -83,7 +83,7 @@ export interface WorkflowRunTransitionStateRequestV1 {
 }
 
 export interface WorkflowRunTransitionStateResponseV1 {
-	newRevision: number;
+	run: WorkflowRun;
 }
 
 export interface WorkflowRunTransitionTaskStateRequestV1 {
@@ -94,7 +94,7 @@ export interface WorkflowRunTransitionTaskStateRequestV1 {
 }
 
 export interface WorkflowRunTransitionTaskStateResponseV1 {
-	newRevision: number;
+	run: WorkflowRun;
 }
 
 export interface WorkflowRunListTransitionsRequestV1 {

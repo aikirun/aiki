@@ -119,7 +119,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 		)
 		.output(
 			z.object({
-				newRevision: z.number(),
+				run: workflowRunSchema,
 			})
 		);
 
@@ -137,7 +137,7 @@ const transitionTaskStateV1: ContractProcedure<
 	)
 	.output(
 		z.object({
-			newRevision: z.number(),
+			run: workflowRunSchema,
 		})
 	);
 
