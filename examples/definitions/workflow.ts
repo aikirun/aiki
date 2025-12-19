@@ -41,6 +41,6 @@ export const eveningRoutineWorkflow = workflow({ id: "evening-routine" });
 export const eveningRoutineWorkflowV1 = eveningRoutineWorkflow.v("1.0.0", {
 	async handler(_, run, _context: AppContext) {
 		await sayPrayer.start(run);
-		await run.sleep({ id: "post-prayer-rest", seconds: 5 });
+		await run.sleep({ id: "post-prayer-rest", seconds: 30 });
 	},
 });
