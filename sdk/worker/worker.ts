@@ -60,7 +60,7 @@ export function worker(params: WorkerParams): Worker {
 
 export interface WorkerParams {
 	id: string;
-	// biome-ignore lint/suspicious/noExplicitAny: reason
+	// biome-ignore lint/suspicious/noExplicitAny: AppContext is contravariant
 	workflows: WorkflowVersion<any, any, any>[];
 	subscriber?: SubscriberStrategy;
 	opts?: WorkerOptions;
