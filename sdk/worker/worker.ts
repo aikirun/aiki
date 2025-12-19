@@ -27,14 +27,14 @@ import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@a
 /**
  * Creates an Aiki worker definition for executing workflows.
  *
- * Worker definitions are static and reusable. Call `start(client)` to begin
+ * Worker definitions are static and reusable. Call `spawn(client)` to begin
  * execution, which returns a handle for controlling the running worker.
  *
  * @param params - Worker configuration parameters
  * @param params.id - Unique worker ID for identification and monitoring
  * @param params.workflows - Array of workflow versions this worker can execute
  * @param params.subscriber - Message subscriber strategy (default: redis_streams)
- * @returns Worker definition, call start(client) to begin execution
+ * @returns Worker definition, call spawn(client) to begin execution
  *
  * @example
  * ```typescript
@@ -46,7 +46,7 @@ import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@a
  *   },
  * });
  *
- * const handle = await myWorker.start(client);
+ * const handle = await myWorker.spawn(client);
  *
  * process.on("SIGINT", async () => {
  *   await handle.stop();
@@ -94,13 +94,13 @@ export interface WorkerBuilder {
 		path: Path,
 		value: TypeOfValueAtPath<WorkerOptions, Path>
 	): WorkerBuilder;
-	start: Worker["start"];
+	spawn: Worker["spawn"];
 }
 
 export interface Worker {
 	id: string;
 	with(): WorkerBuilder;
-	start: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
+	spawn: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
 }
 
 export interface WorkerHandle {
@@ -120,13 +120,13 @@ class WorkerImpl implements Worker {
 
 		const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): WorkerBuilder => ({
 			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
-			start: (client) => new WorkerImpl({ ...this.params, opts: optsBuilder.build() }).start(client),
+			spawn: (client) => new WorkerImpl({ ...this.params, opts: optsBuilder.build() }).spawn(client),
 		});
 
 		return createBuilder(optsOverrider());
 	}
 
-	public async start<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
+	public async spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
 		const handle = new WorkerHandleImpl(client, this.params);
 		await handle._start();
 		return handle;

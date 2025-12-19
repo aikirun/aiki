@@ -22,14 +22,14 @@ const aikiWorker = worker({
   },
 });
 
-const handle = await aikiWorker.start(aiki);
+const handle = await aikiWorker.spawn(aikiClient);
 ```
 
-Worker definitions are static and reusable. The `worker()` function creates a definition with an `id` that uniquely identifies the worker and a `workflows` array specifying which workflow versions it can execute. Call `start(client)` to begin execution—it returns a handle for controlling the running worker.
+Worker definitions are static and reusable. The `worker()` function creates a definition with an `id` that uniquely identifies the worker and a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution—it returns a handle for controlling the running worker.
 
 ## How Workers Operate
 
-When you call `start()`, the worker subscribes to a stream for each registered workflow. When a workflow run is triggered, a message appears on the stream. The worker picks it up, looks up the workflow definition in its registry, and begins execution.
+When you call `spawn()`, the worker subscribes to a stream for each registered workflow. When a workflow run is triggered, a message appears on the stream. The worker picks it up, looks up the workflow definition in its registry, and begins execution.
 
 During execution, the worker sends periodic heartbeats by refreshing its claim on the message. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the message remains unacknowledged. After a configurable idle time (default: 3 minutes), other workers detect the orphaned work and claim it. The workflow then re-executes from its last checkpoint.
 
@@ -45,8 +45,8 @@ Workers scale naturally. You can add capacity in several ways:
 const worker1 = worker({ id: "worker-1", workflows: [orderWorkflowV1] });
 const worker2 = worker({ id: "worker-2", workflows: [orderWorkflowV1] });
 
-const handle1 = await worker1.start(aiki);
-const handle2 = await worker2.start(aiki);
+const handle1 = await worker1.spawn(aikiClient);
+const handle2 = await worker2.spawn(aikiClient);
 ```
 
 **Specialize workers** by registering different workflows on different workers. Each worker only handles the workflows it knows about.

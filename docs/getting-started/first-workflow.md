@@ -152,7 +152,7 @@ const aikiWorker = worker({
 });
 
 // Start processing
-await aikiWorker.start(aiki);
+await aikiWorker.spawn(aikiClient);
 ```
 
 ## Step 4: Execute the Workflow
@@ -270,13 +270,13 @@ const aikiClient = await client({
 	redis: { host: "localhost", port: 6379 },
 });
 
-const aikiWorker = worker(aikiClient, {
+const aikiWorker = worker({
 	id: "order-worker",
 	workflows: [orderWorkflowV1],
 	subscriber: { type: "redis_streams" },
 });
 
-await aikiWorker.start();
+await aikiWorker.spawn(aikiClient);
 
 // Execute workflow
 const result = await orderWorkflowV1.start(aikiClient, {

@@ -187,7 +187,7 @@ const aikiWorker = worker({
 	},
 });
 
-await aikiWorker.start(aiki);
+await aikiWorker.spawn(aikiClient);
 ```
 
 ## Execution Context

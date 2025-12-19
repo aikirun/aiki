@@ -45,8 +45,8 @@ const aikiClient = await client({
 });
 
 // 4. Create a worker (executes workflows)
-const myWorker = worker(aikiClient, { id: "my-worker", workflows: [helloV1] });
-await myWorker.start();
+const myWorker = worker({ id: "my-worker", workflows: [helloV1] });
+await myWorker.spawn(aikiClient);
 
 // 5. Execute your workflow
 console.log("Starting workflow...");

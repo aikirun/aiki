@@ -64,7 +64,7 @@ export const aikiClient = await client({
   redis: { host: "localhost", port: 6379 }
 });
 
-const workerA = worker(aikiClient, {
+const workerA = worker({
   id: "worker-A",
   workflows: [onboardingWorkflowV1],
   subscriber: { type: "redis_streams" }
@@ -72,7 +72,7 @@ const workerA = worker(aikiClient, {
 
 // This worker can process workflows alongside other workers - Aiki handles distribution.
 // Scale horizontally by launching more workers pointing to the same stream.
-await workerA.start();
+await workerA.spawn(aikiClient);
 ```
 
 *Start workflow `main.ts`*

@@ -28,8 +28,8 @@ export const aikiClient = await client({
 	}),
 });
 
-const workerHandleA = await workerA.start(aikiClient);
-const workerHandleB = await workerB.start(aikiClient);
+const workerHandleA = await workerA.spawn(aikiClient);
+const workerHandleB = await workerB.spawn(aikiClient);
 
 const shutdown = async () => {
 	await workerHandleA.stop();

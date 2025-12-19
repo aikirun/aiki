@@ -11,7 +11,7 @@ npm install @aikirun/worker
 
 ## Quick Start
 
-### Create and Start a Worker
+### Create and Spawn a Worker
 
 ```typescript
 import { worker } from "@aikirun/worker";
@@ -34,8 +34,8 @@ const aikiClient = await client({
 	redis: { host: "localhost", port: 6379 },
 });
 
-// Start worker
-const handle = await aikiWorker.start(aiki);
+// Spawn worker
+const handle = await aikiWorker.spawn(aiki);
 ```
 
 ### Graceful Shutdown
@@ -71,16 +71,16 @@ Scale workers by creating separate definitions to isolate workflows or shard by 
 const orderWorker = worker({ id: "orders", workflows: [orderWorkflowV1] });
 const emailWorker = worker({ id: "emails", workflows: [emailWorkflowV1] });
 
-await orderWorker.start(client);
-await emailWorker.start(client);
+await orderWorker.spawn(client);
+await emailWorker.spawn(client);
 ```
 
 ```typescript
 // Shard workers by key (reuse base definition with different shards)
 const orderWorker = worker({ id: "order-processor", workflows: [orderWorkflowV1] });
 
-await orderWorker.with().opt("shardKeys", ["us-east", "us-west"]).start(client);
-await orderWorker.with().opt("shardKeys", ["eu-west"]).start(client);
+await orderWorker.with().opt("shardKeys", ["us-east", "us-west"]).spawn(client);
+await orderWorker.with().opt("shardKeys", ["eu-west"]).spawn(client);
 ```
 
 ## Worker Configuration
