@@ -18,7 +18,7 @@ import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@a
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/run-handle";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
-	handler: (input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<Output>;
+	handler: (input: Input, run: Readonly<WorkflowRunContext<Input, Output>>, context: AppContext) => Promise<Output>;
 	opts?: WorkflowOptions;
 }
 
