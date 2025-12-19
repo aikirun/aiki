@@ -120,7 +120,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			: // this cast is okay cos if args is empty, Input must be type null
 				(null as Input);
 
-		const path = await this.getPath(runCtx, input);
+		const path = await this.getPath(input);
 
 		const taskState = await handle[INTERNAL].getTaskState(path);
 		if (taskState.status === "completed") {
@@ -242,18 +242,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private async getPath<WorkflowInput, WorkflowOutput>(
-		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
-		input: Input
-	): Promise<TaskPath> {
-		// TODO: we don't need workflowid in task path
-		const workflowRunPath = `${runCtx.workflowId}/${runCtx.workflowVersionId}/${runCtx.id}`;
-
+	private async getPath<WorkflowInput, WorkflowOutput>(input: Input): Promise<TaskPath> {
 		const inputHash = await sha256(stableStringify(input));
 
 		const taskPath = this.params.opts?.idempotencyKey
-			? `${workflowRunPath}/${this.id}/${inputHash}/${this.params.opts.idempotencyKey}`
-			: `${workflowRunPath}/${this.id}/${inputHash}`;
+			? `${this.id}/${inputHash}/${this.params.opts.idempotencyKey}`
+			: `${this.id}/${inputHash}`;
 
 		return taskPath as TaskPath;
 	}
