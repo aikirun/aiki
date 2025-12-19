@@ -129,7 +129,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const logger = run.logger.child({
 			"aiki.component": "task-execution",
-			"aiki.taskId": this.id,
 			"aiki.taskPath": path,
 		});
 

@@ -384,7 +384,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			);
 
 			shouldAcknowledge = true;
-			logger.info("Workflow execution completed");
 		} catch (error) {
 			if (
 				error instanceof WorkflowRunNotExecutableError ||
