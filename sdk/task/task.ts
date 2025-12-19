@@ -84,7 +84,7 @@ export interface Task<Input, Output> {
 	id: TaskId;
 	with(): TaskBuilder<Input, Output>;
 	start: <WorkflowInput, WorkflowOutput>(
-		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		...args: Input extends null ? [] : [Input]
 	) => Promise<Output>;
 }
@@ -101,17 +101,17 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): TaskBuilder<Input, Output> => ({
 			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
-			start: (runCtx, ...args) => new TaskImpl({ ...this.params, opts: optsBuilder.build() }).start(runCtx, ...args),
+			start: (run, ...args) => new TaskImpl({ ...this.params, opts: optsBuilder.build() }).start(run, ...args),
 		});
 
 		return createBuilder(optsOverrider());
 	}
 
 	public async start<WorkflowInput, WorkflowOutput>(
-		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<Output> {
-		const handle = runCtx.handle;
+		const handle = run[INTERNAL].handle;
 
 		await handle[INTERNAL].assertExecutionAllowed();
 
@@ -127,7 +127,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			return taskState.output as Output;
 		}
 
-		const logger = runCtx.logger.child({
+		const logger = run.logger.child({
 			"aiki.component": "task-execution",
 			"aiki.taskId": this.id,
 			"aiki.taskPath": path,
@@ -158,7 +158,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		logger.info("Starting task", { "aiki.attempts": attempts });
 		await handle[INTERNAL].transitionTaskState(path, { status: "running", attempts });
 
-		const { output, lastAttempt } = await this.tryExecuteTask(runCtx, input, path, retryStrategy, attempts, logger);
+		const { output, lastAttempt } = await this.tryExecuteTask(run, input, path, retryStrategy, attempts, logger);
 
 		await handle[INTERNAL].transitionTaskState(path, { status: "completed", output });
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
@@ -167,7 +167,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async tryExecuteTask<WorkflowInput, WorkflowOutput>(
-		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		input: Input,
 		path: TaskPath,
 		retryStrategy: RetryStrategy,
@@ -199,7 +199,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {
-					await runCtx.handle[INTERNAL].transitionTaskState(path, taskFailedState);
+					await run[INTERNAL].handle[INTERNAL].transitionTaskState(path, taskFailedState);
 					logger.error("Task failed", {
 						"aiki.attempts": attempts,
 						"aiki.reason": taskFailedState.reason,
@@ -209,7 +209,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 				const nextAttemptAt = Date.now() + retryParams.delayMs;
 
-				await runCtx.handle[INTERNAL].transitionTaskState(path, { ...taskFailedState, nextAttemptAt });
+				await run[INTERNAL].handle[INTERNAL].transitionTaskState(path, { ...taskFailedState, nextAttemptAt });
 				logger.debug("Task failed. Retrying", {
 					"aiki.attempts": attempts,
 					"aiki.nextAttemptAt": nextAttemptAt,

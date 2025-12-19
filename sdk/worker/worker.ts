@@ -376,11 +376,11 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					workflowId: workflowRun.workflowId as WorkflowId,
 					workflowVersionId: workflowRun.workflowVersionId as WorkflowVersionId,
 					options: workflowRun.options,
-					handle,
 					logger,
 					sleep: createWorkflowRunSleeper(handle, logger, {
 						spinThresholdMs: this.params.opts?.workflowRun?.spinThresholdMs ?? 10,
 					}),
+					[INTERNAL]: { handle },
 				},
 				appContext
 			);
