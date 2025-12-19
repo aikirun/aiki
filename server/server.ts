@@ -1,12 +1,12 @@
 import process from "node:process";
 import { loadConfig } from "./config/index";
 import { RPCHandler } from "@orpc/server/fetch";
-import { contextFactory } from "./middleware/index";
+import { createContext } from "./middleware/index";
 import { router } from "./router/index";
 import {
-	transitionRetryableWorkflowRunsToQueued,
-	transitionScheduledWorkflowRunsToQueued,
-	transitionSleepingWorkflowRunsToQueued,
+	scheduleRetryableWorkflowRuns,
+	queueScheduledWorkflowRuns,
+	scheduleSleepingWorkflowRuns,
 } from "./router/workflow-run";
 import { Redis } from "ioredis";
 import { createLogger } from "./logger/index";
@@ -51,54 +51,56 @@ if (import.meta.main) {
 		// },
 	});
 
-	const scheduledRunsSchedulerInterval = setInterval(() => {
-		transitionScheduledWorkflowRunsToQueued(redis, logger).catch((err) => {
-			logger.error(
-				{
-					err,
-				},
-				"Error transitioning scheduled workflows"
-			);
+	const queueScheduledWorkflowRunsInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "queueScheduledWorkflowRuns",
+			logger,
+		});
+		queueScheduledWorkflowRuns(context, redis).catch((err) => {
+			logger.error({ err }, "Error queueing scheduled workflows");
 		});
 	}, 1_000);
 
-	const sleepingRunsSchedulerInterval = setInterval(() => {
-		transitionSleepingWorkflowRunsToQueued(redis, logger).catch((err) => {
-			logger.error(
-				{
-					err,
-				},
-				"Error transitioning sleeping workflows"
-			);
+	const scheduleSleepingWorkflowRunsInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "scheduleSleepingWorkflowRuns",
+			logger,
+		});
+		scheduleSleepingWorkflowRuns(context, redis).catch((err) => {
+			logger.error({ err }, "Error scheduling sleeping workflows");
 		});
 	}, 1_000);
 
-	const retryableRunsSchedulerInterval = setInterval(() => {
-		transitionRetryableWorkflowRunsToQueued(redis, logger).catch((err) => {
-			logger.error(
-				{
-					err,
-				},
-				"Error transitioning retryable workflows"
-			);
+	const scheduleRetryableWorkflowRunsInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "scheduleRetryableWorkflowRuns",
+			logger,
+		});
+		scheduleRetryableWorkflowRuns(context, redis).catch((err) => {
+			logger.error({ err }, "Error scheduling retryable workflows");
 		});
 	}, 1_000);
 
 	Bun.serve({
 		port: config.port,
-		fetch: async (req) => {
-			const context = contextFactory(req, logger);
-
-			const result = await rpcHandler.handle(req, { context });
-
+		fetch: async (request) => {
+			const context = createContext({
+				type: "request",
+				request,
+				logger,
+			});
+			const result = await rpcHandler.handle(request, { context });
 			return result.response ?? new Response("Not Found", { status: 404 });
 		},
 	});
 
 	const shutdown = async () => {
-		clearInterval(scheduledRunsSchedulerInterval);
-		clearInterval(sleepingRunsSchedulerInterval);
-		clearInterval(retryableRunsSchedulerInterval);
+		clearInterval(queueScheduledWorkflowRunsInterval);
+		clearInterval(scheduleSleepingWorkflowRunsInterval);
+		clearInterval(scheduleRetryableWorkflowRunsInterval);
 		await redis.quit();
 		process.exit(0);
 	};

@@ -1,6 +1,6 @@
 import type { Logger } from "@aikirun/types/client";
 import type { WorkflowRunHandle } from "./run-handle";
-import type { SleepParams, SleepResult, SleepStateNone } from "@aikirun/types/sleep";
+import type { SleepParams, SleepPath, SleepResult, SleepStateNone } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { delay, toMilliseconds } from "@aikirun/lib";
 import { type WorkflowRunId, WorkflowSuspendedError } from "@aikirun/types/workflow-run";
@@ -9,9 +9,10 @@ interface SleeperOptions {
 	spinThresholdMs: number;
 }
 
-const MAX_SLEEP_MS = 100 * 365 * 24 * 60 * 60 * 1000; // 100 years
+const MAX_SLEEP_YEARS = 10;
+const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1000;
 
-export function workflowRunSleeper(
+export function createWorkflowRunSleeper(
 	workflowRunHandle: WorkflowRunHandle<unknown, unknown>,
 	logger: Logger,
 	options: SleeperOptions
@@ -21,12 +22,12 @@ export function workflowRunSleeper(
 		const durationMs = toMilliseconds(durationFields);
 
 		if (durationMs > MAX_SLEEP_MS) {
-			throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of 100 years`);
+			throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years`);
 		}
 
-		const sleepPath = `${sleepId}/${durationMs}`;
+		const sleepPath = `${sleepId}/${durationMs}` as SleepPath;
 
-		const sleepState = workflowRunHandle[INTERNAL].getSleepState(sleepPath);
+		const sleepState = await workflowRunHandle[INTERNAL].getSleepState(sleepPath);
 		if (sleepState.status === "completed") {
 			logger.debug("Sleep completed, skipping", {
 				"aiki.sleepId": sleepId,
@@ -59,7 +60,7 @@ export function workflowRunSleeper(
 			return { cancelled: false };
 		}
 
-		await workflowRunHandle.transitionState({ status: "sleeping", sleepPath, durationMs });
+		await workflowRunHandle[INTERNAL].transitionState({ status: "sleeping", sleepPath, durationMs });
 
 		logger.info("Workflow sleeping", {
 			"aiki.sleepId": sleepId,

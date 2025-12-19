@@ -37,22 +37,27 @@ interface WorkflowRunStateBase {
 export interface WorkflowRunStateOthers extends WorkflowRunStateBase {
 	status: Exclude<
 		WorkflowRunStatus,
-		"scheduled" | "queued" | "running" | "sleeping" | "awaiting_retry" | "cancelled" | "completed" | "failed"
+		"scheduled" | "queued" | "running" | "paused" | "sleeping" | "awaiting_retry" | "cancelled" | "completed" | "failed"
 	>;
 }
 
 export interface WorkflowRunStateScheduled extends WorkflowRunStateBase {
 	status: "scheduled";
 	scheduledAt: number;
+	reason: "new" | "retry" | "awake" | "resume" | "event";
 }
 
 export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
 	status: "queued";
-	reason: "new" | "event" | "retry" | "awake";
 }
 
 export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
 	status: "running";
+}
+
+export interface WorkflowRunStatePaused extends WorkflowRunStateBase {
+	status: "paused";
+	pausedAt: number;
 }
 
 export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
@@ -72,7 +77,7 @@ export interface WorkflowRunStateAwaitingBase extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateAwaitingRetryCausedByTask extends WorkflowRunStateAwaitingBase {
 	cause: "task";
-	taskId: string;
+	taskPath: string;
 }
 
 export interface WorkflowRunStateAwaitingRetryCausedByChildWorkflow extends WorkflowRunStateAwaitingBase {
@@ -108,7 +113,7 @@ interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase {
 	cause: "task";
-	taskId: string;
+	taskPath: string;
 }
 
 export interface WorkflowRunStateFailedByChildWorkflow extends WorkflowRunStateFailedBase {
@@ -129,6 +134,7 @@ export type WorkflowRunStateFailed =
 export type NonTerminalWorkflowRunState =
 	| WorkflowRunStateOthers
 	| WorkflowRunStateScheduled
+	| WorkflowRunStatePaused
 	| WorkflowRunStateSleeping
 	| WorkflowRunStateQueued
 	| WorkflowRunStateRunning
@@ -142,6 +148,7 @@ export type TerminalWorlfowRunState<Output> =
 export type WorkflowRunStateInComplete =
 	| WorkflowRunStateOthers
 	| WorkflowRunStateScheduled
+	| WorkflowRunStatePaused
 	| WorkflowRunStateSleeping
 	| WorkflowRunStateQueued
 	| WorkflowRunStateRunning
@@ -232,6 +239,7 @@ export class WorkflowRunCancelledError extends Error {
 	}
 }
 
+// TODO: check where this error is thrown. Maybe we need to split into other types
 export class WorkflowRunFailedError extends Error {
 	constructor(
 		public readonly id: WorkflowRunId,

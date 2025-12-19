@@ -98,6 +98,7 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 		status: workflowRunStatusSchema.exclude([
 			"scheduled",
 			"queued",
+			"paused",
 			"sleeping",
 			"awaiting_retry",
 			"cancelled",
@@ -108,10 +109,16 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 	z.object({
 		status: z.literal("scheduled"),
 		scheduledAt: z.number(),
+		reason: z.union([
+			z.literal("new"),
+			z.literal("retry"),
+			z.literal("awake"),
+			z.literal("resume"),
+			z.literal("event"),
+		]),
 	}),
 	z.object({
 		status: z.literal("queued"),
-		reason: z.union([z.literal("new"), z.literal("event"), z.literal("retry"), z.literal("awake")]),
 	}),
 	z.object({
 		status: z.literal("sleeping"),
@@ -119,11 +126,15 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 		durationMs: z.number(),
 	}),
 	z.object({
+		status: z.literal("paused"),
+		pausedAt: z.number(),
+	}),
+	z.object({
 		status: z.literal("awaiting_retry"),
 		cause: z.literal("task"),
 		reason: z.string(),
 		nextAttemptAt: z.number(),
-		taskId: z.string(),
+		taskPath: z.string(),
 	}),
 	z.object({
 		status: z.literal("awaiting_retry"),
@@ -151,7 +162,7 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 		status: z.literal("failed"),
 		cause: z.literal("task"),
 		reason: z.string(),
-		taskId: z.string(),
+		taskPath: z.string(),
 	}),
 	z.object({
 		status: z.literal("failed"),

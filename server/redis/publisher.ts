@@ -1,54 +1,36 @@
 import type { Redis } from "ioredis";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import type { Logger } from "../logger/index";
-
-export interface WorkflowMessageToPublish {
-	workflowRunId: string;
-	workflowId: string;
-	shardKey?: string;
-}
+import type { WorkflowRun } from "@aikirun/types/workflow-run";
+import type { ServerContext } from "server/middleware/context";
 
 export async function publishWorkflowReadyBatch(
+	context: ServerContext,
 	redis: Redis,
-	messages: WorkflowMessageToPublish[],
-	logger: Logger
+	runs: WorkflowRun<unknown, unknown>[]
 ): Promise<void> {
-	if (!isNonEmptyArray(messages)) {
+	if (!isNonEmptyArray(runs)) {
 		return;
 	}
 
 	try {
-		const messagesByStream = new Map<string, WorkflowMessageToPublish[]>();
-		for (const message of messages) {
-			const streamName =
-				message.shardKey !== undefined
-					? `workflow:${message.workflowId}:${message.shardKey}`
-					: `workflow:${message.workflowId}`;
-
-			const streamMessages = messagesByStream.get(streamName);
-			if (streamMessages === undefined) {
-				messagesByStream.set(streamName, [message]);
-			} else {
-				streamMessages.push(message);
-			}
-		}
-
 		const pipeline = redis.pipeline();
 
-		for (const [streamName, streamMessages] of messagesByStream.entries()) {
-			for (const message of streamMessages) {
-				pipeline.xadd(streamName, "*", "type", "workflow_run_ready", "workflowRunId", message.workflowRunId);
-			}
+		for (const run of runs) {
+			const streamName = run.options.shardKey
+				? `workflow/${run.workflowId}/${run.workflowVersionId}/${run.options.shardKey}`
+				: `workflow/${run.workflowId}/${run.workflowVersionId}`;
+
+			pipeline.xadd(streamName, "*", "type", "workflow_run_ready", "workflowRunId", run.id);
 		}
 
 		await pipeline.exec();
 	} catch (error) {
-		logger.error(
+		context.logger.error(
 			{
-				messageCount: messages.length,
+				messageCount: runs.length,
 				error,
 			},
-			"Failed to batch publish workflow ready messages"
+			"Failed to publishw orkflow_run_ready messages"
 		);
 	}
 }

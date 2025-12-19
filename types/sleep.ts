@@ -2,6 +2,8 @@ import type { DurationObject } from "./duration";
 
 export type SleepId = string & { _brand: "sleep_id" };
 
+export type SleepPath = string & { _brand: "sleep_path" };
+
 export type SleepStatus = "none" | "sleeping" | "completed" | "cancelled";
 
 interface SleepStateBase {

@@ -5,12 +5,10 @@ export { WorkflowVersionImpl } from "./workflow-version";
 export type { WorkflowVersion, WorkflowVersionParams } from "./workflow-version";
 export type { WorkflowRunContext } from "./run/context";
 
-export { initWorkflowRegistry } from "./registry";
+export { workflowRegistry } from "./registry";
 export type { WorkflowRegistry } from "./registry";
 
-export { initWorkflowRunHandle } from "./run/run-handle";
-export type { WorkflowRunHandle } from "./run/run-handle";
+export { workflowRunHandle } from "./run/run-handle";
+export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/run-handle";
 
-export type { WorkflowRunStateHandle } from "./run/state-handle";
-
-export { workflowRunSleeper } from "./run/sleeper";
+export { createWorkflowRunSleeper } from "./run/sleeper";

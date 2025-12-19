@@ -1,7 +1,7 @@
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowVersion } from "./workflow-version";
 
-export function initWorkflowRegistry(): WorkflowRegistry {
+export function workflowRegistry(): WorkflowRegistry {
 	return new WorkflowRegistryImpl();
 }
 

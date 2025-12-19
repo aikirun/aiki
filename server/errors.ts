@@ -1,3 +1,6 @@
+import type { TaskPath, TaskStatus } from "@aikirun/types/task";
+import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
+
 export class NotFoundError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -19,24 +22,36 @@ export class UnauthorizedError extends Error {
 	}
 }
 
-export class ConflictError extends Error {
+export class RevisionConflictError extends Error {
 	constructor(
-		message: string,
-		public readonly currentRevision: number,
-		public readonly expectedRevision: number
+		public readonly workflowRunId: string,
+		public readonly expectedRevision: number,
+		public readonly actualRevision: number
 	) {
-		super(message);
-		this.name = "ConflictError";
+		super(`Revision conflict for workflow ${workflowRunId}: expected ${expectedRevision}, actual is ${actualRevision}`);
+		this.name = "RevisionConflictError";
 	}
 }
 
-export class InvalidStateTransitionError extends Error {
+export class InvalidWorkflowRunStateTransitionError extends Error {
 	constructor(
 		public readonly workflowRunId: string,
-		public readonly fromStatus: string,
-		public readonly toStatus: string
+		public readonly fromStatus: WorkflowRunStatus,
+		public readonly toStatus: WorkflowRunStatus
 	) {
 		super(`Cannot transition workflow ${workflowRunId} from ${fromStatus} to ${toStatus}`);
 		this.name = "InvalidStateTransitionError";
+	}
+}
+
+export class InvalidTaskStateTransitionError extends Error {
+	constructor(
+		public readonly workflowRunId: string,
+		public readonly taskPath: TaskPath,
+		public readonly fromStatus: TaskStatus,
+		public readonly toStatus: TaskStatus
+	) {
+		super(`Cannot transition workflow ${workflowRunId} task ${taskPath} from ${fromStatus} to ${toStatus}`);
+		this.name = "InvalidTaskStateTransitionError";
 	}
 }

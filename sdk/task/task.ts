@@ -8,7 +8,7 @@ import { createSerializableError, type SerializableInput } from "@aikirun/lib/er
 import { TaskFailedError, type TaskId } from "@aikirun/types/task";
 import type { WorkflowRunContext } from "@aikirun/workflow";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import type { TaskStateFailed } from "@aikirun/types/task";
+import type { TaskPath, TaskStateFailed } from "@aikirun/types/task";
 import type { Logger } from "@aikirun/types/client";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 
@@ -122,7 +122,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const path = await this.getPath(runCtx, input);
 
-		const taskState = handle[INTERNAL].getTaskState(path);
+		const taskState = await handle[INTERNAL].getTaskState(path);
 		if (taskState.status === "completed") {
 			return taskState.output as Output;
 		}
@@ -137,7 +137,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
 
 		if ("attempts" in taskState) {
-			this.assertRetryAllowed(taskState.attempts, retryStrategy, logger);
+			this.assertRetryAllowed(path, taskState.attempts, retryStrategy, logger);
 			logger.warn("Retrying task", {
 				"aiki.attempts": taskState.attempts,
 				"aiki.taskStatus": taskState.status,
@@ -169,7 +169,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private async tryExecuteTask<WorkflowInput, WorkflowOutput>(
 		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		input: Input,
-		path: string,
+		path: TaskPath,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
 		logger: Logger
@@ -204,7 +204,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						"aiki.attempts": attempts,
 						"aiki.reason": taskFailedState.reason,
 					});
-					throw new TaskFailedError(this.id, attempts, taskFailedState.reason);
+					throw new TaskFailedError(path, attempts, taskFailedState.reason);
 				}
 
 				const nextAttemptAt = Date.now() + retryParams.delayMs;
@@ -222,13 +222,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private assertRetryAllowed(attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
+	private assertRetryAllowed(path: TaskPath, attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
 			logger.error("Task retry not allowed", {
 				"aiki.attempts": attempts,
 			});
-			throw new TaskFailedError(this.id, attempts, "Task retry not allowed");
+			throw new TaskFailedError(path, attempts, "Task retry not allowed");
 		}
 	}
 
@@ -245,14 +245,16 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private async getPath<WorkflowInput, WorkflowOutput>(
 		runCtx: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
 		input: Input
-	): Promise<string> {
+	): Promise<TaskPath> {
 		// TODO: we don't need workflowid in task path
 		const workflowRunPath = `${runCtx.workflowId}/${runCtx.workflowVersionId}/${runCtx.id}`;
 
 		const inputHash = await sha256(stableStringify(input));
 
-		return this.params.opts?.idempotencyKey
+		const taskPath = this.params.opts?.idempotencyKey
 			? `${workflowRunPath}/${this.id}/${inputHash}/${this.params.opts.idempotencyKey}`
 			: `${workflowRunPath}/${this.id}/${inputHash}`;
+
+		return taskPath as TaskPath;
 	}
 }

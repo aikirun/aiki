@@ -2,6 +2,8 @@ import type { SerializableError } from "./error";
 
 export type TaskId = string & { _brand: "task_id" };
 
+export type TaskPath = string & { _brand: "task_path" };
+
 export type TaskStatus = "none" | "running" | "completed" | "failed";
 
 interface TaskStateBase {
@@ -37,11 +39,11 @@ export type TaskState<Output> = TaskStateNone | TaskStateRunning | TaskStateComp
 
 export class TaskFailedError extends Error {
 	constructor(
-		public readonly taskId: TaskId,
+		public readonly taskPath: TaskPath,
 		public readonly attempts: number,
 		public readonly reason: string
 	) {
-		super(`Task ${taskId} failed after ${attempts} attempts. Reason: ${reason}`);
+		super(`Task ${taskPath} failed after ${attempts} attempts. Reason: ${reason}`);
 		this.name = "TaskFailedError";
 	}
 }

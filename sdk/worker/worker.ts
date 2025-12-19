@@ -13,9 +13,9 @@ import { delay, fireAndForget } from "@aikirun/lib/async";
 import type { Client, Logger, SubscriberStrategy } from "@aikirun/client";
 import type { ResolvedSubscriberStrategy, SubscriberMessageMeta, WorkflowRunBatch } from "@aikirun/client";
 import {
-	initWorkflowRegistry,
-	initWorkflowRunHandle,
-	workflowRunSleeper,
+	workflowRegistry,
+	workflowRunHandle,
+	createWorkflowRunSleeper,
 	type WorkflowRegistry,
 } from "@aikirun/workflow";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -152,7 +152,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		private readonly params: WorkerParams
 	) {
 		this.id = params.id;
-		this.registry = initWorkflowRegistry().addMany(this.params.workflows);
+		this.registry = workflowRegistry().addMany(this.params.workflows);
 
 		this.logger = client.logger.child({
 			"aiki.component": "worker",
@@ -350,7 +350,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		let shouldAcknowledge = false;
 
 		try {
-			const workflowRunHandle = initWorkflowRunHandle(this.client.api, workflowRun, logger);
+			const handle = await workflowRunHandle(this.client, workflowRun, logger);
 
 			const appContext = this.client[INTERNAL].contextFactory
 				? await this.client[INTERNAL].contextFactory(workflowRun)
@@ -376,9 +376,9 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					workflowId: workflowRun.workflowId as WorkflowId,
 					workflowVersionId: workflowRun.workflowVersionId as WorkflowVersionId,
 					options: workflowRun.options,
-					handle: workflowRunHandle,
+					handle,
 					logger,
-					sleep: workflowRunSleeper(workflowRunHandle, logger, {
+					sleep: createWorkflowRunSleeper(handle, logger, {
 						spinThresholdMs: this.params.opts?.workflowRun?.spinThresholdMs ?? 10,
 					}),
 				},

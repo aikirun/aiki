@@ -9,7 +9,7 @@ const handle = await eveningRoutineWorkflowV1.start(aikiClient);
 
 const result = await handle.wait({ type: "status", status: "completed" }, { maxDurationMs: 30_000 });
 if (result.success) {
-	logger.info("Workflow completed", { id: handle.id });
+	logger.info("Workflow completed", { id: handle.run.id });
 } else {
 	logger.info("Could not get desired state", { cause: result.cause });
 }

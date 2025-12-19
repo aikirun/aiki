@@ -5,8 +5,8 @@ import {
 	NotFoundError,
 	ValidationError,
 	UnauthorizedError,
-	ConflictError,
-	InvalidStateTransitionError,
+	RevisionConflictError,
+	InvalidWorkflowRunStateTransitionError,
 } from "../errors";
 
 const base = implement(contract).$context<ServerContext>();
@@ -36,11 +36,11 @@ const withErrorHandler = base.middleware(async ({ context, next }) => {
 			throw new ORPCError("UNAUTHORIZED", { message: error.message });
 		}
 
-		if (error instanceof ConflictError) {
+		if (error instanceof RevisionConflictError) {
 			throw new ORPCError("CONFLICT", { message: error.message });
 		}
 
-		if (error instanceof InvalidStateTransitionError) {
+		if (error instanceof InvalidWorkflowRunStateTransitionError) {
 			throw new ORPCError("BAD_REQUEST", { message: error.message });
 		}
 

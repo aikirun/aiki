@@ -1,7 +1,6 @@
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowOptions,
-	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	type WorkflowRunStateAwaitingRetry,
@@ -10,13 +9,13 @@ import {
 } from "@aikirun/types/workflow-run";
 import type { Client, Logger } from "@aikirun/types/client";
 import type { WorkflowRunContext } from "./run/context";
-import { initWorkflowRunStateHandle, type WorkflowRunStateHandle } from "./run/state-handle";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import { createSerializableError } from "@aikirun/lib/error";
 import { TaskFailedError } from "@aikirun/types/task";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
+import { type WorkflowRunHandle, workflowRunHandle } from "./run/run-handle";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	exec: (input: Input, runContext: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<Output>;
@@ -40,7 +39,7 @@ export interface WorkflowVersion<Input, Output, AppContext> {
 	start: (
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
-	) => Promise<WorkflowRunStateHandle<Output>>;
+	) => Promise<WorkflowRunHandle<Input, Output>>;
 
 	[INTERNAL]: {
 		exec: (input: Input, runContext: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<void>;
@@ -80,30 +79,33 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	public async start(
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
-	): Promise<WorkflowRunStateHandle<Output>> {
+	): Promise<WorkflowRunHandle<Input, Output>> {
 		const response = await client.api.workflowRun.createV1({
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : null,
 			options: this.params.opts,
 		});
-		return initWorkflowRunStateHandle(response.run.id as WorkflowRunId, client.api, client.logger);
+		return workflowRunHandle(client, response.run.id as WorkflowRunId);
 	}
 
 	private async exec(input: Input, runCtx: WorkflowRunContext<Input, Output>, context: AppContext): Promise<void> {
 		const { handle, logger } = runCtx;
+		const { run } = handle;
 
 		await handle[INTERNAL].assertExecutionAllowed();
 
 		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
-		this.assertRetryAllowed(runCtx.handle.run, retryStrategy, logger);
+		if (run.attempts > 0) {
+			this.assertRetryAllowed(run.id as WorkflowRunId, run.attempts, retryStrategy, logger);
+		}
 
 		logger.info("Starting workflow");
-		await handle.transitionState({ status: "running" });
+		await handle[INTERNAL].transitionState({ status: "running" });
 
 		const output = await this.tryExecuteWorkflow(input, runCtx, context, retryStrategy);
 
-		await handle.transitionState({ status: "completed", output });
+		await handle[INTERNAL].transitionState({ status: "completed", output });
 		logger.info("Workflow complete");
 	}
 
@@ -126,7 +128,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 
 				if (!retryParams.retriesLeft) {
 					const failedState = this.createFailedState(error);
-					await runCtx.handle.transitionState(failedState);
+					await runCtx.handle[INTERNAL].transitionState(failedState);
 
 					const logMeta: Record<string, unknown> = {};
 					for (const [key, value] of Object.entries(failedState)) {
@@ -141,13 +143,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 
 				const nextAttemptAt = Date.now() + retryParams.delayMs;
 				const awaitingRetryState = this.createAwaitingRetryState(error, nextAttemptAt);
-				await runCtx.handle.transitionState(awaitingRetryState);
+				await runCtx.handle[INTERNAL].transitionState(awaitingRetryState);
 
 				const logMeta: Record<string, unknown> = {};
 				for (const [key, value] of Object.entries(awaitingRetryState)) {
 					logMeta[`aiki.${key}`] = value;
 				}
-				runCtx.logger.info("Workflow failed. Scheduled for retry", {
+				runCtx.logger.info("Workflow failed. Awaiting retry", {
 					"aiki.attempts": attempts,
 					"aiki.nextAttemptAt": nextAttemptAt,
 					"aiki.delayMs": retryParams.delayMs,
@@ -155,21 +157,21 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				});
 
 				// TODO: if delay is small enough, it might be more profitable to spin
+				// Spinning should not reload workflow state or transition to awaiting retry
+				// If the workflow failed
+				// TODO: create new error type for awaiting retry
 				throw new WorkflowRunFailedError(runCtx.id, attempts, awaitingRetryState.reason, awaitingRetryState.cause);
 			}
 		}
 	}
 
-	private assertRetryAllowed(run: WorkflowRun<Input, Output>, retryStrategy: RetryStrategy, logger: Logger): void {
-		const { state } = run;
-		if (state.status === "queued" && state.reason === "retry") {
-			const retryParams = getRetryParams(run.attempts, retryStrategy);
-			if (!retryParams.retriesLeft) {
-				logger.error("Workflow retry not allowed", {
-					"aiki.attempts": run.attempts,
-				});
-				throw new WorkflowRunFailedError(run.id as WorkflowRunId, run.attempts, "Workflow retry not allowed");
-			}
+	private assertRetryAllowed(id: WorkflowRunId, attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
+		const retryParams = getRetryParams(attempts, retryStrategy);
+		if (!retryParams.retriesLeft) {
+			logger.error("Workflow retry not allowed", {
+				"aiki.attempts": attempts,
+			});
+			throw new WorkflowRunFailedError(id, attempts, "Workflow retry not allowed");
 		}
 	}
 
@@ -178,7 +180,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			return {
 				status: "failed",
 				cause: "task",
-				taskId: error.taskId,
+				taskPath: error.taskPath,
 				reason: error.reason,
 			};
 		}
@@ -201,7 +203,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				cause: "task",
 				reason: error.reason,
 				nextAttemptAt: nextAttemptAt,
-				taskId: error.taskId,
+				taskPath: error.taskPath,
 			};
 		}
 
