@@ -392,8 +392,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				error instanceof WorkflowRunNotExecutableError ||
 				error instanceof WorkflowRunCancelledError ||
 				error instanceof WorkflowRunFailedError ||
-				error instanceof TaskFailedError ||
 				error instanceof WorkflowSuspendedError ||
+				error instanceof TaskFailedError ||
 				isServerConflictError(error)
 			) {
 				shouldAcknowledge = true;

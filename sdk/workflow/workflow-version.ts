@@ -159,8 +159,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				// TODO: if delay is small enough, it might be more profitable to spin
 				// Spinning should not reload workflow state or transition to awaiting retry
 				// If the workflow failed
-				// TODO: create new error type for awaiting retry
-				throw new WorkflowRunFailedError(run.id, attempts, awaitingRetryState.reason, awaitingRetryState.cause);
+				throw new WorkflowSuspendedError(run.id);
 			}
 		}
 	}

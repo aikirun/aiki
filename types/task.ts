@@ -14,6 +14,7 @@ export interface TaskStateNone extends TaskStateBase {
 	status: "none";
 }
 
+// TODO: add input to this interface, so we can track what the input was to a task
 export interface TaskStateRunning extends TaskStateBase {
 	status: "running";
 	attempts: number;
@@ -34,8 +35,6 @@ export interface TaskStateFailed extends TaskStateBase {
 }
 
 export type TaskState<Output> = TaskStateNone | TaskStateRunning | TaskStateCompleted<Output> | TaskStateFailed;
-
-// TODO: create Task interface. It should contain the input that was fed into the task
 
 export class TaskFailedError extends Error {
 	constructor(

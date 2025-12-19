@@ -6,7 +6,7 @@ const validWorkflowRunStatusTransition: Record<WorkflowRunStatus, WorkflowRunSta
 	scheduled: ["scheduled", "queued", "paused", "cancelled"],
 	queued: ["running", "paused", "cancelled"],
 	running: [
-		"running", // TODO: is this safe?
+		"running",
 		"paused",
 		"sleeping",
 		"awaiting_event",

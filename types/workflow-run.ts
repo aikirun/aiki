@@ -178,7 +178,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	state: WorkflowRunState<Output>;
 	// TODO:
 	// for workflows with a large number of tasks and/or deeply nested child workflows,
-	// prefetch all results might be problematic.
+	// prefetching all results might be problematic.
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
 	tasksState: Record<string, TaskState<unknown>>;
@@ -239,7 +239,6 @@ export class WorkflowRunCancelledError extends Error {
 	}
 }
 
-// TODO: check where this error is thrown. Maybe we need to split into other types
 export class WorkflowRunFailedError extends Error {
 	constructor(
 		public readonly id: WorkflowRunId,
