@@ -10,25 +10,25 @@ import {
 import { taskStateSchema } from "../task/schema";
 import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure";
 import type {
-	CreateRequestV1,
-	CreateResponseV1,
-	GetByIdRequestV1,
-	GetByIdResponseV1,
-	GetStateRequestV1,
-	GetStateResponseV1,
-	ListRequestV1,
-	ListResponseV1,
-	ListTransitionsRequestV1,
-	ListTransitionsResponseV1,
-	TransitionStateRequestV1,
-	TransitionStateResponseV1,
-	TransitionTaskStateRequestV1,
-	TransitionTaskStateResponseV1,
+	WorkflowRunCreateRequestV1,
+	WorkflowRunCreateResponseV1,
+	WorkflowRunGetByIdRequestV1,
+	WorkflowRunGetByIdResponseV1,
+	WorkflowRunGetStateRequestV1,
+	WorkflowRunGetStateResponseV1,
+	WorkflowRunListRequestV1,
+	WorkflowRunListResponseV1,
+	WorkflowRunListTransitionsRequestV1,
+	WorkflowRunListTransitionsResponseV1,
+	WorkflowRunTransitionStateRequestV1,
+	WorkflowRunTransitionStateResponseV1,
+	WorkflowRunTransitionTaskStateRequestV1,
+	WorkflowRunTransitionTaskStateResponseV1,
 	WorkflowRunApi,
 } from "@aikirun/types/workflow-run-api";
 import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
 
-const listV1: ContractProcedure<ListRequestV1, ListResponseV1> = oc
+const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
 	.input(
 		z.object({
 			limit: z.number().optional(),
@@ -69,7 +69,7 @@ const listV1: ContractProcedure<ListRequestV1, ListResponseV1> = oc
 		})
 	);
 
-const getByIdV1: ContractProcedure<GetByIdRequestV1, GetByIdResponseV1> = oc
+const getByIdV1: ContractProcedure<WorkflowRunGetByIdRequestV1, WorkflowRunGetByIdResponseV1> = oc
 	.input(
 		z.object({
 			id: z.string().min(1),
@@ -81,7 +81,7 @@ const getByIdV1: ContractProcedure<GetByIdRequestV1, GetByIdResponseV1> = oc
 		})
 	);
 
-const getStateV1: ContractProcedure<GetStateRequestV1, GetStateResponseV1> = oc
+const getStateV1: ContractProcedure<WorkflowRunGetStateRequestV1, WorkflowRunGetStateResponseV1> = oc
 	.input(
 		z.object({
 			id: z.string().min(1),
@@ -93,7 +93,7 @@ const getStateV1: ContractProcedure<GetStateRequestV1, GetStateResponseV1> = oc
 		})
 	);
 
-const createV1: ContractProcedure<CreateRequestV1, CreateResponseV1> = oc
+const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateResponseV1> = oc
 	.input(
 		z.object({
 			workflowId: z.string().min(1),
@@ -108,21 +108,25 @@ const createV1: ContractProcedure<CreateRequestV1, CreateResponseV1> = oc
 		})
 	);
 
-const transitionStateV1: ContractProcedure<TransitionStateRequestV1, TransitionStateResponseV1> = oc
-	.input(
-		z.object({
-			id: z.string().min(1),
-			state: workflowRunStateSchema,
-			expectedRevision: z.number(),
-		})
-	)
-	.output(
-		z.object({
-			newRevision: z.number(),
-		})
-	);
+const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, WorkflowRunTransitionStateResponseV1> =
+	oc
+		.input(
+			z.object({
+				id: z.string().min(1),
+				state: workflowRunStateSchema,
+				expectedRevision: z.number(),
+			})
+		)
+		.output(
+			z.object({
+				newRevision: z.number(),
+			})
+		);
 
-const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, TransitionTaskStateResponseV1> = oc
+const transitionTaskStateV1: ContractProcedure<
+	WorkflowRunTransitionTaskStateRequestV1,
+	WorkflowRunTransitionTaskStateResponseV1
+> = oc
 	.input(
 		z.object({
 			id: z.string(),
@@ -137,26 +141,27 @@ const transitionTaskStateV1: ContractProcedure<TransitionTaskStateRequestV1, Tra
 		})
 	);
 
-const listTransitionsV1: ContractProcedure<ListTransitionsRequestV1, ListTransitionsResponseV1> = oc
-	.input(
-		z.object({
-			id: z.string().min(1),
-			limit: z.number().optional(),
-			offset: z.number().optional(),
-			sort: z
-				.object({
-					field: z.literal("createdAt"),
-					order: z.enum(["asc", "desc"]),
-				})
-				.optional(),
-		})
-	)
-	.output(
-		z.object({
-			transitions: z.array(workflowRunTransitionSchema),
-			total: z.number(),
-		})
-	);
+const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, WorkflowRunListTransitionsResponseV1> =
+	oc
+		.input(
+			z.object({
+				id: z.string().min(1),
+				limit: z.number().optional(),
+				offset: z.number().optional(),
+				sort: z
+					.object({
+						field: z.literal("createdAt"),
+						order: z.enum(["asc", "desc"]),
+					})
+					.optional(),
+			})
+		)
+		.output(
+			z.object({
+				transitions: z.array(workflowRunTransitionSchema),
+				total: z.number(),
+			})
+		);
 
 export const workflowRunContract = {
 	listV1,

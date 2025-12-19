@@ -8,17 +8,19 @@ import type {
 import type { TaskState } from "./task";
 
 export interface WorkflowRunApi {
-	listV1: (input: ListRequestV1) => Promise<ListResponseV1>;
-	getByIdV1: (input: GetByIdRequestV1) => Promise<GetByIdResponseV1>;
-	getStateV1: (input: GetStateRequestV1) => Promise<GetStateResponseV1>;
-	createV1: (input: CreateRequestV1) => Promise<CreateResponseV1>;
+	listV1: (input: WorkflowRunListRequestV1) => Promise<WorkflowRunListResponseV1>;
+	getByIdV1: (input: WorkflowRunGetByIdRequestV1) => Promise<WorkflowRunGetByIdResponseV1>;
+	getStateV1: (input: WorkflowRunGetStateRequestV1) => Promise<WorkflowRunGetStateResponseV1>;
+	createV1: (input: WorkflowRunCreateRequestV1) => Promise<WorkflowRunCreateResponseV1>;
 	// TODO: instead of throwing conflict error, return good error type
-	transitionStateV1: (input: TransitionStateRequestV1) => Promise<TransitionStateResponseV1>;
-	transitionTaskStateV1: (input: TransitionTaskStateRequestV1) => Promise<TransitionTaskStateResponseV1>;
-	listTransitionsV1: (input: ListTransitionsRequestV1) => Promise<ListTransitionsResponseV1>;
+	transitionStateV1: (input: WorkflowRunTransitionStateRequestV1) => Promise<WorkflowRunTransitionStateResponseV1>;
+	transitionTaskStateV1: (
+		input: WorkflowRunTransitionTaskStateRequestV1
+	) => Promise<WorkflowRunTransitionTaskStateResponseV1>;
+	listTransitionsV1: (input: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
 }
 
-export interface ListRequestV1 {
+export interface WorkflowRunListRequestV1 {
 	limit?: number;
 	offset?: number;
 	filters?: {
@@ -42,60 +44,60 @@ export interface WorkflowRunListItem {
 	status: WorkflowRunStatus;
 }
 
-export interface ListResponseV1 {
+export interface WorkflowRunListResponseV1 {
 	runs: WorkflowRunListItem[];
 	total: number;
 }
 
-export interface GetByIdRequestV1 {
+export interface WorkflowRunGetByIdRequestV1 {
 	id: string;
 }
 
-export interface GetByIdResponseV1 {
+export interface WorkflowRunGetByIdResponseV1 {
 	run: WorkflowRun;
 }
 
-export interface GetStateRequestV1 {
+export interface WorkflowRunGetStateRequestV1 {
 	id: string;
 }
 
-export interface GetStateResponseV1 {
+export interface WorkflowRunGetStateResponseV1 {
 	state: WorkflowRunState<unknown>;
 }
 
-export interface CreateRequestV1 {
+export interface WorkflowRunCreateRequestV1 {
 	workflowId: string;
 	workflowVersionId: string;
 	input: unknown;
 	options?: WorkflowOptions;
 }
 
-export interface CreateResponseV1 {
+export interface WorkflowRunCreateResponseV1 {
 	run: WorkflowRun;
 }
 
-export interface TransitionStateRequestV1 {
+export interface WorkflowRunTransitionStateRequestV1 {
 	id: string;
 	state: WorkflowRunState<unknown>;
 	expectedRevision: number;
 }
 
-export interface TransitionStateResponseV1 {
+export interface WorkflowRunTransitionStateResponseV1 {
 	newRevision: number;
 }
 
-export interface TransitionTaskStateRequestV1 {
+export interface WorkflowRunTransitionTaskStateRequestV1 {
 	id: string;
 	taskPath: string;
 	taskState: TaskState<unknown>;
 	expectedRevision: number;
 }
 
-export interface TransitionTaskStateResponseV1 {
+export interface WorkflowRunTransitionTaskStateResponseV1 {
 	newRevision: number;
 }
 
-export interface ListTransitionsRequestV1 {
+export interface WorkflowRunListTransitionsRequestV1 {
 	id: string;
 	limit?: number;
 	offset?: number;
@@ -105,7 +107,7 @@ export interface ListTransitionsRequestV1 {
 	};
 }
 
-export interface ListTransitionsResponseV1 {
+export interface WorkflowRunListTransitionsResponseV1 {
 	transitions: WorkflowRunTransition[];
 	total: number;
 }
