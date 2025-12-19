@@ -113,7 +113,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
 
-		await handle[INTERNAL].assertExecutionAllowed();
+		handle[INTERNAL].assertExecutionAllowed();
 
 		const input = isNonEmptyArray(args)
 			? args[0]
@@ -122,7 +122,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const path = await this.getPath(input);
 
-		const taskState = await handle[INTERNAL].getTaskState(path);
+		const taskState = handle.run.tasksState[path] ?? { status: "none" };
 		if (taskState.status === "completed") {
 			return taskState.output as Output;
 		}

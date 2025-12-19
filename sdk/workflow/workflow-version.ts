@@ -1,6 +1,7 @@
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowOptions,
+	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	type WorkflowRunStateAwaitingRetry,
@@ -80,20 +81,20 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output>> {
-		const response = await client.api.workflowRun.createV1({
+		const { run } = await client.api.workflowRun.createV1({
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : null,
 			options: this.params.opts,
 		});
-		return workflowRunHandle(client, response.run.id as WorkflowRunId);
+		return workflowRunHandle(client, run as WorkflowRun<Input, Output>);
 	}
 
 	private async handler(input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext): Promise<void> {
 		const { logger } = run;
 		const { handle } = run[INTERNAL];
 
-		await handle[INTERNAL].assertExecutionAllowed();
+		handle[INTERNAL].assertExecutionAllowed();
 
 		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
 		const state = handle.run.state;

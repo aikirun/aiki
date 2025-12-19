@@ -27,16 +27,16 @@ export function createWorkflowRunSleeper(
 
 		const sleepPath = `${sleepId}/${durationMs}` as SleepPath;
 
-		const sleepState = await workflowRunHandle[INTERNAL].getSleepState(sleepPath);
+		const sleepState = workflowRunHandle.run.sleepsState[sleepPath] ?? { status: "none" };
 		if (sleepState.status === "completed") {
-			logger.debug("Sleep completed, skipping", {
+			logger.debug("Sleep completed", {
 				"aiki.sleepId": sleepId,
 				"aiki.durationMs": durationMs,
 			});
 			return { cancelled: false };
 		}
 		if (sleepState.status === "cancelled") {
-			logger.debug("Sleep cancelled, skipping", {
+			logger.debug("Sleep cancelled", {
 				"aiki.sleepId": sleepId,
 				"aiki.durationMs": durationMs,
 			});
@@ -62,7 +62,7 @@ export function createWorkflowRunSleeper(
 
 		await workflowRunHandle[INTERNAL].transitionState({ status: "sleeping", sleepPath, durationMs });
 
-		logger.info("Workflow sleeping", {
+		logger.info("Workflow going to sleep", {
 			"aiki.sleepId": sleepId,
 			"aiki.durationMs": durationMs,
 		});
