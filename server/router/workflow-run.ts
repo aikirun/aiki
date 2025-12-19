@@ -243,7 +243,11 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		};
 	}
 
-	if (input.state.status === "running" && run.state.status === "queued" && run.state.reason === "retry") {
+	if (
+		input.state.status === "running" &&
+		run.state.status === "queued" &&
+		(run.state.reason === "retry" || run.state.reason === "new")
+	) {
 		run.attempts++;
 	}
 
