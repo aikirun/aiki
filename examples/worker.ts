@@ -1,20 +1,6 @@
 import process from "node:process";
-import { worker } from "@aikirun/worker";
-import { eveningRoutineWorkflowV1, morningWorkflowV1, morningWorkflowV2 } from "./workflows";
 import { client } from "../sdk/client/client";
-
-const workerA = worker({
-	id: "worker-A",
-	workflows: [morningWorkflowV1, morningWorkflowV2, eveningRoutineWorkflowV1],
-	opts: {
-		maxConcurrentWorkflowRuns: 10,
-	},
-});
-
-const workerB = worker({
-	id: "worker-B",
-	workflows: [eveningRoutineWorkflowV1],
-});
+import { workerA, workerB } from "./definitions/worker";
 
 export const aikiClient = await client({
 	url: "http://localhost:9090",

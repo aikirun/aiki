@@ -1,46 +1,26 @@
-import { workflow } from "@aikirun/workflow";
-import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "./tasks";
+import { client } from "@aikirun/client";
+import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./definitions/workflow";
 
-export const morningWorkflow = workflow({ id: "morning-routine" });
-
-export const morningWorkflowV1 = morningWorkflow.v("1.0", {
-	async handler(input: { a: boolean }, run) {
-		await drinkCoffee.start(run, { withSugar: input.a });
+export const aikiClient = await client({
+	url: "http://localhost:9090",
+	redis: {
+		host: "localhost",
+		port: 6379,
 	},
+	contextFactory: (run) => ({
+		traceId: "123456789",
+		workflowRunId: run.id,
+	}),
 });
+const { logger } = aikiClient;
 
-interface AppContext {
-	traceId: string;
-	workflowRunId: string;
+await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
+
+const handle = await eveningRoutineWorkflowV1.start(aikiClient);
+
+const result = await handle.wait({ type: "status", status: "completed" }, { maxDurationMs: 30_000 });
+if (result.success) {
+	logger.info("Workflow completed", { id: handle.run.id });
+} else {
+	logger.info("Could not get desired state", { cause: result.cause });
 }
-
-export const morningWorkflowV2 = morningWorkflow.v("2.0", {
-	async handler(input: { a: string; b: number }, run, context: AppContext): Promise<string> {
-		run.logger.info("Starting morning routine", { song: input.a, duration: input.b, traceId: context.traceId });
-
-		const alarmOutput = await ringAlarm.start(run, { song: input.a });
-
-		const stretchOutput = await stretch.start(run, { duration: input.b });
-
-		const response = `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}`;
-
-		run.logger.info("Morning routine completed", { response });
-
-		return response;
-	},
-	opts: {
-		trigger: {
-			type: "delayed",
-			delay: { seconds: 5 },
-		},
-	},
-});
-
-export const eveningRoutineWorkflow = workflow({ id: "evening-routine" });
-
-export const eveningRoutineWorkflowV1 = eveningRoutineWorkflow.v("1.0.0", {
-	async handler(_, run, _context: AppContext) {
-		await sayPrayer.start(run);
-		await run.sleep({ id: "post-prayer-rest", seconds: 5 });
-	},
-});
