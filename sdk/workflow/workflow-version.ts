@@ -96,7 +96,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		await handle[INTERNAL].assertExecutionAllowed();
 
 		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
-		if (handle.run.attempts > 0) {
+		const state = handle.run.state;
+		if (state.status === "queued" && state.reason === "retry") {
 			this.assertRetryAllowed(handle.run.id as WorkflowRunId, handle.run.attempts, retryStrategy, logger);
 		}
 

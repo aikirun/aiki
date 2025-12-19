@@ -49,6 +49,7 @@ export interface WorkflowRunStateScheduled extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
 	status: "queued";
+	reason: "new" | "retry" | "awake" | "resume" | "event";
 }
 
 export interface WorkflowRunStateRunning extends WorkflowRunStateBase {

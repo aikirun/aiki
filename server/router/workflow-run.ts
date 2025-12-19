@@ -243,12 +243,12 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		};
 	}
 
-	run.state = input.state;
-	run.revision++;
-
-	if (input.state.status === "running") {
+	if (input.state.status === "running" && run.state.status === "queued" && run.state.reason === "retry") {
 		run.attempts++;
 	}
+
+	run.state = input.state;
+	run.revision++;
 
 	if (input.state.status === "cancelled") {
 		for (const childRunId of Object.keys(run.childWorkflowsRunState)) {
@@ -351,11 +351,13 @@ export async function queueScheduledWorkflowRuns(context: ServerContext, redis: 
 	const runs = getWorkflowRunsWithElapsedSchedule();
 
 	for (const run of runs) {
-		await transitionStateV1.callable({ context })({
-			id: run.id,
-			state: { status: "queued" },
-			expectedRevision: run.revision,
-		});
+		if (run.state.status === "scheduled") {
+			await transitionStateV1.callable({ context })({
+				id: run.id,
+				state: { status: "queued", reason: run.state.reason },
+				expectedRevision: run.revision,
+			});
+		}
 	}
 
 	if (runs.length) {

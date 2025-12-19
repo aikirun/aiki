@@ -119,6 +119,13 @@ export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
 	}),
 	z.object({
 		status: z.literal("queued"),
+		reason: z.union([
+			z.literal("new"),
+			z.literal("retry"),
+			z.literal("awake"),
+			z.literal("resume"),
+			z.literal("event"),
+		]),
 	}),
 	z.object({
 		status: z.literal("sleeping"),
