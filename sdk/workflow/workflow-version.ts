@@ -5,7 +5,7 @@ import {
 	type WorkflowRunId,
 	type WorkflowRunStateAwaitingRetry,
 	type WorkflowRunStateFailed,
-	WorkflowSuspendedError,
+	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { Client, Logger } from "@aikirun/types/client";
 import type { WorkflowRunContext } from "./run/context";
@@ -119,7 +119,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			try {
 				return await this.params.handler(input, run, context);
 			} catch (error) {
-				if (error instanceof WorkflowSuspendedError) {
+				if (error instanceof WorkflowRunSuspendedError) {
 					throw error;
 				}
 
@@ -159,7 +159,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				// TODO: if delay is small enough, it might be more profitable to spin
 				// Spinning should not reload workflow state or transition to awaiting retry
 				// If the workflow failed
-				throw new WorkflowSuspendedError(run.id);
+				throw new WorkflowRunSuspendedError(run.id);
 			}
 		}
 	}

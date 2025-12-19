@@ -251,9 +251,9 @@ export class WorkflowRunFailedError extends Error {
 	}
 }
 
-export class WorkflowSuspendedError extends Error {
+export class WorkflowRunSuspendedError extends Error {
 	constructor(public readonly id: WorkflowRunId) {
 		super(`Workflow ${id} is suspended`);
-		this.name = "WorkflowSuspendedError";
+		this.name = "WorkflowRunSuspendedError";
 	}
 }
