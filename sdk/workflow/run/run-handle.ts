@@ -233,7 +233,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 	private async assertExecutionAllowed() {
 		await this.refresh();
 		const status = this.run.state.status;
-		if (status !== "running") {
+		if (status !== "queued" && status !== "running") {
 			throw new WorkflowRunNotExecutableError(this.run.id as WorkflowRunId, status);
 		}
 	}

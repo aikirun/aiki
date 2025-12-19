@@ -161,8 +161,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	}
 
 	async _start(): Promise<void> {
-		this.logger.info("Worker starting");
-
 		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
 			this.registry.getAll(),
@@ -396,6 +394,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				error instanceof TaskFailedError ||
 				isServerConflictError(error)
 			) {
+				logger.debug("Flow control error occurred", { error });
 				shouldAcknowledge = true;
 			} else {
 				logger.error("Unexpected error during workflow execution", {
