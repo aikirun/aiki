@@ -19,7 +19,7 @@ Here's a simple example:
 // ✅ Deterministic task
 const calculateTax = task({
 	id: "calculate-tax",
-	exec(input: { amount: number; taxRate: number }) {
+	handler(input: { amount: number; taxRate: number }) {
 		const { amount, taxRate } = input;
 		return { tax: amount * taxRate, total: amount * (1 + taxRate) };
 	},
@@ -49,7 +49,7 @@ Let me illustrate this with a cautionary tale:
 // ❌ Non-deterministic task - dangerous with duplicate execution
 const badTask = task({
 	id: "create-user",
-	exec(input: { email: string; userData: any }) {
+	handler(input: { email: string; userData: any }) {
 		// This could create duplicate users if executed twice
 		const userId = generateRandomId(); // Different each time!
 		return createUserInDatabase(userId, input.userData);
@@ -59,7 +59,7 @@ const badTask = task({
 // ✅ Deterministic task - safe with duplicate execution
 const goodTask = task({
 	id: "create-user",
-	exec(input: { email: string; userData: any }) {
+	handler(input: { email: string; userData: any }) {
 		// Same input always produces same result
 		const userId = generateIdFromEmail(input.email); // Deterministic!
 		return createUserInDatabase(userId, input.userData);
@@ -80,7 +80,7 @@ has the same effect as running it once.
 // ✅ Idempotent task - safe to run multiple times
 const sendEmail = task({
 	id: "send-welcome-email",
-	exec(input: { userId: string; email: string }) {
+	handler(input: { userId: string; email: string }) {
 		const { userId, email } = input;
 
 		// Check if email was already sent
@@ -99,7 +99,7 @@ const sendEmail = task({
 // ✅ Idempotent payment processing
 const processPayment = task({
 	id: "process-payment",
-	exec(input: { paymentId: string; amount: number }) {
+	handler(input: { paymentId: string; amount: number }) {
 		const { paymentId, amount } = input;
 
 		// Check if payment was already processed
@@ -123,7 +123,7 @@ debugging and recovery.
 // ❌ Non-deterministic task
 const badTask = task({
 	id: "bad-task",
-	exec(input: {}) {
+	handler(input: {}) {
 		// This will produce different results on each run
 		const randomId = Math.random();
 		const timestamp = Date.now();
@@ -134,7 +134,7 @@ const badTask = task({
 // ✅ Deterministic task
 const goodTask = task({
 	id: "good-task",
-	exec(input: { userId: string }) {
+	handler(input: { userId: string }) {
 		// Same input always produces same output
 		const userId = input.userId;
 		const email = `${userId}@example.com`;
@@ -153,7 +153,7 @@ const orderWorkflow = workflow({
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async exec(input: { orderId: string; amount: number }, run) {
+	async handler(input: { orderId: string; amount: number }, run) {
 		// If this workflow crashes after validateOrder completes,
 		// it will resume here with the same result
 		const validation = await validateOrder.start(run, input);
@@ -175,7 +175,7 @@ Deterministic tasks make workflows easier to debug and test:
 // Easy to test - same input, same output
 const testTask = task({
 	id: "calculate-tax",
-	exec(input: { amount: number; taxRate: number }) {
+	handler(input: { amount: number; taxRate: number }) {
 		const { amount, taxRate } = input;
 		return { tax: amount * taxRate, total: amount * (1 + taxRate) };
 	},
@@ -199,7 +199,7 @@ Here are the common pitfalls to avoid:
 // ❌ Avoid these in tasks:
 const badPractices = task({
 	id: "bad-practices",
-	exec(input: {}) {
+	handler(input: {}) {
 		// Don't use random numbers
 		const random = Math.random();
 
@@ -219,7 +219,7 @@ const badPractices = task({
 // ✅ Use deterministic alternatives:
 const goodPractices = task({
 	id: "good-practices",
-	exec(input: { createdAt: number; duration: number; userData: any; sequenceNumber: number }) {
+	handler(input: { createdAt: number; duration: number; userData: any; sequenceNumber: number }) {
 		// Use provided IDs or generate from input
 		const id = generateIdFromInput(input);
 
@@ -249,7 +249,7 @@ For tasks that need external data, make them deterministic by:
 // ✅ Good: External data passed as input
 const sendEmail = task({
 	id: "send-email",
-	exec(input: { recipient: string; template: string; variables: Record<string, any> }) {
+	handler(input: { recipient: string; template: string; variables: Record<string, any> }) {
 		// Email content is deterministic based on input
 		const { recipient, template, variables } = input;
 		const emailContent = generateEmail(template, variables);
@@ -262,7 +262,7 @@ const sendEmail = task({
 // ✅ Good: Store external state in workflow
 const processPayment = task({
 	id: "process-payment",
-	exec(input: { paymentId: string; amount: number }) {
+	handler(input: { paymentId: string; amount: number }) {
 		// Use input parameters to ensure determinism
 		const { paymentId, amount } = input;
 
@@ -280,7 +280,7 @@ const processPayment = task({
 // ❌ Bad: Random numbers
 const badTask = task({
 	id: "generate-id",
-	exec(input: {}) {
+	handler(input: {}) {
 		return { id: Math.random().toString(36) };
 	},
 });
@@ -288,7 +288,7 @@ const badTask = task({
 // ✅ Good: Deterministic ID generation
 const goodTask = task({
 	id: "generate-id",
-	exec(input: { userId: string; timestamp: number }) {
+	handler(input: { userId: string; timestamp: number }) {
 		const { userId, timestamp } = input;
 		return { id: `${userId}-${timestamp}` };
 	},
@@ -301,7 +301,7 @@ const goodTask = task({
 // ❌ Bad: Current timestamp
 const badTask = task({
 	id: "create-record",
-	exec(input: { data: any }) {
+	handler(input: { data: any }) {
 		return createRecord({ ...input.data, createdAt: Date.now() });
 	},
 });
@@ -309,7 +309,7 @@ const badTask = task({
 // ✅ Good: Use provided timestamp
 const goodTask = task({
 	id: "create-record",
-	exec(input: { data: any; createdAt: number }) {
+	handler(input: { data: any; createdAt: number }) {
 		return createRecord({ ...input.data, createdAt: input.createdAt });
 	},
 });
@@ -321,7 +321,7 @@ const goodTask = task({
 // ❌ Bad: External API that might change
 const badTask = task({
 	id: "get-exchange-rate",
-	exec(input: { currency: string }) {
+	handler(input: { currency: string }) {
 		return fetchExchangeRate(input.currency);
 	},
 });
@@ -329,7 +329,7 @@ const badTask = task({
 // ✅ Good: Pass rate as input or use idempotent lookup
 const goodTask = task({
 	id: "get-exchange-rate",
-	exec(input: { currency: string; rate: number }) {
+	handler(input: { currency: string; rate: number }) {
 		const { currency, rate } = input;
 		return { currency, rate };
 	},
@@ -343,7 +343,7 @@ const goodTask = task({
 let globalCounter = 0;
 const badTask = task({
 	id: "increment-counter",
-	exec(input: {}) {
+	handler(input: {}) {
 		globalCounter++;
 		return { counter: globalCounter };
 	},
@@ -352,7 +352,7 @@ const badTask = task({
 // ✅ Good: Pass counter as input
 const goodTask = task({
 	id: "increment-counter",
-	exec(input: { currentCounter: number }) {
+	handler(input: { currentCounter: number }) {
 		return { counter: input.currentCounter + 1 };
 	},
 });

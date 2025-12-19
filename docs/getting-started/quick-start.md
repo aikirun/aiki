@@ -22,7 +22,7 @@ import { workflow } from "@aikirun/workflow";
 // 1. Define a task (unit of work)
 const greet = task({
 	id: "greet",
-	async exec(input: { name: string }) {
+	async handler(input: { name: string }) {
 		console.log(`👋 Hello, ${input.name}!`);
 		return { greeted: true, name: input.name };
 	},
@@ -32,7 +32,7 @@ const greet = task({
 const helloWorkflow = workflow({ id: "hello" });
 
 const helloV1 = helloWorkflow.v("1.0.0", {
-	async exec(input: { name: string }, run) {
+	async handler(input: { name: string }, run) {
 		const result = await greet.start(run, { name: input.name });
 		return { success: true, greeting: result };
 	},

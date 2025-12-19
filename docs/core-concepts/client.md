@@ -132,7 +132,7 @@ import { workflow } from "@aikirun/workflow";
 // Define task and workflow
 const sendEmail = task({
 	id: "send-email",
-	exec(input: { email: string }) {
+	handler(input: { email: string }) {
 		console.log(`Sending email to ${input.email}`);
 		return { sent: true };
 	},
@@ -141,7 +141,7 @@ const sendEmail = task({
 const onboardingWorkflow = workflow({ id: "user-onboarding" });
 
 const onboardingV1 = onboardingWorkflow.v("1.0.0", {
-	async exec(input: { email: string }, run) {
+	async handler(input: { email: string }, run) {
 		await sendEmail.start(run, { email: input.email });
 		return { success: true };
 	},

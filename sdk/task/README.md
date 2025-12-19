@@ -18,7 +18,7 @@ import { task } from "@aikirun/task";
 
 export const sendVerificationEmail = task({
 	id: "send-verification",
-	async exec(input: { email: string }) {
+	async handler(input: { email: string }) {
 		return emailService.sendVerification(input.email);
 	},
 });
@@ -29,7 +29,7 @@ export const sendVerificationEmail = task({
 ```typescript
 export const ringAlarm = task({
 	id: "ring-alarm",
-	exec(input: { song: string }) {
+	handler(input: { song: string }) {
 		return Promise.resolve(audioService.play(input.song));
 	},
 	opts: {
@@ -50,7 +50,7 @@ import { workflow } from "@aikirun/workflow";
 export const morningWorkflow = workflow({ id: "morning-routine" });
 
 export const morningWorkflowV1 = morningWorkflow.v("1.0", {
-	async exec(input, run) {
+	async handler(input, run) {
 		const result = await ringAlarm.start(run, { song: "alarm.mp3" });
 		console.log("Task completed:", result);
 	},
@@ -132,13 +132,13 @@ Tasks are executed within a workflow's execution context. Logging happens in the
 ```typescript
 export const processPayment = task({
 	id: "process-payment",
-	async exec(input: { amount: number }) {
+	async handler(input: { amount: number }) {
 		return { success: true, transactionId: "tx_123" };
 	},
 });
 
 export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
-	async exec(input, run) {
+	async handler(input, run) {
 		run.logger.info("Processing payment", { amount: input.amount });
 		const result = await processPayment.start(run, { amount: input.amount });
 		run.logger.info("Payment complete", result);

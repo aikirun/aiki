@@ -773,7 +773,7 @@
 <span class="code-keyword">export</span> <span class="code-keyword">const</span> onboardingWorkflow = <span class="code-function">workflow</span>({ name: <span class="code-string">"user-onboarding"</span> });
 
 <span class="code-keyword">export</span> <span class="code-keyword">const</span> onboardingWorkflowV1 = onboardingWorkflow.<span class="code-function">v</span>(<span class="code-string">"1.0"</span>, {
-  <span class="code-keyword">async</span> <span class="code-function">exec</span>(input: { email: string }, run) {
+  <span class="code-keyword">async</span> <span class="code-function">handler</span>(input: { email: string }, run) {
     <span class="code-keyword">const</span> { userId } = <span class="code-keyword">await</span> createUserProfile.<span class="code-function">start</span>(run, { email: input.email });
 
     <span class="code-keyword">await</span> sendWelcomeEmail.<span class="code-function">start</span>(run, { email: input.email });

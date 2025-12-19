@@ -20,7 +20,7 @@ const orderWorkflow = workflow({
 
 // Step 2: Create a version
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async exec(input: { orderId: string; amount: number }, run) {
+	async handler(input: { orderId: string; amount: number }, run) {
 		// Your workflow logic here
 		const validation = await validateOrder.start(run, input);
 		const payment = await processPayment.start(run, {
@@ -44,7 +44,7 @@ A unique identifier for the workflow. Use descriptive names like `"user-onboardi
 Specified when calling `.v()`, following semantic versioning (e.g., `"1.0.0"`, `"2.1.0"`). Versioning lets you update
 workflows without breaking existing executions.
 
-### exec Function
+### handler Function
 
 The main orchestration function that:
 
@@ -54,13 +54,13 @@ The main orchestration function that:
 
 ## Workflow Logic
 
-The `exec` function orchestrates your workflow by calling tasks using `.start()`, implementing conditional logic to
+The `handler` function orchestrates your workflow by calling tasks using `.start()`, implementing conditional logic to
 choose different paths based on data, transforming data between steps, applying application-specific business logic, and
 handling errors with custom recovery strategies.
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async exec(input: { orderData: any }, run) {
+	async handler(input: { orderData: any }, run) {
 		// Validate order
 		const validation = await validateOrder.start(run, {
 			orderData: input.orderData,
@@ -103,7 +103,7 @@ const userOnboardingWorkflow = workflow({
 
 // Version 1.0.0: Simple onboarding
 const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
-	async exec(input: { userId: string }, run) {
+	async handler(input: { userId: string }, run) {
 		await sendWelcomeEmail.start(run, {
 			userId: input.userId,
 		});
@@ -112,7 +112,7 @@ const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
 
 // Version 2.0.0: Add profile creation
 const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
-	async exec(input: { userId: string }, run) {
+	async handler(input: { userId: string }, run) {
 		await sendWelcomeEmail.start(run, {
 			userId: input.userId,
 		});

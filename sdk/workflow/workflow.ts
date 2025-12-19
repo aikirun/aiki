@@ -21,7 +21,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
  *
  * // Define version 1.0
  * export const userOnboardingV1 = userOnboarding.v("1.0", {
- *   async exec(input: { email: string }, run) {
+ *   async handler(input: { email: string }, run) {
  *     run.logger.info("Starting onboarding", { email: input.email });
  *
  *     // Execute tasks
@@ -40,7 +40,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
  *
  * // Deploy version 2.0 alongside 1.0 (no downtime)
  * export const userOnboardingV2 = userOnboarding.v("2.0", {
- *   async exec(input: { email: string; trial: boolean }, run) {
+ *   async handler(input: { email: string; trial: boolean }, run) {
  *     // Enhanced version with different logic
  *     // Existing v1.0 workflows continue with their version
  *     // New workflows use v2.0

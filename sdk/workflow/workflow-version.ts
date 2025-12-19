@@ -18,7 +18,7 @@ import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@a
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/run-handle";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
-	exec: (input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<Output>;
+	handler: (input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<Output>;
 	opts?: WorkflowOptions;
 }
 
@@ -42,7 +42,7 @@ export interface WorkflowVersion<Input, Output, AppContext> {
 	) => Promise<WorkflowRunHandle<Input, Output>>;
 
 	[INTERNAL]: {
-		exec: (input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<void>;
+		handler: (input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<void>;
 	};
 }
 
@@ -55,7 +55,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		private readonly params: WorkflowVersionParams<Input, Output, AppContext>
 	) {
 		this[INTERNAL] = {
-			exec: this.exec.bind(this),
+			handler: this.handler.bind(this),
 		};
 	}
 
@@ -89,7 +89,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		return workflowRunHandle(client, response.run.id as WorkflowRunId);
 	}
 
-	private async exec(input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext): Promise<void> {
+	private async handler(input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext): Promise<void> {
 		const { logger } = run;
 		const { handle } = run[INTERNAL];
 
@@ -117,7 +117,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	): Promise<Output> {
 		while (true) {
 			try {
-				return await this.params.exec(input, run, context);
+				return await this.params.handler(input, run, context);
 			} catch (error) {
 				if (error instanceof WorkflowSuspendedError) {
 					throw error;

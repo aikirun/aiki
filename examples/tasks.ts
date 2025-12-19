@@ -2,7 +2,7 @@ import { task } from "@aikirun/task";
 
 export const ringAlarm = task({
 	id: "ring-alarm",
-	exec(input: { song: string }) {
+	handler(input: { song: string }) {
 		return Promise.resolve(input.song);
 	},
 	opts: {
@@ -16,21 +16,21 @@ export const ringAlarm = task({
 
 export const stretch = task({
 	id: "stretch",
-	exec(input: { duration: number }) {
+	handler(input: { duration: number }) {
 		return Promise.resolve(input.duration);
 	},
 });
 
 export const drinkCoffee = task({
 	id: "drink-coffee",
-	exec(input: { withSugar: boolean }) {
+	handler(input: { withSugar: boolean }) {
 		return Promise.resolve(input.withSugar);
 	},
 });
 
 export const sayPrayer = task({
 	id: "say-prayer",
-	exec() {
+	handler() {
 		return Promise.resolve();
 	},
 });

@@ -23,7 +23,7 @@ import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@a
  * @template Output - Type of task output (must be JSON serializable)
  * @param params - Task configuration
  * @param params.id - Unique task id used for execution tracking
- * @param params.exec - Async function that executes the task logic
+ * @param params.handler - Async function that executes the task logic
  * @returns Task instance with retry and option configuration methods
  *
  * @example
@@ -31,7 +31,7 @@ import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@a
  * // Simple task without retry
  * export const sendEmail = task({
  *   id: "send-email",
- *   exec(input: { email: string; message: string }) {
+ *   handler(input: { email: string; message: string }) {
  *     return emailService.send(input.email, input.message);
  *   },
  * });
@@ -39,7 +39,7 @@ import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@a
  * // Task with retry configuration
  * export const chargeCard = task({
  *   id: "charge-card",
- *   exec(input: { cardId: string; amount: number }) {
+ *   handler(input: { cardId: string; amount: number }) {
  *     return paymentService.charge(input.cardId, input.amount);
  *   },
  *   opts: {
@@ -63,7 +63,7 @@ export function task<Input extends SerializableInput = null, Output = void>(
 
 export interface TaskParams<Input, Output> {
 	id: string;
-	exec: (input: Input) => Promise<Output>;
+	handler: (input: Input) => Promise<Output>;
 	opts?: TaskOptions;
 }
 
@@ -185,7 +185,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		while (true) {
 			const attemptedAt = Date.now();
 			try {
-				const output = await this.params.exec(input);
+				const output = await this.params.handler(input);
 				return { output, lastAttempt: attempts };
 			} catch (error) {
 				const serializableError = createSerializableError(error);

@@ -38,7 +38,7 @@ import {createUserProfile, sendWelcomeEmail, sendUsageTips} from "./task.ts";
 export const onboardingWorkflow = workflow({ id: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
-  async exec(input: { email: string }, run) {
+  async handler(input: { email: string }, run) {
     
     const { userId } = await createUserProfile.start(run, {email: input.email});
     await sendWelcomeEmail.start(run, {email: input.email});
@@ -91,7 +91,7 @@ import { task } from "@aikirun/task";
 
 export const createUserProfile = task({
   id: "create-profile",
-  async exec(input: { email: string }) {
+  async handler(input: { email: string }) {
     const id = db.users.create({ email: input.email });
     return { userId: id};
   }
@@ -99,7 +99,7 @@ export const createUserProfile = task({
 
 export const sendWelcomeEmail = task({
   id: "send-welcome",
-  async exec(input: { email: string }) {
+  async handler(input: { email: string }) {
     return emailService.sendWelcome(input.email);
   },
   // If email sending fails it is retried up to 5 times with exponential backoff.
@@ -116,7 +116,7 @@ export const sendWelcomeEmail = task({
 
 export const sendUsageTips = task({
   id: "send-usage-tips",
-  async exec(input: { email: string }) {
+  async handler(input: { email: string }) {
     return emailService.sendFeatures(input.email, {
       features: ["Advanced analytics"]
     });

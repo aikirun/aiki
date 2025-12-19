@@ -10,7 +10,7 @@ import { task } from "@aikirun/task";
 
 const sendEmail = task({
 	id: "send-email",
-	exec(input: { email: string; message: string }) {
+	handler(input: { email: string; message: string }) {
 		// Your business logic
 		return sendEmailToUser(input.email, input.message);
 	},
@@ -23,7 +23,7 @@ const sendEmail = task({
 
 A unique identifier for the task. Use descriptive names like `"send-email"` or `"process-payment"`.
 
-### exec Function
+### handler Function
 
 The function that performs the actual work. It receives:
 
@@ -32,7 +32,7 @@ The function that performs the actual work. It receives:
 ```typescript
 const processPayment = task({
 	id: "process-payment",
-	exec(input: { paymentId: string; amount: number }) {
+	handler(input: { paymentId: string; amount: number }) {
 		console.log(`Processing payment for ${input.paymentId}`);
 
 		return processPaymentWithId(input.paymentId, input.amount);
@@ -46,7 +46,7 @@ Tasks are executed within workflows using `.start()`:
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async exec(input: { orderData: any }, run) {
+	async handler(input: { orderData: any }, run) {
 		const validation = await validateOrder.start(run, {
 			orderData: input.orderData,
 		});
@@ -70,7 +70,7 @@ level.
 // This will be supported in a future version:
 const processPayment = task({
 	id: "process-payment",
-	exec(input: { paymentId: string; amount: number }) {
+	handler(input: { paymentId: string; amount: number }) {
 		return processPaymentWithId(input.paymentId, input.amount);
 	},
 	// retry: {
@@ -88,7 +88,7 @@ The task receives input directly:
 ```typescript
 const exampleTask = task({
 	id: "example",
-	exec(input: { data: string }) {
+	handler(input: { data: string }) {
 		// input: Input data for this task
 		console.log("Task input:", input);
 
@@ -104,7 +104,7 @@ Tasks within a workflow are automatically idempotent - the same task with the sa
 ```typescript
 const sendEmail = task({
 	id: "send-email",
-	exec(input: { email: string; message: string }) {
+	handler(input: { email: string; message: string }) {
 		return sendEmailToUser(input.email, input.message);
 	},
 });
@@ -146,7 +146,7 @@ await sendEmail.with().opt("idempotencyKey", "second-email").start(run, {
 ```typescript
 const validateOrder = task({
 	id: "validate-order",
-	exec(input: { items: Array<{ id: string; quantity: number }> }) {
+	handler(input: { items: Array<{ id: string; quantity: number }> }) {
 		if (input.items.length === 0) {
 			throw new Error("Order must have items");
 		}
@@ -164,7 +164,7 @@ const validateOrder = task({
 ```typescript
 const fetchUserData = task({
 	id: "fetch-user-data",
-	exec(input: { userId: string }) {
+	handler(input: { userId: string }) {
 		return fetch(`https://api.example.com/users/${input.userId}`)
 			.then((res) => res.json());
 	},
@@ -176,7 +176,7 @@ const fetchUserData = task({
 ```typescript
 const updateInventory = task({
 	id: "update-inventory",
-	exec(input: { itemId: string; amount: number }) {
+	handler(input: { itemId: string; amount: number }) {
 		return db.inventory.update({
 			where: { id: input.itemId },
 			data: { quantity: { decrement: input.amount } },

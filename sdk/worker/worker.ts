@@ -369,7 +369,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				}, this.params.opts?.workflowRun?.heartbeatIntervalMs ?? 30_000);
 			}
 
-			await workflowVersion[INTERNAL].exec(
+			await workflowVersion[INTERNAL].handler(
 				workflowRun.input,
 				{
 					id: workflowRun.id as WorkflowRunId,

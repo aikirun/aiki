@@ -36,7 +36,7 @@ multiple times, it will only execute once and return the cached result:
 ```typescript
 const sendEmail = task({
 	id: "send-welcome-email",
-	exec(input: { email: string }) {
+	handler(input: { email: string }) {
 		return sendEmailToUser(input.email, welcomeTemplate);
 	},
 });
@@ -96,7 +96,7 @@ Sometimes you want the same task executed multiple times for different reasons:
 ```typescript
 const sendEmail = task({
 	id: "send-email",
-	exec(input: { email: string; content: string }) {
+	handler(input: { email: string; content: string }) {
 		return sendEmailToUser(input.email, input.content);
 	},
 });
