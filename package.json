@@ -1,6 +1,5 @@
 {
 	"name": "aiki",
-	"version": "0.1.12",
 	"private": true,
 	"type": "module",
 	"workspaces": [
