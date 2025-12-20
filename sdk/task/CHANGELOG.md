@@ -1,5 +1,14 @@
 # @aikirun/task
 
+## 0.3.2
+
+### Patch Changes
+
+- 6e6d4f1: Mark @aikirun/lib as a dev dependency
+- Updated dependencies [6e6d4f1]
+  - @aikirun/workflow@0.3.2
+  - @aikirun/types@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes
