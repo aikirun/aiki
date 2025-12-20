@@ -1,5 +1,11 @@
 # @aikirun/types
 
+## 0.5.0
+
+### Minor Changes
+
+- 4dc62f7: Depend only on latest aiki packages
+
 ## 0.4.0
 
 ### Minor Changes

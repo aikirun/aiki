@@ -1,5 +1,16 @@
 # @aikirun/client
 
+## 0.5.0
+
+### Minor Changes
+
+- 4dc62f7: Depend only on latest aiki packages
+
+### Patch Changes
+
+- Updated dependencies [4dc62f7]
+  - @aikirun/types@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
