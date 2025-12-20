@@ -2,6 +2,12 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.5.3
+
+### Patch Changes
+
+- Merge per-package changelogs into one changelog
+
 ## 0.5.2
 
 ### Patch Changes
