@@ -13,6 +13,7 @@ export default defineConfig({
 		"workflow-run": "workflow-run.ts",
 		"workflow-run-api": "workflow-run-api.ts",
 		task: "task.ts",
+		sleep: "sleep.ts",
 	},
 	format: ["esm"],
 	dts: true,

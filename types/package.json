@@ -47,6 +47,10 @@
 		"./task": {
 			"types": "./dist/task.d.ts",
 			"import": "./dist/task.js"
+		},
+		"./sleep": {
+			"types": "./dist/sleep.d.ts",
+			"import": "./dist/sleep.js"
 		}
 	},
 	"files": [
