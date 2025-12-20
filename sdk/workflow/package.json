@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/workflow",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"description": "Workflow SDK for Aiki - define durable workflows with tasks, sleeps, waits, and event handling",
 	"type": "module",
 	"main": "./dist/index.js",

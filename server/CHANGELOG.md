@@ -1,5 +1,14 @@
 # @aikirun/server
 
+## 0.3.3
+
+### Patch Changes
+
+- 3441f8d: no need to mark @aikirun/lib as a dev dependency since it is bundled as build time
+- Updated dependencies [3441f8d]
+  - @aikirun/lib@0.3.3
+  - @aikirun/types@0.3.3
+
 ## 0.3.2
 
 ### Patch Changes
