@@ -17,16 +17,15 @@
     },
     "lib": {
       "name": "@aikirun/lib",
-      "version": "0.2.0",
+      "version": "0.3.3",
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
     },
     "sdk/client": {
       "name": "@aikirun/client",
-      "version": "0.2.0",
+      "version": "0.3.3",
       "dependencies": {
-        "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.9.3",
         "ioredis": "^5.4.1",
@@ -35,34 +34,31 @@
     },
     "sdk/task": {
       "name": "@aikirun/task",
-      "version": "0.2.0",
+      "version": "0.3.3",
       "dependencies": {
-        "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
       },
     },
     "sdk/worker": {
       "name": "@aikirun/worker",
-      "version": "0.2.0",
+      "version": "0.3.3",
       "dependencies": {
         "@aikirun/client": "workspace:*",
-        "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
       },
     },
     "sdk/workflow": {
       "name": "@aikirun/workflow",
-      "version": "0.2.0",
+      "version": "0.3.3",
       "dependencies": {
-        "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
       },
     },
     "server": {
       "name": "@aikirun/server",
-      "version": "0.2.0",
+      "version": "0.3.3",
       "dependencies": {
         "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
@@ -79,7 +75,7 @@
     },
     "types": {
       "name": "@aikirun/types",
-      "version": "0.2.0",
+      "version": "0.3.3",
     },
   },
   "packages": {
