@@ -189,7 +189,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	context.logger.info(
 		{
 			workflowRunId: runId,
-			status: input.state.status,
+			state: input.state,
 		},
 		"Transitioning workflow run state"
 	);
@@ -293,7 +293,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context
 		{
 			workflowRunId: runId,
 			taskPath,
-			taskStatus: taskState.status,
+			taskState: taskState,
 		},
 		"Transitioning task state"
 	);

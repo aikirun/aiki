@@ -399,7 +399,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				error instanceof TaskFailedError ||
 				isServerConflictError(error)
 			) {
-				logger.debug("Flow control error occurred", { error });
 				shouldAcknowledge = true;
 			} else {
 				logger.error("Unexpected error during workflow execution", {
