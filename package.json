@@ -31,7 +31,8 @@
 		"docker:up": "docker compose up -d",
 		"docker:down": "docker compose down",
 		"docker:logs": "docker compose logs -f",
-		"release": "bun run build:types && bun run build:lib && bun run build:sdk && changeset publish && git push --follow-tags",
+		"release": "bun run build:types && bun run build:lib && bun run build:sdk && bun run release:publish && changeset tag && git push --follow-tags",
+		"release:publish": "for pkg in types lib sdk/workflow sdk/task sdk/client sdk/worker; do (cd $pkg && bun publish --access public) || true; done",
 		"prepare": "husky"
 	},
 	"lint-staged": {
