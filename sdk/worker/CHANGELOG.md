@@ -1,5 +1,18 @@
 # @aikirun/worker
 
+## 0.4.0
+
+### Minor Changes
+
+- 01ccb2b: Do not depend on older versions of aiki packages
+
+### Patch Changes
+
+- Updated dependencies [01ccb2b]
+  - @aikirun/client@0.4.0
+  - @aikirun/workflow@0.4.0
+  - @aikirun/types@0.4.0
+
 ## 0.3.3
 
 ### Patch Changes
