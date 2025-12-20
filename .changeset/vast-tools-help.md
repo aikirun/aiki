@@ -1,0 +1,11 @@
+---
+"@aikirun/lib": patch
+"@aikirun/client": patch
+"@aikirun/task": patch
+"@aikirun/worker": patch
+"@aikirun/workflow": patch
+"@aikirun/server": patch
+"@aikirun/types": patch
+---
+
+Mark @aikirun/lib as a dev dependency
