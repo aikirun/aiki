@@ -5,8 +5,8 @@
 	"workspaces": [
 		"types",
 		"lib",
-		"sdk/task",
 		"sdk/workflow",
+		"sdk/task",
 		"sdk/client",
 		"sdk/worker",
 		"server"
@@ -25,7 +25,7 @@
 		"clean": "rm -rf types/dist lib/dist server/dist sdk/*/dist",
 		"build:types": "bun run --cwd types build",
 		"build:lib": "bun run --cwd lib build",
-		"build:sdk": "bun run --cwd sdk/task build && bun run --cwd sdk/workflow build && bun run --cwd sdk/client build && bun run --cwd sdk/worker build",
+		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/task build && bun run --cwd sdk/client build && bun run --cwd sdk/worker build",
 		"build:server": "bun build server/server.ts --compile --outfile server/dist/aiki-server",
 		"docker:build": "docker compose build",
 		"docker:up": "docker compose up -d",
