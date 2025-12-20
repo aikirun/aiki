@@ -2,6 +2,11 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
 	entry: {
+		utils: "utils.ts",
+		symbols: "symbols.ts",
+		duration: "duration.ts",
+		retry: "retry.ts",
+		error: "error.ts",
 		client: "client.ts",
 		trigger: "trigger.ts",
 		workflow: "workflow.ts",
