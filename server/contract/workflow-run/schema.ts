@@ -1,4 +1,7 @@
-import { z } from "zod";
+import type { DurationObject } from "@aikirun/lib/duration";
+import type { UnionToRecord } from "@aikirun/lib/object";
+import type { RetryStrategy } from "@aikirun/lib/retry";
+import type { TriggerStrategy } from "@aikirun/types/trigger";
 import type {
 	WorkflowOptions,
 	WorkflowRun,
@@ -22,14 +25,12 @@ import type {
 	WorkflowRunStatus,
 	WorkflowRunTransition,
 } from "@aikirun/types/workflow-run";
-import type { TriggerStrategy } from "@aikirun/types/trigger";
-import type { RetryStrategy } from "@aikirun/lib/retry";
-import type { DurationObject } from "@aikirun/lib/duration";
-import type { UnionToRecord } from "@aikirun/lib/object";
-import { sleepStateSchema } from "../sleep/schema";
-import { taskStateSchema } from "../task/schema";
+import { z } from "zod";
+
 import type { Zt } from "../helpers/schema";
 import { serializedErrorSchema } from "../serializable";
+import { sleepStateSchema } from "../sleep/schema";
+import { taskStateSchema } from "../task/schema";
 
 export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>> = z.enum([
 	"scheduled",

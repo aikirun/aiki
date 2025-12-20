@@ -1,2 +1,2 @@
-export * from "./schema";
 export * from "./procedure";
+export * from "./schema";

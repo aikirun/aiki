@@ -1,5 +1,6 @@
-import { z } from "zod";
 import type { SerializableError } from "@aikirun/lib/error";
+import { z } from "zod";
+
 import type { Zt } from "./helpers/schema";
 
 export const serializedErrorSchema: Zt<SerializableError> = z.object({

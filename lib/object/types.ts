@@ -1,7 +1,9 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: the unused types are tests
+
+import type { RequireAtLeastOneOf } from "@aikirun/types/utils";
+
 import type { NonEmptyArray } from "../array";
 import type { Equal, ExpectTrue } from "../testing/expect/types";
-import type { RequireAtLeastOneOf } from "@aikirun/types/utils";
 export type { RequireAtLeastOneOf };
 
 export type UndefinedToPartial<T extends object> = {

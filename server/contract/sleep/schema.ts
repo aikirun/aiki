@@ -1,5 +1,6 @@
-import { z } from "zod";
 import type { SleepState } from "@aikirun/types/sleep";
+import { z } from "zod";
+
 import type { Zt } from "../helpers/schema";
 
 export const sleepStateSchema: Zt<SleepState> = z.discriminatedUnion("status", [

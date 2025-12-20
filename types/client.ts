@@ -1,7 +1,7 @@
-import type { WorkflowRun } from "@aikirun/types/workflow-run";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
-import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
+import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
+
 import { INTERNAL } from "./symbols";
 
 export interface ClientParams<AppContext> {

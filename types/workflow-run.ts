@@ -1,8 +1,8 @@
 import type { SerializableError } from "./error";
+import type { RetryStrategy } from "./retry";
 import type { SleepState } from "./sleep";
 import type { TaskState } from "./task";
 import type { TriggerStrategy } from "./trigger";
-import type { RetryStrategy } from "./retry";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 

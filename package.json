@@ -13,11 +13,9 @@
 		"sdk/worker"
 	],
 	"scripts": {
-		"check": "tsc --noEmit",
-		"lint": "bunx @biomejs/biome lint .",
-		"lint:fix": "bunx @biomejs/biome lint --write .",
-		"fmt": "bunx @biomejs/biome format .",
-		"fmt:fix": "bunx @biomejs/biome format --write .",
+		"check": "bunx @biomejs/biome check .",
+		"check:fix": "bunx @biomejs/biome check --write .",
+		"check:types": "tsc --noEmit",
 		"test": "bun test",
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage",
@@ -40,8 +38,7 @@
 	},
 	"lint-staged": {
 		"*.{ts,tsx,js,jsx,json}": [
-			"bunx @biomejs/biome format --write",
-			"bunx @biomejs/biome lint --write"
+			"bunx @biomejs/biome check --write"
 		]
 	},
 	"devDependencies": {

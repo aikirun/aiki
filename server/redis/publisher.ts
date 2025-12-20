@@ -1,6 +1,6 @@
-import type { Redis } from "ioredis";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRun } from "@aikirun/types/workflow-run";
+import type { Redis } from "ioredis";
 import type { ServerContext } from "server/middleware/context";
 
 export async function publishWorkflowReadyBatch(

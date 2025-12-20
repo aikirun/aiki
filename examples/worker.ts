@@ -1,6 +1,7 @@
 import process from "node:process";
-import { client } from "../sdk/client/client";
+
 import { workerA, workerB } from "./definitions/worker";
+import { client } from "../sdk/client/client";
 
 export const aikiClient = await client({
 	url: "http://localhost:9090",

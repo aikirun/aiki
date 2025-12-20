@@ -1,5 +1,6 @@
-import { delay } from "../async/delay";
 import type { RetryStrategy } from "@aikirun/types/retry";
+
+import { delay } from "../async/delay";
 
 export type WithRetryOptions<Result, Abortable extends boolean> = {
 	shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>;

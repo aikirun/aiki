@@ -1,9 +1,10 @@
+import { delay, toMilliseconds } from "@aikirun/lib";
 import type { Logger } from "@aikirun/types/client";
-import type { WorkflowRunHandle } from "./run-handle";
 import type { SleepParams, SleepPath, SleepResult, SleepStateNone } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { delay, toMilliseconds } from "@aikirun/lib";
 import { type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
+
+import type { WorkflowRunHandle } from "./run-handle";
 
 interface SleeperOptions {
 	spinThresholdMs: number;

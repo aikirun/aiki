@@ -1,4 +1,5 @@
 import { workflow } from "@aikirun/workflow";
+
 import { drinkCoffee, ringAlarm, sayPrayer, stretch } from "./task";
 
 export const morningWorkflow = workflow({ id: "morning-routine" });

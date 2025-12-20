@@ -1,9 +1,10 @@
-import type { WorkflowOptions, WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { Logger } from "@aikirun/types/client";
 import type { SleepParams, SleepResult } from "@aikirun/types/sleep";
-import type { WorkflowRunHandle } from "./run-handle";
-import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import { INTERNAL } from "@aikirun/types/symbols";
+import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowOptions, WorkflowRunId } from "@aikirun/types/workflow-run";
+
+import type { WorkflowRunHandle } from "./run-handle";
 
 export interface WorkflowRunContext<Input, Output> {
 	id: WorkflowRunId;

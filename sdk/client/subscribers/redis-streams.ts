@@ -1,9 +1,5 @@
 import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aikirun/lib/array";
-import { INTERNAL } from "@aikirun/types/symbols";
-import { z } from "zod";
 import { getRetryParams } from "@aikirun/lib/retry";
-import type { WorkflowMeta } from "@aikirun/types/workflow";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type {
 	Client,
 	Logger,
@@ -15,6 +11,10 @@ import type {
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
 } from "@aikirun/types/client";
+import { INTERNAL } from "@aikirun/types/symbols";
+import type { WorkflowMeta } from "@aikirun/types/workflow";
+import type { WorkflowRunId } from "@aikirun/types/workflow-run";
+import { z } from "zod";
 
 const WorkflowRunReadyMessageDataSchema = z.object({
 	type: z.literal("workflow_run_ready"),

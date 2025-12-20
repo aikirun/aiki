@@ -1,5 +1,3 @@
-export { client } from "./client";
-
 export type {
 	AdaptivePollingSubscriberStrategy,
 	ApiClient,
@@ -15,4 +13,5 @@ export type {
 	WorkflowRunBatch,
 } from "@aikirun/types/client";
 
+export { client } from "./client";
 export { ConsoleLogger } from "./logger/index";

@@ -1,15 +1,16 @@
 import process from "node:process";
-import { loadConfig } from "./config/index";
 import { RPCHandler } from "@orpc/server/fetch";
+import { Redis } from "ioredis";
+
+import { loadConfig } from "./config/index";
+import { createLogger } from "./logger/index";
 import { createContext } from "./middleware/index";
 import { router } from "./router/index";
 import {
-	scheduleRetryableWorkflowRuns,
 	queueScheduledWorkflowRuns,
+	scheduleRetryableWorkflowRuns,
 	scheduleSleepingWorkflowRuns,
 } from "./router/workflow-run";
-import { Redis } from "ioredis";
-import { createLogger } from "./logger/index";
 
 if (import.meta.main) {
 	const config = await loadConfig();

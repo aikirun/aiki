@@ -1,8 +1,9 @@
 export type {
-	RetryStrategy,
-	NeverRetryStrategy,
-	FixedRetryStrategy,
 	ExponentialRetryStrategy,
+	FixedRetryStrategy,
 	JitteredRetryStrategy,
+	NeverRetryStrategy,
+	RetryStrategy,
 } from "@aikirun/types/retry";
-export { getRetryParams, withRetry, type RetryParams, type WithRetryOptions } from "./strategy";
+
+export { getRetryParams, type RetryParams, type WithRetryOptions, withRetry } from "./strategy";
