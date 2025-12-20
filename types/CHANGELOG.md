@@ -1,5 +1,11 @@
 # @aikirun/types
 
+## 0.5.2
+
+### Patch Changes
+
+- 3e7739d: Add missing entrypoint for sleep types
+
 ## 0.5.1
 
 ### Patch Changes

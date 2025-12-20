@@ -1,5 +1,13 @@
 # @aikirun/workflow
 
+## 0.5.2
+
+### Patch Changes
+
+- 3e7739d: Add missing entrypoint for sleep types
+- Updated dependencies [3e7739d]
+  - @aikirun/types@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes
