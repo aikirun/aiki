@@ -3,6 +3,22 @@ import type {
 	WorkflowOptions,
 	WorkflowRun,
 	WorkflowRunState,
+	WorkflowRunStateAwaitingChildWorkflow,
+	WorkflowRunStateAwaitingEvent,
+	WorkflowRunStateAwaitingRetry,
+	WorkflowRunStateCancelled,
+	WorkflowRunStateCompleted,
+	WorkflowRunStateFailed,
+	WorkflowRunStatePaused,
+	WorkflowRunStateQueued,
+	WorkflowRunStateRunning,
+	WorkflowRunStateScheduled,
+	WorkflowRunStateScheduledByAwake,
+	WorkflowRunStateScheduledByEvent,
+	WorkflowRunStateScheduledByNew,
+	WorkflowRunStateScheduledByResume,
+	WorkflowRunStateScheduledByRetry,
+	WorkflowRunStateSleeping,
 	WorkflowRunStatus,
 	WorkflowRunTransition,
 } from "@aikirun/types/workflow-run";
@@ -93,96 +109,139 @@ export const workflowOptionsSchema: Zt<WorkflowOptions> = z.object({
 	retry: retryStrategySchema.optional(),
 });
 
+export const workflowRunStateScheduledByNewSchema: Zt<WorkflowRunStateScheduledByNew> = z.object({
+	status: z.literal("scheduled"),
+	scheduledAt: z.number(),
+	reason: z.literal("new"),
+});
+
+export const workflowRunStateScheduledByRetrySchema: Zt<WorkflowRunStateScheduledByRetry> = z.object({
+	status: z.literal("scheduled"),
+	scheduledAt: z.number(),
+	reason: z.literal("retry"),
+});
+
+export const workflowRunStateScheduledByAwakeSchema: Zt<WorkflowRunStateScheduledByAwake> = z.object({
+	status: z.literal("scheduled"),
+	scheduledAt: z.number(),
+	reason: z.literal("awake"),
+});
+
+export const workflowRunStateScheduledByResumeSchema: Zt<WorkflowRunStateScheduledByResume> = z.object({
+	status: z.literal("scheduled"),
+	scheduledAt: z.number(),
+	reason: z.literal("resume"),
+});
+
+export const workflowRunStateScheduledByEventSchema: Zt<WorkflowRunStateScheduledByEvent> = z.object({
+	status: z.literal("scheduled"),
+	scheduledAt: z.number(),
+	reason: z.literal("event"),
+});
+
+export const workflowRunStateScheduledSchema: Zt<WorkflowRunStateScheduled> = z.union([
+	workflowRunStateScheduledByNewSchema,
+	workflowRunStateScheduledByRetrySchema,
+	workflowRunStateScheduledByAwakeSchema,
+	workflowRunStateScheduledByResumeSchema,
+	workflowRunStateScheduledByEventSchema,
+]);
+
+export const workflowRunStateQueuedSchema: Zt<WorkflowRunStateQueued> = z.object({
+	status: z.literal("queued"),
+	reason: z.union([z.literal("new"), z.literal("retry"), z.literal("awake"), z.literal("resume"), z.literal("event")]),
+});
+
+export const workflowRunStateRunningSchema: Zt<WorkflowRunStateRunning> = z.object({
+	status: z.literal("running"),
+});
+
+export const workflowRunStatePausedSchema: Zt<WorkflowRunStatePaused> = z.object({
+	status: z.literal("paused"),
+	pausedAt: z.number(),
+});
+
+export const workflowRunStateSleepingSchema: Zt<WorkflowRunStateSleeping> = z.object({
+	status: z.literal("sleeping"),
+	sleepPath: z.string(),
+	durationMs: z.number(),
+});
+
+export const workflowRunStateAwaitingEventSchema: Zt<WorkflowRunStateAwaitingEvent> = z.object({
+	status: z.literal("awaiting_event"),
+});
+
+export const workflowRunStateAwaitingRetrySchema: Zt<WorkflowRunStateAwaitingRetry> = z.union([
+	z.object({
+		status: z.literal("awaiting_retry"),
+		cause: z.literal("task"),
+		reason: z.string(),
+		nextAttemptAt: z.number(),
+		taskPath: z.string(),
+	}),
+	z.object({
+		status: z.literal("awaiting_retry"),
+		cause: z.literal("child_workflow"),
+		reason: z.string(),
+		nextAttemptAt: z.number(),
+		childWorkflowRunId: z.string(),
+	}),
+	z.object({
+		status: z.literal("awaiting_retry"),
+		cause: z.literal("self"),
+		reason: z.string(),
+		nextAttemptAt: z.number(),
+		error: serializedErrorSchema,
+	}),
+]);
+
+export const workflowRunStateAwaitingChildWorkflowSchema: Zt<WorkflowRunStateAwaitingChildWorkflow> = z.object({
+	status: z.literal("awaiting_child_workflow"),
+});
+
+export const workflowRunStateCancelledSchema: Zt<WorkflowRunStateCancelled> = z.object({
+	status: z.literal("cancelled"),
+	reason: z.string().optional(),
+});
+
+export const workflowRunStateCompletedSchema: Zt<WorkflowRunStateCompleted<unknown>> = z.object({
+	status: z.literal("completed"),
+	output: z.unknown(),
+});
+
+export const workflowRunStateFailedSchema: Zt<WorkflowRunStateFailed> = z.union([
+	z.object({
+		status: z.literal("failed"),
+		cause: z.literal("task"),
+		reason: z.string(),
+		taskPath: z.string(),
+	}),
+	z.object({
+		status: z.literal("failed"),
+		cause: z.literal("child_workflow"),
+		reason: z.string(),
+		childWorkflowRunId: z.string(),
+	}),
+	z.object({
+		status: z.literal("failed"),
+		cause: z.literal("self"),
+		reason: z.string(),
+		error: serializedErrorSchema,
+	}),
+]);
+
 export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
-	z.object({
-		status: workflowRunStatusSchema.exclude([
-			"scheduled",
-			"queued",
-			"paused",
-			"sleeping",
-			"awaiting_retry",
-			"cancelled",
-			"completed",
-			"failed",
-		]),
-	}),
-	z.object({
-		status: z.literal("scheduled"),
-		scheduledAt: z.number(),
-		reason: z.union([
-			z.literal("new"),
-			z.literal("retry"),
-			z.literal("awake"),
-			z.literal("resume"),
-			z.literal("event"),
-		]),
-	}),
-	z.object({
-		status: z.literal("queued"),
-		reason: z.union([
-			z.literal("new"),
-			z.literal("retry"),
-			z.literal("awake"),
-			z.literal("resume"),
-			z.literal("event"),
-		]),
-	}),
-	z.object({
-		status: z.literal("sleeping"),
-		sleepPath: z.string(),
-		durationMs: z.number(),
-	}),
-	z.object({
-		status: z.literal("paused"),
-		pausedAt: z.number(),
-	}),
-	z.object({
-		status: z.literal("awaiting_retry"),
-		cause: z.literal("task"),
-		reason: z.string(),
-		nextAttemptAt: z.number(),
-		taskPath: z.string(),
-	}),
-	z.object({
-		status: z.literal("awaiting_retry"),
-		cause: z.literal("child_workflow"),
-		reason: z.string(),
-		nextAttemptAt: z.number(),
-		childWorkflowRunId: z.string(),
-	}),
-	z.object({
-		status: z.literal("awaiting_retry"),
-		cause: z.literal("self"),
-		reason: z.string(),
-		nextAttemptAt: z.number(),
-		error: serializedErrorSchema,
-	}),
-	z.object({
-		status: z.literal("cancelled"),
-		reason: z.string().optional(),
-	}),
-	z.object({
-		status: z.literal("completed"),
-		output: z.unknown(),
-	}),
-	z.object({
-		status: z.literal("failed"),
-		cause: z.literal("task"),
-		reason: z.string(),
-		taskPath: z.string(),
-	}),
-	z.object({
-		status: z.literal("failed"),
-		cause: z.literal("child_workflow"),
-		reason: z.string(),
-		childWorkflowRunId: z.string(),
-	}),
-	z.object({
-		status: z.literal("failed"),
-		cause: z.literal("self"),
-		reason: z.string(),
-		error: serializedErrorSchema,
-	}),
+	workflowRunStateScheduledSchema,
+	workflowRunStateQueuedSchema,
+	workflowRunStateRunningSchema,
+	workflowRunStatePausedSchema,
+	workflowRunStateSleepingSchema,
+	workflowRunStateAwaitingEventSchema,
+	workflowRunStateAwaitingRetrySchema,
+	workflowRunStateAwaitingChildWorkflowSchema,
+	workflowRunStateCancelledSchema,
+	workflowRunStateCompletedSchema,
+	workflowRunStateFailedSchema,
 ]);
 
 export const workflowRunSchema: Zt<WorkflowRun> = z.object({

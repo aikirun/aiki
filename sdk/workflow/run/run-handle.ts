@@ -172,7 +172,21 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 	}
 
 	private async transitionState(targetState: WorkflowRunState<Output>): Promise<void> {
+		if (
+			(targetState.status === "scheduled" && (targetState.reason === "new" || targetState.reason === "resume")) ||
+			targetState.status === "paused" ||
+			targetState.status === "cancelled"
+		) {
+			const { run } = await this.api.workflowRun.transitionStateV1({
+				type: "pessimistic",
+				id: this.run.id,
+				state: targetState,
+			});
+			this._run = run as WorkflowRun<Input, Output>;
+			return;
+		}
 		const { run } = await this.api.workflowRun.transitionStateV1({
+			type: "optimistic",
 			id: this.run.id,
 			state: targetState,
 			expectedRevision: this.run.revision,

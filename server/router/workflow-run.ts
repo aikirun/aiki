@@ -179,7 +179,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
-	if (run.revision !== input.expectedRevision) {
+	if (input.type === "optimistic" && run.revision !== input.expectedRevision) {
 		throw new RevisionConflictError(runId, input.expectedRevision, run.revision);
 	}
 
@@ -261,9 +261,9 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
 			}
 			await transitionStateV1.callable({ context })({
+				type: "pessimistic",
 				id: childRunId,
 				state: input.state,
-				expectedRevision: childRun.revision,
 			});
 			run.childWorkflowsRunState[childRunId] = input.state;
 		}
@@ -358,6 +358,7 @@ export async function queueScheduledWorkflowRuns(context: ServerContext, redis: 
 	for (const run of runs) {
 		if (run.state.status === "scheduled") {
 			await transitionStateV1.callable({ context })({
+				type: "optimistic",
 				id: run.id,
 				state: { status: "queued", reason: run.state.reason },
 				expectedRevision: run.revision,
@@ -396,6 +397,7 @@ export async function scheduleRetryableWorkflowRuns(context: ServerContext) {
 		}
 
 		await transitionStateV1.callable({ context })({
+			type: "optimistic",
 			id: run.id,
 			state: { status: "scheduled", scheduledAt: now, reason: "retry" },
 			expectedRevision: run.revision,
@@ -425,6 +427,7 @@ export async function scheduleSleepingWorkflowRuns(context: ServerContext) {
 
 	for (const run of runs) {
 		await transitionStateV1.callable({ context })({
+			type: "optimistic",
 			id: run.id,
 			state: { status: "scheduled", scheduledAt: now, reason: "awake" },
 			expectedRevision: run.revision,

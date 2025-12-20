@@ -2,6 +2,11 @@ import type {
 	WorkflowOptions,
 	WorkflowRun,
 	WorkflowRunState,
+	WorkflowRunStateCancelled,
+	WorkflowRunStatePaused,
+	WorkflowRunStateScheduled,
+	WorkflowRunStateScheduledByNew,
+	WorkflowRunStateScheduledByResume,
 	WorkflowRunStatus,
 	WorkflowRunTransition,
 } from "./workflow-run";
@@ -76,11 +81,32 @@ export interface WorkflowRunCreateResponseV1 {
 	run: WorkflowRun;
 }
 
-export interface WorkflowRunTransitionStateRequestV1 {
+interface WorkflowRunTransitionStateRequestBase {
+	type: "optimistic" | "pessimistic";
 	id: string;
 	state: WorkflowRunState<unknown>;
+}
+
+interface WorkflowRunTransitionStateRequestOptimistic extends WorkflowRunTransitionStateRequestBase {
+	type: "optimistic";
+	state:
+		| Exclude<WorkflowRunState<unknown>, { status: "scheduled" | "paused" | "cancelled" }>
+		| Exclude<WorkflowRunStateScheduled, { reason: "new" | "resume" }>;
 	expectedRevision: number;
 }
+
+interface WorkflowRunTransitionStateRequestPessimistic extends WorkflowRunTransitionStateRequestBase {
+	type: "pessimistic";
+	state:
+		| WorkflowRunStateScheduledByNew
+		| WorkflowRunStateScheduledByResume
+		| WorkflowRunStatePaused
+		| WorkflowRunStateCancelled;
+}
+
+export type WorkflowRunTransitionStateRequestV1 =
+	| WorkflowRunTransitionStateRequestOptimistic
+	| WorkflowRunTransitionStateRequestPessimistic;
 
 export interface WorkflowRunTransitionStateResponseV1 {
 	run: WorkflowRun;

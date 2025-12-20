@@ -1,15 +1,6 @@
-import { z } from "zod";
-import { oc } from "@orpc/contract";
-import {
-	workflowOptionsSchema,
-	workflowRunSchema,
-	workflowRunStateSchema,
-	workflowRunStatusSchema,
-	workflowRunTransitionSchema,
-} from "./schema";
-import { taskStateSchema } from "../task/schema";
-import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure";
+import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
 import type {
+	WorkflowRunApi,
 	WorkflowRunCreateRequestV1,
 	WorkflowRunCreateResponseV1,
 	WorkflowRunGetByIdRequestV1,
@@ -24,9 +15,34 @@ import type {
 	WorkflowRunTransitionStateResponseV1,
 	WorkflowRunTransitionTaskStateRequestV1,
 	WorkflowRunTransitionTaskStateResponseV1,
-	WorkflowRunApi,
 } from "@aikirun/types/workflow-run-api";
-import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
+import { oc } from "@orpc/contract";
+import { z } from "zod";
+
+import {
+	workflowOptionsSchema,
+	workflowRunSchema,
+	workflowRunStateAwaitingChildWorkflowSchema,
+	workflowRunStateAwaitingEventSchema,
+	workflowRunStateAwaitingRetrySchema,
+	workflowRunStateCancelledSchema,
+	workflowRunStateCompletedSchema,
+	workflowRunStateFailedSchema,
+	workflowRunStatePausedSchema,
+	workflowRunStateQueuedSchema,
+	workflowRunStateRunningSchema,
+	workflowRunStateScheduledByAwakeSchema,
+	workflowRunStateScheduledByEventSchema,
+	workflowRunStateScheduledByNewSchema,
+	workflowRunStateScheduledByResumeSchema,
+	workflowRunStateScheduledByRetrySchema,
+	workflowRunStateSchema,
+	workflowRunStateSleepingSchema,
+	workflowRunStatusSchema,
+	workflowRunTransitionSchema,
+} from "./schema";
+import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure";
+import { taskStateSchema } from "../task/schema";
 
 const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
 	.input(
@@ -111,11 +127,36 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, WorkflowRunTransitionStateResponseV1> =
 	oc
 		.input(
-			z.object({
-				id: z.string().min(1),
-				state: workflowRunStateSchema,
-				expectedRevision: z.number(),
-			})
+			z.union([
+				z.object({
+					type: z.literal("optimistic"),
+					id: z.string().min(1),
+					state: z.union([
+						workflowRunStateScheduledByRetrySchema,
+						workflowRunStateScheduledByAwakeSchema,
+						workflowRunStateScheduledByEventSchema,
+						workflowRunStateQueuedSchema,
+						workflowRunStateRunningSchema,
+						workflowRunStateSleepingSchema,
+						workflowRunStateAwaitingEventSchema,
+						workflowRunStateAwaitingRetrySchema,
+						workflowRunStateAwaitingChildWorkflowSchema,
+						workflowRunStateCompletedSchema,
+						workflowRunStateFailedSchema,
+					]),
+					expectedRevision: z.number(),
+				}),
+				z.object({
+					type: z.literal("pessimistic"),
+					id: z.string().min(1),
+					state: z.union([
+						workflowRunStateScheduledByNewSchema,
+						workflowRunStateScheduledByResumeSchema,
+						workflowRunStatePausedSchema,
+						workflowRunStateCancelledSchema,
+					]),
+				}),
+			])
 		)
 		.output(
 			z.object({

@@ -34,22 +34,44 @@ interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;
 }
 
-export interface WorkflowRunStateOthers extends WorkflowRunStateBase {
-	status: Exclude<
-		WorkflowRunStatus,
-		"scheduled" | "queued" | "running" | "paused" | "sleeping" | "awaiting_retry" | "cancelled" | "completed" | "failed"
-	>;
-}
+export type WorkflowRunScheduledReason = "new" | "retry" | "awake" | "resume" | "event";
 
-export interface WorkflowRunStateScheduled extends WorkflowRunStateBase {
+interface WorkflowRunStateScheduledBase extends WorkflowRunStateBase {
 	status: "scheduled";
 	scheduledAt: number;
-	reason: "new" | "retry" | "awake" | "resume" | "event";
+	reason: WorkflowRunScheduledReason;
 }
+
+export interface WorkflowRunStateScheduledByNew extends WorkflowRunStateScheduledBase {
+	reason: "new";
+}
+
+export interface WorkflowRunStateScheduledByRetry extends WorkflowRunStateScheduledBase {
+	reason: "retry";
+}
+
+export interface WorkflowRunStateScheduledByAwake extends WorkflowRunStateScheduledBase {
+	reason: "awake";
+}
+
+export interface WorkflowRunStateScheduledByResume extends WorkflowRunStateScheduledBase {
+	reason: "resume";
+}
+
+export interface WorkflowRunStateScheduledByEvent extends WorkflowRunStateScheduledBase {
+	reason: "event";
+}
+
+export type WorkflowRunStateScheduled =
+	| WorkflowRunStateScheduledByNew
+	| WorkflowRunStateScheduledByRetry
+	| WorkflowRunStateScheduledByAwake
+	| WorkflowRunStateScheduledByResume
+	| WorkflowRunStateScheduledByEvent;
 
 export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
 	status: "queued";
-	reason: "new" | "retry" | "awake" | "resume" | "event";
+	reason: WorkflowRunScheduledReason;
 }
 
 export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
@@ -65,6 +87,10 @@ export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
 	status: "sleeping";
 	sleepPath: string;
 	durationMs: number;
+}
+
+export interface WorkflowRunStateAwaitingEvent extends WorkflowRunStateBase {
+	status: "awaiting_event";
 }
 
 export type WorkflowFailureCause = "task" | "child_workflow" | "self";
@@ -95,6 +121,10 @@ export type WorkflowRunStateAwaitingRetry =
 	| WorkflowRunStateAwaitingRetryCausedByTask
 	| WorkflowRunStateAwaitingRetryCausedByChildWorkflow
 	| WorkflowRunStateAwaitingRetryCausedBySelf;
+
+export interface WorkflowRunStateAwaitingChildWorkflow extends WorkflowRunStateBase {
+	status: "awaiting_child_workflow";
+}
 
 export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
 	status: "cancelled";
@@ -132,40 +162,19 @@ export type WorkflowRunStateFailed =
 	| WorkflowRunStateFailedByChildWorkflow
 	| WorkflowRunStateFailedBySelf;
 
-export type NonTerminalWorkflowRunState =
-	| WorkflowRunStateOthers
-	| WorkflowRunStateScheduled
-	| WorkflowRunStatePaused
-	| WorkflowRunStateSleeping
-	| WorkflowRunStateQueued
-	| WorkflowRunStateRunning
-	| WorkflowRunStateAwaitingRetry;
-
-export type TerminalWorlfowRunState<Output> =
-	| WorkflowRunStateCancelled
-	| WorkflowRunStateCompleted<Output>
-	| WorkflowRunStateFailed;
-
 export type WorkflowRunStateInComplete =
-	| WorkflowRunStateOthers
 	| WorkflowRunStateScheduled
-	| WorkflowRunStatePaused
-	| WorkflowRunStateSleeping
 	| WorkflowRunStateQueued
 	| WorkflowRunStateRunning
+	| WorkflowRunStatePaused
+	| WorkflowRunStateSleeping
+	| WorkflowRunStateAwaitingEvent
 	| WorkflowRunStateAwaitingRetry
+	| WorkflowRunStateAwaitingChildWorkflow
 	| WorkflowRunStateCancelled
 	| WorkflowRunStateFailed;
 
-export type WorkflowRunState<Output> = NonTerminalWorkflowRunState | TerminalWorlfowRunState<Output>;
-
-export function isTerminalStatus(status: WorkflowRunStatus): status is TerminalWorkflowRunStatus {
-	return status === "completed" || status === "failed" || status === "cancelled";
-}
-
-export function isTerminalState<Output>(state: WorkflowRunState<Output>): state is TerminalWorlfowRunState<Output> {
-	return isTerminalStatus(state.status);
-}
+export type WorkflowRunState<Output> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
 
 export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;

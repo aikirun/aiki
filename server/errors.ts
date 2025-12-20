@@ -37,10 +37,16 @@ export class InvalidWorkflowRunStateTransitionError extends Error {
 	constructor(
 		public readonly workflowRunId: string,
 		public readonly fromStatus: WorkflowRunStatus,
-		public readonly toStatus: WorkflowRunStatus
+		public readonly toStatus: WorkflowRunStatus,
+		public readonly reason?: string
 	) {
-		super(`Cannot transition workflow ${workflowRunId} from ${fromStatus} to ${toStatus}`);
-		this.name = "InvalidStateTransitionError";
+		const message = `Cannot transition workflow ${workflowRunId} from ${fromStatus} to ${toStatus}`;
+		if (!reason) {
+			super(message);
+		} else {
+			super(`${message} - ${reason}`);
+		}
+		this.name = "InvalidWorkflowRunStateTransitionError";
 	}
 }
 
