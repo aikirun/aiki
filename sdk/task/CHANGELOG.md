@@ -1,5 +1,15 @@
 # @aikirun/task
 
+## 0.3.1
+
+### Patch Changes
+
+- 6acc070: Use `bun publish` instead of `changeset publish`
+- Updated dependencies [6acc070]
+  - @aikirun/lib@0.3.1
+  - @aikirun/workflow@0.3.1
+  - @aikirun/types@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

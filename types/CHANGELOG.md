@@ -1,5 +1,11 @@
 # @aikirun/types
 
+## 0.3.1
+
+### Patch Changes
+
+- 6acc070: Use `bun publish` instead of `changeset publish`
+
 ## 0.3.0
 
 ### Minor Changes
