@@ -1,4 +1,6 @@
 import { client } from "@aikirun/client";
+import { delay } from "@aikirun/lib";
+
 import { eveningRoutineWorkflowV1, morningWorkflowV2 } from "./definitions/workflow";
 
 export const aikiClient = await client({
@@ -17,6 +19,8 @@ const { logger } = aikiClient;
 await morningWorkflowV2.start(aikiClient, { a: "1", b: 1 });
 
 const handle = await eveningRoutineWorkflowV1.start(aikiClient);
+await delay(10_000);
+await handle.resume();
 
 const result = await handle.wait({ type: "status", status: "completed" }, { maxDurationMs: 30_000 });
 if (result.success) {
