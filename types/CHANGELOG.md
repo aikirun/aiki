@@ -1,5 +1,11 @@
 # @aikirun/types
 
+## 0.5.1
+
+### Patch Changes
+
+- 773ce1e: add missing entry point in types package
+
 ## 0.5.0
 
 ### Minor Changes

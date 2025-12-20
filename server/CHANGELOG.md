@@ -1,5 +1,14 @@
 # @aikirun/server
 
+## 0.5.1
+
+### Patch Changes
+
+- 773ce1e: add missing entry point in types package
+- Updated dependencies [773ce1e]
+  - @aikirun/lib@0.5.1
+  - @aikirun/types@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes
