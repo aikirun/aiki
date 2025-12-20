@@ -59,9 +59,9 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 
 ## Features
 
-- **Deterministic Execution** - Tasks must be deterministic for reliability
+- **Idempotent Execution** - Tasks can be safely retried without unintended side effects
 - **Automatic Retries** - Multiple retry strategies (fixed, exponential, jittered)
-- **Idempotency** - Tasks can safely be retried without side effects
+- **Idempotency Keys** - Deduplicate task executions with custom keys
 - **Error Handling** - Structured error information with recovery strategies
 - **State Tracking** - Task execution state persists across failures
 - **Type Safety** - Full TypeScript support with input/output types
@@ -148,8 +148,8 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 
 ## Best Practices
 
-1. **Make Tasks Deterministic** - Same input should always produce same output
-2. **Handle Idempotency** - Tasks may be retried multiple times
+1. **Make Tasks Idempotent** - Tasks may be retried, so re-running should not cause unintended side effects
+2. **Use Idempotency Keys** - Use custom keys to prevent duplicate processing
 3. **Use Meaningful Errors** - Help diagnose failures
 4. **Log Information** - Use `run.logger` for debugging
 5. **Keep Tasks Focused** - One responsibility per task
@@ -160,6 +160,10 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute tasks in workers
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Manage task execution
 - [@aikirun/types](https://www.npmjs.com/package/@aikirun/types) - Type definitions
+
+## Changelog
+
+See the [CHANGELOG](https://github.com/aikirun/aiki/blob/main/CHANGELOG.md) for version history.
 
 ## License
 

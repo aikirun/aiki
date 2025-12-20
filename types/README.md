@@ -39,6 +39,10 @@ import type { TriggerStrategy } from "@aikirun/types/trigger";
 - [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Task SDK
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Worker SDK
 
+## Changelog
+
+See the [CHANGELOG](https://github.com/aikirun/aiki/blob/main/CHANGELOG.md) for version history.
+
 ## License
 
 Apache-2.0

@@ -23,8 +23,7 @@ Understand the building blocks:
 
 Best practices and patterns:
 
-- **[Task Determinism](./guides/task-determinism.md)** - Why and how to write deterministic tasks
-- **[Idempotency](./guides/idempotency.md)** - Prevent duplicate executions
+- **[Idempotency](./guides/idempotency.md)** - Why and how to write idempotent tasks
 - **[Error Handling](./guides/error-handling.md)** - Handle failures gracefully
 
 ## 🏗️ Architecture

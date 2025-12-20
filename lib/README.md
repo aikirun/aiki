@@ -91,6 +91,10 @@ Export async helpers like `delay()` and `fireAndForget()`.
 
 For more information, see the [Aiki documentation](https://github.com/aikirun/aiki).
 
+## Changelog
+
+See the [CHANGELOG](https://github.com/aikirun/aiki/blob/main/CHANGELOG.md) for version history.
+
 ## License
 
 Apache-2.0

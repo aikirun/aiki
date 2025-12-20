@@ -178,7 +178,7 @@ Aiki's server orchestrates workflows and manages state, while workers execute ta
 - **[Getting Started](./docs/getting-started/quick-start.md)** - Complete setup guide and first workflow
 - **[Core Concepts](./docs/core-concepts/)** - Workflows, tasks, workers, and the client
 - **[Architecture](./docs/architecture/)** - System design and how components interact
-- **[Guides](./docs/guides/)** - Task determinism, idempotency, and best practices
+- **[Guides](./docs/guides/)** - Task idempotency and best practices
 
 ## Requirements
 

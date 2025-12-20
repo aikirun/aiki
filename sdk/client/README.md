@@ -111,6 +111,10 @@ See the [Aiki documentation](https://github.com/aikirun/aiki) for comprehensive 
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute workflows
 - [@aikirun/types](https://www.npmjs.com/package/@aikirun/types) - Type definitions
 
+## Changelog
+
+See the [CHANGELOG](https://github.com/aikirun/aiki/blob/main/CHANGELOG.md) for version history.
+
 ## License
 
 Apache-2.0
