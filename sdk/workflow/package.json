@@ -20,9 +20,6 @@
 	"dependencies": {
 		"@aikirun/types": "workspace:*"
 	},
-	"devDependencies": {
-		"@aikirun/lib": "workspace:*"
-	},
 	"publishConfig": {
 		"access": "public"
 	},

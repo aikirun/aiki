@@ -21,9 +21,6 @@
 		"@aikirun/types": "workspace:*",
 		"@aikirun/workflow": "workspace:*"
 	},
-	"devDependencies": {
-		"@aikirun/lib": "workspace:*"
-	},
 	"publishConfig": {
 		"access": "public"
 	},
