@@ -18,11 +18,13 @@
 		"build": "tsup"
 	},
 	"dependencies": {
-		"@aikirun/lib": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"@orpc/client": "^1.9.3",
 		"ioredis": "^5.4.1",
 		"zod": "^4.1.12"
+	},
+	"devDependencies": {
+		"@aikirun/lib": "workspace:*"
 	},
 	"publishConfig": {
 		"access": "public"

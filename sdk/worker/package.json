@@ -18,10 +18,12 @@
 		"build": "tsup"
 	},
 	"dependencies": {
-		"@aikirun/lib": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"@aikirun/client": "workspace:*",
 		"@aikirun/workflow": "workspace:*"
+	},
+	"devDependencies": {
+		"@aikirun/lib": "workspace:*"
 	},
 	"publishConfig": {
 		"access": "public"
