@@ -80,7 +80,6 @@ export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
 
 export interface WorkflowRunStatePaused extends WorkflowRunStateBase {
 	status: "paused";
-	pausedAt: number;
 }
 
 export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {

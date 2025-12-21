@@ -29,7 +29,6 @@ export interface TaskStateFailed extends TaskStateBase {
 	status: "failed";
 	reason: string;
 	attempts: number;
-	attemptedAt: number;
 	nextAttemptAt?: number;
 	error?: SerializableError;
 }

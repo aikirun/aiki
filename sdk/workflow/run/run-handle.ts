@@ -164,7 +164,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 	}
 
 	public async pause(): Promise<void> {
-		return this.transitionState({ status: "paused", pausedAt: Date.now() });
+		return this.transitionState({ status: "paused" });
 	}
 
 	public async resume(): Promise<void> {

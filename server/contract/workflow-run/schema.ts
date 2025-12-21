@@ -159,7 +159,6 @@ export const workflowRunStateRunningSchema: Zt<WorkflowRunStateRunning> = z.obje
 
 export const workflowRunStatePausedSchema: Zt<WorkflowRunStatePaused> = z.object({
 	status: z.literal("paused"),
-	pausedAt: z.number(),
 });
 
 export const workflowRunStateSleepingSchema: Zt<WorkflowRunStateSleeping> = z.object({

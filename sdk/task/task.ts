@@ -182,7 +182,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		// exhaused or retry the task
 
 		while (true) {
-			const attemptedAt = Date.now();
 			try {
 				const output = await this.params.handler(input);
 				return { output, lastAttempt: attempts };
@@ -192,7 +191,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					status: "failed",
 					reason: serializableError.message,
 					attempts,
-					attemptedAt,
 					error: serializableError,
 				};
 
