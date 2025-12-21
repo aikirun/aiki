@@ -12,9 +12,9 @@
 		"server"
 	],
 	"scripts": {
-		"check": "bunx @biomejs/biome check .",
-		"check:fix": "bunx @biomejs/biome check --write .",
-		"check:types": "tsc --noEmit",
+		"check": "tsc --noEmit",
+		"lint": "bunx @biomejs/biome check .",
+		"lint:fix": "bunx @biomejs/biome check --write .",
 		"test": "bun test",
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage",
