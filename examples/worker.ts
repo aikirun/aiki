@@ -1,6 +1,6 @@
 import process from "node:process";
 
-import { workerA, workerB } from "./definitions/worker";
+import { aikiWorker } from "./definitions/worker";
 import { client } from "../sdk/client/client";
 
 export const aikiClient = await client({
@@ -15,12 +15,10 @@ export const aikiClient = await client({
 	}),
 });
 
-const workerHandleA = await workerA.spawn(aikiClient);
-const workerHandleB = await workerB.spawn(aikiClient);
+const workerHandle = await aikiWorker.spawn(aikiClient);
 
 const shutdown = async () => {
-	await workerHandleA.stop();
-	await workerHandleB.stop();
+	await workerHandle.stop();
 	await aikiClient.close();
 	process.exit(0);
 };

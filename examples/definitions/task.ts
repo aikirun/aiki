@@ -27,10 +27,3 @@ export const drinkCoffee = task({
 		return Promise.resolve(input.withSugar);
 	},
 });
-
-export const sayPrayer = task({
-	id: "say-prayer",
-	handler() {
-		return Promise.resolve();
-	},
-});

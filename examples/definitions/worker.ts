@@ -1,16 +1,11 @@
 import { worker } from "@aikirun/worker";
 
-import { eveningRoutineWorkflowV1, morningWorkflowV1, morningWorkflowV2 } from "./workflow";
+import { morningWorkflowV1, morningWorkflowV2 } from "./workflow";
 
-export const workerA = worker({
+export const aikiWorker = worker({
 	id: "worker-A",
-	workflows: [morningWorkflowV1, morningWorkflowV2, eveningRoutineWorkflowV1],
+	workflows: [morningWorkflowV1, morningWorkflowV2],
 	opts: {
 		maxConcurrentWorkflowRuns: 10,
 	},
-});
-
-export const workerB = worker({
-	id: "worker-B",
-	workflows: [eveningRoutineWorkflowV1],
 });
