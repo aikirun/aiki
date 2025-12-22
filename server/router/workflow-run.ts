@@ -302,7 +302,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context
 
 	const now = Date.now();
 
-	const taskState: TaskState<unknown> =
+	const taskState: TaskState =
 		taskStateRequest.status === "awaiting_retry"
 			? {
 					status: "awaiting_retry",

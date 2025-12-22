@@ -193,7 +193,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	// prefetching all results might be problematic.
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
-	tasksState: Record<string, TaskState<unknown>>;
+	tasksState: Record<string, TaskState>;
 	sleepsState: Record<string, SleepState>;
 	childWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;
 }
@@ -211,7 +211,7 @@ export interface WorkflowRunStateTransition extends WorkflowRunTransitionBase {
 export interface WorkflowRunTaskStateTransition extends WorkflowRunTransitionBase {
 	type: "task_state";
 	taskPath: string;
-	taskState: TaskState<unknown>;
+	taskState: TaskState;
 }
 
 export type WorkflowRunTransition = WorkflowRunStateTransition | WorkflowRunTaskStateTransition;

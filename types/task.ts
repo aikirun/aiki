@@ -38,7 +38,7 @@ export interface TaskStateFailed extends TaskStateBase {
 	error: SerializableError;
 }
 
-export type TaskState<Output> =
+export type TaskState<Output = unknown> =
 	| TaskStateNone
 	| TaskStateRunning
 	| TaskStateAwaitingRetry

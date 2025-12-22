@@ -173,7 +173,7 @@ const validTaskStatusTransition: Record<TaskStatus, TaskStatus[]> = {
 export function assertIsValidTaskStateTransition(
 	runId: WorkflowRunId,
 	taskPath: TaskPath,
-	from: TaskState<unknown>,
+	from: TaskState,
 	to: TaskStateRequest
 ) {
 	const allowedDestinations = validTaskStatusTransition[from.status];

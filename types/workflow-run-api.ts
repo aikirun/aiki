@@ -135,9 +135,7 @@ export type TaskStateAwaitingRetryRequest = DistributiveOmit<TaskStateAwaitingRe
 	nextAttemptInMs: number;
 };
 
-export type TaskStateRequest =
-	| Exclude<TaskState<unknown>, { status: "awaiting_retry" }>
-	| TaskStateAwaitingRetryRequest;
+export type TaskStateRequest = Exclude<TaskState, { status: "awaiting_retry" }> | TaskStateAwaitingRetryRequest;
 
 export interface WorkflowRunTransitionTaskStateRequestV1 {
 	id: string;

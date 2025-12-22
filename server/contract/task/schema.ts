@@ -25,7 +25,7 @@ export const taskStateRequestSchema: Zt<TaskStateRequest> = z.discriminatedUnion
 	}),
 ]);
 
-export const taskStateSchema: Zt<TaskState<unknown>> = z.discriminatedUnion("status", [
+export const taskStateSchema: Zt<TaskState> = z.discriminatedUnion("status", [
 	z.object({ status: z.literal("none") }),
 	z.object({
 		status: z.literal("running"),
