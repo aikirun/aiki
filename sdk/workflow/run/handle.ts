@@ -99,6 +99,9 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		this._run = currentRun as WorkflowRun<Input, Output>;
 	}
 
+	// TODO: instead polling the current state, use the transition history
+	// because it is entirely possible for a workflow to flash though a state
+	// and the handle will never know that the workflow hit that state
 	public async wait<
 		S extends WorkflowRunStatus,
 		R extends S extends "completed" ? WorkflowRunStateCompleted<Output> : WorkflowRunStateInComplete,
