@@ -6,7 +6,7 @@ import type { ServerContext } from "server/middleware/context";
 export async function publishWorkflowReadyBatch(
 	context: ServerContext,
 	redis: Redis,
-	runs: WorkflowRun<unknown, unknown>[]
+	runs: WorkflowRun[]
 ): Promise<void> {
 	if (!isNonEmptyArray(runs)) {
 		return;

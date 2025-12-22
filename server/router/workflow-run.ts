@@ -24,7 +24,7 @@ const workflowRunTransitions = new Map<WorkflowRunId, WorkflowRunTransition[]>()
 const listV1 = os.listV1.handler(({ input }) => {
 	const { filters, limit = 50, offset = 0, sort } = input;
 
-	const runs: WorkflowRun<unknown, unknown>[] = [];
+	const runs: WorkflowRun[] = [];
 
 	for (const run of workflowRuns.values()) {
 		if (
