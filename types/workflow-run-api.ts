@@ -1,4 +1,10 @@
-import type { TaskState } from "./task";
+import type {
+	TaskStateAwaitingRetry,
+	TaskStateCompleted,
+	TaskStateFailed,
+	TaskStateNone,
+	TaskStateRunning,
+} from "./task";
 import type {
 	WorkflowOptions,
 	WorkflowRun,
@@ -112,10 +118,17 @@ export interface WorkflowRunTransitionStateResponseV1 {
 	run: WorkflowRun;
 }
 
+export type TaskStateRequest =
+	| TaskStateNone
+	| TaskStateRunning
+	| (Omit<TaskStateAwaitingRetry, "nextAttemptAt"> & { nextAttemptInMs: number })
+	| TaskStateCompleted<unknown>
+	| TaskStateFailed;
+
 export interface WorkflowRunTransitionTaskStateRequestV1 {
 	id: string;
 	taskPath: string;
-	taskState: TaskState<unknown>;
+	taskState: TaskStateRequest;
 	expectedRevision: number;
 }
 

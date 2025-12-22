@@ -8,8 +8,9 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskPath, TaskStateFailed } from "@aikirun/types/task";
+import type { TaskPath, TaskStateAwaitingRetry } from "@aikirun/types/task";
 import { TaskFailedError, type TaskId } from "@aikirun/types/task";
+import { WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext } from "@aikirun/workflow";
 
 /**
@@ -126,6 +127,9 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		if (taskState.status === "completed") {
 			return taskState.output as Output;
 		}
+		if (taskState.status === "failed") {
+			throw new TaskFailedError(path, taskState.attempts, taskState.error.message);
+		}
 
 		const logger = run.logger.child({
 			"aiki.component": "task-execution",
@@ -135,21 +139,17 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		let attempts = 0;
 		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
 
-		if ("attempts" in taskState) {
+		if (taskState.status !== "none") {
 			this.assertRetryAllowed(path, taskState.attempts, retryStrategy, logger);
-			logger.warn("Retrying task", {
+			logger.debug("Retrying task", {
 				"aiki.attempts": taskState.attempts,
 				"aiki.taskStatus": taskState.status,
 			});
 			attempts = taskState.attempts;
 		}
 
-		if (taskState.status === "failed") {
-			// TODO: this is spin based delay, if the delay is large enough,
-			// it might be more profitable to add task to waiting queue,
-			// letting the serve schedule it at a later time.
-			// Thefore, releasing worker resources
-			await this.delayIfNecessary(taskState);
+		if (taskState.status === "awaiting_retry") {
+			await this.delayIfNecessary(run, taskState);
 		}
 
 		attempts++;
@@ -187,34 +187,40 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				return { output, lastAttempt: attempts };
 			} catch (error) {
 				const serializableError = createSerializableError(error);
-				const taskFailedState: TaskStateFailed = {
-					status: "failed",
-					reason: serializableError.message,
-					attempts,
-					error: serializableError,
-				};
 
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {
-					await run[INTERNAL].handle[INTERNAL].transitionTaskState(path, taskFailedState);
 					logger.error("Task failed", {
 						"aiki.attempts": attempts,
-						"aiki.reason": taskFailedState.reason,
+						"aiki.reason": serializableError.message,
 					});
-					throw new TaskFailedError(path, attempts, taskFailedState.reason);
+					await run[INTERNAL].handle[INTERNAL].transitionTaskState(path, {
+						status: "failed",
+						attempts,
+						error: serializableError,
+					});
+					throw new TaskFailedError(path, attempts, serializableError.message);
 				}
 
-				const nextAttemptAt = Date.now() + retryParams.delayMs;
-
-				await run[INTERNAL].handle[INTERNAL].transitionTaskState(path, { ...taskFailedState, nextAttemptAt });
-				logger.debug("Task failed. Retrying", {
+				logger.debug("Task failed. It will be retried", {
 					"aiki.attempts": attempts,
-					"aiki.nextAttemptAt": nextAttemptAt,
-					"aiki.reason": taskFailedState.reason,
+					"aiki.nextAttemptInMs": retryParams.delayMs,
+					"aiki.reason": serializableError.message,
 				});
 
-				await delay(retryParams.delayMs);
-				attempts++;
+				if (retryParams.delayMs <= run[INTERNAL].options.spinThresholdMs) {
+					await delay(retryParams.delayMs);
+					attempts++;
+					continue;
+				}
+
+				await run[INTERNAL].handle[INTERNAL].transitionTaskState(path, {
+					status: "awaiting_retry",
+					attempts,
+					error: serializableError,
+					nextAttemptInMs: retryParams.delayMs,
+				});
+				throw new WorkflowRunSuspendedError(run.id);
 			}
 		}
 	}
@@ -229,14 +235,19 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private async delayIfNecessary(taskState: TaskStateFailed): Promise<void> {
-		if (taskState.nextAttemptAt !== undefined) {
-			const now = Date.now();
-			const remainingDelay = Math.max(0, taskState.nextAttemptAt - now);
-			if (remainingDelay > 0) {
-				await delay(remainingDelay);
-			}
+	private async delayIfNecessary<WorkflowInput, WorkflowOutput>(
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		taskState: TaskStateAwaitingRetry
+	): Promise<void> {
+		const remainingDelayMs = Math.max(0, taskState.nextAttemptAt - Date.now());
+		if (remainingDelayMs <= 0) {
+			return;
 		}
+		if (remainingDelayMs <= run[INTERNAL].options.spinThresholdMs) {
+			await delay(remainingDelayMs);
+			return;
+		}
+		throw new WorkflowRunSuspendedError(run.id);
 	}
 
 	private async getPath(input: Input): Promise<TaskPath> {

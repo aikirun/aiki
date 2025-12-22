@@ -3,13 +3,14 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { Redis } from "ioredis";
 
 import { loadConfig } from "./config/index";
-import { createLogger } from "./logger/index";
+import { createLogger, type Logger } from "./logger/index";
 import { createContext } from "./middleware/index";
 import { router } from "./router/index";
 import {
 	queueScheduledWorkflowRuns,
 	scheduleRetryableWorkflowRuns,
 	scheduleSleepingWorkflowRuns,
+	scheduleWorkflowRunsWithRetryableTask,
 } from "./router/workflow-run";
 
 if (import.meta.main) {
@@ -52,38 +53,7 @@ if (import.meta.main) {
 		// },
 	});
 
-	const queueScheduledWorkflowRunsInterval = setInterval(() => {
-		const context = createContext({
-			type: "cron",
-			name: "queueScheduledWorkflowRuns",
-			logger,
-		});
-		queueScheduledWorkflowRuns(context, redis).catch((err) => {
-			logger.error({ err }, "Error queueing scheduled workflows");
-		});
-	}, 1_000);
-
-	const scheduleSleepingWorkflowRunsInterval = setInterval(() => {
-		const context = createContext({
-			type: "cron",
-			name: "scheduleSleepingWorkflowRuns",
-			logger,
-		});
-		scheduleSleepingWorkflowRuns(context).catch((err) => {
-			logger.error({ err }, "Error scheduling sleeping workflows");
-		});
-	}, 1_000);
-
-	const scheduleRetryableWorkflowRunsInterval = setInterval(() => {
-		const context = createContext({
-			type: "cron",
-			name: "scheduleRetryableWorkflowRuns",
-			logger,
-		});
-		scheduleRetryableWorkflowRuns(context).catch((err) => {
-			logger.error({ err }, "Error scheduling retryable workflows");
-		});
-	}, 1_000);
+	const cronIntervals = initCrons(redis, logger);
 
 	Bun.serve({
 		port: config.port,
@@ -99,9 +69,9 @@ if (import.meta.main) {
 	});
 
 	const shutdown = async () => {
-		clearInterval(queueScheduledWorkflowRunsInterval);
-		clearInterval(scheduleSleepingWorkflowRunsInterval);
-		clearInterval(scheduleRetryableWorkflowRunsInterval);
+		for (const interval of cronIntervals) {
+			clearInterval(interval);
+		}
 		await redis.quit();
 		process.exit(0);
 	};
@@ -110,4 +80,57 @@ if (import.meta.main) {
 	process.on("SIGINT", shutdown);
 
 	logger.info(`Server running on port ${config.port}`);
+}
+
+function initCrons(redis: Redis, logger: Logger) {
+	const queueScheduledWorkflowRunsInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "queueScheduledWorkflowRuns",
+			logger,
+		});
+		queueScheduledWorkflowRuns(context, redis).catch((err) => {
+			logger.error({ err }, "Error queueing scheduled workflows");
+		});
+	}, 500);
+
+	const scheduleSleepingWorkflowRunsInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "scheduleSleepingWorkflowRuns",
+			logger,
+		});
+		scheduleSleepingWorkflowRuns(context).catch((err) => {
+			logger.error({ err }, "Error scheduling sleeping workflows");
+		});
+	}, 500);
+
+	const scheduleRetryableWorkflowRunsInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "scheduleRetryableWorkflowRuns",
+			logger,
+		});
+		scheduleRetryableWorkflowRuns(context).catch((err) => {
+			logger.error({ err }, "Error scheduling retryable workflows");
+		});
+	}, 500);
+
+	const scheduleWorkflowRunsWithRetryableTaskInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "scheduleWorkflowRunsWithRetryableTask",
+			logger,
+		});
+		scheduleWorkflowRunsWithRetryableTask(context).catch((err) => {
+			logger.error({ err }, "Error scheduling workflows with retryable task");
+		});
+	}, 500);
+
+	return [
+		queueScheduledWorkflowRunsInterval,
+		scheduleSleepingWorkflowRunsInterval,
+		scheduleRetryableWorkflowRunsInterval,
+		scheduleWorkflowRunsWithRetryableTaskInterval,
+	];
 }

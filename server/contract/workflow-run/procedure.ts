@@ -36,13 +36,14 @@ import {
 	workflowRunStateScheduledByNewSchema,
 	workflowRunStateScheduledByResumeSchema,
 	workflowRunStateScheduledByRetrySchema,
+	workflowRunStateScheduledByTaskRetrySchema,
 	workflowRunStateSchema,
 	workflowRunStateSleepingSchema,
 	workflowRunStatusSchema,
 	workflowRunTransitionSchema,
 } from "./schema";
 import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure";
-import { taskStateSchema } from "../task/schema";
+import { taskStateRequestSchema } from "../task/schema";
 
 const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
 	.input(
@@ -133,6 +134,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 					id: z.string().min(1),
 					state: z.union([
 						workflowRunStateScheduledByRetrySchema,
+						workflowRunStateScheduledByTaskRetrySchema,
 						workflowRunStateScheduledByAwakeSchema,
 						workflowRunStateScheduledByEventSchema,
 						workflowRunStateQueuedSchema,
@@ -172,7 +174,7 @@ const transitionTaskStateV1: ContractProcedure<
 		z.object({
 			id: z.string(),
 			taskPath: z.string(),
-			taskState: taskStateSchema,
+			taskState: taskStateRequestSchema,
 			expectedRevision: z.number(),
 		})
 	)

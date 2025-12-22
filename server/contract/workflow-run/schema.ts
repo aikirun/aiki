@@ -21,6 +21,7 @@ import type {
 	WorkflowRunStateScheduledByNew,
 	WorkflowRunStateScheduledByResume,
 	WorkflowRunStateScheduledByRetry,
+	WorkflowRunStateScheduledByTaskRetry,
 	WorkflowRunStateSleeping,
 	WorkflowRunStatus,
 	WorkflowRunTransition,
@@ -122,6 +123,12 @@ export const workflowRunStateScheduledByRetrySchema: Zt<WorkflowRunStateSchedule
 	reason: z.literal("retry"),
 });
 
+export const workflowRunStateScheduledByTaskRetrySchema: Zt<WorkflowRunStateScheduledByTaskRetry> = z.object({
+	status: z.literal("scheduled"),
+	scheduledAt: z.number(),
+	reason: z.literal("task_retry"),
+});
+
 export const workflowRunStateScheduledByAwakeSchema: Zt<WorkflowRunStateScheduledByAwake> = z.object({
 	status: z.literal("scheduled"),
 	scheduledAt: z.number(),
@@ -143,6 +150,7 @@ export const workflowRunStateScheduledByEventSchema: Zt<WorkflowRunStateSchedule
 export const workflowRunStateScheduledSchema: Zt<WorkflowRunStateScheduled> = z.union([
 	workflowRunStateScheduledByNewSchema,
 	workflowRunStateScheduledByRetrySchema,
+	workflowRunStateScheduledByTaskRetrySchema,
 	workflowRunStateScheduledByAwakeSchema,
 	workflowRunStateScheduledByResumeSchema,
 	workflowRunStateScheduledByEventSchema,
@@ -175,21 +183,18 @@ export const workflowRunStateAwaitingRetrySchema: Zt<WorkflowRunStateAwaitingRet
 	z.object({
 		status: z.literal("awaiting_retry"),
 		cause: z.literal("task"),
-		reason: z.string(),
 		nextAttemptAt: z.number(),
 		taskPath: z.string(),
 	}),
 	z.object({
 		status: z.literal("awaiting_retry"),
 		cause: z.literal("child_workflow"),
-		reason: z.string(),
 		nextAttemptAt: z.number(),
 		childWorkflowRunId: z.string(),
 	}),
 	z.object({
 		status: z.literal("awaiting_retry"),
 		cause: z.literal("self"),
-		reason: z.string(),
 		nextAttemptAt: z.number(),
 		error: serializedErrorSchema,
 	}),
@@ -213,19 +218,16 @@ export const workflowRunStateFailedSchema: Zt<WorkflowRunStateFailed> = z.union(
 	z.object({
 		status: z.literal("failed"),
 		cause: z.literal("task"),
-		reason: z.string(),
 		taskPath: z.string(),
 	}),
 	z.object({
 		status: z.literal("failed"),
 		cause: z.literal("child_workflow"),
-		reason: z.string(),
 		childWorkflowRunId: z.string(),
 	}),
 	z.object({
 		status: z.literal("failed"),
 		cause: z.literal("self"),
-		reason: z.string(),
 		error: serializedErrorSchema,
 	}),
 ]);

@@ -1,7 +1,7 @@
 import { withRetry } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskPath, TaskState } from "@aikirun/types/task";
+import type { TaskPath } from "@aikirun/types/task";
 import {
 	type WorkflowRun,
 	type WorkflowRunId,
@@ -11,6 +11,7 @@ import {
 	type WorkflowRunStateInComplete,
 	type WorkflowRunStatus,
 } from "@aikirun/types/workflow-run";
+import type { TaskStateRequest } from "@aikirun/types/workflow-run-api";
 
 export function workflowRunHandle<Input, Output>(
 	client: Client<unknown>,
@@ -63,7 +64,7 @@ export interface WorkflowRunHandle<Input, Output> {
 
 	[INTERNAL]: {
 		transitionState: (state: WorkflowRunState<Output>) => Promise<void>;
-		transitionTaskState: (taskPath: TaskPath, taskState: TaskState<unknown>) => Promise<void>;
+		transitionTaskState: (taskPath: TaskPath, taskState: TaskStateRequest) => Promise<void>;
 		assertExecutionAllowed: () => void;
 	};
 }
@@ -194,7 +195,7 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 		this._run = run as WorkflowRun<Input, Output>;
 	}
 
-	private async transitionTaskState(taskPath: TaskPath, taskState: TaskState<unknown>): Promise<void> {
+	private async transitionTaskState(taskPath: TaskPath, taskState: TaskStateRequest): Promise<void> {
 		const { run } = await this.api.workflowRun.transitionTaskStateV1({
 			id: this.run.id,
 			taskPath,

@@ -16,5 +16,8 @@ export interface WorkflowRunContext<Input, Output> {
 
 	[INTERNAL]: {
 		handle: WorkflowRunHandle<Input, Output>;
+		options: {
+			spinThresholdMs: number;
+		};
 	};
 }

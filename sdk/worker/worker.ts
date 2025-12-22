@@ -373,6 +373,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				}, this.params.opts?.workflowRun?.heartbeatIntervalMs ?? 30_000);
 			}
 
+			const spinThresholdMs = this.params.opts?.workflowRun?.spinThresholdMs ?? 10;
+
 			await workflowVersion[INTERNAL].handler(
 				workflowRun.input,
 				{
@@ -381,10 +383,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					workflowVersionId: workflowRun.workflowVersionId as WorkflowVersionId,
 					options: workflowRun.options,
 					logger,
-					sleep: createWorkflowRunSleeper(handle, logger, {
-						spinThresholdMs: this.params.opts?.workflowRun?.spinThresholdMs ?? 10,
-					}),
-					[INTERNAL]: { handle },
+					sleep: createWorkflowRunSleeper(handle, logger, { spinThresholdMs }),
+					[INTERNAL]: { handle, options: { spinThresholdMs } },
 				},
 				appContext
 			);

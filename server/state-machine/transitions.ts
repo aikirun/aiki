@@ -1,6 +1,7 @@
 // biome-ignore-all lint/style/useNamingConvention: snake case fields are okay
 import type { TaskPath, TaskState, TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { TaskStateRequest } from "@aikirun/types/workflow-run-api";
 import { InvalidTaskStateTransitionError, InvalidWorkflowRunStateTransitionError } from "server/errors";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
@@ -29,6 +30,7 @@ const workflowRunStateTransitionValidator: Record<
 
 	running: (() => {
 		const allowedDestinations: WorkflowRunStatus[] = [
+			"scheduled",
 			"running",
 			"paused",
 			"sleeping",
@@ -39,7 +41,15 @@ const workflowRunStateTransitionValidator: Record<
 			"completed",
 			"failed",
 		];
-		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
+		return (to) => {
+			if (!allowedDestinations.includes(to.status)) {
+				return { allowed: false };
+			}
+			if (to.status === "scheduled" && to.reason !== "task_retry") {
+				return { allowed: false, reason: "Only task_retry run allowed" };
+			}
+			return { allowed: true };
+		};
 	})(),
 
 	paused: (() => {
@@ -152,8 +162,10 @@ export function assertIsValidWorkflowRunStateTransition(
 }
 
 const validTaskStatusTransition: Record<TaskStatus, TaskStatus[]> = {
+	// TODO: none => completed is for cases where task result is manually injected
 	none: ["running", "completed"],
-	running: ["none", "running", "completed", "failed"],
+	running: ["none", "running", "awaiting_retry", "completed", "failed"],
+	awaiting_retry: ["none", "running"],
 	completed: ["none"],
 	failed: ["none"],
 };
@@ -162,7 +174,7 @@ export function assertIsValidTaskStateTransition(
 	runId: WorkflowRunId,
 	taskPath: TaskPath,
 	from: TaskState<unknown>,
-	to: TaskState<unknown>
+	to: TaskStateRequest
 ) {
 	const allowedDestinations = validTaskStatusTransition[from.status];
 	if (!allowedDestinations.includes(to.status)) {

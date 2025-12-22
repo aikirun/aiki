@@ -1,6 +1,6 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
-import type { TaskPath } from "@aikirun/types/task";
+import type { TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
 import type { Redis } from "ioredis";
@@ -285,26 +285,36 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context
 	}
 
 	const taskPath = input.taskPath as TaskPath;
-	const taskState = input.taskState;
+	const taskStateRequest = input.taskState;
 
-	assertIsValidTaskStateTransition(runId, taskPath, run.tasksState[taskPath] ?? { status: "none" }, taskState);
+	assertIsValidTaskStateTransition(runId, taskPath, run.tasksState[taskPath] ?? { status: "none" }, taskStateRequest);
 
 	context.logger.info(
 		{
 			workflowRunId: runId,
 			taskPath,
-			taskState: taskState,
+			taskState: taskStateRequest,
 		},
 		"Transitioning task state"
 	);
 
 	const now = Date.now();
 
+	const taskState: TaskState<unknown> =
+		taskStateRequest.status === "awaiting_retry"
+			? {
+					status: "awaiting_retry",
+					attempts: taskStateRequest.attempts,
+					error: taskStateRequest.error,
+					nextAttemptAt: now + taskStateRequest.nextAttemptInMs,
+				}
+			: taskStateRequest;
+
 	const transition: WorkflowRunTransition = {
 		type: "task_state",
 		createdAt: now,
 		taskPath,
-		taskState: taskState,
+		taskState,
 	};
 
 	const transitions = workflowRunTransitions.get(runId);
@@ -390,10 +400,16 @@ export async function scheduleRetryableWorkflowRuns(context: ServerContext) {
 	const now = Date.now();
 
 	for (const run of runs) {
-		// Reset all failed/running tasks atomically with state transition
 		for (const [taskPath, taskState] of Object.entries(run.tasksState)) {
-			if (taskState.status === "failed" || taskState.status === "running") {
-				run.tasksState[taskPath] = { status: "none" };
+			if (taskState.status === "running" || taskState.status === "failed" || taskState.status === "awaiting_retry") {
+				await transitionTaskStateV1.callable({ context })({
+					id: run.id,
+					taskPath: taskPath,
+					taskState: { status: "none" },
+					expectedRevision: run.revision,
+				});
+			} else {
+				taskState.status satisfies "none" | "completed";
 			}
 		}
 
@@ -401,6 +417,37 @@ export async function scheduleRetryableWorkflowRuns(context: ServerContext) {
 			type: "optimistic",
 			id: run.id,
 			state: { status: "scheduled", scheduledAt: now, reason: "retry" },
+			expectedRevision: run.revision,
+		});
+	}
+}
+
+function getWorkflowRunsWithRetryableTask(): WorkflowRun[] {
+	const now = Date.now();
+	const runsWithRetryableTask: WorkflowRun[] = [];
+
+	for (const run of workflowRuns.values()) {
+		if (run.state.status === "running") {
+			for (const taskState of Object.values(run.tasksState)) {
+				if (taskState.status === "awaiting_retry" && taskState.nextAttemptAt <= now) {
+					runsWithRetryableTask.push(run);
+				}
+			}
+		}
+	}
+
+	return runsWithRetryableTask;
+}
+
+export async function scheduleWorkflowRunsWithRetryableTask(context: ServerContext) {
+	const runs = getWorkflowRunsWithRetryableTask();
+	const now = Date.now();
+
+	for (const run of runs) {
+		await transitionStateV1.callable({ context })({
+			type: "optimistic",
+			id: run.id,
+			state: { status: "scheduled", scheduledAt: now, reason: "task_retry" },
 			expectedRevision: run.revision,
 		});
 	}

@@ -4,7 +4,7 @@ export type TaskId = string & { _brand: "task_id" };
 
 export type TaskPath = string & { _brand: "task_path" };
 
-export type TaskStatus = "none" | "running" | "completed" | "failed";
+export type TaskStatus = "none" | "running" | "awaiting_retry" | "completed" | "failed";
 
 interface TaskStateBase {
 	status: TaskStatus;
@@ -20,6 +20,13 @@ export interface TaskStateRunning extends TaskStateBase {
 	attempts: number;
 }
 
+export interface TaskStateAwaitingRetry extends TaskStateBase {
+	status: "awaiting_retry";
+	attempts: number;
+	error: SerializableError;
+	nextAttemptAt: number;
+}
+
 export interface TaskStateCompleted<Output> extends TaskStateBase {
 	status: "completed";
 	output: Output;
@@ -27,13 +34,16 @@ export interface TaskStateCompleted<Output> extends TaskStateBase {
 
 export interface TaskStateFailed extends TaskStateBase {
 	status: "failed";
-	reason: string;
 	attempts: number;
-	nextAttemptAt?: number;
-	error?: SerializableError;
+	error: SerializableError;
 }
 
-export type TaskState<Output> = TaskStateNone | TaskStateRunning | TaskStateCompleted<Output> | TaskStateFailed;
+export type TaskState<Output> =
+	| TaskStateNone
+	| TaskStateRunning
+	| TaskStateAwaitingRetry
+	| TaskStateCompleted<Output>
+	| TaskStateFailed;
 
 export class TaskFailedError extends Error {
 	constructor(

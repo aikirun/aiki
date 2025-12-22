@@ -141,7 +141,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 						"aiki.attempts": attempts,
 						...logMeta,
 					});
-					throw new WorkflowRunFailedError(run.id, attempts, failedState.reason, failedState.cause);
+					throw new WorkflowRunFailedError(run.id, attempts);
 				}
 
 				const nextAttemptAt = Date.now() + retryParams.delayMs;
@@ -173,7 +173,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			logger.error("Workflow retry not allowed", {
 				"aiki.attempts": attempts,
 			});
-			throw new WorkflowRunFailedError(id, attempts, "Workflow retry not allowed");
+			throw new WorkflowRunFailedError(id, attempts);
 		}
 	}
 
@@ -183,7 +183,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				status: "failed",
 				cause: "task",
 				taskPath: error.taskPath,
-				reason: error.reason,
 			};
 		}
 
@@ -193,7 +192,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		return {
 			status: "failed",
 			cause: "self",
-			reason: serializableError.message,
 			error: serializableError,
 		};
 	}
@@ -203,7 +201,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 			return {
 				status: "awaiting_retry",
 				cause: "task",
-				reason: error.reason,
 				nextAttemptAt: nextAttemptAt,
 				taskPath: error.taskPath,
 			};
@@ -215,7 +212,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		return {
 			status: "awaiting_retry",
 			cause: "self",
-			reason: serializableError.message,
 			nextAttemptAt: nextAttemptAt,
 			error: serializableError,
 		};

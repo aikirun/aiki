@@ -34,7 +34,7 @@ interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;
 }
 
-export type WorkflowRunScheduledReason = "new" | "retry" | "awake" | "resume" | "event";
+export type WorkflowRunScheduledReason = "new" | "retry" | "task_retry" | "awake" | "resume" | "event";
 
 interface WorkflowRunStateScheduledBase extends WorkflowRunStateBase {
 	status: "scheduled";
@@ -48,6 +48,10 @@ export interface WorkflowRunStateScheduledByNew extends WorkflowRunStateSchedule
 
 export interface WorkflowRunStateScheduledByRetry extends WorkflowRunStateScheduledBase {
 	reason: "retry";
+}
+
+export interface WorkflowRunStateScheduledByTaskRetry extends WorkflowRunStateScheduledBase {
+	reason: "task_retry";
 }
 
 export interface WorkflowRunStateScheduledByAwake extends WorkflowRunStateScheduledBase {
@@ -65,6 +69,7 @@ export interface WorkflowRunStateScheduledByEvent extends WorkflowRunStateSchedu
 export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByNew
 	| WorkflowRunStateScheduledByRetry
+	| WorkflowRunStateScheduledByTaskRetry
 	| WorkflowRunStateScheduledByAwake
 	| WorkflowRunStateScheduledByResume
 	| WorkflowRunStateScheduledByEvent;
@@ -94,24 +99,23 @@ export interface WorkflowRunStateAwaitingEvent extends WorkflowRunStateBase {
 
 export type WorkflowFailureCause = "task" | "child_workflow" | "self";
 
-export interface WorkflowRunStateAwaitingBase extends WorkflowRunStateBase {
+export interface WorkflowRunStateAwaitingRetryBase extends WorkflowRunStateBase {
 	status: "awaiting_retry";
 	cause: WorkflowFailureCause;
-	reason: string;
 	nextAttemptAt: number;
 }
 
-export interface WorkflowRunStateAwaitingRetryCausedByTask extends WorkflowRunStateAwaitingBase {
+export interface WorkflowRunStateAwaitingRetryCausedByTask extends WorkflowRunStateAwaitingRetryBase {
 	cause: "task";
 	taskPath: string;
 }
 
-export interface WorkflowRunStateAwaitingRetryCausedByChildWorkflow extends WorkflowRunStateAwaitingBase {
+export interface WorkflowRunStateAwaitingRetryCausedByChildWorkflow extends WorkflowRunStateAwaitingRetryBase {
 	cause: "child_workflow";
 	childWorkflowRunId: string;
 }
 
-export interface WorkflowRunStateAwaitingRetryCausedBySelf extends WorkflowRunStateAwaitingBase {
+export interface WorkflowRunStateAwaitingRetryCausedBySelf extends WorkflowRunStateAwaitingRetryBase {
 	cause: "self";
 	error: SerializableError;
 }
@@ -138,7 +142,6 @@ export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase 
 interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
 	status: "failed";
 	cause: WorkflowFailureCause;
-	reason: string;
 }
 
 export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase {
@@ -251,11 +254,9 @@ export class WorkflowRunCancelledError extends Error {
 export class WorkflowRunFailedError extends Error {
 	constructor(
 		public readonly id: WorkflowRunId,
-		public readonly attempts: number,
-		public readonly reason: string,
-		public readonly failureCause?: WorkflowFailureCause
+		public readonly attempts: number
 	) {
-		super(`Workflow ${id} failed after ${attempts} attempt(s): ${reason}`);
+		super(`Workflow ${id} failed after ${attempts} attempt(s)`);
 		this.name = "WorkflowRunFailedError";
 	}
 }
