@@ -176,7 +176,7 @@ export type WorkflowRunStateInComplete =
 	| WorkflowRunStateCancelled
 	| WorkflowRunStateFailed;
 
-export type WorkflowRunState<Output> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
+export type WorkflowRunState<Output = unknown> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
 
 export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;
@@ -195,7 +195,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
 	tasksState: Record<string, TaskState>;
 	sleepsState: Record<string, SleepState>;
-	childWorkflowsRunState: Record<string, WorkflowRunState<unknown>>;
+	childWorkflowsRunState: Record<string, WorkflowRunState>;
 }
 
 export interface WorkflowRunTransitionBase {
@@ -205,7 +205,7 @@ export interface WorkflowRunTransitionBase {
 
 export interface WorkflowRunStateTransition extends WorkflowRunTransitionBase {
 	type: "state";
-	state: WorkflowRunState<unknown>;
+	state: WorkflowRunState;
 }
 
 export interface WorkflowRunTaskStateTransition extends WorkflowRunTransitionBase {

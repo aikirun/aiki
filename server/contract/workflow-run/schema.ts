@@ -243,7 +243,7 @@ export const workflowRunStateFailedSchema: Zt<WorkflowRunStateFailed> = z.union(
 	}),
 ]);
 
-export const workflowRunStateSchema: Zt<WorkflowRunState<unknown>> = z.union([
+export const workflowRunStateSchema: Zt<WorkflowRunState> = z.union([
 	workflowRunStateScheduledSchema,
 	workflowRunStateQueuedSchema,
 	workflowRunStateRunningSchema,

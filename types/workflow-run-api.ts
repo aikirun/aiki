@@ -67,7 +67,7 @@ export interface WorkflowRunGetStateRequestV1 {
 }
 
 export interface WorkflowRunGetStateResponseV1 {
-	state: WorkflowRunState<unknown>;
+	state: WorkflowRunState;
 }
 
 export interface WorkflowRunCreateRequestV1 {
@@ -90,7 +90,7 @@ export type WorkflowRunStateAwaitingRetryRequest = DistributiveOmit<WorkflowRunS
 };
 
 export type WorkflowRunStateRequest =
-	| Exclude<WorkflowRunState<unknown>, { status: "scheduled" | "awaiting_retry" }>
+	| Exclude<WorkflowRunState, { status: "scheduled" | "awaiting_retry" }>
 	| WorkflowRunStateScheduledRequest
 	| WorkflowRunStateAwaitingRetryRequest;
 

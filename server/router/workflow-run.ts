@@ -482,10 +482,7 @@ export async function scheduleSleepingWorkflowRuns(context: ServerContext) {
 	}
 }
 
-function convertWorkflowRunStateDurationsToTimestamps(
-	request: WorkflowRunStateRequest,
-	now: number
-): WorkflowRunState<unknown> {
+function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateRequest, now: number): WorkflowRunState {
 	if (request.status === "scheduled" && "scheduledInMs" in request) {
 		return {
 			status: "scheduled",

@@ -152,7 +152,7 @@ const workflowRunStateTransitionValidator: Record<
 
 export function assertIsValidWorkflowRunStateTransition(
 	runId: WorkflowRunId,
-	from: WorkflowRunState<unknown>,
+	from: WorkflowRunState,
 	to: WorkflowRunStateRequest
 ) {
 	const result = workflowRunStateTransitionValidator[from.status](to);
