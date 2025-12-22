@@ -26,6 +26,10 @@ import type {
 	WorkflowRunStatus,
 	WorkflowRunTransition,
 } from "@aikirun/types/workflow-run";
+import type {
+	WorkflowRunStateAwaitingRetryRequest,
+	WorkflowRunStateScheduledRequestOptimistic,
+} from "@aikirun/types/workflow-run-api";
 import { z } from "zod";
 
 import type { Zt } from "../helpers/schema";
@@ -158,7 +162,14 @@ export const workflowRunStateScheduledSchema: Zt<WorkflowRunStateScheduled> = z.
 
 export const workflowRunStateQueuedSchema: Zt<WorkflowRunStateQueued> = z.object({
 	status: z.literal("queued"),
-	reason: z.union([z.literal("new"), z.literal("retry"), z.literal("awake"), z.literal("resume"), z.literal("event")]),
+	reason: z.union([
+		z.literal("new"),
+		z.literal("retry"),
+		z.literal("task_retry"),
+		z.literal("awake"),
+		z.literal("resume"),
+		z.literal("event"),
+	]),
 });
 
 export const workflowRunStateRunningSchema: Zt<WorkflowRunStateRunning> = z.object({
@@ -272,5 +283,64 @@ export const workflowRunTransitionSchema: Zt<WorkflowRunTransition> = z.discrimi
 		createdAt: z.number(),
 		taskPath: z.string(),
 		taskState: taskStateSchema,
+	}),
+]);
+
+export const workflowRunStateScheduledRequestOptimisticSchema: Zt<WorkflowRunStateScheduledRequestOptimistic> = z.union(
+	[
+		z.object({
+			status: z.literal("scheduled"),
+			reason: z.literal("retry"),
+			scheduledInMs: z.number(),
+		}),
+		z.object({
+			status: z.literal("scheduled"),
+			reason: z.literal("task_retry"),
+			scheduledInMs: z.number(),
+		}),
+		z.object({
+			status: z.literal("scheduled"),
+			reason: z.literal("awake"),
+			scheduledInMs: z.number(),
+		}),
+		z.object({
+			status: z.literal("scheduled"),
+			reason: z.literal("event"),
+			scheduledInMs: z.number(),
+		}),
+	]
+);
+
+export const workflowRunStateScheduledRequestPessimisticSchema = z.union([
+	z.object({
+		status: z.literal("scheduled"),
+		reason: z.enum(["new"]),
+		scheduledInMs: z.number(),
+	}),
+	z.object({
+		status: z.literal("scheduled"),
+		reason: z.enum(["resume"]),
+		scheduledInMs: z.number(),
+	}),
+]);
+
+export const workflowRunStateAwaitingRetryRequestSchema: Zt<WorkflowRunStateAwaitingRetryRequest> = z.union([
+	z.object({
+		status: z.literal("awaiting_retry"),
+		cause: z.literal("task"),
+		taskPath: z.string(),
+		nextAttemptInMs: z.number(),
+	}),
+	z.object({
+		status: z.literal("awaiting_retry"),
+		cause: z.literal("child_workflow"),
+		childWorkflowRunId: z.string(),
+		nextAttemptInMs: z.number(),
+	}),
+	z.object({
+		status: z.literal("awaiting_retry"),
+		cause: z.literal("self"),
+		error: serializedErrorSchema,
+		nextAttemptInMs: z.number(),
 	}),
 ]);

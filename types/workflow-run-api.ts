@@ -1,19 +1,13 @@
-import type {
-	TaskStateAwaitingRetry,
-	TaskStateCompleted,
-	TaskStateFailed,
-	TaskStateNone,
-	TaskStateRunning,
-} from "./task";
+import type { TaskState, TaskStateAwaitingRetry } from "./task";
+import type { DistributiveOmit } from "./utils";
 import type {
 	WorkflowOptions,
 	WorkflowRun,
 	WorkflowRunState,
+	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateCancelled,
 	WorkflowRunStatePaused,
 	WorkflowRunStateScheduled,
-	WorkflowRunStateScheduledByNew,
-	WorkflowRunStateScheduledByResume,
 	WorkflowRunStatus,
 	WorkflowRunTransition,
 } from "./workflow-run";
@@ -87,27 +81,46 @@ export interface WorkflowRunCreateResponseV1 {
 	run: WorkflowRun;
 }
 
+export type WorkflowRunStateScheduledRequest = DistributiveOmit<WorkflowRunStateScheduled, "scheduledAt"> & {
+	scheduledInMs: number;
+};
+
+export type WorkflowRunStateAwaitingRetryRequest = DistributiveOmit<WorkflowRunStateAwaitingRetry, "nextAttemptAt"> & {
+	nextAttemptInMs: number;
+};
+
+export type WorkflowRunStateRequest =
+	| Exclude<WorkflowRunState<unknown>, { status: "scheduled" | "awaiting_retry" }>
+	| WorkflowRunStateScheduledRequest
+	| WorkflowRunStateAwaitingRetryRequest;
+
 interface WorkflowRunTransitionStateRequestBase {
 	type: "optimistic" | "pessimistic";
 	id: string;
-	state: WorkflowRunState<unknown>;
+	state: WorkflowRunStateRequest;
 }
 
-interface WorkflowRunTransitionStateRequestOptimistic extends WorkflowRunTransitionStateRequestBase {
+export type WorkflowRunStateScheduledRequestOptimistic = Exclude<
+	WorkflowRunStateScheduledRequest,
+	{ reason: "new" | "resume" }
+>;
+
+export type WorkflowRunStateScheduledRequestPessimistic = Exclude<
+	WorkflowRunStateScheduledRequest,
+	WorkflowRunStateScheduledRequestOptimistic
+>;
+
+export interface WorkflowRunTransitionStateRequestOptimistic extends WorkflowRunTransitionStateRequestBase {
 	type: "optimistic";
 	state:
-		| Exclude<WorkflowRunState<unknown>, { status: "scheduled" | "paused" | "cancelled" }>
-		| Exclude<WorkflowRunStateScheduled, { reason: "new" | "resume" }>;
+		| WorkflowRunStateScheduledRequestOptimistic
+		| Exclude<WorkflowRunStateRequest, { status: "scheduled" | "paused" | "cancelled" }>;
 	expectedRevision: number;
 }
 
-interface WorkflowRunTransitionStateRequestPessimistic extends WorkflowRunTransitionStateRequestBase {
+export interface WorkflowRunTransitionStateRequestPessimistic extends WorkflowRunTransitionStateRequestBase {
 	type: "pessimistic";
-	state:
-		| WorkflowRunStateScheduledByNew
-		| WorkflowRunStateScheduledByResume
-		| WorkflowRunStatePaused
-		| WorkflowRunStateCancelled;
+	state: WorkflowRunStateScheduledRequestPessimistic | WorkflowRunStatePaused | WorkflowRunStateCancelled;
 }
 
 export type WorkflowRunTransitionStateRequestV1 =
@@ -118,12 +131,13 @@ export interface WorkflowRunTransitionStateResponseV1 {
 	run: WorkflowRun;
 }
 
+export type TaskStateAwaitingRetryRequest = DistributiveOmit<TaskStateAwaitingRetry, "nextAttemptAt"> & {
+	nextAttemptInMs: number;
+};
+
 export type TaskStateRequest =
-	| TaskStateNone
-	| TaskStateRunning
-	| (Omit<TaskStateAwaitingRetry, "nextAttemptAt"> & { nextAttemptInMs: number })
-	| TaskStateCompleted<unknown>
-	| TaskStateFailed;
+	| Exclude<TaskState<unknown>, { status: "awaiting_retry" }>
+	| TaskStateAwaitingRetryRequest;
 
 export interface WorkflowRunTransitionTaskStateRequestV1 {
 	id: string;

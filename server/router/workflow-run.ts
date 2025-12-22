@@ -2,7 +2,8 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
+import type { WorkflowRun, WorkflowRunId, WorkflowRunState, WorkflowRunTransition } from "@aikirun/types/workflow-run";
+import type { WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 import type { Redis } from "ioredis";
 import { NotFoundError, RevisionConflictError } from "server/errors";
 import type { ServerContext } from "server/middleware";
@@ -186,20 +187,21 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 
 	assertIsValidWorkflowRunStateTransition(runId, run.state, input.state);
 
+	const now = Date.now();
+	const state = convertWorkflowRunStateDurationsToTimestamps(input.state, now);
+
 	context.logger.info(
 		{
 			workflowRunId: runId,
-			state: input.state,
+			state,
 		},
 		"Transitioning workflow run state"
 	);
 
-	const now = Date.now();
-
 	const transition: WorkflowRunTransition = {
 		type: "state",
 		createdAt: now,
-		state: input.state,
+		state,
 	};
 
 	const transitions = workflowRunTransitions.get(runId);
@@ -209,9 +211,9 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		transitions.push(transition);
 	}
 
-	if (run.state.status === "sleeping" && input.state.status === "scheduled") {
+	if (run.state.status === "sleeping" && state.status === "scheduled") {
 		const sleepPath = run.state.sleepPath;
-		if (input.state.reason === "awake") {
+		if (state.reason === "awake") {
 			run.sleepsState[sleepPath] = {
 				status: "completed",
 				completedAt: now,
@@ -224,7 +226,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		}
 	}
 
-	if (run.state.status === "paused" && input.state.status === "scheduled") {
+	if (run.state.status === "paused" && state.status === "scheduled") {
 		for (const [sleepPath, sleepState] of Object.entries(run.sleepsState)) {
 			if (sleepState.status === "sleeping" && sleepState.awakeAt <= now) {
 				run.sleepsState[sleepPath] = {
@@ -235,8 +237,8 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		}
 	}
 
-	if (input.state.status === "sleeping") {
-		const { sleepPath, durationMs } = input.state;
+	if (state.status === "sleeping") {
+		const { sleepPath, durationMs } = state;
 		const awakeAt = now + durationMs;
 		run.sleepsState[sleepPath] = {
 			status: "sleeping",
@@ -245,17 +247,17 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	}
 
 	if (
-		input.state.status === "running" &&
+		state.status === "running" &&
 		run.state.status === "queued" &&
 		(run.state.reason === "retry" || run.state.reason === "new")
 	) {
 		run.attempts++;
 	}
 
-	run.state = input.state;
+	run.state = state;
 	run.revision++;
 
-	if (input.state.status === "cancelled") {
+	if (state.status === "cancelled") {
 		for (const childRunId of Object.keys(run.childWorkflowsRunState)) {
 			const childRun = workflowRuns.get(childRunId as WorkflowRunId);
 			if (!childRun) {
@@ -264,9 +266,9 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 			await transitionStateV1.callable({ context })({
 				type: "pessimistic",
 				id: childRunId,
-				state: input.state,
+				state,
 			});
-			run.childWorkflowsRunState[childRunId] = input.state;
+			run.childWorkflowsRunState[childRunId] = state;
 		}
 	}
 
@@ -397,7 +399,6 @@ function getRetryableWorkflows(): WorkflowRun[] {
 
 export async function scheduleRetryableWorkflowRuns(context: ServerContext) {
 	const runs = getRetryableWorkflows();
-	const now = Date.now();
 
 	for (const run of runs) {
 		for (const [taskPath, taskState] of Object.entries(run.tasksState)) {
@@ -416,7 +417,7 @@ export async function scheduleRetryableWorkflowRuns(context: ServerContext) {
 		await transitionStateV1.callable({ context })({
 			type: "optimistic",
 			id: run.id,
-			state: { status: "scheduled", scheduledAt: now, reason: "retry" },
+			state: { status: "scheduled", scheduledInMs: 0, reason: "retry" },
 			expectedRevision: run.revision,
 		});
 	}
@@ -441,13 +442,12 @@ function getWorkflowRunsWithRetryableTask(): WorkflowRun[] {
 
 export async function scheduleWorkflowRunsWithRetryableTask(context: ServerContext) {
 	const runs = getWorkflowRunsWithRetryableTask();
-	const now = Date.now();
 
 	for (const run of runs) {
 		await transitionStateV1.callable({ context })({
 			type: "optimistic",
 			id: run.id,
-			state: { status: "scheduled", scheduledAt: now, reason: "task_retry" },
+			state: { status: "scheduled", scheduledInMs: 0, reason: "task_retry" },
 			expectedRevision: run.revision,
 		});
 	}
@@ -471,16 +471,57 @@ function getSleepingWorkflowRuns(): WorkflowRun[] {
 
 export async function scheduleSleepingWorkflowRuns(context: ServerContext) {
 	const runs = getSleepingWorkflowRuns();
-	const now = Date.now();
 
 	for (const run of runs) {
 		await transitionStateV1.callable({ context })({
 			type: "optimistic",
 			id: run.id,
-			state: { status: "scheduled", scheduledAt: now, reason: "awake" },
+			state: { status: "scheduled", scheduledInMs: 0, reason: "awake" },
 			expectedRevision: run.revision,
 		});
 	}
+}
+
+function convertWorkflowRunStateDurationsToTimestamps(
+	request: WorkflowRunStateRequest,
+	now: number
+): WorkflowRunState<unknown> {
+	if (request.status === "scheduled" && "scheduledInMs" in request) {
+		return {
+			status: "scheduled",
+			reason: request.reason,
+			scheduledAt: now + request.scheduledInMs,
+		};
+	}
+
+	if (request.status === "awaiting_retry" && "nextAttemptInMs" in request) {
+		const nextAttemptAt = now + request.nextAttemptInMs;
+		switch (request.cause) {
+			case "task":
+				return {
+					status: request.status,
+					cause: request.cause,
+					taskPath: request.taskPath,
+					nextAttemptAt,
+				};
+			case "child_workflow":
+				return {
+					status: request.status,
+					cause: request.cause,
+					childWorkflowRunId: request.childWorkflowRunId,
+					nextAttemptAt,
+				};
+			case "self":
+				return {
+					status: request.status,
+					cause: request.cause,
+					error: request.error,
+					nextAttemptAt,
+				};
+		}
+	}
+
+	return request;
 }
 
 export const workflowRunRouter = os.router({

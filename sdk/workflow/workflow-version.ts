@@ -11,10 +11,10 @@ import {
 	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
-	type WorkflowRunStateAwaitingRetry,
 	type WorkflowRunStateFailed,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
+import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/workflow-run-api";
 
 import type { WorkflowRunContext } from "./run/context";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/run-handle";
@@ -144,8 +144,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 					throw new WorkflowRunFailedError(run.id, attempts);
 				}
 
-				const nextAttemptAt = Date.now() + retryParams.delayMs;
-				const awaitingRetryState = this.createAwaitingRetryState(error, nextAttemptAt);
+				const awaitingRetryState = this.createAwaitingRetryState(error, retryParams.delayMs);
 				await run[INTERNAL].handle[INTERNAL].transitionState(awaitingRetryState);
 
 				const logMeta: Record<string, unknown> = {};
@@ -154,7 +153,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				}
 				run.logger.info("Workflow failed. Awaiting retry", {
 					"aiki.attempts": attempts,
-					"aiki.nextAttemptAt": nextAttemptAt,
 					"aiki.delayMs": retryParams.delayMs,
 					...logMeta,
 				});
@@ -196,12 +194,12 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		};
 	}
 
-	private createAwaitingRetryState(error: unknown, nextAttemptAt: number): WorkflowRunStateAwaitingRetry {
+	private createAwaitingRetryState(error: unknown, nextAttemptInMs: number): WorkflowRunStateAwaitingRetryRequest {
 		if (error instanceof TaskFailedError) {
 			return {
 				status: "awaiting_retry",
 				cause: "task",
-				nextAttemptAt: nextAttemptAt,
+				nextAttemptInMs,
 				taskPath: error.taskPath,
 			};
 		}
@@ -212,7 +210,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		return {
 			status: "awaiting_retry",
 			cause: "self",
-			nextAttemptAt: nextAttemptAt,
+			nextAttemptInMs,
 			error: serializableError,
 		};
 	}

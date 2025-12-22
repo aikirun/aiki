@@ -1,14 +1,14 @@
 // biome-ignore-all lint/style/useNamingConvention: snake case fields are okay
 import type { TaskPath, TaskState, TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
-import type { TaskStateRequest } from "@aikirun/types/workflow-run-api";
+import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 import { InvalidTaskStateTransitionError, InvalidWorkflowRunStateTransitionError } from "server/errors";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
 
 const workflowRunStateTransitionValidator: Record<
 	WorkflowRunStatus,
-	(to: WorkflowRunState<unknown>) => StateTransitionValidation
+	(to: WorkflowRunStateRequest) => StateTransitionValidation
 > = {
 	scheduled: (() => {
 		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "queued", "paused", "cancelled"];
@@ -153,7 +153,7 @@ const workflowRunStateTransitionValidator: Record<
 export function assertIsValidWorkflowRunStateTransition(
 	runId: WorkflowRunId,
 	from: WorkflowRunState<unknown>,
-	to: WorkflowRunState<unknown>
+	to: WorkflowRunStateRequest
 ) {
 	const result = workflowRunStateTransitionValidator[from.status](to);
 	if (!result.allowed) {

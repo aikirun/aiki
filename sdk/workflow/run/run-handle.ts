@@ -11,7 +11,7 @@ import {
 	type WorkflowRunStateInComplete,
 	type WorkflowRunStatus,
 } from "@aikirun/types/workflow-run";
-import type { TaskStateRequest } from "@aikirun/types/workflow-run-api";
+import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 
 export function workflowRunHandle<Input, Output>(
 	client: Client<unknown>,
@@ -63,7 +63,7 @@ export interface WorkflowRunHandle<Input, Output> {
 	resume: () => Promise<void>;
 
 	[INTERNAL]: {
-		transitionState: (state: WorkflowRunState<Output>) => Promise<void>;
+		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (taskPath: TaskPath, taskState: TaskStateRequest) => Promise<void>;
 		assertExecutionAllowed: () => void;
 	};
@@ -169,10 +169,10 @@ class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, O
 	}
 
 	public async resume(): Promise<void> {
-		return this.transitionState({ status: "scheduled", scheduledAt: Date.now(), reason: "resume" });
+		return this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resume" });
 	}
 
-	private async transitionState(targetState: WorkflowRunState<Output>): Promise<void> {
+	private async transitionState(targetState: WorkflowRunStateRequest): Promise<void> {
 		if (
 			(targetState.status === "scheduled" && (targetState.reason === "new" || targetState.reason === "resume")) ||
 			targetState.status === "paused" ||
