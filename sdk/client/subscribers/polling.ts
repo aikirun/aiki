@@ -8,10 +8,7 @@ import type {
 	WorkflowRunBatch,
 } from "@aikirun/types/client";
 
-export function createPollingStrategy(
-	_client: Client<unknown>,
-	strategy: PollingSubscriberStrategy
-): SubscriberStrategyBuilder {
+export function createPollingStrategy(_client: Client, strategy: PollingSubscriberStrategy): SubscriberStrategyBuilder {
 	const intervalMs = strategy.intervalMs ?? 100;
 	const maxRetryIntervalMs = strategy.maxRetryIntervalMs ?? 30_000;
 	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;

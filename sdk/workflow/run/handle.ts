@@ -14,18 +14,18 @@ import {
 import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 
 export function workflowRunHandle<Input, Output>(
-	client: Client<unknown>,
+	client: Client,
 	id: WorkflowRunId
 ): Promise<WorkflowRunHandle<Input, Output>>;
 
 export function workflowRunHandle<Input, Output>(
-	client: Client<unknown>,
+	client: Client,
 	run: WorkflowRun<Input, Output>,
 	logger?: Logger
 ): Promise<WorkflowRunHandle<Input, Output>>;
 
 export async function workflowRunHandle<Input, Output>(
-	client: Client<unknown>,
+	client: Client,
 	runOrId: WorkflowRunId | WorkflowRun<Input, Output>,
 	logger?: Logger
 ): Promise<WorkflowRunHandle<Input, Output>> {

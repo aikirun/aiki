@@ -4,14 +4,14 @@ import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
 
 import { INTERNAL } from "./symbols";
 
-export interface ClientParams<AppContext> {
+export interface ClientParams<AppContext = unknown> {
 	url: string;
 	redis: RedisConfig;
 	logger?: Logger;
 	contextFactory?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
 }
 
-export interface Client<AppContext> {
+export interface Client<AppContext = unknown> {
 	api: ApiClient;
 	logger: Logger;
 	close: () => Promise<void>;

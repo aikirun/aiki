@@ -9,7 +9,7 @@ import type {
 } from "@aikirun/types/client";
 
 export function createAdaptivePollingStrategy(
-	_client: Client<unknown>,
+	_client: Client,
 	strategy: AdaptivePollingSubscriberStrategy
 ): SubscriberStrategyBuilder {
 	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;

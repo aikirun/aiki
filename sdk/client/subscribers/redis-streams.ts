@@ -81,7 +81,7 @@ interface ClaimableRedisStreamMessage {
 }
 
 export function createRedisStreamsStrategy(
-	client: Client<unknown>,
+	client: Client,
 	strategy: RedisStreamsSubscriberStrategy,
 	workflows: WorkflowMeta[],
 	workerShards?: string[]
