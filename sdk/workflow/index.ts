@@ -1,8 +1,8 @@
 export type { WorkflowRegistry } from "./registry";
 export { workflowRegistry } from "./registry";
 export type { WorkflowRunContext } from "./run/context";
-export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/run-handle";
-export { workflowRunHandle } from "./run/run-handle";
+export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/handle";
+export { workflowRunHandle } from "./run/handle";
 export { createWorkflowRunSleeper } from "./run/sleeper";
 export type { Workflow, WorkflowParams } from "./workflow";
 export { workflow } from "./workflow";

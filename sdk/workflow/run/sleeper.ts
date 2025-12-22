@@ -4,7 +4,7 @@ import type { SleepParams, SleepPath, SleepResult, SleepStateNone } from "@aikir
 import { INTERNAL } from "@aikirun/types/symbols";
 import { type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 
-import type { WorkflowRunHandle } from "./run-handle";
+import type { WorkflowRunHandle } from "./handle";
 
 interface SleeperOptions {
 	spinThresholdMs: number;

@@ -4,7 +4,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowOptions, WorkflowRunId } from "@aikirun/types/workflow-run";
 
-import type { WorkflowRunHandle } from "./run-handle";
+import type { WorkflowRunHandle } from "./handle";
 
 export interface WorkflowRunContext<Input, Output> {
 	id: WorkflowRunId;

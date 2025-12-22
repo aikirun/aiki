@@ -17,7 +17,7 @@ import {
 import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/workflow-run-api";
 
 import type { WorkflowRunContext } from "./run/context";
-import { type WorkflowRunHandle, workflowRunHandle } from "./run/run-handle";
+import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 
 export interface WorkflowVersionParams<Input, Output, AppContext> {
 	handler: (input: Input, run: Readonly<WorkflowRunContext<Input, Output>>, context: AppContext) => Promise<Output>;
