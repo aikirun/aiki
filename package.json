@@ -21,7 +21,7 @@
 		"server": "bun run server/server.ts",
 		"server:watch": "bun --watch run server/server.ts",
 		"changeset": "changeset",
-		"bump": "changeset version && rm bun.lock && bun install && bun run check:fix",
+		"bump": "changeset version && rm bun.lock && bun install && bun run lint:fix",
 		"clean": "rm -rf types/dist lib/dist server/dist sdk/*/dist",
 		"build:types": "bun run --cwd types build",
 		"build:lib": "bun run --cwd lib build",
