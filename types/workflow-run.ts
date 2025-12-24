@@ -1,4 +1,5 @@
 import type { SerializableError } from "./error";
+import type { EventQueue } from "./event";
 import type { RetryStrategy } from "./retry";
 import type { SleepState } from "./sleep";
 import type { TaskState } from "./task";
@@ -95,6 +96,8 @@ export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateAwaitingEvent extends WorkflowRunStateBase {
 	status: "awaiting_event";
+	eventId: string;
+	timeoutAt?: number;
 }
 
 export type WorkflowFailureCause = "task" | "child_workflow" | "self";
@@ -195,6 +198,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
 	tasksState: Record<string, TaskState>;
 	sleepsState: Record<string, SleepState>;
+	eventsQueue: Record<string, EventQueue<unknown>>;
 	childWorkflowsRunState: Record<string, WorkflowRunState>;
 }
 
@@ -216,17 +220,6 @@ export interface WorkflowRunTaskStateTransition extends WorkflowRunTransitionBas
 
 export type WorkflowRunTransition = WorkflowRunStateTransition | WorkflowRunTaskStateTransition;
 
-export class WorkflowRunConflictError extends Error {
-	constructor(
-		public readonly id: WorkflowRunId,
-		public readonly operation: string,
-		public readonly attempts: number
-	) {
-		super(`Conflict while performing ${operation} on workflow ${id} after ${attempts} attempts`);
-		this.name = "WorkflowRunConflictError";
-	}
-}
-
 export class WorkflowRunNotExecutableError extends Error {
 	constructor(
 		public readonly id: WorkflowRunId,
@@ -237,17 +230,10 @@ export class WorkflowRunNotExecutableError extends Error {
 	}
 }
 
-export class WorkflowRunPausedError extends Error {
-	constructor(id: WorkflowRunId) {
-		super(`Workflow ${id} paused`);
-		this.name = "WorkflowRunPausedError";
-	}
-}
-
-export class WorkflowRunCancelledError extends Error {
-	constructor(id: WorkflowRunId) {
-		super(`Workflow ${id} cancelled`);
-		this.name = "WorkflowRunCancelledError";
+export class WorkflowRunSuspendedError extends Error {
+	constructor(public readonly id: WorkflowRunId) {
+		super(`Workflow ${id} is suspended`);
+		this.name = "WorkflowRunSuspendedError";
 	}
 }
 
@@ -258,12 +244,5 @@ export class WorkflowRunFailedError extends Error {
 	) {
 		super(`Workflow ${id} failed after ${attempts} attempt(s)`);
 		this.name = "WorkflowRunFailedError";
-	}
-}
-
-export class WorkflowRunSuspendedError extends Error {
-	constructor(public readonly id: WorkflowRunId) {
-		super(`Workflow ${id} is suspended`);
-		this.name = "WorkflowRunSuspendedError";
 	}
 }

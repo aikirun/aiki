@@ -8,6 +8,7 @@ import { createContext } from "./middleware/index";
 import { router } from "./router/index";
 import {
 	queueScheduledWorkflowRuns,
+	scheduleEventWaitTimedOutWorkflowRuns,
 	scheduleRetryableWorkflowRuns,
 	scheduleSleepingWorkflowRuns,
 	scheduleWorkflowRunsWithRetryableTask,
@@ -127,10 +128,22 @@ function initCrons(redis: Redis, logger: Logger) {
 		});
 	}, 500);
 
+	const scheduleEventWaitTimedOutWorkflowRunsInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "scheduleEventWaitTimedOutWorkflowRuns",
+			logger,
+		});
+		scheduleEventWaitTimedOutWorkflowRuns(context).catch((err) => {
+			logger.error({ err }, "Error scheduling event wait timed out workflows");
+		});
+	}, 500);
+
 	return [
 		queueScheduledWorkflowRunsInterval,
 		scheduleSleepingWorkflowRunsInterval,
 		scheduleRetryableWorkflowRunsInterval,
 		scheduleWorkflowRunsWithRetryableTaskInterval,
+		scheduleEventWaitTimedOutWorkflowRunsInterval,
 	];
 }

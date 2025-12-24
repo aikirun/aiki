@@ -2,6 +2,7 @@ import type { SerializableInput } from "@aikirun/lib/error";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 
+import type { EventsDefinition } from "./run/event";
 import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version";
 
 /**
@@ -62,10 +63,15 @@ export interface WorkflowParams {
 export interface Workflow {
 	id: WorkflowId;
 
-	v: <Input extends SerializableInput = null, Output = void, AppContext = null>(
+	v: <
+		Input extends SerializableInput = null,
+		Output = void,
+		AppContext = null,
+		TEventsDefinition extends EventsDefinition = Record<string, never>,
+	>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext>
-	) => WorkflowVersion<Input, Output, AppContext>;
+		params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
+	) => WorkflowVersion<Input, Output, AppContext, TEventsDefinition>;
 
 	[INTERNAL]: {
 		getAllVersions: () => WorkflowVersion<unknown, unknown, unknown>[];
@@ -86,10 +92,10 @@ class WorkflowImpl implements Workflow {
 		};
 	}
 
-	v<Input, Output, AppContext>(
+	v<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext>
-	): WorkflowVersion<Input, Output, AppContext> {
+		params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
+	): WorkflowVersion<Input, Output, AppContext, TEventsDefinition> {
 		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
 			throw new Error(`Workflow "${this.id}/${versionId}" already exists`);
 		}

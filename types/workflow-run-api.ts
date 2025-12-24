@@ -1,9 +1,11 @@
+import type { EventSendOptions } from "./event";
 import type { TaskState, TaskStateAwaitingRetry } from "./task";
 import type { DistributiveOmit } from "./utils";
 import type {
 	WorkflowOptions,
 	WorkflowRun,
 	WorkflowRunState,
+	WorkflowRunStateAwaitingEvent,
 	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateCancelled,
 	WorkflowRunStatePaused,
@@ -23,6 +25,7 @@ export interface WorkflowRunApi {
 		input: WorkflowRunTransitionTaskStateRequestV1
 	) => Promise<WorkflowRunTransitionTaskStateResponseV1>;
 	listTransitionsV1: (input: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
+	sendEventV1: (input: WorkflowRunSendEventRequestV1) => Promise<WorkflowRunSendEventResponseV1>;
 }
 
 export interface WorkflowRunListRequestV1 {
@@ -85,13 +88,18 @@ export type WorkflowRunStateScheduledRequest = DistributiveOmit<WorkflowRunState
 	scheduledInMs: number;
 };
 
+export type WorkflowRunStateAwaitingEventRequest = DistributiveOmit<WorkflowRunStateAwaitingEvent, "timeoutAt"> & {
+	timeoutInMs?: number;
+};
+
 export type WorkflowRunStateAwaitingRetryRequest = DistributiveOmit<WorkflowRunStateAwaitingRetry, "nextAttemptAt"> & {
 	nextAttemptInMs: number;
 };
 
 export type WorkflowRunStateRequest =
-	| Exclude<WorkflowRunState, { status: "scheduled" | "awaiting_retry" }>
+	| Exclude<WorkflowRunState, { status: "scheduled" | "awaiting_event" | "awaiting_retry" }>
 	| WorkflowRunStateScheduledRequest
+	| WorkflowRunStateAwaitingEventRequest
 	| WorkflowRunStateAwaitingRetryRequest;
 
 interface WorkflowRunTransitionStateRequestBase {
@@ -161,4 +169,15 @@ export interface WorkflowRunListTransitionsRequestV1 {
 export interface WorkflowRunListTransitionsResponseV1 {
 	transitions: WorkflowRunTransition[];
 	total: number;
+}
+
+export interface WorkflowRunSendEventRequestV1 {
+	id: string;
+	eventId: string;
+	data: unknown;
+	options?: EventSendOptions;
+}
+
+export interface WorkflowRunSendEventResponseV1 {
+	run: WorkflowRun;
 }

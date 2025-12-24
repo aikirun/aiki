@@ -16,7 +16,6 @@ import { TaskFailedError } from "@aikirun/types/task";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowRun,
-	WorkflowRunCancelledError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
@@ -24,7 +23,8 @@ import {
 } from "@aikirun/types/workflow-run";
 import type { WorkflowVersion } from "@aikirun/workflow";
 import {
-	createWorkflowRunSleeper,
+	createEventWaiters,
+	createSleeper,
 	type WorkflowRegistry,
 	workflowRegistry,
 	workflowRunHandle,
@@ -67,7 +67,7 @@ export function worker(params: WorkerParams): Worker {
 export interface WorkerParams {
 	id: string;
 	// biome-ignore lint/suspicious/noExplicitAny: AppContext is contravariant
-	workflows: WorkflowVersion<any, any, any>[];
+	workflows: WorkflowVersion<any, any, any, any>[];
 	subscriber?: SubscriberStrategy;
 	opts?: WorkerOptions;
 }
@@ -354,12 +354,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		let shouldAcknowledge = false;
 
 		try {
-			const handle = await workflowRunHandle(this.client, workflowRun, logger);
-
-			const appContext = this.client[INTERNAL].contextFactory
-				? await this.client[INTERNAL].contextFactory(workflowRun)
-				: null;
-
 			const heartbeat = this.subscriberStrategy?.heartbeat;
 			if (meta && heartbeat) {
 				heartbeatInterval = setInterval(() => {
@@ -373,7 +367,14 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				}, this.params.opts?.workflowRun?.heartbeatIntervalMs ?? 30_000);
 			}
 
+			const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
+			const handle = await workflowRunHandle(this.client, workflowRun, eventsDefinition, logger);
+
 			const spinThresholdMs = this.params.opts?.workflowRun?.spinThresholdMs ?? 10;
+
+			const appContext = this.client[INTERNAL].contextFactory
+				? await this.client[INTERNAL].contextFactory(workflowRun)
+				: null;
 
 			await workflowVersion[INTERNAL].handler(
 				workflowRun.input,
@@ -383,7 +384,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					workflowVersionId: workflowRun.workflowVersionId as WorkflowVersionId,
 					options: workflowRun.options,
 					logger,
-					sleep: createWorkflowRunSleeper(handle, logger, { spinThresholdMs }),
+					sleep: createSleeper(handle, logger, { spinThresholdMs }),
+					events: createEventWaiters(handle, eventsDefinition, logger),
 					[INTERNAL]: { handle, options: { spinThresholdMs } },
 				},
 				appContext
@@ -393,9 +395,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		} catch (error) {
 			if (
 				error instanceof WorkflowRunNotExecutableError ||
-				error instanceof WorkflowRunCancelledError ||
-				error instanceof WorkflowRunFailedError ||
 				error instanceof WorkflowRunSuspendedError ||
+				error instanceof WorkflowRunFailedError ||
 				error instanceof TaskFailedError ||
 				isServerConflictError(error)
 			) {

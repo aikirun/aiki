@@ -13,31 +13,45 @@ import {
 } from "@aikirun/types/workflow-run";
 import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 
-export function workflowRunHandle<Input, Output>(
-	client: Client,
-	id: WorkflowRunId
-): Promise<WorkflowRunHandle<Input, Output>>;
+import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
-export function workflowRunHandle<Input, Output>(
+export function workflowRunHandle<Input, Output, TEventsDefinition extends EventsDefinition>(
+	client: Client,
+	id: WorkflowRunId,
+	eventsDefinition?: TEventsDefinition,
+	logger?: Logger
+): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>>;
+
+export function workflowRunHandle<Input, Output, TEventsDefinition extends EventsDefinition>(
 	client: Client,
 	run: WorkflowRun<Input, Output>,
+	eventsDefinition?: TEventsDefinition,
 	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output>>;
+): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>>;
 
-export async function workflowRunHandle<Input, Output>(
+export async function workflowRunHandle<Input, Output, TEventsDefinition extends EventsDefinition>(
 	client: Client,
 	runOrId: WorkflowRunId | WorkflowRun<Input, Output>,
+	eventsDefinition?: TEventsDefinition,
 	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output>> {
+): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>> {
 	const run =
 		typeof runOrId !== "string"
 			? runOrId
 			: ((await client.api.workflowRun.getByIdV1({ id: runOrId })).run as WorkflowRun<Input, Output>);
-	return new WorkflowRunHandleImpl(client.api, run, logger ?? client.logger.child({ "aiki.workflowRunId": run.id }));
+
+	return new WorkflowRunHandleImpl(
+		client.api,
+		run,
+		eventsDefinition ?? ({} as TEventsDefinition),
+		logger ?? client.logger.child({ "aiki.workflowRunId": run.id })
+	);
 }
 
-export interface WorkflowRunHandle<Input, Output> {
+export interface WorkflowRunHandle<Input, Output, TEventsDefinition extends EventsDefinition = EventsDefinition> {
 	run: Readonly<WorkflowRun<Input, Output>>;
+
+	events: EventSenders<TEventsDefinition>;
 
 	refresh: () => Promise<void>;
 
@@ -75,14 +89,22 @@ export interface WorkflowRunWaitOptions {
 	abortSignal?: AbortSignal;
 }
 
-class WorkflowRunHandleImpl<Input, Output> implements WorkflowRunHandle<Input, Output> {
-	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output>[typeof INTERNAL];
+class WorkflowRunHandleImpl<Input, Output, TEventsDefinition extends EventsDefinition>
+	implements WorkflowRunHandle<Input, Output, TEventsDefinition>
+{
+	public readonly events: EventSenders<TEventsDefinition>;
+	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output, TEventsDefinition>[typeof INTERNAL];
 
 	constructor(
 		private readonly api: ApiClient,
 		private _run: WorkflowRun<Input, Output>,
+		eventsDefinition: TEventsDefinition,
 		private readonly logger: Logger
 	) {
+		this.events = createEventSenders(this.api, this._run.id, eventsDefinition, this.logger, (run) => {
+			this._run = run as WorkflowRun<Input, Output>;
+		});
+
 		this[INTERNAL] = {
 			transitionState: this.transitionState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),

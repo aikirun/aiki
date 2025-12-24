@@ -11,6 +11,8 @@ import type {
 	WorkflowRunListResponseV1,
 	WorkflowRunListTransitionsRequestV1,
 	WorkflowRunListTransitionsResponseV1,
+	WorkflowRunSendEventRequestV1,
+	WorkflowRunSendEventResponseV1,
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
 	WorkflowRunTransitionTaskStateRequestV1,
@@ -23,7 +25,7 @@ import {
 	workflowOptionsSchema,
 	workflowRunSchema,
 	workflowRunStateAwaitingChildWorkflowSchema,
-	workflowRunStateAwaitingEventSchema,
+	workflowRunStateAwaitingEventRequestSchema,
 	workflowRunStateAwaitingRetryRequestSchema,
 	workflowRunStateCancelledSchema,
 	workflowRunStateCompletedSchema,
@@ -133,7 +135,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 						workflowRunStateQueuedSchema,
 						workflowRunStateRunningSchema,
 						workflowRunStateSleepingSchema,
-						workflowRunStateAwaitingEventSchema,
+						workflowRunStateAwaitingEventRequestSchema,
 						workflowRunStateAwaitingRetryRequestSchema,
 						workflowRunStateAwaitingChildWorkflowSchema,
 						workflowRunStateCompletedSchema,
@@ -198,6 +200,25 @@ const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, 
 			})
 		);
 
+const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, WorkflowRunSendEventResponseV1> = oc
+	.input(
+		z.object({
+			id: z.string().min(1),
+			eventId: z.string().min(1),
+			data: z.unknown(),
+			options: z
+				.object({
+					idempotencyKey: z.string().optional(),
+				})
+				.optional(),
+		})
+	)
+	.output(
+		z.object({
+			run: workflowRunSchema,
+		})
+	);
+
 export const workflowRunContract = {
 	listV1,
 	getByIdV1,
@@ -206,6 +227,7 @@ export const workflowRunContract = {
 	transitionStateV1,
 	transitionTaskStateV1,
 	listTransitionsV1,
+	sendEventV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

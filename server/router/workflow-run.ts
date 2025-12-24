@@ -60,12 +60,7 @@ const listV1 = os.listV1.handler(({ input }) => {
 });
 
 const getByIdV1 = os.getByIdV1.handler(({ input, context }) => {
-	context.logger.info(
-		{
-			workflowRunId: input.id,
-		},
-		"Fetching workflow run by id"
-	);
+	context.logger.info({ runId: input.id }, "Fetching workflow run by id");
 
 	const run = workflowRuns.get(input.id as WorkflowRunId);
 	if (!run) {
@@ -76,12 +71,7 @@ const getByIdV1 = os.getByIdV1.handler(({ input, context }) => {
 });
 
 const getStateV1 = os.getStateV1.handler(({ input, context }) => {
-	context.logger.info(
-		{
-			workflowRunId: input.id,
-		},
-		"Fetching workflow run state"
-	);
+	context.logger.info({ runId: input.id }, "Fetching workflow run state");
 
 	const run = workflowRuns.get(input.id as WorkflowRunId);
 	if (!run) {
@@ -92,28 +82,16 @@ const getStateV1 = os.getStateV1.handler(({ input, context }) => {
 });
 
 const createV1 = os.createV1.handler(({ input, context }) => {
-	context.logger.info(
-		{
-			workflowId: input.workflowId,
-			workflowVersionId: input.workflowVersionId,
-		},
-		"Creating workflow run"
-	);
-
 	const workflowId = input.workflowId as WorkflowId;
 	const workflowVersionId = input.workflowVersionId as WorkflowVersionId;
 	const idempotencyKey = input.options?.idempotencyKey;
 
+	context.logger.info({ workflowId, workflowVersionId }, "Creating workflow run");
+
 	if (idempotencyKey) {
 		const existingRunId = workflowRunsIdempotencyMap.get(workflowId)?.get(workflowVersionId)?.get(idempotencyKey);
 		if (existingRunId) {
-			context.logger.info(
-				{
-					workflowRunId: existingRunId,
-					idempotencyKey,
-				},
-				"Returning existing run from idempotency key"
-			);
+			context.logger.info({ runId: existingRunId, idempotencyKey }, "Returning existing run from idempotency key");
 			const existingRun = workflowRuns.get(existingRunId);
 			if (!existingRun) {
 				throw new NotFoundError(`Workflow run not found: ${existingRunId}`);
@@ -129,8 +107,8 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 
 	const run: WorkflowRun = {
 		id: runId,
-		workflowId: input.workflowId,
-		workflowVersionId: input.workflowVersionId,
+		workflowId: workflowId,
+		workflowVersionId: workflowVersionId,
 		createdAt: now,
 		revision: 0,
 		attempts: 0,
@@ -150,6 +128,7 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 		},
 		tasksState: {},
 		sleepsState: {},
+		eventsQueue: {},
 		childWorkflowsRunState: {},
 	};
 
@@ -190,13 +169,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	const now = Date.now();
 	const state = convertWorkflowRunStateDurationsToTimestamps(input.state, now);
 
-	context.logger.info(
-		{
-			workflowRunId: runId,
-			state,
-		},
-		"Transitioning workflow run state"
-	);
+	context.logger.info({ runId, state }, "Transitioning workflow run state");
 
 	const transition: WorkflowRunTransition = {
 		type: "state",
@@ -291,14 +264,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context
 
 	assertIsValidTaskStateTransition(runId, taskPath, run.tasksState[taskPath] ?? { status: "none" }, taskStateRequest);
 
-	context.logger.info(
-		{
-			workflowRunId: runId,
-			taskPath,
-			taskState: taskStateRequest,
-		},
-		"Transitioning task state"
-	);
+	context.logger.info({ runId, taskPath, taskState: taskStateRequest }, "Transitioning task state");
 
 	const now = Date.now();
 
@@ -348,6 +314,56 @@ const listTransitionsV1 = os.listTransitionsV1.handler(({ input }) => {
 			.slice(offset, offset + limit),
 		total: transitions.length,
 	};
+});
+
+const sendEventV1 = os.sendEventV1.handler(async ({ input, context }) => {
+	const runId = input.id as WorkflowRunId;
+
+	const run = workflowRuns.get(runId);
+	if (!run) {
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
+	}
+
+	const { eventId, data, options } = input;
+	const idempotencyKey = options?.idempotencyKey;
+
+	let eventQueue = run.eventsQueue[eventId];
+	if (!eventQueue) {
+		eventQueue = { events: [] };
+		run.eventsQueue[eventId] = eventQueue;
+	}
+
+	if (idempotencyKey) {
+		const isDuplicate = eventQueue.events.some(
+			(event) => event.status === "received" && event.idempotencyKey === idempotencyKey
+		);
+		if (isDuplicate) {
+			context.logger.info({ runId, eventId, idempotencyKey }, "Duplicate event, ignoring");
+			return { run };
+		}
+	}
+
+	const now = Date.now();
+
+	eventQueue.events.push({
+		status: "received",
+		data,
+		receivedAt: now,
+		idempotencyKey,
+	});
+
+	context.logger.info({ runId, eventId }, "Event sent to workflow run");
+
+	if (run.state.status === "awaiting_event" && run.state.eventId === eventId) {
+		await transitionStateV1.callable({ context })({
+			type: "optimistic",
+			id: run.id,
+			state: { status: "scheduled", scheduledInMs: 0, reason: "event" },
+			expectedRevision: run.revision,
+		});
+	}
+
+	return { run };
 });
 
 function getWorkflowRunsWithElapsedSchedule(): WorkflowRun[] {
@@ -482,6 +498,47 @@ export async function scheduleSleepingWorkflowRuns(context: ServerContext) {
 	}
 }
 
+function getEventWaitTimedOutWorkflowRuns(): WorkflowRun[] {
+	const now = Date.now();
+	const eventWaitTimedOutRuns: WorkflowRun[] = [];
+
+	for (const run of workflowRuns.values()) {
+		if (run.state.status === "awaiting_event" && run.state.timeoutAt !== undefined && run.state.timeoutAt <= now) {
+			eventWaitTimedOutRuns.push(run);
+		}
+	}
+
+	return eventWaitTimedOutRuns;
+}
+
+export async function scheduleEventWaitTimedOutWorkflowRuns(context: ServerContext) {
+	const runs = getEventWaitTimedOutWorkflowRuns();
+
+	for (const run of runs) {
+		if (run.state.status !== "awaiting_event") {
+			continue;
+		}
+
+		const eventId = run.state.eventId;
+		const now = Date.now();
+
+		let eventQueue = run.eventsQueue[eventId];
+		if (!eventQueue) {
+			eventQueue = { events: [] };
+			run.eventsQueue[eventId] = eventQueue;
+		}
+
+		eventQueue.events.push({ status: "timeout", timedOutAt: now });
+
+		await transitionStateV1.callable({ context })({
+			type: "optimistic",
+			id: run.id,
+			state: { status: "scheduled", scheduledInMs: 0, reason: "event" },
+			expectedRevision: run.revision,
+		});
+	}
+}
+
 function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateRequest, now: number): WorkflowRunState {
 	if (request.status === "scheduled" && "scheduledInMs" in request) {
 		return {
@@ -518,6 +575,14 @@ function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateR
 		}
 	}
 
+	if (request.status === "awaiting_event" && "timeoutInMs" in request && request.timeoutInMs !== undefined) {
+		return {
+			status: request.status,
+			eventId: request.eventId,
+			timeoutAt: now + request.timeoutInMs,
+		};
+	}
+
 	return request;
 }
 
@@ -529,4 +594,5 @@ export const workflowRunRouter = os.router({
 	transitionStateV1,
 	transitionTaskStateV1,
 	listTransitionsV1,
+	sendEventV1,
 });

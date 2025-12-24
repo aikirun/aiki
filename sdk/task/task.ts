@@ -12,6 +12,7 @@ import type { TaskPath, TaskStateAwaitingRetry } from "@aikirun/types/task";
 import { TaskFailedError, type TaskId } from "@aikirun/types/task";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext } from "@aikirun/workflow";
+import type { EventsDefinition } from "sdk/workflow/run/event";
 
 /**
  * Defines a durable task with deterministic execution and automatic retries.
@@ -85,7 +86,7 @@ export interface Task<Input, Output> {
 	id: TaskId;
 	with(): TaskBuilder<Input, Output>;
 	start: <WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput, EventsDefinition>,
 		...args: Input extends null ? [] : [Input]
 	) => Promise<Output>;
 }
@@ -109,7 +110,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	public async start<WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput, EventsDefinition>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
@@ -166,7 +167,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async tryExecuteTask<WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput, EventsDefinition>,
 		input: Input,
 		path: TaskPath,
 		retryStrategy: RetryStrategy,
@@ -236,7 +237,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async delayIfNecessary<WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput>,
+		run: WorkflowRunContext<WorkflowInput, WorkflowOutput, EventsDefinition>,
 		taskState: TaskStateAwaitingRetry
 	): Promise<void> {
 		const remainingDelayMs = Math.max(0, taskState.nextAttemptAt - Date.now());

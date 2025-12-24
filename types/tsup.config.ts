@@ -14,6 +14,7 @@ export default defineConfig({
 		"workflow-run-api": "workflow-run-api.ts",
 		task: "task.ts",
 		sleep: "sleep.ts",
+		event: "event.ts",
 	},
 	format: ["esm"],
 	dts: true,

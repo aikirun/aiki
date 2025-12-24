@@ -27,11 +27,13 @@ import type {
 	WorkflowRunTransition,
 } from "@aikirun/types/workflow-run";
 import type {
+	WorkflowRunStateAwaitingEventRequest,
 	WorkflowRunStateAwaitingRetryRequest,
 	WorkflowRunStateScheduledRequestOptimistic,
 } from "@aikirun/types/workflow-run-api";
 import { z } from "zod";
 
+import { eventsQueueSchema } from "../event/schema";
 import type { Zt } from "../helpers/schema";
 import { serializedErrorSchema } from "../serializable";
 import { sleepStateSchema } from "../sleep/schema";
@@ -188,6 +190,8 @@ export const workflowRunStateSleepingSchema: Zt<WorkflowRunStateSleeping> = z.ob
 
 export const workflowRunStateAwaitingEventSchema: Zt<WorkflowRunStateAwaitingEvent> = z.object({
 	status: z.literal("awaiting_event"),
+	eventId: z.string(),
+	timeoutAt: z.number().optional(),
 });
 
 export const workflowRunStateAwaitingRetrySchema: Zt<WorkflowRunStateAwaitingRetry> = z.union([
@@ -269,6 +273,7 @@ export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	state: workflowRunStateSchema,
 	tasksState: z.record(z.string(), taskStateSchema),
 	sleepsState: z.record(z.string(), sleepStateSchema),
+	eventsQueue: z.record(z.string(), eventsQueueSchema),
 	childWorkflowsRunState: z.record(z.string(), workflowRunStateSchema),
 });
 
@@ -323,6 +328,12 @@ export const workflowRunStateScheduledRequestPessimisticSchema = z.union([
 		scheduledInMs: z.number(),
 	}),
 ]);
+
+export const workflowRunStateAwaitingEventRequestSchema: Zt<WorkflowRunStateAwaitingEventRequest> = z.object({
+	status: z.literal("awaiting_event"),
+	eventId: z.string(),
+	timeoutInMs: z.number().optional(),
+});
 
 export const workflowRunStateAwaitingRetryRequestSchema: Zt<WorkflowRunStateAwaitingRetryRequest> = z.union([
 	z.object({

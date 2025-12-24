@@ -13,11 +13,7 @@ interface SleeperOptions {
 const MAX_SLEEP_YEARS = 10;
 const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1000;
 
-export function createWorkflowRunSleeper(
-	workflowRunHandle: WorkflowRunHandle<unknown, unknown>,
-	logger: Logger,
-	options: SleeperOptions
-) {
+export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logger: Logger, options: SleeperOptions) {
 	return async (params: SleepParams): Promise<SleepResult> => {
 		const { id: sleepId, ...durationFields } = params;
 		const durationMs = toMilliseconds(durationFields);
@@ -28,7 +24,7 @@ export function createWorkflowRunSleeper(
 
 		const sleepPath = `${sleepId}/${durationMs}` as SleepPath;
 
-		const sleepState = workflowRunHandle.run.sleepsState[sleepPath] ?? { status: "none" };
+		const sleepState = handle.run.sleepsState[sleepPath] ?? { status: "none" };
 		if (sleepState.status === "completed") {
 			logger.debug("Sleep completed", {
 				"aiki.sleepId": sleepId,
@@ -48,7 +44,7 @@ export function createWorkflowRunSleeper(
 				"aiki.sleepId": sleepId,
 				"aiki.durationMs": durationMs,
 			});
-			throw new WorkflowRunSuspendedError(workflowRunHandle.run.id as WorkflowRunId);
+			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 		}
 		sleepState satisfies SleepStateNone;
 
@@ -61,13 +57,13 @@ export function createWorkflowRunSleeper(
 			return { cancelled: false };
 		}
 
-		await workflowRunHandle[INTERNAL].transitionState({ status: "sleeping", sleepPath, durationMs });
+		await handle[INTERNAL].transitionState({ status: "sleeping", sleepPath, durationMs });
 
 		logger.info("Workflow going to sleep", {
 			"aiki.sleepId": sleepId,
 			"aiki.durationMs": durationMs,
 		});
 
-		throw new WorkflowRunSuspendedError(workflowRunHandle.run.id as WorkflowRunId);
+		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 	};
 }

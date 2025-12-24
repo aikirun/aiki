@@ -17,56 +17,81 @@ import {
 import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/workflow-run-api";
 
 import type { WorkflowRunContext } from "./run/context";
+import type { EventsDefinition } from "./run/event";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 
-export interface WorkflowVersionParams<Input, Output, AppContext> {
-	handler: (input: Input, run: Readonly<WorkflowRunContext<Input, Output>>, context: AppContext) => Promise<Output>;
+export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
+	events?: TEventsDefinition;
 	opts?: WorkflowOptions;
+	handler: (
+		input: Input,
+		run: Readonly<WorkflowRunContext<Input, Output, TEventsDefinition>>,
+		context: AppContext
+	) => Promise<Output>;
 }
 
-export interface WorkflowBuilder<Input, Output, AppContext> {
+export interface WorkflowBuilder<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
 	opt<Path extends PathFromObject<WorkflowOptions>>(
 		path: Path,
 		value: TypeOfValueAtPath<WorkflowOptions, Path>
-	): WorkflowBuilder<Input, Output, AppContext>;
-	start: WorkflowVersion<Input, Output, AppContext>["start"];
+	): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>;
+
+	start: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["start"];
 }
 
-export interface WorkflowVersion<Input, Output, AppContext> {
+export interface WorkflowVersion<
+	Input,
+	Output,
+	AppContext,
+	TEventsDefinition extends EventsDefinition = EventsDefinition,
+> {
 	id: WorkflowId;
 	versionId: WorkflowVersionId;
 
-	with(): WorkflowBuilder<Input, Output, AppContext>;
+	with(): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>;
 
 	start: (
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
-	) => Promise<WorkflowRunHandle<Input, Output>>;
+	) => Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>>;
+
+	getHandle: (
+		client: Client<AppContext>,
+		runId: WorkflowRunId
+	) => Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>>;
 
 	[INTERNAL]: {
-		handler: (input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext) => Promise<void>;
+		eventsDefinition: TEventsDefinition;
+		handler: (
+			input: Input,
+			run: WorkflowRunContext<Input, Output, TEventsDefinition>,
+			context: AppContext
+		) => Promise<void>;
 	};
 }
 
-export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowVersion<Input, Output, AppContext> {
-	public readonly [INTERNAL]: WorkflowVersion<Input, Output, AppContext>[typeof INTERNAL];
+export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>
+	implements WorkflowVersion<Input, Output, AppContext, TEventsDefinition>
+{
+	public readonly [INTERNAL]: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>[typeof INTERNAL];
 
 	constructor(
 		public readonly id: WorkflowId,
 		public readonly versionId: WorkflowVersionId,
-		private readonly params: WorkflowVersionParams<Input, Output, AppContext>
+		private readonly params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
 	) {
 		this[INTERNAL] = {
+			eventsDefinition: this.params.events ?? ({} as TEventsDefinition),
 			handler: this.handler.bind(this),
 		};
 	}
 
-	public with(): WorkflowBuilder<Input, Output, AppContext> {
+	public with(): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition> {
 		const optsOverrider = objectOverrider(this.params.opts ?? {});
 
 		const createBuilder = (
 			optsBuilder: ReturnType<typeof optsOverrider>
-		): WorkflowBuilder<Input, Output, AppContext> => ({
+		): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition> => ({
 			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
 			start: (client, ...args) =>
 				new WorkflowVersionImpl(this.id, this.versionId, { ...this.params, opts: optsBuilder.build() }).start(
@@ -81,17 +106,28 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 	public async start(
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output>> {
+	): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>> {
 		const { run } = await client.api.workflowRun.createV1({
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : null,
 			options: this.params.opts,
 		});
-		return workflowRunHandle(client, run as WorkflowRun<Input, Output>);
+		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
 	}
 
-	private async handler(input: Input, run: WorkflowRunContext<Input, Output>, context: AppContext): Promise<void> {
+	public async getHandle(
+		client: Client<AppContext>,
+		runId: WorkflowRunId
+	): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>> {
+		return workflowRunHandle(client, runId, this[INTERNAL].eventsDefinition);
+	}
+
+	private async handler(
+		input: Input,
+		run: WorkflowRunContext<Input, Output, TEventsDefinition>,
+		context: AppContext
+	): Promise<void> {
 		const { logger } = run;
 		const { handle } = run[INTERNAL];
 
@@ -100,7 +136,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
 		const state = handle.run.state;
 		if (state.status === "queued" && state.reason === "retry") {
-			this.assertRetryAllowed(handle.run.id as WorkflowRunId, handle.run.attempts, retryStrategy, logger);
+			await this.assertRetryAllowed(handle, retryStrategy, logger);
 		}
 
 		logger.info("Starting workflow");
@@ -114,7 +150,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 
 	private async tryExecuteWorkflow(
 		input: Input,
-		run: WorkflowRunContext<Input, Output>,
+		run: WorkflowRunContext<Input, Output, TEventsDefinition>,
 		context: AppContext,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
@@ -126,12 +162,14 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 					throw error;
 				}
 
-				const attempts = run[INTERNAL].handle.run.attempts;
+				const { handle } = run[INTERNAL];
+
+				const attempts = handle.run.attempts;
 				const retryParams = getRetryParams(attempts, retryStrategy);
 
 				if (!retryParams.retriesLeft) {
 					const failedState = this.createFailedState(error);
-					await run[INTERNAL].handle[INTERNAL].transitionState(failedState);
+					await handle[INTERNAL].transitionState(failedState);
 
 					const logMeta: Record<string, unknown> = {};
 					for (const [key, value] of Object.entries(failedState)) {
@@ -145,7 +183,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 				}
 
 				const awaitingRetryState = this.createAwaitingRetryState(error, retryParams.delayMs);
-				await run[INTERNAL].handle[INTERNAL].transitionState(awaitingRetryState);
+				await handle[INTERNAL].transitionState(awaitingRetryState);
 
 				const logMeta: Record<string, unknown> = {};
 				for (const [key, value] of Object.entries(awaitingRetryState)) {
@@ -165,13 +203,28 @@ export class WorkflowVersionImpl<Input, Output, AppContext> implements WorkflowV
 		}
 	}
 
-	private assertRetryAllowed(id: WorkflowRunId, attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
+	private async assertRetryAllowed(
+		handle: WorkflowRunHandle<Input, Output, TEventsDefinition>,
+		retryStrategy: RetryStrategy,
+		logger: Logger
+	): Promise<void> {
+		const { id, attempts } = handle.run;
+
 		const retryParams = getRetryParams(attempts, retryStrategy);
+
 		if (!retryParams.retriesLeft) {
-			logger.error("Workflow retry not allowed", {
-				"aiki.attempts": attempts,
+			logger.error("Workflow retry not allowed", { "aiki.attempts": attempts });
+
+			const error = new WorkflowRunFailedError(id as WorkflowRunId, attempts);
+			const serializableError = createSerializableError(error);
+
+			await handle[INTERNAL].transitionState({
+				status: "failed",
+				cause: "self",
+				error: serializableError,
 			});
-			throw new WorkflowRunFailedError(id, attempts);
+
+			throw error;
 		}
 	}
 

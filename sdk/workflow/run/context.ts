@@ -4,18 +4,20 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowOptions, WorkflowRunId } from "@aikirun/types/workflow-run";
 
+import type { EventsDefinition, EventWaiters } from "./event";
 import type { WorkflowRunHandle } from "./handle";
 
-export interface WorkflowRunContext<Input, Output> {
+export interface WorkflowRunContext<Input, Output, TEventDefinition extends EventsDefinition> {
 	id: WorkflowRunId;
 	workflowId: WorkflowId;
 	workflowVersionId: WorkflowVersionId;
 	options: WorkflowOptions;
 	logger: Logger;
 	sleep: (params: SleepParams) => Promise<SleepResult>;
+	events: EventWaiters<TEventDefinition>;
 
 	[INTERNAL]: {
-		handle: WorkflowRunHandle<Input, Output>;
+		handle: WorkflowRunHandle<Input, Output, TEventDefinition>;
 		options: {
 			spinThresholdMs: number;
 		};

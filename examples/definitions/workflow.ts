@@ -1,6 +1,6 @@
-import { workflow } from "@aikirun/workflow";
+import { event, workflow } from "@aikirun/workflow";
 
-import { drinkCoffee, ringAlarm, stretch } from "./task";
+import { drinkCoffee, stretch } from "./task";
 
 export const morningWorkflow = workflow({ id: "morning-routine" });
 
@@ -11,16 +11,21 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 });
 
 export const morningWorkflowV2 = morningWorkflow.v("2.0", {
-	async handler(input: { a: string; b: number }, run): Promise<{ message: string }> {
-		const alarmOutput = await ringAlarm.start(run, { song: input.a });
+	async handler(input: { foo: number }, run): Promise<{ bar: string }> {
+		const { data: eventData } = await run.events.alarm.wait();
 
 		run.logger.info("I need to sleep some more");
 
-		await run.sleep({ id: "post-prayer-rest", seconds: 30 });
+		await run.sleep({ id: "snooze", seconds: 30 });
 
-		const stretchOutput = await stretch.start(run, { duration: input.b });
+		const { muscles } = await stretch.start(run, { duration: input.foo });
 
-		return { message: `Alarm: ${alarmOutput}, Stretch: ${stretchOutput}` };
+		await drinkCoffee.start(run, { withSugar: true });
+
+		return { bar: `Alarm: ${eventData.ringtone}, Stretched: ${muscles}` };
+	},
+	events: {
+		alarm: event<{ ringtone: string }>(),
 	},
 	opts: {
 		trigger: {

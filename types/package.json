@@ -51,6 +51,10 @@
 		"./sleep": {
 			"types": "./dist/sleep.d.ts",
 			"import": "./dist/sleep.js"
+		},
+		"./event": {
+			"types": "./dist/event.d.ts",
+			"import": "./dist/event.js"
 		}
 	},
 	"files": [
