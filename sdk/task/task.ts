@@ -8,7 +8,7 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskPath, TaskStateAwaitingRetry } from "@aikirun/types/task";
+import type { TaskPath } from "@aikirun/types/task";
 import { TaskFailedError, type TaskId } from "@aikirun/types/task";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext } from "@aikirun/workflow";
@@ -149,8 +149,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			attempts = taskState.attempts;
 		}
 
-		if (taskState.status === "awaiting_retry") {
-			await this.delayIfNecessary(run, taskState);
+		if (taskState.status === "awaiting_retry" && handle.run.state.status === "running") {
+			throw new WorkflowRunSuspendedError(run.id);
 		}
 
 		attempts++;
@@ -234,21 +234,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			});
 			throw new TaskFailedError(path, attempts, "Task retry not allowed");
 		}
-	}
-
-	private async delayIfNecessary<WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput, EventsDefinition>,
-		taskState: TaskStateAwaitingRetry
-	): Promise<void> {
-		const remainingDelayMs = Math.max(0, taskState.nextAttemptAt - Date.now());
-		if (remainingDelayMs <= 0) {
-			return;
-		}
-		if (remainingDelayMs <= run[INTERNAL].options.spinThresholdMs) {
-			await delay(remainingDelayMs);
-			return;
-		}
-		throw new WorkflowRunSuspendedError(run.id);
 	}
 
 	private async getPath(input: Input): Promise<TaskPath> {
