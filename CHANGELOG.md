@@ -2,6 +2,20 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.6.0
+
+### Minor Changes
+
+- Add workflow events for external signal handling
+  * Define type-safe events on workflow versions with optional schema validation
+  * Wait for events inside workflows with optional timeout
+  * Send events via typed handles (from start() or getHandle())
+  * Queue-based model with idempotency key support for deduplication
+- New `awaiting_retry` state for tasks when retry delay exceeds spin threshold
+- Workers now send time deltas instead of absolute timestamps to resolve clock skew
+- Fix assertRetryAllowed to transition workflow to failed state before throwing
+- Fix clock skew in task retry: suspend on Redis redelivery, let server schedule
+
 ## 0.5.3
 
 ### Patch Changes
