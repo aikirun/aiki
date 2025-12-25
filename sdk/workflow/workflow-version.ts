@@ -21,13 +21,13 @@ import { createEventMulticasters, type EventMulticasters, type EventsDefinition 
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 
 export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
-	events?: TEventsDefinition;
-	opts?: WorkflowOptions;
 	handler: (
 		input: Input,
 		run: Readonly<WorkflowRunContext<Input, Output, TEventsDefinition>>,
 		context: AppContext
 	) => Promise<Output>;
+	events?: TEventsDefinition;
+	opts?: WorkflowOptions;
 }
 
 export interface WorkflowBuilder<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
