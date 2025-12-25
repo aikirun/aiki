@@ -1,4 +1,4 @@
-import { withRetry } from "@aikirun/lib";
+import { type DurationObject, type RetryStrategy, toMilliseconds, withRetry } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { TaskPath } from "@aikirun/types/task";
@@ -7,8 +7,6 @@ import {
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
 	type WorkflowRunState,
-	type WorkflowRunStateCompleted,
-	type WorkflowRunStateInComplete,
 	type WorkflowRunStatus,
 } from "@aikirun/types/workflow-run";
 import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
@@ -55,20 +53,22 @@ export interface WorkflowRunHandle<Input, Output, TEventsDefinition extends Even
 
 	refresh: () => Promise<void>;
 
-	wait<S extends WorkflowRunStatus>(
-		condition: { type: "status"; status: S },
-		options: WorkflowRunWaitOptions
-	): Promise<
-		| { success: false; cause: "timeout" | "aborted" }
-		| {
-				success: true;
-				state: S extends "completed" ? WorkflowRunStateCompleted<Output> : WorkflowRunStateInComplete;
-		  }
-	>;
-	wait(
-		condition: { type: "event"; event: string },
-		options: WorkflowRunWaitOptions
-	): Promise<{ success: false; cause: "timeout" | "aborted" } | { success: true; state: WorkflowRunState<Output> }>;
+	waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options?: WorkflowRunWaitOptions<false, false>
+	): Promise<WorkflowRunWaitResultSuccess<Status, Output>>;
+	waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options: WorkflowRunWaitOptions<true, false>
+	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
+	waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options: WorkflowRunWaitOptions<false, true>
+	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
+	waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options: WorkflowRunWaitOptions<true, true>
+	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
 
 	cancel: (reason?: string) => Promise<void>;
 
@@ -83,11 +83,31 @@ export interface WorkflowRunHandle<Input, Output, TEventsDefinition extends Even
 	};
 }
 
-export interface WorkflowRunWaitOptions {
-	maxDurationMs: number;
-	pollIntervalMs?: number;
-	abortSignal?: AbortSignal;
+export interface WorkflowRunWaitOptions<Timed extends boolean, Abortable extends boolean> {
+	interval?: DurationObject;
+	timeout?: Timed extends true ? DurationObject : never;
+	abortSignal?: Abortable extends true ? AbortSignal : never;
 }
+
+export type WorkflowRunWaitResultSuccess<Status extends WorkflowRunStatus, Output> = Extract<
+	WorkflowRunState<Output>,
+	{ status: Status }
+>;
+
+export type WorkflowRunWaitResult<
+	Status extends WorkflowRunStatus,
+	Output,
+	Timed extends boolean,
+	Abortable extends boolean,
+> =
+	| {
+			success: false;
+			cause: (Timed extends true ? "timeout" : never) | (Abortable extends true ? "aborted" : never);
+	  }
+	| {
+			success: true;
+			state: WorkflowRunWaitResultSuccess<Status, Output>;
+	  };
 
 class WorkflowRunHandleImpl<Input, Output, TEventsDefinition extends EventsDefinition>
 	implements WorkflowRunHandle<Input, Output, TEventsDefinition>
@@ -121,68 +141,69 @@ class WorkflowRunHandleImpl<Input, Output, TEventsDefinition extends EventsDefin
 		this._run = currentRun as WorkflowRun<Input, Output>;
 	}
 
+	public async waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options?: WorkflowRunWaitOptions<false, false>
+	): Promise<WorkflowRunWaitResultSuccess<Status, Output>>;
+	public async waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options: WorkflowRunWaitOptions<true, false>
+	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
+	public async waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options: WorkflowRunWaitOptions<false, true>
+	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
+	public async waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options: WorkflowRunWaitOptions<true, true>
+	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
 	// TODO: instead polling the current state, use the transition history
 	// because it is entirely possible for a workflow to flash though a state
 	// and the handle will never know that the workflow hit that state
-	public async wait<
-		S extends WorkflowRunStatus,
-		R extends S extends "completed" ? WorkflowRunStateCompleted<Output> : WorkflowRunStateInComplete,
-	>(
-		condition: { type: "status"; status: S } | { type: "event"; event: string },
-		options: WorkflowRunWaitOptions
-	): Promise<{ success: false; cause: "timeout" | "aborted" } | { success: true; state: R }> {
-		if (options.abortSignal?.aborted) {
-			throw new Error("Wait operation aborted");
+	public async waitForState<Status extends WorkflowRunStatus>(
+		status: Status,
+		options?: WorkflowRunWaitOptions<boolean, boolean>
+	): Promise<WorkflowRunWaitResultSuccess<Status, Output> | WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
+		if (options?.abortSignal?.aborted) {
+			throw new Error("Status wait operation aborted");
 		}
 
-		const delayMs = options.pollIntervalMs ?? 1_000;
-		const maxAttempts = Math.ceil(options.maxDurationMs / delayMs);
+		const delayMs = options?.interval ? toMilliseconds(options.interval) : 1_000;
+		const maxAttempts = options?.timeout
+			? Math.ceil(toMilliseconds(options.timeout) / delayMs)
+			: Number.POSITIVE_INFINITY;
+		const retryStrategy: RetryStrategy = { type: "fixed", maxAttempts, delayMs };
 
-		switch (condition.type) {
-			case "status": {
-				if (options.abortSignal !== undefined) {
-					const maybeResult = await withRetry(
-						async () => {
-							await this.refresh();
-							return this.run.state;
-						},
-						{ type: "fixed", maxAttempts, delayMs },
-						{
-							abortSignal: options.abortSignal,
-							shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status),
-						}
-					).run();
-					if (maybeResult.state === "timeout" || maybeResult.state === "aborted") {
-						return { success: false, cause: maybeResult.state };
-					}
-					return {
-						success: true,
-						state: maybeResult.result as R,
-					};
-				}
+		const loadState = async () => {
+			await this.refresh();
+			return this.run.state;
+		};
 
-				const maybeResult = await withRetry(
-					async () => {
-						await this.refresh();
-						return this.run.state;
-					},
-					{ type: "fixed", maxAttempts, delayMs },
-					{ shouldRetryOnResult: (state) => Promise.resolve(state.status !== condition.status) }
-				).run();
-				if (maybeResult.state === "timeout") {
-					return { success: false, cause: maybeResult.state };
-				}
-				return {
-					success: true,
-					state: maybeResult.result as R,
-				};
+		const shouldRetryOnResult = (state: WorkflowRunState<Output>) => Promise.resolve(state.status !== status);
+
+		if (!Number.isFinite(maxAttempts) && options?.abortSignal === undefined) {
+			const maybeResult = await withRetry(loadState, retryStrategy, { shouldRetryOnResult }).run();
+
+			if (maybeResult.state === "timeout") {
+				throw new Error("Something's wrong, this should've never timed out");
 			}
-			case "event": {
-				throw new Error("Event-based waiting is not yet implemented");
-			}
-			default:
-				return condition satisfies never;
+			return maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>;
 		}
+
+		const maybeResult = options?.abortSignal
+			? await withRetry(loadState, retryStrategy, {
+					abortSignal: options.abortSignal,
+					shouldRetryOnResult,
+				}).run()
+			: await withRetry(loadState, retryStrategy, { shouldRetryOnResult }).run();
+
+		if (maybeResult.state === "completed") {
+			return {
+				success: true,
+				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
+			};
+		}
+		return { success: false, cause: maybeResult.state };
 	}
 
 	public async cancel(reason?: string): Promise<void> {
