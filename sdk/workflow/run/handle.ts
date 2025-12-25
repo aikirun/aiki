@@ -53,19 +53,19 @@ export interface WorkflowRunHandle<Input, Output, TEventsDefinition extends Even
 
 	refresh: () => Promise<void>;
 
-	waitForState<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<false, false>
 	): Promise<WorkflowRunWaitResultSuccess<Status, Output>>;
-	waitForState<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, false>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
-	waitForState<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<false, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
-	waitForState<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
@@ -141,26 +141,26 @@ class WorkflowRunHandleImpl<Input, Output, TEventsDefinition extends EventsDefin
 		this._run = currentRun as WorkflowRun<Input, Output>;
 	}
 
-	public async waitForState<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<false, false>
 	): Promise<WorkflowRunWaitResultSuccess<Status, Output>>;
-	public async waitForState<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, false>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
-	public async waitForState<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<false, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
-	public async waitForState<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
 	// TODO: instead polling the current state, use the transition history
 	// because it is entirely possible for a workflow to flash though a state
 	// and the handle will never know that the workflow hit that state
-	public async waitForState<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
 	): Promise<WorkflowRunWaitResultSuccess<Status, Output> | WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
