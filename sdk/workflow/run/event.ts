@@ -32,7 +32,9 @@ import type { WorkflowRunHandle } from "./handle";
  * });
  * ```
  */
-export function event<Data>(params?: EventParams<Data>): EventDefinition<Data> {
+export function event(): EventDefinition<undefined>;
+export function event<Data>(params?: EventParams<Data>): EventDefinition<Data>;
+export function event<Data = undefined>(params?: EventParams<Data>): EventDefinition<Data> {
 	return {
 		_type: undefined as Data,
 		schema: params?.schema,
@@ -47,7 +49,7 @@ export interface Schema<Data> {
 	parse: (data: unknown) => Data;
 }
 
-export interface EventDefinition<Data> {
+interface EventDefinition<Data> {
 	_type: Data;
 	schema?: Schema<Data>;
 }
@@ -70,7 +72,11 @@ export type EventSenders<TEventsDefinition extends EventsDefinition> = {
 };
 
 export interface EventSender<Data> {
-	send: (data: Data, options?: EventSendOptions) => Promise<void>;
+	send: (
+		...args: Data extends undefined
+			? [data?: Data, options?: EventSendOptions]
+			: [data: Data, options?: EventSendOptions]
+	) => Promise<void>;
 }
 
 export type EventMulticasters<TEventsDefinition extends EventsDefinition> = {
@@ -202,7 +208,13 @@ function createEventSender<Data>(
 	onSend: (run: WorkflowRun<unknown, unknown>) => void
 ): EventSender<Data> {
 	return {
-		async send(data: Data, options?: EventSendOptions): Promise<void> {
+		async send(
+			...args: Data extends undefined
+				? [data?: Data, options?: EventSendOptions]
+				: [data: Data, options?: EventSendOptions]
+		): Promise<void> {
+			const [data, options] = args;
+
 			if (schema) {
 				schema.parse(data);
 			}
