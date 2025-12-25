@@ -53,6 +53,44 @@ export interface WorkflowRunHandle<Input, Output, TEventsDefinition extends Even
 
 	refresh: () => Promise<void>;
 
+	/**
+	 * Waits for the workflow run to reach a specific status by polling.
+	 *
+	 * The return type varies based on the options provided:
+	 * - No timeout or abort signal: Returns the state directly
+	 * - With timeout: Returns `{ success: true, state }` or `{ success: false, cause: "timeout" }`
+	 * - With abort signal: Returns `{ success: true, state }` or `{ success: false, cause: "aborted" }`
+	 *
+	 * @param status - The target status to wait for
+	 * @param options - Optional configuration for polling interval, timeout, and abort signal
+	 *
+	 * @example
+	 * // Wait indefinitely until completed (returns state directly)
+	 * const state = await handle.waitForStatus("completed");
+	 * console.log(state.output);
+	 *
+	 * @example
+	 * // Wait with a timeout (must check success)
+	 * const result = await handle.waitForStatus("completed", {
+	 *   timeout: { seconds: 30 },
+	 *   interval: { seconds: 2 }
+	 * });
+	 * if (result.success) {
+	 *   console.log(result.state.output);
+	 * } else {
+	 *   console.log("Timed out waiting for completion");
+	 * }
+	 *
+	 * @example
+	 * // Wait with an abort signal
+	 * const controller = new AbortController();
+	 * const result = await handle.waitForStatus("completed", {
+	 *   abortSignal: controller.signal
+	 * });
+	 * if (!result.success) {
+	 *   console.log(`Wait was ${result.cause}`);
+	 * }
+	 */
 	waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<false, false>
