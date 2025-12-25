@@ -11,6 +11,7 @@ import type {
 	WorkflowRunListResponseV1,
 	WorkflowRunListTransitionsRequestV1,
 	WorkflowRunListTransitionsResponseV1,
+	WorkflowRunMulticastEventRequestV1,
 	WorkflowRunSendEventRequestV1,
 	WorkflowRunSendEventResponseV1,
 	WorkflowRunTransitionStateRequestV1,
@@ -219,6 +220,21 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, WorkflowRunS
 		})
 	);
 
+const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, void> = oc
+	.input(
+		z.object({
+			ids: z.array(z.string().min(1)),
+			eventId: z.string().min(1),
+			data: z.unknown(),
+			options: z
+				.object({
+					idempotencyKey: z.string().optional(),
+				})
+				.optional(),
+		})
+	)
+	.output(z.void());
+
 export const workflowRunContract = {
 	listV1,
 	getByIdV1,
@@ -228,6 +244,7 @@ export const workflowRunContract = {
 	transitionTaskStateV1,
 	listTransitionsV1,
 	sendEventV1,
+	multicastEventV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

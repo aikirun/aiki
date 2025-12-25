@@ -316,17 +316,14 @@ const listTransitionsV1 = os.listTransitionsV1.handler(({ input }) => {
 	};
 });
 
-const sendEventV1 = os.sendEventV1.handler(async ({ input, context }) => {
-	const runId = input.id as WorkflowRunId;
-
-	const run = workflowRuns.get(runId);
-	if (!run) {
-		throw new NotFoundError(`Workflow run not found: ${runId}`);
-	}
-
-	const { eventId, data, options } = input;
-	const idempotencyKey = options?.idempotencyKey;
-
+async function sendEventToWorkflowRun(
+	context: ServerContext,
+	run: WorkflowRun<unknown, unknown>,
+	receivedAt: number,
+	eventId: string,
+	data: unknown,
+	idempotencyKey: string | undefined
+): Promise<void> {
 	let eventQueue = run.eventsQueue[eventId];
 	if (!eventQueue) {
 		eventQueue = { events: [] };
@@ -338,21 +335,19 @@ const sendEventV1 = os.sendEventV1.handler(async ({ input, context }) => {
 			(event) => event.status === "received" && event.idempotencyKey === idempotencyKey
 		);
 		if (isDuplicate) {
-			context.logger.info({ runId, eventId, idempotencyKey }, "Duplicate event, ignoring");
-			return { run };
+			context.logger.info({ runId: run.id, eventId, idempotencyKey }, "Duplicate event, ignoring");
+			return;
 		}
 	}
-
-	const now = Date.now();
 
 	eventQueue.events.push({
 		status: "received",
 		data,
-		receivedAt: now,
+		receivedAt,
 		idempotencyKey,
 	});
 
-	context.logger.info({ runId, eventId }, "Event sent to workflow run");
+	context.logger.info({ runId: run.id, eventId }, "Event sent to workflow run");
 
 	if (run.state.status === "awaiting_event" && run.state.eventId === eventId) {
 		await transitionStateV1.callable({ context })({
@@ -362,8 +357,43 @@ const sendEventV1 = os.sendEventV1.handler(async ({ input, context }) => {
 			expectedRevision: run.revision,
 		});
 	}
+}
+
+const sendEventV1 = os.sendEventV1.handler(async ({ input, context }) => {
+	const runId = input.id as WorkflowRunId;
+
+	const run = workflowRuns.get(runId);
+	if (!run) {
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
+	}
+
+	const { eventId, data, options } = input;
+	const idempotencyKey = options?.idempotencyKey;
+	const now = Date.now();
+
+	await sendEventToWorkflowRun(context, run, now, eventId, data, idempotencyKey);
 
 	return { run };
+});
+
+const multicastEventV1 = os.multicastEventV1.handler(async ({ input, context }) => {
+	const runIds = input.ids as WorkflowRunId[];
+
+	const runs = runIds.map((runId) => {
+		const run = workflowRuns.get(runId);
+		if (!run) {
+			throw new NotFoundError(`Workflow run not found: ${runId}`);
+		}
+		return run;
+	});
+
+	const { eventId, data, options } = input;
+	const idempotencyKey = options?.idempotencyKey;
+	const now = Date.now();
+
+	for (const run of runs) {
+		await sendEventToWorkflowRun(context, run, now, eventId, data, idempotencyKey);
+	}
 });
 
 function getWorkflowRunsWithElapsedSchedule(): WorkflowRun[] {
@@ -595,4 +625,5 @@ export const workflowRunRouter = os.router({
 	transitionTaskStateV1,
 	listTransitionsV1,
 	sendEventV1,
+	multicastEventV1,
 });

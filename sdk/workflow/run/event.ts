@@ -1,5 +1,5 @@
 import { createSerializableError, type DurationObject, toMilliseconds } from "@aikirun/lib";
-import type { ApiClient, Logger } from "@aikirun/types/client";
+import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import type { EventId, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
@@ -71,6 +71,19 @@ export type EventSenders<TEventsDefinition extends EventsDefinition> = {
 
 export interface EventSender<Data> {
 	send: (data: Data, options?: EventSendOptions) => Promise<void>;
+}
+
+export type EventMulticasters<TEventsDefinition extends EventsDefinition> = {
+	[K in keyof TEventsDefinition]: EventMulticaster<EventData<TEventsDefinition[K]>>;
+};
+
+export interface EventMulticaster<Data> {
+	send: <AppContext>(
+		client: Client<AppContext>,
+		runId: string | string[],
+		data: Data,
+		options?: EventSendOptions
+	) => Promise<void>;
 }
 
 export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
@@ -180,7 +193,7 @@ export function createEventSenders<TEventsDefinition extends EventsDefinition>(
 	return senders;
 }
 
-export function createEventSender<Data>(
+function createEventSender<Data>(
 	api: ApiClient,
 	workflowRunId: string,
 	eventId: EventId,
@@ -205,6 +218,45 @@ export function createEventSender<Data>(
 				options,
 			});
 			onSend(run);
+		},
+	};
+}
+
+export function createEventMulticasters<TEventsDefinition extends EventsDefinition>(
+	eventsDefinition: TEventsDefinition
+): EventMulticasters<TEventsDefinition> {
+	const senders = {} as EventMulticasters<TEventsDefinition>;
+
+	for (const [eventId, eventDefinition] of Object.entries(eventsDefinition)) {
+		const sender = createEventMulticaster(eventId as EventId, eventDefinition.schema) as EventMulticaster<
+			EventData<TEventsDefinition[keyof TEventsDefinition]>
+		>;
+		senders[eventId as keyof TEventsDefinition] = sender;
+	}
+
+	return senders;
+}
+
+function createEventMulticaster<Data>(eventId: EventId, schema: Schema<Data> | undefined): EventMulticaster<Data> {
+	return {
+		async send<AppContext>(
+			client: Client<AppContext>,
+			runId: string | string[],
+			data: Data,
+			options?: EventSendOptions
+		): Promise<void> {
+			if (schema) {
+				schema.parse(data);
+			}
+
+			const runIds = Array.isArray(runId) ? runId : [runId];
+
+			await client.api.workflowRun.multicastEventV1({
+				ids: runIds,
+				eventId,
+				data,
+				options,
+			});
 		},
 	};
 }

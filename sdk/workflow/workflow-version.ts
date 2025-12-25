@@ -17,7 +17,7 @@ import {
 import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/workflow-run-api";
 
 import type { WorkflowRunContext } from "./run/context";
-import type { EventsDefinition } from "./run/event";
+import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 
 export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
@@ -47,6 +47,7 @@ export interface WorkflowVersion<
 > {
 	id: WorkflowId;
 	versionId: WorkflowVersionId;
+	events: EventMulticasters<TEventsDefinition>;
 
 	with(): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>;
 
@@ -73,6 +74,7 @@ export interface WorkflowVersion<
 export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>
 	implements WorkflowVersion<Input, Output, AppContext, TEventsDefinition>
 {
+	public readonly events: EventMulticasters<TEventsDefinition>;
 	public readonly [INTERNAL]: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>[typeof INTERNAL];
 
 	constructor(
@@ -80,8 +82,10 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		public readonly versionId: WorkflowVersionId,
 		private readonly params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
 	) {
+		const eventsDefinition = this.params.events ?? ({} as TEventsDefinition);
+		this.events = createEventMulticasters(eventsDefinition);
 		this[INTERNAL] = {
-			eventsDefinition: this.params.events ?? ({} as TEventsDefinition),
+			eventsDefinition,
 			handler: this.handler.bind(this),
 		};
 	}
