@@ -26,8 +26,8 @@ export interface EventQueue<Data> {
 	events: EventState<Data>[];
 }
 
-export interface EventWaitOptions<Timeout extends DurationObject | undefined> {
-	timeout?: Timeout;
+export interface EventWaitOptions<Timed extends boolean> {
+	timeout?: Timed extends true ? DurationObject : never;
 }
 
 export type EventWaitState<Data, Timed extends boolean> = Timed extends false

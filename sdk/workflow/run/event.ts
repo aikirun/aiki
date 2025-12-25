@@ -1,4 +1,4 @@
-import { createSerializableError, type DurationObject, toMilliseconds } from "@aikirun/lib";
+import { createSerializableError, toMilliseconds } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import type { EventId, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -63,8 +63,8 @@ export type EventWaiters<TEventsDefinition extends EventsDefinition> = {
 };
 
 export interface EventWaiter<Data> {
-	wait(options?: EventWaitOptions<undefined>): Promise<EventWaitState<Data, false>>;
-	wait(options: EventWaitOptions<DurationObject>): Promise<EventWaitState<Data, true>>;
+	wait(options?: EventWaitOptions<false>): Promise<EventWaitState<Data, false>>;
+	wait(options: EventWaitOptions<true>): Promise<EventWaitState<Data, true>>;
 }
 
 export type EventSenders<TEventsDefinition extends EventsDefinition> = {
@@ -120,11 +120,9 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 ): EventWaiter<Data> {
 	let nextEventIndex = 0;
 
-	async function wait(options?: EventWaitOptions<undefined>): Promise<EventWaitState<Data, false>>;
-	async function wait(options: EventWaitOptions<DurationObject>): Promise<EventWaitState<Data, true>>;
-	async function wait(
-		options?: EventWaitOptions<undefined> | EventWaitOptions<DurationObject>
-	): Promise<EventWaitState<Data, boolean>> {
+	async function wait(options?: EventWaitOptions<false>): Promise<EventWaitState<Data, false>>;
+	async function wait(options: EventWaitOptions<true>): Promise<EventWaitState<Data, true>>;
+	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitState<Data, boolean>> {
 		const events = handle.run.eventsQueue[eventId]?.events ?? [];
 
 		if (nextEventIndex < events.length) {
