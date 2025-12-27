@@ -112,7 +112,7 @@ interface WorkflowRunTransitionStateRequestBase {
 
 export type WorkflowRunStateScheduledRequestOptimistic = Exclude<
 	WorkflowRunStateScheduledRequest,
-	{ reason: "new" | "resume" }
+	{ reason: "new" | "resume" | "awake" }
 >;
 
 export type WorkflowRunStateScheduledRequestPessimistic = Exclude<

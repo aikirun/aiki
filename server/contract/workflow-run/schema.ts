@@ -317,11 +317,6 @@ export const workflowRunStateScheduledRequestOptimisticSchema: Zt<WorkflowRunSta
 		}),
 		z.object({
 			status: z.literal("scheduled"),
-			reason: z.literal("awake"),
-			scheduledInMs: z.number(),
-		}),
-		z.object({
-			status: z.literal("scheduled"),
 			reason: z.literal("event"),
 			scheduledInMs: z.number(),
 		}),
@@ -337,6 +332,11 @@ export const workflowRunStateScheduledRequestPessimisticSchema = z.union([
 	z.object({
 		status: z.literal("scheduled"),
 		reason: z.enum(["resume"]),
+		scheduledInMs: z.number(),
+	}),
+	z.object({
+		status: z.literal("scheduled"),
+		reason: z.enum(["awake"]),
 		scheduledInMs: z.number(),
 	}),
 ]);

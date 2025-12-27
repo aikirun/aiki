@@ -543,10 +543,9 @@ export async function scheduleSleepingWorkflowRuns(context: ServerContext) {
 
 	for (const run of runs) {
 		await transitionStateV1.callable({ context })({
-			type: "optimistic",
+			type: "pessimistic",
 			id: run.id,
 			state: { status: "scheduled", scheduledInMs: 0, reason: "awake" },
-			expectedRevision: run.revision,
 		});
 	}
 }

@@ -132,6 +132,8 @@ export interface WorkflowRunHandle<
 
 	resume: () => Promise<void>;
 
+	awake: () => Promise<void>;
+
 	[INTERNAL]: {
 		client: Client<AppContext>;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
@@ -348,9 +350,14 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		return this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resume" });
 	}
 
+	public async awake(): Promise<void> {
+		return this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "awake" });
+	}
+
 	private async transitionState(targetState: WorkflowRunStateRequest): Promise<void> {
 		if (
-			(targetState.status === "scheduled" && (targetState.reason === "new" || targetState.reason === "resume")) ||
+			(targetState.status === "scheduled" &&
+				(targetState.reason === "new" || targetState.reason === "resume" || targetState.reason === "awake")) ||
 			targetState.status === "paused" ||
 			targetState.status === "cancelled"
 		) {
