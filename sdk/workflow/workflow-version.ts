@@ -1,5 +1,7 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
+import { sha256 } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
+import { stableStringify } from "@aikirun/lib/json";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
@@ -11,6 +13,7 @@ import {
 	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
+	type WorkflowRunPath,
 	type WorkflowRunStateFailed,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
@@ -23,7 +26,7 @@ import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
 	handler: (
 		input: Input,
-		run: Readonly<WorkflowRunContext<Input, Output, TEventsDefinition>>,
+		run: Readonly<WorkflowRunContext<Input, Output, AppContext, TEventsDefinition>>,
 		context: AppContext
 	) => Promise<Output>;
 	events?: TEventsDefinition;
@@ -37,6 +40,8 @@ export interface WorkflowBuilder<Input, Output, AppContext, TEventsDefinition ex
 	): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>;
 
 	start: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["start"];
+
+	startAsChild: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["startAsChild"];
 }
 
 export interface WorkflowVersion<
@@ -54,18 +59,23 @@ export interface WorkflowVersion<
 	start: (
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
-	) => Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>>;
+	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+
+	startAsChild: <ParentInput, ParentOutput, ParentEventsDefinition extends EventsDefinition>(
+		parentRun: WorkflowRunContext<ParentInput, ParentOutput, AppContext, ParentEventsDefinition>,
+		...args: Input extends null ? [] : [Input]
+	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
 	getHandle: (
 		client: Client<AppContext>,
 		runId: WorkflowRunId
-	) => Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>>;
+	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
 	[INTERNAL]: {
 		eventsDefinition: TEventsDefinition;
 		handler: (
 			input: Input,
-			run: WorkflowRunContext<Input, Output, TEventsDefinition>,
+			run: WorkflowRunContext<Input, Output, AppContext, TEventsDefinition>,
 			context: AppContext
 		) => Promise<void>;
 	};
@@ -95,14 +105,23 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 		const createBuilder = (
 			optsBuilder: ReturnType<typeof optsOverrider>
-		): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition> => ({
-			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
-			start: (client, ...args) =>
-				new WorkflowVersionImpl(this.id, this.versionId, { ...this.params, opts: optsBuilder.build() }).start(
-					client,
-					...args
-				),
-		});
+		): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition> => {
+			return {
+				opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
+
+				start: (client, ...args) =>
+					new WorkflowVersionImpl(this.id, this.versionId, {
+						...this.params,
+						opts: optsBuilder.build(),
+					}).start(client, ...args),
+
+				startAsChild: (parentRun, ...args) =>
+					new WorkflowVersionImpl(this.id, this.versionId, {
+						...this.params,
+						opts: optsBuilder.build(),
+					}).startAsChild(parentRun, ...args),
+			};
+		};
 
 		return createBuilder(optsOverrider());
 	}
@@ -110,7 +129,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	public async start(
 		client: Client<AppContext>,
 		...args: Input extends null ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>> {
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const { run } = await client.api.workflowRun.createV1({
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
@@ -120,16 +139,74 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
 	}
 
+	public async startAsChild<ParentInput, ParentOutput>(
+		parentRun: WorkflowRunContext<ParentInput, ParentOutput, AppContext, EventsDefinition>,
+		...args: Input extends null ? [] : [Input]
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+		const parentRunHandle = parentRun[INTERNAL].handle;
+		parentRunHandle[INTERNAL].assertExecutionAllowed();
+
+		const { client } = parentRunHandle[INTERNAL];
+
+		const input = isNonEmptyArray(args) ? args[0] : (null as Input);
+		const childRunPath = await this.getPath(input);
+
+		const existingChildRunId = parentRunHandle.run.childWorkflowRuns[childRunPath]?.id;
+		if (existingChildRunId) {
+			const { run: existingChildRun } = await client.api.workflowRun.getByIdV1({ id: existingChildRunId });
+
+			const logger = parentRun.logger.child({
+				"aiki.childWorkflowId": existingChildRun.workflowId,
+				"aiki.childWorkflowVersionId": existingChildRun.workflowVersionId,
+				"aiki.childWorkflowRunId": existingChildRun.id,
+			});
+
+			return workflowRunHandle(
+				client,
+				existingChildRun as WorkflowRun<Input, Output>,
+				this[INTERNAL].eventsDefinition,
+				logger,
+				parentRun
+			);
+		}
+
+		const { run: newChildRun } = await client.api.workflowRun.createV1({
+			workflowId: this.id,
+			workflowVersionId: this.versionId,
+			input,
+			parentWorkflowRunId: parentRun.id,
+			options: {
+				...this.params.opts,
+				idempotencyKey: childRunPath,
+			},
+		});
+		parentRunHandle.run.childWorkflowRuns[childRunPath] = { id: newChildRun.id };
+
+		const logger = parentRun.logger.child({
+			"aiki.childWorkflowId": newChildRun.workflowId,
+			"aiki.childWorkflowVersionId": newChildRun.workflowVersionId,
+			"aiki.childWorkflowRunId": newChildRun.id,
+		});
+
+		return workflowRunHandle(
+			client,
+			newChildRun as WorkflowRun<Input, Output>,
+			this[INTERNAL].eventsDefinition,
+			logger,
+			parentRun
+		);
+	}
+
 	public async getHandle(
 		client: Client<AppContext>,
 		runId: WorkflowRunId
-	): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>> {
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		return workflowRunHandle(client, runId, this[INTERNAL].eventsDefinition);
 	}
 
 	private async handler(
 		input: Input,
-		run: WorkflowRunContext<Input, Output, TEventsDefinition>,
+		run: WorkflowRunContext<Input, Output, AppContext, TEventsDefinition>,
 		context: AppContext
 	): Promise<void> {
 		const { logger } = run;
@@ -154,7 +231,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	private async tryExecuteWorkflow(
 		input: Input,
-		run: WorkflowRunContext<Input, Output, TEventsDefinition>,
+		run: WorkflowRunContext<Input, Output, AppContext, TEventsDefinition>,
 		context: AppContext,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
@@ -162,7 +239,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			try {
 				return await this.params.handler(input, run, context);
 			} catch (error) {
-				if (error instanceof WorkflowRunSuspendedError) {
+				if (error instanceof WorkflowRunSuspendedError || error instanceof WorkflowRunFailedError) {
 					throw error;
 				}
 
@@ -208,7 +285,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	}
 
 	private async assertRetryAllowed(
-		handle: WorkflowRunHandle<Input, Output, TEventsDefinition>,
+		handle: WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>,
 		retryStrategy: RetryStrategy,
 		logger: Logger
 	): Promise<void> {
@@ -241,8 +318,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			};
 		}
 
-		// TODO: check for other error types, like child workflow failures
-
 		const serializableError = createSerializableError(error);
 		return {
 			status: "failed",
@@ -261,8 +336,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			};
 		}
 
-		// TODO: check for other error types, like child workflow failures
-
 		const serializableError = createSerializableError(error);
 		return {
 			status: "awaiting_retry",
@@ -270,5 +343,15 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			nextAttemptInMs,
 			error: serializableError,
 		};
+	}
+
+	private async getPath(input: Input): Promise<WorkflowRunPath> {
+		const inputHash = await sha256(stableStringify(input));
+
+		const path = this.params.opts?.idempotencyKey
+			? `${this.id}/${this.versionId}/${inputHash}/${this.params.opts.idempotencyKey}`
+			: `${this.id}/${this.versionId}/${inputHash}`;
+
+		return path as WorkflowRunPath;
 	}
 }

@@ -345,9 +345,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			"aiki.workflowId": workflowRun.workflowId,
 			"aiki.workflowVersionId": workflowRun.workflowVersionId,
 			"aiki.workflowRunId": workflowRun.id,
-			...(meta && {
-				"aiki.messageId": meta.messageId,
-			}),
 		});
 
 		let heartbeatInterval: ReturnType<typeof setInterval> | undefined;

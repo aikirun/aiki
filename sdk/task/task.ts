@@ -85,8 +85,8 @@ export interface TaskBuilder<Input, Output> {
 export interface Task<Input, Output> {
 	id: TaskId;
 	with(): TaskBuilder<Input, Output>;
-	start: <WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput, EventsDefinition>,
+	start: (
+		run: WorkflowRunContext<unknown, unknown, unknown, EventsDefinition>,
 		...args: Input extends null ? [] : [Input]
 	) => Promise<Output>;
 }
@@ -109,12 +109,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		return createBuilder(optsOverrider());
 	}
 
-	public async start<WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput, EventsDefinition>,
+	public async start(
+		run: WorkflowRunContext<unknown, unknown, unknown, EventsDefinition>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
-
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const input = isNonEmptyArray(args) ? args[0] : (null as Input); // this cast is okay cos if args is empty, Input must be type null;
@@ -163,8 +162,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		return output;
 	}
 
-	private async tryExecuteTask<WorkflowInput, WorkflowOutput>(
-		run: WorkflowRunContext<WorkflowInput, WorkflowOutput, EventsDefinition>,
+	private async tryExecuteTask(
+		run: WorkflowRunContext<unknown, unknown, unknown, EventsDefinition>,
 		input: Input,
 		path: TaskPath,
 		retryStrategy: RetryStrategy,
@@ -236,10 +235,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private async getPath(input: Input): Promise<TaskPath> {
 		const inputHash = await sha256(stableStringify(input));
 
-		const taskPath = this.params.opts?.idempotencyKey
+		const path = this.params.opts?.idempotencyKey
 			? `${this.id}/${inputHash}/${this.params.opts.idempotencyKey}`
 			: `${this.id}/${inputHash}`;
 
-		return taskPath as TaskPath;
+		return path as TaskPath;
 	}
 }

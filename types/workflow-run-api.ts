@@ -78,6 +78,7 @@ export interface WorkflowRunCreateRequestV1 {
 	workflowId: string;
 	workflowVersionId: string;
 	input: unknown;
+	parentWorkflowRunId?: string;
 	options?: WorkflowOptions;
 }
 

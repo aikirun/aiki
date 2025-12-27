@@ -17,6 +17,7 @@ import type {
 	WorkflowRunStateRunning,
 	WorkflowRunStateScheduled,
 	WorkflowRunStateScheduledByAwake,
+	WorkflowRunStateScheduledByChildWorkflow,
 	WorkflowRunStateScheduledByEvent,
 	WorkflowRunStateScheduledByNew,
 	WorkflowRunStateScheduledByResume,
@@ -153,6 +154,12 @@ export const workflowRunStateScheduledByEventSchema: Zt<WorkflowRunStateSchedule
 	reason: z.literal("event"),
 });
 
+export const workflowRunStateScheduledByChildWorkflowSchema: Zt<WorkflowRunStateScheduledByChildWorkflow> = z.object({
+	status: z.literal("scheduled"),
+	scheduledAt: z.number(),
+	reason: z.literal("child_workflow"),
+});
+
 export const workflowRunStateScheduledSchema: Zt<WorkflowRunStateScheduled> = z.union([
 	workflowRunStateScheduledByNewSchema,
 	workflowRunStateScheduledByRetrySchema,
@@ -160,6 +167,7 @@ export const workflowRunStateScheduledSchema: Zt<WorkflowRunStateScheduled> = z.
 	workflowRunStateScheduledByAwakeSchema,
 	workflowRunStateScheduledByResumeSchema,
 	workflowRunStateScheduledByEventSchema,
+	workflowRunStateScheduledByChildWorkflowSchema,
 ]);
 
 export const workflowRunStateQueuedSchema: Zt<WorkflowRunStateQueued> = z.object({
@@ -171,6 +179,7 @@ export const workflowRunStateQueuedSchema: Zt<WorkflowRunStateQueued> = z.object
 		z.literal("awake"),
 		z.literal("resume"),
 		z.literal("event"),
+		z.literal("child_workflow"),
 	]),
 });
 
@@ -217,6 +226,8 @@ export const workflowRunStateAwaitingRetrySchema: Zt<WorkflowRunStateAwaitingRet
 
 export const workflowRunStateAwaitingChildWorkflowSchema: Zt<WorkflowRunStateAwaitingChildWorkflow> = z.object({
 	status: z.literal("awaiting_child_workflow"),
+	childWorkflowRunId: z.string(),
+	childWorkflowRunStatus: workflowRunStatusSchema,
 });
 
 export const workflowRunStateCancelledSchema: Zt<WorkflowRunStateCancelled> = z.object({
@@ -274,7 +285,8 @@ export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	tasksState: z.record(z.string(), taskStateSchema),
 	sleepsState: z.record(z.string(), sleepStateSchema),
 	eventsQueue: z.record(z.string(), eventsQueueSchema),
-	childWorkflowsRunState: z.record(z.string(), workflowRunStateSchema),
+	childWorkflowRuns: z.record(z.string(), z.object({ id: z.string() })),
+	parentWorkflowRunId: z.string().optional(),
 });
 
 export const workflowRunTransitionSchema: Zt<WorkflowRunTransition> = z.discriminatedUnion("type", [

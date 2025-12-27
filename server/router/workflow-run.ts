@@ -1,3 +1,4 @@
+import { propsDefined, type RequiredProp } from "@aikirun/lib";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { TaskPath, TaskState } from "@aikirun/types/task";
@@ -129,7 +130,8 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 		tasksState: {},
 		sleepsState: {},
 		eventsQueue: {},
-		childWorkflowsRunState: {},
+		childWorkflowRuns: {},
+		parentWorkflowRunId: input.parentWorkflowRunId,
 	};
 
 	workflowRuns.set(runId, run);
@@ -231,7 +233,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	run.revision++;
 
 	if (state.status === "cancelled") {
-		for (const childRunId of Object.keys(run.childWorkflowsRunState)) {
+		for (const [childRunPath, { id: childRunId }] of Object.entries(run.childWorkflowRuns)) {
 			const childRun = workflowRuns.get(childRunId as WorkflowRunId);
 			if (!childRun) {
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
@@ -241,8 +243,12 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 				id: childRunId,
 				state,
 			});
-			run.childWorkflowsRunState[childRunId] = state;
+			run.childWorkflowRuns[childRunPath] = { id: childRunId };
 		}
+	}
+
+	if (propsDefined(run, ["parentWorkflowRunId"])) {
+		await notifyParentOfStateChangeIfNecessary(context, run);
 	}
 
 	return { run };
@@ -355,6 +361,34 @@ async function sendEventToWorkflowRun(
 			id: run.id,
 			state: { status: "scheduled", scheduledInMs: 0, reason: "event" },
 			expectedRevision: run.revision,
+		});
+	}
+}
+
+async function notifyParentOfStateChangeIfNecessary(
+	context: ServerContext,
+	childRun: RequiredProp<WorkflowRun, "parentWorkflowRunId">
+): Promise<void> {
+	const parentRun = workflowRuns.get(childRun.parentWorkflowRunId as WorkflowRunId);
+	if (!parentRun) {
+		return;
+	}
+
+	if (
+		parentRun.state.status === "awaiting_child_workflow" &&
+		parentRun.state.childWorkflowRunId === childRun.id &&
+		parentRun.state.childWorkflowRunStatus === childRun.state.status
+	) {
+		context.logger.info(
+			{ parentRunId: parentRun.id, childRunId: childRun.id, status: childRun.state.status },
+			"Notifying parent of child state change"
+		);
+
+		await transitionStateV1.callable({ context })({
+			type: "optimistic",
+			id: parentRun.id,
+			state: { status: "scheduled", scheduledInMs: 0, reason: "child_workflow" },
+			expectedRevision: parentRun.revision,
 		});
 	}
 }

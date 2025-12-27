@@ -6,6 +6,7 @@ import type { TaskState } from "./task";
 import type { TriggerStrategy } from "./trigger";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
+export type WorkflowRunPath = string & { _brand: "workflow_run_path" };
 
 export type WorkflowRunStatus =
 	| "scheduled"
@@ -20,9 +21,19 @@ export type WorkflowRunStatus =
 	| "completed"
 	| "failed";
 
-export type TerminalWorkflowRunStatus = "cancelled" | "completed" | "failed";
+const terminalWorkflowRunStatuses = ["cancelled", "completed", "failed"] as const;
+export type TerminalWorkflowRunStatus = (typeof terminalWorkflowRunStatuses)[number];
 
 export type NonTerminalWorkflowRunStatus = Exclude<WorkflowRunStatus, TerminalWorkflowRunStatus>;
+
+export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status is TerminalWorkflowRunStatus {
+	for (const terminalStatus of terminalWorkflowRunStatuses) {
+		if (status === terminalStatus) {
+			return true;
+		}
+	}
+	return false;
+}
 
 export interface WorkflowOptions {
 	retry?: RetryStrategy;
@@ -35,7 +46,14 @@ interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;
 }
 
-export type WorkflowRunScheduledReason = "new" | "retry" | "task_retry" | "awake" | "resume" | "event";
+export type WorkflowRunScheduledReason =
+	| "new"
+	| "retry"
+	| "task_retry"
+	| "awake"
+	| "resume"
+	| "event"
+	| "child_workflow";
 
 interface WorkflowRunStateScheduledBase extends WorkflowRunStateBase {
 	status: "scheduled";
@@ -67,13 +85,18 @@ export interface WorkflowRunStateScheduledByEvent extends WorkflowRunStateSchedu
 	reason: "event";
 }
 
+export interface WorkflowRunStateScheduledByChildWorkflow extends WorkflowRunStateScheduledBase {
+	reason: "child_workflow";
+}
+
 export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByNew
 	| WorkflowRunStateScheduledByRetry
 	| WorkflowRunStateScheduledByTaskRetry
 	| WorkflowRunStateScheduledByAwake
 	| WorkflowRunStateScheduledByResume
-	| WorkflowRunStateScheduledByEvent;
+	| WorkflowRunStateScheduledByEvent
+	| WorkflowRunStateScheduledByChildWorkflow;
 
 export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
 	status: "queued";
@@ -130,6 +153,8 @@ export type WorkflowRunStateAwaitingRetry =
 
 export interface WorkflowRunStateAwaitingChildWorkflow extends WorkflowRunStateBase {
 	status: "awaiting_child_workflow";
+	childWorkflowRunId: string;
+	childWorkflowRunStatus: WorkflowRunStatus;
 }
 
 export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
@@ -199,7 +224,8 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	tasksState: Record<string, TaskState>;
 	sleepsState: Record<string, SleepState>;
 	eventsQueue: Record<string, EventQueue<unknown>>;
-	childWorkflowsRunState: Record<string, WorkflowRunState>;
+	childWorkflowRuns: Record<string, { id: string }>;
+	parentWorkflowRunId?: string;
 }
 
 export interface WorkflowRunTransitionBase {

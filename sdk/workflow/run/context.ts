@@ -7,7 +7,7 @@ import type { WorkflowOptions, WorkflowRunId } from "@aikirun/types/workflow-run
 import type { EventsDefinition, EventWaiters } from "./event";
 import type { WorkflowRunHandle } from "./handle";
 
-export interface WorkflowRunContext<Input, Output, TEventDefinition extends EventsDefinition> {
+export interface WorkflowRunContext<Input, Output, AppContext, TEventDefinition extends EventsDefinition> {
 	id: WorkflowRunId;
 	workflowId: WorkflowId;
 	workflowVersionId: WorkflowVersionId;
@@ -17,7 +17,7 @@ export interface WorkflowRunContext<Input, Output, TEventDefinition extends Even
 	events: EventWaiters<TEventDefinition>;
 
 	[INTERNAL]: {
-		handle: WorkflowRunHandle<Input, Output, TEventDefinition>;
+		handle: WorkflowRunHandle<Input, Output, AppContext, TEventDefinition>;
 		options: {
 			spinThresholdMs: number;
 		};

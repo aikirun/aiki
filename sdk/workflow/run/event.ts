@@ -93,7 +93,7 @@ export interface EventMulticaster<Data> {
 }
 
 export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
-	handle: WorkflowRunHandle<unknown, unknown, TEventsDefinition>,
+	handle: WorkflowRunHandle<unknown, unknown, unknown, TEventsDefinition>,
 	eventsDefinition: TEventsDefinition,
 	logger: Logger
 ): EventWaiters<TEventsDefinition> {
@@ -113,7 +113,7 @@ export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
 }
 
 export function createEventWaiter<TEventsDefinition extends EventsDefinition, Data>(
-	handle: WorkflowRunHandle<unknown, unknown, TEventsDefinition>,
+	handle: WorkflowRunHandle<unknown, unknown, unknown, TEventsDefinition>,
 	eventId: EventId,
 	schema: Schema<Data> | undefined,
 	logger: Logger

@@ -27,9 +27,11 @@ async function runSampleWorkflow() {
 	await delay(10_000);
 	await handle.resume();
 
-	const { output } = await handle.waitForStatus("completed");
-	logger.info("Workflow completed", {
-		id: handle.run.id,
-		bar: output.bar,
-	});
+	const waitResult = await handle.waitForStatus("completed");
+	if (waitResult.success) {
+		logger.info("Workflow completed", {
+			id: handle.run.id,
+			bar: waitResult.state.output.bar,
+		});
+	}
 }

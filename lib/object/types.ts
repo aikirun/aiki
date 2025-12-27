@@ -1,25 +1,9 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: the unused types are tests
-
 import type { RequireAtLeastOneOf } from "@aikirun/types/utils";
 
 import type { NonEmptyArray } from "../array";
 import type { Equal, ExpectTrue } from "../testing/expect/types";
 export type { RequireAtLeastOneOf };
-
-export type UndefinedToPartial<T extends object> = {
-	[K in keyof T as undefined extends T[K] ? K : never]?: Exclude<T[K], undefined>;
-} & {
-	[K in keyof T as undefined extends T[K] ? never : K]: T[K];
-};
-//#region <UndefinedToPartial Tests>
-type TestUndefinedToPartial = ExpectTrue<
-	Equal<UndefinedToPartial<{ a: number; b: string | undefined; c?: boolean }>, { a: number; b?: string; c?: boolean }>
->;
-//#endregion
-
-export type MaybeField<Key extends string, Value> = Value extends undefined
-	? { [K in Key]?: undefined }
-	: { [K in Key]: Value };
 
 export type EmptyRecord = Record<PropertyKey, never>;
 
@@ -31,36 +15,7 @@ type TestNonArrayObjectArray = ExpectTrue<Equal<NonArrayObject<[]>, never>>;
 type TestNonArrayReadonlyArray = ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>;
 //#endregion
 
-export type RequiredDeep<T> =
-	NonArrayObject<T> extends never
-		? T
-		: {
-				[K in keyof T]-?: RequiredDeep<T[K]>;
-			};
-//#region <RequiredDeep Tests>
-type TestRequiredDeep = ExpectTrue<
-	Equal<
-		RequiredDeep<{
-			a?: {
-				b?: string;
-				c: number;
-				d?: {
-					e?: [];
-				};
-			};
-		}>,
-		{
-			a: {
-				b: string;
-				c: number;
-				d: {
-					e: [];
-				};
-			};
-		}
-	>
->;
-//#endregion
+export type RequiredProp<T, K extends keyof T> = T & Required<Pick<T, K>>;
 
 export type UnionToRecord<T extends string> = {
 	[K in T]: K;
@@ -73,7 +28,7 @@ type TestRequireAtLeastOneOfProducesUnion = ExpectTrue<
 		{ a: string; b?: number; c?: boolean } | { a?: string; b: number; c?: boolean }
 	>
 >;
-type TestRequireAtLeastOneOfPreservesPreviouslyRequiredField = ExpectTrue<
+type TestRequireAtLeastOneOfPreservesPreviouslyRequiredProp = ExpectTrue<
 	Equal<
 		RequireAtLeastOneOf<{ a: string; b?: number; c?: boolean }, "a" | "b">,
 		{ a: string; b?: number; c?: boolean } | { a: string; b: number; c?: boolean }
@@ -82,6 +37,7 @@ type TestRequireAtLeastOneOfPreservesPreviouslyRequiredField = ExpectTrue<
 //#endregion
 
 type IsSubtype<SubT, SuperT> = SubT extends SuperT ? true : false;
+
 type And<T extends NonEmptyArray<boolean>> = T extends [infer First, ...infer Rest]
 	? false extends First
 		? false
@@ -89,6 +45,7 @@ type And<T extends NonEmptyArray<boolean>> = T extends [infer First, ...infer Re
 			? And<Rest>
 			: true
 	: never;
+
 type Or<T extends NonEmptyArray<boolean>> = T extends [infer First, ...infer Rest]
 	? true extends First
 		? true

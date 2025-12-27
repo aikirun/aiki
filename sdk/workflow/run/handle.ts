@@ -3,50 +3,68 @@ import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { TaskPath } from "@aikirun/types/task";
 import {
+	isTerminalWorkflowRunStatus,
 	type WorkflowRun,
+	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
 	type WorkflowRunState,
 	type WorkflowRunStatus,
+	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 
+import type { WorkflowRunContext } from "./context";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
-export function workflowRunHandle<Input, Output, TEventsDefinition extends EventsDefinition>(
-	client: Client,
+export function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
+	client: Client<AppContext>,
 	id: WorkflowRunId,
 	eventsDefinition?: TEventsDefinition,
-	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>>;
+	logger?: Logger,
+	parentRun?: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
+): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
-export function workflowRunHandle<Input, Output, TEventsDefinition extends EventsDefinition>(
-	client: Client,
+export function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
+	client: Client<AppContext>,
 	run: WorkflowRun<Input, Output>,
 	eventsDefinition?: TEventsDefinition,
-	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>>;
+	logger?: Logger,
+	parentRun?: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
+): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
-export async function workflowRunHandle<Input, Output, TEventsDefinition extends EventsDefinition>(
-	client: Client,
+export async function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
+	client: Client<AppContext>,
 	runOrId: WorkflowRunId | WorkflowRun<Input, Output>,
 	eventsDefinition?: TEventsDefinition,
-	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, TEventsDefinition>> {
+	logger?: Logger,
+	parentRun?: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
+): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 	const run =
 		typeof runOrId !== "string"
 			? runOrId
 			: ((await client.api.workflowRun.getByIdV1({ id: runOrId })).run as WorkflowRun<Input, Output>);
 
 	return new WorkflowRunHandleImpl(
-		client.api,
+		client,
 		run,
 		eventsDefinition ?? ({} as TEventsDefinition),
-		logger ?? client.logger.child({ "aiki.workflowRunId": run.id })
+		logger ??
+			client.logger.child({
+				"aiki.workflowId": run.workflowId,
+				"aiki.workflowVersionId": run.workflowVersionId,
+				"aiki.workflowRunId": run.id,
+			}),
+		parentRun
 	);
 }
 
-export interface WorkflowRunHandle<Input, Output, TEventsDefinition extends EventsDefinition = EventsDefinition> {
+export interface WorkflowRunHandle<
+	Input,
+	Output,
+	AppContext,
+	TEventsDefinition extends EventsDefinition = EventsDefinition,
+> {
 	run: Readonly<WorkflowRun<Input, Output>>;
 
 	events: EventSenders<TEventsDefinition>;
@@ -94,7 +112,7 @@ export interface WorkflowRunHandle<Input, Output, TEventsDefinition extends Even
 	waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<false, false>
-	): Promise<WorkflowRunWaitResultSuccess<Status, Output>>;
+	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
 	waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, false>
@@ -115,6 +133,7 @@ export interface WorkflowRunHandle<Input, Output, TEventsDefinition extends Even
 	resume: () => Promise<void>;
 
 	[INTERNAL]: {
+		client: Client<AppContext>;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (taskPath: TaskPath, taskState: TaskStateRequest) => Promise<void>;
 		assertExecutionAllowed: () => void;
@@ -140,30 +159,34 @@ export type WorkflowRunWaitResult<
 > =
 	| {
 			success: false;
-			cause: (Timed extends true ? "timeout" : never) | (Abortable extends true ? "aborted" : never);
+			cause: "run_terminated" | (Timed extends true ? "timeout" : never) | (Abortable extends true ? "aborted" : never);
 	  }
 	| {
 			success: true;
 			state: WorkflowRunWaitResultSuccess<Status, Output>;
 	  };
 
-class WorkflowRunHandleImpl<Input, Output, TEventsDefinition extends EventsDefinition>
-	implements WorkflowRunHandle<Input, Output, TEventsDefinition>
+class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>
+	implements WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>
 {
+	private readonly api: ApiClient;
 	public readonly events: EventSenders<TEventsDefinition>;
-	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output, TEventsDefinition>[typeof INTERNAL];
+	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>[typeof INTERNAL];
 
 	constructor(
-		private readonly api: ApiClient,
+		client: Client<AppContext>,
 		private _run: WorkflowRun<Input, Output>,
 		eventsDefinition: TEventsDefinition,
-		private readonly logger: Logger
+		private readonly logger: Logger,
+		private readonly parentRun?: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
 	) {
-		this.events = createEventSenders(this.api, this._run.id, eventsDefinition, this.logger, (run) => {
+		this.api = client.api;
+		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger, (run) => {
 			this._run = run as WorkflowRun<Input, Output>;
 		});
 
 		this[INTERNAL] = {
+			client,
 			transitionState: this.transitionState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
@@ -182,28 +205,78 @@ class WorkflowRunHandleImpl<Input, Output, TEventsDefinition extends EventsDefin
 	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<false, false>
-	): Promise<WorkflowRunWaitResultSuccess<Status, Output>>;
+	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
+
 	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, false>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
+
 	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<false, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
+
 	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
-	// TODO: instead polling the current state, use the transition history
-	// because it is entirely possible for a workflow to flash though a state
-	// and the handle will never know that the workflow hit that state
+
 	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
-	): Promise<WorkflowRunWaitResultSuccess<Status, Output> | WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
+	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
+		if (this.parentRun) {
+			return this.waitForStatusInParentRunContext(status, this.parentRun);
+		}
+		return this.waitForStatusByPolling(status, options);
+	}
+
+	private async waitForStatusInParentRunContext<Status extends WorkflowRunStatus>(
+		expectedStatus: Status,
+		parentRun: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
+	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
+		const parentRunHandle = parentRun[INTERNAL].handle;
+
+		const { id, state } = this.run;
+		if (state.status === expectedStatus) {
+			return {
+				success: true,
+				state: state as WorkflowRunWaitResultSuccess<Status, Output>,
+			};
+		}
+
+		if (isTerminalWorkflowRunStatus(state.status)) {
+			this.logger.error("Child workflow run was terminated");
+			await parentRunHandle[INTERNAL].transitionState({
+				status: "failed",
+				cause: "child_workflow",
+				childWorkflowRunId: id,
+			});
+			throw new WorkflowRunFailedError(parentRun.id, parentRunHandle.run.attempts);
+		}
+
+		await parentRunHandle[INTERNAL].transitionState({
+			status: "awaiting_child_workflow",
+			childWorkflowRunId: id,
+			childWorkflowRunStatus: expectedStatus,
+		});
+
+		throw new WorkflowRunSuspendedError(parentRun.id);
+	}
+
+	// TODO: instead polling the current state, use the transition history
+	// because it is entirely possible for a workflow to flash though a state
+	// and the handle will never know that the workflow hit that state
+	private async waitForStatusByPolling<Status extends WorkflowRunStatus>(
+		expectedStatus: Status,
+		options?: WorkflowRunWaitOptions<boolean, boolean>
+	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
 		if (options?.abortSignal?.aborted) {
-			throw new Error("Status wait operation aborted");
+			return {
+				success: false,
+				cause: "aborted",
+			};
 		}
 
 		const delayMs = options?.interval ? toMilliseconds(options.interval) : 1_000;
@@ -217,25 +290,44 @@ class WorkflowRunHandleImpl<Input, Output, TEventsDefinition extends EventsDefin
 			return this.run.state;
 		};
 
-		const shouldRetryOnResult = (state: WorkflowRunState<Output>) => Promise.resolve(state.status !== status);
+		const isNotInExpectedState = (state: WorkflowRunState<Output>) =>
+			Promise.resolve(state.status !== expectedStatus && isTerminalWorkflowRunStatus(state.status));
 
 		if (!Number.isFinite(maxAttempts) && options?.abortSignal === undefined) {
-			const maybeResult = await withRetry(loadState, retryStrategy, { shouldRetryOnResult }).run();
+			const maybeResult = await withRetry(loadState, retryStrategy, {
+				shouldRetryOnResult: isNotInExpectedState,
+			}).run();
 
 			if (maybeResult.state === "timeout") {
 				throw new Error("Something's wrong, this should've never timed out");
 			}
-			return maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>;
+
+			if (await isNotInExpectedState(maybeResult.result)) {
+				return {
+					success: false,
+					cause: "run_terminated",
+				};
+			}
+			return {
+				success: true,
+				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
+			};
 		}
 
 		const maybeResult = options?.abortSignal
 			? await withRetry(loadState, retryStrategy, {
 					abortSignal: options.abortSignal,
-					shouldRetryOnResult,
+					shouldRetryOnResult: isNotInExpectedState,
 				}).run()
-			: await withRetry(loadState, retryStrategy, { shouldRetryOnResult }).run();
+			: await withRetry(loadState, retryStrategy, { shouldRetryOnResult: isNotInExpectedState }).run();
 
 		if (maybeResult.state === "completed") {
+			if (await isNotInExpectedState(maybeResult.result)) {
+				return {
+					success: false,
+					cause: "run_terminated",
+				};
+			}
 			return {
 				success: true,
 				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,

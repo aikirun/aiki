@@ -13,7 +13,11 @@ interface SleeperOptions {
 const MAX_SLEEP_YEARS = 10;
 const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1000;
 
-export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logger: Logger, options: SleeperOptions) {
+export function createSleeper(
+	handle: WorkflowRunHandle<unknown, unknown, unknown>,
+	logger: Logger,
+	options: SleeperOptions
+) {
 	return async (params: SleepParams): Promise<SleepResult> => {
 		const { id: sleepId, ...durationFields } = params;
 		const durationMs = toMilliseconds(durationFields);

@@ -46,7 +46,7 @@ const workflowRunStateTransitionValidator: Record<
 				return { allowed: false };
 			}
 			if (to.status === "scheduled" && to.reason !== "task_retry") {
-				return { allowed: false, reason: "Only task_retry run allowed" };
+				return { allowed: false, reason: "Only task retry run allowed" };
 			}
 			return { allowed: true };
 		};
@@ -85,7 +85,7 @@ const workflowRunStateTransitionValidator: Record<
 				return { allowed: false };
 			}
 			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "event") {
-				return { allowed: false, reason: "Only new or event run allowed" };
+				return { allowed: false, reason: "Only new or event received run allowed" };
 			}
 			return { allowed: true };
 		};
@@ -98,7 +98,7 @@ const workflowRunStateTransitionValidator: Record<
 				return { allowed: false };
 			}
 			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "retry") {
-				return { allowed: false, reason: "Only new or event run allowed" };
+				return { allowed: false, reason: "Only new or retry run allowed" };
 			}
 			return { allowed: true };
 		};
@@ -106,8 +106,15 @@ const workflowRunStateTransitionValidator: Record<
 
 	awaiting_child_workflow: (() => {
 		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "paused", "cancelled"];
-		// TODO: possibly add a new scheduled reason for when child workflows complete and the parent needs to resume
-		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
+		return (to) => {
+			if (!allowedDestinations.includes(to.status)) {
+				return { allowed: false };
+			}
+			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "child_workflow") {
+				return { allowed: false, reason: "Only new or child workflow concluded run allowed" };
+			}
+			return { allowed: true };
+		};
 	})(),
 
 	cancelled: (() => {

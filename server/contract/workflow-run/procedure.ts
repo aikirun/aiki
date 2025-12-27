@@ -115,6 +115,7 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 			workflowId: z.string().min(1),
 			workflowVersionId: z.string().min(1),
 			input: z.unknown(),
+			parentWorkflowRunId: z.string().min(1).optional(),
 			options: workflowOptionsSchema.optional(),
 		})
 	)
