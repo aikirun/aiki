@@ -66,20 +66,20 @@ const workflowRunStateTransitionValidator: Record<
 	})(),
 
 	sleeping: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "paused", "cancelled"];
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
 		return (to) => {
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
-			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "awake" && to.reason !== "resume") {
-				return { allowed: false, reason: "Only new or awake or resume run allowed" };
+			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "awake") {
+				return { allowed: false, reason: "Only new or awake run allowed" };
 			}
 			return { allowed: true };
 		};
 	})(),
 
 	awaiting_event: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "paused", "cancelled"];
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
 		return (to) => {
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
@@ -92,7 +92,7 @@ const workflowRunStateTransitionValidator: Record<
 	})(),
 
 	awaiting_retry: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "paused", "cancelled"];
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
 		return (to) => {
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
@@ -105,13 +105,13 @@ const workflowRunStateTransitionValidator: Record<
 	})(),
 
 	awaiting_child_workflow: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "paused", "cancelled"];
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
 		return (to) => {
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
 			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "child_workflow") {
-				return { allowed: false, reason: "Only new or child workflow concluded run allowed" };
+				return { allowed: false, reason: "Only new or child workflow triggered run allowed" };
 			}
 			return { allowed: true };
 		};

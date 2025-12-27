@@ -201,17 +201,6 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		}
 	}
 
-	if (run.state.status === "paused" && state.status === "scheduled") {
-		for (const [sleepPath, sleepState] of Object.entries(run.sleepsState)) {
-			if (sleepState.status === "sleeping" && sleepState.awakeAt <= now) {
-				run.sleepsState[sleepPath] = {
-					status: "completed",
-					completedAt: now,
-				};
-			}
-		}
-	}
-
 	if (state.status === "sleeping") {
 		const { sleepPath, durationMs } = state;
 		const awakeAt = now + durationMs;
