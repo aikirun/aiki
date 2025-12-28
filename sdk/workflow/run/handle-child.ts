@@ -3,9 +3,9 @@ import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
 	isTerminalWorkflowRunStatus,
+	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
 	type WorkflowRunPath,
-	type WorkflowRunStatus,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 
@@ -48,26 +48,26 @@ export type ChildWorkflowRunHandle<
 	TEventsDefinition extends EventsDefinition = EventsDefinition,
 > = Omit<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>, "waitForStatus"> & {
 	/**
-	 * Waits for the child workflow run to reach a specific status.
+	 * Waits for the child workflow run to reach a terminal status.
 	 *
-	 * This method suspends the parent workflow until the child reaches the expected status
-	 * or the optional timeout elapses or the child reaches a terminal state.
-	 * When the parent resumes, the result is deterministically
-	 * replayed from stored wait results.
+	 * This method suspends the parent workflow until the child reaches the expected terminal status
+	 * or the optional timeout elapses.
+	 *
+	 * When the parent resumes, the result is deterministically replayed from stored wait results.
 	 *
 	 * Returns a result object:
 	 * - `{ success: true, state }` - child reached the expected status
 	 * - `{ success: false, cause }` - child did not reach status
 	 *
 	 * Possible failure causes:
-	 * - `"run_terminated"` - child reached a terminal state (cancelled, failed, completed) other than expected
+	 * - `"run_terminated"` - child reached a different terminal state than expected
 	 * - `"timeout"` - timeout elapsed (only when timeout option provided)
 	 *
-	 * @param status - The target status to wait for
+	 * @param status - The target terminal status to wait for
 	 * @param options - Optional configuration with timeout
 	 *
 	 * @example
-	 * // Wait indefinitely for child to complete or reaches a terminal
+	 * // Wait indefinitely for child to complete
 	 * const result = await childHandle.waitForStatus("completed");
 	 * if (result.success) {
 	 *   console.log(result.state.output);
@@ -84,11 +84,11 @@ export type ChildWorkflowRunHandle<
 	 *   console.log("Child workflow took too long");
 	 * }
 	 */
-	waitForStatus<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options?: ChildWorkflowRunWaitOptions<false>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
-	waitForStatus<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options: ChildWorkflowRunWaitOptions<true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
@@ -106,17 +106,17 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 ) {
 	let nextWaitIndex = 0;
 
-	async function waitForStatus<Status extends WorkflowRunStatus>(
+	async function waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options?: ChildWorkflowRunWaitOptions<false>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
 
-	async function waitForStatus<Status extends WorkflowRunStatus>(
+	async function waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options: ChildWorkflowRunWaitOptions<true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
 
-	async function waitForStatus<Status extends WorkflowRunStatus>(
+	async function waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		expectedStatus: Status,
 		options?: ChildWorkflowRunWaitOptions<boolean>
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, false>> {
@@ -144,7 +144,7 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 			}
 
 			if (isTerminalWorkflowRunStatus(waitResult.childWorkflowRunState.status)) {
-				logger.error("Child workflow run was terminated");
+				logger.debug("Child workflow run reached termnial state");
 				return {
 					success: false,
 					cause: "run_terminated",
@@ -161,7 +161,7 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 		}
 
 		if (isTerminalWorkflowRunStatus(state.status)) {
-			logger.error("Child workflow run was terminated");
+			logger.debug("Child workflow run reached termnial state");
 			return {
 				success: false,
 				cause: "run_terminated",

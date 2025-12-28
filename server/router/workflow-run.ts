@@ -3,12 +3,12 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
-import type {
-	ChildWorkflowWaitResult,
-	WorkflowRun,
-	WorkflowRunId,
-	WorkflowRunState,
-	WorkflowRunTransition,
+import {
+	isTerminalWorkflowRunStatus,
+	type WorkflowRun,
+	type WorkflowRunId,
+	type WorkflowRunState,
+	type WorkflowRunTransition,
 } from "@aikirun/types/workflow-run";
 import type { WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 import type { Redis } from "ioredis";
@@ -186,7 +186,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	assertIsValidWorkflowRunStateTransition(runId, run.state, input.state);
 
 	const now = Date.now();
-	const state = convertWorkflowRunStateDurationsToTimestamps(input.state, now);
+	let state = convertWorkflowRunStateDurationsToTimestamps(input.state, now);
 
 	context.logger.info({ runId, state }, "Transitioning workflow run state");
 
@@ -233,6 +233,33 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		(run.state.reason === "retry" || run.state.reason === "new")
 	) {
 		run.attempts++;
+	}
+
+	if (state.status === "awaiting_child_workflow") {
+		const childPath = state.childWorkflowRunPath;
+		const childRunId = run.childWorkflowRuns[childPath]?.id;
+
+		if (childRunId) {
+			const childRun = workflowRuns.get(childRunId as WorkflowRunId);
+			if (childRun) {
+				const childStatus = childRun.state.status;
+				const expectedStatus = state.childWorkflowRunStatus;
+
+				if (childStatus === expectedStatus || isTerminalWorkflowRunStatus(childStatus)) {
+					const statusWaitResults = run.childWorkflowRuns[childPath]?.statusWaitResults;
+					if (statusWaitResults) {
+						statusWaitResults.push({
+							status: "completed",
+							completedAt: now,
+							childWorkflowRunState: childRun.state,
+						});
+					}
+
+					state = { status: "scheduled", scheduledAt: now, reason: "child_workflow" };
+					context.logger.info({ runId, childPath, childStatus }, "Child already at status, scheduling immediately");
+				}
+			}
+		}
 	}
 
 	run.state = state;
@@ -390,14 +417,13 @@ async function notifyParentOfStateChangeIfNecessary(
 			"Notifying parent of child state change"
 		);
 
-		const waitResult: ChildWorkflowWaitResult = {
-			status: "completed",
-			completedAt: Date.now(),
-			childWorkflowRunState: childRun.state,
-		};
 		const statusWaitResults = parentRun.childWorkflowRuns[childRun.path]?.statusWaitResults;
 		if (statusWaitResults) {
-			statusWaitResults.push(waitResult);
+			statusWaitResults.push({
+				status: "completed",
+				completedAt: Date.now(),
+				childWorkflowRunState: childRun.state,
+			});
 		}
 
 		await transitionStateV1.callable({ context })({

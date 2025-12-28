@@ -4,11 +4,11 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { TaskPath } from "@aikirun/types/task";
 import {
 	isTerminalWorkflowRunStatus,
+	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
 	type WorkflowRunState,
-	type WorkflowRunStatus,
 } from "@aikirun/types/workflow-run";
 import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 
@@ -65,14 +65,14 @@ export interface WorkflowRunHandle<
 	refresh: () => Promise<void>;
 
 	/**
-	 * Waits for the workflow run to reach a specific status by polling.
+	 *  Waits for the child workflow run to reach a terminal status by polling.
 	 *
 	 * Returns a result object:
 	 * - `{ success: true, state }` - workflow reached the expected status
 	 * - `{ success: false, cause }` - workflow did not reach status
 	 *
 	 * Possible failure causes:
-	 * - `"run_terminated"` - workflow reached a terminal state (cancelled, failed, completed) other than expected
+	 * - `"run_terminated"` - workflow reached a terminal state other than expected
 	 * - `"timeout"` - timeout elapsed (only when timeout option provided)
 	 * - `"aborted"` - abort signal triggered (only when abortSignal option provided)
 	 *
@@ -80,7 +80,7 @@ export interface WorkflowRunHandle<
 	 * @param options - Optional configuration for polling interval, timeout, and abort signal
 	 *
 	 * @example
-	 * // Wait indefinitely until completed or the workflow reaches a terminal state
+	 * // Wait indefinitely until completed or the workflow reaches another terminal state
 	 * const result = await handle.waitForStatus("completed");
 	 * if (result.success) {
 	 *   console.log(result.state.output);
@@ -109,19 +109,19 @@ export interface WorkflowRunHandle<
 	 *   console.log(`Wait ended: ${result.cause}`);
 	 * }
 	 */
-	waitForStatus<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<false, false>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
-	waitForStatus<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, false>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
-	waitForStatus<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<false, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
-	waitForStatus<Status extends WorkflowRunStatus>(
+	waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
@@ -148,13 +148,13 @@ export interface WorkflowRunWaitOptions<Timed extends boolean, Abortable extends
 	abortSignal?: Abortable extends true ? AbortSignal : never;
 }
 
-export type WorkflowRunWaitResultSuccess<Status extends WorkflowRunStatus, Output> = Extract<
+export type WorkflowRunWaitResultSuccess<Status extends TerminalWorkflowRunStatus, Output> = Extract<
 	WorkflowRunState<Output>,
 	{ status: Status }
 >;
 
 export type WorkflowRunWaitResult<
-	Status extends WorkflowRunStatus,
+	Status extends TerminalWorkflowRunStatus,
 	Output,
 	Timed extends boolean,
 	Abortable extends boolean,
@@ -203,22 +203,22 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		this._run = currentRun as WorkflowRun<Input, Output>;
 	}
 
-	public async waitForStatus<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<false, false>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
 
-	public async waitForStatus<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, false>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
 
-	public async waitForStatus<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<false, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
 
-	public async waitForStatus<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options: WorkflowRunWaitOptions<true, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
@@ -226,14 +226,14 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 	// TODO: instead checking the current state, use the transition history
 	// because it is possible for a workflow to flash though a state
 	// and the handle will never know that the workflow hit that state
-	public async waitForStatus<Status extends WorkflowRunStatus>(
+	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
 		return this.waitForStatusByPolling(status, options);
 	}
 
-	private async waitForStatusByPolling<Status extends WorkflowRunStatus>(
+	private async waitForStatusByPolling<Status extends TerminalWorkflowRunStatus>(
 		expectedStatus: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
