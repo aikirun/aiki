@@ -1,13 +1,13 @@
 import { event, workflow } from "@aikirun/workflow";
 
-import { drinkCoffee, stretch } from "./task";
+import { makeCoffee, stretch } from "./task";
 
 export const morningRoutine = workflow({ id: "morning-routine" });
 
 export const morningRoutineV1 = morningRoutine.v("1.0", {
 	async handler(input: { sugar: boolean }, run) {
-		await drinkCoffee.start(run, { withSugar: input.sugar, withCream: false });
-		return "Here's your coffee";
+		await makeCoffee.start(run, { withSugar: input.sugar, withCream: false });
+		return { coffee: "Here's your coffee" };
 	},
 });
 
@@ -24,8 +24,8 @@ export const morningRoutineV2 = morningRoutine.v("2.0", {
 		const childHandle = await morningRoutineV1.startAsChild(run, { sugar: true });
 		const childResult = await childHandle.waitForStatus("completed");
 		if (childResult.success) {
-			run.logger.info("Morning routine v1 outpu", {
-				cause: childResult.state.output,
+			run.logger.info("Morning routine v1 output", {
+				coffee: childResult.state.output.coffee,
 			});
 		}
 
