@@ -2,7 +2,7 @@ import { task } from "@aikirun/task";
 
 export const drinkCoffee = task({
 	id: "drink-coffee",
-	handler(_input: { withSugar: boolean }) {
+	handler(_input: { withSugar: boolean; withCream: boolean }) {
 		return Promise.resolve();
 	},
 });

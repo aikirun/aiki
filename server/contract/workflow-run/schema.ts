@@ -341,6 +341,11 @@ export const workflowRunStateScheduledRequestOptimisticSchema: Zt<WorkflowRunSta
 			reason: z.literal("event"),
 			scheduledInMs: z.number(),
 		}),
+		z.object({
+			status: z.literal("scheduled"),
+			reason: z.literal("child_workflow"),
+			scheduledInMs: z.number(),
+		}),
 	]
 );
 

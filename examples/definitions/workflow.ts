@@ -2,15 +2,16 @@ import { event, workflow } from "@aikirun/workflow";
 
 import { drinkCoffee, stretch } from "./task";
 
-export const morningWorkflow = workflow({ id: "morning-routine" });
+export const morningRoutine = workflow({ id: "morning-routine" });
 
-export const morningWorkflowV1 = morningWorkflow.v("1.0", {
-	async handler(input: { a: boolean }, run) {
-		await drinkCoffee.start(run, { withSugar: input.a });
+export const morningRoutineV1 = morningRoutine.v("1.0", {
+	async handler(input: { sugar: boolean }, run): Promise<string> {
+		await drinkCoffee.start(run, { withSugar: input.sugar, withCream: false });
+		return "Here's your coffee";
 	},
 });
 
-export const morningWorkflowV2 = morningWorkflow.v("2.0", {
+export const morningRoutineV2 = morningRoutine.v("2.0", {
 	async handler(input: { foo: number }, run): Promise<{ bar: string }> {
 		const { data: eventData } = await run.events.alarm.wait();
 
@@ -20,7 +21,14 @@ export const morningWorkflowV2 = morningWorkflow.v("2.0", {
 
 		const { muscles } = await stretch.start(run, { duration: input.foo });
 
-		await drinkCoffee.start(run, { withSugar: true });
+		const childHandle = await morningRoutineV1.startAsChild(run, { sugar: true });
+		const childResult = await childHandle.waitForStatus("completed");
+
+		if (!childResult.success) {
+			run.logger.info("Morning routine v1 did not succeed", {
+				cause: childResult.cause,
+			});
+		}
 
 		return { bar: `Alarm: ${eventData.ringtone}, Stretched: ${muscles}` };
 	},

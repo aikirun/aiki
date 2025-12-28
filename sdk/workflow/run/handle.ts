@@ -255,19 +255,19 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 			return this.run.state;
 		};
 
-		const isNotInExpectedState = (state: WorkflowRunState<Output>) =>
-			Promise.resolve(state.status !== expectedStatus && isTerminalWorkflowRunStatus(state.status));
+		const isNeitherExpectedNorTerminal = (state: WorkflowRunState<Output>) =>
+			Promise.resolve(state.status !== expectedStatus && !isTerminalWorkflowRunStatus(state.status));
 
-		if (!Number.isFinite(maxAttempts) && options?.abortSignal === undefined) {
+		if (!Number.isFinite(maxAttempts) && !options?.abortSignal) {
 			const maybeResult = await withRetry(loadState, retryStrategy, {
-				shouldRetryOnResult: isNotInExpectedState,
+				shouldRetryOnResult: isNeitherExpectedNorTerminal,
 			}).run();
 
 			if (maybeResult.state === "timeout") {
 				throw new Error("Something's wrong, this should've never timed out");
 			}
 
-			if (await isNotInExpectedState(maybeResult.result)) {
+			if (await isNeitherExpectedNorTerminal(maybeResult.result)) {
 				return {
 					success: false,
 					cause: "run_terminated",
@@ -282,12 +282,12 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		const maybeResult = options?.abortSignal
 			? await withRetry(loadState, retryStrategy, {
 					abortSignal: options.abortSignal,
-					shouldRetryOnResult: isNotInExpectedState,
+					shouldRetryOnResult: isNeitherExpectedNorTerminal,
 				}).run()
-			: await withRetry(loadState, retryStrategy, { shouldRetryOnResult: isNotInExpectedState }).run();
+			: await withRetry(loadState, retryStrategy, { shouldRetryOnResult: isNeitherExpectedNorTerminal }).run();
 
 		if (maybeResult.state === "completed") {
-			if (await isNotInExpectedState(maybeResult.result)) {
+			if (await isNeitherExpectedNorTerminal(maybeResult.result)) {
 				return {
 					success: false,
 					cause: "run_terminated",

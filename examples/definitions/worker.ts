@@ -1,10 +1,10 @@
 import { worker } from "@aikirun/worker";
 
-import { morningWorkflowV1, morningWorkflowV2 } from "./workflow";
+import { morningRoutineV1, morningRoutineV2 } from "./workflow";
 
 export const aikiWorker = worker({
 	id: "worker-A",
-	workflows: [morningWorkflowV1, morningWorkflowV2],
+	workflows: [morningRoutineV1, morningRoutineV2],
 	opts: {
 		maxConcurrentWorkflowRuns: 10,
 	},

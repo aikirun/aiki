@@ -120,9 +120,9 @@ interface WorkflowRunTransitionStateRequestBase {
 	state: WorkflowRunStateRequest;
 }
 
-export type WorkflowRunStateScheduledRequestOptimistic = Exclude<
+export type WorkflowRunStateScheduledRequestOptimistic = Extract<
 	WorkflowRunStateScheduledRequest,
-	{ reason: "new" | "resume" | "awake" }
+	{ reason: "retry" | "task_retry" | "event" | "child_workflow" }
 >;
 
 export type WorkflowRunStateScheduledRequestPessimistic = Exclude<

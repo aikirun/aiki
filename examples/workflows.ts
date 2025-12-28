@@ -1,7 +1,7 @@
 import { client } from "@aikirun/client";
 import { delay } from "@aikirun/lib";
 
-import { morningWorkflowV2 } from "./definitions/workflow";
+import { morningRoutineV2 } from "./definitions/workflow";
 
 export const aikiClient = await client({
 	url: "http://localhost:9090",
@@ -16,16 +16,13 @@ await runSampleWorkflow();
 async function runSampleWorkflow() {
 	const { logger } = aikiClient;
 
-	const handle = await morningWorkflowV2.start(aikiClient, { foo: 44 });
+	const handle = await morningRoutineV2.start(aikiClient, { foo: 44 });
 
 	await delay(10_000);
 	await handle.events.alarm.send({ ringtone: "juba" });
 
 	await delay(10_000);
-	await handle.pause();
-
-	await delay(10_000);
-	await handle.resume();
+	await handle.awake();
 
 	const waitResult = await handle.waitForStatus("completed");
 	if (waitResult.success) {
