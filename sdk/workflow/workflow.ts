@@ -65,7 +65,7 @@ export interface Workflow {
 
 	v: <
 		Input extends Serializable,
-		Output,
+		Output extends Serializable,
 		AppContext = null,
 		TEventsDefinition extends EventsDefinition = Record<string, never>,
 	>(
