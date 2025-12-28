@@ -123,6 +123,8 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 	async function wait(options?: EventWaitOptions<false>): Promise<EventWaitState<Data, false>>;
 	async function wait(options: EventWaitOptions<true>): Promise<EventWaitState<Data, true>>;
 	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitState<Data, boolean>> {
+		await handle.refresh();
+
 		const events = handle.run.eventsQueue[eventId]?.events ?? [];
 
 		const event = events[nextEventIndex] as EventState<Data> | undefined;
