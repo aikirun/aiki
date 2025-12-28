@@ -1,4 +1,4 @@
-import type { SerializableInput } from "@aikirun/lib/error";
+import type { Serializable } from "@aikirun/lib";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 
@@ -64,8 +64,8 @@ export interface Workflow {
 	id: WorkflowId;
 
 	v: <
-		Input extends SerializableInput = null,
-		Output = void,
+		Input extends Serializable,
+		Output,
 		AppContext = null,
 		TEventsDefinition extends EventsDefinition = Record<string, never>,
 	>(

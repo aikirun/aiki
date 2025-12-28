@@ -22,7 +22,7 @@ export async function childWorkflowRunHandle<Input, Output, AppContext, TEventsD
 	client: Client<AppContext>,
 	path: WorkflowRunPath,
 	run: WorkflowRun<Input, Output>,
-	parentRun: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>,
+	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 	logger: Logger,
 	eventsDefinition?: TEventsDefinition
 ): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
@@ -101,7 +101,7 @@ export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
 	path: WorkflowRunPath,
 	handle: WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>,
-	parentRun: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>,
+	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 	logger: Logger
 ) {
 	let nextWaitIndex = 0;

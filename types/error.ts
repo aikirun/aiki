@@ -1,10 +1,4 @@
-export type SerializableInput =
-	| null
-	| string
-	| number
-	| boolean
-	| { [key: string]: SerializableInput }
-	| SerializableInput[];
+export type Serializable = null | string | number | boolean | { [key: string]: Serializable } | Serializable[];
 
 export interface SerializableError {
 	message: string;

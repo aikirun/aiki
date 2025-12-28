@@ -1,7 +1,7 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
 import { sha256 } from "@aikirun/lib/crypto";
-import { createSerializableError, type SerializableInput } from "@aikirun/lib/error";
+import { createSerializableError, type Serializable } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { RetryStrategy } from "@aikirun/lib/retry";
@@ -57,7 +57,7 @@ import type { EventsDefinition } from "sdk/workflow/run/event";
  * const result = await chargeCard.start(run, { cardId: "123", amount: 9999 });
  * ```
  */
-export function task<Input extends SerializableInput = null, Output = void>(
+export function task<Input extends Serializable = null, Output = void>(
 	params: TaskParams<Input, Output>
 ): Task<Input, Output> {
 	return new TaskImpl(params);
@@ -86,7 +86,7 @@ export interface Task<Input, Output> {
 	id: TaskId;
 	with(): TaskBuilder<Input, Output>;
 	start: (
-		run: WorkflowRunContext<unknown, unknown, unknown, EventsDefinition>,
+		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
 		...args: Input extends null ? [] : [Input]
 	) => Promise<Output>;
 }
@@ -110,7 +110,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	public async start(
-		run: WorkflowRunContext<unknown, unknown, unknown, EventsDefinition>,
+		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
@@ -163,7 +163,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async tryExecuteTask(
-		run: WorkflowRunContext<unknown, unknown, unknown, EventsDefinition>,
+		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
 		input: Input,
 		path: TaskPath,
 		retryStrategy: RetryStrategy,

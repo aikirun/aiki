@@ -27,7 +27,7 @@ import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handl
 export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
 	handler: (
 		input: Input,
-		run: Readonly<WorkflowRunContext<Input, Output, AppContext, TEventsDefinition>>,
+		run: Readonly<WorkflowRunContext<Input, AppContext, TEventsDefinition>>,
 		context: AppContext
 	) => Promise<Output>;
 	events?: TEventsDefinition;
@@ -62,8 +62,8 @@ export interface WorkflowVersion<
 		...args: Input extends null ? [] : [Input]
 	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
-	startAsChild: <ParentInput, ParentOutput, ParentEventsDefinition extends EventsDefinition>(
-		parentRun: WorkflowRunContext<ParentInput, ParentOutput, AppContext, ParentEventsDefinition>,
+	startAsChild: <ParentInput, ParentEventsDefinition extends EventsDefinition>(
+		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEventsDefinition>,
 		...args: Input extends null ? [] : [Input]
 	) => Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
@@ -76,7 +76,7 @@ export interface WorkflowVersion<
 		eventsDefinition: TEventsDefinition;
 		handler: (
 			input: Input,
-			run: WorkflowRunContext<Input, Output, AppContext, TEventsDefinition>,
+			run: WorkflowRunContext<Input, AppContext, TEventsDefinition>,
 			context: AppContext
 		) => Promise<void>;
 	};
@@ -140,8 +140,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
 	}
 
-	public async startAsChild<ParentInput, ParentOutput>(
-		parentRun: WorkflowRunContext<ParentInput, ParentOutput, AppContext, EventsDefinition>,
+	public async startAsChild<ParentInput>(
+		parentRun: WorkflowRunContext<ParentInput, AppContext, EventsDefinition>,
 		...args: Input extends null ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
@@ -210,7 +210,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	private async handler(
 		input: Input,
-		run: WorkflowRunContext<Input, Output, AppContext, TEventsDefinition>,
+		run: WorkflowRunContext<Input, AppContext, TEventsDefinition>,
 		context: AppContext
 	): Promise<void> {
 		const { logger } = run;
@@ -235,7 +235,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	private async tryExecuteWorkflow(
 		input: Input,
-		run: WorkflowRunContext<Input, Output, AppContext, TEventsDefinition>,
+		run: WorkflowRunContext<Input, AppContext, TEventsDefinition>,
 		context: AppContext,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
@@ -289,7 +289,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	}
 
 	private async assertRetryAllowed(
-		handle: WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>,
+		handle: WorkflowRunHandle<Input, unknown, AppContext, TEventsDefinition>,
 		retryStrategy: RetryStrategy,
 		logger: Logger
 	): Promise<void> {

@@ -5,14 +5,14 @@ import { drinkCoffee, stretch } from "./task";
 export const morningRoutine = workflow({ id: "morning-routine" });
 
 export const morningRoutineV1 = morningRoutine.v("1.0", {
-	async handler(input: { sugar: boolean }, run): Promise<string> {
+	async handler(input: { sugar: boolean }, run) {
 		await drinkCoffee.start(run, { withSugar: input.sugar, withCream: false });
 		return "Here's your coffee";
 	},
 });
 
 export const morningRoutineV2 = morningRoutine.v("2.0", {
-	async handler(input: { foo: number }, run): Promise<{ bar: string }> {
+	async handler(input: { foo: number }, run) {
 		const { data: eventData } = await run.events.alarm.wait();
 
 		run.logger.info("I need to sleep some more");
@@ -23,10 +23,9 @@ export const morningRoutineV2 = morningRoutine.v("2.0", {
 
 		const childHandle = await morningRoutineV1.startAsChild(run, { sugar: true });
 		const childResult = await childHandle.waitForStatus("completed");
-
-		if (!childResult.success) {
-			run.logger.info("Morning routine v1 did not succeed", {
-				cause: childResult.cause,
+		if (childResult.success) {
+			run.logger.info("Morning routine v1 outpu", {
+				cause: childResult.state.output,
 			});
 		}
 
