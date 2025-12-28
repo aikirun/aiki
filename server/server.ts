@@ -11,6 +11,7 @@ import {
 	scheduleEventWaitTimedOutWorkflowRuns,
 	scheduleRetryableWorkflowRuns,
 	scheduleSleepingWorkflowRuns,
+	scheduleWorkflowRunsThatTimedOutWaitingForChild,
 	scheduleWorkflowRunsWithRetryableTask,
 } from "./router/workflow-run";
 
@@ -139,11 +140,23 @@ function initCrons(redis: Redis, logger: Logger) {
 		});
 	}, 500);
 
+	const scheduleWorkflowRunsThatTimedOutWaitingForChildInterval = setInterval(() => {
+		const context = createContext({
+			type: "cron",
+			name: "scheduleWorkflowRunsThatTimedOutWaitingForChild",
+			logger,
+		});
+		scheduleWorkflowRunsThatTimedOutWaitingForChild(context).catch((err) => {
+			logger.error({ err }, "Error scheduling workflows that timed out while waiting for child");
+		});
+	}, 500);
+
 	return [
 		queueScheduledWorkflowRunsInterval,
 		scheduleSleepingWorkflowRunsInterval,
 		scheduleRetryableWorkflowRunsInterval,
 		scheduleWorkflowRunsWithRetryableTaskInterval,
 		scheduleEventWaitTimedOutWorkflowRunsInterval,
+		scheduleWorkflowRunsThatTimedOutWaitingForChildInterval,
 	];
 }

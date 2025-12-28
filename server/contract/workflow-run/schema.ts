@@ -28,6 +28,7 @@ import type {
 	WorkflowRunTransition,
 } from "@aikirun/types/workflow-run";
 import type {
+	WorkflowRunStateAwaitingChildWorkflowRequest,
 	WorkflowRunStateAwaitingEventRequest,
 	WorkflowRunStateAwaitingRetryRequest,
 	WorkflowRunStateScheduledRequestOptimistic,
@@ -226,8 +227,9 @@ export const workflowRunStateAwaitingRetrySchema: Zt<WorkflowRunStateAwaitingRet
 
 export const workflowRunStateAwaitingChildWorkflowSchema: Zt<WorkflowRunStateAwaitingChildWorkflow> = z.object({
 	status: z.literal("awaiting_child_workflow"),
-	childWorkflowRunId: z.string(),
+	childWorkflowRunPath: z.string(),
 	childWorkflowRunStatus: workflowRunStatusSchema,
+	timeoutAt: z.number().optional(),
 });
 
 export const workflowRunStateCancelledSchema: Zt<WorkflowRunStateCancelled> = z.object({
@@ -279,13 +281,32 @@ export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	createdAt: z.number(),
 	revision: z.number(),
 	input: z.unknown(),
+	path: z.string().optional(),
 	options: workflowOptionsSchema,
 	attempts: z.number(),
 	state: workflowRunStateSchema,
 	tasksState: z.record(z.string(), taskStateSchema),
 	sleepsState: z.record(z.string(), sleepStateSchema),
 	eventsQueue: z.record(z.string(), eventsQueueSchema),
-	childWorkflowRuns: z.record(z.string(), z.object({ id: z.string() })),
+	childWorkflowRuns: z.record(
+		z.string(),
+		z.object({
+			id: z.string(),
+			statusWaitResults: z.array(
+				z.union([
+					z.object({
+						status: z.literal("completed"),
+						completedAt: z.number(),
+						childWorkflowRunState: workflowRunStateSchema,
+					}),
+					z.object({
+						status: z.literal("timeout"),
+						timedOutAt: z.number(),
+					}),
+				])
+			),
+		})
+	),
 	parentWorkflowRunId: z.string().optional(),
 });
 
@@ -367,3 +388,11 @@ export const workflowRunStateAwaitingRetryRequestSchema: Zt<WorkflowRunStateAwai
 		nextAttemptInMs: z.number(),
 	}),
 ]);
+
+export const workflowRunStateAwaitingChildWorkflowRequestSchema: Zt<WorkflowRunStateAwaitingChildWorkflowRequest> =
+	z.object({
+		status: z.literal("awaiting_child_workflow"),
+		childWorkflowRunPath: z.string(),
+		childWorkflowRunStatus: workflowRunStatusSchema,
+		timeoutInMs: z.number().optional(),
+	});

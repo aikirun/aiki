@@ -153,8 +153,9 @@ export type WorkflowRunStateAwaitingRetry =
 
 export interface WorkflowRunStateAwaitingChildWorkflow extends WorkflowRunStateBase {
 	status: "awaiting_child_workflow";
-	childWorkflowRunId: string;
+	childWorkflowRunPath: string;
 	childWorkflowRunStatus: WorkflowRunStatus;
+	timeoutAt?: number;
 }
 
 export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
@@ -213,6 +214,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	createdAt: number;
 	revision: number;
 	input: Input;
+	path?: string;
 	options: WorkflowOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;
@@ -224,8 +226,26 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	tasksState: Record<string, TaskState>;
 	sleepsState: Record<string, SleepState>;
 	eventsQueue: Record<string, EventQueue<unknown>>;
-	childWorkflowRuns: Record<string, { id: string }>;
+	childWorkflowRuns: Record<string, ChildWorkflowRun>;
 	parentWorkflowRunId?: string;
+}
+
+export interface ChildWorkflowRun {
+	id: string;
+	statusWaitResults: ChildWorkflowWaitResult[];
+}
+
+export type ChildWorkflowWaitResult = ChildWorkflowWaitResultCompleted | ChildWorkflowWaitResultTimeout;
+
+export interface ChildWorkflowWaitResultCompleted {
+	status: "completed";
+	completedAt: number;
+	childWorkflowRunState: WorkflowRunState;
+}
+
+export interface ChildWorkflowWaitResultTimeout {
+	status: "timeout";
+	timedOutAt: number;
 }
 
 export interface WorkflowRunTransitionBase {

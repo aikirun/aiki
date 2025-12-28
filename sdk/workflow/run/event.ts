@@ -125,9 +125,8 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitState<Data, boolean>> {
 		const events = handle.run.eventsQueue[eventId]?.events ?? [];
 
-		if (nextEventIndex < events.length) {
-			// biome-ignore lint/style/noNonNullAssertion: Index exists
-			const event = events[nextEventIndex]! as EventState<Data>;
+		const event = events[nextEventIndex] as EventState<Data> | undefined;
+		if (event) {
 			nextEventIndex++;
 
 			if (event.status === "timeout") {

@@ -15,12 +15,12 @@ export interface EventStateReceived<Data> extends EventStateBase {
 	idempotencyKey?: string;
 }
 
-export interface EventStateTimedOut extends EventStateBase {
+export interface EventStateTimeout extends EventStateBase {
 	status: "timeout";
 	timedOutAt: number;
 }
 
-export type EventState<Data> = EventStateReceived<Data> | EventStateTimedOut;
+export type EventState<Data> = EventStateReceived<Data> | EventStateTimeout;
 
 export interface EventQueue<Data> {
 	events: EventState<Data>[];

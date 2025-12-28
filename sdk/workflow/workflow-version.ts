@@ -22,6 +22,7 @@ import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/workfl
 import type { WorkflowRunContext } from "./run/context";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
+import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
 
 export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
 	handler: (
@@ -64,7 +65,7 @@ export interface WorkflowVersion<
 	startAsChild: <ParentInput, ParentOutput, ParentEventsDefinition extends EventsDefinition>(
 		parentRun: WorkflowRunContext<ParentInput, ParentOutput, AppContext, ParentEventsDefinition>,
 		...args: Input extends null ? [] : [Input]
-	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+	) => Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
 	getHandle: (
 		client: Client<AppContext>,
@@ -142,7 +143,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	public async startAsChild<ParentInput, ParentOutput>(
 		parentRun: WorkflowRunContext<ParentInput, ParentOutput, AppContext, EventsDefinition>,
 		...args: Input extends null ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
 		parentRunHandle[INTERNAL].assertExecutionAllowed();
 
@@ -161,12 +162,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 				"aiki.childWorkflowRunId": existingChildRun.id,
 			});
 
-			return workflowRunHandle(
+			return childWorkflowRunHandle(
 				client,
+				childRunPath,
 				existingChildRun as WorkflowRun<Input, Output>,
-				this[INTERNAL].eventsDefinition,
+				parentRun,
 				logger,
-				parentRun
+				this[INTERNAL].eventsDefinition
 			);
 		}
 
@@ -174,13 +176,14 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
 			input,
+			path: childRunPath,
 			parentWorkflowRunId: parentRun.id,
 			options: {
 				...this.params.opts,
 				idempotencyKey: childRunPath,
 			},
 		});
-		parentRunHandle.run.childWorkflowRuns[childRunPath] = { id: newChildRun.id };
+		parentRunHandle.run.childWorkflowRuns[childRunPath] = { id: newChildRun.id, statusWaitResults: [] };
 
 		const logger = parentRun.logger.child({
 			"aiki.childWorkflowId": newChildRun.workflowId,
@@ -188,12 +191,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			"aiki.childWorkflowRunId": newChildRun.id,
 		});
 
-		return workflowRunHandle(
+		return childWorkflowRunHandle(
 			client,
+			childRunPath,
 			newChildRun as WorkflowRun<Input, Output>,
-			this[INTERNAL].eventsDefinition,
+			parentRun,
 			logger,
-			parentRun
+			this[INTERNAL].eventsDefinition
 		);
 	}
 

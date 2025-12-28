@@ -5,40 +5,34 @@ import type { TaskPath } from "@aikirun/types/task";
 import {
 	isTerminalWorkflowRunStatus,
 	type WorkflowRun,
-	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
 	type WorkflowRunState,
 	type WorkflowRunStatus,
-	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 
-import type { WorkflowRunContext } from "./context";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
 export function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
 	client: Client<AppContext>,
 	id: WorkflowRunId,
 	eventsDefinition?: TEventsDefinition,
-	logger?: Logger,
-	parentRun?: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
+	logger?: Logger
 ): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
 export function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
 	client: Client<AppContext>,
 	run: WorkflowRun<Input, Output>,
 	eventsDefinition?: TEventsDefinition,
-	logger?: Logger,
-	parentRun?: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
+	logger?: Logger
 ): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
 export async function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
 	client: Client<AppContext>,
 	runOrId: WorkflowRunId | WorkflowRun<Input, Output>,
 	eventsDefinition?: TEventsDefinition,
-	logger?: Logger,
-	parentRun?: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
+	logger?: Logger
 ): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 	const run =
 		typeof runOrId !== "string"
@@ -54,8 +48,7 @@ export async function workflowRunHandle<Input, Output, AppContext, TEventsDefini
 				"aiki.workflowId": run.workflowId,
 				"aiki.workflowVersionId": run.workflowVersionId,
 				"aiki.workflowRunId": run.id,
-			}),
-		parentRun
+			})
 	);
 }
 
@@ -74,28 +67,35 @@ export interface WorkflowRunHandle<
 	/**
 	 * Waits for the workflow run to reach a specific status by polling.
 	 *
-	 * The return type varies based on the options provided:
-	 * - No timeout or abort signal: Returns the state directly
-	 * - With timeout: Returns `{ success: true, state }` or `{ success: false, cause: "timeout" }`
-	 * - With abort signal: Returns `{ success: true, state }` or `{ success: false, cause: "aborted" }`
+	 * Returns a result object:
+	 * - `{ success: true, state }` - workflow reached the expected status
+	 * - `{ success: false, cause }` - workflow did not reach status
+	 *
+	 * Possible failure causes:
+	 * - `"run_terminated"` - workflow reached a terminal state (cancelled, failed, completed) other than expected
+	 * - `"timeout"` - timeout elapsed (only when timeout option provided)
+	 * - `"aborted"` - abort signal triggered (only when abortSignal option provided)
 	 *
 	 * @param status - The target status to wait for
 	 * @param options - Optional configuration for polling interval, timeout, and abort signal
 	 *
 	 * @example
-	 * // Wait indefinitely until completed (returns state directly)
-	 * const state = await handle.waitForStatus("completed");
-	 * console.log(state.output);
-	 *
-	 * @example
-	 * // Wait with a timeout (must check success)
-	 * const result = await handle.waitForStatus("completed", {
-	 *   timeout: { seconds: 30 },
-	 *   interval: { seconds: 2 }
-	 * });
+	 * // Wait indefinitely until completed or the workflow reaches a terminal state
+	 * const result = await handle.waitForStatus("completed");
 	 * if (result.success) {
 	 *   console.log(result.state.output);
 	 * } else {
+	 *   console.log(`Workflow terminated: ${result.cause}`);
+	 * }
+	 *
+	 * @example
+	 * // Wait with a timeout
+	 * const result = await handle.waitForStatus("completed", {
+	 *   timeout: { seconds: 30 }
+	 * });
+	 * if (result.success) {
+	 *   console.log(result.state.output);
+	 * } else if (result.cause === "timeout") {
 	 *   console.log("Timed out waiting for completion");
 	 * }
 	 *
@@ -106,7 +106,7 @@ export interface WorkflowRunHandle<
 	 *   abortSignal: controller.signal
 	 * });
 	 * if (!result.success) {
-	 *   console.log(`Wait was ${result.cause}`);
+	 *   console.log(`Wait ended: ${result.cause}`);
 	 * }
 	 */
 	waitForStatus<Status extends WorkflowRunStatus>(
@@ -179,8 +179,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		client: Client<AppContext>,
 		private _run: WorkflowRun<Input, Output>,
 		eventsDefinition: TEventsDefinition,
-		private readonly logger: Logger,
-		private readonly parentRun?: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
+		private readonly logger: Logger
 	) {
 		this.api = client.api;
 		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger, (run) => {
@@ -231,43 +230,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		status: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
-		if (this.parentRun) {
-			return this.waitForStatusInParentRunContext(status, this.parentRun);
-		}
 		return this.waitForStatusByPolling(status, options);
-	}
-
-	private async waitForStatusInParentRunContext<Status extends WorkflowRunStatus>(
-		expectedStatus: Status,
-		parentRun: WorkflowRunContext<unknown, unknown, AppContext, EventsDefinition>
-	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
-		const parentRunHandle = parentRun[INTERNAL].handle;
-
-		const { id, state } = this.run;
-		if (state.status === expectedStatus) {
-			return {
-				success: true,
-				state: state as WorkflowRunWaitResultSuccess<Status, Output>,
-			};
-		}
-
-		if (isTerminalWorkflowRunStatus(state.status)) {
-			this.logger.error("Child workflow run was terminated");
-			await parentRunHandle[INTERNAL].transitionState({
-				status: "failed",
-				cause: "child_workflow",
-				childWorkflowRunId: id,
-			});
-			throw new WorkflowRunFailedError(parentRun.id, parentRunHandle.run.attempts);
-		}
-
-		await parentRunHandle[INTERNAL].transitionState({
-			status: "awaiting_child_workflow",
-			childWorkflowRunId: id,
-			childWorkflowRunStatus: expectedStatus,
-		});
-
-		throw new WorkflowRunSuspendedError(parentRun.id);
 	}
 
 	private async waitForStatusByPolling<Status extends WorkflowRunStatus>(

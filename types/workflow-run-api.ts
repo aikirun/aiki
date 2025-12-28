@@ -5,6 +5,7 @@ import type {
 	WorkflowOptions,
 	WorkflowRun,
 	WorkflowRunState,
+	WorkflowRunStateAwaitingChildWorkflow,
 	WorkflowRunStateAwaitingEvent,
 	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateCancelled,
@@ -78,6 +79,7 @@ export interface WorkflowRunCreateRequestV1 {
 	workflowId: string;
 	workflowVersionId: string;
 	input: unknown;
+	path?: string;
 	parentWorkflowRunId?: string;
 	options?: WorkflowOptions;
 }
@@ -98,11 +100,19 @@ export type WorkflowRunStateAwaitingRetryRequest = DistributiveOmit<WorkflowRunS
 	nextAttemptInMs: number;
 };
 
+export type WorkflowRunStateAwaitingChildWorkflowRequest = DistributiveOmit<
+	WorkflowRunStateAwaitingChildWorkflow,
+	"timeoutAt"
+> & {
+	timeoutInMs?: number;
+};
+
 export type WorkflowRunStateRequest =
-	| Exclude<WorkflowRunState, { status: "scheduled" | "awaiting_event" | "awaiting_retry" }>
+	| Exclude<WorkflowRunState, { status: "scheduled" | "awaiting_event" | "awaiting_retry" | "awaiting_child_workflow" }>
 	| WorkflowRunStateScheduledRequest
 	| WorkflowRunStateAwaitingEventRequest
-	| WorkflowRunStateAwaitingRetryRequest;
+	| WorkflowRunStateAwaitingRetryRequest
+	| WorkflowRunStateAwaitingChildWorkflowRequest;
 
 interface WorkflowRunTransitionStateRequestBase {
 	type: "optimistic" | "pessimistic";
