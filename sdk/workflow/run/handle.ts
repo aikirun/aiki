@@ -224,6 +224,9 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		options: WorkflowRunWaitOptions<true, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
 
+	// TODO: instead checking the current state, use the transition history
+	// because it is possible for a workflow to flash though a state
+	// and the handle will never know that the workflow hit that state
 	public async waitForStatus<Status extends WorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
@@ -267,9 +270,6 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		throw new WorkflowRunSuspendedError(parentRun.id);
 	}
 
-	// TODO: instead polling the current state, use the transition history
-	// because it is entirely possible for a workflow to flash though a state
-	// and the handle will never know that the workflow hit that state
 	private async waitForStatusByPolling<Status extends WorkflowRunStatus>(
 		expectedStatus: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
