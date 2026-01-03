@@ -381,7 +381,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					workflowVersionId: workflowRun.workflowVersionId as WorkflowVersionId,
 					options: workflowRun.options,
 					logger,
-					sleep: createSleeper(handle, logger, { spinThresholdMs }),
+					sleep: createSleeper(handle, logger),
 					events: createEventWaiters(handle, eventsDefinition, logger),
 					[INTERNAL]: { handle, options: { spinThresholdMs } },
 				},

@@ -1,16 +1,16 @@
-import type { SleepState } from "@aikirun/types/sleep";
+import type { SleepQueue, SleepState } from "@aikirun/types/sleep";
 import { z } from "zod";
 
 import type { Zt } from "../helpers/schema";
 
 export const sleepStateSchema: Zt<SleepState> = z.discriminatedUnion("status", [
-	z.object({ status: z.literal("none") }),
 	z.object({
 		status: z.literal("sleeping"),
 		awakeAt: z.number(),
 	}),
 	z.object({
 		status: z.literal("completed"),
+		durationMs: z.number(),
 		completedAt: z.number(),
 	}),
 	z.object({
@@ -18,3 +18,7 @@ export const sleepStateSchema: Zt<SleepState> = z.discriminatedUnion("status", [
 		cancelledAt: z.number(),
 	}),
 ]);
+
+export const sleepQueueSchema: Zt<SleepQueue> = z.object({
+	sleeps: z.array(sleepStateSchema),
+});

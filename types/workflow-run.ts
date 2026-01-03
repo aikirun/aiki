@@ -1,7 +1,7 @@
 import type { SerializableError } from "./error";
 import type { EventQueue } from "./event";
 import type { RetryStrategy } from "./retry";
-import type { SleepState } from "./sleep";
+import type { SleepQueue } from "./sleep";
 import type { TaskState } from "./task";
 import type { TriggerStrategy } from "./trigger";
 
@@ -113,7 +113,7 @@ export interface WorkflowRunStatePaused extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
 	status: "sleeping";
-	sleepPath: string;
+	sleepId: string;
 	durationMs: number;
 }
 
@@ -224,7 +224,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
 	tasksState: Record<string, TaskState>;
-	sleepsState: Record<string, SleepState>;
+	sleepsQueue: Record<string, SleepQueue>;
 	eventsQueue: Record<string, EventQueue<unknown>>;
 	childWorkflowRuns: Record<string, ChildWorkflowRun>;
 	parentWorkflowRunId?: string;

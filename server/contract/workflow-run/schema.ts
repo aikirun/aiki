@@ -38,7 +38,7 @@ import { z } from "zod";
 import { eventsQueueSchema } from "../event/schema";
 import type { Zt } from "../helpers/schema";
 import { serializedErrorSchema } from "../serializable";
-import { sleepStateSchema } from "../sleep/schema";
+import { sleepQueueSchema } from "../sleep/schema";
 import { taskStateSchema } from "../task/schema";
 
 export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>> = z.enum([
@@ -194,7 +194,7 @@ export const workflowRunStatePausedSchema: Zt<WorkflowRunStatePaused> = z.object
 
 export const workflowRunStateSleepingSchema: Zt<WorkflowRunStateSleeping> = z.object({
 	status: z.literal("sleeping"),
-	sleepPath: z.string(),
+	sleepId: z.string(),
 	durationMs: z.number(),
 });
 
@@ -286,7 +286,7 @@ export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	attempts: z.number(),
 	state: workflowRunStateSchema,
 	tasksState: z.record(z.string(), taskStateSchema),
-	sleepsState: z.record(z.string(), sleepStateSchema),
+	sleepsQueue: z.record(z.string(), sleepQueueSchema),
 	eventsQueue: z.record(z.string(), eventsQueueSchema),
 	childWorkflowRuns: z.record(
 		z.string(),

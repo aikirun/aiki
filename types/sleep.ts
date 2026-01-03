@@ -2,16 +2,10 @@ import type { DurationObject } from "./duration";
 
 export type SleepId = string & { _brand: "sleep_id" };
 
-export type SleepPath = string & { _brand: "sleep_path" };
-
-export type SleepStatus = "none" | "sleeping" | "completed" | "cancelled";
+export type SleepStatus = "sleeping" | "completed" | "cancelled";
 
 interface SleepStateBase {
 	status: SleepStatus;
-}
-
-export interface SleepStateNone extends SleepStateBase {
-	status: "none";
 }
 
 export interface SleepStateSleeping extends SleepStateBase {
@@ -21,6 +15,7 @@ export interface SleepStateSleeping extends SleepStateBase {
 
 export interface SleepStateCompleted extends SleepStateBase {
 	status: "completed";
+	durationMs: number;
 	completedAt: number;
 }
 
@@ -29,7 +24,11 @@ export interface SleepStateCancelled extends SleepStateBase {
 	cancelledAt: number;
 }
 
-export type SleepState = SleepStateNone | SleepStateSleeping | SleepStateCompleted | SleepStateCancelled;
+export type SleepState = SleepStateSleeping | SleepStateCompleted | SleepStateCancelled;
+
+export interface SleepQueue {
+	sleeps: SleepState[];
+}
 
 export type SleepParams = { id: string } & DurationObject;
 

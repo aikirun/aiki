@@ -10,7 +10,7 @@ import {
 	queueScheduledWorkflowRuns,
 	scheduleEventWaitTimedOutWorkflowRuns,
 	scheduleRetryableWorkflowRuns,
-	scheduleSleepingWorkflowRuns,
+	scheduleSleepingElapedWorkflowRuns,
 	scheduleWorkflowRunsThatTimedOutWaitingForChild,
 	scheduleWorkflowRunsWithRetryableTask,
 } from "./router/workflow-run";
@@ -96,13 +96,13 @@ function initCrons(redis: Redis, logger: Logger) {
 		});
 	}, 500);
 
-	const scheduleSleepingWorkflowRunsInterval = setInterval(() => {
+	const scheduleSleepingElapedWorkflowRunsInterval = setInterval(() => {
 		const context = createContext({
 			type: "cron",
-			name: "scheduleSleepingWorkflowRuns",
+			name: "scheduleSleepingElapedWorkflowRuns",
 			logger,
 		});
-		scheduleSleepingWorkflowRuns(context).catch((err) => {
+		scheduleSleepingElapedWorkflowRuns(context).catch((err) => {
 			logger.error({ err }, "Error scheduling sleeping workflows");
 		});
 	}, 500);
@@ -153,7 +153,7 @@ function initCrons(redis: Redis, logger: Logger) {
 
 	return [
 		queueScheduledWorkflowRunsInterval,
-		scheduleSleepingWorkflowRunsInterval,
+		scheduleSleepingElapedWorkflowRunsInterval,
 		scheduleRetryableWorkflowRunsInterval,
 		scheduleWorkflowRunsWithRetryableTaskInterval,
 		scheduleEventWaitTimedOutWorkflowRunsInterval,

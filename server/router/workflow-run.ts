@@ -135,7 +135,7 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 			reason: "new",
 		},
 		tasksState: {},
-		sleepsState: {},
+		sleepsQueue: {},
 		eventsQueue: {},
 		childWorkflowRuns: {},
 		parentWorkflowRunId: input.parentWorkflowRunId,
@@ -190,41 +190,38 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 
 	context.logger.info({ runId, state }, "Transitioning workflow run state");
 
-	const transition: WorkflowRunTransition = {
-		type: "state",
-		createdAt: now,
-		state,
-	};
-
-	const transitions = workflowRunTransitions.get(runId);
-	if (!transitions) {
-		workflowRunTransitions.set(runId, [transition]);
-	} else {
-		transitions.push(transition);
-	}
+	const transitions = workflowRunTransitions.get(runId) ?? [];
 
 	if (run.state.status === "sleeping" && state.status === "scheduled") {
-		const sleepPath = run.state.sleepPath;
-		if (state.reason === "awake") {
-			run.sleepsState[sleepPath] = {
-				status: "completed",
-				completedAt: now,
-			};
-		} else {
-			run.sleepsState[sleepPath] = {
-				status: "cancelled",
-				cancelledAt: now,
-			};
+		const sleepQueue = run.sleepsQueue[run.state.sleepId];
+		if (sleepQueue && isNonEmptyArray(sleepQueue.sleeps)) {
+			if (state.reason === "awake") {
+				const startedSleepingAt = transitions[transitions.length - 1]?.createdAt;
+				sleepQueue.sleeps[sleepQueue.sleeps.length - 1] = {
+					status: "completed",
+					durationMs: startedSleepingAt ? now - startedSleepingAt : run.state.durationMs,
+					completedAt: now,
+				};
+			} else {
+				sleepQueue.sleeps[sleepQueue.sleeps.length - 1] = {
+					status: "cancelled",
+					cancelledAt: now,
+				};
+			}
 		}
 	}
 
 	if (state.status === "sleeping") {
-		const { sleepPath, durationMs } = state;
+		const { sleepId, durationMs } = state;
 		const awakeAt = now + durationMs;
-		run.sleepsState[sleepPath] = {
-			status: "sleeping",
-			awakeAt,
-		};
+		const sleepQueue = run.sleepsQueue[sleepId];
+		if (sleepQueue?.sleeps) {
+			sleepQueue.sleeps.push({ status: "sleeping", awakeAt });
+		} else {
+			run.sleepsQueue[sleepId] = {
+				sleeps: [{ status: "sleeping", awakeAt }],
+			};
+		}
 	}
 
 	if (
@@ -260,6 +257,18 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 				}
 			}
 		}
+	}
+
+	const transition: WorkflowRunTransition = {
+		type: "state",
+		createdAt: now,
+		state,
+	};
+	if (!transitions.length) {
+		transitions.push(transition);
+		workflowRunTransitions.set(runId, transitions);
+	} else {
+		transitions.push(transition);
 	}
 
 	run.state = state;
@@ -575,14 +584,15 @@ export async function scheduleWorkflowRunsWithRetryableTask(context: ServerConte
 	}
 }
 
-function getSleepingWorkflowRuns(): WorkflowRun[] {
+function getSleepingElapsedWorkflowRuns(): WorkflowRun[] {
 	const now = Date.now();
 	const sleepingRuns: WorkflowRun[] = [];
 
 	for (const run of workflowRuns.values()) {
 		if (run.state.status === "sleeping") {
-			const sleepState = run.sleepsState[run.state.sleepPath];
-			if (sleepState?.status === "sleeping" && sleepState.awakeAt <= now) {
+			const sleepQueue = run.sleepsQueue[run.state.sleepId];
+			const lastSleep = sleepQueue?.sleeps[sleepQueue.sleeps.length - 1];
+			if (lastSleep?.status === "sleeping" && lastSleep.awakeAt <= now) {
 				sleepingRuns.push(run);
 			}
 		}
@@ -591,8 +601,8 @@ function getSleepingWorkflowRuns(): WorkflowRun[] {
 	return sleepingRuns;
 }
 
-export async function scheduleSleepingWorkflowRuns(context: ServerContext) {
-	const runs = getSleepingWorkflowRuns();
+export async function scheduleSleepingElapedWorkflowRuns(context: ServerContext) {
+	const runs = getSleepingElapsedWorkflowRuns();
 
 	for (const run of runs) {
 		await transitionStateV1.callable({ context })({

@@ -22,6 +22,8 @@ npm install @aikirun/types
 - `/duration` - Duration types
 - `/retry` - Retry strategy types
 - `/error` - Serializable error types
+- `/sleep` - Sleep definition types
+- `/event` - Event definition types
 
 ## Usage
 
