@@ -76,6 +76,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 				"aiki.historicDurationMs": sleepState.durationMs,
 				"aiki.latestDurationMs": durationMs,
 			});
+			return { cancelled: false };
 		}
 
 		await handle[INTERNAL].transitionState({ status: "sleeping", sleepId, durationMs });
