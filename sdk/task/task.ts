@@ -57,7 +57,7 @@ import type { EventsDefinition } from "sdk/workflow/run/event";
  * const result = await chargeCard.start(run, { cardId: "123", amount: 9999 });
  * ```
  */
-export function task<Input extends Serializable = null, Output = void>(
+export function task<Input extends Serializable, Output extends Serializable>(
 	params: TaskParams<Input, Output>
 ): Task<Input, Output> {
 	return new TaskImpl(params);
@@ -87,7 +87,7 @@ export interface Task<Input, Output> {
 	with(): TaskBuilder<Input, Output>;
 	start: (
 		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
-		...args: Input extends null ? [] : [Input]
+		...args: Input extends void ? [] : [Input]
 	) => Promise<Output>;
 }
 
@@ -111,12 +111,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 	public async start(
 		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
-		...args: Input extends null ? [] : [Input]
+		...args: Input extends void ? [] : [Input]
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
 		handle[INTERNAL].assertExecutionAllowed();
 
-		const input = isNonEmptyArray(args) ? args[0] : (null as Input); // this cast is okay cos if args is empty, Input must be type null;
+		const input = isNonEmptyArray(args) ? args[0] : (null as Input);
 
 		const path = await this.getPath(input);
 

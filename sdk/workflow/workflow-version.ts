@@ -59,12 +59,12 @@ export interface WorkflowVersion<
 
 	start: (
 		client: Client<AppContext>,
-		...args: Input extends null ? [] : [Input]
+		...args: Input extends void ? [] : [Input]
 	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
 	startAsChild: <ParentInput, ParentEventsDefinition extends EventsDefinition>(
 		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEventsDefinition>,
-		...args: Input extends null ? [] : [Input]
+		...args: Input extends void ? [] : [Input]
 	) => Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
 	getHandle: (
@@ -129,7 +129,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	public async start(
 		client: Client<AppContext>,
-		...args: Input extends null ? [] : [Input]
+		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const { run } = await client.api.workflowRun.createV1({
 			workflowId: this.id,
@@ -142,7 +142,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	public async startAsChild<ParentInput>(
 		parentRun: WorkflowRunContext<ParentInput, AppContext, EventsDefinition>,
-		...args: Input extends null ? [] : [Input]
+		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
 		parentRunHandle[INTERNAL].assertExecutionAllowed();

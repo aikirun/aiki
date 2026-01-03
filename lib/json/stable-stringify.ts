@@ -14,7 +14,7 @@
  */
 export function stableStringify(value: unknown): string {
 	if (value === null || value === undefined) {
-		return JSON.stringify(value);
+		return JSON.stringify(null);
 	}
 
 	if (typeof value !== "object") {
