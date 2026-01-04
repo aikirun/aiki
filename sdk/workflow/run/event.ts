@@ -1,5 +1,6 @@
 import { createSerializableError, toMilliseconds } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
+import type { Serializable } from "@aikirun/types/error";
 import type { EventId, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
@@ -32,9 +33,9 @@ import type { WorkflowRunHandle } from "./handle";
  * });
  * ```
  */
-export function event(): EventDefinition<undefined>;
-export function event<Data>(params?: EventParams<Data>): EventDefinition<Data>;
-export function event<Data = undefined>(params?: EventParams<Data>): EventDefinition<Data> {
+export function event(): EventDefinition<void>;
+export function event<Data extends Serializable>(params?: EventParams<Data>): EventDefinition<Data>;
+export function event<Data>(params?: EventParams<Data>): EventDefinition<Data> {
 	return {
 		_type: undefined as Data,
 		schema: params?.schema,
@@ -45,13 +46,13 @@ export interface EventParams<Data> {
 	schema?: Schema<Data>;
 }
 
-export interface Schema<Data> {
-	parse: (data: unknown) => Data;
-}
-
 interface EventDefinition<Data> {
 	_type: Data;
 	schema?: Schema<Data>;
+}
+
+export interface Schema<Data> {
+	parse: (data: unknown) => Data;
 }
 
 export type EventsDefinition = Record<string, EventDefinition<unknown>>;
@@ -73,9 +74,7 @@ export type EventSenders<TEventsDefinition extends EventsDefinition> = {
 
 export interface EventSender<Data> {
 	send: (
-		...args: Data extends undefined
-			? [data?: Data, options?: EventSendOptions]
-			: [data: Data, options?: EventSendOptions]
+		...args: Data extends void ? [data?: Data, options?: EventSendOptions] : [data: Data, options?: EventSendOptions]
 	) => Promise<void>;
 }
 
@@ -208,9 +207,7 @@ function createEventSender<Data>(
 ): EventSender<Data> {
 	return {
 		async send(
-			...args: Data extends undefined
-				? [data?: Data, options?: EventSendOptions]
-				: [data: Data, options?: EventSendOptions]
+			...args: Data extends void ? [data?: Data, options?: EventSendOptions] : [data: Data, options?: EventSendOptions]
 		): Promise<void> {
 			const [data, options] = args;
 
