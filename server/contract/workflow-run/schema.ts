@@ -29,6 +29,7 @@ import type {
 	WorkflowRunTransition,
 } from "@aikirun/types/workflow-run";
 import type {
+	WorkflowRunSetTaskStateRequestV1,
 	WorkflowRunStateAwaitingChildWorkflowRequest,
 	WorkflowRunStateAwaitingEventRequest,
 	WorkflowRunStateAwaitingRetryRequest,
@@ -40,7 +41,7 @@ import { eventsQueueSchema } from "../event/schema";
 import type { Zt } from "../helpers/schema";
 import { serializedErrorSchema } from "../serializable";
 import { sleepQueueSchema } from "../sleep/schema";
-import { taskStateSchema } from "../task/schema";
+import { taskInfoSchema, taskStateSchema } from "../task/schema";
 
 export const workflowRunStatusSchema: z.ZodEnum<UnionToRecord<WorkflowRunStatus>> = z.enum([
 	"scheduled",
@@ -291,7 +292,7 @@ export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	options: workflowOptionsSchema,
 	attempts: z.number(),
 	state: workflowRunStateSchema,
-	tasksState: z.record(z.string(), taskStateSchema),
+	tasks: z.record(z.string(), taskInfoSchema),
 	sleepsQueue: z.record(z.string(), sleepQueueSchema),
 	eventsQueue: z.record(z.string(), eventsQueueSchema),
 	childWorkflowRuns: z.record(
@@ -408,3 +409,25 @@ export const workflowRunStateAwaitingChildWorkflowRequestSchema: Zt<WorkflowRunS
 		childWorkflowRunStatus: workflowRunStatusSchema,
 		timeoutInMs: z.number().optional(),
 	});
+
+const taskStateOutputSchema: Zt<WorkflowRunSetTaskStateRequestV1["state"]> = z.discriminatedUnion("status", [
+	z.object({ status: z.literal("completed"), output: z.unknown() }),
+	z.object({ status: z.literal("failed"), error: serializedErrorSchema }),
+]);
+
+export const workflowRunSetTaskStateRequestSchema: Zt<WorkflowRunSetTaskStateRequestV1> = z.discriminatedUnion("type", [
+	z.object({
+		type: z.literal("new"),
+		id: z.string().min(1),
+		taskId: z.string().min(1),
+		input: z.unknown(),
+		reference: z.object({ id: z.string().min(1) }).optional(),
+		state: taskStateOutputSchema,
+	}),
+	z.object({
+		type: z.literal("existing"),
+		id: z.string().min(1),
+		taskPath: z.string().min(1),
+		state: taskStateOutputSchema,
+	}),
+]);

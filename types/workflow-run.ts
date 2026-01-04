@@ -2,7 +2,7 @@ import type { SerializableError } from "./error";
 import type { EventQueue } from "./event";
 import type { RetryStrategy } from "./retry";
 import type { SleepQueue } from "./sleep";
-import type { TaskState } from "./task";
+import type { TaskInfo, TaskState } from "./task";
 import type { TriggerStrategy } from "./trigger";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
@@ -228,14 +228,14 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	// prefetching all results might be problematic.
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
-	tasksState: Record<string, TaskState>;
+	tasks: Record<string, TaskInfo>;
 	sleepsQueue: Record<string, SleepQueue>;
 	eventsQueue: Record<string, EventQueue<unknown>>;
-	childWorkflowRuns: Record<string, ChildWorkflowRun>;
+	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>;
 	parentWorkflowRunId?: string;
 }
 
-export interface ChildWorkflowRun {
+export interface ChildWorkflowRunInfo {
 	id: string;
 	inputHash: string;
 	statusWaitResults: ChildWorkflowWaitResult[];
@@ -292,16 +292,14 @@ export class WorkflowRunSuspendedError extends Error {
 export class WorkflowRunFailedError extends Error {
 	constructor(
 		public readonly id: WorkflowRunId,
-		public readonly attempts: number
+		public readonly attempts: number,
+		public readonly reason?: string
 	) {
-		super(`Workflow ${id} failed after ${attempts} attempt(s)`);
+		if (reason) {
+			super(`Workflow ${id} failed after ${attempts} attempt(s): ${reason}`);
+		} else {
+			super(`Workflow ${id} failed after ${attempts} attempt(s)`);
+		}
 		this.name = "WorkflowRunFailedError";
-	}
-}
-
-export class DuplicateReferenceIdError extends Error {
-	constructor(public readonly referenceId: string) {
-		super(`Reference ID "${referenceId}" already used`);
-		this.name = "DuplicateReferenceIdError";
 	}
 }

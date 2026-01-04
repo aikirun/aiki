@@ -14,7 +14,7 @@ import {
 } from "@aikirun/types/workflow-run";
 import type { WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
 import type { Redis } from "ioredis";
-import { NotFoundError, RevisionConflictError } from "server/errors";
+import { NotFoundError, RevisionConflictError, ValidationError } from "server/errors";
 import type { ServerContext } from "server/middleware";
 import { publishWorkflowReadyBatch } from "server/redis/publisher";
 import {
@@ -136,7 +136,7 @@ const createV1 = os.createV1.handler(async ({ input, context }) => {
 						: trigger.startAt,
 			reason: "new",
 		},
-		tasksState: {},
+		tasks: {},
 		sleepsQueue: {},
 		eventsQueue: {},
 		childWorkflowRuns: {},
@@ -237,11 +237,15 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	}
 
 	if (state.status === "scheduled" && state.reason === "retry") {
-		for (const [taskPath, taskState] of Object.entries(run.tasksState)) {
-			if (taskState.status === "running" || taskState.status === "awaiting_retry" || taskState.status === "failed") {
-				delete run.tasksState[taskPath];
+		for (const [taskPath, taskInfo] of Object.entries(run.tasks)) {
+			if (
+				taskInfo.state.status === "running" ||
+				taskInfo.state.status === "awaiting_retry" ||
+				taskInfo.state.status === "failed"
+			) {
+				delete run.tasks[taskPath];
 			} else {
-				taskState.status satisfies "completed";
+				taskInfo.state.status satisfies "completed";
 			}
 		}
 	}
@@ -314,7 +318,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	return { run };
 });
 
-const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context }) => {
+const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input, context }) => {
 	const runId = input.id as WorkflowRunId;
 
 	const run = workflowRuns.get(runId);
@@ -327,22 +331,38 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context
 
 	const taskPath = input.taskPath as TaskPath;
 	const taskStateRequest = input.taskState;
+	const currentTaskInfo = run.tasks[taskPath];
 
-	assertIsValidTaskStateTransition(runId, taskPath, run.tasksState[taskPath], taskStateRequest);
+	assertIsValidTaskStateTransition(runId, taskPath, currentTaskInfo?.state, taskStateRequest);
 
 	context.logger.info({ runId, taskPath, taskState: taskStateRequest }, "Transitioning task state");
 
 	const now = Date.now();
 
-	const taskState: TaskState =
-		taskStateRequest.status === "awaiting_retry"
-			? {
-					status: "awaiting_retry",
-					attempts: taskStateRequest.attempts,
-					error: taskStateRequest.error,
-					nextAttemptAt: now + taskStateRequest.nextAttemptInMs,
-				}
-			: taskStateRequest;
+	let taskState: TaskState;
+	let inputHash: string | undefined;
+	if (taskStateRequest.status === "running") {
+		taskState = taskStateRequest;
+		inputHash = await sha256(stableStringify(taskStateRequest.input));
+	} else if (taskStateRequest.status === "awaiting_retry") {
+		taskState = {
+			status: "awaiting_retry",
+			attempts: taskStateRequest.attempts,
+			error: taskStateRequest.error,
+			nextAttemptAt: now + taskStateRequest.nextAttemptInMs,
+		};
+		inputHash = currentTaskInfo?.inputHash;
+	} else {
+		taskStateRequest.status satisfies "failed" | "completed";
+		taskState = taskStateRequest;
+		inputHash = currentTaskInfo?.inputHash;
+	}
+
+	if (inputHash === undefined) {
+		throw new Error(
+			`Task ${taskPath} cannot be stored without inputHash. assertIsValidTaskStateTransition should've caught this.`
+		);
+	}
 
 	const transition: WorkflowRunTransition = {
 		type: "task_state",
@@ -358,7 +378,103 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context
 		transitions.push(transition);
 	}
 
-	run.tasksState[taskPath] = taskState;
+	run.tasks[taskPath] = { state: taskState, inputHash };
+	run.revision++;
+
+	return { run };
+});
+
+const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input, context }) => {
+	const runId = input.id as WorkflowRunId;
+
+	const run = workflowRuns.get(runId);
+	if (!run) {
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
+	}
+
+	const now = Date.now();
+
+	if (input.type === "new") {
+		const inputHash = await sha256(stableStringify(input.input));
+		const taskPath = (
+			input.reference ? `${input.taskId}/${input.reference.id}` : `${input.taskId}/${inputHash}`
+		) as TaskPath;
+
+		const existingTaskInfo = run.tasks[taskPath];
+		if (existingTaskInfo) {
+			throw new ValidationError(`Task ${taskPath} already exists. Use type: "existing" to update it.`);
+		}
+
+		context.logger.info({ runId, taskPath, state: input.state }, "Setting task state (new task)");
+
+		const runningState: TaskState = {
+			status: "running",
+			attempts: 1,
+			input: input.input,
+		};
+
+		const runningTransition: WorkflowRunTransition = {
+			type: "task_state",
+			createdAt: now,
+			taskPath,
+			taskState: runningState,
+		};
+
+		const finalState: TaskState =
+			input.state.status === "completed"
+				? { status: "completed", attempts: 1, output: input.state.output }
+				: { status: input.state.status satisfies "failed", attempts: 1, error: input.state.error };
+
+		const finalTransition: WorkflowRunTransition = {
+			type: "task_state",
+			createdAt: now,
+			taskPath,
+			taskState: finalState,
+		};
+
+		const transitions = workflowRunTransitions.get(runId);
+		if (!transitions) {
+			workflowRunTransitions.set(runId, [runningTransition, finalTransition]);
+		} else {
+			transitions.push(runningTransition, finalTransition);
+		}
+
+		run.tasks[taskPath] = { state: finalState, inputHash };
+		run.revision++;
+
+		return { run };
+	}
+
+	const taskPath = input.taskPath as TaskPath;
+	const existingTaskInfo = run.tasks[taskPath];
+	if (!existingTaskInfo) {
+		throw new NotFoundError(`Task ${taskPath} does not exist. Use type: "new" to create it.`);
+	}
+
+	context.logger.info({ runId, taskPath, state: input.state }, "Setting task state (existing task)");
+
+	const attempts = existingTaskInfo.state.attempts;
+
+	const finalState: TaskState =
+		input.state.status === "completed"
+			? { status: "completed", attempts: attempts + 1, output: input.state.output }
+			: { status: input.state.status satisfies "failed", attempts: attempts + 1, error: input.state.error };
+
+	const finalTransition: WorkflowRunTransition = {
+		type: "task_state",
+		createdAt: now,
+		taskPath,
+		taskState: finalState,
+	};
+
+	const transitions = workflowRunTransitions.get(runId);
+	if (!transitions) {
+		workflowRunTransitions.set(runId, [finalTransition]);
+	} else {
+		transitions.push(finalTransition);
+	}
+
+	run.tasks[taskPath] = { state: finalState, inputHash: existingTaskInfo.inputHash };
 	run.revision++;
 
 	return { run };
@@ -565,8 +681,8 @@ function getWorkflowRunsWithRetryableTask(): WorkflowRun[] {
 
 	for (const run of workflowRuns.values()) {
 		if (run.state.status === "running") {
-			for (const taskState of Object.values(run.tasksState)) {
-				if (taskState.status === "awaiting_retry" && taskState.nextAttemptAt <= now) {
+			for (const taskInfo of Object.values(run.tasks)) {
+				if (taskInfo.state.status === "awaiting_retry" && taskInfo.state.nextAttemptAt <= now) {
 					runsWithRetryableTask.push(run);
 				}
 			}
@@ -762,6 +878,7 @@ export const workflowRunRouter = os.router({
 	createV1,
 	transitionStateV1,
 	transitionTaskStateV1,
+	setTaskStateV1,
 	listTransitionsV1,
 	sendEventV1,
 	multicastEventV1,

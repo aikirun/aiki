@@ -10,10 +10,10 @@ interface TaskStateBase {
 	status: TaskStatus;
 }
 
-// TODO: add input to this interface, so we can track what the input was to a task
-export interface TaskStateRunning extends TaskStateBase {
+export interface TaskStateRunning<Input> extends TaskStateBase {
 	status: "running";
 	attempts: number;
+	input: Input;
 }
 
 export interface TaskStateAwaitingRetry extends TaskStateBase {
@@ -25,6 +25,7 @@ export interface TaskStateAwaitingRetry extends TaskStateBase {
 
 export interface TaskStateCompleted<Output> extends TaskStateBase {
 	status: "completed";
+	attempts: number;
 	output: Output;
 }
 
@@ -34,11 +35,16 @@ export interface TaskStateFailed extends TaskStateBase {
 	error: SerializableError;
 }
 
-export type TaskState<Output = unknown> =
-	| TaskStateRunning
+export type TaskState<Input = unknown, Output = unknown> =
+	| TaskStateRunning<Input>
 	| TaskStateAwaitingRetry
 	| TaskStateCompleted<Output>
 	| TaskStateFailed;
+
+export interface TaskInfo {
+	state: TaskState;
+	inputHash: string;
+}
 
 export class TaskFailedError extends Error {
 	constructor(

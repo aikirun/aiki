@@ -14,6 +14,8 @@ import type {
 	WorkflowRunMulticastEventRequestV1,
 	WorkflowRunSendEventRequestV1,
 	WorkflowRunSendEventResponseV1,
+	WorkflowRunSetTaskStateRequestV1,
+	WorkflowRunSetTaskStateResponseV1,
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
 	WorkflowRunTransitionTaskStateRequestV1,
@@ -25,6 +27,7 @@ import { z } from "zod";
 import {
 	workflowOptionsSchema,
 	workflowRunSchema,
+	workflowRunSetTaskStateRequestSchema,
 	workflowRunStateAwaitingChildWorkflowRequestSchema,
 	workflowRunStateAwaitingEventRequestSchema,
 	workflowRunStateAwaitingRetryRequestSchema,
@@ -181,6 +184,14 @@ const transitionTaskStateV1: ContractProcedure<
 		})
 	);
 
+const setTaskStateV1: ContractProcedure<WorkflowRunSetTaskStateRequestV1, WorkflowRunSetTaskStateResponseV1> = oc
+	.input(workflowRunSetTaskStateRequestSchema)
+	.output(
+		z.object({
+			run: workflowRunSchema,
+		})
+	);
+
 const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, WorkflowRunListTransitionsResponseV1> =
 	oc
 		.input(
@@ -244,6 +255,7 @@ export const workflowRunContract = {
 	createV1,
 	transitionStateV1,
 	transitionTaskStateV1,
+	setTaskStateV1,
 	listTransitionsV1,
 	sendEventV1,
 	multicastEventV1,

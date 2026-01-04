@@ -9,8 +9,9 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import { TaskFailedError } from "@aikirun/types/task";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	DuplicateReferenceIdError,
+	type ChildWorkflowRunInfo,
 	type WorkflowOptions,
+	type WorkflowReferenceOptions,
 	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -141,8 +142,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
 	}
 
-	public async startAsChild<ParentInput>(
-		parentRun: WorkflowRunContext<ParentInput, AppContext, EventsDefinition>,
+	public async startAsChild(
+		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
@@ -153,17 +154,17 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
 		const inputHash = await sha256(stableStringify(input));
 
-		const runPath = await this.getPath(inputHash);
-		const existingRunInfo = parentRunHandle.run.childWorkflowRuns[runPath];
+		const reference = this.params.opts?.reference;
+		const path = await this.getPath(inputHash, reference);
+		const existingRunInfo = parentRunHandle.run.childWorkflowRuns[path];
 		if (existingRunInfo) {
-			const runReference = this.params.opts?.reference;
-			if (existingRunInfo.inputHash !== inputHash && runReference && runReference.onConflict !== "return_existing") {
-				parentRun.logger.error("Reference ID already used by another child workflow", {
-					"aiki.referenceId": runReference.id,
-					"aiki.existingChildWorkflowRunId": existingRunInfo.id,
-				});
-				throw new DuplicateReferenceIdError(runReference.id);
-			}
+			await this.assertUniqueChildRunReferenceId(
+				parentRunHandle,
+				existingRunInfo,
+				inputHash,
+				reference,
+				parentRun.logger
+			);
 
 			const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
 
@@ -175,7 +176,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 			return childWorkflowRunHandle(
 				client,
-				runPath,
+				path,
 				existingRun as WorkflowRun<Input, Output>,
 				parentRun,
 				logger,
@@ -187,11 +188,11 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
 			input,
-			path: runPath,
+			path,
 			parentWorkflowRunId: parentRun.id,
 			options: this.params.opts,
 		});
-		parentRunHandle.run.childWorkflowRuns[runPath] = {
+		parentRunHandle.run.childWorkflowRuns[path] = {
 			id: newRun.id,
 			inputHash,
 			statusWaitResults: [],
@@ -205,12 +206,42 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 		return childWorkflowRunHandle(
 			client,
-			runPath,
+			path,
 			newRun as WorkflowRun<Input, Output>,
 			parentRun,
 			logger,
 			this[INTERNAL].eventsDefinition
 		);
+	}
+
+	private async assertUniqueChildRunReferenceId(
+		parentRunHandle: WorkflowRunHandle<unknown, unknown, AppContext, EventsDefinition>,
+		existingRunInfo: ChildWorkflowRunInfo,
+		inputHash: string,
+		reference: WorkflowReferenceOptions | undefined,
+		logger: Logger
+	) {
+		if (existingRunInfo.inputHash !== inputHash && reference) {
+			const onConflict = reference.onConflict ?? "error";
+			if (onConflict !== "error") {
+				return;
+			}
+			logger.error("Reference ID already used by another child workflow", {
+				"aiki.referenceId": reference.id,
+				"aiki.existingChildWorkflowRunId": existingRunInfo.id,
+			});
+			const error = new WorkflowRunFailedError(
+				parentRunHandle.run.id as WorkflowRunId,
+				parentRunHandle.run.attempts,
+				`Reference ID "${reference.id}" already used by another child workflow run ${existingRunInfo.id}`
+			);
+			await parentRunHandle[INTERNAL].transitionState({
+				status: "failed",
+				cause: "self",
+				error: createSerializableError(error),
+			});
+			throw error;
+		}
 	}
 
 	public async getHandle(
@@ -313,12 +344,10 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			logger.error("Workflow retry not allowed", { "aiki.attempts": attempts });
 
 			const error = new WorkflowRunFailedError(id as WorkflowRunId, attempts);
-			const serializableError = createSerializableError(error);
-
 			await handle[INTERNAL].transitionState({
 				status: "failed",
 				cause: "self",
-				error: serializableError,
+				error: createSerializableError(error),
 			});
 
 			throw error;
@@ -334,11 +363,10 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			};
 		}
 
-		const serializableError = createSerializableError(error);
 		return {
 			status: "failed",
 			cause: "self",
-			error: serializableError,
+			error: createSerializableError(error),
 		};
 	}
 
@@ -352,20 +380,18 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			};
 		}
 
-		const serializableError = createSerializableError(error);
 		return {
 			status: "awaiting_retry",
 			cause: "self",
 			nextAttemptInMs,
-			error: serializableError,
+			error: createSerializableError(error),
 		};
 	}
 
-	private async getPath(inputHash: string): Promise<WorkflowRunPath> {
-		if (this.params.opts?.reference?.id) {
-			return `${this.id}/${this.versionId}/${this.params.opts.reference.id}` as WorkflowRunPath;
-		}
-
-		return `${this.id}/${this.versionId}/${inputHash}` as WorkflowRunPath;
+	private async getPath(inputHash: string, reference: WorkflowReferenceOptions | undefined): Promise<WorkflowRunPath> {
+		const path = reference
+			? `${this.id}/${this.versionId}/${reference.id}`
+			: `${this.id}/${this.versionId}/${inputHash}`;
+		return path as WorkflowRunPath;
 	}
 }

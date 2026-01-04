@@ -8,10 +8,10 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskPath, TaskStateAwaitingRetry, TaskStateRunning } from "@aikirun/types/task";
+import type { TaskInfo, TaskPath, TaskStateAwaitingRetry, TaskStateRunning } from "@aikirun/types/task";
 import { TaskFailedError, type TaskId } from "@aikirun/types/task";
-import { WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
-import type { WorkflowRunContext } from "@aikirun/workflow";
+import { WorkflowRunFailedError, type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
+import type { WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
 import type { EventsDefinition } from "sdk/workflow/run/event";
 
 /**
@@ -71,7 +71,12 @@ export interface TaskParams<Input, Output> {
 
 export interface TaskOptions {
 	retry?: RetryStrategy;
-	idempotencyKey?: string;
+	reference?: TaskReferenceOptions;
+}
+
+export interface TaskReferenceOptions {
+	id: string;
+	onConflict?: "error" | "return_existing";
 }
 
 export interface TaskBuilder<Input, Output> {
@@ -117,10 +122,17 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
+		const inputHash = await sha256(stableStringify(input));
 
-		const path = await this.getPath(input);
+		const reference = this.params.opts?.reference;
+		const path = await this.getPath(inputHash, reference);
+		const existingTaskInfo = handle.run.tasks[path];
+		if (existingTaskInfo) {
+			await this.assertUniqueTaskReferenceId(handle, existingTaskInfo, inputHash, reference, path, run.logger);
+		}
 
-		const taskState = handle.run.tasksState[path];
+		const taskState = existingTaskInfo?.state;
+
 		if (taskState?.status === "completed") {
 			return taskState.output as Output;
 		}
@@ -152,11 +164,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		attempts++;
 
 		logger.info("Starting task", { "aiki.attempts": attempts });
-		await handle[INTERNAL].transitionTaskState(path, { status: "running", attempts });
+		await handle[INTERNAL].transitionTaskState(path, { status: "running", attempts, input });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(run, input, path, retryStrategy, attempts, logger);
 
-		await handle[INTERNAL].transitionTaskState(path, { status: "completed", output });
+		await handle[INTERNAL].transitionTaskState(path, { status: "completed", attempts: lastAttempt, output });
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
@@ -222,9 +234,40 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
+	private async assertUniqueTaskReferenceId(
+		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		existingTaskInfo: TaskInfo,
+		inputHash: string,
+		reference: TaskReferenceOptions | undefined,
+		path: TaskPath,
+		logger: Logger
+	) {
+		if (existingTaskInfo.inputHash !== inputHash && reference) {
+			const onConflict = reference.onConflict ?? "error";
+			if (onConflict !== "error") {
+				return;
+			}
+			logger.error("Reference ID already used by another task", {
+				"aiki.referenceId": reference.id,
+				"aiki.existingTaskPath": path,
+			});
+			const error = new WorkflowRunFailedError(
+				handle.run.id as WorkflowRunId,
+				handle.run.attempts,
+				`Reference ID "${reference.id}" already used by another task ${path}`
+			);
+			await handle[INTERNAL].transitionState({
+				status: "failed",
+				cause: "self",
+				error: createSerializableError(error),
+			});
+			throw error;
+		}
+	}
+
 	private assertRetryAllowed(
 		path: TaskPath,
-		state: TaskStateRunning | TaskStateAwaitingRetry,
+		state: TaskStateRunning<unknown> | TaskStateAwaitingRetry,
 		retryStrategy: RetryStrategy,
 		logger: Logger
 	): void {
@@ -238,13 +281,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private async getPath(input: Input): Promise<TaskPath> {
-		const inputHash = await sha256(stableStringify(input));
-
-		const path = this.params.opts?.idempotencyKey
-			? `${this.id}/${inputHash}/${this.params.opts.idempotencyKey}`
-			: `${this.id}/${inputHash}`;
-
+	private async getPath(inputHash: string, reference: TaskReferenceOptions | undefined): Promise<TaskPath> {
+		const path = reference ? `${this.id}/${reference.id}` : `${this.id}/${inputHash}`;
 		return path as TaskPath;
 	}
 }

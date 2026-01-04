@@ -1,5 +1,5 @@
 import type { EventSendOptions } from "./event";
-import type { TaskState, TaskStateAwaitingRetry } from "./task";
+import type { TaskState, TaskStateAwaitingRetry, TaskStateCompleted, TaskStateFailed } from "./task";
 import type { DistributiveOmit } from "./utils";
 import type {
 	WorkflowOptions,
@@ -16,18 +16,19 @@ import type {
 } from "./workflow-run";
 
 export interface WorkflowRunApi {
-	listV1: (input: WorkflowRunListRequestV1) => Promise<WorkflowRunListResponseV1>;
-	getByIdV1: (input: WorkflowRunGetByIdRequestV1) => Promise<WorkflowRunGetByIdResponseV1>;
-	getStateV1: (input: WorkflowRunGetStateRequestV1) => Promise<WorkflowRunGetStateResponseV1>;
-	createV1: (input: WorkflowRunCreateRequestV1) => Promise<WorkflowRunCreateResponseV1>;
+	listV1: (_: WorkflowRunListRequestV1) => Promise<WorkflowRunListResponseV1>;
+	getByIdV1: (_: WorkflowRunGetByIdRequestV1) => Promise<WorkflowRunGetByIdResponseV1>;
+	getStateV1: (_: WorkflowRunGetStateRequestV1) => Promise<WorkflowRunGetStateResponseV1>;
+	createV1: (_: WorkflowRunCreateRequestV1) => Promise<WorkflowRunCreateResponseV1>;
 	// TODO: instead of throwing conflict error, return good error type
-	transitionStateV1: (input: WorkflowRunTransitionStateRequestV1) => Promise<WorkflowRunTransitionStateResponseV1>;
+	transitionStateV1: (_: WorkflowRunTransitionStateRequestV1) => Promise<WorkflowRunTransitionStateResponseV1>;
 	transitionTaskStateV1: (
-		input: WorkflowRunTransitionTaskStateRequestV1
+		_: WorkflowRunTransitionTaskStateRequestV1
 	) => Promise<WorkflowRunTransitionTaskStateResponseV1>;
-	listTransitionsV1: (input: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
-	sendEventV1: (input: WorkflowRunSendEventRequestV1) => Promise<WorkflowRunSendEventResponseV1>;
-	multicastEventV1: (input: WorkflowRunMulticastEventRequestV1) => Promise<void>;
+	setTaskStateV1: (_: WorkflowRunSetTaskStateRequestV1) => Promise<WorkflowRunSetTaskStateResponseV1>;
+	listTransitionsV1: (_: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
+	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<WorkflowRunSendEventResponseV1>;
+	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<void>;
 }
 
 export interface WorkflowRunListRequestV1 {
@@ -165,6 +166,30 @@ export interface WorkflowRunTransitionTaskStateRequestV1 {
 }
 
 export interface WorkflowRunTransitionTaskStateResponseV1 {
+	run: WorkflowRun;
+}
+
+export interface WorkflowRunSetTaskStateRequestNew {
+	type: "new";
+	id: string;
+	taskId: string;
+	input: unknown;
+	reference?: { id: string };
+	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
+}
+
+export interface WorkflowRunSetTaskStateRequestExisting {
+	type: "existing";
+	id: string;
+	taskPath: string;
+	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
+}
+
+export type WorkflowRunSetTaskStateRequestV1 =
+	| WorkflowRunSetTaskStateRequestNew
+	| WorkflowRunSetTaskStateRequestExisting;
+
+export interface WorkflowRunSetTaskStateResponseV1 {
 	run: WorkflowRun;
 }
 

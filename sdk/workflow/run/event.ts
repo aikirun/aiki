@@ -140,15 +140,11 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 				data = schema ? schema.parse(event.data) : event.data;
 			} catch (error) {
 				logger.error("Invalid event data", { data: event.data, error });
-
-				const serializableError = createSerializableError(error);
-
 				await handle[INTERNAL].transitionState({
 					status: "failed",
 					cause: "self",
-					error: serializableError,
+					error: createSerializableError(error),
 				});
-
 				throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 			}
 
