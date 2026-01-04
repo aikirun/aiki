@@ -116,7 +116,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const handle = run[INTERNAL].handle;
 		handle[INTERNAL].assertExecutionAllowed();
 
-		const input = isNonEmptyArray(args) ? args[0] : (null as Input);
+		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
 
 		const path = await this.getPath(input);
 

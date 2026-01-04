@@ -134,7 +134,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		const { run } = await client.api.workflowRun.createV1({
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
-			input: isNonEmptyArray(args) ? args[0] : null,
+			input: isNonEmptyArray(args) ? args[0] : undefined,
 			options: this.params.opts,
 		});
 		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
@@ -149,7 +149,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 		const { client } = parentRunHandle[INTERNAL];
 
-		const input = isNonEmptyArray(args) ? args[0] : (null as Input);
+		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
 		const childRunPath = await this.getPath(input);
 
 		const existingChildRunId = parentRunHandle.run.childWorkflowRuns[childRunPath]?.id;
