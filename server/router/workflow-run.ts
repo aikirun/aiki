@@ -30,8 +30,8 @@ const workflowRuns = new Map<WorkflowRunId, WorkflowRun>();
 const workflowRunsByReferenceId = new Map<WorkflowId, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
 const workflowRunTransitions = new Map<WorkflowRunId, WorkflowRunTransition[]>();
 
-const listV1 = os.listV1.handler(({ input }) => {
-	const { filters, limit = 50, offset = 0, sort } = input;
+const listV1 = os.listV1.handler(({ input: req }) => {
+	const { filters, limit = 50, offset = 0, sort } = req;
 
 	const runs: WorkflowRun[] = [];
 
@@ -68,32 +68,32 @@ const listV1 = os.listV1.handler(({ input }) => {
 	};
 });
 
-const getByIdV1 = os.getByIdV1.handler(({ input, context }) => {
-	context.logger.info({ runId: input.id }, "Fetching workflow run by id");
+const getByIdV1 = os.getByIdV1.handler(({ input: req, context }) => {
+	context.logger.info({ runId: req.id }, "Fetching workflow run by id");
 
-	const run = workflowRuns.get(input.id as WorkflowRunId);
+	const run = workflowRuns.get(req.id as WorkflowRunId);
 	if (!run) {
-		throw new NotFoundError(`Workflow run not found: ${input.id}`);
+		throw new NotFoundError(`Workflow run not found: ${req.id}`);
 	}
 
 	return { run };
 });
 
-const getStateV1 = os.getStateV1.handler(({ input, context }) => {
-	context.logger.info({ runId: input.id }, "Fetching workflow run state");
+const getStateV1 = os.getStateV1.handler(({ input: req, context }) => {
+	context.logger.info({ runId: req.id }, "Fetching workflow run state");
 
-	const run = workflowRuns.get(input.id as WorkflowRunId);
+	const run = workflowRuns.get(req.id as WorkflowRunId);
 	if (!run) {
-		throw new NotFoundError(`Workflow run not found: ${input.id}`);
+		throw new NotFoundError(`Workflow run not found: ${req.id}`);
 	}
 
 	return { state: run.state };
 });
 
-const createV1 = os.createV1.handler(async ({ input, context }) => {
-	const workflowId = input.workflowId as WorkflowId;
-	const workflowVersionId = input.workflowVersionId as WorkflowVersionId;
-	const referenceId = input.options?.reference?.id;
+const createV1 = os.createV1.handler(async ({ input: req, context }) => {
+	const workflowId = req.workflowId as WorkflowId;
+	const workflowVersionId = req.workflowVersionId as WorkflowVersionId;
+	const referenceId = req.options?.reference?.id;
 
 	context.logger.info({ workflowId, workflowVersionId }, "Creating workflow run");
 
@@ -112,18 +112,18 @@ const createV1 = os.createV1.handler(async ({ input, context }) => {
 	const now = Date.now();
 	const runId = `${now}` as WorkflowRunId;
 
-	const trigger = input.options?.trigger;
+	const trigger = req.options?.trigger;
 
 	const run: WorkflowRun = {
 		id: runId,
-		path: input.path,
+		path: req.path,
 		workflowId: workflowId,
 		workflowVersionId: workflowVersionId,
 		createdAt: now,
 		revision: 0,
 		attempts: 0,
-		input: input.input,
-		options: input.options ?? {},
+		input: req.input,
+		options: req.options ?? {},
 		state: {
 			status: "scheduled",
 			scheduledAt:
@@ -140,16 +140,16 @@ const createV1 = os.createV1.handler(async ({ input, context }) => {
 		sleepsQueue: {},
 		eventsQueue: {},
 		childWorkflowRuns: {},
-		parentWorkflowRunId: input.parentWorkflowRunId,
+		parentWorkflowRunId: req.parentWorkflowRunId,
 	};
 
 	workflowRuns.set(runId, run);
 
-	if (input.parentWorkflowRunId && input.path) {
-		const parentRun = workflowRuns.get(input.parentWorkflowRunId as WorkflowRunId);
+	if (req.parentWorkflowRunId && req.path) {
+		const parentRun = workflowRuns.get(req.parentWorkflowRunId as WorkflowRunId);
 		if (parentRun) {
-			const inputHash = await sha256(stableStringify(input.input));
-			parentRun.childWorkflowRuns[input.path] = {
+			const inputHash = await sha256(stableStringify(req.input));
+			parentRun.childWorkflowRuns[req.path] = {
 				id: runId,
 				inputHash,
 				statusWaitResults: [],
@@ -176,21 +176,21 @@ const createV1 = os.createV1.handler(async ({ input, context }) => {
 	return { run };
 });
 
-const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }) => {
-	const runId = input.id as WorkflowRunId;
+const transitionStateV1 = os.transitionStateV1.handler(async ({ input: req, context }) => {
+	const runId = req.id as WorkflowRunId;
 
 	const run = workflowRuns.get(runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
-	if (input.type === "optimistic" && run.revision !== input.expectedRevision) {
-		throw new RevisionConflictError(runId, input.expectedRevision, run.revision);
+	if (req.type === "optimistic" && run.revision !== req.expectedRevision) {
+		throw new RevisionConflictError(runId, req.expectedRevision, run.revision);
 	}
 
-	assertIsValidWorkflowRunStateTransition(runId, run.state, input.state);
+	assertIsValidWorkflowRunStateTransition(runId, run.state, req.state);
 
 	const now = Date.now();
-	let state = convertWorkflowRunStateDurationsToTimestamps(input.state, now);
+	let state = convertWorkflowRunStateDurationsToTimestamps(req.state, now);
 
 	context.logger.info({ runId, state }, "Transitioning workflow run state");
 
@@ -318,19 +318,19 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	return { run };
 });
 
-const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input, context }) => {
-	const runId = input.id as WorkflowRunId;
+const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: req, context }) => {
+	const runId = req.id as WorkflowRunId;
 
 	const run = workflowRuns.get(runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
-	if (run.revision !== input.expectedRevision) {
-		throw new RevisionConflictError(runId, input.expectedRevision, run.revision);
+	if (run.revision !== req.expectedRevision) {
+		throw new RevisionConflictError(runId, req.expectedRevision, run.revision);
 	}
 
-	const taskPath = input.taskPath as TaskPath;
-	const taskStateRequest = input.taskState;
+	const taskPath = req.taskPath as TaskPath;
+	const taskStateRequest = req.taskState;
 	const currentTaskInfo = run.tasks[taskPath];
 
 	assertIsValidTaskStateTransition(runId, taskPath, currentTaskInfo?.state, taskStateRequest);
@@ -384,8 +384,8 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input, c
 	return { run };
 });
 
-const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input, context }) => {
-	const runId = input.id as WorkflowRunId;
+const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: req, context }) => {
+	const runId = req.id as WorkflowRunId;
 
 	const run = workflowRuns.get(runId);
 	if (!run) {
@@ -394,23 +394,21 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input, context }) => {
 
 	const now = Date.now();
 
-	if (input.type === "new") {
-		const inputHash = await sha256(stableStringify(input.input));
-		const taskPath = (
-			input.reference ? `${input.taskId}/${input.reference.id}` : `${input.taskId}/${inputHash}`
-		) as TaskPath;
+	if (req.type === "new") {
+		const inputHash = await sha256(stableStringify(req.input));
+		const taskPath = (req.reference ? `${req.taskId}/${req.reference.id}` : `${req.taskId}/${inputHash}`) as TaskPath;
 
 		const existingTaskInfo = run.tasks[taskPath];
 		if (existingTaskInfo) {
 			throw new ValidationError(`Task ${taskPath} already exists. Use type: "existing" to update it.`);
 		}
 
-		context.logger.info({ runId, taskPath, state: input.state }, "Setting task state (new task)");
+		context.logger.info({ runId, taskPath, state: req.state }, "Setting task state (new task)");
 
 		const runningState: TaskState = {
 			status: "running",
 			attempts: 1,
-			input: input.input,
+			input: req.input,
 		};
 
 		const runningTransition: WorkflowRunTransition = {
@@ -421,9 +419,9 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input, context }) => {
 		};
 
 		const finalState: TaskState =
-			input.state.status === "completed"
-				? { status: "completed", attempts: 1, output: input.state.output }
-				: { status: input.state.status satisfies "failed", attempts: 1, error: input.state.error };
+			req.state.status === "completed"
+				? { status: "completed", attempts: 1, output: req.state.output }
+				: { status: req.state.status satisfies "failed", attempts: 1, error: req.state.error };
 
 		const finalTransition: WorkflowRunTransition = {
 			type: "task_state",
@@ -445,20 +443,20 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input, context }) => {
 		return { run };
 	}
 
-	const taskPath = input.taskPath as TaskPath;
+	const taskPath = req.taskPath as TaskPath;
 	const existingTaskInfo = run.tasks[taskPath];
 	if (!existingTaskInfo) {
 		throw new NotFoundError(`Task ${taskPath} does not exist. Use type: "new" to create it.`);
 	}
 
-	context.logger.info({ runId, taskPath, state: input.state }, "Setting task state (existing task)");
+	context.logger.info({ runId, taskPath, state: req.state }, "Setting task state (existing task)");
 
 	const attempts = existingTaskInfo.state.attempts;
 
 	const finalState: TaskState =
-		input.state.status === "completed"
-			? { status: "completed", attempts: attempts + 1, output: input.state.output }
-			: { status: input.state.status satisfies "failed", attempts: attempts + 1, error: input.state.error };
+		req.state.status === "completed"
+			? { status: "completed", attempts: attempts + 1, output: req.state.output }
+			: { status: req.state.status satisfies "failed", attempts: attempts + 1, error: req.state.error };
 
 	const finalTransition: WorkflowRunTransition = {
 		type: "task_state",
@@ -480,8 +478,8 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input, context }) => {
 	return { run };
 });
 
-const listTransitionsV1 = os.listTransitionsV1.handler(({ input }) => {
-	const { id, limit = 50, offset = 0, sort } = input;
+const listTransitionsV1 = os.listTransitionsV1.handler(({ input: req }) => {
+	const { id, limit = 50, offset = 0, sort } = req;
 
 	const run = workflowRuns.get(id as WorkflowRunId);
 	if (!run) {
@@ -578,15 +576,15 @@ async function notifyParentOfStateChangeIfNecessary(
 	}
 }
 
-const sendEventV1 = os.sendEventV1.handler(async ({ input, context }) => {
-	const runId = input.id as WorkflowRunId;
+const sendEventV1 = os.sendEventV1.handler(async ({ input: req, context }) => {
+	const runId = req.id as WorkflowRunId;
 
 	const run = workflowRuns.get(runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
 
-	const { eventId, data, options } = input;
+	const { eventId, data, options } = req;
 	const idempotencyKey = options?.idempotencyKey;
 	const now = Date.now();
 
@@ -595,8 +593,8 @@ const sendEventV1 = os.sendEventV1.handler(async ({ input, context }) => {
 	return { run };
 });
 
-const multicastEventV1 = os.multicastEventV1.handler(async ({ input, context }) => {
-	const runIds = input.ids as WorkflowRunId[];
+const multicastEventV1 = os.multicastEventV1.handler(async ({ input: req, context }) => {
+	const runIds = req.ids as WorkflowRunId[];
 
 	const runs = runIds.map((runId) => {
 		const run = workflowRuns.get(runId);
@@ -606,7 +604,7 @@ const multicastEventV1 = os.multicastEventV1.handler(async ({ input, context }) 
 		return run;
 	});
 
-	const { eventId, data, options } = input;
+	const { eventId, data, options } = req;
 	const idempotencyKey = options?.idempotencyKey;
 	const now = Date.now();
 
