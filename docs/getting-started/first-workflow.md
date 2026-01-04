@@ -132,7 +132,7 @@ import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 
 const aikiClient = await client({
-	url: "localhost:9090",
+	url: "localhost:9876",
 	redis: {
 		host: "localhost",
 		port: 6379,
@@ -266,7 +266,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 // Set up client and worker
 const aikiClient = await client({
-	url: "localhost:9090",
+	url: "localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 });
 

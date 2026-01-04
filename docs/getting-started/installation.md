@@ -43,12 +43,12 @@ Clone the Aiki repository and start the server:
 docker-compose up
 ```
 
-This starts the **Aiki Server** on `http://localhost:9090`.
+This starts the **Aiki Server** on `http://localhost:9876`.
 
 You'll see output like:
 
 ```
-aiki-server | Server running on 0.0.0.0:9090
+aiki-server | Server running on 0.0.0.0:9876
 ```
 
 Leave this running in one terminal and continue in another.
@@ -58,7 +58,7 @@ Leave this running in one terminal and continue in another.
 If you need different ports, use environment variables:
 
 ```bash
-AIKI_PORT=9091 docker-compose up
+AIKI_PORT=9000 docker-compose up
 ```
 
 Or create a `.env` file at the repository root. See `server/.env.example` for available configuration options.
@@ -95,7 +95,7 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 - Make sure Redis is running (`docker ps` to check)
 - Make sure `docker-compose up` is running in another terminal
-- Verify the server is listening: check the Docker output for "Server running on 0.0.0.0:9090"
+- Verify the server is listening: check the Docker output for "Server running on 0.0.0.0:9876"
 
 **"Cannot find module" error (npm)**
 
@@ -109,7 +109,7 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 **Port already in use**
 
-- Use a different port: `AIKI_PORT=9091 docker-compose up`
+- Use a different port: `AIKI_PORT=9000 docker-compose up`
 - Or stop other services using those ports
 
 ## Next Steps

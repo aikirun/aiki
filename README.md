@@ -60,7 +60,7 @@ import { worker } from "@aikirun/worker";
 import { onboardingWorkflowV1 } from "./workflow.ts";
 
 export const aikiClient = await client({
-  url: "localhost:9090",
+  url: "localhost:9876",
   redis: { host: "localhost", port: 6379 }
 });
 

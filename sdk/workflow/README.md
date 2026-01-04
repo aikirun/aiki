@@ -153,7 +153,7 @@ import { client } from "@aikirun/client";
 import { onboardingWorkflowV1 } from "./workflows.ts";
 
 const aikiClient = await client({
-	url: "http://localhost:9090",
+	url: "http://localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 });
 

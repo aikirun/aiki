@@ -93,7 +93,7 @@ GET /workers/:id/health
 
 ```bash
 # Server
-AIKI_PORT=9090
+AIKI_PORT=9876
 AIKI_HOST=0.0.0.0
 
 # Database
@@ -111,7 +111,7 @@ TLS_ENABLED=true
 
 ```typescript
 const server = await createServer({
-	port: 9090,
+	port: 9876,
 	database: {
 		url: process.env.DATABASE_URL,
 		poolSize: 20,
@@ -223,7 +223,7 @@ All network traffic uses TLS, databases are encrypted at rest, and the message q
 ```bash
 docker run -d \
   --name aiki-server \
-  -p 9090:9090 \
+  -p 9876:9876 \
   -e DATABASE_URL=postgresql://... \
   -e REDIS_URL=redis://... \
   aiki/server:latest

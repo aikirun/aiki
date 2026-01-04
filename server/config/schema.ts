@@ -8,7 +8,7 @@ export const redisConfigSchema = z.object({
 });
 
 export const configSchema = z.object({
-	port: z.coerce.number().int().positive().default(9090),
+	port: z.coerce.number().int().positive().default(9876),
 	redis: redisConfigSchema,
 	logLevel: z.enum(logLevels).default("info"),
 	prettyLogs: z.coerce.boolean().default(false),

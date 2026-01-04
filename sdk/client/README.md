@@ -16,7 +16,7 @@ npm install @aikirun/client
 import { client } from "@aikirun/client";
 
 const aikiClient = await client({
-	url: "http://localhost:9090",
+	url: "http://localhost:9876",
 	redis: {
 		host: "localhost",
 		port: 6379,
@@ -90,7 +90,7 @@ interface ClientParams<AppContext> {
 
 ```typescript
 const aikiClient = await client({
-	url: "http://localhost:9090",
+	url: "http://localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 	contextFactory: (run) => ({
 		traceId: generateTraceId(),

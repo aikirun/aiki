@@ -8,7 +8,7 @@ The Aiki client provides the interface for starting workflows, monitoring execut
 import { client } from "@aikirun/client";
 
 const aikiClient = await client({
-	url: "localhost:9090",
+	url: "localhost:9876",
 	redis: {
 		host: "localhost",
 		port: 6379,
@@ -23,7 +23,7 @@ const aikiClient = await client({
 The URL of the Aiki server:
 
 ```typescript
-url: "localhost:9090"; // Local development
+url: "localhost:9876"; // Local development
 // or
 url: "https://aiki.example.com"; // Production
 ```
@@ -149,7 +149,7 @@ const onboardingV1 = onboardingWorkflow.v("1.0.0", {
 
 // Create client
 const aikiClient = await client({
-	url: "localhost:9090",
+	url: "localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 });
 

@@ -4,7 +4,7 @@ import { delay } from "@aikirun/lib";
 import { morningRoutineV2 } from "./definitions/workflow";
 
 export const aikiClient = await client({
-	url: "http://localhost:9090",
+	url: "http://localhost:9876",
 	redis: {
 		host: "localhost",
 		port: 6379,

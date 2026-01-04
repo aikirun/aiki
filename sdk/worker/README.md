@@ -30,7 +30,7 @@ const aikiWorker = worker({
 
 // Initialize client
 const aikiClient = await client({
-	url: "http://localhost:9090",
+	url: "http://localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 });
 
