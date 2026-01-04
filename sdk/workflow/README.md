@@ -18,7 +18,7 @@ import { markUserVerified, sendVerificationEmail } from "./tasks.ts";
 
 export const onboardingWorkflow = workflow({ id: "user-onboarding" });
 
-export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
+export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0.0", {
 	async handler(input: { email: string }, run) {
 		run.logger.info("Starting onboarding", { email: input.email });
 
@@ -106,7 +106,7 @@ run.logger.debug("User created", { userId: result.userId });
 ### Delayed Trigger
 
 ```typescript
-export const morningWorkflowV1 = morningWorkflow.v("1.0", {
+export const morningWorkflowV1 = morningWorkflow.v("1.0.0", {
 	// ... workflow definition
 	opts: {
 		trigger: {
@@ -120,7 +120,7 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0", {
 ### Retry Strategy
 
 ```typescript
-export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
+export const paymentWorkflowV1 = paymentWorkflow.v("1.0.0", {
 	// ... workflow definition
 	opts: {
 		retry: {
@@ -136,7 +136,7 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0", {
 ### Idempotency Key
 
 ```typescript
-export const orderWorkflowV1 = orderWorkflow.v("1.0", {
+export const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	// ... workflow definition
 	opts: {
 		idempotencyKey: "order-${orderId}",

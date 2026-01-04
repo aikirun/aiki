@@ -22,7 +22,7 @@ import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams }
  * export const userOnboarding = workflow({ id: "user-onboarding" });
  *
  * // Define version 1.0
- * export const userOnboardingV1 = userOnboarding.v("1.0", {
+ * export const userOnboardingV1 = userOnboarding.v("1.0.0", {
  *   async handler(input: { email: string }, run) {
  *     run.logger.info("Starting onboarding", { email: input.email });
  *
@@ -41,7 +41,7 @@ import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams }
  * });
  *
  * // Deploy version 2.0 alongside 1.0 (no downtime)
- * export const userOnboardingV2 = userOnboarding.v("2.0", {
+ * export const userOnboardingV2 = userOnboarding.v("2.0.0", {
  *   async handler(input: { email: string; trial: boolean }, run) {
  *     // Enhanced version with different logic
  *     // Existing v1.0 workflows continue with their version

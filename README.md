@@ -37,7 +37,7 @@ import {createUserProfile, sendWelcomeEmail, sendUsageTips} from "./task.ts";
 
 export const onboardingWorkflow = workflow({ id: "user-onboarding" });
 
-export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0", {
+export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0.0", {
   async handler(input: { email: string }, run) {
     
     const { userId } = await createUserProfile.start(run, {email: input.email});
