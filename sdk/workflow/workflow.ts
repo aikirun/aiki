@@ -69,7 +69,7 @@ export interface Workflow {
 		AppContext = null,
 		TEventsDefinition extends EventsDefinition = Record<string, never>,
 	>(
-		versionId: `${number}.${number}.${number}`,
+		versionId: string,
 		params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
 	) => WorkflowVersion<Input, Output, AppContext, TEventsDefinition>;
 
@@ -92,8 +92,8 @@ class WorkflowImpl implements Workflow {
 		};
 	}
 
-	v<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
-		versionId: `${number}.${number}.${number}`,
+	v<Input extends Serializable, Output extends Serializable, AppContext, TEventsDefinition extends EventsDefinition>(
+		versionId: string,
 		params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
 	): WorkflowVersion<Input, Output, AppContext, TEventsDefinition> {
 		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
