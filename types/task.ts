@@ -4,14 +4,10 @@ export type TaskId = string & { _brand: "task_id" };
 
 export type TaskPath = string & { _brand: "task_path" };
 
-export type TaskStatus = "none" | "running" | "awaiting_retry" | "completed" | "failed";
+export type TaskStatus = "running" | "awaiting_retry" | "completed" | "failed";
 
 interface TaskStateBase {
 	status: TaskStatus;
-}
-
-export interface TaskStateNone extends TaskStateBase {
-	status: "none";
 }
 
 // TODO: add input to this interface, so we can track what the input was to a task
@@ -39,7 +35,6 @@ export interface TaskStateFailed extends TaskStateBase {
 }
 
 export type TaskState<Output = unknown> =
-	| TaskStateNone
 	| TaskStateRunning
 	| TaskStateAwaitingRetry
 	| TaskStateCompleted<Output>

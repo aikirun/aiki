@@ -54,10 +54,14 @@ export class InvalidTaskStateTransitionError extends Error {
 	constructor(
 		public readonly workflowRunId: string,
 		public readonly taskPath: TaskPath,
-		public readonly fromStatus: TaskStatus,
+		public readonly fromStatus: TaskStatus | undefined,
 		public readonly toStatus: TaskStatus
 	) {
-		super(`Cannot transition workflow ${workflowRunId} task ${taskPath} from ${fromStatus} to ${toStatus}`);
+		if (!fromStatus) {
+			super(`Cannot transition workflow ${workflowRunId} fresh task ${taskPath} directly to ${toStatus}`);
+		} else {
+			super(`Cannot transition workflow ${workflowRunId} task ${taskPath} from ${fromStatus} to ${toStatus}`);
+		}
 		this.name = "InvalidTaskStateTransitionError";
 	}
 }

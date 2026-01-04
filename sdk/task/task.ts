@@ -8,7 +8,7 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskPath } from "@aikirun/types/task";
+import type { TaskPath, TaskStateAwaitingRetry, TaskStateRunning } from "@aikirun/types/task";
 import { TaskFailedError, type TaskId } from "@aikirun/types/task";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext } from "@aikirun/workflow";
@@ -120,11 +120,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const path = await this.getPath(input);
 
-		const taskState = handle.run.tasksState[path] ?? { status: "none" };
-		if (taskState.status === "completed") {
+		const taskState = handle.run.tasksState[path];
+		if (taskState?.status === "completed") {
 			return taskState.output as Output;
 		}
-		if (taskState.status === "failed") {
+		if (taskState?.status === "failed") {
 			throw new TaskFailedError(path, taskState.attempts, taskState.error.message);
 		}
 
@@ -136,8 +136,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		let attempts = 0;
 		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
 
-		if (taskState.status !== "none") {
-			this.assertRetryAllowed(path, taskState.attempts, retryStrategy, logger);
+		if (taskState) {
+			this.assertRetryAllowed(path, taskState, retryStrategy, logger);
 			logger.debug("Retrying task", {
 				"aiki.attempts": taskState.attempts,
 				"aiki.taskStatus": taskState.status,
@@ -145,7 +145,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			attempts = taskState.attempts;
 		}
 
-		if (taskState.status === "awaiting_retry" && handle.run.state.status === "running") {
+		if (taskState?.status === "awaiting_retry" && handle.run.state.status === "running") {
 			throw new WorkflowRunSuspendedError(run.id);
 		}
 
@@ -222,7 +222,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private assertRetryAllowed(path: TaskPath, attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
+	private assertRetryAllowed(
+		path: TaskPath,
+		state: TaskStateRunning | TaskStateAwaitingRetry,
+		retryStrategy: RetryStrategy,
+		logger: Logger
+	): void {
+		const { attempts } = state;
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
 			logger.error("Task retry not allowed", {

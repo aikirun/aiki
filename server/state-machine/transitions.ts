@@ -169,20 +169,25 @@ export function assertIsValidWorkflowRunStateTransition(
 }
 
 const validTaskStatusTransition: Record<TaskStatus, TaskStatus[]> = {
-	// TODO: none => completed is for cases where task result is manually injected
-	none: ["running", "completed"],
-	running: ["none", "running", "awaiting_retry", "completed", "failed"],
-	awaiting_retry: ["none", "running"],
-	completed: ["none"],
-	failed: ["none"],
+	running: ["running", "awaiting_retry", "completed", "failed"],
+	awaiting_retry: ["running"],
+	completed: [],
+	failed: [],
 };
 
 export function assertIsValidTaskStateTransition(
 	runId: WorkflowRunId,
 	taskPath: TaskPath,
-	from: TaskState,
+	from: TaskState | undefined,
 	to: TaskStateRequest
 ) {
+	if (!from) {
+		if (to.status === "awaiting_retry") {
+			throw new InvalidTaskStateTransitionError(runId, taskPath, undefined, to.status);
+		}
+		return;
+	}
+
 	const allowedDestinations = validTaskStatusTransition[from.status];
 	if (!allowedDestinations.includes(to.status)) {
 		throw new InvalidTaskStateTransitionError(runId, taskPath, from.status, to.status);

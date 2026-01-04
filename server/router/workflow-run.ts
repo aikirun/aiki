@@ -236,6 +236,16 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 		run.attempts++;
 	}
 
+	if (state.status === "scheduled" && state.reason === "retry") {
+		for (const [taskPath, taskState] of Object.entries(run.tasksState)) {
+			if (taskState.status === "running" || taskState.status === "awaiting_retry" || taskState.status === "failed") {
+				delete run.tasksState[taskPath];
+			} else {
+				taskState.status satisfies "completed";
+			}
+		}
+	}
+
 	if (state.status === "awaiting_child_workflow") {
 		const childPath = state.childWorkflowRunPath;
 		const childRunId = run.childWorkflowRuns[childPath]?.id;
@@ -318,7 +328,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(({ input, context
 	const taskPath = input.taskPath as TaskPath;
 	const taskStateRequest = input.taskState;
 
-	assertIsValidTaskStateTransition(runId, taskPath, run.tasksState[taskPath] ?? { status: "none" }, taskStateRequest);
+	assertIsValidTaskStateTransition(runId, taskPath, run.tasksState[taskPath], taskStateRequest);
 
 	context.logger.info({ runId, taskPath, taskState: taskStateRequest }, "Transitioning task state");
 
@@ -540,19 +550,6 @@ export async function scheduleRetryableWorkflowRuns(context: ServerContext) {
 	const runs = getRetryableWorkflows();
 
 	for (const run of runs) {
-		for (const [taskPath, taskState] of Object.entries(run.tasksState)) {
-			if (taskState.status === "running" || taskState.status === "failed" || taskState.status === "awaiting_retry") {
-				await transitionTaskStateV1.callable({ context })({
-					id: run.id,
-					taskPath: taskPath,
-					taskState: { status: "none" },
-					expectedRevision: run.revision,
-				});
-			} else {
-				taskState.status satisfies "none" | "completed";
-			}
-		}
-
 		await transitionStateV1.callable({ context })({
 			type: "optimistic",
 			id: run.id,
