@@ -6,7 +6,8 @@ Build your first workflow in just 5 minutes!
 
 Make sure you've completed the [Installation](./installation.md) steps:
 
-- Docker Compose running (`docker-compose up`)
+- Redis running (see [Installation](./installation.md))
+- Aiki Server running (`docker-compose up`)
 - SDK packages installed
 
 ## Create Your First Workflow File

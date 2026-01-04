@@ -21,25 +21,34 @@ If any of these are missing:
 - **Node.js**: https://nodejs.org/en/
 - **Bun**: https://bun.sh/docs/installation
 
-## Step 2: Start the Aiki Server and Redis
+## Step 2: Start Redis
 
-Clone the Aiki repository and start the infrastructure:
+Aiki requires a Redis instance for message queue functionality. Start Redis locally:
+
+```bash
+# Using Docker
+docker run -d --name redis -p 6379:6379 redis:7
+
+# Or using your system's package manager
+# macOS: brew install redis && brew services start redis
+# Ubuntu: sudo apt install redis-server && sudo systemctl start redis
+```
+
+## Step 3: Start the Aiki Server
+
+Clone the Aiki repository and start the server:
 
 ```bash
 # From the Aiki repository root
 docker-compose up
 ```
 
-This starts:
-
-- **Aiki Server** on `http://localhost:9090`
-- **Redis** on `localhost:6379`
+This starts the **Aiki Server** on `http://localhost:9090`.
 
 You'll see output like:
 
 ```
 aiki-server | Server running on 0.0.0.0:9090
-redis | Ready to accept connections
 ```
 
 Leave this running in one terminal and continue in another.
@@ -49,13 +58,12 @@ Leave this running in one terminal and continue in another.
 If you need different ports, use environment variables:
 
 ```bash
-# Use different ports
-AIKI_PORT=9090 REDIS_PORT=7379 docker-compose up
+AIKI_PORT=9091 docker-compose up
 ```
 
 Or create a `.env` file at the repository root. See `server/.env.example` for available configuration options.
 
-## Step 3: Install SDK Packages
+## Step 4: Install SDK Packages
 
 In a new terminal, install the Aiki packages for your project:
 
@@ -76,7 +84,7 @@ pnpm add @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
 yarn add @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
 ```
 
-## Step 4: You're Ready!
+## Step 5: You're Ready!
 
 Your Aiki infrastructure is now running and you have the SDK packages installed. Proceed to the
 [Quick Start](./quick-start.md) guide to create your first workflow.
@@ -85,6 +93,7 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 **"Connection refused" error**
 
+- Make sure Redis is running (`docker ps` to check)
 - Make sure `docker-compose up` is running in another terminal
 - Verify the server is listening: check the Docker output for "Server running on 0.0.0.0:9090"
 
@@ -100,7 +109,7 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 **Port already in use**
 
-- Use different ports: `AIKI_PORT=9090 docker-compose up`
+- Use a different port: `AIKI_PORT=9091 docker-compose up`
 - Or stop other services using those ports
 
 ## Next Steps

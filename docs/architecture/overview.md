@@ -22,13 +22,13 @@ security, scalability, and flexibility.
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
 └─────────────────────────────────────┬───────────────────────────────────────┘
                                       │
-                                      │ Redis Streams
+                                      │ Message Queue
                                       ▼
                      ┌───────────────────────────────────┐
-                     │         Redis Cluster             │
+                     │          Message Queue            │
                      │  ┌─────────────────────────────┐  │
-                     │  │  Stream 1: workflow:orders  │  │
-                     │  │  Stream 2: workflow:users   │  │
+                     │  │  Stream: workflow:orders    │  │
+                     │  │  Stream: workflow:users     │  │
                      │  └─────────────────────────────┘  │
                      └───────────────────────────────────┘
                                       │
@@ -60,12 +60,12 @@ retrieve results.
 The Aiki Server orchestrates workflows and manages state through three key functions: workflow orchestration manages the
 workflow lifecycle, task management tracks task execution, and the storage layer persists state and history.
 
-### 3. Redis Streams
+### 3. Message Queue
 
-Redis Streams provides high-performance message distribution using consumer groups for work distribution, message
+The message queue provides high-performance message distribution using consumer groups for work distribution, message
 claiming for fault tolerance, parallel stream processing, and round-robin work allocation.
 
-⚠️ **Note**: Redis Streams is currently the only fully implemented subscriber strategy.
+**Available implementations**: Redis Streams (default). See [Redis Streams](./redis-streams.md) for details.
 
 ### 4. Workers
 
@@ -77,7 +77,7 @@ results to the server, and handling retries and failures.
 ### Separation of Concerns
 
 Aiki separates orchestration (handled by the Aiki Server), execution (handled by workers in your environment), state
-management (centralized in storage), and communication (through Redis Streams).
+management (centralized in storage), and communication (through the message queue).
 
 ### Security by Design
 
@@ -102,23 +102,23 @@ distribution and reliable event delivery.
 ```
 Application → SDK Client → Aiki Server → Storage
                                     ↓
-                                Redis Streams
+                               Message Queue
 ```
 
 1. Application calls `workflowVersion.start()`
 2. SDK client sends request to server
 3. Server validates and creates workflow run
 4. Server stores run in database
-5. Server publishes message to Redis Streams
+5. Server publishes message to message queue
 6. Returns result handle to client
 
 ### 2. Workflow Execution
 
 ```
-Redis Streams → Worker → Task Execution → Server
+Message Queue → Worker → Task Execution → Server
 ```
 
-1. Worker polls Redis Streams for workflow runs
+1. Worker polls message queue for workflow runs
 2. Worker receives workflow run message
 3. Worker loads workflow definition
 4. Worker executes tasks in sequence
@@ -141,12 +141,12 @@ Worker ←→ Server ←→ Storage
 ### Self-Hosted
 
 Deploy all components in your infrastructure for full control over deployment, custom security policies, integration
-with existing systems, and no vendor lock-in. This requires running the Aiki Server (Docker/VM), Redis for streams,
+with existing systems, and no vendor lock-in. This requires running the Aiki Server (Docker/VM), a message queue (Redis by default),
 PostgreSQL for storage, and workers in your infrastructure.
 
 ### Cloud-Based
 
-Use a managed Aiki service that handles the server and Redis with automatic scaling, built-in monitoring, and reduced
+Use a managed Aiki service that handles the server and message queue with automatic scaling, built-in monitoring, and reduced
 operational overhead. You're responsible for running workers in your cloud account and optionally managing your storage.
 
 ### Hybrid
@@ -158,8 +158,8 @@ requirements, and geographic distribution.
 
 ### Horizontal Scaling
 
-Scale horizontally by adding more workers to increase throughput, scaling server instances for high availability, using
-Redis Cluster for distributed streams, and implementing read replicas and sharding for storage.
+Scale horizontally by adding more workers to increase throughput, scaling server instances for high availability,
+clustering the message queue for distributed processing, and implementing read replicas and sharding for storage.
 
 ### Performance Optimization
 

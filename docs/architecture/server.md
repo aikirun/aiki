@@ -35,7 +35,7 @@ Manages workflow lifecycle:
 Workflow Start → Validation → State Creation → Queue Publish → Monitoring
 ```
 
-The orchestrator validates workflow definitions, creates workflow run records, publishes to Redis Streams,
+The orchestrator validates workflow definitions, creates workflow run records, publishes to the message queue,
 tracks workflow state, and handles completions and failures.
 
 ### Task Management
@@ -214,7 +214,7 @@ workflow runs, and client for starting workflows and reading status.
 
 ### Encryption
 
-All network traffic uses TLS, databases are encrypted at rest, and Redis uses encryption in transit.
+All network traffic uses TLS, databases are encrypted at rest, and the message queue uses encryption in transit.
 
 ## Deployment
 
@@ -267,9 +267,9 @@ due to the stateless server design.
 
 Use a managed database service with read replicas, automatic backups, and failover configured for high availability.
 
-### Redis
+### Message Queue
 
-Deploy Redis Cluster with persistence configured (AOF/RDB), replication enabled, and memory usage monitored.
+For Redis (default): Deploy Redis Cluster with persistence configured (AOF/RDB), replication enabled, and memory usage monitored.
 
 ## Next Steps
 

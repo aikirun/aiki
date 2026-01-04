@@ -1,6 +1,6 @@
 # Workers
 
-A worker executes your workflows. It runs in your infrastructure, subscribes to workflow run messages, and executes the workflow logic you've defined. You can run multiple workers to scale horizontally—they automatically share the workload. The default subscriber strategy is Redis Streams.
+A worker executes your workflows. It runs in your infrastructure, subscribes to workflow run messages, and executes the workflow logic you've defined. You can run multiple workers to scale horizontally—they automatically share the workload.
 
 ## Creating a Worker
 

@@ -8,7 +8,7 @@ Build reliable, long-running business processes that survive failures, restarts,
 
 - **🔄 Durable Execution** - Workflows survive crashes and restarts automatically
 - **🚀 Horizontal Scaling** - Add workers to scale, with automatic work distribution
-- **⚡ High Performance** - Redis Streams for fault-tolerant message distribution
+- **⚡ High Performance** - Fault-tolerant message distribution
 - **🔒 Run in Your Environment** - Workers execute in your infrastructure, not ours
 - **🎯 Type-Safe** - Full TypeScript support with end-to-end type safety
 - **🛡️ Built-in Fault Tolerance** - Message claiming, automatic retries, graceful recovery
@@ -145,13 +145,13 @@ export const sendUsageTips = task({
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
 └─────────────────────────────────────┬───────────────────────────────────────┘
                                       │
-                                      │ Redis Streams
+                                      │ Message Queue
                                       ▼
                      ┌───────────────────────────────────┐
-                     │              Redis                │
+                     │          Message Queue            │
                      │  ┌─────────────────────────────┐  │
-                     │  │  Stream 1: workflow:orders  │  │
-                     │  │  Stream 2: workflow:users   │  │
+                     │  │  Stream: workflow:orders    │  │
+                     │  │  Stream: workflow:users     │  │
                      │  └─────────────────────────────┘  │
                      └───────────────────────────────────┘
                                       │
@@ -183,7 +183,7 @@ Aiki's server orchestrates workflows and manages state, while workers execute ta
 ## Requirements
 
 - **Runtime**: Node.js 18+ or Bun 1.0+
-- **Redis**: 6.2+ (for Redis Streams)
+- **Message Queue**: Redis 6.2+ (default), or other supported backends
 - **Database**: PostgreSQL 14+ (for state persistence)
 
 ## License

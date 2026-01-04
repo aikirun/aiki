@@ -120,7 +120,7 @@ Always close the client when done to release resources:
 await aiki.close();
 ```
 
-This closes the Redis connection and cleans up resources.
+This closes connections and cleans up resources.
 
 ## Complete Example
 
