@@ -1,6 +1,8 @@
 import { propsDefined, type RequiredProp } from "@aikirun/lib";
 import { isNonEmptyArray } from "@aikirun/lib/array";
+import { sha256 } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
+import { stableStringify } from "@aikirun/lib/json";
 import type { TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
@@ -25,7 +27,7 @@ import { baseImplementer } from "./base";
 const os = baseImplementer.workflowRun;
 
 const workflowRuns = new Map<WorkflowRunId, WorkflowRun>();
-const workflowRunsIdempotencyMap = new Map<WorkflowId, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
+const workflowRunsByReferenceId = new Map<WorkflowId, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
 const workflowRunTransitions = new Map<WorkflowRunId, WorkflowRunTransition[]>();
 
 const listV1 = os.listV1.handler(({ input }) => {
@@ -88,17 +90,17 @@ const getStateV1 = os.getStateV1.handler(({ input, context }) => {
 	return { state: run.state };
 });
 
-const createV1 = os.createV1.handler(({ input, context }) => {
+const createV1 = os.createV1.handler(async ({ input, context }) => {
 	const workflowId = input.workflowId as WorkflowId;
 	const workflowVersionId = input.workflowVersionId as WorkflowVersionId;
-	const idempotencyKey = input.options?.idempotencyKey;
+	const referenceId = input.options?.reference?.id;
 
 	context.logger.info({ workflowId, workflowVersionId }, "Creating workflow run");
 
-	if (idempotencyKey) {
-		const existingRunId = workflowRunsIdempotencyMap.get(workflowId)?.get(workflowVersionId)?.get(idempotencyKey);
+	if (referenceId) {
+		const existingRunId = workflowRunsByReferenceId.get(workflowId)?.get(workflowVersionId)?.get(referenceId);
 		if (existingRunId) {
-			context.logger.info({ runId: existingRunId, idempotencyKey }, "Returning existing run from idempotency key");
+			context.logger.info({ runId: existingRunId, referenceId }, "Returning existing run from reference ID");
 			const existingRun = workflowRuns.get(existingRunId);
 			if (!existingRun) {
 				throw new NotFoundError(`Workflow run not found: ${existingRunId}`);
@@ -146,27 +148,29 @@ const createV1 = os.createV1.handler(({ input, context }) => {
 	if (input.parentWorkflowRunId && input.path) {
 		const parentRun = workflowRuns.get(input.parentWorkflowRunId as WorkflowRunId);
 		if (parentRun) {
+			const inputHash = await sha256(stableStringify(input.input));
 			parentRun.childWorkflowRuns[input.path] = {
 				id: runId,
+				inputHash,
 				statusWaitResults: [],
 			};
 		}
 	}
 
-	if (idempotencyKey) {
-		let versionMap = workflowRunsIdempotencyMap.get(workflowId);
+	if (referenceId) {
+		let versionMap = workflowRunsByReferenceId.get(workflowId);
 		if (!versionMap) {
 			versionMap = new Map();
-			workflowRunsIdempotencyMap.set(workflowId, versionMap);
+			workflowRunsByReferenceId.set(workflowId, versionMap);
 		}
 
-		let idempotencyKeyMap = versionMap.get(workflowVersionId);
-		if (!idempotencyKeyMap) {
-			idempotencyKeyMap = new Map();
-			versionMap.set(workflowVersionId, idempotencyKeyMap);
+		let referenceIdMap = versionMap.get(workflowVersionId);
+		if (!referenceIdMap) {
+			referenceIdMap = new Map();
+			versionMap.set(workflowVersionId, referenceIdMap);
 		}
 
-		idempotencyKeyMap.set(idempotencyKey, runId);
+		referenceIdMap.set(referenceId, runId);
 	}
 
 	return { run };
@@ -275,17 +279,21 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input, context }
 	run.revision++;
 
 	if (state.status === "cancelled") {
-		for (const [childRunPath, { id: childRunId }] of Object.entries(run.childWorkflowRuns)) {
-			const childRun = workflowRuns.get(childRunId as WorkflowRunId);
+		for (const [childRunPath, childRunInfo] of Object.entries(run.childWorkflowRuns)) {
+			const childRun = workflowRuns.get(childRunInfo.id as WorkflowRunId);
 			if (!childRun) {
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
 			}
 			await transitionStateV1.callable({ context })({
 				type: "pessimistic",
-				id: childRunId,
+				id: childRunInfo.id,
 				state,
 			});
-			run.childWorkflowRuns[childRunPath] = { id: childRunId, statusWaitResults: [] };
+			run.childWorkflowRuns[childRunPath] = {
+				id: childRunInfo.id,
+				inputHash: childRunInfo.inputHash,
+				statusWaitResults: [],
+			};
 		}
 	}
 

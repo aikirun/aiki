@@ -9,6 +9,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import { TaskFailedError } from "@aikirun/types/task";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
+	DuplicateReferenceIdError,
 	type WorkflowOptions,
 	type WorkflowRun,
 	WorkflowRunFailedError,
@@ -150,51 +151,62 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		const { client } = parentRunHandle[INTERNAL];
 
 		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
-		const childRunPath = await this.getPath(input);
+		const inputHash = await sha256(stableStringify(input));
 
-		const existingChildRunId = parentRunHandle.run.childWorkflowRuns[childRunPath]?.id;
-		if (existingChildRunId) {
-			const { run: existingChildRun } = await client.api.workflowRun.getByIdV1({ id: existingChildRunId });
+		const runPath = await this.getPath(inputHash);
+		const existingRunInfo = parentRunHandle.run.childWorkflowRuns[runPath];
+		if (existingRunInfo) {
+			const runReference = this.params.opts?.reference;
+			if (existingRunInfo.inputHash !== inputHash && runReference && runReference.onConflict !== "return_existing") {
+				parentRun.logger.error("Reference ID already used by another child workflow", {
+					"aiki.referenceId": runReference.id,
+					"aiki.existingChildWorkflowRunId": existingRunInfo.id,
+				});
+				throw new DuplicateReferenceIdError(runReference.id);
+			}
+
+			const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
 
 			const logger = parentRun.logger.child({
-				"aiki.childWorkflowId": existingChildRun.workflowId,
-				"aiki.childWorkflowVersionId": existingChildRun.workflowVersionId,
-				"aiki.childWorkflowRunId": existingChildRun.id,
+				"aiki.childWorkflowId": existingRun.workflowId,
+				"aiki.childWorkflowVersionId": existingRun.workflowVersionId,
+				"aiki.childWorkflowRunId": existingRun.id,
 			});
 
 			return childWorkflowRunHandle(
 				client,
-				childRunPath,
-				existingChildRun as WorkflowRun<Input, Output>,
+				runPath,
+				existingRun as WorkflowRun<Input, Output>,
 				parentRun,
 				logger,
 				this[INTERNAL].eventsDefinition
 			);
 		}
 
-		const { run: newChildRun } = await client.api.workflowRun.createV1({
+		const { run: newRun } = await client.api.workflowRun.createV1({
 			workflowId: this.id,
 			workflowVersionId: this.versionId,
 			input,
-			path: childRunPath,
+			path: runPath,
 			parentWorkflowRunId: parentRun.id,
-			options: {
-				...this.params.opts,
-				idempotencyKey: childRunPath,
-			},
+			options: this.params.opts,
 		});
-		parentRunHandle.run.childWorkflowRuns[childRunPath] = { id: newChildRun.id, statusWaitResults: [] };
+		parentRunHandle.run.childWorkflowRuns[runPath] = {
+			id: newRun.id,
+			inputHash,
+			statusWaitResults: [],
+		};
 
 		const logger = parentRun.logger.child({
-			"aiki.childWorkflowId": newChildRun.workflowId,
-			"aiki.childWorkflowVersionId": newChildRun.workflowVersionId,
-			"aiki.childWorkflowRunId": newChildRun.id,
+			"aiki.childWorkflowId": newRun.workflowId,
+			"aiki.childWorkflowVersionId": newRun.workflowVersionId,
+			"aiki.childWorkflowRunId": newRun.id,
 		});
 
 		return childWorkflowRunHandle(
 			client,
-			childRunPath,
-			newChildRun as WorkflowRun<Input, Output>,
+			runPath,
+			newRun as WorkflowRun<Input, Output>,
 			parentRun,
 			logger,
 			this[INTERNAL].eventsDefinition
@@ -349,13 +361,11 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		};
 	}
 
-	private async getPath(input: Input): Promise<WorkflowRunPath> {
-		const inputHash = await sha256(stableStringify(input));
+	private async getPath(inputHash: string): Promise<WorkflowRunPath> {
+		if (this.params.opts?.reference?.id) {
+			return `${this.id}/${this.versionId}/${this.params.opts.reference.id}` as WorkflowRunPath;
+		}
 
-		const path = this.params.opts?.idempotencyKey
-			? `${this.id}/${this.versionId}/${inputHash}/${this.params.opts.idempotencyKey}`
-			: `${this.id}/${this.versionId}/${inputHash}`;
-
-		return path as WorkflowRunPath;
+		return `${this.id}/${this.versionId}/${inputHash}` as WorkflowRunPath;
 	}
 }

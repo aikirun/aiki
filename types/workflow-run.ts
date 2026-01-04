@@ -35,9 +35,14 @@ export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status i
 	return false;
 }
 
+export interface WorkflowReferenceOptions {
+	id: string;
+	onConflict?: "error" | "return_existing";
+}
+
 export interface WorkflowOptions {
 	retry?: RetryStrategy;
-	idempotencyKey?: string;
+	reference?: WorkflowReferenceOptions;
 	trigger?: TriggerStrategy;
 	shardKey?: string;
 }
@@ -232,6 +237,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 
 export interface ChildWorkflowRun {
 	id: string;
+	inputHash: string;
 	statusWaitResults: ChildWorkflowWaitResult[];
 }
 
@@ -290,5 +296,12 @@ export class WorkflowRunFailedError extends Error {
 	) {
 		super(`Workflow ${id} failed after ${attempts} attempt(s)`);
 		this.name = "WorkflowRunFailedError";
+	}
+}
+
+export class DuplicateReferenceIdError extends Error {
+	constructor(public readonly referenceId: string) {
+		super(`Reference ID "${referenceId}" already used`);
+		this.name = "DuplicateReferenceIdError";
 	}
 }

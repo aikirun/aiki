@@ -4,6 +4,7 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { TriggerStrategy } from "@aikirun/types/trigger";
 import type {
 	WorkflowOptions,
+	WorkflowReferenceOptions,
 	WorkflowRun,
 	WorkflowRunState,
 	WorkflowRunStateAwaitingChildWorkflow,
@@ -112,8 +113,13 @@ export const retryStrategySchema: Zt<RetryStrategy> = z.discriminatedUnion("type
 	z.object({ type: z.literal("jittered"), maxAttempts: z.number(), baseDelayMs: z.number(), maxDelayMs: z.number() }),
 ]);
 
+const workflowReferenceOptionsSchema: Zt<WorkflowReferenceOptions> = z.object({
+	id: z.string(),
+	onConflict: z.union([z.literal("error"), z.literal("return_existing")]).optional(),
+});
+
 export const workflowOptionsSchema: Zt<WorkflowOptions> = z.object({
-	idempotencyKey: z.string().optional(),
+	reference: workflowReferenceOptionsSchema.optional(),
 	trigger: triggerStrategySchema.optional(),
 	shardKey: z.string().optional(),
 	retry: retryStrategySchema.optional(),
@@ -292,6 +298,7 @@ export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 		z.string(),
 		z.object({
 			id: z.string(),
+			inputHash: z.string(),
 			statusWaitResults: z.array(
 				z.union([
 					z.object({
