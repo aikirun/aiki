@@ -45,7 +45,7 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0.0", {
 
     // Sleeps for 24 hours without blocking workers or tying up resources.
     // If the server restarts during this time, workflow resumes exactly where it left off.
-    await run.sleep({ id: "onboarding-delay", days: 1 });
+    await run.sleep("onboarding-delay", { days: 1 });
 
     await sendUsageTips.start(run, {email: input.email});
     return { success: true, userId };

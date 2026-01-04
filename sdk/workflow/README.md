@@ -30,7 +30,7 @@ export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0.0", {
 		await markUserVerified.start(run, { email: input.email });
 
 		// Sleep for 24 hours before sending tips
-		await run.sleep({ id: "onboarding-delay", days: 1 });
+		await run.sleep("onboarding-delay", { days: 1 });
 
 		// Send usage tips
 		await sendUsageTips.start(run, { email: input.email });
@@ -64,9 +64,9 @@ const result = await createUserProfile.start(run, {
 
 ```typescript
 // Sleep requires a unique id for memoization
-await run.sleep({ id: "daily-delay", days: 1 });
-await run.sleep({ id: "processing-delay", hours: 2, minutes: 30 });
-await run.sleep({ id: "short-pause", seconds: 30 });
+await run.sleep("daily-delay", { days: 1 });
+await run.sleep("processing-delay", { hours: 2, minutes: 30 });
+await run.sleep("short-pause", { seconds: 30 });
 ```
 
 ### Sleep Cancellation
@@ -81,7 +81,7 @@ await handle.wake(); // Wakes the workflow if sleeping
 The sleep returns a result indicating whether it was cancelled:
 
 ```typescript
-const { cancelled } = await run.sleep({ id: "wait-period", hours: 1 });
+const { cancelled } = await run.sleep("wait-period", { hours: 1 });
 if (cancelled) {
   // Handle early wake-up
 }
@@ -210,7 +210,7 @@ Sleep parameters:
 - `id` (required): Unique identifier for memoization
 - Duration fields: `days`, `hours`, `minutes`, `seconds`, `milliseconds`
 
-Example: `run.sleep({ id: "my-sleep", days: 1, hours: 2 })`
+Example: `run.sleep("my-sleep", { days: 1, hours: 2 })`
 
 ## Error Handling
 
