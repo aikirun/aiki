@@ -31,7 +31,7 @@ import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams }
  *     await createUserProfile.start(run, { email: input.email });
  *
  *     // Durable sleep
- *     await run.sleep({ id: "onboarding-delay", days: 1 });
+ *     await run.sleep("onboarding-delay", { days: 1 });
  *
  *     // More tasks
  *     await sendUsageTips.start(run, { email: input.email });

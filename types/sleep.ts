@@ -1,5 +1,3 @@
-import type { DurationObject } from "./duration";
-
 export type SleepId = string & { _brand: "sleep_id" };
 
 export type SleepStatus = "sleeping" | "completed" | "cancelled";
@@ -29,8 +27,6 @@ export type SleepState = SleepStateSleeping | SleepStateCompleted | SleepStateCa
 export interface SleepQueue {
 	sleeps: SleepState[];
 }
-
-export type SleepParams = { id: string } & DurationObject;
 
 export interface SleepResult {
 	cancelled: boolean;

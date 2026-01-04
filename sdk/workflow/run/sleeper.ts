@@ -1,6 +1,6 @@
-import { toMilliseconds } from "@aikirun/lib";
+import { type Duration, toMilliseconds } from "@aikirun/lib";
 import type { Logger } from "@aikirun/types/client";
-import type { SleepId, SleepParams, SleepResult } from "@aikirun/types/sleep";
+import type { SleepId, SleepResult } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 
@@ -12,10 +12,9 @@ const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1000;
 export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknown>, logger: Logger) {
 	const nextSleepIndexById: Record<SleepId, number> = {};
 
-	return async (params: SleepParams): Promise<SleepResult> => {
-		const { id, ...durationFields } = params;
+	return async (id: string, duration: Duration): Promise<SleepResult> => {
 		const sleepId = id as SleepId;
-		let durationMs = toMilliseconds(durationFields);
+		let durationMs = toMilliseconds(duration);
 
 		if (durationMs > MAX_SLEEP_MS) {
 			throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years`);

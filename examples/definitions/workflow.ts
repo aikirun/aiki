@@ -17,7 +17,7 @@ export const morningRoutineV2 = morningRoutine.v("2.0", {
 
 		run.logger.info("I need to sleep some more");
 
-		await run.sleep({ id: "snooze", seconds: 30 });
+		await run.sleep("snooze", { seconds: 30 });
 
 		const { muscles } = await stretch.start(run, { duration: input.foo });
 
