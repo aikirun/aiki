@@ -374,7 +374,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				: null;
 
 			await workflowVersion[INTERNAL].handler(
-				workflowRun.input,
 				{
 					id: workflowRun.id as WorkflowRunId,
 					workflowId: workflowRun.workflowId as WorkflowId,
@@ -385,6 +384,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					events: createEventWaiters(handle, eventsDefinition, logger),
 					[INTERNAL]: { handle, options: { spinThresholdMs } },
 				},
+				workflowRun.input,
 				appContext
 			);
 

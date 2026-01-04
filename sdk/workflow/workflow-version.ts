@@ -26,8 +26,8 @@ import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handl
 
 export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
 	handler: (
-		input: Input,
 		run: Readonly<WorkflowRunContext<Input, AppContext, TEventsDefinition>>,
+		input: Input,
 		context: AppContext
 	) => Promise<Output>;
 	events?: TEventsDefinition;
@@ -75,8 +75,8 @@ export interface WorkflowVersion<
 	[INTERNAL]: {
 		eventsDefinition: TEventsDefinition;
 		handler: (
-			input: Input,
 			run: WorkflowRunContext<Input, AppContext, TEventsDefinition>,
+			input: Input,
 			context: AppContext
 		) => Promise<void>;
 	};
@@ -209,8 +209,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	}
 
 	private async handler(
-		input: Input,
 		run: WorkflowRunContext<Input, AppContext, TEventsDefinition>,
+		input: Input,
 		context: AppContext
 	): Promise<void> {
 		const { logger } = run;
@@ -241,7 +241,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	): Promise<Output> {
 		while (true) {
 			try {
-				return await this.params.handler(input, run, context);
+				return await this.params.handler(run, input, context);
 			} catch (error) {
 				if (error instanceof WorkflowRunSuspendedError || error instanceof WorkflowRunFailedError) {
 					throw error;

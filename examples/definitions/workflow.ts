@@ -5,14 +5,14 @@ import { makeCoffee, stretch } from "./task";
 export const morningRoutine = workflow({ id: "morning-routine" });
 
 export const morningRoutineV1 = morningRoutine.v("1.0.0", {
-	async handler(input: { sugar: boolean }, run) {
+	async handler(run, input: { sugar: boolean }) {
 		await makeCoffee.start(run, { withSugar: input.sugar, withCream: false });
 		return { coffee: "Here's your coffee" };
 	},
 });
 
 export const morningRoutineV2 = morningRoutine.v("2.0.0", {
-	async handler(input: { foo: number }, run) {
+	async handler(run, input: { foo: number }) {
 		const { data: eventData } = await run.events.alarm.wait();
 
 		run.logger.info("I need to sleep some more");

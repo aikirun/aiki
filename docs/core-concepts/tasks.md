@@ -46,7 +46,7 @@ Tasks are executed within workflows using `.start()`:
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(input: { orderData: any }, run) {
+	async handler(run, input: { orderData: any }) {
 		const validation = await validateOrder.start(run, {
 			orderData: input.orderData,
 		});

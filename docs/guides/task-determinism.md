@@ -153,7 +153,7 @@ const orderWorkflow = workflow({
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(input: { orderId: string; amount: number }, run) {
+	async handler(run, input: { orderId: string; amount: number }) {
 		// If this workflow crashes after validateOrder completes,
 		// it will resume here with the same result
 		const validation = await validateOrder.start(run, input);

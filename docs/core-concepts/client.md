@@ -141,7 +141,7 @@ const sendEmail = task({
 const onboardingWorkflow = workflow({ id: "user-onboarding" });
 
 const onboardingV1 = onboardingWorkflow.v("1.0.0", {
-	async handler(input: { email: string }, run) {
+	async handler(run, input: { email: string }) {
 		await sendEmail.start(run, { email: input.email });
 		return { success: true };
 	},

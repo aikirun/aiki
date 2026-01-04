@@ -19,7 +19,7 @@ import { markUserVerified, sendVerificationEmail } from "./tasks.ts";
 export const onboardingWorkflow = workflow({ id: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0.0", {
-	async handler(input: { email: string }, run) {
+	async handler(run, input: { email: string }) {
 		run.logger.info("Starting onboarding", { email: input.email });
 
 		// Execute a task to send verification email

@@ -20,7 +20,7 @@ const orderWorkflow = workflow({
 
 // Step 2: Create a version
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(input: { orderId: string; amount: number }, run) {
+	async handler(run, input: { orderId: string; amount: number }) {
 		// Your workflow logic here
 		const validation = await validateOrder.start(run, input);
 		const payment = await processPayment.start(run, {
@@ -60,7 +60,7 @@ handling errors with custom recovery strategies.
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(input: { orderData: any }, run) {
+	async handler(run, input: { orderData: any }) {
 		// Validate order
 		const validation = await validateOrder.start(run, {
 			orderData: input.orderData,
@@ -103,7 +103,7 @@ const userOnboardingWorkflow = workflow({
 
 // Version 1.0.0: Simple onboarding
 const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
-	async handler(input: { userId: string }, run) {
+	async handler(run, input: { userId: string }) {
 		await sendWelcomeEmail.start(run, {
 			userId: input.userId,
 		});
@@ -112,7 +112,7 @@ const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
 
 // Version 2.0.0: Add profile creation
 const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
-	async handler(input: { userId: string }, run) {
+	async handler(run, input: { userId: string }) {
 		await sendWelcomeEmail.start(run, {
 			userId: input.userId,
 		});

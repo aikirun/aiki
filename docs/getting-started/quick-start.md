@@ -32,7 +32,7 @@ const greet = task({
 const helloWorkflow = workflow({ id: "hello" });
 
 const helloV1 = helloWorkflow.v("1.0.0", {
-	async handler(input: { name: string }, run) {
+	async handler(run, input: { name: string }) {
 		const result = await greet.start(run, { name: input.name });
 		return { success: true, greeting: result };
 	},

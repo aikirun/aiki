@@ -86,11 +86,11 @@ const orderWorkflow = workflow({
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(input: {
+	async handler(run, input: {
 		items: Array<{ id: string; quantity: number }>;
 		total: number;
 		email: string;
-	}, run) {
+	}) {
 		// Step 1: Validate order
 		const validation = await validateOrder.start(run, {
 			items: input.items,
@@ -232,11 +232,11 @@ const sendConfirmation = task({
 const orderWorkflow = workflow({ id: "order-processing" });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(input: {
+	async handler(run, input: {
 		items: Array<{ id: string; quantity: number }>;
 		total: number;
 		email: string;
-	}, run) {
+	}) {
 		const validation = await validateOrder.start(run, {
 			items: input.items,
 			total: input.total,

@@ -50,7 +50,7 @@ import { workflow } from "@aikirun/workflow";
 export const morningWorkflow = workflow({ id: "morning-routine" });
 
 export const morningWorkflowV1 = morningWorkflow.v("1.0.0", {
-	async handler(input, run) {
+	async handler(run, input) {
 		const result = await ringAlarm.start(run, { song: "alarm.mp3" });
 		console.log("Task completed:", result);
 	},
@@ -138,7 +138,7 @@ export const processPayment = task({
 });
 
 export const paymentWorkflowV1 = paymentWorkflow.v("1.0.0", {
-	async handler(input, run) {
+	async handler(run, input) {
 		run.logger.info("Processing payment", { amount: input.amount });
 		const result = await processPayment.start(run, { amount: input.amount });
 		run.logger.info("Payment complete", result);
