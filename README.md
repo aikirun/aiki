@@ -90,7 +90,7 @@ await onboardingWorkflowV1.start(aikiClient, { email: "newuser@example.com" });
 import { task } from "@aikirun/task";
 
 export const createUserProfile = task({
-  id: "create-profile",
+  name: "create-profile",
   async handler(input: { email: string }) {
     const id = db.users.create({ email: input.email });
     return { userId: id};
@@ -98,7 +98,7 @@ export const createUserProfile = task({
 });
 
 export const sendWelcomeEmail = task({
-  id: "send-welcome",
+  name: "send-welcome",
   async handler(input: { email: string }) {
     return emailService.sendWelcome(input.email);
   },
@@ -115,7 +115,7 @@ export const sendWelcomeEmail = task({
 });
 
 export const sendUsageTips = task({
-  id: "send-usage-tips",
+  name: "send-usage-tips",
   async handler(input: { email: string }) {
     return emailService.sendFeatures(input.email, {
       features: ["Advanced analytics"]

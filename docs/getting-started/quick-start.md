@@ -22,7 +22,7 @@ import { workflow } from "@aikirun/workflow";
 
 // 1. Define a task (unit of work)
 const greet = task({
-	id: "greet",
+	name: "greet",
 	async handler(input: { name: string }) {
 		console.log(`👋 Hello, ${input.name}!`);
 		return { greeted: true, name: input.name };

@@ -397,7 +397,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 	if (request.type === "new") {
 		const inputHash = await sha256(stableStringify(request.input));
 		const taskPath = (
-			request.reference ? `${request.taskId}/${request.reference.id}` : `${request.taskId}/${inputHash}`
+			request.reference ? `${request.taskName}/${request.reference.id}` : `${request.taskName}/${inputHash}`
 		) as TaskPath;
 
 		const existingTaskInfo = run.tasks[taskPath];

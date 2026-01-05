@@ -172,7 +172,7 @@ export interface WorkflowRunTransitionTaskStateResponseV1 {
 export interface WorkflowRunSetTaskStateRequestNew {
 	type: "new";
 	id: string;
-	taskId: string;
+	taskName: string;
 	input: unknown;
 	reference?: { id: string };
 	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;

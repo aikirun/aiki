@@ -1,6 +1,6 @@
 import type { SerializableError } from "./serializable";
 
-export type TaskId = string & { _brand: "task_id" };
+export type TaskName = string & { _brand: "task_name" };
 
 export type TaskPath = string & { _brand: "task_path" };
 

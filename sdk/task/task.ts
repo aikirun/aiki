@@ -10,7 +10,7 @@ import type { Logger } from "@aikirun/types/client";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { TaskInfo, TaskPath, TaskStateAwaitingRetry, TaskStateRunning } from "@aikirun/types/task";
-import { TaskFailedError, type TaskId } from "@aikirun/types/task";
+import { TaskFailedError, type TaskName } from "@aikirun/types/task";
 import { WorkflowRunFailedError, type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
 import type { EventsDefinition } from "sdk/workflow/run/event";
@@ -25,7 +25,7 @@ import type { EventsDefinition } from "sdk/workflow/run/event";
  * @template Input - Type of task input (must be JSON serializable)
  * @template Output - Type of task output (must be JSON serializable)
  * @param params - Task configuration
- * @param params.id - Unique task id used for execution tracking
+ * @param params.name - Unique task name used for execution tracking
  * @param params.handler - Async function that executes the task logic
  * @returns Task instance with retry and option configuration methods
  *
@@ -33,7 +33,7 @@ import type { EventsDefinition } from "sdk/workflow/run/event";
  * ```typescript
  * // Simple task without retry
  * export const sendEmail = task({
- *   id: "send-email",
+ *   name: "send-email",
  *   handler(input: { email: string; message: string }) {
  *     return emailService.send(input.email, input.message);
  *   },
@@ -41,7 +41,7 @@ import type { EventsDefinition } from "sdk/workflow/run/event";
  *
  * // Task with retry configuration
  * export const chargeCard = task({
- *   id: "charge-card",
+ *   name: "charge-card",
  *   handler(input: { cardId: string; amount: number }) {
  *     return paymentService.charge(input.cardId, input.amount);
  *   },
@@ -65,7 +65,7 @@ export function task<Input extends Serializable, Output extends Serializable>(
 }
 
 export interface TaskParams<Input, Output> {
-	id: string;
+	name: string;
 	handler: (input: Input) => Promise<Output>;
 	opts?: TaskOptions;
 }
@@ -89,7 +89,7 @@ export interface TaskBuilder<Input, Output> {
 }
 
 export interface Task<Input, Output> {
-	id: TaskId;
+	name: TaskName;
 	with(): TaskBuilder<Input, Output>;
 	start: (
 		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
@@ -98,10 +98,10 @@ export interface Task<Input, Output> {
 }
 
 class TaskImpl<Input, Output> implements Task<Input, Output> {
-	public readonly id: TaskId;
+	public readonly name: TaskName;
 
 	constructor(private readonly params: TaskParams<Input, Output>) {
-		this.id = params.id as TaskId;
+		this.name = params.name as TaskName;
 	}
 
 	public with(): TaskBuilder<Input, Output> {
@@ -283,7 +283,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async getPath(inputHash: string, reference: TaskReferenceOptions | undefined): Promise<TaskPath> {
-		const path = reference ? `${this.id}/${reference.id}` : `${this.id}/${inputHash}`;
+		const path = reference ? `${this.name}/${reference.id}` : `${this.name}/${inputHash}`;
 		return path as TaskPath;
 	}
 }

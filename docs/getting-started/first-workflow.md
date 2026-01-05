@@ -16,7 +16,7 @@ Each step is a separate task for independent retry and monitoring:
 import { task } from "@aikirun/task";
 
 const validateOrder = task({
-	id: "validate-order",
+	name: "validate-order",
 	handler(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
 		const { items, total } = input;
 
@@ -34,7 +34,7 @@ const validateOrder = task({
 });
 
 const processPayment = task({
-	id: "process-payment",
+	name: "process-payment",
 	handler(input: { orderId: string; amount: number }) {
 		const { orderId, amount } = input;
 
@@ -49,7 +49,7 @@ const processPayment = task({
 });
 
 const updateInventory = task({
-	id: "update-inventory",
+	name: "update-inventory",
 	handler(input: { items: Array<{ id: string; quantity: number }> }) {
 		const { items } = input;
 
@@ -63,7 +63,7 @@ const updateInventory = task({
 });
 
 const sendConfirmation = task({
-	id: "send-confirmation",
+	name: "send-confirmation",
 	handler(input: { email: string; orderId: string }) {
 		const { email, orderId } = input;
 
@@ -186,7 +186,7 @@ import { workflow } from "@aikirun/workflow";
 
 // Define tasks
 const validateOrder = task({
-	id: "validate-order",
+	name: "validate-order",
 	handler(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
 		if (input.items.length === 0) {
 			throw new Error("Order must have items");
@@ -200,7 +200,7 @@ const validateOrder = task({
 });
 
 const processPayment = task({
-	id: "process-payment",
+	name: "process-payment",
 	handler(input: { orderId: string; amount: number }) {
 		console.log(`Processing payment: $${input.amount}`);
 		return {
@@ -211,7 +211,7 @@ const processPayment = task({
 });
 
 const updateInventory = task({
-	id: "update-inventory",
+	name: "update-inventory",
 	handler(input: { items: Array<{ id: string; quantity: number }> }) {
 		input.items.forEach((item) => {
 			console.log(`Updating inventory for ${item.id}`);
@@ -221,7 +221,7 @@ const updateInventory = task({
 });
 
 const sendConfirmation = task({
-	id: "send-confirmation",
+	name: "send-confirmation",
 	handler(input: { email: string; orderId: string }) {
 		console.log(`Sending confirmation to ${input.email}`);
 		return { sent: true };

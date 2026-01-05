@@ -131,7 +131,7 @@ import { workflow } from "@aikirun/workflow";
 
 // Define task and workflow
 const sendEmail = task({
-	id: "send-email",
+	name: "send-email",
 	handler(input: { email: string }) {
 		console.log(`Sending email to ${input.email}`);
 		return { sent: true };

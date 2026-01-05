@@ -419,7 +419,7 @@ export const workflowRunSetTaskStateRequestSchema: Zt<WorkflowRunSetTaskStateReq
 	z.object({
 		type: z.literal("new"),
 		id: z.string().min(1),
-		taskId: z.string().min(1),
+		taskName: z.string().min(1),
 		input: z.unknown(),
 		reference: z.object({ id: z.string().min(1) }).optional(),
 		state: taskStateOutputSchema,
