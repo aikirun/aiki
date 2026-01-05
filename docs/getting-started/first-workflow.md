@@ -298,6 +298,6 @@ from failed workers, ensuring your processes complete even when individual worke
 ## Next Steps
 
 - **[Task Determinism](../guides/task-determinism.md)** - Learn why tasks should be deterministic
-- **[Idempotency](../guides/idempotency.md)** - Understand idempotency keys
+- **[Reference IDs](../guides/reference-ids.md)** - Understand reference IDs
 - **[Error Handling](../guides/error-handling.md)** - Handle failures gracefully
 - **[Workflows](../core-concepts/workflows.md)** - Deep dive into workflow concepts

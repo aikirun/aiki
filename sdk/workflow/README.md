@@ -133,15 +133,18 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0.0", {
 });
 ```
 
-### Idempotency Key
+### Reference ID
 
 ```typescript
-export const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	// ... workflow definition
-	opts: {
-		idempotencyKey: "order-${orderId}",
-	},
-});
+// Assign a reference ID for tracking and lookup
+const handle = await orderWorkflowV1
+	.with().opt("reference.id", `order-${orderId}`)
+	.start(client, { orderId });
+
+// Configure conflict handling: "error" (default) or "return_existing"
+const handle = await orderWorkflowV1
+	.with().opt("reference", { id: `order-${orderId}`, onConflict: "return_existing" })
+	.start(client, { orderId });
 ```
 
 ## Running Workflows
@@ -199,7 +202,7 @@ interface WorkflowRunContext<Input, Output> {
 	id: WorkflowRunId; // Unique run ID
 	name: WorkflowName; // Workflow name
 	versionId: WorkflowVersionId; // Version ID
-	options: WorkflowOptions; // Execution options (trigger, retry, idempotencyKey)
+	options: WorkflowOptions; // Execution options (trigger, retry, reference)
 	handle: WorkflowRunHandle<Input, Output>; // Advanced state management
 	logger: Logger; // Logging (info, debug, warn, error, trace)
 	sleep(params: SleepParams): Promise<SleepResult>; // Durable sleep

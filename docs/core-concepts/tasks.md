@@ -126,7 +126,7 @@ await sendEmail.start(run, {
 To force re-execution, use the `with()` builder:
 
 ```typescript
-await sendEmail.with().opt("idempotencyKey", "second-email").start(run, {
+await sendEmail.with().opt("reference.id", "second-email").start(run, {
 	email: "user@example.com",
 	message: "Hello",
 });
@@ -189,4 +189,4 @@ const updateInventory = task({
 
 - **[Workflows](./workflows.md)** - Learn about workflow orchestration
 - **[Task Determinism](../guides/task-determinism.md)** - Why tasks should be deterministic
-- **[Idempotency](../guides/idempotency.md)** - Understand automatic idempotency
+- **[Reference IDs](../guides/reference-ids.md)** - Custom identifiers for workflows and tasks

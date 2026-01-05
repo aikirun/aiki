@@ -61,7 +61,7 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0.0", {
 
 - **Idempotent Execution** - Tasks can be safely retried without unintended side effects
 - **Automatic Retries** - Multiple retry strategies (fixed, exponential, jittered)
-- **Idempotency Keys** - Deduplicate task executions with custom keys
+- **Reference IDs** - Custom identifiers for tracking and deduplication
 - **Error Handling** - Structured error information with recovery strategies
 - **State Tracking** - Task execution state persists across failures
 - **Type Safety** - Full TypeScript support with input/output types
@@ -70,8 +70,8 @@ export const morningWorkflowV1 = morningWorkflow.v("1.0.0", {
 
 ```typescript
 interface TaskOptions {
-	retry?: RetryStrategy; // Retry strategy
-	idempotencyKey?: string; // For deduplication
+	retry?: RetryStrategy;
+	reference?: { id: string; onConflict?: "error" | "return_existing" };
 }
 ```
 
@@ -149,7 +149,7 @@ export const paymentWorkflowV1 = paymentWorkflow.v("1.0.0", {
 ## Best Practices
 
 1. **Make Tasks Idempotent** - Tasks may be retried, so re-running should not cause unintended side effects
-2. **Use Idempotency Keys** - Use custom keys to prevent duplicate processing
+2. **Use Reference IDs** - Use custom reference IDs to prevent duplicate processing
 3. **Use Meaningful Errors** - Help diagnose failures
 4. **Log Information** - Use `run.logger` for debugging
 5. **Keep Tasks Focused** - One responsibility per task

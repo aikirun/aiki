@@ -64,7 +64,9 @@ heartbeats, and audit logs. PostgreSQL is recommended, though MySQL and other re
 POST /workflows/:name/versions/:version/start
 {
   "payload": {...},
-  "idempotencyKey": "optional-key"
+  "options": {
+    "reference": { "id": "optional-reference-id" }
+  }
 }
 
 // Get workflow run status

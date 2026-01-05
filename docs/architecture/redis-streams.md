@@ -159,7 +159,7 @@ const claimResults = await Promise.allSettled(
 		"orderId": "order-456",
 		"amount": 99.99
 	},
-	"idempotencyKey": "order-456-process",
+	"referenceId": "order-456-process",
 	"createdAt": 1234567890
 }
 ```
@@ -214,11 +214,11 @@ for (const msg of stuckMessages) {
 }
 ```
 
-### Idempotency
+### Reference IDs
 
-Messages may be processed multiple times if a worker crashes after processing but before acknowledging. When this
-happens, the message is claimed and re-processed by another worker. Idempotency keys prevent duplicate execution in
-these scenarios.
+Reference IDs are custom identifiers assigned to workflows. They enable lookup by reference ID and prevent
+duplicate execution. If a worker crashes after processing but before acknowledging, the message is claimed and
+re-processed by another worker. Reference IDs ensure the workflow isn't executed twice in these scenarios.
 
 ## Performance Optimizations
 
@@ -341,7 +341,7 @@ const groups = await redis.xinfo("GROUPS", streamName);
 
 1. **Set Appropriate Claim Times** - Balance recovery speed vs duplicate work
 2. **Monitor Pending Messages** - Track stuck messages
-3. **Use Idempotency Keys** - Prevent duplicate execution
+3. **Use Reference IDs** - Prevent duplicate execution
 4. **Configure Persistence** - Enable AOF/RDB for Redis
 5. **Tune Batch Sizes** - Balance throughput and latency
 6. **Parallel Processing** - Process multiple streams concurrently

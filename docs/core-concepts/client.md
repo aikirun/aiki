@@ -48,16 +48,15 @@ redis: {
 Use the workflow version's `.start()` method:
 
 ```typescript
-const handle = await workflowVersion.start(aikiClient, {
-	payload: {
+const handle = await workflowVersion
+	.with().opt("reference.id", "user-123-onboarding") // Optional
+	.start(aikiClient, {
 		userId: "123",
 		email: "user@example.com",
-	},
-	idempotencyKey: "user-123-onboarding", // Optional
-});
+	});
 ```
 
-The `payload` parameter contains the input data for your workflow, while the optional `idempotencyKey` prevents
+The input parameter contains the data for your workflow. The optional `reference` option with an `id` prevents
 duplicate executions. The method returns a result handle that you can use for monitoring and retrieving results.
 
 ### Monitoring Workflow Runs
@@ -92,24 +91,25 @@ Cancel a running workflow:
 await handle.cancel();
 ```
 
-## Idempotency
+## Reference IDs
 
-Prevent duplicate workflow executions using idempotency keys:
+Assign custom identifiers to workflows for tracking and lookup:
 
 ```typescript
-// First call - starts the workflow
-const result1 = await workflowVersion.start(aikiClient, {
-	payload: { orderId: "order-123" },
-	idempotencyKey: "order-123-process",
-});
+// Start a workflow with a reference ID
+const result1 = await workflowVersion
+	.with().opt("reference.id", "order-123")
+	.start(aikiClient, { orderId: "order-123" });
 
-// Second call with same key - returns existing workflow run
-const result2 = await workflowVersion.start(aikiClient, {
-	payload: { orderId: "order-123" },
-	idempotencyKey: "order-123-process",
-});
+// You can look up the workflow using "order-123" later
+// If you try to start another workflow with the same reference ID,
+// Aiki throws an error by default to prevent duplicates
 
-// result1.id === result2.id (same workflow run)
+// Use onConflict: "return_existing" to return the existing run instead
+const result2 = await workflowVersion
+	.with().opt("reference", { id: "order-123", onConflict: "return_existing" })
+	.start(aikiClient, { orderId: "order-123" });
+// result2.id === result1.id (same workflow run)
 ```
 
 ## Closing the Client
@@ -153,9 +153,9 @@ const aikiClient = await client({
 	redis: { host: "localhost", port: 6379 },
 });
 
-// Start workflow with idempotency key
+// Start workflow with reference ID
 const result = await onboardingV1
-	.with().opt("idempotencyKey", "user-onboarding-123")
+	.with().opt("reference.id", "user-onboarding-123")
 	.start(aikiClient, { email: "user@example.com" });
 
 // Monitor progress
@@ -210,7 +210,7 @@ See the [Client API Reference](../api/client.md) for complete API documentation.
 ## Best Practices
 
 1. **Reuse clients** - Create one client and reuse it across your application
-2. **Use idempotency keys** - Prevent duplicate workflow executions
+2. **Use reference IDs** - Prevent duplicate workflow executions
 3. **Close clients** - Always close clients to release resources
 4. **Set timeouts** - Use timeouts when waiting for completion
 
@@ -219,4 +219,4 @@ See the [Client API Reference](../api/client.md) for complete API documentation.
 - **[Workflows](./workflows.md)** - Learn about workflow definition
 - **[Tasks](./tasks.md)** - Understand task execution
 - **[Client API Reference](../api/client.md)** - Complete API documentation
-- **[Idempotency](../guides/idempotency.md)** - Deep dive into idempotency keys
+- **[Reference IDs](../guides/reference-ids.md)** - Deep dive into reference IDs

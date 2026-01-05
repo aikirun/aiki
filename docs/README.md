@@ -23,7 +23,7 @@ Understand the building blocks:
 
 Best practices and patterns:
 
-- **[Idempotency](./guides/idempotency.md)** - Why and how to write idempotent tasks
+- **[Reference IDs](./guides/reference-ids.md)** - Custom identifiers for workflows and tasks
 - **[Error Handling](./guides/error-handling.md)** - Handle failures gracefully
 
 ## 🏗️ Architecture
