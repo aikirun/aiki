@@ -1,4 +1,5 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
+import { getWorkflowStreamName } from "@aikirun/lib/path";
 import type { WorkflowRun } from "@aikirun/types/workflow-run";
 import type { Redis } from "ioredis";
 import type { ServerContext } from "server/middleware/context";
@@ -16,10 +17,7 @@ export async function publishWorkflowReadyBatch(
 		const pipeline = redis.pipeline();
 
 		for (const run of runs) {
-			const streamName = run.options.shard
-				? `workflow/${run.name}/${run.versionId}/${run.options.shard}`
-				: `workflow/${run.name}/${run.versionId}`;
-
+			const streamName = getWorkflowStreamName(run.name, run.versionId, run.options.shard);
 			pipeline.xadd(streamName, "*", "type", "workflow_run_ready", "workflowRunId", run.id);
 		}
 

@@ -3,6 +3,7 @@ import { sha256 } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
+import { getWorkflowRunPath } from "@aikirun/lib/path";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -15,7 +16,6 @@ import {
 	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
-	type WorkflowRunPath,
 	type WorkflowRunStateFailed,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
@@ -155,7 +155,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		const inputHash = await sha256(stableStringify(input));
 
 		const reference = this.params.opts?.reference;
-		const path = await this.getPath(inputHash, reference);
+		const path = getWorkflowRunPath(this.name, this.versionId, reference?.id ?? inputHash);
 		const existingRunInfo = parentRunHandle.run.childWorkflowRuns[path];
 		if (existingRunInfo) {
 			await this.assertUniqueChildRunReferenceId(
@@ -386,12 +386,5 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			nextAttemptInMs,
 			error: createSerializableError(error),
 		};
-	}
-
-	private async getPath(inputHash: string, reference: WorkflowReferenceOptions | undefined): Promise<WorkflowRunPath> {
-		const path = reference
-			? `${this.name}/${this.versionId}/${reference.id}`
-			: `${this.name}/${this.versionId}/${inputHash}`;
-		return path as WorkflowRunPath;
 	}
 }

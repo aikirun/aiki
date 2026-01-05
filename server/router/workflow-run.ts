@@ -3,6 +3,7 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import { sha256 } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { stableStringify } from "@aikirun/lib/json";
+import { getTaskPath } from "@aikirun/lib/path";
 import type { TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
@@ -394,9 +395,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 
 	if (request.type === "new") {
 		const inputHash = await sha256(stableStringify(request.input));
-		const taskPath = (
-			request.reference ? `${request.taskName}/${request.reference.id}` : `${request.taskName}/${inputHash}`
-		) as TaskPath;
+		const taskPath = getTaskPath(request.taskName, request.reference?.id ?? inputHash);
 
 		const existingTaskInfo = run.tasks[taskPath];
 		if (existingTaskInfo) {

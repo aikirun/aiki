@@ -4,6 +4,7 @@ import { sha256 } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
+import { getTaskPath } from "@aikirun/lib/path";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
@@ -126,7 +127,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const inputHash = await sha256(stableStringify(input));
 
 		const reference = this.params.opts?.reference;
-		const path = await this.getPath(inputHash, reference);
+		const path = getTaskPath(this.name, reference?.id ?? inputHash);
 		const existingTaskInfo = handle.run.tasks[path];
 		if (existingTaskInfo) {
 			await this.assertUniqueTaskReferenceId(handle, existingTaskInfo, inputHash, reference, path, run.logger);
@@ -280,10 +281,5 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			});
 			throw new TaskFailedError(path, attempts, "Task retry not allowed");
 		}
-	}
-
-	private async getPath(inputHash: string, reference: TaskReferenceOptions | undefined): Promise<TaskPath> {
-		const path = reference ? `${this.name}/${reference.id}` : `${this.name}/${inputHash}`;
-		return path as TaskPath;
 	}
 }

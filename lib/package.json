@@ -33,6 +33,10 @@
 			"types": "./dist/object/index.d.ts",
 			"import": "./dist/object/index.js"
 		},
+		"./path": {
+			"types": "./dist/path/index.d.ts",
+			"import": "./dist/path/index.js"
+		},
 		"./polling": {
 			"types": "./dist/polling/index.d.ts",
 			"import": "./dist/polling/index.js"

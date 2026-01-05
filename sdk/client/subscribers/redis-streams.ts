@@ -1,4 +1,5 @@
 import { distributeRoundRobin, groupBy, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aikirun/lib/array";
+import { getWorkerConsumerGroupName, getWorkflowStreamName } from "@aikirun/lib/path";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type {
 	Client,
@@ -204,8 +205,8 @@ function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shards?: stri
 	if (!shards || !isNonEmptyArray(shards)) {
 		return new Map(
 			workflows.map((workflow) => [
-				`workflow/${workflow.name}/${workflow.versionId}`,
-				`worker/${workflow.name}/${workflow.versionId}`,
+				getWorkflowStreamName(workflow.name, workflow.versionId),
+				getWorkerConsumerGroupName(workflow.name, workflow.versionId),
 			])
 		);
 	}
@@ -213,8 +214,8 @@ function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shards?: stri
 	return new Map(
 		workflows.flatMap((workflow) =>
 			shards.map((shard) => [
-				`workflow/${workflow.name}/${workflow.versionId}/${shard}`,
-				`worker/${workflow.name}/${workflow.versionId}/${shard}`,
+				getWorkflowStreamName(workflow.name, workflow.versionId, shard),
+				getWorkerConsumerGroupName(workflow.name, workflow.versionId, shard),
 			])
 		)
 	);

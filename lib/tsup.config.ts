@@ -9,6 +9,7 @@ export default defineConfig({
 		"error/index": "error/index.ts",
 		"json/index": "json/index.ts",
 		"object/index": "object/index.ts",
+		"path/index": "path/index.ts",
 		"polling/index": "polling/index.ts",
 		"retry/index": "retry/index.ts",
 		"testing/expect/index": "testing/expect/index.ts",
