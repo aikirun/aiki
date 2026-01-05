@@ -1,4 +1,4 @@
-import type { Serializable } from "@aikirun/lib";
+import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
 

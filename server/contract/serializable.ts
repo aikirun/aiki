@@ -1,4 +1,4 @@
-import type { SerializableError } from "@aikirun/lib/error";
+import type { SerializableError } from "@aikirun/types/serializable";
 import { z } from "zod";
 
 import type { Zt } from "./helpers/schema";

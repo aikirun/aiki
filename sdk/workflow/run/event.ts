@@ -1,7 +1,7 @@
 import { createSerializableError, toMilliseconds } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
-import type { Serializable } from "@aikirun/types/error";
 import type { EventId, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
+import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
 	type WorkflowRun,

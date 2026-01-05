@@ -1,6 +1,6 @@
-import type { SerializableError } from "./error";
 import type { EventQueue } from "./event";
 import type { RetryStrategy } from "./retry";
+import type { SerializableError } from "./serializable";
 import type { SleepQueue } from "./sleep";
 import type { TaskInfo, TaskState } from "./task";
 import type { TriggerStrategy } from "./trigger";

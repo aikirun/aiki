@@ -4,9 +4,9 @@ export default defineConfig({
 	entry: {
 		client: "client.ts",
 		duration: "duration.ts",
-		error: "error.ts",
 		event: "event.ts",
 		retry: "retry.ts",
+		serializable: "serializable.ts",
 		sleep: "sleep.ts",
 		symbols: "symbols.ts",
 		task: "task.ts",

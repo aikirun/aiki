@@ -12,10 +12,6 @@
 			"types": "./dist/duration.d.ts",
 			"import": "./dist/duration.js"
 		},
-		"./error": {
-			"types": "./dist/error.d.ts",
-			"import": "./dist/error.js"
-		},
 		"./event": {
 			"types": "./dist/event.d.ts",
 			"import": "./dist/event.js"
@@ -23,6 +19,10 @@
 		"./retry": {
 			"types": "./dist/retry.d.ts",
 			"import": "./dist/retry.js"
+		},
+		"./serializable": {
+			"types": "./dist/serializable.d.ts",
+			"import": "./dist/serializable.js"
 		},
 		"./sleep": {
 			"types": "./dist/sleep.d.ts",

@@ -1,4 +1,4 @@
-import type { SerializableError } from "./error";
+import type { SerializableError } from "./serializable";
 
 export type TaskId = string & { _brand: "task_id" };
 

@@ -1,12 +1,13 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
 import { sha256 } from "@aikirun/lib/crypto";
-import { createSerializableError, type Serializable } from "@aikirun/lib/error";
+import { createSerializableError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
+import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { TaskInfo, TaskPath, TaskStateAwaitingRetry, TaskStateRunning } from "@aikirun/types/task";
 import { TaskFailedError, type TaskId } from "@aikirun/types/task";
