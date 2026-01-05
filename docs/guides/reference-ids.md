@@ -79,17 +79,20 @@ When sending events to a workflow, you can provide a reference ID to prevent dup
 
 ```typescript
 // Send an event with a reference ID
-await handle.events.approved.send(
-  { by: "manager@example.com" },
-  { reference: { id: "approval-123" } }
-);
+await handle.events.approved
+  .with()
+  .opt("reference.id", "approval-123")
+  .send({ by: "manager@example.com" });
 
 // If the same event is sent again with the same reference ID,
 // it will be silently ignored (no error, no duplicate)
-await handle.events.approved.send(
-  { by: "manager@example.com" },
-  { reference: { id: "approval-123" } }
-); // Ignored - duplicate
+await handle.events.approved
+  .with()
+  .opt("reference.id", "approval-123")
+  .send({ by: "manager@example.com" }); // Ignored - duplicate
+
+// Without options, use send directly
+await handle.events.approved.send({ by: "manager@example.com" });
 ```
 
 Unlike workflows and tasks, events use **silent deduplication** - duplicate events are simply ignored rather than throwing an error. This follows industry practice for event-driven systems where at-least-once delivery is common.
