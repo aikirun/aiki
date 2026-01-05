@@ -77,14 +77,6 @@ export interface TaskParams<Input, Output> {
 	opts?: TaskOptions;
 }
 
-export interface TaskBuilder<Input, Output> {
-	opt<Path extends PathFromObject<TaskOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<TaskOptions, Path>
-	): TaskBuilder<Input, Output>;
-	start: Task<Input, Output>["start"];
-}
-
 export interface Task<Input, Output> {
 	name: TaskName;
 	with(): TaskBuilder<Input, Output>;
@@ -92,6 +84,14 @@ export interface Task<Input, Output> {
 		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
 		...args: Input extends void ? [] : [Input]
 	) => Promise<Output>;
+}
+
+export interface TaskBuilder<Input, Output> {
+	opt<Path extends PathFromObject<TaskOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<TaskOptions, Path>
+	): TaskBuilder<Input, Output>;
+	start: Task<Input, Output>["start"];
 }
 
 class TaskImpl<Input, Output> implements Task<Input, Output> {

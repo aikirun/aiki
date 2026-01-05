@@ -35,17 +35,6 @@ export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinit
 	opts?: WorkflowOptions;
 }
 
-export interface WorkflowBuilder<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
-	opt<Path extends PathFromObject<WorkflowOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<WorkflowOptions, Path>
-	): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>;
-
-	start: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["start"];
-
-	startAsChild: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["startAsChild"];
-}
-
 export interface WorkflowVersion<
 	Input,
 	Output,
@@ -81,6 +70,17 @@ export interface WorkflowVersion<
 			context: AppContext
 		) => Promise<void>;
 	};
+}
+
+export interface WorkflowBuilder<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
+	opt<Path extends PathFromObject<WorkflowOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkflowOptions, Path>
+	): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>;
+
+	start: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["start"];
+
+	startAsChild: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["startAsChild"];
 }
 
 export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>
