@@ -1,10 +1,23 @@
+import type { RetryStrategy } from "./retry";
 import type { SerializableError } from "./serializable";
+
+export type TaskId = string & { _brand: "task_id" };
 
 export type TaskName = string & { _brand: "task_name" };
 
 export type TaskPath = string & { _brand: "task_path" };
 
 export type TaskStatus = "running" | "awaiting_retry" | "completed" | "failed";
+
+export interface TaskOptions {
+	retry?: RetryStrategy;
+	reference?: TaskReferenceOptions;
+}
+
+export interface TaskReferenceOptions {
+	id: string;
+	onConflict?: "error" | "return_existing";
+}
 
 interface TaskStateBase {
 	status: TaskStatus;
@@ -42,17 +55,57 @@ export type TaskState<Input = unknown, Output = unknown> =
 	| TaskStateFailed;
 
 export interface TaskInfo {
+	id: string;
+	name: string;
 	state: TaskState;
 	inputHash: string;
 }
 
+export interface TransitionTaskStateBase {
+	id: string;
+	expectedRevision: number;
+}
+
+export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateBase {
+	type: "create";
+	taskName: string;
+	options?: TaskOptions;
+	taskState: TaskStateRunning<unknown>;
+}
+
+export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
+	type: "retry";
+	taskId: string;
+	options?: TaskOptions;
+	taskState: TaskStateRunning<unknown>;
+}
+
+export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
+	taskId: string;
+	taskState: TaskStateCompleted<unknown>;
+}
+
+export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
+	taskId: string;
+	taskState: TaskStateFailed;
+}
+
+export interface TransitionTaskStateToAwaitingRetry extends TransitionTaskStateBase {
+	taskId: string;
+	taskState: TaskStateAwaitingRetryRequest;
+}
+
+export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAttemptAt"> & {
+	nextAttemptInMs: number;
+};
+
 export class TaskFailedError extends Error {
 	constructor(
-		public readonly taskPath: TaskPath,
+		public readonly taskId: TaskId,
 		public readonly attempts: number,
 		public readonly reason: string
 	) {
-		super(`Task ${taskPath} failed after ${attempts} attempts. Reason: ${reason}`);
+		super(`Task ${taskId} failed after ${attempts} attempts. Reason: ${reason}`);
 		this.name = "TaskFailedError";
 	}
 }

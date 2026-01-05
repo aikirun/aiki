@@ -216,7 +216,7 @@ export const workflowRunStateAwaitingRetrySchema: Zt<WorkflowRunStateAwaitingRet
 		status: z.literal("awaiting_retry"),
 		cause: z.literal("task"),
 		nextAttemptAt: z.number(),
-		taskPath: z.string(),
+		taskId: z.string().min(1),
 	}),
 	z.object({
 		status: z.literal("awaiting_retry"),
@@ -253,7 +253,7 @@ export const workflowRunStateFailedSchema: Zt<WorkflowRunStateFailed> = z.union(
 	z.object({
 		status: z.literal("failed"),
 		cause: z.literal("task"),
-		taskPath: z.string(),
+		taskId: z.string(),
 	}),
 	z.object({
 		status: z.literal("failed"),
@@ -327,7 +327,7 @@ export const workflowRunTransitionSchema: Zt<WorkflowRunTransition> = z.discrimi
 	z.object({
 		type: z.literal("task_state"),
 		createdAt: z.number(),
-		taskPath: z.string(),
+		taskId: z.string(),
 		taskState: taskStateSchema,
 	}),
 ]);
@@ -385,7 +385,7 @@ export const workflowRunStateAwaitingRetryRequestSchema: Zt<WorkflowRunStateAwai
 	z.object({
 		status: z.literal("awaiting_retry"),
 		cause: z.literal("task"),
-		taskPath: z.string(),
+		taskId: z.string().min(1),
 		nextAttemptInMs: z.number(),
 	}),
 	z.object({
@@ -427,7 +427,7 @@ export const workflowRunSetTaskStateRequestSchema: Zt<WorkflowRunSetTaskStateReq
 	z.object({
 		type: z.literal("existing"),
 		id: z.string().min(1),
-		taskPath: z.string().min(1),
+		taskId: z.string().min(1),
 		state: taskStateOutputSchema,
 	}),
 ]);

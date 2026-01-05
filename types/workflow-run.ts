@@ -138,7 +138,7 @@ export interface WorkflowRunStateAwaitingRetryBase extends WorkflowRunStateBase 
 
 export interface WorkflowRunStateAwaitingRetryCausedByTask extends WorkflowRunStateAwaitingRetryBase {
 	cause: "task";
-	taskPath: string;
+	taskId: string;
 }
 
 export interface WorkflowRunStateAwaitingRetryCausedByChildWorkflow extends WorkflowRunStateAwaitingRetryBase {
@@ -180,7 +180,7 @@ interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateFailedByTask extends WorkflowRunStateFailedBase {
 	cause: "task";
-	taskPath: string;
+	taskId: string;
 }
 
 export interface WorkflowRunStateFailedByChildWorkflow extends WorkflowRunStateFailedBase {
@@ -266,7 +266,7 @@ export interface WorkflowRunStateTransition extends WorkflowRunTransitionBase {
 
 export interface WorkflowRunTaskStateTransition extends WorkflowRunTransitionBase {
 	type: "task_state";
-	taskPath: string;
+	taskId: string;
 	taskState: TaskState;
 }
 

@@ -1,5 +1,13 @@
 import type { EventSendOptions } from "./event";
-import type { TaskState, TaskStateAwaitingRetry, TaskStateCompleted, TaskStateFailed } from "./task";
+import type {
+	TaskStateCompleted,
+	TaskStateFailed,
+	TransitionTaskStateToAwaitingRetry,
+	TransitionTaskStateToCompleted,
+	TransitionTaskStateToFailed,
+	TransitionTaskStateToRunningCreate,
+	TransitionTaskStateToRunningRetry,
+} from "./task";
 import type { DistributiveOmit } from "./utils";
 import type {
 	WorkflowOptions,
@@ -152,21 +160,17 @@ export interface WorkflowRunTransitionStateResponseV1 {
 	run: WorkflowRun;
 }
 
-export type TaskStateAwaitingRetryRequest = DistributiveOmit<TaskStateAwaitingRetry, "nextAttemptAt"> & {
-	nextAttemptInMs: number;
-};
+export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | TransitionTaskStateToRunningRetry;
 
-export type TaskStateRequest = Exclude<TaskState, { status: "awaiting_retry" }> | TaskStateAwaitingRetryRequest;
-
-export interface WorkflowRunTransitionTaskStateRequestV1 {
-	id: string;
-	taskPath: string;
-	taskState: TaskStateRequest;
-	expectedRevision: number;
-}
+export type WorkflowRunTransitionTaskStateRequestV1 =
+	| TransitionTaskStateToRunning
+	| TransitionTaskStateToCompleted
+	| TransitionTaskStateToFailed
+	| TransitionTaskStateToAwaitingRetry;
 
 export interface WorkflowRunTransitionTaskStateResponseV1 {
 	run: WorkflowRun;
+	taskId: string;
 }
 
 export interface WorkflowRunSetTaskStateRequestNew {
@@ -181,7 +185,7 @@ export interface WorkflowRunSetTaskStateRequestNew {
 export interface WorkflowRunSetTaskStateRequestExisting {
 	type: "existing";
 	id: string;
-	taskPath: string;
+	taskId: string;
 	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
 }
 

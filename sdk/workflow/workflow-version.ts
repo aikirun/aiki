@@ -359,7 +359,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			return {
 				status: "failed",
 				cause: "task",
-				taskPath: error.taskPath,
+				taskId: error.taskId,
 			};
 		}
 
@@ -376,7 +376,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 				status: "awaiting_retry",
 				cause: "task",
 				nextAttemptInMs,
-				taskPath: error.taskPath,
+				taskId: error.taskId,
 			};
 		}
 

@@ -1,7 +1,11 @@
 // biome-ignore-all lint/style/useNamingConvention: snake case fields are okay
-import type { TaskPath, TaskState, TaskStatus } from "@aikirun/types/task";
+import type { TaskId, TaskName, TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
-import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
+import type {
+	TransitionTaskStateToRunning,
+	WorkflowRunStateRequest,
+	WorkflowRunTransitionTaskStateRequestV1,
+} from "@aikirun/types/workflow-run-api";
 import { InvalidTaskStateTransitionError, InvalidWorkflowRunStateTransitionError } from "server/errors";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
@@ -168,7 +172,7 @@ export function assertIsValidWorkflowRunStateTransition(
 	}
 }
 
-const validTaskStatusTransition: Record<TaskStatus, TaskStatus[]> = {
+const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
 	running: ["running", "awaiting_retry", "completed", "failed"],
 	awaiting_retry: ["running"],
 	completed: [],
@@ -177,19 +181,26 @@ const validTaskStatusTransition: Record<TaskStatus, TaskStatus[]> = {
 
 export function assertIsValidTaskStateTransition(
 	runId: WorkflowRunId,
-	taskPath: TaskPath,
-	from: TaskState | undefined,
-	to: TaskStateRequest
+	taskName: TaskName,
+	taskId: TaskId,
+	from: TaskStatus | undefined,
+	to: TaskStatus
 ) {
 	if (!from) {
-		if (to.status === "awaiting_retry") {
-			throw new InvalidTaskStateTransitionError(runId, taskPath, undefined, to.status);
+		if (to !== "running") {
+			throw new InvalidTaskStateTransitionError(runId, { taskName, to });
 		}
 		return;
 	}
 
-	const allowedDestinations = validTaskStatusTransition[from.status];
-	if (!allowedDestinations.includes(to.status)) {
-		throw new InvalidTaskStateTransitionError(runId, taskPath, from.status, to.status);
+	const allowedDestinations = validTaskStatusTransitions[from];
+	if (!allowedDestinations.includes(to)) {
+		throw new InvalidTaskStateTransitionError(runId, { taskId, from, to });
 	}
+}
+
+export function isTaskStateTransitionToRunning(
+	request: WorkflowRunTransitionTaskStateRequestV1
+): request is TransitionTaskStateToRunning {
+	return request.taskState.status === "running";
 }

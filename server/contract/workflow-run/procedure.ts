@@ -45,7 +45,13 @@ import {
 	workflowRunTransitionSchema,
 } from "./schema";
 import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure";
-import { taskStateRequestSchema } from "../task/schema";
+import {
+	taskOptionsSchema,
+	taskStateAwaitingRetryRequestSchema,
+	taskStateCompletedSchema,
+	taskStateFailedSchema,
+	taskStateRunningSchema,
+} from "../task/schema";
 
 const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
 	.input(
@@ -171,16 +177,47 @@ const transitionTaskStateV1: ContractProcedure<
 	WorkflowRunTransitionTaskStateResponseV1
 > = oc
 	.input(
-		z.object({
-			id: z.string(),
-			taskPath: z.string(),
-			taskState: taskStateRequestSchema,
-			expectedRevision: z.number(),
-		})
+		z.union([
+			z.object({
+				type: z.literal("create"),
+				id: z.string().min(1),
+				taskName: z.string().min(1),
+				options: taskOptionsSchema.optional(),
+				taskState: taskStateRunningSchema,
+				expectedRevision: z.number(),
+			}),
+			z.object({
+				type: z.literal("retry"),
+				id: z.string().min(1),
+				taskId: z.string().min(1),
+				options: taskOptionsSchema.optional(),
+				taskState: taskStateRunningSchema,
+				expectedRevision: z.number(),
+			}),
+			z.object({
+				id: z.string().min(1),
+				taskId: z.string().min(1),
+				taskState: taskStateCompletedSchema,
+				expectedRevision: z.number(),
+			}),
+			z.object({
+				id: z.string().min(1),
+				taskId: z.string().min(1),
+				taskState: taskStateFailedSchema,
+				expectedRevision: z.number(),
+			}),
+			z.object({
+				id: z.string().min(1),
+				taskId: z.string().min(1),
+				taskState: taskStateAwaitingRetryRequestSchema,
+				expectedRevision: z.number(),
+			}),
+		])
 	)
 	.output(
 		z.object({
 			run: workflowRunSchema,
+			taskId: z.string(),
 		})
 	);
 

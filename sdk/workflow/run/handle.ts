@@ -1,7 +1,8 @@
 import { type DurationObject, type RetryStrategy, toMilliseconds, withRetry } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskPath } from "@aikirun/types/task";
+import type { TaskId } from "@aikirun/types/task";
+import type { DistributiveOmit } from "@aikirun/types/utils";
 import {
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
@@ -10,7 +11,7 @@ import {
 	WorkflowRunNotExecutableError,
 	type WorkflowRunState,
 } from "@aikirun/types/workflow-run";
-import type { TaskStateRequest, WorkflowRunStateRequest } from "@aikirun/types/workflow-run-api";
+import type { WorkflowRunStateRequest, WorkflowRunTransitionTaskStateRequestV1 } from "@aikirun/types/workflow-run-api";
 
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
@@ -137,7 +138,9 @@ export interface WorkflowRunHandle<
 	[INTERNAL]: {
 		client: Client<AppContext>;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
-		transitionTaskState: (taskPath: TaskPath, taskState: TaskStateRequest) => Promise<void>;
+		transitionTaskState: (
+			request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedRevision">
+		) => Promise<{ taskId: TaskId }>;
 		assertExecutionAllowed: () => void;
 	};
 }
@@ -341,14 +344,16 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		this._run = run as WorkflowRun<Input, Output>;
 	}
 
-	private async transitionTaskState(taskPath: TaskPath, taskState: TaskStateRequest): Promise<void> {
-		const { run } = await this.api.workflowRun.transitionTaskStateV1({
+	private async transitionTaskState(
+		request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedRevision">
+	): Promise<{ taskId: TaskId }> {
+		const { run, taskId } = await this.api.workflowRun.transitionTaskStateV1({
+			...request,
 			id: this.run.id,
-			taskPath,
-			taskState,
 			expectedRevision: this.run.revision,
 		});
 		this._run = run as WorkflowRun<Input, Output>;
+		return { taskId: taskId as TaskId };
 	}
 
 	private assertExecutionAllowed() {

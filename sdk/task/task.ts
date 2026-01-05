@@ -10,7 +10,14 @@ import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskInfo, TaskPath, TaskStateAwaitingRetry, TaskStateRunning } from "@aikirun/types/task";
+import type {
+	TaskId,
+	TaskInfo,
+	TaskOptions,
+	TaskReferenceOptions,
+	TaskStateAwaitingRetry,
+	TaskStateRunning,
+} from "@aikirun/types/task";
 import { TaskFailedError, type TaskName } from "@aikirun/types/task";
 import { WorkflowRunFailedError, type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
@@ -71,16 +78,6 @@ export interface TaskParams<Input, Output> {
 	opts?: TaskOptions;
 }
 
-export interface TaskOptions {
-	retry?: RetryStrategy;
-	reference?: TaskReferenceOptions;
-}
-
-export interface TaskReferenceOptions {
-	id: string;
-	onConflict?: "error" | "return_existing";
-}
-
 export interface TaskBuilder<Input, Output> {
 	opt<Path extends PathFromObject<TaskOptions>>(
 		path: Path,
@@ -130,47 +127,68 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const path = getTaskPath(this.name, reference?.id ?? inputHash);
 		const existingTaskInfo = handle.run.tasks[path];
 		if (existingTaskInfo) {
-			await this.assertUniqueTaskReferenceId(handle, existingTaskInfo, inputHash, reference, path, run.logger);
+			await this.assertUniqueTaskReferenceId(handle, existingTaskInfo, inputHash, reference, run.logger);
 		}
 
-		const taskState = existingTaskInfo?.state;
-
-		if (taskState?.status === "completed") {
-			return taskState.output as Output;
+		if (existingTaskInfo?.state.status === "completed") {
+			return existingTaskInfo.state.output as Output;
 		}
-		if (taskState?.status === "failed") {
-			throw new TaskFailedError(path, taskState.attempts, taskState.error.message);
+		if (existingTaskInfo?.state.status === "failed") {
+			const { state } = existingTaskInfo;
+			throw new TaskFailedError(existingTaskInfo.id as TaskId, state.attempts, state.error.message);
 		}
-
-		const logger = run.logger.child({
-			"aiki.component": "task-execution",
-			"aiki.taskPath": path,
-		});
 
 		let attempts = 0;
 		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
 
-		if (taskState) {
-			this.assertRetryAllowed(path, taskState, retryStrategy, logger);
-			logger.debug("Retrying task", {
-				"aiki.attempts": taskState.attempts,
-				"aiki.taskStatus": taskState.status,
-			});
-			attempts = taskState.attempts;
-		}
+		if (existingTaskInfo?.state) {
+			const taskId = existingTaskInfo.id as TaskId;
+			const state = existingTaskInfo?.state;
 
-		if (taskState?.status === "awaiting_retry" && handle.run.state.status === "running") {
-			throw new WorkflowRunSuspendedError(run.id);
+			this.assertRetryAllowed(taskId, state, retryStrategy, run.logger);
+
+			run.logger.debug("Retrying task", {
+				"aiki.taskId": taskId,
+				"aiki.attempts": state.attempts,
+				"aiki.taskStatus": state.status,
+			});
+			attempts = state.attempts;
+
+			if (state.status === "awaiting_retry" && handle.run.state.status === "running") {
+				throw new WorkflowRunSuspendedError(run.id);
+			}
 		}
 
 		attempts++;
 
-		logger.info("Starting task", { "aiki.attempts": attempts });
-		await handle[INTERNAL].transitionTaskState(path, { status: "running", attempts, input });
+		const options: TaskOptions = { retry: retryStrategy, reference };
 
-		const { output, lastAttempt } = await this.tryExecuteTask(run, input, path, retryStrategy, attempts, logger);
+		const { taskId } = existingTaskInfo
+			? await handle[INTERNAL].transitionTaskState({
+					type: "retry",
+					taskId: existingTaskInfo.id,
+					options,
+					taskState: { status: "running", attempts, input },
+				})
+			: await handle[INTERNAL].transitionTaskState({
+					type: "create",
+					taskName: this.name,
+					options,
+					taskState: { status: "running", attempts, input },
+				});
 
-		await handle[INTERNAL].transitionTaskState(path, { status: "completed", attempts: lastAttempt, output });
+		const logger = run.logger.child({
+			"aiki.component": "task-execution",
+			"aiki.taskId": taskId,
+		});
+		logger.info("Task started", { "aiki.attempts": attempts });
+
+		const { output, lastAttempt } = await this.tryExecuteTask(run, input, taskId, retryStrategy, attempts, logger);
+
+		await handle[INTERNAL].transitionTaskState({
+			taskId,
+			taskState: { status: "completed", attempts: lastAttempt, output },
+		});
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
@@ -179,7 +197,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private async tryExecuteTask(
 		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
 		input: Input,
-		path: TaskPath,
+		taskId: TaskId,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
 		logger: Logger
@@ -205,12 +223,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						"aiki.attempts": attempts,
 						"aiki.reason": serializableError.message,
 					});
-					await run[INTERNAL].handle[INTERNAL].transitionTaskState(path, {
-						status: "failed",
-						attempts,
-						error: serializableError,
+					await run[INTERNAL].handle[INTERNAL].transitionTaskState({
+						taskId,
+						taskState: { status: "failed", attempts, error: serializableError },
 					});
-					throw new TaskFailedError(path, attempts, serializableError.message);
+					throw new TaskFailedError(taskId, attempts, serializableError.message);
 				}
 
 				logger.debug("Task failed. It will be retried", {
@@ -225,11 +242,14 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					continue;
 				}
 
-				await run[INTERNAL].handle[INTERNAL].transitionTaskState(path, {
-					status: "awaiting_retry",
-					attempts,
-					error: serializableError,
-					nextAttemptInMs: retryParams.delayMs,
+				await run[INTERNAL].handle[INTERNAL].transitionTaskState({
+					taskId,
+					taskState: {
+						status: "awaiting_retry",
+						attempts,
+						error: serializableError,
+						nextAttemptInMs: retryParams.delayMs,
+					},
 				});
 				throw new WorkflowRunSuspendedError(run.id);
 			}
@@ -241,7 +261,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		existingTaskInfo: TaskInfo,
 		inputHash: string,
 		reference: TaskReferenceOptions | undefined,
-		path: TaskPath,
 		logger: Logger
 	) {
 		if (existingTaskInfo.inputHash !== inputHash && reference) {
@@ -251,12 +270,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			}
 			logger.error("Reference ID already used by another task", {
 				"aiki.referenceId": reference.id,
-				"aiki.existingTaskPath": path,
+				"aiki.existingTaskId": existingTaskInfo.id,
 			});
 			const error = new WorkflowRunFailedError(
 				handle.run.id as WorkflowRunId,
 				handle.run.attempts,
-				`Reference ID "${reference.id}" already used by another task ${path}`
+				`Reference ID "${reference.id}" already used by another task ${existingTaskInfo.id}`
 			);
 			await handle[INTERNAL].transitionState({
 				status: "failed",
@@ -268,7 +287,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private assertRetryAllowed(
-		path: TaskPath,
+		taskId: TaskId,
 		state: TaskStateRunning<unknown> | TaskStateAwaitingRetry,
 		retryStrategy: RetryStrategy,
 		logger: Logger
@@ -277,9 +296,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
 			logger.error("Task retry not allowed", {
+				"aiki.taskId": taskId,
 				"aiki.attempts": attempts,
 			});
-			throw new TaskFailedError(path, attempts, "Task retry not allowed");
+			throw new TaskFailedError(taskId, attempts, "Task retry not allowed");
 		}
 	}
 }

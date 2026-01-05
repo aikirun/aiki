@@ -4,7 +4,7 @@ import { sha256 } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { stableStringify } from "@aikirun/lib/json";
 import { getTaskPath } from "@aikirun/lib/path";
-import type { TaskPath, TaskState } from "@aikirun/types/task";
+import type { TaskId, TaskInfo, TaskName, TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	isTerminalWorkflowRunStatus,
@@ -21,6 +21,7 @@ import { publishWorkflowReadyBatch } from "server/redis/publisher";
 import {
 	assertIsValidTaskStateTransition,
 	assertIsValidWorkflowRunStateTransition,
+	isTaskStateTransitionToRunning,
 } from "server/state-machine/transitions";
 
 import { baseImplementer } from "./base";
@@ -328,45 +329,57 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: r
 		throw new RevisionConflictError(runId, request.expectedRevision, run.revision);
 	}
 
-	const taskPath = request.taskPath as TaskPath;
-	const taskStateRequest = request.taskState;
-	const currentTaskInfo = run.tasks[taskPath];
-
-	assertIsValidTaskStateTransition(runId, taskPath, currentTaskInfo?.state, taskStateRequest);
-
-	context.logger.info({ runId, taskPath, taskState: taskStateRequest }, "Transitioning task state");
-
+	let inputHash: string;
+	let taskName: TaskName;
+	let taskPath: TaskPath;
+	let taskId: TaskId;
+	let existingTaskState: TaskState | undefined;
+	let taskState: TaskState;
 	const now = Date.now();
 
-	let taskState: TaskState;
-	let inputHash: string | undefined;
-	if (taskStateRequest.status === "running") {
-		taskState = taskStateRequest;
-		inputHash = await sha256(stableStringify(taskStateRequest.input));
-	} else if (taskStateRequest.status === "awaiting_retry") {
-		taskState = {
-			status: "awaiting_retry",
-			attempts: taskStateRequest.attempts,
-			error: taskStateRequest.error,
-			nextAttemptAt: now + taskStateRequest.nextAttemptInMs,
-		};
-		inputHash = currentTaskInfo?.inputHash;
+	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
+		inputHash = await sha256(stableStringify(request.taskState.input));
+		taskName = request.taskName as TaskName;
+		taskPath = getTaskPath(taskName, request.options?.reference?.id ?? inputHash);
+
+		const existingTaskInfo = run.tasks[taskPath];
+		if (existingTaskInfo) {
+			throw new ValidationError(`Task ${taskPath} already exists. Use type: "retry" to retry it.`);
+		}
+
+		taskId = crypto.randomUUID() as TaskId;
+		taskState = request.taskState;
 	} else {
-		taskStateRequest.status satisfies "failed" | "completed";
-		taskState = taskStateRequest;
-		inputHash = currentTaskInfo?.inputHash;
+		const existingTaskInfo = findTaskById(run, request.taskId as TaskId);
+		if (!existingTaskInfo) {
+			throw new NotFoundError(`Task not found: ${request.taskId}`);
+		}
+
+		inputHash = existingTaskInfo.inputHash;
+		taskName = existingTaskInfo.name as TaskName;
+		taskPath = existingTaskInfo.path;
+		taskId = existingTaskInfo.id as TaskId;
+
+		existingTaskState = existingTaskInfo.state;
+		taskState =
+			request.taskState.status === "awaiting_retry"
+				? {
+						status: "awaiting_retry",
+						attempts: request.taskState.attempts,
+						error: request.taskState.error,
+						nextAttemptAt: now + request.taskState.nextAttemptInMs,
+					}
+				: request.taskState;
 	}
 
-	if (inputHash === undefined) {
-		throw new Error(
-			`Task ${taskPath} cannot be stored without inputHash. assertIsValidTaskStateTransition should've caught this.`
-		);
-	}
+	assertIsValidTaskStateTransition(runId, taskName, taskId, existingTaskState?.status, taskState.status);
+
+	context.logger.info({ runId, taskId, taskState }, "Transitioning task state");
 
 	const transition: WorkflowRunTransition = {
 		type: "task_state",
 		createdAt: now,
-		taskPath,
+		taskId,
 		taskState,
 	};
 
@@ -377,10 +390,10 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: r
 		transitions.push(transition);
 	}
 
-	run.tasks[taskPath] = { state: taskState, inputHash };
+	run.tasks[taskPath] = { id: taskId, name: taskName, state: taskState, inputHash };
 	run.revision++;
 
-	return { run };
+	return { run, taskId };
 });
 
 const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, context }) => {
@@ -402,7 +415,9 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			throw new ValidationError(`Task ${taskPath} already exists. Use type: "existing" to update it.`);
 		}
 
-		context.logger.info({ runId, taskPath, state: request.state }, "Setting task state (new task)");
+		const taskId = crypto.randomUUID();
+
+		context.logger.info({ runId, taskId, state: request.state }, "Setting task state (new task)");
 
 		const runningState: TaskState = {
 			status: "running",
@@ -413,7 +428,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		const runningTransition: WorkflowRunTransition = {
 			type: "task_state",
 			createdAt: now,
-			taskPath,
+			taskId,
 			taskState: runningState,
 		};
 
@@ -425,7 +440,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		const finalTransition: WorkflowRunTransition = {
 			type: "task_state",
 			createdAt: now,
-			taskPath,
+			taskId,
 			taskState: finalState,
 		};
 
@@ -436,19 +451,18 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			transitions.push(runningTransition, finalTransition);
 		}
 
-		run.tasks[taskPath] = { state: finalState, inputHash };
+		run.tasks[taskPath] = { id: taskId, name: request.taskName, state: finalState, inputHash };
 		run.revision++;
 
 		return { run };
 	}
 
-	const taskPath = request.taskPath as TaskPath;
-	const existingTaskInfo = run.tasks[taskPath];
+	const existingTaskInfo = findTaskById(run, request.taskId as TaskId);
 	if (!existingTaskInfo) {
-		throw new NotFoundError(`Task ${taskPath} does not exist. Use type: "new" to create it.`);
+		throw new NotFoundError(`Task not found: ${request.taskId}`);
 	}
 
-	context.logger.info({ runId, taskPath, state: request.state }, "Setting task state (existing task)");
+	context.logger.info({ runId, taskId: request.taskId, state: request.state }, "Setting task state (existing task)");
 
 	const attempts = existingTaskInfo.state.attempts;
 
@@ -460,7 +474,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 	const finalTransition: WorkflowRunTransition = {
 		type: "task_state",
 		createdAt: now,
-		taskPath,
+		taskId: existingTaskInfo.id,
 		taskState: finalState,
 	};
 
@@ -471,11 +485,28 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		transitions.push(finalTransition);
 	}
 
-	run.tasks[taskPath] = { state: finalState, inputHash: existingTaskInfo.inputHash };
+	run.tasks[existingTaskInfo.path] = {
+		id: existingTaskInfo.id,
+		name: existingTaskInfo.name,
+		state: finalState,
+		inputHash: existingTaskInfo.inputHash,
+	};
 	run.revision++;
 
 	return { run };
 });
+
+function findTaskById(run: WorkflowRun, taskId: TaskId): (TaskInfo & { path: TaskPath }) | undefined {
+	for (const [path, info] of Object.entries(run.tasks)) {
+		if (info.id === taskId) {
+			return {
+				...info,
+				path: path as TaskPath,
+			};
+		}
+	}
+	return undefined;
+}
 
 const listTransitionsV1 = os.listTransitionsV1.handler(({ input: request }) => {
 	const { id, limit = 50, offset = 0, sort } = request;
@@ -828,7 +859,7 @@ function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateR
 				return {
 					status: request.status,
 					cause: request.cause,
-					taskPath: request.taskPath,
+					taskId: request.taskId,
 					nextAttemptAt,
 				};
 			case "child_workflow":

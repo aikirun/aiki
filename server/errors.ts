@@ -1,5 +1,5 @@
-import type { TaskPath, TaskStatus } from "@aikirun/types/task";
-import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { TaskId, TaskName, TaskStatus } from "@aikirun/types/task";
+import type { WorkflowRunId, WorkflowRunStatus } from "@aikirun/types/workflow-run";
 
 export class NotFoundError extends Error {
 	constructor(message: string) {
@@ -35,12 +35,12 @@ export class RevisionConflictError extends Error {
 
 export class InvalidWorkflowRunStateTransitionError extends Error {
 	constructor(
-		public readonly workflowRunId: string,
-		public readonly fromStatus: WorkflowRunStatus,
-		public readonly toStatus: WorkflowRunStatus,
+		public readonly workflowRunId: WorkflowRunId,
+		public readonly from: WorkflowRunStatus,
+		public readonly to: WorkflowRunStatus,
 		public readonly reason?: string
 	) {
-		const message = `Cannot transition workflow ${workflowRunId} from ${fromStatus} to ${toStatus}`;
+		const message = `Cannot transition workflow ${workflowRunId} from ${from} to ${to}`;
 		if (!reason) {
 			super(message);
 		} else {
@@ -52,15 +52,17 @@ export class InvalidWorkflowRunStateTransitionError extends Error {
 
 export class InvalidTaskStateTransitionError extends Error {
 	constructor(
-		public readonly workflowRunId: string,
-		public readonly taskPath: TaskPath,
-		public readonly fromStatus: TaskStatus | undefined,
-		public readonly toStatus: TaskStatus
+		public readonly workflowRunId: WorkflowRunId,
+		public readonly taskData:
+			| { taskId: TaskId; from: TaskStatus; to: TaskStatus }
+			| { taskName: TaskName; to: TaskStatus }
 	) {
-		if (!fromStatus) {
-			super(`Cannot transition workflow ${workflowRunId} fresh task ${taskPath} directly to ${toStatus}`);
+		if ("from" in taskData) {
+			super(
+				`Cannot transition task ${taskData.taskId} from ${taskData.from} to ${taskData.to} (workflow ${workflowRunId})`
+			);
 		} else {
-			super(`Cannot transition workflow ${workflowRunId} task ${taskPath} from ${fromStatus} to ${toStatus}`);
+			super(`Cannot create task ${taskData.taskName} directly in ${taskData.to} state (workflow ${workflowRunId})`);
 		}
 		this.name = "InvalidTaskStateTransitionError";
 	}
