@@ -11,7 +11,7 @@ import type { WorkflowRunHandle } from "./handle";
 export interface WorkflowRunContext<Input, AppContext, TEventDefinition extends EventsDefinition> {
 	id: WorkflowRunId;
 	workflowName: WorkflowName;
-	workflowVersionId: WorkflowVersionId;
+	versionId: WorkflowVersionId;
 	options: WorkflowOptions;
 	logger: Logger;
 	sleep: (id: string, duration: Duration) => Promise<SleepResult>;

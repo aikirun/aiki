@@ -309,12 +309,12 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 			const workflowVersion = this.registry.get(
 				workflowRun.workflowName as WorkflowName,
-				workflowRun.workflowVersionId as WorkflowVersionId
+				workflowRun.versionId as WorkflowVersionId
 			);
 			if (!workflowVersion) {
 				this.logger.warn("Workflow version not found", {
 					"aiki.workflowName": workflowRun.workflowName,
-					"aiki.workflowVersionId": workflowRun.workflowVersionId,
+					"aiki.workflowVersionId": workflowRun.versionId,
 					"aiki.workflowRunId": workflowRun.id,
 				});
 				if (meta && this.subscriberStrategy?.acknowledge) {
@@ -343,7 +343,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const logger = this.logger.child({
 			"aiki.component": "workflow-execution",
 			"aiki.workflowName": workflowRun.workflowName,
-			"aiki.workflowVersionId": workflowRun.workflowVersionId,
+			"aiki.workflowVersionId": workflowRun.versionId,
 			"aiki.workflowRunId": workflowRun.id,
 		});
 
@@ -377,7 +377,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				{
 					id: workflowRun.id as WorkflowRunId,
 					workflowName: workflowRun.workflowName as WorkflowName,
-					workflowVersionId: workflowRun.workflowVersionId as WorkflowVersionId,
+					versionId: workflowRun.versionId as WorkflowVersionId,
 					options: workflowRun.options,
 					logger,
 					sleep: createSleeper(handle, logger),

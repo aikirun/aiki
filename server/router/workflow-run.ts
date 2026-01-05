@@ -40,7 +40,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 			filters?.workflows &&
 			isNonEmptyArray(filters.workflows) &&
 			filters.workflows.every(
-				(w) => (w.id && w.id !== run.workflowName) || (w.versionId && w.versionId !== run.workflowVersionId)
+				(w) => (w.id && w.id !== run.workflowName) || (w.versionId && w.versionId !== run.versionId)
 			)
 		) {
 			continue;
@@ -60,7 +60,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 			.map((run) => ({
 				id: run.id,
 				workflowName: run.workflowName,
-				workflowVersionId: run.workflowVersionId,
+				versionId: run.versionId,
 				createdAt: run.createdAt,
 				status: run.state.status,
 			})),
@@ -92,13 +92,13 @@ const getStateV1 = os.getStateV1.handler(({ input: request, context }) => {
 
 const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	const workflowName = request.workflowName as WorkflowName;
-	const workflowVersionId = request.workflowVersionId as WorkflowVersionId;
+	const versionId = request.versionId as WorkflowVersionId;
 	const referenceId = request.options?.reference?.id;
 
-	context.logger.info({ workflowName, workflowVersionId }, "Creating workflow run");
+	context.logger.info({ workflowName, versionId }, "Creating workflow run");
 
 	if (referenceId) {
-		const existingRunId = workflowRunsByReferenceId.get(workflowName)?.get(workflowVersionId)?.get(referenceId);
+		const existingRunId = workflowRunsByReferenceId.get(workflowName)?.get(versionId)?.get(referenceId);
 		if (existingRunId) {
 			context.logger.info({ runId: existingRunId, referenceId }, "Returning existing run from reference ID");
 			const existingRun = workflowRuns.get(existingRunId);
@@ -118,7 +118,7 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 		id: runId,
 		path: request.path,
 		workflowName: workflowName,
-		workflowVersionId: workflowVersionId,
+		versionId: versionId,
 		createdAt: now,
 		revision: 0,
 		attempts: 0,
@@ -164,10 +164,10 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 			workflowRunsByReferenceId.set(workflowName, versionMap);
 		}
 
-		let referenceIdMap = versionMap.get(workflowVersionId);
+		let referenceIdMap = versionMap.get(versionId);
 		if (!referenceIdMap) {
 			referenceIdMap = new Map();
-			versionMap.set(workflowVersionId, referenceIdMap);
+			versionMap.set(versionId, referenceIdMap);
 		}
 
 		referenceIdMap.set(referenceId, runId);

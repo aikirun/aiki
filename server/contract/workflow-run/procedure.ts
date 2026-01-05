@@ -79,7 +79,7 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 				z.object({
 					id: z.string(),
 					workflowName: z.string(),
-					workflowVersionId: z.string(),
+					versionId: z.string(),
 					createdAt: z.number(),
 					status: workflowRunStatusSchema,
 				})
@@ -116,7 +116,7 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 	.input(
 		z.object({
 			workflowName: z.string().min(1),
-			workflowVersionId: z.string().min(1),
+			versionId: z.string().min(1),
 			input: z.unknown(),
 			path: z.string().optional(),
 			parentWorkflowRunId: z.string().min(1).optional(),

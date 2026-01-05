@@ -46,7 +46,7 @@ export async function workflowRunHandle<Input, Output, AppContext, TEventsDefini
 		logger ??
 			client.logger.child({
 				"aiki.workflowName": run.workflowName,
-				"aiki.workflowVersionId": run.workflowVersionId,
+				"aiki.workflowVersionId": run.versionId,
 				"aiki.workflowRunId": run.id,
 			})
 	);

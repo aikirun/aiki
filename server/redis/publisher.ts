@@ -17,8 +17,8 @@ export async function publishWorkflowReadyBatch(
 
 		for (const run of runs) {
 			const streamName = run.options.shardKey
-				? `workflow/${run.workflowName}/${run.workflowVersionId}/${run.options.shardKey}`
-				: `workflow/${run.workflowName}/${run.workflowVersionId}`;
+				? `workflow/${run.workflowName}/${run.versionId}/${run.options.shardKey}`
+				: `workflow/${run.workflowName}/${run.versionId}`;
 
 			pipeline.xadd(streamName, "*", "type", "workflow_run_ready", "workflowRunId", run.id);
 		}
