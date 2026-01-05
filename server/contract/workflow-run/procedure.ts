@@ -254,7 +254,7 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, WorkflowRunS
 	.input(
 		z.object({
 			id: z.string().min(1),
-			eventId: z.string().min(1),
+			eventName: z.string().min(1),
 			data: z.unknown(),
 			options: z
 				.object({
@@ -273,7 +273,7 @@ const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, vo
 	.input(
 		z.object({
 			ids: z.array(z.string().min(1)),
-			eventId: z.string().min(1),
+			eventName: z.string().min(1),
 			data: z.unknown(),
 			options: z
 				.object({

@@ -124,7 +124,7 @@ export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateAwaitingEvent extends WorkflowRunStateBase {
 	status: "awaiting_event";
-	eventId: string;
+	eventName: string;
 	timeoutAt?: number;
 }
 

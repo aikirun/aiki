@@ -531,14 +531,14 @@ async function sendEventToWorkflowRun(
 	context: ServerContext,
 	run: WorkflowRun<unknown, unknown>,
 	receivedAt: number,
-	eventId: string,
+	eventName: string,
 	data: unknown,
 	reference: EventReferenceOptions | undefined
 ): Promise<void> {
-	let eventQueue = run.eventsQueue[eventId];
+	let eventQueue = run.eventsQueue[eventName];
 	if (!eventQueue) {
 		eventQueue = { events: [] };
-		run.eventsQueue[eventId] = eventQueue;
+		run.eventsQueue[eventName] = eventQueue;
 	}
 
 	if (reference) {
@@ -546,7 +546,7 @@ async function sendEventToWorkflowRun(
 			(event) => event.status === "received" && event.reference?.id === reference.id
 		);
 		if (isDuplicate) {
-			context.logger.info({ runId: run.id, eventId, referenceId: reference.id }, "Duplicate event, ignoring");
+			context.logger.info({ runId: run.id, eventName, referenceId: reference.id }, "Duplicate event, ignoring");
 			return;
 		}
 	}
@@ -558,9 +558,9 @@ async function sendEventToWorkflowRun(
 		reference,
 	});
 
-	context.logger.info({ runId: run.id, eventId }, "Event sent to workflow run");
+	context.logger.info({ runId: run.id, eventName }, "Event sent to workflow run");
 
-	if (run.state.status === "awaiting_event" && run.state.eventId === eventId) {
+	if (run.state.status === "awaiting_event" && run.state.eventName === eventName) {
 		await transitionStateV1.callable({ context })({
 			type: "optimistic",
 			id: run.id,
@@ -615,10 +615,10 @@ const sendEventV1 = os.sendEventV1.handler(async ({ input: request, context }) =
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
 
-	const { eventId, data, options } = request;
+	const { eventName, data, options } = request;
 	const now = Date.now();
 
-	await sendEventToWorkflowRun(context, run, now, eventId, data, options?.reference);
+	await sendEventToWorkflowRun(context, run, now, eventName, data, options?.reference);
 
 	return { run };
 });
@@ -634,11 +634,11 @@ const multicastEventV1 = os.multicastEventV1.handler(async ({ input: request, co
 		return run;
 	});
 
-	const { eventId, data, options } = request;
+	const { eventName, data, options } = request;
 	const now = Date.now();
 
 	for (const run of runs) {
-		await sendEventToWorkflowRun(context, run, now, eventId, data, options?.reference);
+		await sendEventToWorkflowRun(context, run, now, eventName, data, options?.reference);
 	}
 });
 
@@ -782,13 +782,13 @@ export async function scheduleEventWaitTimedOutWorkflowRuns(context: ServerConte
 			continue;
 		}
 
-		const eventId = run.state.eventId;
+		const eventName = run.state.eventName;
 		const now = Date.now();
 
-		let eventQueue = run.eventsQueue[eventId];
+		let eventQueue = run.eventsQueue[eventName];
 		if (!eventQueue) {
 			eventQueue = { events: [] };
-			run.eventsQueue[eventId] = eventQueue;
+			run.eventsQueue[eventName] = eventQueue;
 		}
 
 		eventQueue.events.push({ status: "timeout", timedOutAt: now });
@@ -886,7 +886,7 @@ function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateR
 	if (request.status === "awaiting_event" && "timeoutInMs" in request && request.timeoutInMs !== undefined) {
 		return {
 			status: request.status,
-			eventId: request.eventId,
+			eventName: request.eventName,
 			timeoutAt: now + request.timeoutInMs,
 		};
 	}

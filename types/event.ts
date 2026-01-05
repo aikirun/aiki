@@ -1,6 +1,6 @@
 import type { DurationObject } from "./duration";
 
-export type EventId = string & { _brand: "event_id" };
+export type EventName = string & { _brand: "event_name" };
 
 export type EventStatus = "received" | "timeout";
 

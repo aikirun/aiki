@@ -207,7 +207,7 @@ export const workflowRunStateSleepingSchema: Zt<WorkflowRunStateSleeping> = z.ob
 
 export const workflowRunStateAwaitingEventSchema: Zt<WorkflowRunStateAwaitingEvent> = z.object({
 	status: z.literal("awaiting_event"),
-	eventId: z.string(),
+	eventName: z.string(),
 	timeoutAt: z.number().optional(),
 });
 
@@ -377,7 +377,7 @@ export const workflowRunStateScheduledRequestPessimisticSchema = z.union([
 
 export const workflowRunStateAwaitingEventRequestSchema: Zt<WorkflowRunStateAwaitingEventRequest> = z.object({
 	status: z.literal("awaiting_event"),
-	eventId: z.string(),
+	eventName: z.string(),
 	timeoutInMs: z.number().optional(),
 });
 

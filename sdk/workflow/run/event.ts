@@ -1,6 +1,6 @@
 import { createSerializableError, toMilliseconds } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
-import type { EventId, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
+import type { EventName, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
@@ -98,14 +98,14 @@ export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
 ): EventWaiters<TEventsDefinition> {
 	const waiters = {} as EventWaiters<TEventsDefinition>;
 
-	for (const [eventId, eventDefinition] of Object.entries(eventsDefinition)) {
+	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
 		const waiter = createEventWaiter(
 			handle,
-			eventId as EventId,
+			eventName as EventName,
 			eventDefinition.schema,
-			logger.child({ "aiki.eventId": eventId })
+			logger.child({ "aiki.eventName": eventName })
 		) as EventWaiter<EventData<TEventsDefinition[keyof TEventsDefinition]>>;
-		waiters[eventId as keyof TEventsDefinition] = waiter;
+		waiters[eventName as keyof TEventsDefinition] = waiter;
 	}
 
 	return waiters;
@@ -113,7 +113,7 @@ export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
 
 export function createEventWaiter<TEventsDefinition extends EventsDefinition, Data>(
 	handle: WorkflowRunHandle<unknown, unknown, unknown, TEventsDefinition>,
-	eventId: EventId,
+	eventName: EventName,
 	schema: Schema<Data> | undefined,
 	logger: Logger
 ): EventWaiter<Data> {
@@ -124,7 +124,7 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitState<Data, boolean>> {
 		await handle.refresh();
 
-		const events = handle.run.eventsQueue[eventId]?.events ?? [];
+		const events = handle.run.eventsQueue[eventName]?.events ?? [];
 
 		const event = events[nextEventIndex] as EventState<Data> | undefined;
 		if (event) {
@@ -159,7 +159,7 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 
 		await handle[INTERNAL].transitionState({
 			status: "awaiting_event",
-			eventId,
+			eventName,
 			timeoutInMs,
 		});
 
@@ -178,16 +178,16 @@ export function createEventSenders<TEventsDefinition extends EventsDefinition>(
 ): EventSenders<TEventsDefinition> {
 	const senders = {} as EventSenders<TEventsDefinition>;
 
-	for (const [eventId, eventDefinition] of Object.entries(eventsDefinition)) {
+	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
 		const sender = createEventSender(
 			api,
 			workflowRunId,
-			eventId as EventId,
+			eventName as EventName,
 			eventDefinition.schema,
-			logger.child({ "aiki.eventId": eventId }),
+			logger.child({ "aiki.eventName": eventName }),
 			onSend
 		) as EventSender<EventData<TEventsDefinition[keyof TEventsDefinition]>>;
-		senders[eventId as keyof TEventsDefinition] = sender;
+		senders[eventName as keyof TEventsDefinition] = sender;
 	}
 
 	return senders;
@@ -196,7 +196,7 @@ export function createEventSenders<TEventsDefinition extends EventsDefinition>(
 function createEventSender<Data>(
 	api: ApiClient,
 	workflowRunId: string,
-	eventId: EventId,
+	eventName: EventName,
 	schema: Schema<Data> | undefined,
 	logger: Logger,
 	onSend: (run: WorkflowRun<unknown, unknown>) => void
@@ -217,7 +217,7 @@ function createEventSender<Data>(
 
 			const { run } = await api.workflowRun.sendEventV1({
 				id: workflowRunId,
-				eventId,
+				eventName,
 				data,
 				options,
 			});
@@ -231,17 +231,17 @@ export function createEventMulticasters<TEventsDefinition extends EventsDefiniti
 ): EventMulticasters<TEventsDefinition> {
 	const senders = {} as EventMulticasters<TEventsDefinition>;
 
-	for (const [eventId, eventDefinition] of Object.entries(eventsDefinition)) {
-		const sender = createEventMulticaster(eventId as EventId, eventDefinition.schema) as EventMulticaster<
+	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
+		const sender = createEventMulticaster(eventName as EventName, eventDefinition.schema) as EventMulticaster<
 			EventData<TEventsDefinition[keyof TEventsDefinition]>
 		>;
-		senders[eventId as keyof TEventsDefinition] = sender;
+		senders[eventName as keyof TEventsDefinition] = sender;
 	}
 
 	return senders;
 }
 
-function createEventMulticaster<Data>(eventId: EventId, schema: Schema<Data> | undefined): EventMulticaster<Data> {
+function createEventMulticaster<Data>(eventName: EventName, schema: Schema<Data> | undefined): EventMulticaster<Data> {
 	return {
 		async send<AppContext>(
 			client: Client<AppContext>,
@@ -257,7 +257,7 @@ function createEventMulticaster<Data>(eventId: EventId, schema: Schema<Data> | u
 
 			await client.api.workflowRun.multicastEventV1({
 				ids: runIds,
-				eventId,
+				eventName,
 				data,
 				options,
 			});
