@@ -79,8 +79,8 @@ await emailWorker.spawn(client);
 // Shard workers by key (reuse base definition with different shards)
 const orderWorker = worker({ name: "order-processor", workflows: [orderWorkflowV1] });
 
-await orderWorker.with().opt("shardKeys", ["us-east", "us-west"]).spawn(client);
-await orderWorker.with().opt("shardKeys", ["eu-west"]).spawn(client);
+await orderWorker.with().opt("shards", ["us-east", "us-west"]).spawn(client);
+await orderWorker.with().opt("shards", ["eu-west"]).spawn(client);
 ```
 
 ## Worker Configuration
@@ -104,7 +104,7 @@ interface WorkerOptions {
 		heartbeatIntervalMs?: number; // Heartbeat interval (default: 30s)
 	};
 	gracefulShutdownTimeoutMs?: number; // Shutdown timeout (default: 5s)
-	shardKeys?: string[]; // Optional shard keys for distributed work
+	shards?: string[]; // Optional shards for distributed work
 }
 ```
 

@@ -122,7 +122,7 @@ const workflowReferenceOptionsSchema: Zt<WorkflowReferenceOptions> = z.object({
 export const workflowOptionsSchema: Zt<WorkflowOptions> = z.object({
 	reference: workflowReferenceOptionsSchema.optional(),
 	trigger: triggerStrategySchema.optional(),
-	shardKey: z.string().optional(),
+	shard: z.string().optional(),
 	retry: retryStrategySchema.optional(),
 });
 

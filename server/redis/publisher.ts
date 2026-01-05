@@ -16,8 +16,8 @@ export async function publishWorkflowReadyBatch(
 		const pipeline = redis.pipeline();
 
 		for (const run of runs) {
-			const streamName = run.options.shardKey
-				? `workflow/${run.name}/${run.versionId}/${run.options.shardKey}`
+			const streamName = run.options.shard
+				? `workflow/${run.name}/${run.versionId}/${run.options.shard}`
 				: `workflow/${run.name}/${run.versionId}`;
 
 			pipeline.xadd(streamName, "*", "type", "workflow_run_ready", "workflowRunId", run.id);

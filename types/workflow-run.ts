@@ -44,7 +44,7 @@ export interface WorkflowOptions {
 	retry?: RetryStrategy;
 	reference?: WorkflowReferenceOptions;
 	trigger?: TriggerStrategy;
-	shardKey?: string;
+	shard?: string;
 }
 
 interface WorkflowRunStateBase {

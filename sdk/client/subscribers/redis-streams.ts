@@ -200,8 +200,8 @@ export function createRedisStreamsStrategy(
 	};
 }
 
-function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shardKeys?: string[]): Map<string, string> {
-	if (!shardKeys || !isNonEmptyArray(shardKeys)) {
+function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shards?: string[]): Map<string, string> {
+	if (!shards || !isNonEmptyArray(shards)) {
 		return new Map(
 			workflows.map((workflow) => [
 				`workflow/${workflow.name}/${workflow.versionId}`,
@@ -212,9 +212,9 @@ function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shardKeys?: s
 
 	return new Map(
 		workflows.flatMap((workflow) =>
-			shardKeys.map((shardKey) => [
-				`workflow/${workflow.name}/${workflow.versionId}/${shardKey}`,
-				`worker/${workflow.name}/${workflow.versionId}/${shardKey}`,
+			shards.map((shard) => [
+				`workflow/${workflow.name}/${workflow.versionId}/${shard}`,
+				`worker/${workflow.name}/${workflow.versionId}/${shard}`,
 			])
 		)
 	);

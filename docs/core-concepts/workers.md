@@ -51,7 +51,7 @@ const handle2 = await worker2.spawn(aikiClient);
 
 **Specialize workers** by registering different workflows on different workers. Each worker only handles the workflows it knows about.
 
-**Shard by region or tenant** using `shardKeys`. A worker with `shardKeys: ["us-east"]` only processes workflow runs routed to that shard.
+**Shard by region or tenant** using `shards`. A worker with `shards: ["us-east"]` only processes workflow runs routed to that shard.
 
 ## Graceful Shutdown
 
@@ -86,7 +86,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 | `maxConcurrentWorkflowRuns` | 1 | Max parallel executions |
 | `gracefulShutdownTimeoutMs` | 5,000 | Shutdown wait time (ms) |
 | `workflowRun.heartbeatIntervalMs` | 30,000 | Heartbeat frequency (ms) |
-| `shardKeys` | — | Shards to process |
+| `shards` | — | Shards to process |
 
 **Subscriber options** (within `subscriber`):
 

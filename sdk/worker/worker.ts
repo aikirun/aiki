@@ -89,11 +89,11 @@ export interface WorkerOptions {
 	};
 	gracefulShutdownTimeoutMs?: number;
 	/**
-	 * Optional array of shardKeys this worker should process.
+	 * Optional array of shards this worker should process.
 	 * When provided, the worker will only subscribe to sharded streams.
 	 * When omitted, the worker subscribes to default streams.
 	 */
-	shardKeys?: string[];
+	shards?: string[];
 	/**
 	 * Optional reference for external correlation.
 	 * Use this to associate the worker with external identifiers.
@@ -184,7 +184,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
 			this.params.subscriber ?? { type: "redis_streams" },
 			this.registry.getAll(),
-			this.params.opts?.shardKeys
+			this.params.opts?.shards
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
 			onError: (error: Error) => this.handleNotificationError(error),
