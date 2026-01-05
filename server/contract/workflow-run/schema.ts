@@ -234,7 +234,7 @@ export const workflowRunStateAwaitingRetrySchema: Zt<WorkflowRunStateAwaitingRet
 
 export const workflowRunStateAwaitingChildWorkflowSchema: Zt<WorkflowRunStateAwaitingChildWorkflow> = z.object({
 	status: z.literal("awaiting_child_workflow"),
-	childWorkflowRunPath: z.string(),
+	childWorkflowRunId: z.string(),
 	childWorkflowRunStatus: workflowRunStatusSchema,
 	timeoutAt: z.number().optional(),
 });
@@ -288,7 +288,7 @@ export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	createdAt: z.number(),
 	revision: z.number(),
 	input: z.unknown(),
-	path: z.string().optional(),
+	path: z.string(),
 	options: workflowOptionsSchema,
 	attempts: z.number(),
 	state: workflowRunStateSchema,
@@ -405,7 +405,7 @@ export const workflowRunStateAwaitingRetryRequestSchema: Zt<WorkflowRunStateAwai
 export const workflowRunStateAwaitingChildWorkflowRequestSchema: Zt<WorkflowRunStateAwaitingChildWorkflowRequest> =
 	z.object({
 		status: z.literal("awaiting_child_workflow"),
-		childWorkflowRunPath: z.string(),
+		childWorkflowRunId: z.string(),
 		childWorkflowRunStatus: workflowRunStatusSchema,
 		timeoutInMs: z.number().optional(),
 	});

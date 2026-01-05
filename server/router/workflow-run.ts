@@ -3,7 +3,7 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import { sha256 } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { stableStringify } from "@aikirun/lib/json";
-import { getTaskPath } from "@aikirun/lib/path";
+import { getTaskPath, getWorkflowRunPath } from "@aikirun/lib/path";
 import type { TaskId, TaskInfo, TaskName, TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
@@ -112,13 +112,15 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	const now = Date.now();
 	const runId = crypto.randomUUID() as WorkflowRunId;
 
+	const inputHash = await sha256(stableStringify(request.input));
+	const path = getWorkflowRunPath(name, versionId, request.options?.reference?.id ?? inputHash);
 	const trigger = request.options?.trigger;
 
 	const run: WorkflowRun = {
 		id: runId,
-		path: request.path,
-		name: name,
-		versionId: versionId,
+		path,
+		name,
+		versionId,
 		createdAt: now,
 		revision: 0,
 		attempts: 0,
@@ -145,11 +147,10 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 
 	workflowRuns.set(runId, run);
 
-	if (request.parentWorkflowRunId && request.path) {
+	if (request.parentWorkflowRunId) {
 		const parentRun = workflowRuns.get(request.parentWorkflowRunId as WorkflowRunId);
 		if (parentRun) {
-			const inputHash = await sha256(stableStringify(request.input));
-			parentRun.childWorkflowRuns[request.path] = {
+			parentRun.childWorkflowRuns[run.path] = {
 				id: runId,
 				inputHash,
 				statusWaitResults: [],
@@ -251,28 +252,24 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 	}
 
 	if (state.status === "awaiting_child_workflow") {
-		const childPath = state.childWorkflowRunPath;
-		const childRunId = run.childWorkflowRuns[childPath]?.id;
+		const childRunId = state.childWorkflowRunId as WorkflowRunId;
+		const childRun = workflowRuns.get(childRunId);
+		if (childRun) {
+			const childRunStatus = childRun.state.status;
+			const expectedStatus = state.childWorkflowRunStatus;
 
-		if (childRunId) {
-			const childRun = workflowRuns.get(childRunId as WorkflowRunId);
-			if (childRun) {
-				const childStatus = childRun.state.status;
-				const expectedStatus = state.childWorkflowRunStatus;
-
-				if (childStatus === expectedStatus || isTerminalWorkflowRunStatus(childStatus)) {
-					const statusWaitResults = run.childWorkflowRuns[childPath]?.statusWaitResults;
-					if (statusWaitResults) {
-						statusWaitResults.push({
-							status: "completed",
-							completedAt: now,
-							childWorkflowRunState: childRun.state,
-						});
-					}
-
-					state = { status: "scheduled", scheduledAt: now, reason: "child_workflow" };
-					context.logger.info({ runId, childPath, childStatus }, "Child already at status, scheduling immediately");
+			if (childRunStatus === expectedStatus || isTerminalWorkflowRunStatus(childRunStatus)) {
+				const statusWaitResults = run.childWorkflowRuns[childRun.path]?.statusWaitResults;
+				if (statusWaitResults) {
+					statusWaitResults.push({
+						status: "completed",
+						completedAt: now,
+						childWorkflowRunState: childRun.state,
+					});
 				}
+
+				state = { status: "scheduled", scheduledAt: now, reason: "child_workflow" };
+				context.logger.info({ runId, childRunId, childRunStatus }, "Child already at status, scheduling immediately");
 			}
 		}
 	}
@@ -301,7 +298,10 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 			await transitionStateV1.callable({ context })({
 				type: "pessimistic",
 				id: childRunInfo.id,
-				state,
+				state: {
+					status: "cancelled",
+					reason: "Parent cancelled",
+				},
 			});
 			run.childWorkflowRuns[childRunPath] = {
 				id: childRunInfo.id,
@@ -311,7 +311,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 		}
 	}
 
-	if (propsDefined(run, ["path", "parentWorkflowRunId"])) {
+	if (propsDefined(run, ["parentWorkflowRunId"])) {
 		await notifyParentOfStateChangeIfNecessary(context, run);
 	}
 
@@ -571,7 +571,7 @@ async function sendEventToWorkflowRun(
 
 async function notifyParentOfStateChangeIfNecessary(
 	context: ServerContext,
-	childRun: RequiredProp<WorkflowRun, "path" | "parentWorkflowRunId">
+	childRun: RequiredProp<WorkflowRun, "parentWorkflowRunId">
 ): Promise<void> {
 	const parentRun = workflowRuns.get(childRun.parentWorkflowRunId as WorkflowRunId);
 	if (!parentRun) {
@@ -580,7 +580,7 @@ async function notifyParentOfStateChangeIfNecessary(
 
 	if (
 		parentRun.state.status === "awaiting_child_workflow" &&
-		parentRun.state.childWorkflowRunPath === childRun.path &&
+		parentRun.state.childWorkflowRunId === childRun.id &&
 		parentRun.state.childWorkflowRunStatus === childRun.state.status
 	) {
 		context.logger.info(
@@ -829,7 +829,12 @@ export async function scheduleWorkflowRunsThatTimedOutWaitingForChild(context: S
 			continue;
 		}
 
-		const statusWaitResults = run.childWorkflowRuns[run.state.childWorkflowRunPath]?.statusWaitResults;
+		const childRun = workflowRuns.get(run.state.childWorkflowRunId as WorkflowRunId);
+		if (!childRun) {
+			continue;
+		}
+
+		const statusWaitResults = run.childWorkflowRuns[childRun.path]?.statusWaitResults;
 		if (statusWaitResults) {
 			statusWaitResults.push({ status: "timeout", timedOutAt: now });
 		}
@@ -890,7 +895,7 @@ function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateR
 	if (request.status === "awaiting_child_workflow" && "timeoutInMs" in request && request.timeoutInMs !== undefined) {
 		return {
 			status: request.status,
-			childWorkflowRunPath: request.childWorkflowRunPath,
+			childWorkflowRunId: request.childWorkflowRunId,
 			childWorkflowRunStatus: request.childWorkflowRunStatus,
 			timeoutAt: now + request.timeoutInMs,
 		};

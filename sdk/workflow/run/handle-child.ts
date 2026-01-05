@@ -5,7 +5,6 @@ import {
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
-	type WorkflowRunPath,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 
@@ -20,7 +19,6 @@ import {
 
 export async function childWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
 	client: Client<AppContext>,
-	path: WorkflowRunPath,
 	run: WorkflowRun<Input, Output>,
 	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 	logger: Logger,
@@ -32,7 +30,7 @@ export async function childWorkflowRunHandle<Input, Output, AppContext, TEventsD
 		run: handle.run,
 		events: handle.events,
 		refresh: handle.refresh.bind(handle),
-		waitForStatus: createStatusWaiter(path, handle, parentRun, logger),
+		waitForStatus: createStatusWaiter(handle, parentRun, logger),
 		cancel: handle.cancel.bind(handle),
 		pause: handle.pause.bind(handle),
 		resume: handle.resume.bind(handle),
@@ -99,7 +97,6 @@ export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 }
 
 function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
-	path: WorkflowRunPath,
 	handle: WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>,
 	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 	logger: Logger
@@ -122,7 +119,7 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, false>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
 
-		const waitResults = parentRunHandle.run.childWorkflowRuns[path]?.statusWaitResults ?? [];
+		const waitResults = parentRunHandle.run.childWorkflowRuns[handle.run.path]?.statusWaitResults ?? [];
 
 		const waitResult = waitResults[nextWaitIndex];
 		if (waitResult) {
@@ -172,7 +169,7 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 
 		await parentRunHandle[INTERNAL].transitionState({
 			status: "awaiting_child_workflow",
-			childWorkflowRunPath: path,
+			childWorkflowRunId: handle.run.id,
 			childWorkflowRunStatus: expectedStatus,
 			timeoutInMs,
 		});

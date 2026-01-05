@@ -176,7 +176,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 			return childWorkflowRunHandle(
 				client,
-				path,
 				existingRun as WorkflowRun<Input, Output>,
 				parentRun,
 				logger,
@@ -188,7 +187,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			name: this.name,
 			versionId: this.versionId,
 			input,
-			path,
 			parentWorkflowRunId: parentRun.id,
 			options: this.params.opts,
 		});
@@ -199,14 +197,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		};
 
 		const logger = parentRun.logger.child({
-			"aiki.childWorkflowNamew": newRun.name,
+			"aiki.childWorkflowName": newRun.name,
 			"aiki.childWorkflowVersionId": newRun.versionId,
 			"aiki.childWorkflowRunId": newRun.id,
 		});
 
 		return childWorkflowRunHandle(
 			client,
-			path,
 			newRun as WorkflowRun<Input, Output>,
 			parentRun,
 			logger,

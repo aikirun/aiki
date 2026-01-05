@@ -158,7 +158,7 @@ export type WorkflowRunStateAwaitingRetry =
 
 export interface WorkflowRunStateAwaitingChildWorkflow extends WorkflowRunStateBase {
 	status: "awaiting_child_workflow";
-	childWorkflowRunPath: string;
+	childWorkflowRunId: string;
 	childWorkflowRunStatus: WorkflowRunStatus;
 	timeoutAt?: number;
 }
@@ -219,7 +219,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	createdAt: number;
 	revision: number;
 	input: Input;
-	path?: string;
+	path: string;
 	options: WorkflowOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;
