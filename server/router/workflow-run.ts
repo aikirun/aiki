@@ -311,7 +311,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 		}
 	}
 
-	if (propsDefined(run, ["parentWorkflowRunId"])) {
+	if (propsDefined(run, "parentWorkflowRunId")) {
 		await notifyParentOfStateChangeIfNecessary(context, run);
 	}
 
