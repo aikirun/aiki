@@ -12,6 +12,7 @@ export default defineConfig({
 		task: "task.ts",
 		trigger: "trigger.ts",
 		utils: "utils.ts",
+		worker: "worker.ts",
 		workflow: "workflow.ts",
 		"workflow-run": "workflow-run.ts",
 		"workflow-run-api": "workflow-run-api.ts",

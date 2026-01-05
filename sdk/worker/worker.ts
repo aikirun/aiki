@@ -13,6 +13,7 @@ import { isServerConflictError } from "@aikirun/lib/error";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { TaskFailedError } from "@aikirun/types/task";
+import type { WorkerId } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowRun,
@@ -93,6 +94,13 @@ export interface WorkerOptions {
 	 * When omitted, the worker subscribes to default streams.
 	 */
 	shardKeys?: string[];
+	/**
+	 * Optional reference for external correlation.
+	 * Use this to associate the worker with external identifiers.
+	 */
+	reference?: {
+		id: string;
+	};
 }
 
 export interface WorkerBuilder {
@@ -110,6 +118,7 @@ export interface Worker {
 }
 
 export interface WorkerHandle {
+	id: WorkerId;
 	name: string;
 	stop: () => Promise<void>;
 }
@@ -146,6 +155,7 @@ interface ActiveWorkflowRun {
 }
 
 class WorkerHandleImpl<AppContext> implements WorkerHandle {
+	public readonly id: WorkerId;
 	public readonly name: string;
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
@@ -157,12 +167,16 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		private readonly client: Client<AppContext>,
 		private readonly params: WorkerParams
 	) {
+		this.id = crypto.randomUUID() as WorkerId;
 		this.name = params.name;
 		this.registry = workflowRegistry().addMany(this.params.workflows);
 
+		const reference = this.params.opts?.reference;
 		this.logger = client.logger.child({
 			"aiki.component": "worker",
-			"aiki.workerId": this.name,
+			"aiki.workerId": this.id,
+			"aiki.workerName": this.name,
+			...(reference && { "aiki.workerReferenceId": reference.id }),
 		});
 	}
 
@@ -172,7 +186,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			this.registry.getAll(),
 			this.params.opts?.shardKeys
 		);
-		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.name, {
+		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
 			onError: (error: Error) => this.handleNotificationError(error),
 			onStop: () => this.stop(),
 		});

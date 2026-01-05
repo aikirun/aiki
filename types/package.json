@@ -44,6 +44,10 @@
 			"types": "./dist/utils.d.ts",
 			"import": "./dist/utils.js"
 		},
+		"./worker": {
+			"types": "./dist/worker.d.ts",
+			"import": "./dist/worker.js"
+		},
 		"./workflow": {
 			"types": "./dist/workflow.d.ts",
 			"import": "./dist/workflow.js"
