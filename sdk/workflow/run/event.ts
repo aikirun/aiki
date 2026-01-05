@@ -212,7 +212,7 @@ function createEventSender<Data>(
 			}
 
 			logger.debug("Sending event", {
-				...(options?.idempotencyKey ? { "aiki.idempotencyKey": options.idempotencyKey } : {}),
+				...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
 			});
 
 			const { run } = await api.workflowRun.sendEventV1({

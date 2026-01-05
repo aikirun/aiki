@@ -1,16 +1,16 @@
 # Reference IDs
 
-Reference IDs let you assign custom identifiers to workflows and tasks. This enables tracking, correlation with
+Reference IDs let you assign custom identifiers to workflows, tasks, and events. This enables tracking, correlation with
 your systems, and lookup by your own IDs. As a secondary benefit, reference IDs prevent duplicate executions when
 the same reference is reused.
 
 ## What are Reference IDs?
 
-A reference ID is a custom identifier you provide when starting a workflow or task. Use cases include:
+A reference ID is a custom identifier you provide when starting a workflow, task, or sending an event. Use cases include:
 
 - **Tracking**: Correlate Aiki workflows with your order IDs, user IDs, or transaction IDs
 - **Lookup**: Find a workflow run using your own identifier instead of Aiki's internal run ID
-- **Duplicate prevention**: When a reference ID is reused, Aiki can either throw an error or return the existing run
+- **Duplicate prevention**: When a reference ID is reused, Aiki can either throw an error, return the existing run, or silently deduplicate (for events)
 
 Reference IDs are unique per workflow version (workflow name + version ID). The same reference ID can be used across different workflow versions without conflict.
 
@@ -72,6 +72,27 @@ await sendEmail.start(run, {
 	email: "user@example.com",
 });
 ```
+
+## Event Reference IDs
+
+When sending events to a workflow, you can provide a reference ID to prevent duplicate event delivery:
+
+```typescript
+// Send an event with a reference ID
+await handle.events.approved.send(
+  { by: "manager@example.com" },
+  { reference: { id: "approval-123" } }
+);
+
+// If the same event is sent again with the same reference ID,
+// it will be silently ignored (no error, no duplicate)
+await handle.events.approved.send(
+  { by: "manager@example.com" },
+  { reference: { id: "approval-123" } }
+); // Ignored - duplicate
+```
+
+Unlike workflows and tasks, events use **silent deduplication** - duplicate events are simply ignored rather than throwing an error. This follows industry practice for event-driven systems where at-least-once delivery is common.
 
 ## How It Works
 
@@ -165,7 +186,7 @@ Use reference IDs when you want to:
 
 ## Summary
 
-Reference IDs let you assign custom identifiers to workflows and tasks. This enables correlation with your systems
+Reference IDs let you assign custom identifiers to workflows, tasks, and events. This enables correlation with your systems
 (order IDs, user IDs, etc.), lookup by your own identifiers, and prevents duplicate executions when the same
 reference is reused. Combined with automatic task idempotency and deterministic execution, reference IDs provide the
 foundation for building robust workflows that integrate seamlessly with your existing systems.

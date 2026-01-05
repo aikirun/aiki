@@ -258,7 +258,7 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, WorkflowRunS
 			data: z.unknown(),
 			options: z
 				.object({
-					idempotencyKey: z.string().optional(),
+					reference: z.object({ id: z.string().min(1) }).optional(),
 				})
 				.optional(),
 		})
@@ -277,7 +277,7 @@ const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, vo
 			data: z.unknown(),
 			options: z
 				.object({
-					idempotencyKey: z.string().optional(),
+					reference: z.object({ id: z.string().min(1) }).optional(),
 				})
 				.optional(),
 		})

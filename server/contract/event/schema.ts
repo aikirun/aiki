@@ -8,7 +8,7 @@ export const eventStateSchema: Zt<EventState<unknown>> = z.union([
 		status: z.literal("received"),
 		data: z.unknown(),
 		receivedAt: z.number(),
-		idempotencyKey: z.string().optional(),
+		reference: z.object({ id: z.string().min(1) }).optional(),
 	}),
 	z.object({
 		status: z.literal("timeout"),

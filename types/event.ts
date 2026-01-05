@@ -12,7 +12,7 @@ export interface EventStateReceived<Data> extends EventStateBase {
 	status: "received";
 	data: Data;
 	receivedAt: number;
-	idempotencyKey?: string;
+	reference?: EventReferenceOptions;
 }
 
 export interface EventStateTimeout extends EventStateBase {
@@ -35,5 +35,9 @@ export type EventWaitState<Data, Timed extends boolean> = Timed extends false
 	: { timeout: false; data: Data } | { timeout: true };
 
 export interface EventSendOptions {
-	idempotencyKey?: string;
+	reference?: EventReferenceOptions;
+}
+
+export interface EventReferenceOptions {
+	id: string;
 }

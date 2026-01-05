@@ -3,6 +3,7 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { getTaskPath, getWorkflowRunPath } from "@aikirun/lib/path";
+import type { EventReferenceOptions } from "@aikirun/types/event";
 import type { TaskId, TaskInfo, TaskName, TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
@@ -532,7 +533,7 @@ async function sendEventToWorkflowRun(
 	receivedAt: number,
 	eventId: string,
 	data: unknown,
-	idempotencyKey: string | undefined
+	reference: EventReferenceOptions | undefined
 ): Promise<void> {
 	let eventQueue = run.eventsQueue[eventId];
 	if (!eventQueue) {
@@ -540,12 +541,12 @@ async function sendEventToWorkflowRun(
 		run.eventsQueue[eventId] = eventQueue;
 	}
 
-	if (idempotencyKey) {
+	if (reference) {
 		const isDuplicate = eventQueue.events.some(
-			(event) => event.status === "received" && event.idempotencyKey === idempotencyKey
+			(event) => event.status === "received" && event.reference?.id === reference.id
 		);
 		if (isDuplicate) {
-			context.logger.info({ runId: run.id, eventId, idempotencyKey }, "Duplicate event, ignoring");
+			context.logger.info({ runId: run.id, eventId, referenceId: reference.id }, "Duplicate event, ignoring");
 			return;
 		}
 	}
@@ -554,7 +555,7 @@ async function sendEventToWorkflowRun(
 		status: "received",
 		data,
 		receivedAt,
-		idempotencyKey,
+		reference,
 	});
 
 	context.logger.info({ runId: run.id, eventId }, "Event sent to workflow run");
@@ -615,10 +616,9 @@ const sendEventV1 = os.sendEventV1.handler(async ({ input: request, context }) =
 	}
 
 	const { eventId, data, options } = request;
-	const idempotencyKey = options?.idempotencyKey;
 	const now = Date.now();
 
-	await sendEventToWorkflowRun(context, run, now, eventId, data, idempotencyKey);
+	await sendEventToWorkflowRun(context, run, now, eventId, data, options?.reference);
 
 	return { run };
 });
@@ -635,11 +635,10 @@ const multicastEventV1 = os.multicastEventV1.handler(async ({ input: request, co
 	});
 
 	const { eventId, data, options } = request;
-	const idempotencyKey = options?.idempotencyKey;
 	const now = Date.now();
 
 	for (const run of runs) {
-		await sendEventToWorkflowRun(context, run, now, eventId, data, idempotencyKey);
+		await sendEventToWorkflowRun(context, run, now, eventId, data, options?.reference);
 	}
 });
 
