@@ -1,4 +1,4 @@
-import { createSerializableError, toMilliseconds } from "@aikirun/lib";
+import { createSerializableError, isNonEmptyArray, toMilliseconds } from "@aikirun/lib";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import type { EventName, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
@@ -75,7 +75,7 @@ export type EventSenders<TEventsDefinition extends EventsDefinition> = {
 
 export interface EventSender<Data> {
 	with(): EventSenderBuilder<Data>;
-	send: (...args: Data extends void ? [data?: Data] : [data: Data]) => Promise<void>;
+	send: (...args: Data extends void ? [] : [Data]) => Promise<void>;
 }
 
 export interface EventSenderBuilder<Data> {
@@ -83,7 +83,7 @@ export interface EventSenderBuilder<Data> {
 		path: Path,
 		value: TypeOfValueAtPath<EventSendOptions, Path>
 	): EventSenderBuilder<Data>;
-	send: (...args: Data extends void ? [data?: Data] : [data: Data]) => Promise<void>;
+	send: (...args: Data extends void ? [] : [Data]) => Promise<void>;
 }
 
 export type EventMulticasters<TEventsDefinition extends EventsDefinition> = {
@@ -92,7 +92,11 @@ export type EventMulticasters<TEventsDefinition extends EventsDefinition> = {
 
 export interface EventMulticaster<Data> {
 	with(): EventMulticasterBuilder<Data>;
-	send: <AppContext>(client: Client<AppContext>, runId: string | string[], data: Data) => Promise<void>;
+	send: <AppContext>(
+		client: Client<AppContext>,
+		runId: string | string[],
+		...args: Data extends void ? [] : [Data]
+	) => Promise<void>;
 }
 
 export interface EventMulticasterBuilder<Data> {
@@ -100,7 +104,11 @@ export interface EventMulticasterBuilder<Data> {
 		path: Path,
 		value: TypeOfValueAtPath<EventSendOptions, Path>
 	): EventMulticasterBuilder<Data>;
-	send: <AppContext>(client: Client<AppContext>, runId: string | string[], data: Data) => Promise<void>;
+	send: <AppContext>(
+		client: Client<AppContext>,
+		runId: string | string[],
+		...args: Data extends void ? [] : [Data]
+	) => Promise<void>;
 }
 
 export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
@@ -218,12 +226,12 @@ function createEventSender<Data>(
 
 	const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): EventSenderBuilder<Data> => ({
 		opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
-		send: (...args: Data extends void ? [data?: Data] : [data: Data]) =>
+		send: (...args: Data extends void ? [] : [Data]) =>
 			createEventSender(api, workflowRunId, eventName, schema, logger, onSend, optsBuilder.build()).send(...args),
 	});
 
-	async function send(...args: Data extends void ? [data?: Data] : [data: Data]): Promise<void> {
-		const [data] = args;
+	async function send(...args: Data extends void ? [] : [Data]): Promise<void> {
+		const data = isNonEmptyArray(args) ? args[0] : (undefined as Data);
 
 		if (schema) {
 			schema.parse(data);
@@ -272,11 +280,20 @@ function createEventMulticaster<Data>(
 
 	const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): EventMulticasterBuilder<Data> => ({
 		opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
-		send: <AppContext>(client: Client<AppContext>, runId: string | string[], data: Data) =>
-			createEventMulticaster(eventName, schema, optsBuilder.build()).send(client, runId, data),
+		send: <AppContext>(
+			client: Client<AppContext>,
+			runId: string | string[],
+			...args: Data extends void ? [] : [Data]
+		) => createEventMulticaster(eventName, schema, optsBuilder.build()).send(client, runId, ...args),
 	});
 
-	async function send<AppContext>(client: Client<AppContext>, runId: string | string[], data: Data): Promise<void> {
+	async function send<AppContext>(
+		client: Client<AppContext>,
+		runId: string | string[],
+		...args: Data extends void ? [] : [Data]
+	): Promise<void> {
+		const data = isNonEmptyArray(args) ? args[0] : (undefined as Data);
+
 		if (schema) {
 			schema.parse(data);
 		}
