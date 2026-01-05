@@ -183,7 +183,7 @@ With a worker:
 import { worker } from "@aikirun/worker";
 
 const aikiWorker = worker({
-	id: "my-worker",
+	name: "my-worker",
 	workflows: [onboardingWorkflowV1],
 	opts: {
 		maxConcurrentWorkflowRuns: 10,

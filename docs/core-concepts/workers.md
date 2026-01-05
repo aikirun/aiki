@@ -15,7 +15,7 @@ const aikiClient = await client({
 });
 
 const aikiWorker = worker({
-  id: "order-worker",
+  name: "order-worker",
   workflows: [orderWorkflowV1, userWorkflowV1],
   opts: {
     maxConcurrentWorkflowRuns: 10,
@@ -25,7 +25,7 @@ const aikiWorker = worker({
 const handle = await aikiWorker.spawn(aikiClient);
 ```
 
-Worker definitions are static and reusable. The `worker()` function creates a definition with an `id` that uniquely identifies the worker and a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution—it returns a handle for controlling the running worker.
+Worker definitions are static and reusable. The `worker()` function creates a definition with a `name` that uniquely identifies the worker and a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution—it returns a handle for controlling the running worker.
 
 ## How Workers Operate
 
@@ -42,8 +42,8 @@ Workers scale naturally. You can add capacity in several ways:
 **Run multiple instances** of the same worker to share load. Each gets a portion of the work automatically:
 
 ```typescript
-const worker1 = worker({ id: "worker-1", workflows: [orderWorkflowV1] });
-const worker2 = worker({ id: "worker-2", workflows: [orderWorkflowV1] });
+const worker1 = worker({ name: "worker-1", workflows: [orderWorkflowV1] });
+const worker2 = worker({ name: "worker-2", workflows: [orderWorkflowV1] });
 
 const handle1 = await worker1.spawn(aikiClient);
 const handle2 = await worker2.spawn(aikiClient);

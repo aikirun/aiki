@@ -140,7 +140,7 @@ const aikiClient = await client({
 });
 
 const aikiWorker = worker({
-	id: "order-worker-1",
+	name: "order-worker-1",
 	workflows: [orderWorkflowV1],
 	subscriber: {
 		type: "redis_streams",
@@ -271,7 +271,7 @@ const aikiClient = await client({
 });
 
 const aikiWorker = worker({
-	id: "order-worker",
+	name: "order-worker",
 	workflows: [orderWorkflowV1],
 	subscriber: { type: "redis_streams" },
 });

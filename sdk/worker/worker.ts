@@ -37,7 +37,7 @@ import {
  * execution, which returns a handle for controlling the running worker.
  *
  * @param params - Worker configuration parameters
- * @param params.id - Unique worker ID for identification and monitoring
+ * @param params.name - Unique worker name for identification and monitoring
  * @param params.workflows - Array of workflow versions this worker can execute
  * @param params.subscriber - Message subscriber strategy (default: redis_streams)
  * @returns Worker definition, call spawn(client) to begin execution
@@ -45,7 +45,7 @@ import {
  * @example
  * ```typescript
  * export const myWorker = worker({
- *   id: "order-worker",
+ *   name: "order-worker",
  *   workflows: [orderWorkflowV1, paymentWorkflowV1],
  *   opts: {
  *     maxConcurrentWorkflowRuns: 10,
@@ -65,7 +65,7 @@ export function worker(params: WorkerParams): Worker {
 }
 
 export interface WorkerParams {
-	id: string;
+	name: string;
 	// biome-ignore lint/suspicious/noExplicitAny: AppContext is contravariant
 	workflows: WorkflowVersion<any, any, any, any>[];
 	subscriber?: SubscriberStrategy;
@@ -104,21 +104,21 @@ export interface WorkerBuilder {
 }
 
 export interface Worker {
-	id: string;
+	name: string;
 	with(): WorkerBuilder;
 	spawn: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
 }
 
 export interface WorkerHandle {
-	id: string;
+	name: string;
 	stop: () => Promise<void>;
 }
 
 class WorkerImpl implements Worker {
-	public readonly id: string;
+	public readonly name: string;
 
 	constructor(private readonly params: WorkerParams) {
-		this.id = params.id;
+		this.name = params.name;
 	}
 
 	public with(): WorkerBuilder {
@@ -146,7 +146,7 @@ interface ActiveWorkflowRun {
 }
 
 class WorkerHandleImpl<AppContext> implements WorkerHandle {
-	public readonly id: string;
+	public readonly name: string;
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
@@ -157,12 +157,12 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		private readonly client: Client<AppContext>,
 		private readonly params: WorkerParams
 	) {
-		this.id = params.id;
+		this.name = params.name;
 		this.registry = workflowRegistry().addMany(this.params.workflows);
 
 		this.logger = client.logger.child({
 			"aiki.component": "worker",
-			"aiki.workerId": this.id,
+			"aiki.workerId": this.name,
 		});
 	}
 
@@ -172,7 +172,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			this.registry.getAll(),
 			this.params.opts?.shardKeys
 		);
-		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
+		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.name, {
 			onError: (error: Error) => this.handleNotificationError(error),
 			onStop: () => this.stop(),
 		});

@@ -65,7 +65,7 @@ export const aikiClient = await client({
 });
 
 const workerA = worker({
-  id: "worker-A",
+  name: "worker-A",
   workflows: [onboardingWorkflowV1],
   subscriber: { type: "redis_streams" }
 });

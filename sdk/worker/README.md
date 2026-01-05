@@ -20,7 +20,7 @@ import { onboardingWorkflowV1 } from "./workflows.ts";
 
 // Define worker
 const aikiWorker = worker({
-	id: "worker-1",
+	name: "worker-1",
 	workflows: [onboardingWorkflowV1],
 	subscriber: { type: "redis_streams" },
 	opts: {
@@ -68,8 +68,8 @@ Scale workers by creating separate definitions to isolate workflows or shard by 
 
 ```typescript
 // Separate workers by workflow type
-const orderWorker = worker({ id: "orders", workflows: [orderWorkflowV1] });
-const emailWorker = worker({ id: "emails", workflows: [emailWorkflowV1] });
+const orderWorker = worker({ name: "orders", workflows: [orderWorkflowV1] });
+const emailWorker = worker({ name: "emails", workflows: [emailWorkflowV1] });
 
 await orderWorker.spawn(client);
 await emailWorker.spawn(client);
@@ -77,7 +77,7 @@ await emailWorker.spawn(client);
 
 ```typescript
 // Shard workers by key (reuse base definition with different shards)
-const orderWorker = worker({ id: "order-processor", workflows: [orderWorkflowV1] });
+const orderWorker = worker({ name: "order-processor", workflows: [orderWorkflowV1] });
 
 await orderWorker.with().opt("shardKeys", ["us-east", "us-west"]).spawn(client);
 await orderWorker.with().opt("shardKeys", ["eu-west"]).spawn(client);
@@ -89,7 +89,7 @@ await orderWorker.with().opt("shardKeys", ["eu-west"]).spawn(client);
 
 ```typescript
 interface WorkerParams {
-	id: string; // Unique worker ID
+	name: string; // Unique worker name
 	workflows: WorkflowVersion[]; // Workflow versions to execute
 	subscriber?: SubscriberStrategy; // Message subscriber (default: redis_streams)
 }
@@ -114,7 +114,7 @@ Workers receive workflow versions through the `workflows` param:
 
 ```typescript
 const aikiWorker = worker({
-	id: "worker-1",
+	name: "worker-1",
 	workflows: [workflowV1, workflowV2, anotherWorkflowV1],
 	subscriber: { type: "redis_streams" },
 });
