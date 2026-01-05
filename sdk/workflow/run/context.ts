@@ -14,7 +14,7 @@ export interface WorkflowRunContext<Input, AppContext, TEventDefinition extends 
 	versionId: WorkflowVersionId;
 	options: WorkflowOptions;
 	logger: Logger;
-	sleep: (id: string, duration: Duration) => Promise<SleepResult>;
+	sleep: (name: string, duration: Duration) => Promise<SleepResult>;
 	events: EventWaiters<TEventDefinition>;
 
 	[INTERNAL]: {

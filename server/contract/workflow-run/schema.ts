@@ -201,7 +201,7 @@ export const workflowRunStatePausedSchema: Zt<WorkflowRunStatePaused> = z.object
 
 export const workflowRunStateSleepingSchema: Zt<WorkflowRunStateSleeping> = z.object({
 	status: z.literal("sleeping"),
-	sleepId: z.string(),
+	sleepName: z.string(),
 	durationMs: z.number(),
 });
 

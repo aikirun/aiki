@@ -199,7 +199,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 	const transitions = workflowRunTransitions.get(runId) ?? [];
 
 	if (run.state.status === "sleeping" && state.status === "scheduled") {
-		const sleepQueue = run.sleepsQueue[run.state.sleepId];
+		const sleepQueue = run.sleepsQueue[run.state.sleepName];
 		if (sleepQueue && isNonEmptyArray(sleepQueue.sleeps)) {
 			if (state.reason === "awake") {
 				const startedSleepingAt = transitions[transitions.length - 1]?.createdAt;
@@ -218,13 +218,13 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 	}
 
 	if (state.status === "sleeping") {
-		const { sleepId, durationMs } = state;
+		const { sleepName, durationMs } = state;
 		const awakeAt = now + durationMs;
-		const sleepQueue = run.sleepsQueue[sleepId];
+		const sleepQueue = run.sleepsQueue[sleepName];
 		if (sleepQueue?.sleeps) {
 			sleepQueue.sleeps.push({ status: "sleeping", awakeAt });
 		} else {
-			run.sleepsQueue[sleepId] = {
+			run.sleepsQueue[sleepName] = {
 				sleeps: [{ status: "sleeping", awakeAt }],
 			};
 		}
@@ -738,7 +738,7 @@ function getSleepingElapsedWorkflowRuns(): WorkflowRun[] {
 
 	for (const run of workflowRuns.values()) {
 		if (run.state.status === "sleeping") {
-			const sleepQueue = run.sleepsQueue[run.state.sleepId];
+			const sleepQueue = run.sleepsQueue[run.state.sleepName];
 			const lastSleep = sleepQueue?.sleeps[sleepQueue.sleeps.length - 1];
 			if (lastSleep?.status === "sleeping" && lastSleep.awakeAt <= now) {
 				sleepingRuns.push(run);

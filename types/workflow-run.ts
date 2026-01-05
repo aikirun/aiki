@@ -118,7 +118,7 @@ export interface WorkflowRunStatePaused extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
 	status: "sleeping";
-	sleepId: string;
+	sleepName: string;
 	durationMs: number;
 }
 

@@ -1,4 +1,4 @@
-export type SleepId = string & { _brand: "sleep_id" };
+export type SleepName = string & { _brand: "sleep_name" };
 
 export type SleepStatus = "sleeping" | "completed" | "cancelled";
 
