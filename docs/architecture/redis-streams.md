@@ -153,7 +153,7 @@ const claimResults = await Promise.allSettled(
 ```json
 {
 	"id": "run-123",
-	"workflowName": "order-processing",
+	"name": "order-processing",
 	"version": "1.0.0",
 	"payload": {
 		"orderId": "order-456",
@@ -289,7 +289,7 @@ const redis = new Redis({
 ```typescript
 // Publish workflow run
 await redis.xadd(
-	`workflow:${workflowName}`,
+	`workflow:${name}`,
 	"*",
 	"data",
 	JSON.stringify(workflowRun),
