@@ -214,7 +214,7 @@ export type WorkflowRunState<Output = unknown> = WorkflowRunStateInComplete | Wo
 
 export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;
-	workflowName: string;
+	name: string;
 	versionId: string;
 	createdAt: number;
 	revision: number;

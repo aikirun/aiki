@@ -39,9 +39,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 		if (
 			filters?.workflows &&
 			isNonEmptyArray(filters.workflows) &&
-			filters.workflows.every(
-				(w) => (w.id && w.id !== run.workflowName) || (w.versionId && w.versionId !== run.versionId)
-			)
+			filters.workflows.every((w) => (w.id && w.id !== run.name) || (w.versionId && w.versionId !== run.versionId))
 		) {
 			continue;
 		}
@@ -59,7 +57,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 			.slice(offset, offset + limit)
 			.map((run) => ({
 				id: run.id,
-				workflowName: run.workflowName,
+				name: run.name,
 				versionId: run.versionId,
 				createdAt: run.createdAt,
 				status: run.state.status,
@@ -91,14 +89,14 @@ const getStateV1 = os.getStateV1.handler(({ input: request, context }) => {
 });
 
 const createV1 = os.createV1.handler(async ({ input: request, context }) => {
-	const workflowName = request.workflowName as WorkflowName;
+	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
 	const referenceId = request.options?.reference?.id;
 
-	context.logger.info({ workflowName, versionId }, "Creating workflow run");
+	context.logger.info({ name, versionId }, "Creating workflow run");
 
 	if (referenceId) {
-		const existingRunId = workflowRunsByReferenceId.get(workflowName)?.get(versionId)?.get(referenceId);
+		const existingRunId = workflowRunsByReferenceId.get(name)?.get(versionId)?.get(referenceId);
 		if (existingRunId) {
 			context.logger.info({ runId: existingRunId, referenceId }, "Returning existing run from reference ID");
 			const existingRun = workflowRuns.get(existingRunId);
@@ -117,7 +115,7 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	const run: WorkflowRun = {
 		id: runId,
 		path: request.path,
-		workflowName: workflowName,
+		name: name,
 		versionId: versionId,
 		createdAt: now,
 		revision: 0,
@@ -158,10 +156,10 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	}
 
 	if (referenceId) {
-		let versionMap = workflowRunsByReferenceId.get(workflowName);
+		let versionMap = workflowRunsByReferenceId.get(name);
 		if (!versionMap) {
 			versionMap = new Map();
-			workflowRunsByReferenceId.set(workflowName, versionMap);
+			workflowRunsByReferenceId.set(name, versionMap);
 		}
 
 		let referenceIdMap = versionMap.get(versionId);

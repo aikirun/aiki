@@ -134,7 +134,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const { run } = await client.api.workflowRun.createV1({
-			workflowName: this.name,
+			name: this.name,
 			versionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : undefined,
 			options: this.params.opts,
@@ -169,7 +169,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
 
 			const logger = parentRun.logger.child({
-				"aiki.childWorkflowName": existingRun.workflowName,
+				"aiki.childWorkflowName": existingRun.name,
 				"aiki.childWorkflowVersionId": existingRun.versionId,
 				"aiki.childWorkflowRunId": existingRun.id,
 			});
@@ -185,7 +185,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		}
 
 		const { run: newRun } = await client.api.workflowRun.createV1({
-			workflowName: this.name,
+			name: this.name,
 			versionId: this.versionId,
 			input,
 			path,
@@ -199,7 +199,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		};
 
 		const logger = parentRun.logger.child({
-			"aiki.childWorkflowNamew": newRun.workflowName,
+			"aiki.childWorkflowNamew": newRun.name,
 			"aiki.childWorkflowVersionId": newRun.versionId,
 			"aiki.childWorkflowRunId": newRun.id,
 		});

@@ -308,12 +308,12 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			}
 
 			const workflowVersion = this.registry.get(
-				workflowRun.workflowName as WorkflowName,
+				workflowRun.name as WorkflowName,
 				workflowRun.versionId as WorkflowVersionId
 			);
 			if (!workflowVersion) {
 				this.logger.warn("Workflow version not found", {
-					"aiki.workflowName": workflowRun.workflowName,
+					"aiki.workflowName": workflowRun.name,
 					"aiki.workflowVersionId": workflowRun.versionId,
 					"aiki.workflowRunId": workflowRun.id,
 				});
@@ -342,7 +342,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	): Promise<void> {
 		const logger = this.logger.child({
 			"aiki.component": "workflow-execution",
-			"aiki.workflowName": workflowRun.workflowName,
+			"aiki.workflowName": workflowRun.name,
 			"aiki.workflowVersionId": workflowRun.versionId,
 			"aiki.workflowRunId": workflowRun.id,
 		});
@@ -376,7 +376,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			await workflowVersion[INTERNAL].handler(
 				{
 					id: workflowRun.id as WorkflowRunId,
-					workflowName: workflowRun.workflowName as WorkflowName,
+					name: workflowRun.name as WorkflowName,
 					versionId: workflowRun.versionId as WorkflowVersionId,
 					options: workflowRun.options,
 					logger,

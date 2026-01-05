@@ -78,7 +78,7 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 			runs: z.array(
 				z.object({
 					id: z.string(),
-					workflowName: z.string(),
+					name: z.string(),
 					versionId: z.string(),
 					createdAt: z.number(),
 					status: workflowRunStatusSchema,
@@ -115,7 +115,7 @@ const getStateV1: ContractProcedure<WorkflowRunGetStateRequestV1, WorkflowRunGet
 const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateResponseV1> = oc
 	.input(
 		z.object({
-			workflowName: z.string().min(1),
+			name: z.string().min(1),
 			versionId: z.string().min(1),
 			input: z.unknown(),
 			path: z.string().optional(),

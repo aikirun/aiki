@@ -10,7 +10,7 @@ import type { WorkflowRunHandle } from "./handle";
 
 export interface WorkflowRunContext<Input, AppContext, TEventDefinition extends EventsDefinition> {
 	id: WorkflowRunId;
-	workflowName: WorkflowName;
+	name: WorkflowName;
 	versionId: WorkflowVersionId;
 	options: WorkflowOptions;
 	logger: Logger;
