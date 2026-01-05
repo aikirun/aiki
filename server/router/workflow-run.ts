@@ -108,7 +108,7 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	}
 
 	const now = Date.now();
-	const runId = `${now}` as WorkflowRunId;
+	const runId = crypto.randomUUID() as WorkflowRunId;
 
 	const trigger = request.options?.trigger;
 
