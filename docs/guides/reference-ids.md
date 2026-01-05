@@ -84,14 +84,12 @@ exists. Based on the `onConflict` setting:
 
 ### Task Level
 
-Tasks within a workflow are automatically idempotent based on their payload. The system generates a unique path for each task execution that includes:
+Tasks within a workflow are automatically idempotent based on their input. The system generates a unique identifier for each task execution based on:
 
-- The workflow path
 - The task name
-- A hash of the task payload
+- A hash of the task input
 
-When you provide a reference ID, it's added to this path, allowing you to create different execution contexts for
-the same task and payload combination.
+When you provide a reference ID, it replaces the input hash, allowing you to create different execution contexts for the same task and input combination.
 
 ## Determinism vs Reference IDs
 
