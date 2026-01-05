@@ -13,7 +13,7 @@ import { isServerConflictError } from "@aikirun/lib/error";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { TaskFailedError } from "@aikirun/types/task";
-import type { WorkerId } from "@aikirun/types/worker";
+import type { WorkerId, WorkerName } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowRun,
@@ -112,22 +112,22 @@ export interface WorkerBuilder {
 }
 
 export interface Worker {
-	name: string;
+	name: WorkerName;
 	with(): WorkerBuilder;
 	spawn: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
 }
 
 export interface WorkerHandle {
 	id: WorkerId;
-	name: string;
+	name: WorkerName;
 	stop: () => Promise<void>;
 }
 
 class WorkerImpl implements Worker {
-	public readonly name: string;
+	public readonly name: WorkerName;
 
 	constructor(private readonly params: WorkerParams) {
-		this.name = params.name;
+		this.name = params.name as WorkerName;
 	}
 
 	public with(): WorkerBuilder {
@@ -156,7 +156,7 @@ interface ActiveWorkflowRun {
 
 class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	public readonly id: WorkerId;
-	public readonly name: string;
+	public readonly name: WorkerName;
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
@@ -168,7 +168,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		private readonly params: WorkerParams
 	) {
 		this.id = crypto.randomUUID() as WorkerId;
-		this.name = params.name;
+		this.name = params.name as WorkerName;
 		this.registry = workflowRegistry().addMany(this.params.workflows);
 
 		const reference = this.params.opts?.reference;
