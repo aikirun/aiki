@@ -138,7 +138,7 @@ const sendEmail = task({
 	},
 });
 
-const onboardingWorkflow = workflow({ id: "user-onboarding" });
+const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 const onboardingV1 = onboardingWorkflow.v("1.0.0", {
 	async handler(run, input: { email: string }) {

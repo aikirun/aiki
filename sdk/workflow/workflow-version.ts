@@ -7,7 +7,7 @@ import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { TaskFailedError } from "@aikirun/types/task";
-import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type ChildWorkflowRunInfo,
 	type WorkflowOptions,
@@ -53,7 +53,7 @@ export interface WorkflowVersion<
 	AppContext,
 	TEventsDefinition extends EventsDefinition = EventsDefinition,
 > {
-	id: WorkflowId;
+	name: WorkflowName;
 	versionId: WorkflowVersionId;
 	events: EventMulticasters<TEventsDefinition>;
 
@@ -91,7 +91,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	public readonly [INTERNAL]: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>[typeof INTERNAL];
 
 	constructor(
-		public readonly id: WorkflowId,
+		public readonly name: WorkflowName,
 		public readonly versionId: WorkflowVersionId,
 		private readonly params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
 	) {
@@ -113,13 +113,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 				opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
 
 				start: (client, ...args) =>
-					new WorkflowVersionImpl(this.id, this.versionId, {
+					new WorkflowVersionImpl(this.name, this.versionId, {
 						...this.params,
 						opts: optsBuilder.build(),
 					}).start(client, ...args),
 
 				startAsChild: (parentRun, ...args) =>
-					new WorkflowVersionImpl(this.id, this.versionId, {
+					new WorkflowVersionImpl(this.name, this.versionId, {
 						...this.params,
 						opts: optsBuilder.build(),
 					}).startAsChild(parentRun, ...args),
@@ -134,7 +134,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const { run } = await client.api.workflowRun.createV1({
-			workflowId: this.id,
+			workflowName: this.name,
 			workflowVersionId: this.versionId,
 			input: isNonEmptyArray(args) ? args[0] : undefined,
 			options: this.params.opts,
@@ -169,7 +169,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
 
 			const logger = parentRun.logger.child({
-				"aiki.childWorkflowId": existingRun.workflowId,
+				"aiki.childWorkflowName": existingRun.workflowName,
 				"aiki.childWorkflowVersionId": existingRun.workflowVersionId,
 				"aiki.childWorkflowRunId": existingRun.id,
 			});
@@ -185,7 +185,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		}
 
 		const { run: newRun } = await client.api.workflowRun.createV1({
-			workflowId: this.id,
+			workflowName: this.name,
 			workflowVersionId: this.versionId,
 			input,
 			path,
@@ -199,7 +199,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		};
 
 		const logger = parentRun.logger.child({
-			"aiki.childWorkflowId": newRun.workflowId,
+			"aiki.childWorkflowNamew": newRun.workflowName,
 			"aiki.childWorkflowVersionId": newRun.workflowVersionId,
 			"aiki.childWorkflowRunId": newRun.id,
 		});
@@ -390,8 +390,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	private async getPath(inputHash: string, reference: WorkflowReferenceOptions | undefined): Promise<WorkflowRunPath> {
 		const path = reference
-			? `${this.id}/${this.versionId}/${reference.id}`
-			: `${this.id}/${this.versionId}/${inputHash}`;
+			? `${this.name}/${this.versionId}/${reference.id}`
+			: `${this.name}/${this.versionId}/${inputHash}`;
 		return path as WorkflowRunPath;
 	}
 }

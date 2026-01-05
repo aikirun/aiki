@@ -82,7 +82,7 @@ Orchestrate tasks in sequence:
 import { workflow } from "@aikirun/workflow";
 
 const orderWorkflow = workflow({
-	id: "order-processing",
+	name: "order-processing",
 });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
@@ -229,7 +229,7 @@ const sendConfirmation = task({
 });
 
 // Define workflow
-const orderWorkflow = workflow({ id: "order-processing" });
+const orderWorkflow = workflow({ name: "order-processing" });
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	async handler(run, input: {

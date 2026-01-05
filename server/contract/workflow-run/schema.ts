@@ -283,7 +283,7 @@ export const workflowRunStateSchema: Zt<WorkflowRunState> = z.union([
 
 export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 	id: z.string(),
-	workflowId: z.string(),
+	workflowName: z.string(),
 	workflowVersionId: z.string(),
 	createdAt: z.number(),
 	revision: z.number(),

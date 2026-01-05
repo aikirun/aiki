@@ -2,7 +2,7 @@ import { event, workflow } from "@aikirun/workflow";
 
 import { makeCoffee, stretch } from "./task";
 
-export const morningRoutine = workflow({ id: "morning-routine" });
+export const morningRoutine = workflow({ name: "morning-routine" });
 
 export const morningRoutineV1 = morningRoutine.v("1.0.0", {
 	async handler(run, input: { sugar: boolean }) {

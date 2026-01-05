@@ -1,6 +1,6 @@
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
 import type { EventsDefinition } from "./run/event";
 import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version";
@@ -13,13 +13,13 @@ import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams }
  * Multiple versions of a workflow can run simultaneously, allowing safe deployments.
  *
  * @param params - Workflow configuration
- * @param params.id - Unique workflow id used for identification and routing
+ * @param params.name - Unique workflow name used for identification and routing
  * @returns Workflow instance with version management methods
  *
  * @example
  * ```typescript
  * // Define a workflow
- * export const userOnboarding = workflow({ id: "user-onboarding" });
+ * export const userOnboarding = workflow({ name: "user-onboarding" });
  *
  * // Define version 1.0
  * export const userOnboardingV1 = userOnboarding.v("1.0.0", {
@@ -57,11 +57,11 @@ export function workflow(params: WorkflowParams): Workflow {
 }
 
 export interface WorkflowParams {
-	id: string;
+	name: string;
 }
 
 export interface Workflow {
-	id: WorkflowId;
+	name: WorkflowName;
 
 	v: <
 		Input extends Serializable,
@@ -80,12 +80,12 @@ export interface Workflow {
 }
 
 class WorkflowImpl implements Workflow {
-	public readonly id: WorkflowId;
+	public readonly name: WorkflowName;
 	public readonly [INTERNAL]: Workflow[typeof INTERNAL];
 	private workflowVersions = new Map<WorkflowVersionId, WorkflowVersion<unknown, unknown, unknown>>();
 
 	constructor(params: WorkflowParams) {
-		this.id = params.id as WorkflowId;
+		this.name = params.name as WorkflowName;
 		this[INTERNAL] = {
 			getAllVersions: this.getAllVersions.bind(this),
 			getVersion: this.getVersion.bind(this),
@@ -97,10 +97,10 @@ class WorkflowImpl implements Workflow {
 		params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
 	): WorkflowVersion<Input, Output, AppContext, TEventsDefinition> {
 		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
-			throw new Error(`Workflow "${this.id}/${versionId}" already exists`);
+			throw new Error(`Workflow "${this.name}/${versionId}" already exists`);
 		}
 
-		const workflowVersion = new WorkflowVersionImpl(this.id, versionId as WorkflowVersionId, params);
+		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
 		this.workflowVersions.set(
 			versionId as WorkflowVersionId,
 			workflowVersion as unknown as WorkflowVersion<unknown, unknown, unknown>

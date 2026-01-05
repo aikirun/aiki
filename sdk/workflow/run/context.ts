@@ -2,7 +2,7 @@ import type { Duration } from "@aikirun/lib";
 import type { Logger } from "@aikirun/types/client";
 import type { SleepResult } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowOptions, WorkflowRunId } from "@aikirun/types/workflow-run";
 
 import type { EventsDefinition, EventWaiters } from "./event";
@@ -10,7 +10,7 @@ import type { WorkflowRunHandle } from "./handle";
 
 export interface WorkflowRunContext<Input, AppContext, TEventDefinition extends EventsDefinition> {
 	id: WorkflowRunId;
-	workflowId: WorkflowId;
+	workflowName: WorkflowName;
 	workflowVersionId: WorkflowVersionId;
 	options: WorkflowOptions;
 	logger: Logger;

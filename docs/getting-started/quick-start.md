@@ -30,7 +30,7 @@ const greet = task({
 });
 
 // 2. Define a workflow (orchestrates tasks)
-const helloWorkflow = workflow({ id: "hello" });
+const helloWorkflow = workflow({ name: "hello" });
 
 const helloV1 = helloWorkflow.v("1.0.0", {
 	async handler(run, input: { name: string }) {

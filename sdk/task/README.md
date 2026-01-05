@@ -47,7 +47,7 @@ export const ringAlarm = task({
 ```typescript
 import { workflow } from "@aikirun/workflow";
 
-export const morningWorkflow = workflow({ id: "morning-routine" });
+export const morningWorkflow = workflow({ name: "morning-routine" });
 
 export const morningWorkflowV1 = morningWorkflow.v("1.0.0", {
 	async handler(run, input) {

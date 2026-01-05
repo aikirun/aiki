@@ -35,7 +35,7 @@ Here's an example user onboarding workflow spanning multiple days. Traditional j
 import { workflow } from "@aikirun/workflow";
 import {createUserProfile, sendWelcomeEmail, sendUsageTips} from "./task.ts";
 
-export const onboardingWorkflow = workflow({ id: "user-onboarding" });
+export const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0.0", {
   async handler(run, input: { email: string }) {

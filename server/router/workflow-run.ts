@@ -4,7 +4,7 @@ import { sha256 } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { stableStringify } from "@aikirun/lib/json";
 import type { TaskPath, TaskState } from "@aikirun/types/task";
-import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	isTerminalWorkflowRunStatus,
 	type WorkflowRun,
@@ -27,7 +27,7 @@ import { baseImplementer } from "./base";
 const os = baseImplementer.workflowRun;
 
 const workflowRuns = new Map<WorkflowRunId, WorkflowRun>();
-const workflowRunsByReferenceId = new Map<WorkflowId, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
+const workflowRunsByReferenceId = new Map<WorkflowName, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
 const workflowRunTransitions = new Map<WorkflowRunId, WorkflowRunTransition[]>();
 
 const listV1 = os.listV1.handler(({ input: request }) => {
@@ -40,7 +40,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 			filters?.workflows &&
 			isNonEmptyArray(filters.workflows) &&
 			filters.workflows.every(
-				(w) => (w.id && w.id !== run.workflowId) || (w.versionId && w.versionId !== run.workflowVersionId)
+				(w) => (w.id && w.id !== run.workflowName) || (w.versionId && w.versionId !== run.workflowVersionId)
 			)
 		) {
 			continue;
@@ -59,7 +59,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 			.slice(offset, offset + limit)
 			.map((run) => ({
 				id: run.id,
-				workflowId: run.workflowId,
+				workflowName: run.workflowName,
 				workflowVersionId: run.workflowVersionId,
 				createdAt: run.createdAt,
 				status: run.state.status,
@@ -91,14 +91,14 @@ const getStateV1 = os.getStateV1.handler(({ input: request, context }) => {
 });
 
 const createV1 = os.createV1.handler(async ({ input: request, context }) => {
-	const workflowId = request.workflowId as WorkflowId;
+	const workflowName = request.workflowName as WorkflowName;
 	const workflowVersionId = request.workflowVersionId as WorkflowVersionId;
 	const referenceId = request.options?.reference?.id;
 
-	context.logger.info({ workflowId, workflowVersionId }, "Creating workflow run");
+	context.logger.info({ workflowName, workflowVersionId }, "Creating workflow run");
 
 	if (referenceId) {
-		const existingRunId = workflowRunsByReferenceId.get(workflowId)?.get(workflowVersionId)?.get(referenceId);
+		const existingRunId = workflowRunsByReferenceId.get(workflowName)?.get(workflowVersionId)?.get(referenceId);
 		if (existingRunId) {
 			context.logger.info({ runId: existingRunId, referenceId }, "Returning existing run from reference ID");
 			const existingRun = workflowRuns.get(existingRunId);
@@ -117,7 +117,7 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	const run: WorkflowRun = {
 		id: runId,
 		path: request.path,
-		workflowId: workflowId,
+		workflowName: workflowName,
 		workflowVersionId: workflowVersionId,
 		createdAt: now,
 		revision: 0,
@@ -158,10 +158,10 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	}
 
 	if (referenceId) {
-		let versionMap = workflowRunsByReferenceId.get(workflowId);
+		let versionMap = workflowRunsByReferenceId.get(workflowName);
 		if (!versionMap) {
 			versionMap = new Map();
-			workflowRunsByReferenceId.set(workflowId, versionMap);
+			workflowRunsByReferenceId.set(workflowName, versionMap);
 		}
 
 		let referenceIdMap = versionMap.get(workflowVersionId);

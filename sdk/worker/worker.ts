@@ -13,7 +13,7 @@ import { isServerConflictError } from "@aikirun/lib/error";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { TaskFailedError } from "@aikirun/types/task";
-import type { WorkflowId, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowRun,
 	WorkflowRunFailedError,
@@ -308,12 +308,12 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			}
 
 			const workflowVersion = this.registry.get(
-				workflowRun.workflowId as WorkflowId,
+				workflowRun.workflowName as WorkflowName,
 				workflowRun.workflowVersionId as WorkflowVersionId
 			);
 			if (!workflowVersion) {
 				this.logger.warn("Workflow version not found", {
-					"aiki.workflowId": workflowRun.workflowId,
+					"aiki.workflowName": workflowRun.workflowName,
 					"aiki.workflowVersionId": workflowRun.workflowVersionId,
 					"aiki.workflowRunId": workflowRun.id,
 				});
@@ -342,7 +342,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	): Promise<void> {
 		const logger = this.logger.child({
 			"aiki.component": "workflow-execution",
-			"aiki.workflowId": workflowRun.workflowId,
+			"aiki.workflowName": workflowRun.workflowName,
 			"aiki.workflowVersionId": workflowRun.workflowVersionId,
 			"aiki.workflowRunId": workflowRun.id,
 		});
@@ -376,7 +376,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			await workflowVersion[INTERNAL].handler(
 				{
 					id: workflowRun.id as WorkflowRunId,
-					workflowId: workflowRun.workflowId as WorkflowId,
+					workflowName: workflowRun.workflowName as WorkflowName,
 					workflowVersionId: workflowRun.workflowVersionId as WorkflowVersionId,
 					options: workflowRun.options,
 					logger,
