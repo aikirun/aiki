@@ -1,7 +1,6 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import { sha256 } from "@aikirun/lib/crypto";
+import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
-import { stableStringify } from "@aikirun/lib/json";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { getWorkflowRunPath } from "@aikirun/lib/path";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
@@ -152,7 +151,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		const { client } = parentRunHandle[INTERNAL];
 
 		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
-		const inputHash = await sha256(stableStringify(input));
+		const inputHash = await hashInput(input);
 
 		const reference = this.params.opts?.reference;
 		const path = getWorkflowRunPath(this.name, this.versionId, reference?.id ?? inputHash);

@@ -2,7 +2,7 @@
  * Stable JSON serialization that sorts object keys for deterministic hashing.
  * Ensures {a: 1, b: 2} and {b: 2, a: 1} produce the same hash.
  *
- * @param value - The value to serialize
+ * @param value - The record to serialize
  * @returns A stable JSON string representation
  *
  * @example
@@ -12,9 +12,13 @@
  * assert(hash1 === hash2); // true - same hash despite different key order
  * ```
  */
-export function stableStringify(value: unknown): string {
+export function stableStringify(value: Record<string, unknown>): string {
+	return stringifyValue(value);
+}
+
+function stringifyValue(value: unknown): string {
 	if (value === null || value === undefined) {
-		return JSON.stringify(null);
+		return "null";
 	}
 
 	if (typeof value !== "object") {
@@ -22,13 +26,16 @@ export function stableStringify(value: unknown): string {
 	}
 
 	if (Array.isArray(value)) {
-		return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+		return `[${value.map(stringifyValue).join(",")}]`;
 	}
 
 	const keys = Object.keys(value).sort();
-	const pairs = keys.map((key) => {
-		const val = (value as Record<string, unknown>)[key];
-		return `${JSON.stringify(key)}:${stableStringify(val)}`;
-	});
+	const pairs: string[] = [];
+	for (const key of keys) {
+		const keyValue = (value as Record<string, unknown>)[key];
+		if (keyValue !== undefined) {
+			pairs.push(`${JSON.stringify(key)}:${stringifyValue(keyValue)}`);
+		}
+	}
 	return `{${pairs.join(",")}}`;
 }

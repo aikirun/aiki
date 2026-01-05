@@ -1,8 +1,7 @@
 import { propsDefined, type RequiredProp } from "@aikirun/lib";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import { sha256 } from "@aikirun/lib/crypto";
+import { hashInput } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
-import { stableStringify } from "@aikirun/lib/json";
 import { getTaskPath, getWorkflowRunPath } from "@aikirun/lib/path";
 import type { TaskId, TaskInfo, TaskName, TaskPath, TaskState } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -112,7 +111,8 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	const now = Date.now();
 	const runId = crypto.randomUUID() as WorkflowRunId;
 
-	const inputHash = await sha256(stableStringify(request.input));
+	const inputHash = await hashInput(request.input);
+
 	const path = getWorkflowRunPath(name, versionId, request.options?.reference?.id ?? inputHash);
 	const trigger = request.options?.trigger;
 
@@ -338,7 +338,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: r
 	const now = Date.now();
 
 	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
-		inputHash = await sha256(stableStringify(request.taskState.input));
+		inputHash = await hashInput(request.taskState.input);
 		taskName = request.taskName as TaskName;
 		taskPath = getTaskPath(taskName, request.options?.reference?.id ?? inputHash);
 
@@ -407,7 +407,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 	const now = Date.now();
 
 	if (request.type === "new") {
-		const inputHash = await sha256(stableStringify(request.input));
+		const inputHash = await hashInput(request.input);
 		const taskPath = getTaskPath(request.taskName, request.reference?.id ?? inputHash);
 
 		const existingTaskInfo = run.tasks[taskPath];

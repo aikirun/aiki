@@ -1,8 +1,7 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
-import { sha256 } from "@aikirun/lib/crypto";
+import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
-import { stableStringify } from "@aikirun/lib/json";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { getTaskPath } from "@aikirun/lib/path";
 import type { RetryStrategy } from "@aikirun/lib/retry";
@@ -121,7 +120,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
-		const inputHash = await sha256(stableStringify(input));
+		const inputHash = await hashInput(input);
 
 		const reference = this.params.opts?.reference;
 		const path = getTaskPath(this.name, reference?.id ?? inputHash);
