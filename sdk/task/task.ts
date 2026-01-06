@@ -2,7 +2,12 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
-import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
+import {
+	objectOverrider,
+	type PathFromObject,
+	type RequireAtLeastOneProp,
+	type TypeOfValueAtPath,
+} from "@aikirun/lib/object";
 import { getTaskPath } from "@aikirun/lib/path";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
@@ -76,10 +81,10 @@ export interface TaskParams<Input, Output> {
 	name: string;
 	handler: (input: Input) => Promise<Output>;
 	opts?: TaskOptions;
-	schema?: {
+	schema?: RequireAtLeastOneProp<{
 		input?: Schema<Input>;
 		output?: Schema<Output>;
-	};
+	}>;
 }
 
 export interface Task<Input, Output> {

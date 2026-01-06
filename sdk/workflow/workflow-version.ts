@@ -4,7 +4,7 @@ import { createSerializableError } from "@aikirun/lib/error";
 import {
 	objectOverrider,
 	type PathFromObject,
-	type RequireAtLeastOneOf,
+	type RequireAtLeastOneProp,
 	type TypeOfValueAtPath,
 } from "@aikirun/lib/object";
 import { getWorkflowRunPath } from "@aikirun/lib/path";
@@ -39,13 +39,10 @@ export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinit
 	) => Promise<Output>;
 	events?: TEventsDefinition;
 	opts?: WorkflowOptions;
-	schema?: RequireAtLeastOneOf<
-		{
-			input?: Schema<Input>;
-			output?: Schema<Output>;
-		},
-		"input" | "output"
-	>;
+	schema?: RequireAtLeastOneProp<{
+		input?: Schema<Input>;
+		output?: Schema<Output>;
+	}>;
 }
 
 export interface WorkflowVersion<

@@ -1,9 +1,9 @@
 // biome-ignore-all lint/correctness/noUnusedVariables: the unused types are tests
-import type { RequireAtLeastOneOf } from "@aikirun/types/utils";
+import type { RequireAtLeastOneProp } from "@aikirun/types/utils";
 
 import type { NonEmptyArray } from "../array";
 import type { Equal, ExpectTrue } from "../testing/expect/types";
-export type { RequireAtLeastOneOf };
+export type { RequireAtLeastOneProp };
 
 export type EmptyRecord = Record<PropertyKey, never>;
 
@@ -21,16 +21,24 @@ export type UnionToRecord<T extends string> = {
 	[K in T]: K;
 };
 
-//#region <RequireAtLeastOneOf Tests>
-type TestRequireAtLeastOneOfProducesUnion = ExpectTrue<
+//#region <RequireAtLeastOneProp Tests>
+type TestRequireAtLeastOnePropProducesUnion = ExpectTrue<
 	Equal<
-		RequireAtLeastOneOf<{ a?: string; b?: number; c?: boolean }, "a" | "b">,
+		RequireAtLeastOneProp<{ a?: string; b?: number; c?: boolean }, "a" | "b">,
 		{ a: string; b?: number; c?: boolean } | { a?: string; b: number; c?: boolean }
 	>
 >;
-type TestRequireAtLeastOneOfPreservesPreviouslyRequiredProp = ExpectTrue<
+type TestRequireAtLeastOneDefaultIsUnionOfAllProps = ExpectTrue<
 	Equal<
-		RequireAtLeastOneOf<{ a: string; b?: number; c?: boolean }, "a" | "b">,
+		RequireAtLeastOneProp<{ a?: string; b?: number; c?: boolean }>,
+		| { a: string; b?: number; c?: boolean }
+		| { a?: string; b: number; c?: boolean }
+		| { a?: string; b?: number; c: boolean }
+	>
+>;
+type TestRequireAtLeastOnePropPreservesPreviouslyRequiredProp = ExpectTrue<
+	Equal<
+		RequireAtLeastOneProp<{ a: string; b?: number; c?: boolean }, "a" | "b">,
 		{ a: string; b?: number; c?: boolean } | { a: string; b: number; c?: boolean }
 	>
 >;
