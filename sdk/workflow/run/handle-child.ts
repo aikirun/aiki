@@ -5,6 +5,7 @@ import {
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
+	WorkflowRunConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 
@@ -167,12 +168,19 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
 
-		await parentRunHandle[INTERNAL].transitionState({
-			status: "awaiting_child_workflow",
-			childWorkflowRunId: handle.run.id,
-			childWorkflowRunStatus: expectedStatus,
-			timeoutInMs,
-		});
+		try {
+			await parentRunHandle[INTERNAL].transitionState({
+				status: "awaiting_child_workflow",
+				childWorkflowRunId: handle.run.id,
+				childWorkflowRunStatus: expectedStatus,
+				timeoutInMs,
+			});
+		} catch (error) {
+			if (error instanceof WorkflowRunConflictError) {
+				throw new WorkflowRunSuspendedError(parentRun.id);
+			}
+			throw error;
+		}
 
 		throw new WorkflowRunSuspendedError(parentRun.id);
 	}
