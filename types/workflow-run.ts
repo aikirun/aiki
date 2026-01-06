@@ -255,6 +255,7 @@ export interface ChildWorkflowWaitResultTimeout {
 }
 
 export interface WorkflowRunTransitionBase {
+	id: string;
 	createdAt: number;
 	type: "state" | "task_state";
 }

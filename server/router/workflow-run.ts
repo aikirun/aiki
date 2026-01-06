@@ -276,6 +276,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 	}
 
 	const transition: WorkflowRunTransition = {
+		id: crypto.randomUUID(),
 		type: "state",
 		createdAt: now,
 		state,
@@ -378,6 +379,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: r
 	context.logger.info({ runId, taskId, taskState }, "Transitioning task state");
 
 	const transition: WorkflowRunTransition = {
+		id: crypto.randomUUID(),
 		type: "task_state",
 		createdAt: now,
 		taskId,
@@ -427,6 +429,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		};
 
 		const runningTransition: WorkflowRunTransition = {
+			id: crypto.randomUUID(),
 			type: "task_state",
 			createdAt: now,
 			taskId,
@@ -439,6 +442,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 				: { status: request.state.status satisfies "failed", attempts: 1, error: request.state.error };
 
 		const finalTransition: WorkflowRunTransition = {
+			id: crypto.randomUUID(),
 			type: "task_state",
 			createdAt: now,
 			taskId,
@@ -473,6 +477,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			: { status: request.state.status satisfies "failed", attempts: attempts + 1, error: request.state.error };
 
 	const finalTransition: WorkflowRunTransition = {
+		id: crypto.randomUUID(),
 		type: "task_state",
 		createdAt: now,
 		taskId: existingTaskInfo.id,

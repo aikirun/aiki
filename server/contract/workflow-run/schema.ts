@@ -320,11 +320,13 @@ export const workflowRunSchema: Zt<WorkflowRun> = z.object({
 
 export const workflowRunTransitionSchema: Zt<WorkflowRunTransition> = z.discriminatedUnion("type", [
 	z.object({
+		id: z.string(),
 		type: z.literal("state"),
 		createdAt: z.number(),
 		state: workflowRunStateSchema,
 	}),
 	z.object({
+		id: z.string(),
 		type: z.literal("task_state"),
 		createdAt: z.number(),
 		taskId: z.string(),
