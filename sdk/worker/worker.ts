@@ -12,7 +12,6 @@ import { delay, fireAndForget } from "@aikirun/lib/async";
 import { isServerConflictError } from "@aikirun/lib/error";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { TaskFailedError } from "@aikirun/types/task";
 import type { WorkerId, WorkerName } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
@@ -408,7 +407,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				error instanceof WorkflowRunNotExecutableError ||
 				error instanceof WorkflowRunSuspendedError ||
 				error instanceof WorkflowRunFailedError ||
-				error instanceof TaskFailedError ||
 				isServerConflictError(error)
 			) {
 				shouldAcknowledge = true;

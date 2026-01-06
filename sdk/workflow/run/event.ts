@@ -4,6 +4,7 @@ import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import type { EventName, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
+import type { Schema } from "@aikirun/types/validator";
 import {
 	type WorkflowRun,
 	WorkflowRunFailedError,
@@ -50,10 +51,6 @@ export interface EventParams<Data> {
 interface EventDefinition<Data> {
 	_type: Data;
 	schema?: Schema<Data>;
-}
-
-export interface Schema<Data> {
-	parse: (data: unknown) => Data;
 }
 
 export type EventsDefinition = Record<string, EventDefinition<unknown>>;

@@ -18,6 +18,7 @@ import type {
 	TaskStateRunning,
 } from "@aikirun/types/task";
 import { TaskFailedError, type TaskName } from "@aikirun/types/task";
+import type { Schema } from "@aikirun/types/validator";
 import { WorkflowRunFailedError, type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
 import type { EventsDefinition } from "sdk/workflow/run/event";
@@ -75,6 +76,10 @@ export interface TaskParams<Input, Output> {
 	name: string;
 	handler: (input: Input) => Promise<Output>;
 	opts?: TaskOptions;
+	schema?: {
+		input?: Schema<Input>;
+		output?: Schema<Output>;
+	};
 }
 
 export interface Task<Input, Output> {
@@ -119,7 +124,21 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const handle = run[INTERNAL].handle;
 		handle[INTERNAL].assertExecutionAllowed();
 
-		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
+		const inputRaw = isNonEmptyArray(args) ? args[0] : (undefined as Input);
+		let input = inputRaw;
+		if (this.params.schema?.input) {
+			try {
+				input = this.params.schema.input.parse(inputRaw);
+			} catch (error) {
+				await handle[INTERNAL].transitionState({
+					status: "failed",
+					cause: "self",
+					error: createSerializableError(error),
+				});
+				throw new WorkflowRunFailedError(run.id, handle.run.attempts);
+			}
+		}
+
 		const inputHash = await hashInput(input);
 
 		const reference = this.params.opts?.reference;
@@ -211,9 +230,26 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		while (true) {
 			try {
-				const output = await this.params.handler(input);
+				const outputRaw = await this.params.handler(input);
+				let output = outputRaw;
+				if (this.params.schema?.output) {
+					try {
+						output = this.params.schema.output.parse(outputRaw);
+					} catch (error) {
+						await run[INTERNAL].handle[INTERNAL].transitionState({
+							status: "failed",
+							cause: "self",
+							error: createSerializableError(error),
+						});
+						throw new WorkflowRunFailedError(run.id, run[INTERNAL].handle.run.attempts);
+					}
+				}
 				return { output, lastAttempt: attempts };
 			} catch (error) {
+				if (error instanceof WorkflowRunFailedError || error instanceof WorkflowRunSuspendedError) {
+					throw error;
+				}
+
 				const serializableError = createSerializableError(error);
 
 				const retryParams = getRetryParams(attempts, retryStrategy);

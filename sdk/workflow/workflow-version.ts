@@ -1,12 +1,18 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
-import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
+import {
+	objectOverrider,
+	type PathFromObject,
+	type RequireAtLeastOneOf,
+	type TypeOfValueAtPath,
+} from "@aikirun/lib/object";
 import { getWorkflowRunPath } from "@aikirun/lib/path";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { TaskFailedError } from "@aikirun/types/task";
+import type { Schema } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type ChildWorkflowRunInfo,
@@ -33,6 +39,13 @@ export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinit
 	) => Promise<Output>;
 	events?: TEventsDefinition;
 	opts?: WorkflowOptions;
+	schema?: RequireAtLeastOneOf<
+		{
+			input?: Schema<Input>;
+			output?: Schema<Output>;
+		},
+		"input" | "output"
+	>;
 }
 
 export interface WorkflowVersion<
@@ -132,10 +145,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		client: Client<AppContext>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+		const inputRaw = isNonEmptyArray(args) ? args[0] : undefined;
+		const input = this.params.schema?.input ? this.params.schema.input.parse(inputRaw) : inputRaw;
+
 		const { run } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
-			input: isNonEmptyArray(args) ? args[0] : undefined,
+			input,
 			options: this.params.opts,
 		});
 		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
@@ -150,7 +166,21 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 		const { client } = parentRunHandle[INTERNAL];
 
-		const input = isNonEmptyArray(args) ? args[0] : (undefined as Input);
+		const inputRaw = isNonEmptyArray(args) ? args[0] : (undefined as Input);
+		let input = inputRaw;
+		if (this.params.schema?.input) {
+			try {
+				input = this.params.schema.input.parse(inputRaw);
+			} catch (error) {
+				await parentRunHandle[INTERNAL].transitionState({
+					status: "failed",
+					cause: "self",
+					error: createSerializableError(error),
+				});
+				throw new WorkflowRunFailedError(parentRun.id, parentRunHandle.run.attempts);
+			}
+		}
+
 		const inputHash = await hashInput(input);
 
 		const reference = this.params.opts?.reference;
@@ -280,7 +310,22 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	): Promise<Output> {
 		while (true) {
 			try {
-				return await this.params.handler(run, input, context);
+				const outputRaw = await this.params.handler(run, input, context);
+				let output = outputRaw;
+				if (this.params.schema?.output) {
+					try {
+						output = this.params.schema.output.parse(outputRaw);
+					} catch (error) {
+						const { handle } = run[INTERNAL];
+						await handle[INTERNAL].transitionState({
+							status: "failed",
+							cause: "self",
+							error: createSerializableError(error),
+						});
+						throw new WorkflowRunFailedError(run.id, handle.run.attempts);
+					}
+				}
+				return output;
 			} catch (error) {
 				if (error instanceof WorkflowRunSuspendedError || error instanceof WorkflowRunFailedError) {
 					throw error;
