@@ -7,6 +7,7 @@ import {
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
+	WorkflowRunConflictError,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
 	type WorkflowRunState,
@@ -321,39 +322,53 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 	}
 
 	private async transitionState(targetState: WorkflowRunStateRequest): Promise<void> {
-		if (
-			(targetState.status === "scheduled" &&
-				(targetState.reason === "new" || targetState.reason === "resume" || targetState.reason === "awake")) ||
-			targetState.status === "paused" ||
-			targetState.status === "cancelled"
-		) {
+		try {
+			if (
+				(targetState.status === "scheduled" &&
+					(targetState.reason === "new" || targetState.reason === "resume" || targetState.reason === "awake")) ||
+				targetState.status === "paused" ||
+				targetState.status === "cancelled"
+			) {
+				const { run } = await this.api.workflowRun.transitionStateV1({
+					type: "pessimistic",
+					id: this.run.id,
+					state: targetState,
+				});
+				this._run = run as WorkflowRun<Input, Output>;
+				return;
+			}
 			const { run } = await this.api.workflowRun.transitionStateV1({
-				type: "pessimistic",
+				type: "optimistic",
 				id: this.run.id,
 				state: targetState,
+				expectedRevision: this.run.revision,
 			});
 			this._run = run as WorkflowRun<Input, Output>;
-			return;
+		} catch (error) {
+			if (isConflictError(error)) {
+				throw new WorkflowRunConflictError(this.run.id as WorkflowRunId);
+			}
+			throw error;
 		}
-		const { run } = await this.api.workflowRun.transitionStateV1({
-			type: "optimistic",
-			id: this.run.id,
-			state: targetState,
-			expectedRevision: this.run.revision,
-		});
-		this._run = run as WorkflowRun<Input, Output>;
 	}
 
 	private async transitionTaskState(
 		request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedRevision">
 	): Promise<{ taskId: TaskId }> {
-		const { run, taskId } = await this.api.workflowRun.transitionTaskStateV1({
-			...request,
-			id: this.run.id,
-			expectedRevision: this.run.revision,
-		});
-		this._run = run as WorkflowRun<Input, Output>;
-		return { taskId: taskId as TaskId };
+		try {
+			const { run, taskId } = await this.api.workflowRun.transitionTaskStateV1({
+				...request,
+				id: this.run.id,
+				expectedRevision: this.run.revision,
+			});
+			this._run = run as WorkflowRun<Input, Output>;
+			return { taskId: taskId as TaskId };
+		} catch (error) {
+			if (isConflictError(error)) {
+				throw new WorkflowRunConflictError(this.run.id as WorkflowRunId);
+			}
+			throw error;
+		}
 	}
 
 	private assertExecutionAllowed() {
@@ -362,4 +377,8 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 			throw new WorkflowRunNotExecutableError(this.run.id as WorkflowRunId, status);
 		}
 	}
+}
+
+function isConflictError(error: unknown): boolean {
+	return error != null && typeof error === "object" && "code" in error && error.code === "CONFLICT";
 }

@@ -24,7 +24,12 @@ import type {
 } from "@aikirun/types/task";
 import { TaskFailedError, type TaskName } from "@aikirun/types/task";
 import type { Schema } from "@aikirun/types/validator";
-import { WorkflowRunFailedError, type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
+import {
+	WorkflowRunConflictError,
+	WorkflowRunFailedError,
+	type WorkflowRunId,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
 import type { EventsDefinition } from "sdk/workflow/run/event";
 
@@ -228,9 +233,9 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		let attempts = currentAttempt;
 
 		// TODO: Add test cases for this:
-		// Infra changes like transitioning of task state should not consume retry budged
+		// Infra changes like transitioning of task state should not consume retry budget.
 		// Even if task crashes while trying to transition state, it will be picked up
-		// by another worker, who will detect either fail the task if retry budget is
+		// by another worker, who will either fail the task if retry budget is
 		// exhaused or retry the task
 
 		while (true) {
@@ -251,7 +256,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				}
 				return { output, lastAttempt: attempts };
 			} catch (error) {
-				if (error instanceof WorkflowRunFailedError || error instanceof WorkflowRunSuspendedError) {
+				if (
+					error instanceof WorkflowRunFailedError ||
+					error instanceof WorkflowRunSuspendedError ||
+					error instanceof WorkflowRunConflictError
+				) {
 					throw error;
 				}
 

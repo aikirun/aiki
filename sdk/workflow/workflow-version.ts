@@ -19,6 +19,7 @@ import {
 	type WorkflowOptions,
 	type WorkflowReferenceOptions,
 	type WorkflowRun,
+	WorkflowRunConflictError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	type WorkflowRunStateFailed,
@@ -324,7 +325,11 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 				}
 				return output;
 			} catch (error) {
-				if (error instanceof WorkflowRunSuspendedError || error instanceof WorkflowRunFailedError) {
+				if (
+					error instanceof WorkflowRunSuspendedError ||
+					error instanceof WorkflowRunFailedError ||
+					error instanceof WorkflowRunConflictError
+				) {
 					throw error;
 				}
 

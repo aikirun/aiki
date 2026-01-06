@@ -304,3 +304,10 @@ export class WorkflowRunFailedError extends Error {
 		this.name = "WorkflowRunFailedError";
 	}
 }
+
+export class WorkflowRunConflictError extends Error {
+	constructor(public readonly id: WorkflowRunId) {
+		super(`Conflict while trying to update Workflow run ${id}`);
+		this.name = "WorkflowRunConflictError";
+	}
+}
