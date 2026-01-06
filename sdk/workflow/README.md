@@ -232,9 +232,11 @@ Failed workflows transition to `awaiting_retry` state and are automatically retr
 
 ### Expected Errors
 
-`WorkflowRunSuspendedError` is thrown when a workflow suspends (e.g., during sleep).
-This is expected behavior - the worker catches this error and the workflow resumes
-when the sleep completes. Do not catch this error in workflow code.
+These errors are thrown during normal workflow execution and should not be caught in workflow code:
+
+- `WorkflowRunSuspendedError` - Thrown when a workflow suspends (e.g., during sleep or awaiting events). The worker catches this error and the workflow resumes when the condition is met.
+
+- `WorkflowRunConflictError` - Thrown when another worker has already claimed the workflow execution. This prevents duplicate execution when workers race to process the same workflow.
 
 ## Best Practices
 
