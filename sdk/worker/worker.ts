@@ -9,7 +9,6 @@ import type {
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { delay, fireAndForget } from "@aikirun/lib/async";
-import { isServerConflictError } from "@aikirun/lib/error";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkerId, WorkerName } from "@aikirun/types/worker";
@@ -406,8 +405,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			if (
 				error instanceof WorkflowRunNotExecutableError ||
 				error instanceof WorkflowRunSuspendedError ||
-				error instanceof WorkflowRunFailedError ||
-				isServerConflictError(error)
+				error instanceof WorkflowRunFailedError
 			) {
 				shouldAcknowledge = true;
 			} else {
