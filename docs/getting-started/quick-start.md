@@ -109,4 +109,4 @@ Note: By default, `waitForStatus` waits indefinitely. To add a timeout, use:
 
 - **[Your First Workflow](./first-workflow.md)** - Build a more realistic workflow with multiple tasks and delays
 - **[Core Concepts](../core-concepts/)** - Understand workflows, tasks, and workers in depth
-- **[Task Determinism](../guides/task-determinism.md)** - Learn best practices for reliable tasks
+- **[Determinism](../guides/determinism.md)** - Learn best practices for reliable workflows

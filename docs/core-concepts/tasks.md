@@ -192,5 +192,5 @@ See the **[Dependency Injection Guide](../guides/dependency-injection.md)** for 
 ## Next Steps
 
 - **[Workflows](./workflows.md)** - Learn about workflow orchestration
-- **[Task Determinism](../guides/task-determinism.md)** - Why tasks should be deterministic
+- **[Determinism](../guides/determinism.md)** - Workflow determinism and task idempotency
 - **[Reference IDs](../guides/reference-ids.md)** - Custom identifiers for workflows and tasks

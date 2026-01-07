@@ -232,6 +232,6 @@ If the server crashes at any point—during payment, delivery, or the 1-day wait
 
 ## Next Steps
 
-- **[Task Determinism](../guides/task-determinism.md)** - Learn why tasks should be deterministic
+- **[Determinism](../guides/determinism.md)** - Learn about workflow determinism and task idempotency
 - **[Reference IDs](../guides/reference-ids.md)** - Custom identifiers for workflows and tasks
 - **[Workflows](../core-concepts/workflows.md)** - Deep dive into workflow concepts

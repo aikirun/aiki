@@ -152,10 +152,10 @@ const chargeCard = task({
 });
 ```
 
-See the [Task Determinism Guide](./task-determinism.md) for more on writing reliable tasks.
+See the [Determinism Guide](./determinism.md) for more on writing reliable workflows and tasks.
 
 ## Next Steps
 
 - **[Tasks](../core-concepts/tasks.md)** - Task configuration and execution
 - **[Workflows](../core-concepts/workflows.md)** - Workflow orchestration
-- **[Task Determinism](./task-determinism.md)** - Writing reliable, deterministic code
+- **[Determinism](./determinism.md)** - Workflow determinism and task idempotency

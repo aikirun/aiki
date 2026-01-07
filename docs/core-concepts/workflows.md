@@ -239,4 +239,4 @@ await handle.cancel("User requested cancellation");
 
 - **[Tasks](./tasks.md)** - Learn about task execution
 - **[Workers](./workers.md)** - Understand worker configuration
-- **[Task Determinism](../guides/task-determinism.md)** - Write reliable workflows
+- **[Determinism](../guides/determinism.md)** - Write reliable workflows
