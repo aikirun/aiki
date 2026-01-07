@@ -62,37 +62,14 @@ workflow lifecycle, task management tracks task execution, and the storage layer
 ### 3. Message Queue
 
 The message queue provides high-performance message distribution using consumer groups for work distribution, message
-claiming for fault tolerance, parallel stream processing, and round-robin work allocation.
+claiming for fault tolerance, and automatic load balancing (workers pull work when they have capacity).
 
 **Available implementations**: Redis Streams (default). See [Redis Streams](./redis-streams.md) for details.
 
 ### 4. Workers
 
-Workers execute workflows in your infrastructure by polling for workflow runs, executing tasks in sequence, reporting
-results to the server, and handling retries and failures.
-
-## Design Principles
-
-### Separation of Concerns
-
-Aiki separates orchestration (handled by the Aiki Server), execution (handled by workers in your environment), state
-management (centralized in storage), and communication (through the message queue).
-
-### Security by Design
-
-Security is built into the architecture: your code runs exclusively on your infrastructure, the Aiki server never
-executes your code, all traffic uses TLS encryption, and your data never leaves your environment.
-
-### Fault Tolerance
-
-The system achieves fault tolerance through state persistence that allows workflows to survive restarts, message
-claiming that lets workers claim stuck workflows, automatic retries for failed tasks, and graceful degradation that
-keeps the system running with reduced capacity.
-
-### Event-Driven Architecture
-
-Components communicate through events, creating loose coupling between server and workers. This enables scalable message
-distribution and reliable event delivery.
+Workers execute workflows in your infrastructure by receiving workflow runs from the message queue, executing workflow
+logic and tasks, reporting results to the server, and handling retries and failures.
 
 ## Data Flow
 
@@ -117,70 +94,21 @@ Application → SDK Client → Aiki Server → Storage
 Message Queue → Worker → Task Execution → Server
 ```
 
-1. Worker polls message queue for workflow runs
-2. Worker receives workflow run message
-3. Worker loads workflow definition
-4. Worker executes tasks in sequence
-5. Worker reports results to server
-6. Server updates state in storage
+1. Worker receives workflow run message from queue
+2. Worker loads workflow definition
+3. Worker executes workflow logic and tasks
+4. Worker reports results to server
+5. Server updates state in storage
 
-### 3. State Synchronization
+### 3. State Updates
 
 ```
-Worker ←→ Server ←→ Storage
+Worker → Server → Storage → Subscribers
 ```
 
-1. Worker sends heartbeat to server
-2. Server updates worker status
-3. Server publishes workflow updates
-4. Other workers receive updates if needed
-
-## Deployment Models
-
-### Self-Hosted
-
-Deploy all components in your infrastructure for full control over deployment, custom security policies, integration
-with existing systems, and no vendor lock-in. This requires running the Aiki Server (Docker/VM), a message queue (Redis by default),
-PostgreSQL for storage, and workers in your infrastructure.
-
-### Cloud-Based
-
-Use a managed Aiki service that handles the server and message queue with automatic scaling, built-in monitoring, and reduced
-operational overhead. You're responsible for running workers in your cloud account and optionally managing your storage.
-
-### Hybrid
-
-Combine self-hosted and managed components for flexibility in deployment, cost optimization, meeting compliance
-requirements, and geographic distribution.
-
-## Scalability
-
-### Horizontal Scaling
-
-Scale horizontally by adding more workers to increase throughput, scaling server instances for high availability,
-clustering the message queue for distributed processing, and implementing read replicas and sharding for storage.
-
-### Performance Optimization
-
-Optimize performance by caching frequently accessed data, using connection pooling to reuse database connections, batch
-processing multiple items together, and leveraging async processing for non-blocking operations.
-
-## Security Considerations
-
-### Network Security
-
-Protect network communications with TLS encryption for all communication, authentication for API access, role-based
-access control, and network isolation through VPC or firewall rules.
-
-### Data Security
-
-Secure data with encryption at rest for stored data, encryption in transit for network traffic, data residency controls,
-and access logging and auditing.
-
-### Execution Security
-
-Ensure execution security through code isolation in worker environments, resource limits to prevent exhaustion,
-sandboxing to limit system access, and regular security updates.
+1. Worker updates workflow run state via server
+2. Server persists state to storage
+3. Server streams updates to subscribers (SSE for browsers, pub-sub for backend services)
 
 ## Next Steps
 

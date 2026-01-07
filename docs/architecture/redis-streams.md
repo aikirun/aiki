@@ -1,353 +1,98 @@
 # Redis Streams
 
-Aiki uses Redis Streams for high-performance, fault-tolerant message distribution between the server and workers.
+Aiki uses Redis Streams for work distribution and fault tolerance. This document explains how Aiki leverages streams, not how Redis Streams work (see the [official Redis documentation](https://redis.io/docs/data-types/streams/) for that).
 
-## Why Redis Streams?
+## How Aiki Uses Streams
 
-Redis Streams provides high performance capable of handling millions of messages per second. Built-in fault tolerance
-through message claiming (XPENDING/XCLAIM) ensures reliability. Consumer groups enable automatic work distribution
-across workers. Messages persist through Redis restarts, and the system supports parallel processing of multiple streams
-concurrently.
+### Stream Per Workflow
 
-## Stream Organization
-
-### Stream Naming
-
-One stream per workflow type:
+Each workflow type gets its own stream:
 
 ```
-workflow:order-processing
-workflow:user-onboarding
-workflow:email-sending
+workflow/order-processing/1.0.0
+workflow/user-onboarding/1.0.0
+workflow/email-sending/2.0.0
 ```
 
-With sharding:
+With sharding enabled:
 
 ```
-workflow:order-processing:us-east
-workflow:order-processing:eu-west
+workflow/order-processing/1.0.0/us-east
+workflow/order-processing/1.0.0/eu-west
 ```
 
-### Consumer Groups
+### Work Distribution
 
-Each worker belongs to a consumer group:
+Workers use consumer groups to receive work:
 
-```
-Group: aiki-workers
-Consumer: worker-1
-Consumer: worker-2
-Consumer: worker-3
-```
-
-Messages are distributed across consumers automatically.
-
-## Key Operations
-
-### XREADGROUP - Message Retrieval
-
-Workers read messages using XREADGROUP:
-
-```redis
-XREADGROUP GROUP aiki-workers worker-1
-  BLOCK 1000
-  COUNT 10
-  STREAMS workflow:orders >
-```
-
-**Parameters:**
-
-- `GROUP`: Consumer group name
-- `worker-1`: Consumer ID (worker ID)
-- `BLOCK 1000`: Wait 1 second for messages
-- `COUNT 10`: Read up to 10 messages
-- `>`: Only new messages
-
-**Parallel reads:**
-
-```typescript
-const results = await Promise.allSettled(
-	streams.map((stream) =>
-		redis.xreadgroup(
-			"GROUP",
-			"aiki-workers",
-			workerId,
-			"BLOCK",
-			blockTimeMs,
-			"COUNT",
-			batchSize,
-			"STREAMS",
-			stream,
-			">",
-		)
-	),
-);
-```
-
-### XPENDING - Stuck Message Detection
-
-Identify messages from failed workers:
-
-```redis
-XPENDING workflow:orders aiki-workers
-  - + 100
-  claimMinIdleTimeMs
-```
-
-**Returns:**
-
-- Messages idle > `claimMinIdleTimeMs`
-- Consumer that claimed the message
-- Idle time for each message
-- Delivery count
-
-**Parallel scanning:**
-
-```typescript
-const pendingResults = await Promise.allSettled(
-	streams.map((stream) =>
-		redis.xpending(
-			stream,
-			"aiki-workers",
-			"-",
-			"+",
-			100,
-			workerId,
-		)
-	),
-);
-```
-
-### XCLAIM - Message Recovery
-
-Claim stuck messages from failed workers:
-
-```redis
-XCLAIM workflow:orders aiki-workers worker-2
-  claimMinIdleTimeMs
-  <message-id>
-```
-
-The claiming process finds stuck messages with XPENDING, filters by idle time, claims ownership with XCLAIM, and
-re-executes the workflow.
-
-**Parallel claiming:**
-
-```typescript
-const claimResults = await Promise.allSettled(
-	messagesToClaim.map(({ stream, messageId }) =>
-		redis.xclaim(
-			stream,
-			"aiki-workers",
-			workerId,
-			claimMinIdleTimeMs,
-			messageId,
-		)
-	),
-);
-```
-
-## Message Format
-
-### Workflow Run Message
-
-```json
-{
-	"id": "run-123",
-	"name": "order-processing",
-	"version": "1.0.0",
-	"payload": {
-		"orderId": "order-456",
-		"amount": 99.99
-	},
-	"referenceId": "order-456-process",
-	"createdAt": 1234567890
-}
-```
+- When a workflow is started, the server publishes a message to the appropriate stream
+- Workers receive messages when they have capacity (automatic load balancing)
+- Each message is delivered to exactly one worker in the consumer group
+- No central coordinator assigns work; workers pull when ready
 
 ### Message Lifecycle
 
-```
-1. Server → XADD: Publish message
-2. Worker → XREADGROUP: Read message
-3. Worker: Process workflow
-4. Worker → XACK: Acknowledge completion
-5. Redis: Remove from pending list
-```
+1. Server publishes workflow run message to stream
+2. Worker receives message from consumer group
+3. Worker executes workflow, sending periodic heartbeats to refresh its claim
+4. Worker acknowledges message on completion
+5. If worker crashes before acknowledging, message remains pending (heartbeats stop)
 
 ## Fault Tolerance
 
-### Dead Worker Detection
+The key benefit of Redis Streams for Aiki is fault tolerance through message claiming.
 
-```
-1. Worker-1 crashes during execution
-2. Message remains in pending list
-3. XPENDING shows message idle > 60s
-4. Worker-2 sees idle message
-5. Worker-2 executes XCLAIM
-6. Worker-2 processes workflow
-```
+### Work Stealing
 
-### Message Claiming Flow
+When a worker crashes mid-execution:
 
-```typescript
-// Find stuck messages
-const pending = await redis.xpending(
-	stream,
-	group,
-	"-",
-	"+",
-	100,
-);
+1. The message stays in the pending list (unacknowledged)
+2. Other workers periodically scan for idle messages
+3. If a message has been idle longer than `claimMinIdleTimeMs`, any worker can claim it
+4. The claiming worker takes over and re-executes the workflow
 
-// Filter by idle time
-const stuckMessages = pending.filter((msg) => msg.idle > claimMinIdleTimeMs);
+This "work stealing" ensures no workflow is lost due to worker failures.
 
-// Claim messages
-for (const msg of stuckMessages) {
-	await redis.xclaim(
-		stream,
-		group,
-		workerId,
-		claimMinIdleTimeMs,
-		msg.id,
-	);
-}
-```
+### Safe Re-execution
 
-### Reference IDs
+When a claimed workflow re-executes:
 
-Reference IDs are custom identifiers assigned to workflows. They enable lookup by reference ID and prevent
-duplicate execution. If a worker crashes after processing but before acknowledging, the message is claimed and
-re-processed by another worker. Reference IDs ensure the workflow isn't executed twice in these scenarios.
+- **Tasks return cached results** - Already-completed tasks don't run again
+- **Reference IDs prevent duplicates** - External operations with reference IDs remain idempotent
+- **State is preserved** - The workflow resumes from its persisted state
 
-## Performance Optimizations
-
-### Parallel Operations
-
-```typescript
-// Read from multiple streams in parallel
-const reads = streams.map(stream =>
-  redis.xreadgroup(...)
-);
-await Promise.allSettled(reads);
-
-// Claim from multiple streams in parallel
-const claims = messages.map(msg =>
-  redis.xclaim(...)
-);
-await Promise.allSettled(claims);
-```
-
-### Stream Shuffling
-
-Randomize stream order for fairness:
-
-```typescript
-function shuffleArray(array) {
-	for (let i = array.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
-		[array[i], array[j]] = [array[j], array[i]];
-	}
-	return array;
-}
-
-const shuffledStreams = shuffleArray([...streams]);
-```
-
-### Batch Size Distribution
-
-Round-robin batch sizes:
-
-```typescript
-const batchSizes = distributeBatchSize(
-	totalBatchSize,
-	streamCount,
-);
-
-// [5, 5] for totalBatchSize=10, streamCount=2
-// [4, 3, 3] for totalBatchSize=10, streamCount=3
-```
-
-### Connection Pooling
-
-Reuse Redis connections:
-
-```typescript
-const redis = new Redis({
-	host: "localhost",
-	port: 6379,
-	maxRetriesPerRequest: 3,
-	enableReadyCheck: true,
-	lazyConnect: false,
-});
-```
+This means work stealing is safe. Re-executing a workflow doesn't cause duplicate side effects for properly designed tasks.
 
 ## Configuration
 
-### Server-Side
+Configure stream behavior in worker options:
 
 ```typescript
-// Publish workflow run
-await redis.xadd(
-	`workflow:${name}`,
-	"*",
-	"data",
-	JSON.stringify(workflowRun),
-);
-```
-
-### Worker-Side
-
-```typescript
-const worker = worker(client, {
+const orderWorker = worker({
+	name: "order-worker",
+	workflows: [orderWorkflowV1],
 	subscriber: {
 		type: "redis",
-		claimMinIdleTimeMs: 60_000, // Claim after 60s
-		blockTimeMs: 1000, // Block for 1s
-		batchSize: 10, // Read 10 messages
+		claimMinIdleTimeMs: 180_000, // Claim messages idle > 3 minutes
+		blockTimeMs: 1000,           // Wait up to 1s for new messages
 	},
 });
 ```
 
-## Monitoring
+| Option | Default | Description |
+|--------|---------|-------------|
+| `claimMinIdleTimeMs` | 180,000 | How long a message must be idle before other workers can claim it |
+| `blockTimeMs` | 1,000 | How long to wait for new messages before checking for claimable work |
 
-### Stream Metrics
+Heartbeat interval is configured separately in worker options:
 
-```bash
-# Stream length
-XLEN workflow:orders
+| Option | Default | Description |
+|--------|---------|-------------|
+| `workflowRun.heartbeatIntervalMs` | 30,000 | How often workers refresh their claim on a message |
 
-# Pending messages
-XPENDING workflow:orders aiki-workers
-
-# Consumer info
-XINFO CONSUMERS workflow:orders aiki-workers
-```
-
-### Health Checks
-
-```typescript
-// Check Redis connection
-const ping = await redis.ping();
-
-// Check stream exists
-const length = await redis.xlen(streamName);
-
-// Check consumer group exists
-const groups = await redis.xinfo("GROUPS", streamName);
-```
-
-## Best Practices
-
-1. **Set Appropriate Claim Times** - Balance recovery speed vs duplicate work
-2. **Monitor Pending Messages** - Track stuck messages
-3. **Use Reference IDs** - Prevent duplicate execution
-4. **Configure Persistence** - Enable AOF/RDB for Redis
-5. **Tune Batch Sizes** - Balance throughput and latency
-6. **Parallel Processing** - Process multiple streams concurrently
+**Choosing `claimMinIdleTimeMs`**: Set this higher than the heartbeat interval. Workers refresh their claim every heartbeat, so a message only becomes "idle" when a worker stops heartbeating (crashes or hangs). The default of 3 minutes with 30-second heartbeats gives plenty of margin.
 
 ## Next Steps
 
-- **[Workers](./workers.md)** - Worker architecture details
-- **[Server](./server.md)** - Server architecture
+- **[Workers](../core-concepts/workers.md)** - Worker configuration
 - **[Overview](./overview.md)** - High-level architecture
