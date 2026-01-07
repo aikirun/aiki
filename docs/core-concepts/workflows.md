@@ -216,6 +216,95 @@ await handle.resume();
 await handle.cancel("User requested cancellation");
 ```
 
+## Child Workflows
+
+Workflows can start other workflows as children. By default, child workflows run in a fire-and-forget manner - the parent continues without waiting.
+
+### Starting a Child Workflow
+
+```typescript
+const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
+	async handler(run, input) {
+		// Fire and forget - parent continues immediately
+		await childWorkflowV1.startAsChild(run, { userId: input.userId });
+
+		// Parent continues without waiting for child
+		await doOtherWork.start(run, input);
+	},
+});
+```
+
+### Waiting for Child Completion
+
+To wait for a child workflow to complete, call `waitForStatus()` on the child handle:
+
+```typescript
+const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
+	async handler(run, input) {
+		const childHandle = await childWorkflowV1.startAsChild(run, { userId: input.userId });
+
+		// Parent suspends until child completes
+		const result = await childHandle.waitForStatus("completed");
+
+		if (result.success) {
+			return { childOutput: result.state.output };
+		} else {
+			throw new Error(`Child failed: ${result.cause}`);
+		}
+	},
+});
+```
+
+You can also wait with a timeout:
+
+```typescript
+const result = await childHandle.waitForStatus("completed", {
+	timeout: { hours: 1 },
+});
+
+if (result.timeout) {
+	// Child didn't complete within 1 hour
+}
+```
+
+Like sleeps and events, child workflow waits have an internal queue. On replay, if the parent already waited for a child to complete, the cached result is returned immediately instead of waiting again.
+
+### Reference IDs for Child Workflows
+
+Use reference IDs to ensure idempotent child workflow creation:
+
+```typescript
+const childHandle = await childWorkflowV1
+	.with()
+	.opt("reference.id", `process-user-${input.userId}`)
+	.startAsChild(run, { userId: input.userId });
+```
+
+Without a reference ID, child workflows are deduplicated by input hash.
+
+### Conflict Policies
+
+When starting a child workflow multiple times with the same reference ID but different inputs, Aiki provides two conflict policies:
+
+```typescript
+// Default: "error" - fails the parent workflow
+const childHandle = await childWorkflowV1
+	.with()
+	.opt("reference.id", "unique-id")
+	.startAsChild(run, input);
+
+// Alternative: "return_existing" - returns the existing child run
+const childHandle = await childWorkflowV1
+	.with()
+	.opt("reference", { id: "unique-id", onConflict: "return_existing" })
+	.startAsChild(run, input);
+```
+
+| Policy | Behavior |
+|--------|----------|
+| `"error"` (default) | Fails the parent workflow if reference ID exists with different inputs |
+| `"return_existing"` | Returns the existing child workflow run |
+
 ## Next Steps
 
 - **[Tasks](./tasks.md)** - Learn about task execution
