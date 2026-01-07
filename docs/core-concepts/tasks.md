@@ -1,7 +1,6 @@
 # Tasks
 
-Tasks are the building blocks of workflows. Each task represents a single unit of work that can be executed and retried
-independently.
+Tasks are the building blocks of workflows. Each task represents a single unit of work that can be executed and retried independently.
 
 ## Defining a Task
 
@@ -83,6 +82,35 @@ const processPayment = task({
 
 For available strategies and best practices, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
 
+## Schema Validation
+
+Define schemas to validate task input and output at runtime:
+
+```typescript
+import { z } from "zod";
+
+const processPayment = task({
+	name: "process-payment",
+	handler(input: { paymentId: string; amount: number }) {
+		return paymentService.charge(input);
+	},
+	schema: {
+		input: z.object({
+			paymentId: z.string(),
+			amount: z.number().positive(),
+		}),
+		output: z.object({
+			transactionId: z.string(),
+			status: z.enum(["success", "failed"]),
+		}),
+	},
+});
+```
+
+Schemas use any validation library with a `parse(data: unknown) => T` method (Zod, ArkType, etc.).
+
+**Why use output schemas?** When task results are cached, the schema validates cached data on replay. If the cached shape doesn't match (e.g., after refactoring), the workflow fails immediately rather than silently returning mismatched data. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
+
 ## Task Input
 
 The task receives input directly:
@@ -141,56 +169,9 @@ await sendEmail.with().opt("reference.id", "second-email").start(run, {
 3. **Avoid side effects** - Be careful with external state
 4. **Use meaningful names** - Clear, descriptive task names
 
-## Common Patterns
-
-### Validation Task
-
-```typescript
-const validateOrder = task({
-	name: "validate-order",
-	handler(input: { items: Array<{ id: string; quantity: number }> }) {
-		if (input.items.length === 0) {
-			throw new Error("Order must have items");
-		}
-
-		return {
-			valid: true,
-			orderId: generateOrderId(input),
-		};
-	},
-});
-```
-
-### External API Call
-
-```typescript
-const fetchUserData = task({
-	name: "fetch-user-data",
-	handler(input: { userId: string }) {
-		return fetch(`https://api.example.com/users/${input.userId}`)
-			.then((res) => res.json());
-	},
-});
-```
-
-### Database Operation
-
-```typescript
-const updateInventory = task({
-	name: "update-inventory",
-	handler(input: { itemId: string; amount: number }) {
-		return db.inventory.update({
-			where: { id: input.itemId },
-			data: { quantity: { decrement: input.amount } },
-		});
-	},
-});
-```
-
-See the **[Dependency Injection Guide](../guides/dependency-injection.md)** for patterns on injecting dependencies like `db` into tasks.
-
 ## Next Steps
 
 - **[Workflows](./workflows.md)** - Learn about workflow orchestration
 - **[Determinism](../guides/determinism.md)** - Workflow determinism and task idempotency
 - **[Reference IDs](../guides/reference-ids.md)** - Custom identifiers for workflows and tasks
+- **[Dependency Injection](../guides/dependency-injection.md)** - Inject dependencies into tasks

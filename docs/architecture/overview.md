@@ -1,7 +1,6 @@
 # Architecture Overview
 
-Aiki follows a distributed architecture where workflow orchestration is separated from execution. This provides
-security, scalability, and flexibility.
+Aiki follows a distributed architecture where workflow orchestration is separated from execution. This provides security, scalability, and flexibility.
 
 ## System Design
 

@@ -58,6 +58,18 @@ const aikiClient = await client<AppContext>({
 
 See the [Dependency Injection Guide](../guides/dependency-injection.md) for more on `createContext` vs higher-order functions.
 
+### logger
+
+Optional custom logger implementation. Defaults to console logging:
+
+```typescript
+const aikiClient = await client({
+	url: "localhost:9876",
+	redis: { host: "localhost", port: 6379 },
+	logger: myCustomLogger, // Must implement Logger interface
+});
+```
+
 ## Starting Workflows
 
 Use the workflow version's `.start()` method:
@@ -93,36 +105,6 @@ Always close the client when done to release resources:
 ```typescript
 await aikiClient.close();
 ```
-
-## Example
-
-```typescript
-import { client } from "@aikirun/client";
-import { orderWorkflowV1 } from "./workflows";
-
-// Create client
-const aikiClient = await client({
-	url: "localhost:9876",
-	redis: { host: "localhost", port: 6379 },
-});
-
-// Start workflow
-const handle = await orderWorkflowV1.start(aikiClient, {
-	orderId: "order-123",
-	customerId: "customer-456",
-});
-
-console.log("Workflow started:", handle.run.id);
-
-// Clean up
-await aikiClient.close();
-```
-
-## Best Practices
-
-1. **Reuse clients** - Create one client and reuse it across your application
-2. **Use reference IDs** - Prevent duplicate workflow executions
-3. **Close clients** - Always close clients to release resources
 
 ## Next Steps
 

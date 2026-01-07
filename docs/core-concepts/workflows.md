@@ -1,7 +1,6 @@
 # Workflows
 
-A workflow is a recipe for a business process - it defines the steps needed to complete an operation. Workflows in Aiki
-are durable, versioned, and can contain complex logic.
+A workflow is a recipe for a business process - it defines the steps needed to complete an operation. Workflows in Aiki are durable, versioned, and can contain complex logic.
 
 ## Defining a Workflow
 
@@ -29,65 +28,6 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 		});
 
 		return { success: true, orderId: validation.orderId };
-	},
-});
-```
-
-## Workflow Properties
-
-### name
-
-A unique identifier for the workflow. Use descriptive names like `"user-onboarding"` or `"order-processing"`.
-
-### version
-
-Specified when calling `.v()`, following semantic versioning (e.g., `"1.0.0"`, `"2.1.0"`). Versioning lets you update
-workflows without breaking existing executions.
-
-### handler Function
-
-The main orchestration function that:
-
-- Receives input and a run context (`run`)
-- Executes tasks in sequence or parallel
-- Returns the workflow result
-
-## Workflow Logic
-
-The `handler` function orchestrates your workflow by calling tasks using `.start()`, implementing conditional logic to
-choose different paths based on data, transforming data between steps, applying application-specific business logic, and
-handling errors with custom recovery strategies.
-
-```typescript
-const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(run, input: { orderData: any }) {
-		// Validate order
-		const validation = await validateOrder.start(run, {
-			orderData: input.orderData,
-		});
-
-		// Business logic: Apply discount
-		let finalAmount = validation.amount;
-		if (validation.amount > 100) {
-			finalAmount = validation.amount * 0.9; // 10% discount
-		}
-
-		// Conditional execution
-		const payment = await processPayment.start(run, {
-			amount: finalAmount,
-		});
-
-		if (payment.success) {
-			await updateInventory.start(run, {
-				items: input.orderData.items,
-			});
-		} else {
-			await sendFailureNotification.start(run, {
-				reason: payment.error,
-			});
-		}
-
-		return { success: payment.success };
 	},
 });
 ```
@@ -147,6 +87,48 @@ When a workflow fails (due to an unhandled error or task failure), Aiki will aut
 
 For detailed guidance on retry strategies, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
 
+## Schema Validation
+
+Define schemas to validate workflow input and output:
+
+```typescript
+import { z } from "zod";
+
+const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	async handler(run, input: { orderId: string; items: string[] }) {
+		// ...
+		return { success: true, total: 100 };
+	},
+	schema: {
+		input: z.object({
+			orderId: z.string(),
+			items: z.array(z.string()),
+		}),
+		output: z.object({
+			success: z.boolean(),
+			total: z.number(),
+		}),
+	},
+});
+```
+
+Schemas use any validation library with a `parse(data: unknown) => T` method (Zod, ArkType, etc.).
+
+**Why use output schemas?** For child workflows, cached outputs are validated against the schema. If the cached shape doesn't match, the parent workflow fails immediately. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
+
+## Sharding
+
+Route workflows to specific shards for distributed processing, multi-region deployments, or tenant isolation:
+
+```typescript
+const handle = await orderWorkflowV1
+	.with()
+	.opt("shard", "us-east")
+	.start(client, { orderId: "123" });
+```
+
+Workers must be configured to listen to the same shard. A workflow routed to `"us-east"` will only be picked up by workers with `shards: ["us-east"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
+
 ## Starting Workflows
 
 Execute workflows using the version's `.start()` method:
@@ -176,15 +158,21 @@ A workflow run is an instance of a workflow execution. It has:
 
 ### States
 
-- `pending` - Queued, not yet started
+- `scheduled` - Scheduled for future execution
+- `queued` - Queued, waiting to be picked up by a worker
 - `running` - Currently executing
 - `paused` - Paused by user
+- `sleeping` - Waiting for a sleep duration to elapse
+- `awaiting_event` - Waiting for an external event
 - `awaiting_retry` - Waiting to retry after failure
+- `awaiting_child_workflow` - Waiting for a child workflow to complete
 - `completed` - Finished successfully
-- `failed` - Encountered an error
+- `failed` - Encountered a non-retryable error or exhausted all retries
 - `cancelled` - Cancelled by user
 
 ### Workflow Handle
+
+A handle is a reference to a workflow run that lets you interact with it from outside the workflow - check its status, wait for completion, send events, or control execution.
 
 The handle returned from `.start()` provides:
 
@@ -227,13 +215,6 @@ await handle.resume();
 // Cancel a workflow
 await handle.cancel("User requested cancellation");
 ```
-
-## Best Practices
-
-1. **Keep workflows focused** - One business process per workflow
-2. **Use versions** - Version workflows as requirements change
-3. **Deterministic logic** - Workflow logic should be predictable
-4. **Document versions** - Comment what changed between versions
 
 ## Next Steps
 

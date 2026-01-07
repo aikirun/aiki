@@ -25,7 +25,7 @@ const aikiWorker = worker({
 const handle = await aikiWorker.spawn(aikiClient);
 ```
 
-Worker definitions are static and reusable. The `worker()` function creates a definition with a `name` that uniquely identifies the worker and a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution—it returns a handle for controlling the running worker.
+Worker definitions are static and reusable. The `worker()` function creates a definition with a `name` that uniquely identifies the worker and a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution; it returns a handle for controlling the running worker.
 
 ## How Workers Operate
 
@@ -33,7 +33,7 @@ When you call `spawn()`, the worker subscribes to a stream for each registered w
 
 During execution, the worker sends periodic heartbeats by refreshing its claim on the message. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the message remains unacknowledged. After a configurable idle time (default: 3 minutes), other workers detect the orphaned work and claim it. The workflow then re-executes from its last checkpoint.
 
-When execution completes successfully—or fails in an expected way—the worker acknowledges the message, marking it as processed.
+When execution completes successfully or fails in an expected way, the worker acknowledges the message, marking it as processed.
 
 ## Scaling
 
