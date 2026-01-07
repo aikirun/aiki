@@ -187,6 +187,8 @@ const updateInventory = task({
 });
 ```
 
+See the **[Dependency Injection Guide](../guides/dependency-injection.md)** for patterns on injecting dependencies like `db` into tasks.
+
 ## Next Steps
 
 - **[Workflows](./workflows.md)** - Learn about workflow orchestration

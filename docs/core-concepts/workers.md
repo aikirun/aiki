@@ -60,7 +60,7 @@ Always handle shutdown signals to let active workflows complete:
 ```typescript
 process.on("SIGTERM", async () => {
   await handle.stop();
-  await aiki.close();
+  await aikiClient.close();
   process.exit(0);
 });
 ```
@@ -75,7 +75,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 
 | Param | Description |
 |-------|-------------|
-| `id` | Unique worker identifier |
+| `name` | Unique worker identifier |
 | `workflows` | Workflow versions this worker executes |
 | `subscriber` | Subscriber config (default: `{ type: "redis" }`) |
 

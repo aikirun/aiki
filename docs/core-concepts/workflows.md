@@ -157,11 +157,17 @@ const handle = await workflowVersion.start(client, {
 	email: "user@example.com",
 });
 
-// Check status
-const status = await handle.getStatus();
+// Access run data
+console.log("Started:", handle.run.id);
+console.log("Status:", handle.run.state.status);
 
 // Wait for completion
-const result = await handle.waitForCompletion();
+const result = await handle.waitForStatus("completed");
+if (result.success) {
+	console.log("Output:", result.state.output);
+} else {
+	console.log("Failed:", result.cause);
+}
 ```
 
 ## Workflow Runs
@@ -172,18 +178,55 @@ A workflow run is an instance of a workflow execution. It has:
 
 - `pending` - Queued, not yet started
 - `running` - Currently executing
+- `paused` - Paused by user
+- `awaiting_retry` - Waiting to retry after failure
 - `completed` - Finished successfully
 - `failed` - Encountered an error
-- `cancelled` - Cancelled by user/admin
+- `cancelled` - Cancelled by user
 
-### Result Handle
+### Workflow Handle
 
-The result handle provides:
+The handle returned from `.start()` provides:
 
-- `id` - Unique run identifier
-- `getStatus()` - Check current state
-- `waitForCompletion()` - Wait for final result
-- `cancel()` - Cancel the run
+| Property/Method | Description |
+|-----------------|-------------|
+| `run` | The workflow run data (id, state, input, output, etc.) |
+| `events` | Send events to the workflow |
+| `refresh()` | Refresh run data from the server |
+| `waitForStatus(status)` | Wait for a terminal status (`completed`, `failed`, `cancelled`) |
+| `cancel(reason?)` | Cancel the workflow run |
+| `pause()` | Pause the workflow |
+| `resume()` | Resume a paused workflow |
+| `awake()` | Wake a sleeping workflow |
+
+#### Waiting for Status
+
+The `waitForStatus()` method returns a result object:
+
+```typescript
+const result = await handle.waitForStatus("completed");
+
+if (result.success) {
+	// Workflow reached the requested status
+	console.log("Output:", result.state.output);
+} else {
+	// Workflow reached a different terminal status
+	console.log("Ended with:", result.cause);
+}
+```
+
+#### Controlling Workflow Execution
+
+```typescript
+// Pause a running workflow
+await handle.pause();
+
+// Resume a paused workflow
+await handle.resume();
+
+// Cancel a workflow
+await handle.cancel("User requested cancellation");
+```
 
 ## Best Practices
 

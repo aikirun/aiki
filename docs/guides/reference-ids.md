@@ -1,8 +1,6 @@
 # Reference IDs
 
-Reference IDs let you assign custom identifiers to workflows, tasks, and events. This enables tracking, correlation with
-your systems, and lookup by your own IDs. As a secondary benefit, reference IDs prevent duplicate executions when
-the same reference is reused.
+Reference IDs let you assign custom identifiers to workflows, tasks, and events. This enables tracking, correlation with your systems, and lookup by your own IDs. As a secondary benefit, reference IDs prevent duplicate executions when the same reference is reused.
 
 ## What are Reference IDs?
 
@@ -31,8 +29,7 @@ const handle = await orderWorkflowV1
 
 ### Conflict Handling
 
-By default, Aiki throws an error when you try to start a workflow with a reference ID that already exists but with
-different input. You can configure this behavior with the `onConflict` option:
+By default, Aiki throws an error when you try to start a workflow with a reference ID that already exists but with different input. You can configure this behavior with the `onConflict` option:
 
 ```typescript
 // Default behavior: throw error on conflict
@@ -51,8 +48,7 @@ const handle = await orderWorkflowV1
 
 ## Task Idempotency
 
-Tasks within a workflow are **automatically idempotent** by default. When you run the same task with the same payload
-multiple times, it will only execute once and return the cached result:
+Tasks within a workflow are **automatically idempotent** by default. When you run the same task with the same payload multiple times, it will only execute once and return the cached result:
 
 ```typescript
 const sendEmail = task({
@@ -71,7 +67,14 @@ await sendEmail.start(run, {
 await sendEmail.start(run, {
 	email: "user@example.com",
 });
+
+// To force re-execution, use a different reference ID
+await sendEmail.with().opt("reference.id", "second-welcome").start(run, {
+	email: "user@example.com",
+});
 ```
+
+Using a different reference ID creates a separate execution context, bypassing the cached result.
 
 ## Event Reference IDs
 
@@ -95,14 +98,13 @@ await handle.events.approved
 await handle.events.approved.send({ by: "manager@example.com" });
 ```
 
-Unlike workflows and tasks, events use **silent deduplication** - duplicate events are simply ignored rather than throwing an error. This follows industry practice for event-driven systems where at-least-once delivery is common.
+Unlike workflows and tasks, events use **silent deduplication** - duplicate events are simply ignored rather than throwing an error.
 
 ## How It Works
 
 ### Workflow Level
 
-When you provide a reference ID when starting a workflow, the system checks if a workflow run with that ID already
-exists. Based on the `onConflict` setting:
+When you provide a reference ID when starting a workflow, the system checks if a workflow run with that ID already exists. Based on the `onConflict` setting:
 - `"error"` (default): Throws an error if a run exists with different input
 - `"return_existing"`: Returns the existing workflow run
 
@@ -117,8 +119,7 @@ When you provide a reference ID, it replaces the input hash, allowing you to cre
 
 ## Determinism vs Reference IDs
 
-You might wonder: if tasks are deterministic (same input → same output) and automatically idempotent within workflows,
-why do we need reference IDs? This is a great question that highlights the complementary nature of these concepts.
+You might wonder: if tasks are deterministic (same input → same output) and automatically idempotent within workflows, why do we need reference IDs? This is a great question that highlights the complementary nature of these concepts.
 
 ### The Apparent Tension
 
@@ -128,8 +129,7 @@ There seems to be a logical conflict:
 - **Automatic Idempotency**: Same payload within a workflow only executes once
 - **Reference IDs**: Allow forcing re-execution of the same task with same payload
 
-If tasks are truly deterministic and automatically idempotent, why would we ever want to execute the same task twice
-with the same input?
+If tasks are truly deterministic and automatically idempotent, why would we ever want to execute the same task twice with the same input?
 
 ### Why Reference IDs Are Valuable
 
@@ -177,19 +177,3 @@ Reference IDs provide several benefits:
 - **Lookup capability**: Find workflow runs by reference ID instead of internal run IDs
 - **Duplicate prevention**: Prevent accidental duplicate executions when retrying requests
 - **Intentional re-execution**: Execute the same task multiple times by using different reference IDs
-
-## When to Use Reference IDs
-
-Use reference IDs when you want to:
-
-- **Correlate with external systems**: Use your order ID, transaction ID, or user ID as the reference
-- **Enable lookup**: Find a workflow later using your own identifier
-- **Prevent duplicates**: Safely retry requests without creating duplicate workflows
-- **Re-execute intentionally**: Run the same task with different reference IDs for different purposes
-
-## Summary
-
-Reference IDs let you assign custom identifiers to workflows, tasks, and events. This enables correlation with your systems
-(order IDs, user IDs, etc.), lookup by your own identifiers, and prevents duplicate executions when the same
-reference is reused. Combined with automatic task idempotency and deterministic execution, reference IDs provide the
-foundation for building robust workflows that integrate seamlessly with your existing systems.
