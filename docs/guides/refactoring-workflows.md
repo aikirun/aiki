@@ -1,5 +1,7 @@
 # Refactoring Workflows
 
+This guide is about refactoring workflow code while workflows are in flight. If no workflow runs exist, you can change your code freely - these concerns only arise when running workflows replay with new code.
+
 Aiki's content-addressable design allows you to safely refactor running workflows in ways that would cause determinism errors in other durable execution platforms. This guide explains what changes are safe and what to watch out for.
 
 ## How Aiki Differs
@@ -92,6 +94,23 @@ async handler(run, input) {
 	const payment = await run.events.paymentReceived.wait(); // Reads from payment queue
 	const approval = await run.events.approved.wait();       // Reads from approval queue
 	// Process order...
+}
+```
+
+### Adding Event Waits
+
+You can add new event waits to a workflow. They wait for new events to arrive:
+
+```typescript
+// Original workflow
+async handler(run, input) {
+	await processOrder.start(run, input);
+}
+
+// Refactored with new event wait
+async handler(run, input) {
+	const approval = await run.events.managerApproval.wait(); // Waits for new event
+	await processOrder.start(run, input);
 }
 ```
 
@@ -269,46 +288,106 @@ async handler(run, input) {
 }
 ```
 
-### Reordering Same-Named Sleeps
+### Same-Named Sleeps
 
-Sleeps with the same name share a queue and are matched in sequence. Reordering them while a workflow is mid-sleep causes unexpected behavior:
+Sleeps with the same name share a queue. Reordering, removing, or adding same-named sleeps while a workflow is in flight causes queue mismatch.
+
+**Always use different names for different sleeps:**
 
 ```typescript
-// Original workflow
+// DON'T use the same name for different sleeps
 async handler(run, input) {
 	await run.sleep("delay", { minutes: 5 });
 	await run.sleep("delay", { hours: 1 });
-	await processOrder.start(run, input);
 }
-```
 
-1. Workflow starts, first sleep (5 min) completes
-2. Second sleep (1 hr) starts - workflow is now sleeping
-3. Developer refactors: swaps the order
-
-```typescript
-// Refactored while workflow was sleeping (UNSAFE!)
-async handler(run, input) {
-	await run.sleep("delay", { hours: 1 });
-	await run.sleep("delay", { minutes: 5 });
-	await processOrder.start(run, input);
-}
-```
-
-4. After 1 hour, workflow wakes and replays with the new code:
-   - First `"delay"` call asks for 1 hour, reads the first recorded sleep (5 min elapsed)
-   - Aiki calculates delta: 1hr - 5min = 55 more minutes needed
-   - Workflow goes back to sleep for 55 minutes!
-5. Total sleep: 1hr + 55min = **1hr 55min** instead of 1hr 5min
-
-**Solution:** Use different names when sleeps have different purposes:
-
-```typescript
+// DO use different names
 async handler(run, input) {
 	await run.sleep("initial-delay", { minutes: 5 });
 	await run.sleep("cooldown", { hours: 1 });
 }
 ```
+
+With different names, each sleep has its own queue and can be safely reordered, removed, or added.
+
+#### Why This Matters: Reordering
+
+```typescript
+// Original workflow
+async handler(run, input) {
+	await run.sleep("delay", { minutes: 5 });
+	await run.sleep("delay", { hours: 1 }); // Workflow is sleeping here
+	await processOrder.start(run, input);
+}
+```
+
+1. First sleep (5 min) completes
+2. Workflow is sleeping on second sleep (1 hr)
+3. Developer swaps the order:
+
+```typescript
+// Refactored while workflow was sleeping
+async handler(run, input) {
+	await run.sleep("delay", { hours: 1 });
+	await run.sleep("delay", { minutes: 5 });
+	await processOrder.start(run, input);
+}
+```
+
+4. After 1 hour, workflow wakes and replays
+5. First `"delay"` call asks for 1 hour, reads first recorded sleep (5 min elapsed)
+6. Aiki calculates delta: 1hr - 5min = 55 more minutes needed
+7. Workflow goes back to sleep for 55 minutes!
+
+#### Why This Matters: Removing
+
+```typescript
+// Original workflow
+async handler(run, input) {
+	await run.sleep("delay", { minutes: 5 });
+	await run.sleep("delay", { hours: 1 }); // Workflow is sleeping here
+	await processOrder.start(run, input);
+}
+```
+
+1. First sleep (5 min) completes
+2. Workflow is sleeping on second sleep (1 hr)
+3. Developer removes the first sleep:
+
+```typescript
+// Refactored - removed first sleep
+async handler(run, input) {
+	await run.sleep("delay", { hours: 1 }); // Reads 5min from queue!
+	await processOrder.start(run, input);
+}
+```
+
+4. After 1 hour, workflow wakes and replays
+5. Remaining sleep reads first from queue - gets 5 min result
+6. Aiki calculates delta: 1hr - 5min = 55 more minutes needed
+7. Workflow goes back to sleep!
+
+### Same-Named Events
+
+Events have the same queue-based behavior as sleeps, but with an important difference: events come from external systems, so the order is inherently unpredictable.
+
+Two different external processes might trigger the same event type simultaneously. Your workflow code should never rely on the order of same-named events:
+
+```typescript
+// DON'T rely on order - external systems may send events in any order
+async handler(run, input) {
+	const first = await run.events.statusUpdate.wait();   // Which update comes first?
+	const second = await run.events.statusUpdate.wait();  // Unpredictable!
+}
+
+// DO use different event types when order matters
+async handler(run, input) {
+	const started = await run.events.started.wait();
+	const completed = await run.events.completed.wait();
+}
+```
+
+This is a design principle, not just a refactoring concern. Even without any code changes, external event ordering is non-deterministic.
 
 ## Best Practices
 
