@@ -4,59 +4,54 @@
 
 Some workflows take minutes. Others take days. They need to wait for humans, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means message queues, state machines, and fragile recovery logic. With Aiki, you write normal async code and let the platform handle durability.
 
-## Example: Food Order Workflow
+## Example: Restaurant Order Workflow
 
-A food ordering workflow that coordinates restaurant confirmation, courier delivery, and customer feedback—spanning from order placement to a follow-up email the next day.
+A restaurant ordering workflow that coordinates restaurant confirmation, courier delivery, and customer feedback—spanning from order placement to a follow-up email the next day.
 
 ```typescript
 import { event, workflow } from "@aikirun/workflow";
 import { notifyRestaurant, notifyCustomer, sendFeedbackEmail } from "./tasks";
 import { courierDeliveryV1 } from "./courier-workflow";
 
-export const foodOrder = workflow({ name: "food-order" });
+export const restaurantOrder = workflow({ name: "restaurant-order" });
 
-export const foodOrderV1 = foodOrder.v("1.0.0", {
-  async handler(run, order: { orderId: string; customer: string; restaurant: string }) {
+export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
+  async handler(run, input: { orderId: string; customerId: string; }) {
 
-    // Notify restaurant and wait for acceptance (5 min timeout)
-    await notifyRestaurant.start(run, order);
-    const response = await run.events.restaurantAccepted.wait({
-      timeout: { minutes: 5 }
-    });
+    await notifyRestaurant.start(run, input.orderId);
+    
+    // Wwait for acceptance with 5 mins timeout
+    const response = await run.events.restaurantAccepted.wait({timeout: { minutes: 5 } });
     if (response.timeout) {
       await notifyCustomer.start(run, {
-        customer: order.customer,
+        customerId: input.customerId,
         message: "Restaurant didn't respond. Order cancelled."
       });
-      return { status: "cancelled", reason: "timeout" };
+      return { status: "cancelled" };
     }
 
     await notifyCustomer.start(run, {
-      customer: order.customer,
+      customerId: input.customerId,
       message: `Order confirmed! Estimated time: ${response.data.estimatedTime} mins`
     });
 
     // Start courier delivery as child workflow
-    // (internally: waits for food ready → pickup → delivery)
-    const deliveryHandle = await courierDeliveryV1.startAsChild(run, {
-      orderId: order.orderId,
-      restaurant: order.restaurant,
-      customer: order.customer
-    });
+    // (internally: searches for courier, waits for food ready event → pickup → delivery)
+    const deliveryHandle = await courierDeliveryV1.startAsChild(run, input);
 
     // Wait for delivery to complete
     await deliveryHandle.waitForStatus("completed");
 
     await notifyCustomer.start(run, {
-      customer: order.customer,
+      customerId: input.customerId,
       message: "Your order has been delivered. Enjoy!"
     });
 
     // Sleep for 1 day, then request feedback
     await run.sleep("feedback-delay", { days: 1 });
-    await sendFeedbackEmail.start(run, { customer: order.customer, orderId: order.orderId });
+    await sendFeedbackEmail.start(run, input);
 
-    return { status: "completed", orderId: order.orderId };
+    return { status: "completed" };
   },
   events: {
     restaurantAccepted: event<{ estimatedTime: number }>(),
@@ -83,7 +78,7 @@ npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```typescript
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
-import { foodOrderV1 } from "./workflow";
+import { restaurantOrderV1 } from "./workflow";
 
 // Connect to Aiki server
 const aikiClient = await client({
@@ -94,16 +89,15 @@ const aikiClient = await client({
 // Start a worker
 const myWorker = worker({
   name: "order-worker",
-  workflows: [foodOrderV1],
+  workflows: [restaurantOrderV1],
   subscriber: { type: "redis_streams" }
 });
 await myWorker.spawn(aikiClient);
 
 // Start a workflow
-await foodOrderV1.start(aikiClient, {
+await restaurantOrderV1.start(aikiClient, {
   orderId: "order-123",
-  customer: "customer@example.com",
-  restaurant: "pizza-place"
+  customerId: "customer-456"
 });
 ```
 
