@@ -21,7 +21,10 @@ export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
     await notifyRestaurant.start(run, input.orderId);
     
     // Wwait for acceptance with 5 mins timeout
-    const response = await run.events.restaurantAccepted.wait({timeout: { minutes: 5 } });
+    const response = await run.events.restaurantAccepted.wait({
+      timeout: { minutes: 5 } 
+    });
+
     if (response.timeout) {
       await notifyCustomer.start(run, {
         customerId: input.customerId,
@@ -78,11 +81,11 @@ npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 Start the Aiki server:
 
 ```bash
-# Option 1: Run directly
-bun run server
+# Using Docker Compose
+docker-compose up
 
-# Option 2: Use Docker
-bun run docker:up
+# Or run directly with Bun
+bun run server
 ```
 
 ```typescript
@@ -102,7 +105,13 @@ const myWorker = worker({
   workflows: [restaurantOrderV1],
   subscriber: { type: "redis_streams" }
 });
-await myWorker.spawn(aikiClient);
+const workerHandle = await myWorker.spawn(aikiClient);
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+  await workerHandle.stop();
+  await aikiClient.close();
+});
 
 // Start a workflow
 await restaurantOrderV1.start(aikiClient, {
@@ -179,7 +188,3 @@ await restaurantOrderV1.start(aikiClient, {
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md)

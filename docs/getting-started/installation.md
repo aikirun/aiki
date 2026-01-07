@@ -36,11 +36,14 @@ docker run -d --name redis -p 6379:6379 redis:7
 
 ## Step 3: Start the Aiki Server
 
-Clone the Aiki repository and start the server:
+Start the server using one of these methods:
 
 ```bash
-# From the Aiki repository root
+# Option 1: Using Docker Compose
 docker-compose up
+
+# Option 2: Run directly with Bun
+bun run server
 ```
 
 This starts the **Aiki Server** on `http://localhost:9876`.

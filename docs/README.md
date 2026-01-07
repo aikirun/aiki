@@ -24,7 +24,7 @@ Understand the building blocks:
 Best practices and patterns:
 
 - **[Reference IDs](./guides/reference-ids.md)** - Custom identifiers for workflows and tasks
-- **[Error Handling](./guides/error-handling.md)** - Handle failures gracefully
+- **[Task Determinism](./guides/task-determinism.md)** - Write reliable, deterministic tasks
 
 ## 🏗️ Architecture
 
@@ -38,5 +38,4 @@ Deep dive into system design:
 
 - [GitHub Repository](https://github.com/shobande-femi/aiki)
 - [Examples](../examples/)
-- [Contributing Guide](../CONTRIBUTING.md)
 - [License](../LICENSE)

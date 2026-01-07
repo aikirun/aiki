@@ -1,129 +1,150 @@
 # Your First Workflow
 
-Build a complete order processing workflow that demonstrates Aiki's key features.
+Build a restaurant ordering workflow that demonstrates Aiki's key features: events, timeouts, child workflows, and durable sleep.
 
 ## What We'll Build
 
-We'll create an order processing system that validates orders, processes payments, updates inventory, and sends
-confirmation emails. Each step will be a separate task, demonstrating how Aiki enables independent retry and monitoring
-of workflow components.
+A restaurant ordering system that:
+- Notifies the restaurant and waits for acceptance (with timeout)
+- Coordinates courier delivery as a child workflow
+- Sends a feedback email the next day
+
+This workflow spans hours or days and coordinates multiple humans—exactly what Aiki is designed for.
 
 ## Step 1: Define Tasks
 
-Each step is a separate task for independent retry and monitoring:
+Each task is an independent unit of work that can be retried separately:
 
 ```typescript
 import { task } from "@aikirun/task";
 
-const validateOrder = task({
-	name: "validate-order",
-	handler(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
-		const { items, total } = input;
-
-		// Validation logic
-		if (items.length === 0) {
-			throw new Error("Order must have items");
-		}
-
-		return {
-			valid: true,
-			orderId: `order-${Date.now()}`,
-			total,
-		};
+const notifyRestaurant = task({
+	name: "notify-restaurant",
+	handler(input: { orderId: string; items: string[] }) {
+		console.log(`Notifying restaurant about order ${input.orderId}`);
+		console.log(`Items: ${input.items.join(", ")}`);
 	},
 });
 
-const processPayment = task({
-	name: "process-payment",
-	handler(input: { orderId: string; amount: number }) {
-		const { orderId, amount } = input;
-
-		// Payment processing logic
-		console.log(`Processing payment for ${orderId}: $${amount}`);
-
-		return {
-			paymentId: `pay-${Date.now()}`,
-			status: "completed",
-		};
+const notifyCustomer = task({
+	name: "notify-customer",
+	handler(input: { customerId: string; message: string }) {
+		console.log(`To customer ${input.customerId}: ${input.message}`);
 	},
 });
 
-const updateInventory = task({
-	name: "update-inventory",
-	handler(input: { items: Array<{ id: string; quantity: number }> }) {
-		const { items } = input;
-
-		// Update inventory
-		items.forEach((item) => {
-			console.log(`Updating inventory for ${item.id}`);
-		});
-
-		return { updated: true };
-	},
-});
-
-const sendConfirmation = task({
-	name: "send-confirmation",
-	handler(input: { email: string; orderId: string }) {
-		const { email, orderId } = input;
-
-		console.log(`Sending confirmation to ${email} for order ${orderId}`);
-
-		return { sent: true };
+const sendFeedbackEmail = task({
+	name: "send-feedback-email",
+	handler(input: { orderId: string; customerId: string }) {
+		console.log(`Sending feedback request for order ${input.orderId}`);
 	},
 });
 ```
 
-## Step 2: Create the Workflow
+## Step 2: Create the Courier Delivery Workflow
 
-Orchestrate tasks in sequence:
+The courier delivery is a child workflow; a separate workflow that runs independently:
 
 ```typescript
-import { workflow } from "@aikirun/workflow";
+import { event, workflow } from "@aikirun/workflow";
 
-const orderWorkflow = workflow({
-	name: "order-processing",
-});
+const courierDelivery = workflow({ name: "courier-delivery" });
 
-const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(run, input: {
-		items: Array<{ id: string; quantity: number }>;
-		total: number;
-		email: string;
-	}) {
-		// Step 1: Validate order
-		const validation = await validateOrder.start(run, {
-			items: input.items,
-			total: input.total,
-		});
+const courierDeliveryV1 = courierDelivery.v("1.0.0", {
+	async handler(run, input: { orderId: string; restaurantId: string }) {
+		run.logger.info("Finding available courier...");
 
-		// Step 2: Process payment
-		const payment = await processPayment.start(run, {
-			orderId: validation.orderId,
-			amount: validation.total,
-		});
+		// Simulate courier search
+		await run.sleep("find-courier", { seconds: 2 });
 
-		// Step 3: Update inventory
-		await updateInventory.start(run, {
-			items: input.items,
-		});
+		run.logger.info("Courier assigned, waiting for food to be ready...");
 
-		// Step 4: Send confirmation
-		await sendConfirmation.start(run, {
-			email: input.email,
-			orderId: validation.orderId,
-		});
+		// Wait for restaurant to signal food is ready
+		await run.events.foodReady.wait();
 
-		return {
-			success: true,
-			orderId: validation.orderId,
-			paymentId: payment.paymentId,
-		};
+		run.logger.info("Food ready! Courier picking up...");
+		await run.sleep("delivery", { seconds: 2 });
+
+		run.logger.info("Order delivered!");
+		return { courierName: "Oluwafemi" };
+	},
+	events: {
+		foodReady: event(),
 	},
 });
 ```
 
-## Step 3: Set Up Infrastructure
+## Step 3: Create the Main Restaurant Order Workflow
+
+This workflow orchestrates the entire order process:
+
+```typescript
+import { event, workflow } from "@aikirun/workflow";
+
+const restaurantOrder = workflow({ name: "restaurant-order" });
+
+const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
+	async handler(run, input: { orderId: string; customerId: string; items: string[] }) {
+		// Step 1: Notify restaurant
+		await notifyRestaurant.start(run, {
+			orderId: input.orderId,
+			items: input.items,
+		});
+
+		// Step 2: Wait for restaurant to accept (with 5 minute timeout)
+		const response = await run.events.restaurantAccepted.wait({
+			timeout: { minutes: 5 },
+		});
+
+		if (response.timeout) {
+			await notifyCustomer.start(run, {
+				customerId: input.customerId,
+				message: "Restaurant didn't respond. Order cancelled.",
+			});
+			return { status: "cancelled", reason: "timeout" };
+		}
+
+		// Step 3: Notify customer of acceptance
+		await notifyCustomer.start(run, {
+			customerId: input.customerId,
+			message: `Order confirmed! Estimated time: ${response.data.estimatedTime} mins`,
+		});
+
+		// Step 4: Start courier delivery as child workflow
+		const deliveryHandle = await courierDeliveryV1.startAsChild(run, {
+			orderId: input.orderId,
+			restaurantId: "restaurant-1",
+		});
+
+		// Step 5: Wait for delivery to complete
+		const deliveryResult = await deliveryHandle.waitForStatus("completed");
+		if (!deliveryResult.success) {
+			return { status: "failed", reason: "delivery_failed" };
+		}
+
+		// Step 6: Notify customer of delivery (using child workflow output)
+		const { courierName } = deliveryResult.state.output;
+		await notifyCustomer.start(run, {
+			customerId: input.customerId,
+			message: `Your order was delivered by ${courierName}. Enjoy!`,
+		});
+
+		// Step 7: Sleep for 1 day, then request feedback
+		await run.sleep("feedback-delay", { days: 1 });
+		await sendFeedbackEmail.start(run, {
+			orderId: input.orderId,
+			customerId: input.customerId,
+		});
+
+		return { status: "completed", orderId: input.orderId };
+	},
+	events: {
+		restaurantAccepted: event<{ estimatedTime: number }>(),
+	},
+});
+```
+
+## Step 4: Set Up Infrastructure
 
 Create the client and worker:
 
@@ -133,171 +154,77 @@ import { worker } from "@aikirun/worker";
 
 const aikiClient = await client({
 	url: "localhost:9876",
-	redis: {
-		host: "localhost",
-		port: 6379,
-	},
-});
-
-const aikiWorker = worker({
-	name: "order-worker-1",
-	workflows: [orderWorkflowV1],
-	subscriber: {
-		type: "redis_streams",
-		claimMinIdleTimeMs: 60_000,
-	},
-	opts: {
-		maxConcurrentWorkflowRuns: 10,
-	},
-});
-
-// Start processing
-await aikiWorker.spawn(aikiClient);
-```
-
-## Step 4: Execute the Workflow
-
-Process an order:
-
-```typescript
-const result = await orderWorkflowV1.start(aikiClient, {
-	items: [
-		{ id: "item-1", quantity: 2 },
-		{ id: "item-2", quantity: 1 },
-	],
-	total: 99.99,
-	email: "customer@example.com",
-});
-
-console.log("Workflow started:", result.id);
-
-// Wait for completion
-const finalResult = await result.waitForCompletion();
-console.log("Order processed:", finalResult);
-```
-
-## Complete Code
-
-```typescript
-import { client } from "@aikirun/client";
-import { task } from "@aikirun/task";
-import { worker } from "@aikirun/worker";
-import { workflow } from "@aikirun/workflow";
-
-// Define tasks
-const validateOrder = task({
-	name: "validate-order",
-	handler(input: { items: Array<{ id: string; quantity: number }>; total: number }) {
-		if (input.items.length === 0) {
-			throw new Error("Order must have items");
-		}
-		return {
-			valid: true,
-			orderId: `order-${Date.now()}`,
-			total: input.total,
-		};
-	},
-});
-
-const processPayment = task({
-	name: "process-payment",
-	handler(input: { orderId: string; amount: number }) {
-		console.log(`Processing payment: $${input.amount}`);
-		return {
-			paymentId: `pay-${Date.now()}`,
-			status: "completed",
-		};
-	},
-});
-
-const updateInventory = task({
-	name: "update-inventory",
-	handler(input: { items: Array<{ id: string; quantity: number }> }) {
-		input.items.forEach((item) => {
-			console.log(`Updating inventory for ${item.id}`);
-		});
-		return { updated: true };
-	},
-});
-
-const sendConfirmation = task({
-	name: "send-confirmation",
-	handler(input: { email: string; orderId: string }) {
-		console.log(`Sending confirmation to ${input.email}`);
-		return { sent: true };
-	},
-});
-
-// Define workflow
-const orderWorkflow = workflow({ name: "order-processing" });
-
-const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(run, input: {
-		items: Array<{ id: string; quantity: number }>;
-		total: number;
-		email: string;
-	}) {
-		const validation = await validateOrder.start(run, {
-			items: input.items,
-			total: input.total,
-		});
-
-		const payment = await processPayment.start(run, {
-			orderId: validation.orderId,
-			amount: validation.total,
-		});
-
-		await updateInventory.start(run, {
-			items: input.items,
-		});
-
-		await sendConfirmation.start(run, {
-			email: input.email,
-			orderId: validation.orderId,
-		});
-
-		return {
-			success: true,
-			orderId: validation.orderId,
-			paymentId: payment.paymentId,
-		};
-	},
-});
-
-// Set up client and worker
-const aikiClient = await client({
-	url: "localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 });
 
 const aikiWorker = worker({
-	name: "order-worker",
-	workflows: [orderWorkflowV1],
-	subscriber: { type: "redis_streams" },
+	name: "restaurant-worker",
+	workflows: [restaurantOrderV1, courierDeliveryV1],
 });
 
-await aikiWorker.spawn(aikiClient);
+const workerHandle = await aikiWorker.spawn(aikiClient);
 
-// Execute workflow
-const result = await orderWorkflowV1.start(aikiClient, {
-	items: [{ id: "item-1", quantity: 2 }],
-	total: 99.99,
-	email: "customer@example.com",
+// Graceful shutdown
+process.on("SIGINT", async () => {
+	await workerHandle.stop();
+	await aikiClient.close();
+});
+```
+
+## Step 5: Execute the Workflow
+
+Start the workflow and send events:
+
+```typescript
+// Start the order workflow
+const handle = await restaurantOrderV1.start(aikiClient, {
+	orderId: "order-123",
+	customerId: "customer-456",
+	items: ["Burger", "Fries", "Drink"],
 });
 
-console.log("Done:", await result.waitForCompletion());
+console.log("Workflow started:", handle.run.id);
+
+// Simulate restaurant accepting the order after 3 seconds
+setTimeout(async () => {
+	await handle.events.restaurantAccepted.send({ estimatedTime: 30 });
+	console.log("Restaurant accepted the order!");
+}, 3000);
+
+// In a real app, the restaurant would send the foodReady event via API
+// when the food is prepared. For this demo, we'll simulate it:
+setTimeout(async () => {
+	// Get the child workflow run ID (in production, you'd track this)
+	const childRunId = "..."; // The courier delivery workflow run ID
+	await courierDeliveryV1.events.foodReady.send(aikiClient, childRunId);
+	console.log("Food is ready for pickup!");
+}, 10000);
+
+// Wait for completion (this will take a while due to the 1-day sleep)
+const result = await handle.waitForStatus("completed");
+if (result.success) {
+	console.log("Order completed:", result.state.output);
+}
 ```
 
 ## What's Happening?
 
-Each task executes independently, so if payment fails, only the payment task is retried rather than the entire workflow.
-The server persists state continuously, which means crashes don't lose progress. Idempotency ensures that the same order
-won't be processed twice, even if requests are duplicated. Workers provide fault tolerance by claiming stuck workflows
-from failed workers, ensuring your processes complete even when individual workers crash.
+This workflow demonstrates Aiki's key features:
+
+**Events & Timeouts**
+The workflow waits for the restaurant to accept, but won't wait forever. If no response comes within 5 minutes, it cancels the order automatically.
+
+**Child Workflows**
+Courier delivery runs as a separate workflow. It can be monitored independently, and if the main workflow crashes, the child continues running.
+
+**Durable Sleep**
+The 1-day wait for feedback doesn't block any workers or consume resources. The workflow simply resumes the next day.
+
+**Crash Recovery**
+If the server crashes at any point—during payment, delivery, or the 1-day wait—the workflow resumes exactly where it left off.
 
 ## Next Steps
 
 - **[Task Determinism](../guides/task-determinism.md)** - Learn why tasks should be deterministic
-- **[Reference IDs](../guides/reference-ids.md)** - Understand reference IDs
-- **[Error Handling](../guides/error-handling.md)** - Handle failures gracefully
+- **[Reference IDs](../guides/reference-ids.md)** - Custom identifiers for workflows and tasks
 - **[Workflows](../core-concepts/workflows.md)** - Deep dive into workflow concepts

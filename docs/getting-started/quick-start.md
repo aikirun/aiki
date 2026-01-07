@@ -7,7 +7,7 @@ Build your first workflow in just 5 minutes!
 Make sure you've completed the [Installation](./installation.md) steps:
 
 - Redis running (see [Installation](./installation.md))
-- Aiki Server running (`docker-compose up`)
+- Aiki Server running (see [Installation](./installation.md))
 - SDK packages installed
 
 ## Create Your First Workflow File
@@ -47,33 +47,36 @@ const aikiClient = await client({
 
 // 4. Create a worker (executes workflows)
 const myWorker = worker({ name: "my-worker", workflows: [helloV1] });
-await myWorker.spawn(aikiClient);
+const workerHandle = await myWorker.spawn(aikiClient);
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+	await workerHandle.stop();
+	await aikiClient.close();
+});
 
 // 5. Execute your workflow
 console.log("Starting workflow...");
-const run = await helloV1.start(aikiClient, { id: "Alice" });
+const run = await helloV1.start(aikiClient, { name: "Alice" });
 
 // Wait for completion
-const result = await run.wait(
-	{ type: "status", status: "completed" },
-	{ maxDurationMs: 60_000 },
-);
+const result = await run.waitForStatus("completed");
 if (result.success) {
 	console.log("Workflow result:", result.state.output);
 }
 
 // Cleanup
-await aiki.close();
+await aikiClient.close();
 ```
 
 ## Run Your Workflow
 
 ```bash
-# Using npx and tsx (npm)
-npx tsx my-first-workflow.ts
-
 # Using Bun
 bun run my-first-workflow.ts
+
+# Using Node.js with tsx
+npx tsx my-first-workflow.ts
 ```
 
 ## Expected Output
@@ -81,11 +84,11 @@ bun run my-first-workflow.ts
 ```
 Starting workflow...
 👋 Hello, Alice!
-Workflow result: { success: true, greeting: { greeted: true, id: "Alice" } }
+Workflow result: { success: true, greeting: { greeted: true, name: "Alice" } }
 ```
 
-Note: The workflow completes within 60 seconds (`maxDurationMs: 60_000`). If you want to wait longer or shorter, adjust
-this value accordingly.
+Note: By default, `waitForStatus` waits indefinitely. To add a timeout, use:
+`await run.waitForStatus("completed", { timeout: { seconds: 60 } })`
 
 ## What Just Happened?
 
