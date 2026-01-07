@@ -1,130 +1,171 @@
-# Aiki (This is still work in progress)
+# Aiki
 
-**A durable execution platform that runs in your infrastructure.**
+**A durable execution platform.**
 
-Build reliable, long-running business processes that survive failures, restarts, and infrastructure changes. Aiki separates workflow orchestration from execution, giving you durability without giving up control.
+Some workflows take minutes. Others take days. They need to wait for humans, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means message queues, state machines, and fragile recovery logic. With Aiki, you write normal async code and let the platform handle durability.
 
-## Why Aiki?
+## Example: Food Order Workflow
 
-- **🔄 Durable Execution** - Workflows survive crashes and restarts automatically
-- **🚀 Horizontal Scaling** - Add workers to scale, with automatic work distribution
-- **⚡ High Performance** - Fault-tolerant message distribution
-- **🔒 Run in Your Environment** - Workers execute in your infrastructure, not ours
-- **🎯 Type-Safe** - Full TypeScript support with end-to-end type safety
-- **🛡️ Built-in Fault Tolerance** - Message claiming, automatic retries, graceful recovery
+A food ordering workflow that coordinates restaurant confirmation, courier delivery, and customer feedback—spanning from order placement to a follow-up email the next day.
+
+```typescript
+import { event, workflow } from "@aikirun/workflow";
+import { notifyRestaurant, findCourier, notifyCustomer, sendFeedbackEmail } from "./tasks";
+
+// Main workflow: orchestrates the entire order
+export const foodOrder = workflow({ name: "food-order" });
+
+export const foodOrderV1 = foodOrder.v("1.0.0", {
+  async handler(run, order: { orderId: string; customer: string; restaurant: string }) {
+
+    // Notify restaurant and wait for acceptance (5 min timeout)
+    await notifyRestaurant.start(run, order);
+    const restaurantResponse = await run.events.restaurantAccepted.wait({
+      timeout: { minutes: 5 }
+    });
+
+    if (restaurantResponse.timeout) {
+      await notifyCustomer.start(run, {
+        customer: order.customer,
+        message: "Restaurant didn't respond. Order cancelled."
+      });
+      return { status: "cancelled", reason: "restaurant_timeout" };
+    }
+
+    // Notify customer: order confirmed
+    await notifyCustomer.start(run, {
+      customer: order.customer,
+      message: `Order confirmed! Estimated time: ${restaurantResponse.data.estimatedTime} mins`
+    });
+
+    // Start courier delivery as child workflow
+    // This child workflow can execute on a DIFFERENT worker in parallel!
+    const courierHandle = await courierDeliveryV1.startAsChild(run, {
+      orderId: order.orderId,
+      restaurantLocation: order.restaurant,
+      customer: order.customer
+    });
+
+    // Wait for child workflow to complete
+    const deliveryResult = await courierHandle.waitForStatus("completed");
+
+    if (deliveryResult.success) {
+      await notifyCustomer.start(run, {
+        customer: order.customer,
+        message: "Your order has been delivered. Enjoy!"
+      });
+    }
+
+    // Sleep for 1 day, then request feedback
+    await run.sleep("feedback-delay", { days: 1 });
+    await sendFeedbackEmail.start(run, { customer: order.customer, orderId: order.orderId });
+
+    return { status: "completed", orderId: order.orderId };
+  },
+  events: {
+    restaurantAccepted: event<{ accepted: boolean; estimatedTime?: number }>(),
+  },
+});
+
+// Child workflow: handles courier assignment and delivery
+export const courierDelivery = workflow({ name: "courier-delivery" });
+
+export const courierDeliveryV1 = courierDelivery.v("1.0.0", {
+  async handler(run, input: { orderId: string; restaurantLocation: string; customer: string }) {
+
+    // Find and assign courier
+    await findCourier.start(run, { orderId: input.orderId });
+    const { data: courier } = await run.events.courierAccepted.wait();
+
+    // Notify customer: courier assigned
+    await notifyCustomer.start(run, {
+      customer: input.customer,
+      message: `Courier ${courier.courierId} is on the way to pick up your order!`
+    });
+
+    // Wait for food to be ready
+    // Note: Even if foodReady event arrived BEFORE we called wait(),
+    // Aiki queues events - so this returns immediately with the queued event!
+    await run.events.foodReady.wait();
+
+    // Courier picks up order
+    await run.events.pickedUp.wait();
+    await notifyCustomer.start(run, {
+      customer: input.customer,
+      message: "Your order has been picked up and is on its way!"
+    });
+
+    // Courier delivers order
+    await run.events.delivered.wait();
+
+    return { courierId: courier.courierId, deliveredAt: new Date().toISOString() };
+  },
+  events: {
+    courierAccepted: event<{ courierId: string }>(),
+    foodReady: event<{ preparedAt: string }>(),
+    pickedUp: event<{ timestamp: string }>(),
+    delivered: event<{ timestamp: string }>(),
+  },
+});
+```
+
+## What Just Happened?
+
+This workflow coordinates multiple humans (restaurant staff, courier, customer) over hours or days. Here's what Aiki handles automatically:
+
+- **Crash Recovery** — Server can crash at any point. Workflow resumes exactly where it left off.
+- **Automatic Retries** — Failed tasks retry automatically based on your configured policy.
+- **Durable Sleep** — The 1-day sleep for feedback doesn't block workers or consume resources.
+- **Event Queuing** — If `foodReady` arrives before we call `wait()`, it's queued. When we wait, it returns immediately. Events are never lost.
+- **Parallel Execution** — Child workflow runs on a different worker in parallel with the parent.
+- **Horizontal Scaling** — Add more workers and Aiki distributes work automatically.
 
 ## Quick Start
-
-Install the SDK packages:
 
 ```bash
 npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
 
-**Package Links:**
-- [`@aikirun/workflow`](https://www.npmjs.com/package/@aikirun/workflow) - Workflow SDK
-- [`@aikirun/task`](https://www.npmjs.com/package/@aikirun/task) - Task SDK
-- [`@aikirun/client`](https://www.npmjs.com/package/@aikirun/client) - Client SDK
-- [`@aikirun/worker`](https://www.npmjs.com/package/@aikirun/worker) - Worker SDK
-- [`@aikirun/types`](https://www.npmjs.com/package/@aikirun/types) - Type definitions
-
-Here's an example user onboarding workflow spanning multiple days. Traditional job queues would struggle with this. Aiki makes it trivial with durable state, event-driven waits, and automatic crash recovery.
-
-*Workflow definition `workflow.ts`*
-```typescript
-import { workflow } from "@aikirun/workflow";
-import {createUserProfile, sendWelcomeEmail, sendUsageTips} from "./task.ts";
-
-export const onboardingWorkflow = workflow({ name: "user-onboarding" });
-
-export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0.0", {
-  async handler(run, input: { email: string }) {
-    
-    const { userId } = await createUserProfile.start(run, {email: input.email});
-    await sendWelcomeEmail.start(run, {email: input.email});
-
-    // Sleeps for 24 hours without blocking workers or tying up resources.
-    // If the server restarts during this time, workflow resumes exactly where it left off.
-    await run.sleep("onboarding-delay", { days: 1 });
-
-    await sendUsageTips.start(run, {email: input.email});
-    return { success: true, userId };
-  }
-});
-```
-
-*Setup worker `worker.ts`*
 ```typescript
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
-import { onboardingWorkflowV1 } from "./workflow.ts";
+import { foodOrderV1 } from "./workflow";
 
-export const aikiClient = await client({
+// Connect to Aiki server
+const aikiClient = await client({
   url: "localhost:9876",
   redis: { host: "localhost", port: 6379 }
 });
 
-const workerA = worker({
-  name: "worker-A",
-  workflows: [onboardingWorkflowV1],
+// Start a worker
+const myWorker = worker({
+  name: "order-worker",
+  workflows: [foodOrderV1, courierDeliveryV1],
   subscriber: { type: "redis_streams" }
 });
+await myWorker.spawn(aikiClient);
 
-// This worker can process workflows alongside other workers - Aiki handles distribution.
-// Scale horizontally by launching more workers pointing to the same stream.
-await workerA.spawn(aikiClient);
-```
-
-*Start workflow `main.ts`*
-```typescript
-import { aikiClient } from "./worker.ts";
-import { onboardingWorkflowV1 } from "./workflow.ts";
-
-await onboardingWorkflowV1.start(aikiClient, { email: "newuser@example.com" });
-```
-
-<details>
-<summary>Task definitions <code>task.ts</code> (click to expand)</summary>
-
-```typescript
-import { task } from "@aikirun/task";
-
-export const createUserProfile = task({
-  name: "create-profile",
-  async handler(input: { email: string }) {
-    const id = db.users.create({ email: input.email });
-    return { userId: id};
-  }
-});
-
-export const sendWelcomeEmail = task({
-  name: "send-welcome",
-  async handler(input: { email: string }) {
-    return emailService.sendWelcome(input.email);
-  },
-  // If email sending fails it is retried up to 5 times with exponential backoff.
-  // If the worker crashes mid-retry, on recovery Aiki detects it and continues from the last attempt.
-  opts: {
-    retry: {
-      type: "exponential",
-      maxAttempts: 5,
-      baseDelayMs: 1000,
-      maxDelayMs: 30000
-    }
-  }
-});
-
-export const sendUsageTips = task({
-  name: "send-usage-tips",
-  async handler(input: { email: string }) {
-    return emailService.sendFeatures(input.email, {
-      features: ["Advanced analytics"]
-    });
-  }
+// Start a workflow
+await foodOrderV1.start(aikiClient, {
+  orderId: "order-123",
+  customer: "customer@example.com",
+  restaurant: "pizza-place"
 });
 ```
 
-</details>
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Durable Execution** | Workflows survive crashes and restarts |
+| **Child Workflows** | Modular, reusable sub-workflows |
+| **Typed Events** | Wait for external signals with full TypeScript support |
+| **Event Timeouts** | Set deadlines for human responses |
+| **Durable Sleep** | Sleep for days without blocking workers |
+| **Scheduled Execution** | Start workflows at a future time |
+| **Retries** | Configure retry policies for failed tasks |
+| **Horizontal Scaling** | Add workers to distribute load |
+| **Your Infrastructure** | Workers run in your environment |
 
 ## Architecture
 
@@ -134,62 +175,53 @@ export const sendUsageTips = task({
 │                    (Uses Aiki SDK to start workflows)                       │
 └─────────────────────────────────────┬───────────────────────────────────────┘
                                       │
-                                      │ SDK Client
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Aiki Server                                    │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐  │
-│  │  Workflow       │  │  Task           │  │  Storage Layer              │  │
-│  │  Orchestration  │  │  Management     │  │  (Workflow Runs, Tasks,     │  │
-│  │                 │  │                 │  │   Results, State)           │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
+│           Orchestrates workflows, manages state, coordinates workers        │
 └─────────────────────────────────────┬───────────────────────────────────────┘
                                       │
-                                      │ Message Queue
                                       ▼
                      ┌───────────────────────────────────┐
-                     │          Message Queue            │
-                     │  ┌─────────────────────────────┐  │
-                     │  │  Stream: workflow:orders    │  │
-                     │  │  Stream: workflow:users     │  │
-                     │  └─────────────────────────────┘  │
+                     │          Redis Streams            │
+                     │     (Message distribution)        │
                      └───────────────────────────────────┘
                                       │
-                                      │
-                                      ▼
-          ┌─────────────────────────────────────────────────────────┐
-          │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
-          │  │   Worker A  │  │   Worker B  │  │   Worker C  │      │
-          │  │             │  │             │  │             │      │
-          │  │ Executes    │  │ Executes    │  │ Executes    │      │
-          │  │ Workflows   │  │ Workflows   │  │ Workflows   │      │
-          │  │ in YOUR     │  │ in YOUR     │  │ in YOUR     │      │
-          │  │ Environment │  │ Environment │  │ Environment │      │
-          │  └─────────────┘  └─────────────┘  └─────────────┘      │
-          │                                                         │
-          │                    Your Infrastructure                  │
-          └─────────────────────────────────────────────────────────┘
+          ┌───────────────────────────┼───────────────────────────┐
+          ▼                           ▼                           ▼
+   ┌─────────────┐             ┌─────────────┐             ┌─────────────┐
+   │  Worker A   │             │  Worker B   │             │  Worker C   │
+   │             │             │             │             │             │
+   │  Executes   │             │  Executes   │             │  Executes   │
+   │  workflows  │             │  workflows  │             │  workflows  │
+   │  in YOUR    │             │  in YOUR    │             │  in YOUR    │
+   │  environment│             │  environment│             │  environment│
+   └─────────────┘             └─────────────┘             └─────────────┘
 ```
-
-Aiki's server orchestrates workflows and manages state, while workers execute tasks in your environment. This separation gives you durability and observability without sacrificing control over where your code runs.
 
 ## Documentation
 
-- **[Getting Started](./docs/getting-started/quick-start.md)** - Complete setup guide and first workflow
-- **[Core Concepts](./docs/core-concepts/)** - Workflows, tasks, workers, and the client
-- **[Architecture](./docs/architecture/)** - System design and how components interact
-- **[Guides](./docs/guides/)** - Task idempotency and best practices
+- **[Getting Started](./docs/getting-started/quick-start.md)** — Setup guide and first workflow
+- **[Core Concepts](./docs/core-concepts/)** — Workflows, tasks, workers, client
+- **[Architecture](./docs/architecture/)** — System design
+- **[Guides](./docs/guides/)** — Best practices
 
 ## Requirements
 
 - **Runtime**: Node.js 18+ or Bun 1.0+
-- **Message Queue**: Redis 6.2+ (default), or other supported backends
-- **Database**: PostgreSQL 14+ (for state persistence)
+- **Message Queue**: Redis 6.2+
+
+## Packages
+
+- [`@aikirun/workflow`](https://www.npmjs.com/package/@aikirun/workflow) — Workflow SDK
+- [`@aikirun/task`](https://www.npmjs.com/package/@aikirun/task) — Task SDK
+- [`@aikirun/client`](https://www.npmjs.com/package/@aikirun/client) — Client SDK
+- [`@aikirun/worker`](https://www.npmjs.com/package/@aikirun/worker) — Worker SDK
 
 ## License
 
-Apache 2.0 - see [LICENSE](LICENSE) file for details.
+Apache 2.0 — see [LICENSE](LICENSE)
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](CONTRIBUTING.md)
