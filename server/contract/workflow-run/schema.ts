@@ -15,6 +15,7 @@ import type {
 	WorkflowRunStateRunning,
 	WorkflowRunStateScheduled,
 	WorkflowRunStateScheduledByAwake,
+	WorkflowRunStateScheduledByAwakeEarly,
 	WorkflowRunStateScheduledByChildWorkflow,
 	WorkflowRunStateScheduledByEvent,
 	WorkflowRunStateScheduledByNew,
@@ -31,6 +32,7 @@ import type {
 	WorkflowRunStateAwaitingEventRequest,
 	WorkflowRunStateAwaitingRetryRequest,
 	WorkflowRunStateScheduledRequestOptimistic,
+	WorkflowRunStateScheduledRequestPessimistic,
 } from "@aikirun/types/workflow-run-api";
 import { z } from "zod";
 
@@ -91,6 +93,12 @@ export const workflowRunStateScheduledByAwakeSchema: Zt<WorkflowRunStateSchedule
 	reason: z.literal("awake"),
 });
 
+export const workflowRunStateScheduledByAwakeEarlySchema: Zt<WorkflowRunStateScheduledByAwakeEarly> = z.object({
+	status: z.literal("scheduled"),
+	scheduledAt: z.number(),
+	reason: z.literal("awake_early"),
+});
+
 export const workflowRunStateScheduledByResumeSchema: Zt<WorkflowRunStateScheduledByResume> = z.object({
 	status: z.literal("scheduled"),
 	scheduledAt: z.number(),
@@ -114,6 +122,7 @@ export const workflowRunStateScheduledSchema: Zt<WorkflowRunStateScheduled> = z.
 	workflowRunStateScheduledByRetrySchema,
 	workflowRunStateScheduledByTaskRetrySchema,
 	workflowRunStateScheduledByAwakeSchema,
+	workflowRunStateScheduledByAwakeEarlySchema,
 	workflowRunStateScheduledByResumeSchema,
 	workflowRunStateScheduledByEventSchema,
 	workflowRunStateScheduledByChildWorkflowSchema,
@@ -126,6 +135,7 @@ export const workflowRunStateQueuedSchema: Zt<WorkflowRunStateQueued> = z.object
 		z.literal("retry"),
 		z.literal("task_retry"),
 		z.literal("awake"),
+		z.literal("awake_early"),
 		z.literal("resume"),
 		z.literal("event"),
 		z.literal("child_workflow"),
@@ -300,23 +310,24 @@ export const workflowRunStateScheduledRequestOptimisticSchema: Zt<WorkflowRunSta
 	]
 );
 
-export const workflowRunStateScheduledRequestPessimisticSchema = z.union([
-	z.object({
-		status: z.literal("scheduled"),
-		reason: z.enum(["new"]),
-		scheduledInMs: z.number(),
-	}),
-	z.object({
-		status: z.literal("scheduled"),
-		reason: z.enum(["resume"]),
-		scheduledInMs: z.number(),
-	}),
-	z.object({
-		status: z.literal("scheduled"),
-		reason: z.enum(["awake"]),
-		scheduledInMs: z.number(),
-	}),
-]);
+export const workflowRunStateScheduledRequestPessimisticSchema: Zt<WorkflowRunStateScheduledRequestPessimistic> =
+	z.union([
+		z.object({
+			status: z.literal("scheduled"),
+			reason: z.enum(["new"]),
+			scheduledInMs: z.number(),
+		}),
+		z.object({
+			status: z.literal("scheduled"),
+			reason: z.enum(["resume"]),
+			scheduledInMs: z.number(),
+		}),
+		z.object({
+			status: z.literal("scheduled"),
+			reason: z.enum(["awake_early"]),
+			scheduledInMs: z.number(),
+		}),
+	]);
 
 export const workflowRunStateAwaitingEventRequestSchema: Zt<WorkflowRunStateAwaitingEventRequest> = z.object({
 	status: z.literal("awaiting_event"),

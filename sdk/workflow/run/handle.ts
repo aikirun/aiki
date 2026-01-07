@@ -321,7 +321,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 	}
 
 	public async awake(): Promise<void> {
-		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "awake" });
+		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "awake_early" });
 		this.logger.info("Workflow awoken");
 	}
 
@@ -329,7 +329,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		try {
 			if (
 				(targetState.status === "scheduled" &&
-					(targetState.reason === "new" || targetState.reason === "resume" || targetState.reason === "awake")) ||
+					(targetState.reason === "new" || targetState.reason === "resume" || targetState.reason === "awake_early")) ||
 				targetState.status === "paused" ||
 				targetState.status === "cancelled"
 			) {

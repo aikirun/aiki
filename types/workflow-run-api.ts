@@ -129,7 +129,7 @@ interface WorkflowRunTransitionStateRequestBase {
 
 export type WorkflowRunStateScheduledRequestOptimistic = Extract<
 	WorkflowRunStateScheduledRequest,
-	{ reason: "retry" | "task_retry" | "event" | "child_workflow" }
+	{ reason: "retry" | "task_retry" | "awake" | "event" | "child_workflow" }
 >;
 
 export type WorkflowRunStateScheduledRequestPessimistic = Exclude<

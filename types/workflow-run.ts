@@ -56,6 +56,7 @@ export type WorkflowRunScheduledReason =
 	| "retry"
 	| "task_retry"
 	| "awake"
+	| "awake_early"
 	| "resume"
 	| "event"
 	| "child_workflow";
@@ -82,6 +83,10 @@ export interface WorkflowRunStateScheduledByAwake extends WorkflowRunStateSchedu
 	reason: "awake";
 }
 
+export interface WorkflowRunStateScheduledByAwakeEarly extends WorkflowRunStateScheduledBase {
+	reason: "awake_early";
+}
+
 export interface WorkflowRunStateScheduledByResume extends WorkflowRunStateScheduledBase {
 	reason: "resume";
 }
@@ -99,6 +104,7 @@ export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByRetry
 	| WorkflowRunStateScheduledByTaskRetry
 	| WorkflowRunStateScheduledByAwake
+	| WorkflowRunStateScheduledByAwakeEarly
 	| WorkflowRunStateScheduledByResume
 	| WorkflowRunStateScheduledByEvent
 	| WorkflowRunStateScheduledByChildWorkflow;

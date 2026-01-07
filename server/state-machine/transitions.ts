@@ -75,7 +75,7 @@ const workflowRunStateTransitionValidator: Record<
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
-			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "awake") {
+			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "awake" && to.reason !== "awake_early") {
 				return { allowed: false, reason: "Only new or awake run allowed" };
 			}
 			return { allowed: true };
