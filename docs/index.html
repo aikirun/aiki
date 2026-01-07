@@ -6,7 +6,7 @@
 		<title>Aiki - Durable Execution Platform</title>
 		<meta
 			name="description"
-			content="Build reliable, long-running business processes that survive failures. A simpler alternative to Temporal with better DX."
+			content="Build reliable, long-running workflows that survive crashes, retry on failure, and scale horizontally. Open source durable execution platform."
 		>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -632,9 +632,9 @@
 		<section class="hero">
 			<div class="container">
 				<div class="hero-badge">✨ Open Source Durable Execution Platform</div>
-				<h1>Durable execution,<br><span class="gradient-text">radically simplified</span></h1>
+				<h1>Workflows that<br><span class="gradient-text">never fail</span></h1>
 				<p>
-					Build reliable, long-running business processes that survive failures, restarts, and infrastructure changes.
+					Survive crashes. Retry automatically. Scale horizontally.<br>Write async code and let Aiki handle durability.
 				</p>
 				<div class="hero-buttons">
 					<a href="https://github.com/aikirun/aiki" class="btn btn-primary btn-large" target="_blank">
@@ -692,19 +692,19 @@
 						</p>
 					</div>
 					<div class="feature">
+						<div class="feature-icon">🛡️</div>
+						<h3>Built-in Fault Tolerance</h3>
+						<p>
+							Message claiming, automatic retries, and graceful recovery out of the box. Reliability without the
+							complexity.
+						</p>
+					</div>
+					<div class="feature">
 						<div class="feature-icon">🚀</div>
 						<h3>Horizontal Scaling</h3>
 						<p>
 							Add workers to scale effortlessly. Aiki handles work distribution automatically across your
 							infrastructure.
-						</p>
-					</div>
-					<div class="feature">
-						<div class="feature-icon">⚡</div>
-						<h3>High Performance</h3>
-						<p>
-							Fault-tolerant message distribution with pluggable backends. Fast, reliable, and battle-tested at
-							scale.
 						</p>
 					</div>
 					<div class="feature">
@@ -719,8 +719,8 @@
 						<div class="feature-icon">🎯</div>
 						<h3>Developer-First</h3>
 						<p>
-							Intuitive APIs with full type safety support. Write workflows in the language you know, with SDKs for
-							multiple languages.
+							Workflows are just async functions with full TypeScript support. No complex abstractions — just code you
+							already know how to write.
 						</p>
 					</div>
 					<div class="feature">
@@ -731,22 +731,6 @@
 							instances use the latest code.
 						</p>
 					</div>
-					<div class="feature">
-						<div class="feature-icon">🧩</div>
-						<h3>Simple Mental Model</h3>
-						<p>
-							Workflows are just async functions. No complex abstractions or steep learning curves. Easy to learn, easy
-							to debug.
-						</p>
-					</div>
-					<div class="feature">
-						<div class="feature-icon">🛡️</div>
-						<h3>Built-in Fault Tolerance</h3>
-						<p>
-							Message claiming, automatic retries, and graceful recovery out of the box. Reliability without the
-							complexity.
-						</p>
-					</div>
 				</div>
 			</div>
 		</section>
@@ -755,8 +739,8 @@
 			<div class="container">
 				<div class="section-header">
 					<span class="section-badge">Developer Experience</span>
-					<h2 class="section-title">Version workflows seamlessly</h2>
-					<p class="section-subtitle">Create multi-day workflows with just a few lines of code</p>
+					<h2 class="section-title">Just async code</h2>
+					<p class="section-subtitle">No DSLs. No YAML. Write workflows as normal TypeScript functions.</p>
 				</div>
 				<div class="code-window">
 					<div class="code-header">
@@ -767,25 +751,29 @@
 					</div>
 					<div class="code-content">
 						<pre>
-<code><span class="code-keyword">import</span> { workflow } <span class="code-keyword">from</span> <span class="code-string">"@aikirun/workflow"</span>;
-<span class="code-keyword">import</span> { createUserProfile, sendWelcomeEmail, sendUsageTips } <span class="code-keyword">from</span> <span class="code-string">"./tasks.ts"</span>;
+<code><span class="code-keyword">import</span> { event, workflow } <span class="code-keyword">from</span> <span class="code-string">"@aikirun/workflow"</span>;
+<span class="code-keyword">import</span> { createUser, sendVerificationEmail, sendWelcomeEmail } <span class="code-keyword">from</span> <span class="code-string">"./tasks"</span>;
 
-<span class="code-keyword">export</span> <span class="code-keyword">const</span> onboardingWorkflow = <span class="code-function">workflow</span>({ name: <span class="code-string">"user-onboarding"</span> });
+<span class="code-keyword">export</span> <span class="code-keyword">const</span> onboarding = <span class="code-function">workflow</span>({ name: <span class="code-string">"user-onboarding"</span> });
 
-<span class="code-keyword">export</span> <span class="code-keyword">const</span> onboardingWorkflowV1 = onboardingWorkflow.<span class="code-function">v</span>(<span class="code-string">"1.0"</span>, {
-  <span class="code-keyword">async</span> <span class="code-function">handler</span>(input: { email: string }, run) {
-    <span class="code-keyword">const</span> { userId } = <span class="code-keyword">await</span> createUserProfile.<span class="code-function">start</span>(run, { email: input.email });
+<span class="code-keyword">export</span> <span class="code-keyword">const</span> onboardingV1 = onboarding.<span class="code-function">v</span>(<span class="code-string">"1.0.0"</span>, {
+  <span class="code-keyword">async</span> <span class="code-function">handler</span>(run, input: { email: <span class="code-keyword">string</span> }) {
+    <span class="code-comment">// Tasks retry automatically on failure</span>
+    <span class="code-keyword">const</span> { userId } = <span class="code-keyword">await</span> createUser.<span class="code-function">start</span>(run, { email: input.email });
+    <span class="code-keyword">await</span> sendVerificationEmail.<span class="code-function">start</span>(run, { email: input.email });
+
+    <span class="code-comment">// Wait for user to click verification link (24 hour timeout)</span>
+    <span class="code-keyword">const</span> result = <span class="code-keyword">await</span> run.events.emailVerified.<span class="code-function">wait</span>({ timeout: { hours: <span class="code-string">24</span> } });
+    <span class="code-keyword">if</span> (result.timeout) {
+      <span class="code-keyword">return</span> { status: <span class="code-string">"unverified"</span>, userId };
+    }
 
     <span class="code-keyword">await</span> sendWelcomeEmail.<span class="code-function">start</span>(run, { email: input.email });
-
-    <span class="code-comment">// Sleeps for 24 hours without blocking workers or tying up resources.</span>
-    <span class="code-comment">// If the server restarts during this time, workflow resumes exactly where it left off.</span>
-    <span class="code-keyword">await</span> run.<span class="code-function">sleep</span>({ days: <span class="code-string">1</span> });
-
-    <span class="code-keyword">await</span> sendUsageTips.<span class="code-function">start</span>(run, { email: input.email });
-
-    <span class="code-keyword">return</span> { success: <span class="code-keyword">true</span>, userId };
-  }
+    <span class="code-keyword">return</span> { status: <span class="code-string">"verified"</span>, userId };
+  },
+  events: {
+    emailVerified: <span class="code-function">event</span>&lt;{ verifiedAt: <span class="code-keyword">number</span> }&gt;(),
+  },
 });</code></pre>
 					</div>
 				</div>
