@@ -23,7 +23,9 @@ Understand the building blocks:
 
 Best practices and patterns:
 
+- **[Dependency Injection](./guides/dependency-injection.md)** - Inject services and dependencies into tasks and workflows
 - **[Reference IDs](./guides/reference-ids.md)** - Custom identifiers for workflows and tasks
+- **[Retry Strategies](./guides/retry-strategies.md)** - Configure automatic retries for tasks and workflows
 - **[Task Determinism](./guides/task-determinism.md)** - Write reliable, deterministic tasks
 
 ## 🏗️ Architecture

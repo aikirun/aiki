@@ -63,23 +63,25 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 ## Task Retry
 
-⚠️ **Note**: Task-level retry configuration is not yet implemented. Retry logic is currently handled at the workflow
-level.
+Configure automatic retries for failed tasks using the `opts.retry` property:
 
 ```typescript
-// This will be supported in a future version:
 const processPayment = task({
 	name: "process-payment",
 	handler(input: { paymentId: string; amount: number }) {
-		return processPaymentWithId(input.paymentId, input.amount);
+		return paymentService.charge(input.paymentId, input.amount);
 	},
-	// retry: {
-	//   type: "exponential",
-	//   maxAttempts: 3,
-	//   baseDelayMs: 1000
-	// }
+	opts: {
+		retry: {
+			type: "exponential",
+			maxAttempts: 3,
+			baseDelayMs: 1000,
+		},
+	},
 });
 ```
+
+For available strategies and best practices, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
 
 ## Task Input
 

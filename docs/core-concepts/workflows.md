@@ -124,6 +124,29 @@ const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
 });
 ```
 
+## Workflow Retry
+
+Configure automatic retries for failed workflows using the `opts.retry` property:
+
+```typescript
+const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	async handler(run, input: { orderId: string }) {
+		// Workflow logic...
+	},
+	opts: {
+		retry: {
+			type: "exponential",
+			maxAttempts: 3,
+			baseDelayMs: 5000,
+		},
+	},
+});
+```
+
+When a workflow fails (due to an unhandled error or task failure), Aiki will automatically retry it based on your retry strategy. Between retries, the workflow enters an `awaiting_retry` state.
+
+For detailed guidance on retry strategies, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
+
 ## Starting Workflows
 
 Execute workflows using the version's `.start()` method:

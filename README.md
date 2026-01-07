@@ -6,7 +6,7 @@ Some workflows take minutes. Others take days. They need to wait for humans, sur
 
 ## Example: Restaurant Order Workflow
 
-A restaurant ordering workflow that coordinates restaurant confirmation, courier delivery, and customer feedback—spanning from order placement to a follow-up email the next day.
+A restaurant ordering workflow that coordinates restaurant confirmation, courier delivery, and follow-up email the next day.
 
 ```typescript
 import { event, workflow } from "@aikirun/workflow";
