@@ -173,10 +173,6 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
-		logger.info("Waiting for child Workflow", {
-			"aiki.childWorkflowExpectedStatus": expectedStatus,
-			...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
-		});
 
 		try {
 			await parentRunHandle[INTERNAL].transitionState({
@@ -184,6 +180,10 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 				childWorkflowRunId: handle.run.id,
 				childWorkflowRunStatus: expectedStatus,
 				timeoutInMs,
+			});
+			logger.info("Waiting for child Workflow", {
+				"aiki.childWorkflowExpectedStatus": expectedStatus,
+				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
 		} catch (error) {
 			if (error instanceof WorkflowRunConflictError) {

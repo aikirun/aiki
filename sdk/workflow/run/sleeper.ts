@@ -26,13 +26,12 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 		const sleepState = sleepQueue.sleeps[nextSleepIndex];
 
 		if (!sleepState) {
-			logger.info("Workflow going to sleep", {
-				"aiki.sleepName": sleepName,
-				"aiki.durationMs": durationMs,
-			});
-
 			try {
 				await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
+				logger.info("Sleeping", {
+					"aiki.sleepName": sleepName,
+					"aiki.durationMs": durationMs,
+				});
 			} catch (error) {
 				if (error instanceof WorkflowRunConflictError) {
 					throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
@@ -87,13 +86,12 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 			return { cancelled: false };
 		}
 
-		logger.info("Workflow going to sleep", {
-			"aiki.sleepName": sleepName,
-			"aiki.durationMs": durationMs,
-		});
-
 		try {
 			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
+			logger.info("Sleeping", {
+				"aiki.sleepName": sleepName,
+				"aiki.durationMs": durationMs,
+			});
 		} catch (error) {
 			if (error instanceof WorkflowRunConflictError) {
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);

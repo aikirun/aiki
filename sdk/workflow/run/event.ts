@@ -172,15 +172,15 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
-		logger.info("Waiting for event", {
-			...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
-		});
 
 		try {
 			await handle[INTERNAL].transitionState({
 				status: "awaiting_event",
 				eventName,
 				timeoutInMs,
+			});
+			logger.info("Waiting for event", {
+				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
 		} catch (error) {
 			if (error instanceof WorkflowRunConflictError) {
