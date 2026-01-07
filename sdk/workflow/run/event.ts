@@ -5,6 +5,7 @@ import type { EventName, EventSendOptions, EventState, EventWaitOptions, EventWa
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { Schema } from "@aikirun/types/validator";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowRun,
 	WorkflowRunConflictError,
@@ -242,7 +243,7 @@ function createEventSender<Data>(
 			schema.parse(data);
 		}
 
-		logger.debug("Sending event", {
+		logger.info("Sending event to workflow", {
 			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
 		});
 
@@ -262,14 +263,19 @@ function createEventSender<Data>(
 }
 
 export function createEventMulticasters<TEventsDefinition extends EventsDefinition>(
+	workflowName: WorkflowName,
+	workflowVersionId: WorkflowVersionId,
 	eventsDefinition: TEventsDefinition
 ): EventMulticasters<TEventsDefinition> {
 	const senders = {} as EventMulticasters<TEventsDefinition>;
 
 	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
-		const sender = createEventMulticaster(eventName as EventName, eventDefinition.schema) as EventMulticaster<
-			EventData<TEventsDefinition[keyof TEventsDefinition]>
-		>;
+		const sender = createEventMulticaster(
+			workflowName,
+			workflowVersionId,
+			eventName as EventName,
+			eventDefinition.schema
+		) as EventMulticaster<EventData<TEventsDefinition[keyof TEventsDefinition]>>;
 		senders[eventName as keyof TEventsDefinition] = sender;
 	}
 
@@ -277,6 +283,8 @@ export function createEventMulticasters<TEventsDefinition extends EventsDefiniti
 }
 
 function createEventMulticaster<Data>(
+	workflowName: WorkflowName,
+	workflowVersionId: WorkflowVersionId,
 	eventName: EventName,
 	schema: Schema<Data> | undefined,
 	options?: EventSendOptions
@@ -289,7 +297,12 @@ function createEventMulticaster<Data>(
 			client: Client<AppContext>,
 			runId: string | string[],
 			...args: Data extends void ? [] : [Data]
-		) => createEventMulticaster(eventName, schema, optsBuilder.build()).send(client, runId, ...args),
+		) =>
+			createEventMulticaster(workflowName, workflowVersionId, eventName, schema, optsBuilder.build()).send(
+				client,
+				runId,
+				...args
+			),
 	});
 
 	async function send<AppContext>(
@@ -304,6 +317,23 @@ function createEventMulticaster<Data>(
 		}
 
 		const runIds = Array.isArray(runId) ? runId : [runId];
+		if (!isNonEmptyArray(runIds)) {
+			return;
+		}
+
+		const logger = client.logger.child({
+			"aiki.workflowName": workflowName,
+			"aiki.workflowVersionId": workflowVersionId,
+			"aiki.eventName": eventName,
+		});
+
+		logger.info("Multicasting event to workflows", {
+			"aiki.workflowName": workflowName,
+			"aiki.workflowVersionId": workflowVersionId,
+			"aiki.workflowRunIds": runIds,
+			"aiki.eventName": eventName,
+			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
+		});
 
 		await client.api.workflowRun.multicastEventV1({
 			ids: runIds,

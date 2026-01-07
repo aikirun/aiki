@@ -106,7 +106,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		private readonly params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
 	) {
 		const eventsDefinition = this.params.events ?? ({} as TEventsDefinition);
-		this.events = createEventMulticasters(eventsDefinition);
+		this.events = createEventMulticasters(this.name, this.versionId, eventsDefinition);
 		this[INTERNAL] = {
 			eventsDefinition,
 			handler: this.handler.bind(this),
@@ -152,6 +152,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			input,
 			options: this.params.opts,
 		});
+
+		client.logger.info("Created workflow", {
+			"aiki.workflowName": this.name,
+			"aiki.workflowVersionId": this.versionId,
+			"aiki.workflowRunId": run.id,
+		});
+
 		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
 	}
 
@@ -228,6 +235,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			"aiki.childWorkflowVersionId": newRun.versionId,
 			"aiki.childWorkflowRunId": newRun.id,
 		});
+
+		logger.info("Created child workflow");
 
 		return childWorkflowRunHandle(
 			client,
