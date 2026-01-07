@@ -135,20 +135,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const inputRaw = isNonEmptyArray(args) ? args[0] : (undefined as Input);
-		let input = inputRaw;
-		if (this.params.schema?.input) {
-			try {
-				input = this.params.schema.input.parse(inputRaw);
-			} catch (error) {
-				await handle[INTERNAL].transitionState({
-					status: "failed",
-					cause: "self",
-					error: createSerializableError(error),
-				});
-				throw new WorkflowRunFailedError(run.id, handle.run.attempts);
-			}
-		}
-
+		const input = await this.parse(handle, this.params.schema?.input, inputRaw);
 		const inputHash = await hashInput(input);
 
 		const reference = this.params.opts?.reference;
@@ -159,7 +146,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 
 		if (existingTaskInfo?.state.status === "completed") {
-			return existingTaskInfo.state.output as Output;
+			return this.parse(handle, this.params.schema?.output, existingTaskInfo.state.output);
 		}
 		if (existingTaskInfo?.state.status === "failed") {
 			const { state } = existingTaskInfo;
@@ -213,7 +200,15 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		});
 		logger.info("Task started", { "aiki.attempts": attempts });
 
-		const { output, lastAttempt } = await this.tryExecuteTask(run, input, taskId, retryStrategy, attempts, logger);
+		const { output, lastAttempt } = await this.tryExecuteTask(
+			handle,
+			input,
+			taskId,
+			retryStrategy,
+			attempts,
+			run[INTERNAL].options.spinThresholdMs,
+			logger
+		);
 
 		await handle[INTERNAL].transitionTaskState({
 			taskId,
@@ -225,11 +220,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async tryExecuteTask(
-		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
+		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
 		input: Input,
 		taskId: TaskId,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
+		spinThresholdMs: number,
 		logger: Logger
 	): Promise<{ output: Output; lastAttempt: number }> {
 		let attempts = currentAttempt;
@@ -243,19 +239,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(input);
-				let output = outputRaw;
-				if (this.params.schema?.output) {
-					try {
-						output = this.params.schema.output.parse(outputRaw);
-					} catch (error) {
-						await run[INTERNAL].handle[INTERNAL].transitionState({
-							status: "failed",
-							cause: "self",
-							error: createSerializableError(error),
-						});
-						throw new WorkflowRunFailedError(run.id, run[INTERNAL].handle.run.attempts);
-					}
-				}
+				const output = await this.parse(handle, this.params.schema?.output, outputRaw);
 				return { output, lastAttempt: attempts };
 			} catch (error) {
 				if (
@@ -274,7 +258,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						"aiki.attempts": attempts,
 						"aiki.reason": serializableError.message,
 					});
-					await run[INTERNAL].handle[INTERNAL].transitionTaskState({
+					await handle[INTERNAL].transitionTaskState({
 						taskId,
 						taskState: { status: "failed", attempts, error: serializableError },
 					});
@@ -287,13 +271,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					"aiki.reason": serializableError.message,
 				});
 
-				if (retryParams.delayMs <= run[INTERNAL].options.spinThresholdMs) {
+				if (retryParams.delayMs <= spinThresholdMs) {
 					await delay(retryParams.delayMs);
 					attempts++;
 					continue;
 				}
 
-				await run[INTERNAL].handle[INTERNAL].transitionTaskState({
+				await handle[INTERNAL].transitionTaskState({
 					taskId,
 					taskState: {
 						status: "awaiting_retry",
@@ -302,7 +286,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						nextAttemptInMs: retryParams.delayMs,
 					},
 				});
-				throw new WorkflowRunSuspendedError(run.id);
+				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
 		}
 	}
@@ -353,6 +337,26 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				"aiki.attempts": attempts,
 			});
 			throw new TaskFailedError(taskId, attempts, "Task retry not allowed");
+		}
+	}
+
+	private async parse<T>(
+		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		schema: Schema<T> | undefined,
+		data: unknown
+	): Promise<T> {
+		if (!schema) {
+			return data as T;
+		}
+		try {
+			return schema.parse(data);
+		} catch (error) {
+			await handle[INTERNAL].transitionState({
+				status: "failed",
+				cause: "self",
+				error: createSerializableError(error),
+			});
+			throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 		}
 	}
 }

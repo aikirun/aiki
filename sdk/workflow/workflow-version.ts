@@ -172,20 +172,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		const { client } = parentRunHandle[INTERNAL];
 
 		const inputRaw = isNonEmptyArray(args) ? args[0] : (undefined as Input);
-		let input = inputRaw;
-		if (this.params.schema?.input) {
-			try {
-				input = this.params.schema.input.parse(inputRaw);
-			} catch (error) {
-				await parentRunHandle[INTERNAL].transitionState({
-					status: "failed",
-					cause: "self",
-					error: createSerializableError(error),
-				});
-				throw new WorkflowRunFailedError(parentRun.id, parentRunHandle.run.attempts);
-			}
-		}
-
+		const input = await this.parse(parentRunHandle, this.params.schema?.input, inputRaw);
 		const inputHash = await hashInput(input);
 
 		const reference = this.params.opts?.reference;
@@ -201,6 +188,9 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			);
 
 			const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
+			if (existingRun.state.status === "completed") {
+				await this.parse(parentRunHandle, this.params.schema?.output, existingRun.state.output);
+			}
 
 			const logger = parentRun.logger.child({
 				"aiki.childWorkflowName": existingRun.name,
@@ -315,23 +305,12 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		context: AppContext,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
+		const { handle } = run[INTERNAL];
+
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(run, input, context);
-				let output = outputRaw;
-				if (this.params.schema?.output) {
-					try {
-						output = this.params.schema.output.parse(outputRaw);
-					} catch (error) {
-						const { handle } = run[INTERNAL];
-						await handle[INTERNAL].transitionState({
-							status: "failed",
-							cause: "self",
-							error: createSerializableError(error),
-						});
-						throw new WorkflowRunFailedError(run.id, handle.run.attempts);
-					}
-				}
+				const output = await this.parse(handle, this.params.schema?.output, outputRaw);
 				return output;
 			} catch (error) {
 				if (
@@ -341,8 +320,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 				) {
 					throw error;
 				}
-
-				const { handle } = run[INTERNAL];
 
 				const attempts = handle.run.attempts;
 				const retryParams = getRetryParams(attempts, retryStrategy);
@@ -403,6 +380,26 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 			});
 
 			throw error;
+		}
+	}
+
+	private async parse<T>(
+		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		schema: Schema<T> | undefined,
+		data: unknown
+	): Promise<T> {
+		if (!schema) {
+			return data as T;
+		}
+		try {
+			return schema.parse(data);
+		} catch (error) {
+			await handle[INTERNAL].transitionState({
+				status: "failed",
+				cause: "self",
+				error: createSerializableError(error),
+			});
+			throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 		}
 	}
 
