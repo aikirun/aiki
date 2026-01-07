@@ -95,6 +95,26 @@ async handler(run, input) {
 }
 ```
 
+### Reordering Different-Named Sleeps
+
+Sleeps with different names can be reordered. Each sleep name has its own queue, so the order doesn't matter:
+
+```typescript
+// Original workflow - total sleep: 1 hour 5 minutes
+async handler(run, input) {
+	await run.sleep("initial-delay", { minutes: 5 });
+	await run.sleep("cooldown-period", { hours: 1 });
+	await processOrder.start(run, input);
+}
+
+// Refactored - reordered sleeps (still 1 hour 5 minutes total)
+async handler(run, input) {
+	await run.sleep("cooldown-period", { hours: 1 }); // Reads from cooldown-period queue
+	await run.sleep("initial-delay", { minutes: 5 }); // Reads from initial-delay queue
+	await processOrder.start(run, input);
+}
+```
+
 ### Changing Sleep Durations
 
 When you change a sleep duration, Aiki calculates the delta:
@@ -249,6 +269,47 @@ async handler(run, input) {
 }
 ```
 
+### Reordering Same-Named Sleeps
+
+Sleeps with the same name share a queue and are matched in sequence. Reordering them while a workflow is mid-sleep causes unexpected behavior:
+
+```typescript
+// Original workflow
+async handler(run, input) {
+	await run.sleep("delay", { minutes: 5 });
+	await run.sleep("delay", { hours: 1 });
+	await processOrder.start(run, input);
+}
+```
+
+1. Workflow starts, first sleep (5 min) completes
+2. Second sleep (1 hr) starts - workflow is now sleeping
+3. Developer refactors: swaps the order
+
+```typescript
+// Refactored while workflow was sleeping (UNSAFE!)
+async handler(run, input) {
+	await run.sleep("delay", { hours: 1 });
+	await run.sleep("delay", { minutes: 5 });
+	await processOrder.start(run, input);
+}
+```
+
+4. After 1 hour, workflow wakes and replays with the new code:
+   - First `"delay"` call asks for 1 hour, reads the first recorded sleep (5 min elapsed)
+   - Aiki calculates delta: 1hr - 5min = 55 more minutes needed
+   - Workflow goes back to sleep for 55 minutes!
+5. Total sleep: 1hr + 55min = **1hr 55min** instead of 1hr 5min
+
+**Solution:** Use different names when sleeps have different purposes:
+
+```typescript
+async handler(run, input) {
+	await run.sleep("initial-delay", { minutes: 5 });
+	await run.sleep("cooldown", { hours: 1 });
+}
+```
+
 ## Best Practices
 
 1. **Test with replays** - Before deploying refactored workflows, test that replays work as expected
@@ -263,7 +324,7 @@ async handler(run, input) {
 
 ## Summary
 
-Aiki's content-addressable design gives you freedom to refactor workflows without strict determinism requirements. You can reorder tasks, add new ones, remove old ones, reorder event waits, and adjust sleep durations. Just be mindful of tasks with side effects and data dependencies between tasks.
+Aiki's content-addressable design gives you freedom to refactor workflows without strict determinism requirements. You can reorder tasks, add new ones, remove old ones, reorder event waits, reorder sleeps, and adjust sleep durations. Just be mindful of tasks with side effects and data dependencies between tasks.
 
 ## Next Steps
 

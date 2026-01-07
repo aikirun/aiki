@@ -1,4 +1,4 @@
-# Quick Start (5 minutes)
+# Quick Start
 
 Build your first workflow in just 5 minutes!
 
