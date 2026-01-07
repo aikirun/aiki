@@ -62,7 +62,7 @@ console.log("Current status:", state.status);
 - **Workflow Management** - Start workflows with type-safe inputs
 - **State Polling** - Wait for workflow completion with configurable polling
 - **Logger** - Built-in logging for debugging
-- **Context Factory** - Pass application context through workflow execution
+- **Create Context** - Pass application context through workflow execution
 - **Redis Integration** - Connect to Redis for distributed state management
 
 ## Configuration
@@ -81,18 +81,18 @@ interface ClientParams<AppContext> {
 		retryDelayOnFailoverMs?: number;
 		connectTimeoutMs?: number;
 	};
-	contextFactory?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
+	createContext?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
 	logger?: Logger;
 }
 ```
 
-### Context Factory Example
+### Create Context Example
 
 ```typescript
 const aikiClient = await client({
 	url: "http://localhost:9876",
 	redis: { host: "localhost", port: 6379 },
-	contextFactory: (run) => ({
+	createContext: (run) => ({
 		traceId: generateTraceId(),
 		workflowRunId: run.id,
 		userId: extractUserIdFromRun(run),

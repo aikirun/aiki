@@ -20,7 +20,7 @@ import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
  * @param params.redis.host - Redis server hostname
  * @param params.redis.port - Redis server port
  * @param params.redis.password - Optional Redis password
- * @param params.contextFactory - Optional function to create context for each workflow run
+ * @param params.createContext - Optional function to create context for each workflow run
  * @param params.logger - Optional custom logger (defaults to ConsoleLogger)
  * @returns Promise resolving to a configured Client instance
  *
@@ -29,7 +29,7 @@ import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
  * const aikiClient = await client({
  *   url: "http://localhost:9876",
  *   redis: { host: "localhost", port: 6379 },
- *   contextFactory: (run) => ({
+ *   createContext: (run) => ({
  *     traceId: generateTraceId(),
  *     userId: extractUserId(run),
  *   }),
@@ -79,7 +79,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 				getConnection: () => this.getRedisConnection(),
 				closeConnection: () => this.closeRedisConnection(),
 			},
-			contextFactory: this.params.contextFactory,
+			createContext: this.params.createContext,
 		};
 	}
 

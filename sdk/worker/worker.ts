@@ -390,8 +390,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
 			const handle = await workflowRunHandle(this.client, workflowRun, eventsDefinition, logger);
 
-			const appContext = this.client[INTERNAL].contextFactory
-				? await this.client[INTERNAL].contextFactory(workflowRun)
+			const appContext = this.client[INTERNAL].createContext
+				? await this.client[INTERNAL].createContext(workflowRun)
 				: null;
 
 			await workflowVersion[INTERNAL].handler(

@@ -9,7 +9,7 @@ export const aikiClient = await client({
 		host: "localhost",
 		port: 6379,
 	},
-	contextFactory: (run) => ({
+	createContext: (run) => ({
 		traceId: "123456789",
 		workflowRunId: run.id,
 	}),

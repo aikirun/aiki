@@ -8,7 +8,7 @@ export interface ClientParams<AppContext = unknown> {
 	url: string;
 	redis: RedisConfig;
 	logger?: Logger;
-	contextFactory?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
+	createContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
 }
 
 export interface Client<AppContext = unknown> {
@@ -24,7 +24,7 @@ export interface Client<AppContext = unknown> {
 			) => SubscriberStrategyBuilder;
 		};
 		redis: RedisConnection;
-		contextFactory?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
+		createContext?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
 	};
 }
 
