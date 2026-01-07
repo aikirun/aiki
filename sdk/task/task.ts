@@ -176,6 +176,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			this.assertRetryAllowed(taskId, state, retryStrategy, run.logger);
 
 			run.logger.debug("Retrying task", {
+				"aiki.taskName": this.name,
 				"aiki.taskId": taskId,
 				"aiki.attempts": state.attempts,
 				"aiki.taskStatus": state.status,
@@ -207,6 +208,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const logger = run.logger.child({
 			"aiki.component": "task-execution",
+			"aiki.taskName": this.name,
 			"aiki.taskId": taskId,
 		});
 		logger.info("Task started", { "aiki.attempts": attempts });
@@ -318,6 +320,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				return;
 			}
 			logger.error("Reference ID already used by another task", {
+				"aiki.taskName": this.name,
 				"aiki.referenceId": reference.id,
 				"aiki.existingTaskId": existingTaskInfo.id,
 			});
@@ -345,6 +348,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
 			logger.error("Task retry not allowed", {
+				"aiki.taskName": this.name,
 				"aiki.taskId": taskId,
 				"aiki.attempts": attempts,
 			});
