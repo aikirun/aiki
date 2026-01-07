@@ -109,7 +109,7 @@ export interface AdaptivePollingSubscriberStrategy {
 }
 
 export interface RedisStreamsSubscriberStrategy {
-	type: "redis_streams";
+	type: "redis";
 	intervalMs?: number;
 	maxRetryIntervalMs?: number;
 	atCapacityIntervalMs?: number;

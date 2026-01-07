@@ -301,7 +301,7 @@ await redis.xadd(
 ```typescript
 const worker = worker(client, {
 	subscriber: {
-		type: "redis_streams",
+		type: "redis",
 		claimMinIdleTimeMs: 60_000, // Claim after 60s
 		blockTimeMs: 1000, // Block for 1s
 		batchSize: 10, // Read 10 messages

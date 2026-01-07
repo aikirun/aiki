@@ -22,7 +22,7 @@ import { onboardingWorkflowV1 } from "./workflows.ts";
 const aikiWorker = worker({
 	name: "worker-1",
 	workflows: [onboardingWorkflowV1],
-	subscriber: { type: "redis_streams" },
+	subscriber: { type: "redis" },
 	opts: {
 		maxConcurrentWorkflowRuns: 10,
 	},
@@ -91,7 +91,7 @@ await orderWorker.with().opt("shards", ["eu-west"]).spawn(client);
 interface WorkerParams {
 	name: string; // Unique worker name
 	workflows: WorkflowVersion[]; // Workflow versions to execute
-	subscriber?: SubscriberStrategy; // Message subscriber (default: redis_streams)
+	subscriber?: SubscriberStrategy; // Message subscriber (default: redis)
 }
 ```
 
@@ -116,7 +116,7 @@ Workers receive workflow versions through the `workflows` param:
 const aikiWorker = worker({
 	name: "worker-1",
 	workflows: [workflowV1, workflowV2, anotherWorkflowV1],
-	subscriber: { type: "redis_streams" },
+	subscriber: { type: "redis" },
 });
 ```
 

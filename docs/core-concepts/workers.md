@@ -77,7 +77,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 |-------|-------------|
 | `id` | Unique worker identifier |
 | `workflows` | Workflow versions this worker executes |
-| `subscriber` | Subscriber config (default: `{ type: "redis_streams" }`) |
+| `subscriber` | Subscriber config (default: `{ type: "redis" }`) |
 
 **Options** are passed via `opts` param or `with()` builder:
 

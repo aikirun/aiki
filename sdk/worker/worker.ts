@@ -38,7 +38,7 @@ import {
  * @param params - Worker configuration parameters
  * @param params.name - Unique worker name for identification and monitoring
  * @param params.workflows - Array of workflow versions this worker can execute
- * @param params.subscriber - Message subscriber strategy (default: redis_streams)
+ * @param params.subscriber - Message subscriber strategy (default: redis)
  * @returns Worker definition, call spawn(client) to begin execution
  *
  * @example
@@ -187,7 +187,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 	async _start(): Promise<void> {
 		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
-			this.params.subscriber ?? { type: "redis_streams" },
+			this.params.subscriber ?? { type: "redis" },
 			this.registry.getAll(),
 			this.params.opts?.shards
 		);

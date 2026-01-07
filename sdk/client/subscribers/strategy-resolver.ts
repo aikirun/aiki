@@ -14,7 +14,7 @@ export function resolveSubscriberStrategy(
 		// 	return createPollingStrategy(client, strategy);
 		// case "adaptive_polling":
 		// 	return createAdaptivePollingStrategy(client, strategy);
-		case "redis_streams":
+		case "redis":
 			return createRedisStreamsStrategy(client, strategy, workflows, workerShards);
 		default:
 			return strategy.type satisfies never;
