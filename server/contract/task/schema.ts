@@ -11,7 +11,7 @@ import { z } from "zod";
 
 import type { Zt } from "../helpers/schema";
 import { serializedErrorSchema } from "../serializable";
-import { retryStrategySchema } from "../workflow-run/schema";
+import { retryStrategySchema } from "../shared/schema";
 
 export const taskOptionsSchema: Zt<TaskOptions> = z.object({
 	retry: retryStrategySchema.optional(),
