@@ -73,18 +73,7 @@ export interface WorkerParams {
 
 export interface WorkerOptions {
 	maxConcurrentWorkflowRuns?: number;
-	workflowRun?: {
-		heartbeatIntervalMs?: number;
-		/**
-		 * Threshold for spinning vs persisting delays (default: 10ms).
-		 *
-		 * Delays <= threshold: In-memory wait (fast, no history, not durable)
-		 * Delays > threshold: Server state transition (history recorded, durable)
-		 *
-		 * Set to 0 to record all delays in transition history.
-		 */
-		spinThresholdMs?: number;
-	};
+	workflowRun?: WorkflowRunOptions;
 	gracefulShutdownTimeoutMs?: number;
 	/**
 	 * Optional array of shards this worker should process.
@@ -99,6 +88,19 @@ export interface WorkerOptions {
 	reference?: {
 		id: string;
 	};
+}
+
+interface WorkflowRunOptions {
+	heartbeatIntervalMs?: number;
+	/**
+	 * Threshold for spinning vs persisting delays (default: 10ms).
+	 *
+	 * Delays <= threshold: In-memory wait (fast, no history, not durable)
+	 * Delays > threshold: Server state transition (history recorded, durable)
+	 *
+	 * Set to 0 to record all delays in transition history.
+	 */
+	spinThresholdMs?: number;
 }
 
 export interface WorkerBuilder {
@@ -155,6 +157,7 @@ interface ActiveWorkflowRun {
 class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	public readonly id: WorkerId;
 	public readonly name: WorkerName;
+	private readonly workflowRunOpts: Required<WorkflowRunOptions>;
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
@@ -167,6 +170,10 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	) {
 		this.id = crypto.randomUUID() as WorkerId;
 		this.name = params.name as WorkerName;
+		this.workflowRunOpts = {
+			heartbeatIntervalMs: this.params.opts?.workflowRun?.heartbeatIntervalMs ?? 30_000,
+			spinThresholdMs: this.params.opts?.workflowRun?.spinThresholdMs ?? 10,
+		};
 		this.registry = workflowRegistry().addMany(this.params.workflows);
 
 		const reference = this.params.opts?.reference;
@@ -185,7 +192,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			this.params.opts?.shards
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
-			onError: (error: Error) => this.handleNotificationError(error),
+			onError: (error: Error) => this.handleSubscriberError(error),
 			onStop: () => this.stop(),
 		});
 
@@ -207,10 +214,11 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.abortController?.abort();
 
 		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
-		if (activeWorkflowRuns.length === 0) return;
+		if (activeWorkflowRuns.length === 0) {
+			return;
+		}
 
 		const timeoutMs = this.params.opts?.gracefulShutdownTimeoutMs ?? 5_000;
-
 		if (timeoutMs > 0) {
 			await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
 		}
@@ -227,11 +235,13 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	}
 
 	private async poll(abortSignal: AbortSignal): Promise<void> {
-		this.logger.info("Worker started");
-
 		if (!this.subscriberStrategy) {
 			throw new Error("Subscriber strategy not initialized");
 		}
+
+		this.logger.info("Worker started");
+
+		const maxConcurrentWorkflowRuns = this.params.opts?.maxConcurrentWorkflowRuns ?? 1;
 
 		let nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: false });
 		let subscriberFailedAttempts = 0;
@@ -239,8 +249,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		while (!abortSignal.aborted) {
 			await delay(nextDelayMs, { abortSignal });
 
-			const availableCapacity = (this.params.opts?.maxConcurrentWorkflowRuns ?? 1) - this.activeWorkflowRunsById.size;
-
+			const availableCapacity = maxConcurrentWorkflowRuns - this.activeWorkflowRunsById.size;
 			if (availableCapacity <= 0) {
 				nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "at_capacity" });
 				continue;
@@ -249,7 +258,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity);
 			if (!nextBatchResponse.success) {
 				subscriberFailedAttempts++;
-
 				nextDelayMs = this.subscriberStrategy.getNextDelay({
 					type: "retry",
 					attemptNumber: subscriberFailedAttempts,
@@ -311,6 +319,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				continue;
 			}
 
+			// TODO: maybe load multiple workflows in one request
 			const { run: workflowRun } = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
 			if (!workflowRun) {
 				if (meta && this.subscriberStrategy?.acknowledge) {
@@ -335,7 +344,9 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				continue;
 			}
 
-			if (abortSignal.aborted) break;
+			if (abortSignal.aborted) {
+				break;
+			}
 
 			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, meta);
 
@@ -373,13 +384,11 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 							"aiki.error": error instanceof Error ? error.message : String(error),
 						});
 					}
-				}, this.params.opts?.workflowRun?.heartbeatIntervalMs ?? 30_000);
+				}, this.workflowRunOpts.heartbeatIntervalMs);
 			}
 
 			const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
 			const handle = await workflowRunHandle(this.client, workflowRun, eventsDefinition, logger);
-
-			const spinThresholdMs = this.params.opts?.workflowRun?.spinThresholdMs ?? 10;
 
 			const appContext = this.client[INTERNAL].contextFactory
 				? await this.client[INTERNAL].contextFactory(workflowRun)
@@ -394,7 +403,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					logger,
 					sleep: createSleeper(handle, logger),
 					events: createEventWaiters(handle, eventsDefinition, logger),
-					[INTERNAL]: { handle, options: { spinThresholdMs } },
+					[INTERNAL]: { handle, options: { spinThresholdMs: this.workflowRunOpts.spinThresholdMs } },
 				},
 				workflowRun.input,
 				appContext
@@ -437,8 +446,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 	}
 
-	private handleNotificationError(error: Error): void {
-		this.logger.warn("Notification error, falling back to polling", {
+	private handleSubscriberError(error: Error): void {
+		this.logger.warn("Subscriber error", {
 			"aiki.error": error.message,
 			"aiki.stack": error.stack,
 		});
