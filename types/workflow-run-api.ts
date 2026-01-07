@@ -28,7 +28,6 @@ export interface WorkflowRunApi {
 	getByIdV1: (_: WorkflowRunGetByIdRequestV1) => Promise<WorkflowRunGetByIdResponseV1>;
 	getStateV1: (_: WorkflowRunGetStateRequestV1) => Promise<WorkflowRunGetStateResponseV1>;
 	createV1: (_: WorkflowRunCreateRequestV1) => Promise<WorkflowRunCreateResponseV1>;
-	// TODO: instead of throwing conflict error, return good error type
 	transitionStateV1: (_: WorkflowRunTransitionStateRequestV1) => Promise<WorkflowRunTransitionStateResponseV1>;
 	transitionTaskStateV1: (
 		_: WorkflowRunTransitionTaskStateRequestV1

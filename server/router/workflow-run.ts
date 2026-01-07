@@ -664,7 +664,6 @@ function getWorkflowRunsWithElapsedSchedule(): WorkflowRun[] {
 export async function queueScheduledWorkflowRuns(context: ServerContext, redis: Redis) {
 	const runs = getWorkflowRunsWithElapsedSchedule();
 
-	// TODO: workflow state might have changed before it is queued. We might need try/catch
 	for (const run of runs) {
 		if (run.state.status === "scheduled") {
 			await transitionStateV1.callable({ context })({
