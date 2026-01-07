@@ -44,11 +44,6 @@
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
-				background: rgba(255, 255, 255, 0.95);
-				backdrop-filter: blur(10px);
-				padding: 16px 32px;
-				border-radius: 100px;
-				box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 			}
 
 			.logo {
@@ -106,7 +101,7 @@
 			}
 
 			.hero {
-				padding: 100px 0 80px;
+				padding: 80px 0 40px;
 				text-align: center;
 				position: relative;
 			}
@@ -165,12 +160,12 @@
 				background-clip: text;
 			}
 
-			.hero p {
-				font-size: 20px;
-				color: #475569;
+			.hero-subtitle {
+				font-size: 18px;
+				color: #64748b;
 				max-width: 680px;
 				margin: 0 auto 40px;
-				animation: fadeInUp 0.6s ease-out 0.2s backwards;
+				animation: fadeInUp 0.6s ease-out 0.25s backwards;
 			}
 
 			.hero-buttons {
@@ -186,53 +181,8 @@
 				font-size: 16px;
 			}
 
-			.stats {
-				padding: 60px 0;
-				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-				color: white;
-				margin: 60px 0;
-				border-radius: 24px;
-				position: relative;
-				overflow: hidden;
-			}
-
-			.stats::before {
-				content: "";
-				position: absolute;
-				top: 0;
-				left: 0;
-				right: 0;
-				bottom: 0;
-				background: url('data:image/svg+xml,<svg width="60" height="60" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="60" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/></svg>');
-				opacity: 0.3;
-			}
-
-			.stats-grid {
-				display: grid;
-				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-				gap: 40px;
-				position: relative;
-				z-index: 1;
-			}
-
-			.stat {
-				text-align: center;
-			}
-
-			.stat-number {
-				font-size: 48px;
-				font-weight: 800;
-				display: block;
-				margin-bottom: 8px;
-			}
-
-			.stat-label {
-				font-size: 16px;
-				opacity: 0.9;
-			}
-
 			.features {
-				padding: 80px 0;
+				padding: 40px 0 80px;
 			}
 
 			.section-header {
@@ -254,17 +204,18 @@
 			}
 
 			.section-title {
-				font-size: 48px;
-				font-weight: 800;
+				font-size: 32px;
+				font-weight: 700;
 				margin-bottom: 16px;
 				color: #0f172a;
 			}
 
 			.section-subtitle {
-				font-size: 18px;
-				color: #64748b;
-				max-width: 600px;
-				margin: 0 auto;
+				font-size: 28px;
+				font-weight: 600;
+				color: #334155;
+				max-width: 700px;
+				margin: 0 auto 32px;
 			}
 
 			.features-grid {
@@ -339,6 +290,8 @@
 				overflow: hidden;
 				box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 				border: 1px solid #334155;
+				max-width: 800px;
+				margin: 0 auto;
 			}
 
 			.code-header {
@@ -586,7 +539,6 @@
 				.header-content {
 					flex-direction: column;
 					gap: 16px;
-					border-radius: 20px;
 				}
 
 				.header-buttons {
@@ -596,11 +548,6 @@
 				.btn {
 					flex: 1;
 					justify-content: center;
-				}
-
-				.stats-grid {
-					grid-template-columns: 1fr;
-					gap: 32px;
 				}
 			}
 		</style>
@@ -632,9 +579,9 @@
 		<section class="hero">
 			<div class="container">
 				<div class="hero-badge">✨ Open Source Durable Execution Platform</div>
-				<h1>Workflows that<br><span class="gradient-text">never fail</span></h1>
-				<p>
-					Survive crashes. Retry automatically. Scale horizontally.<br>Write async code and let Aiki handle durability.
+				<h1>Build workflows<br><span class="gradient-text">that never fail</span></h1>
+				<p class="hero-subtitle">
+					Write business logic and let Aiki handle durability.
 				</p>
 				<div class="hero-buttons">
 					<a href="https://github.com/aikirun/aiki" class="btn btn-primary btn-large" target="_blank">
@@ -654,49 +601,23 @@
 			</div>
 		</section>
 
-		<div class="container">
-			<section class="stats">
-				<div class="stats-grid">
-					<div class="stat">
-						<span class="stat-number">100%</span>
-						<span class="stat-label">Open Source</span>
-					</div>
-					<div class="stat">
-						<span class="stat-number">{ }</span>
-						<span class="stat-label">Just Code</span>
-					</div>
-					<div class="stat">
-						<span class="stat-number">∞</span>
-						<span class="stat-label">Horizontal Scale</span>
-					</div>
-				</div>
-			</section>
-		</div>
-
 		<section class="features">
 			<div class="container">
-				<div class="section-header">
-					<span class="section-badge">Features</span>
-					<h2 class="section-title">Built for developer happiness</h2>
-					<p class="section-subtitle">
-						Everything you need to build reliable, long-running workflows without the complexity
-					</p>
-				</div>
 				<div class="features-grid">
 					<div class="feature">
 						<div class="feature-icon">🔄</div>
 						<h3>Durable Execution</h3>
 						<p>
-							Workflows survive crashes and restarts automatically. Pick up exactly where you left off, even after
-							infrastructure failures.
+							Workflows that run for minutes, days, or months. Survive crashes and restarts automatically — pick up
+							exactly where you left off.
 						</p>
 					</div>
 					<div class="feature">
 						<div class="feature-icon">🛡️</div>
 						<h3>Built-in Fault Tolerance</h3>
 						<p>
-							Message claiming, automatic retries, and graceful recovery out of the box. Reliability without the
-							complexity.
+							If a worker crashes, another picks up the work automatically. Failed tasks retry based on your policy.
+							Reliability without the complexity.
 						</p>
 					</div>
 					<div class="feature">
@@ -738,16 +659,13 @@
 		<section class="code-section">
 			<div class="container">
 				<div class="section-header">
-					<span class="section-badge">Developer Experience</span>
-					<h2 class="section-title">Just async code</h2>
-					<p class="section-subtitle">No DSLs. No YAML. Write workflows as normal TypeScript functions.</p>
+					<h4 class="section-title">No DSLs, no YAML, just TypeScript functions.</h4>
 				</div>
 				<div class="code-window">
 					<div class="code-header">
 						<div class="code-dot"></div>
 						<div class="code-dot"></div>
 						<div class="code-dot"></div>
-						<span class="code-title">workflow.ts</span>
 					</div>
 					<div class="code-content">
 						<pre>
