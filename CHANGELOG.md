@@ -24,6 +24,7 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
 
 ### New Features
 
+- Smart sleep duration handling during replay: if code is refactored to increase sleep duration, the workflow sleeps only the remaining delta; if duration is decreased, it returns immediately
 - Added optional input/output schema validation for tasks and workflows (validation errors fail the workflow)
 - Builder pattern for event options (`.with().opt()`)
 - When event data is void, `data` param not required for `send` method
