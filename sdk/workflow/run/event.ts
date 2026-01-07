@@ -7,6 +7,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { Schema } from "@aikirun/types/validator";
 import {
 	type WorkflowRun,
+	WorkflowRunConflictError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunSuspendedError,
@@ -174,11 +175,18 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 			...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 		});
 
-		await handle[INTERNAL].transitionState({
-			status: "awaiting_event",
-			eventName,
-			timeoutInMs,
-		});
+		try {
+			await handle[INTERNAL].transitionState({
+				status: "awaiting_event",
+				eventName,
+				timeoutInMs,
+			});
+		} catch (error) {
+			if (error instanceof WorkflowRunConflictError) {
+				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
+			}
+			throw error;
+		}
 
 		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 	}

@@ -2,7 +2,7 @@ import { type Duration, toMilliseconds } from "@aikirun/lib";
 import type { Logger } from "@aikirun/types/client";
 import type { SleepName, SleepResult } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
+import { WorkflowRunConflictError, type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
 
 import type { WorkflowRunHandle } from "./handle";
 
@@ -26,11 +26,20 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 		const sleepState = sleepQueue.sleeps[nextSleepIndex];
 
 		if (!sleepState) {
-			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
 			logger.info("Workflow going to sleep", {
 				"aiki.sleepName": sleepName,
 				"aiki.durationMs": durationMs,
 			});
+
+			try {
+				await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
+			} catch (error) {
+				if (error instanceof WorkflowRunConflictError) {
+					throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
+				}
+				throw error;
+			}
+
 			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 		}
 
@@ -78,11 +87,20 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 			return { cancelled: false };
 		}
 
-		await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
 		logger.info("Workflow going to sleep", {
 			"aiki.sleepName": sleepName,
 			"aiki.durationMs": durationMs,
 		});
+
+		try {
+			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
+		} catch (error) {
+			if (error instanceof WorkflowRunConflictError) {
+				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
+			}
+			throw error;
+		}
+
 		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 	};
 }

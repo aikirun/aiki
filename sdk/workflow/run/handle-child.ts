@@ -127,7 +127,9 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 			nextWaitIndex++;
 
 			if (waitResult.status === "timeout") {
-				logger.debug("Timed out waiting for child workflow status", { "aiki.expectedStatus": expectedStatus });
+				logger.debug("Timed out waiting for child workflow status", {
+					"aiki.childWorkflowExpectedStatus": expectedStatus,
+				});
 				return {
 					success: false,
 					cause: "timeout",
@@ -142,7 +144,9 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 			}
 
 			if (isTerminalWorkflowRunStatus(waitResult.childWorkflowRunState.status)) {
-				logger.debug("Child workflow run reached termnial state");
+				logger.debug("Child workflow run reached termnial state", {
+					"aiki.childWorkflowTerminalStatus": waitResult.childWorkflowRunState.status,
+				});
 				return {
 					success: false,
 					cause: "run_terminated",
@@ -159,7 +163,9 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 		}
 
 		if (isTerminalWorkflowRunStatus(state.status)) {
-			logger.debug("Child workflow run reached termnial state");
+			logger.debug("Child workflow run reached termnial state", {
+				"aiki.childWorkflowTerminalStatus": state.status,
+			});
 			return {
 				success: false,
 				cause: "run_terminated",
@@ -167,6 +173,10 @@ function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends
 		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
+		logger.info("Waiting for child Workflow", {
+			"aiki.childWorkflowExpectedStatus": expectedStatus,
+			...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
+		});
 
 		try {
 			await parentRunHandle[INTERNAL].transitionState({
