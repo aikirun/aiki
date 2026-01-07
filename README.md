@@ -10,9 +10,9 @@ A food ordering workflow that coordinates restaurant confirmation, courier deliv
 
 ```typescript
 import { event, workflow } from "@aikirun/workflow";
-import { notifyRestaurant, findCourier, notifyCustomer, sendFeedbackEmail } from "./tasks";
+import { notifyRestaurant, notifyCustomer, sendFeedbackEmail } from "./tasks";
+import { courierDeliveryV1 } from "./courier-workflow";
 
-// Main workflow: orchestrates the entire order
 export const foodOrder = workflow({ name: "food-order" });
 
 export const foodOrderV1 = foodOrder.v("1.0.0", {
@@ -20,41 +20,37 @@ export const foodOrderV1 = foodOrder.v("1.0.0", {
 
     // Notify restaurant and wait for acceptance (5 min timeout)
     await notifyRestaurant.start(run, order);
-    const restaurantResponse = await run.events.restaurantAccepted.wait({
+    const response = await run.events.restaurantAccepted.wait({
       timeout: { minutes: 5 }
     });
-
-    if (restaurantResponse.timeout) {
+    if (response.timeout) {
       await notifyCustomer.start(run, {
         customer: order.customer,
         message: "Restaurant didn't respond. Order cancelled."
       });
-      return { status: "cancelled", reason: "restaurant_timeout" };
+      return { status: "cancelled", reason: "timeout" };
     }
 
-    // Notify customer: order confirmed
     await notifyCustomer.start(run, {
       customer: order.customer,
-      message: `Order confirmed! Estimated time: ${restaurantResponse.data.estimatedTime} mins`
+      message: `Order confirmed! Estimated time: ${response.data.estimatedTime} mins`
     });
 
     // Start courier delivery as child workflow
-    // This child workflow can execute on a DIFFERENT worker in parallel!
-    const courierHandle = await courierDeliveryV1.startAsChild(run, {
+    // (internally: waits for food ready → pickup → delivery)
+    const deliveryHandle = await courierDeliveryV1.startAsChild(run, {
       orderId: order.orderId,
-      restaurantLocation: order.restaurant,
+      restaurant: order.restaurant,
       customer: order.customer
     });
 
-    // Wait for child workflow to complete
-    const deliveryResult = await courierHandle.waitForStatus("completed");
+    // Wait for delivery to complete
+    await deliveryHandle.waitForStatus("completed");
 
-    if (deliveryResult.success) {
-      await notifyCustomer.start(run, {
-        customer: order.customer,
-        message: "Your order has been delivered. Enjoy!"
-      });
-    }
+    await notifyCustomer.start(run, {
+      customer: order.customer,
+      message: "Your order has been delivered. Enjoy!"
+    });
 
     // Sleep for 1 day, then request feedback
     await run.sleep("feedback-delay", { days: 1 });
@@ -63,48 +59,7 @@ export const foodOrderV1 = foodOrder.v("1.0.0", {
     return { status: "completed", orderId: order.orderId };
   },
   events: {
-    restaurantAccepted: event<{ accepted: boolean; estimatedTime?: number }>(),
-  },
-});
-
-// Child workflow: handles courier assignment and delivery
-export const courierDelivery = workflow({ name: "courier-delivery" });
-
-export const courierDeliveryV1 = courierDelivery.v("1.0.0", {
-  async handler(run, input: { orderId: string; restaurantLocation: string; customer: string }) {
-
-    // Find and assign courier
-    await findCourier.start(run, { orderId: input.orderId });
-    const { data: courier } = await run.events.courierAccepted.wait();
-
-    // Notify customer: courier assigned
-    await notifyCustomer.start(run, {
-      customer: input.customer,
-      message: `Courier ${courier.courierId} is on the way to pick up your order!`
-    });
-
-    // Wait for food to be ready
-    // Note: Even if foodReady event arrived BEFORE we called wait(),
-    // Aiki queues events - so this returns immediately with the queued event!
-    await run.events.foodReady.wait();
-
-    // Courier picks up order
-    await run.events.pickedUp.wait();
-    await notifyCustomer.start(run, {
-      customer: input.customer,
-      message: "Your order has been picked up and is on its way!"
-    });
-
-    // Courier delivers order
-    await run.events.delivered.wait();
-
-    return { courierId: courier.courierId, deliveredAt: new Date().toISOString() };
-  },
-  events: {
-    courierAccepted: event<{ courierId: string }>(),
-    foodReady: event<{ preparedAt: string }>(),
-    pickedUp: event<{ timestamp: string }>(),
-    delivered: event<{ timestamp: string }>(),
+    restaurantAccepted: event<{ estimatedTime: number }>(),
   },
 });
 ```
@@ -116,7 +71,6 @@ This workflow coordinates multiple humans (restaurant staff, courier, customer) 
 - **Crash Recovery** — Server can crash at any point. Workflow resumes exactly where it left off.
 - **Automatic Retries** — Failed tasks retry automatically based on your configured policy.
 - **Durable Sleep** — The 1-day sleep for feedback doesn't block workers or consume resources.
-- **Event Queuing** — If `foodReady` arrives before we call `wait()`, it's queued. When we wait, it returns immediately. Events are never lost.
 - **Parallel Execution** — Child workflow runs on a different worker in parallel with the parent.
 - **Horizontal Scaling** — Add more workers and Aiki distributes work automatically.
 
@@ -140,7 +94,7 @@ const aikiClient = await client({
 // Start a worker
 const myWorker = worker({
   name: "order-worker",
-  workflows: [foodOrderV1, courierDeliveryV1],
+  workflows: [foodOrderV1],
   subscriber: { type: "redis_streams" }
 });
 await myWorker.spawn(aikiClient);
