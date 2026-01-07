@@ -306,19 +306,23 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 	}
 
 	public async cancel(reason?: string): Promise<void> {
-		return this.transitionState({ status: "cancelled", reason });
+		await this.transitionState({ status: "cancelled", reason });
+		this.logger.info("Workflow cancelled");
 	}
 
 	public async pause(): Promise<void> {
-		return this.transitionState({ status: "paused" });
+		await this.transitionState({ status: "paused" });
+		this.logger.info("Workflow paused");
 	}
 
 	public async resume(): Promise<void> {
-		return this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resume" });
+		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resume" });
+		this.logger.info("Workflow resumed");
 	}
 
 	public async awake(): Promise<void> {
-		return this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "awake" });
+		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "awake" });
+		this.logger.info("Workflow awoken");
 	}
 
 	private async transitionState(targetState: WorkflowRunStateRequest): Promise<void> {

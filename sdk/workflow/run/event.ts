@@ -243,10 +243,6 @@ function createEventSender<Data>(
 			schema.parse(data);
 		}
 
-		logger.info("Sending event to workflow", {
-			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
-		});
-
 		const { run } = await api.workflowRun.sendEventV1({
 			id: workflowRunId,
 			eventName,
@@ -254,6 +250,10 @@ function createEventSender<Data>(
 			options,
 		});
 		onSend(run);
+
+		logger.info("Sent event to workflow", {
+			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
+		});
 	}
 
 	return {
@@ -327,19 +327,19 @@ function createEventMulticaster<Data>(
 			"aiki.eventName": eventName,
 		});
 
-		logger.info("Multicasting event to workflows", {
-			"aiki.workflowName": workflowName,
-			"aiki.workflowVersionId": workflowVersionId,
-			"aiki.workflowRunIds": runIds,
-			"aiki.eventName": eventName,
-			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
-		});
-
 		await client.api.workflowRun.multicastEventV1({
 			ids: runIds,
 			eventName,
 			data,
 			options,
+		});
+
+		logger.info("Multicasted event to workflows", {
+			"aiki.workflowName": workflowName,
+			"aiki.workflowVersionId": workflowVersionId,
+			"aiki.workflowRunIds": runIds,
+			"aiki.eventName": eventName,
+			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
 		});
 	}
 
