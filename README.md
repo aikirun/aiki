@@ -75,6 +75,16 @@ This workflow coordinates multiple humans (restaurant staff, courier, customer) 
 npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
 
+Start the Aiki server:
+
+```bash
+# Option 1: Run directly
+bun run server
+
+# Option 2: Use Docker
+bun run docker:up
+```
+
 ```typescript
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
