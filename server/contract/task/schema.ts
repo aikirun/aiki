@@ -1,71 +1,63 @@
-import type {
-	TaskInfo,
-	TaskOptions,
-	TaskState,
-	TaskStateAwaitingRetryRequest,
-	TaskStateCompleted,
-	TaskStateFailed,
-	TaskStateRunning,
-} from "@aikirun/types/task";
-import { z } from "zod";
+import { type } from "arktype";
 
-import type { Zt } from "../helpers/schema";
 import { serializedErrorSchema } from "../serializable";
 import { retryStrategySchema } from "../shared/schema";
 
-export const taskOptionsSchema: Zt<TaskOptions> = z.object({
-	retry: retryStrategySchema.optional(),
-	reference: z.object({ id: z.string().min(1) }).optional(),
+export const taskOptionsSchema = type({
+	"retry?": retryStrategySchema,
+	"reference?": { id: "string > 0" },
 });
 
-export const taskStateRunningSchema: Zt<TaskStateRunning<unknown>> = z.object({
-	status: z.literal("running"),
-	attempts: z.number().int().positive(),
-	input: z.unknown(),
+export const taskStateRunningSchema = type({
+	status: "'running'",
+	attempts: "number.integer > 0",
+	input: "unknown",
 });
 
-export const taskStateCompletedSchema: Zt<TaskStateCompleted<unknown>> = z.object({
-	status: z.literal("completed"),
-	attempts: z.number().int().positive(),
-	output: z.unknown(),
+export const taskStateCompletedSchema = type({
+	status: "'completed'",
+	attempts: "number.integer > 0",
+	output: "unknown",
 });
 
-export const taskStateFailedSchema: Zt<TaskStateFailed> = z.object({
-	status: z.literal("failed"),
-	attempts: z.number().int().positive(),
+export const taskStateFailedSchema = type({
+	status: "'failed'",
+	attempts: "number.integer > 0",
 	error: serializedErrorSchema,
 });
 
-export const taskStateAwaitingRetryRequestSchema: Zt<TaskStateAwaitingRetryRequest> = z.object({
-	status: z.literal("awaiting_retry"),
-	attempts: z.number().int().positive(),
+export const taskStateAwaitingRetryRequestSchema = type({
+	status: "'awaiting_retry'",
+	attempts: "number.integer > 0",
 	error: serializedErrorSchema,
-	nextAttemptInMs: z.number().int().nonnegative(),
+	nextAttemptInMs: "number.integer > 0",
 });
 
-export const taskStateSchema: Zt<TaskState> = z.discriminatedUnion("status", [
-	z.object({
-		status: z.literal("running"),
-		attempts: z.number().int().positive(),
-		input: z.unknown(),
-	}),
-	z.object({
-		status: z.literal("awaiting_retry"),
-		attempts: z.number().int().positive(),
+export const taskStateSchema = type({
+	status: "'running'",
+	attempts: "number.integer > 0",
+	input: "unknown",
+})
+	.or({
+		status: "'awaiting_retry'",
+		attempts: "number.integer > 0",
 		error: serializedErrorSchema,
-		nextAttemptAt: z.number(),
-	}),
-	z.object({ status: z.literal("completed"), attempts: z.number().int().positive(), output: z.unknown() }),
-	z.object({
-		status: z.literal("failed"),
-		attempts: z.number().int().positive(),
+		nextAttemptAt: "number",
+	})
+	.or({
+		status: "'completed'",
+		attempts: "number.integer > 0",
+		output: "unknown",
+	})
+	.or({
+		status: "'failed'",
+		attempts: "number.integer > 0",
 		error: serializedErrorSchema,
-	}),
-]);
+	});
 
-export const taskInfoSchema: Zt<TaskInfo> = z.object({
-	id: z.string().min(1),
-	name: z.string().min(1),
+export const taskInfoSchema = type({
+	id: "string > 0",
+	name: "string > 0",
 	state: taskStateSchema,
-	inputHash: z.string(),
+	inputHash: "string > 0",
 });

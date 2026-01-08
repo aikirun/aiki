@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { type } from "arktype";
 
 import { eventsQueueSchema } from "../event/schema";
 import { serializedErrorSchema } from "../serializable";
@@ -6,285 +6,242 @@ import { retryStrategySchema, triggerStrategySchema } from "../shared/schema";
 import { sleepQueueSchema } from "../sleep/schema";
 import { taskInfoSchema, taskStateSchema } from "../task/schema";
 
-export const workflowRunStatusSchema = z.enum([
-	"scheduled",
-	"queued",
-	"running",
-	"paused",
-	"sleeping",
-	"awaiting_event",
-	"awaiting_retry",
-	"awaiting_child_workflow",
-	"cancelled",
-	"failed",
-	"completed",
-]);
+export const workflowRunStatusSchema = type(
+	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_child_workflow' | 'cancelled' | 'failed' | 'completed'"
+);
 
-const workflowReferenceOptionsSchema = z.object({
-	id: z.string(),
-	onConflict: z.enum(["error", "return_existing"]).optional(),
+const workflowReferenceOptionsSchema = type({
+	id: "string > 0",
+	"onConflict?": "'error' | 'return_existing' | undefined",
 });
 
-export const workflowOptionsSchema = z.object({
-	reference: workflowReferenceOptionsSchema.optional(),
-	trigger: triggerStrategySchema.optional(),
-	shard: z.string().optional(),
-	retry: retryStrategySchema.optional(),
+export const workflowOptionsSchema = type({
+	"reference?": workflowReferenceOptionsSchema,
+	"trigger?": triggerStrategySchema,
+	"shard?": "string | undefined",
+	"retry?": retryStrategySchema,
 });
 
-const workflowRunScheduledReasonSchema = z.enum([
-	"new",
-	"retry",
-	"task_retry",
-	"awake",
-	"awake_early",
-	"resume",
-	"event",
-	"child_workflow",
-]);
+const workflowRunScheduledReasonSchema = type(
+	"'new' | 'retry' | 'task_retry' | 'awake' | 'awake_early' | 'resume' | 'event' | 'child_workflow'"
+);
 
-const workflowRunStateScheduledBaseSchema = z.object({
-	status: z.literal("scheduled"),
-	scheduledAt: z.number(),
+export const workflowRunStateScheduledSchema = type({
+	status: "'scheduled'",
+	scheduledAt: "number",
+	reason: "'new'",
+})
+	.or({ status: "'scheduled'", scheduledAt: "number", reason: "'retry'" })
+	.or({ status: "'scheduled'", scheduledAt: "number", reason: "'task_retry'" })
+	.or({ status: "'scheduled'", scheduledAt: "number", reason: "'awake'" })
+	.or({ status: "'scheduled'", scheduledAt: "number", reason: "'awake_early'" })
+	.or({ status: "'scheduled'", scheduledAt: "number", reason: "'resume'" })
+	.or({ status: "'scheduled'", scheduledAt: "number", reason: "'event'" })
+	.or({ status: "'scheduled'", scheduledAt: "number", reason: "'child_workflow'" });
+
+export const workflowRunStateQueuedSchema = type({
+	status: "'queued'",
 	reason: workflowRunScheduledReasonSchema,
 });
 
-export const workflowRunStateScheduledSchema = z.discriminatedUnion("status", [
-	workflowRunStateScheduledBaseSchema.extend({ reason: z.literal("new") }),
-	workflowRunStateScheduledBaseSchema.extend({ reason: z.literal("retry") }),
-	workflowRunStateScheduledBaseSchema.extend({ reason: z.literal("task_retry") }),
-	workflowRunStateScheduledBaseSchema.extend({ reason: z.literal("awake") }),
-	workflowRunStateScheduledBaseSchema.extend({ reason: z.literal("awake_early") }),
-	workflowRunStateScheduledBaseSchema.extend({ reason: z.literal("resume") }),
-	workflowRunStateScheduledBaseSchema.extend({ reason: z.literal("event") }),
-	workflowRunStateScheduledBaseSchema.extend({ reason: z.literal("child_workflow") }),
-]);
-
-export const workflowRunStateQueuedSchema = z.object({
-	status: z.literal("queued"),
-	reason: workflowRunScheduledReasonSchema,
+export const workflowRunStateRunningSchema = type({
+	status: "'running'",
 });
 
-export const workflowRunStateRunningSchema = z.object({
-	status: z.literal("running"),
+export const workflowRunStatePausedSchema = type({
+	status: "'paused'",
 });
 
-export const workflowRunStatePausedSchema = z.object({
-	status: z.literal("paused"),
+export const workflowRunStateSleepingSchema = type({
+	status: "'sleeping'",
+	sleepName: "string > 0",
+	durationMs: "number > 0",
 });
 
-export const workflowRunStateSleepingSchema = z.object({
-	status: z.literal("sleeping"),
-	sleepName: z.string().min(1),
-	durationMs: z.number().positive(),
+export const workflowRunStateAwaitingEventSchema = type({
+	status: "'awaiting_event'",
+	eventName: "string > 0",
+	"timeoutAt?": "number | undefined",
 });
 
-export const workflowRunStateAwaitingEventSchema = z.object({
-	status: z.literal("awaiting_event"),
-	eventName: z.string().min(1),
-	timeoutAt: z.number().positive().optional(),
-});
-
-const workflowFailureCauseSchema = z.enum(["task", "child_workflow", "self"]);
-
-const workflowRunStateAwaitingRetryBaseSchema = z.object({
-	status: z.literal("awaiting_retry"),
-	cause: workflowFailureCauseSchema,
-	nextAttemptAt: z.number().positive(),
-});
-
-export const workflowRunStateAwaitingRetrySchema = z.discriminatedUnion("cause", [
-	workflowRunStateAwaitingRetryBaseSchema.extend({
-		cause: z.literal("task"),
-		taskId: z.string().min(1),
-	}),
-	workflowRunStateAwaitingRetryBaseSchema.extend({
-		cause: z.literal("child_workflow"),
-		childWorkflowRunId: z.string().min(1),
-	}),
-	workflowRunStateAwaitingRetryBaseSchema.extend({
-		cause: z.literal("self"),
+export const workflowRunStateAwaitingRetrySchema = type({
+	status: "'awaiting_retry'",
+	cause: "'task'",
+	nextAttemptAt: "number > 0",
+	taskId: "string > 0",
+})
+	.or({
+		status: "'awaiting_retry'",
+		cause: "'child_workflow'",
+		nextAttemptAt: "number > 0",
+		childWorkflowRunId: "string > 0",
+	})
+	.or({
+		status: "'awaiting_retry'",
+		cause: "'self'",
+		nextAttemptAt: "number > 0",
 		error: serializedErrorSchema,
-	}),
-]);
+	});
 
-export const workflowRunStateAwaitingChildWorkflowSchema = z.object({
-	status: z.literal("awaiting_child_workflow"),
-	childWorkflowRunId: z.string().min(1),
+export const workflowRunStateAwaitingChildWorkflowSchema = type({
+	status: "'awaiting_child_workflow'",
+	childWorkflowRunId: "string > 0",
 	childWorkflowRunStatus: workflowRunStatusSchema,
-	timeoutAt: z.number().positive().optional(),
+	"timeoutAt?": "number > 0 | undefined",
 });
 
-export const workflowRunStateCancelledSchema = z.object({
-	status: z.literal("cancelled"),
-	reason: z.string().min(1).optional(),
+export const workflowRunStateCancelledSchema = type({
+	status: "'cancelled'",
+	"reason?": "string > 0 | undefined",
 });
 
-export const workflowRunStateCompletedSchema = z.object({
-	status: z.literal("completed"),
-	output: z.unknown(),
+export const workflowRunStateCompletedSchema = type({
+	status: "'completed'",
+	output: "unknown",
 });
 
-const workflowRunStateFailedBaseSchema = z.object({
-	status: z.literal("failed"),
-	cause: workflowFailureCauseSchema,
-});
-
-export const workflowRunStateFailedSchema = z.discriminatedUnion("cause", [
-	workflowRunStateFailedBaseSchema.extend({
-		cause: z.literal("task"),
-		taskId: z.string().min(1),
-	}),
-	workflowRunStateFailedBaseSchema.extend({
-		cause: z.literal("child_workflow"),
-		childWorkflowRunId: z.string().min(1),
-	}),
-	workflowRunStateFailedBaseSchema.extend({
-		cause: z.literal("self"),
+export const workflowRunStateFailedSchema = type({
+	status: "'failed'",
+	cause: "'task'",
+	taskId: "string > 0",
+})
+	.or({
+		status: "'failed'",
+		cause: "'child_workflow'",
+		childWorkflowRunId: "string > 0",
+	})
+	.or({
+		status: "'failed'",
+		cause: "'self'",
 		error: serializedErrorSchema,
-	}),
-]);
+	});
 
-export const workflowRunStateSchema = z.discriminatedUnion("status", [
-	workflowRunStateScheduledSchema,
-	workflowRunStateQueuedSchema,
-	workflowRunStateRunningSchema,
-	workflowRunStatePausedSchema,
-	workflowRunStateSleepingSchema,
-	workflowRunStateAwaitingEventSchema,
-	workflowRunStateAwaitingRetrySchema,
-	workflowRunStateAwaitingChildWorkflowSchema,
-	workflowRunStateCancelledSchema,
-	workflowRunStateCompletedSchema,
-	workflowRunStateFailedSchema,
-]);
+export const workflowRunStateSchema = workflowRunStateScheduledSchema
+	.or(workflowRunStateQueuedSchema)
+	.or(workflowRunStateRunningSchema)
+	.or(workflowRunStatePausedSchema)
+	.or(workflowRunStateSleepingSchema)
+	.or(workflowRunStateAwaitingEventSchema)
+	.or(workflowRunStateAwaitingRetrySchema)
+	.or(workflowRunStateAwaitingChildWorkflowSchema)
+	.or(workflowRunStateCancelledSchema)
+	.or(workflowRunStateCompletedSchema)
+	.or(workflowRunStateFailedSchema);
 
-const childWorkflowRunInfoSchema = z.object({
-	id: z.string().min(1),
-	inputHash: z.string().min(1),
-	statusWaitResults: z.array(
-		z.discriminatedUnion("status", [
-			z.object({
-				status: z.literal("completed"),
-				completedAt: z.number().positive(),
-				childWorkflowRunState: workflowRunStateSchema,
-			}),
-			z.object({
-				status: z.literal("timeout"),
-				timedOutAt: z.number().positive(),
-			}),
-		])
-	),
+const childWorkflowWaitResultSchema = type({
+	status: "'completed'",
+	completedAt: "number > 0",
+	childWorkflowRunState: workflowRunStateSchema,
+}).or({
+	status: "'timeout'",
+	timedOutAt: "number > 0",
 });
 
-export const workflowRunSchema = z.object({
-	id: z.string(),
-	name: z.string(),
-	versionId: z.string(),
-	createdAt: z.number(),
-	revision: z.number(),
-	input: z.unknown(),
-	path: z.string(),
+const childWorkflowRunInfoSchema = type({
+	id: "string > 0",
+	inputHash: "string > 0",
+	statusWaitResults: childWorkflowWaitResultSchema.array(),
+});
+
+export const workflowRunSchema = type({
+	id: "string > 0",
+	name: "string > 0",
+	versionId: "string > 0",
+	createdAt: "number > 0",
+	revision: "number >= 0",
+	input: "unknown",
+	path: "string > 0",
 	options: workflowOptionsSchema,
-	attempts: z.number(),
+	attempts: "number.integer >= 0",
 	state: workflowRunStateSchema,
-	tasks: z.record(z.string().min(1), taskInfoSchema),
-	sleepsQueue: z.record(z.string().min(1), sleepQueueSchema),
-	eventsQueue: z.record(z.string().min(1), eventsQueueSchema),
-	childWorkflowRuns: z.record(z.string().min(1), childWorkflowRunInfoSchema),
-	parentWorkflowRunId: z.string().min(1).optional(),
+	tasks: type({ "[string]": taskInfoSchema }),
+	sleepsQueue: type({ "[string]": sleepQueueSchema }),
+	eventsQueue: type({ "[string]": eventsQueueSchema }),
+	childWorkflowRuns: type({ "[string]": childWorkflowRunInfoSchema }),
+	"parentWorkflowRunId?": "string > 0 | undefined",
 });
 
-const workflowRunTransitionBaseSchema = z.object({
-	id: z.string(),
-	createdAt: z.number(),
-	type: z.enum(["state", "task_state"]),
+export const workflowRunTransitionSchema = type({
+	id: "string > 0",
+	createdAt: "number > 0",
+	type: "'state'",
+	state: workflowRunStateSchema,
+}).or({
+	id: "string > 0",
+	createdAt: "number > 0",
+	type: "'task_state'",
+	taskId: "string > 0",
+	taskState: taskStateSchema,
 });
 
-export const workflowRunTransitionSchema = z.discriminatedUnion("type", [
-	workflowRunTransitionBaseSchema.extend({
-		type: z.literal("state"),
-		state: workflowRunStateSchema,
-	}),
-	workflowRunTransitionBaseSchema.extend({
-		type: z.literal("task_state"),
-		taskId: z.string(),
-		taskState: taskStateSchema,
-	}),
-]);
+export const workflowRunStateScheduledRequestOptimisticSchema = type({
+	status: "'scheduled'",
+	scheduledInMs: "number.integer > 0",
+	reason: "'retry'",
+})
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'task_retry'" })
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'awake'" })
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'event'" })
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'child_workflow'" });
 
-const workflowRunStateScheduledRequestBaseSchema = z.object({
-	status: z.literal("scheduled"),
-	reason: workflowRunScheduledReasonSchema,
-	scheduledInMs: z.number().positive(),
+export const workflowRunStateScheduledRequestPessimisticSchema = type({
+	status: "'scheduled'",
+	scheduledInMs: "number.integer > 0",
+	reason: "'new'",
+})
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'awake_early'" })
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'resume'" });
+
+export const workflowRunStateAwaitingEventRequestSchema = type({
+	status: "'awaiting_event'",
+	eventName: "string > 0",
+	"timeoutInMs?": "number.integer > 0 | undefined",
 });
 
-export const workflowRunStateScheduledRequestOptimisticSchema = z.discriminatedUnion("reason", [
-	workflowRunStateScheduledRequestBaseSchema.extend({ reason: z.literal("retry") }),
-	workflowRunStateScheduledRequestBaseSchema.extend({ reason: z.literal("task_retry") }),
-	workflowRunStateScheduledRequestBaseSchema.extend({ reason: z.literal("awake") }),
-	workflowRunStateScheduledRequestBaseSchema.extend({ reason: z.literal("event") }),
-	workflowRunStateScheduledRequestBaseSchema.extend({ reason: z.literal("child_workflow") }),
-]);
-
-export const workflowRunStateScheduledRequestPessimisticSchema = z.discriminatedUnion("reason", [
-	workflowRunStateScheduledRequestBaseSchema.extend({ reason: z.enum(["new"]) }),
-	workflowRunStateScheduledRequestBaseSchema.extend({ reason: z.enum(["awake_early"]) }),
-	workflowRunStateScheduledRequestBaseSchema.extend({ reason: z.enum(["resume"]) }),
-]);
-
-export const workflowRunStateAwaitingEventRequestSchema = z.object({
-	status: z.literal("awaiting_event"),
-	eventName: z.string().min(1),
-	timeoutInMs: z.number().positive().optional(),
-});
-
-export const workflowRunStateAwaitingRetryRequestSchema = z.discriminatedUnion("cause", [
-	z.object({
-		status: z.literal("awaiting_retry"),
-		cause: z.literal("task"),
-		taskId: z.string().min(1),
-		nextAttemptInMs: z.number().positive(),
-	}),
-	z.object({
-		status: z.literal("awaiting_retry"),
-		cause: z.literal("child_workflow"),
-		childWorkflowRunId: z.string().min(1),
-		nextAttemptInMs: z.number().positive(),
-	}),
-	z.object({
-		status: z.literal("awaiting_retry"),
-		cause: z.literal("self"),
+export const workflowRunStateAwaitingRetryRequestSchema = type({
+	status: "'awaiting_retry'",
+	cause: "'task'",
+	taskId: "string > 0",
+	nextAttemptInMs: "number.integer > 0",
+})
+	.or({
+		status: "'awaiting_retry'",
+		cause: "'child_workflow'",
+		childWorkflowRunId: "string > 0",
+		nextAttemptInMs: "number.integer > 0",
+	})
+	.or({
+		status: "'awaiting_retry'",
+		cause: "'self'",
 		error: serializedErrorSchema,
-		nextAttemptInMs: z.number().positive(),
-	}),
-]);
+		nextAttemptInMs: "number.integer > 0",
+	});
 
-export const workflowRunStateAwaitingChildWorkflowRequestSchema = z.object({
-	status: z.literal("awaiting_child_workflow"),
-	childWorkflowRunId: z.string().min(1),
+export const workflowRunStateAwaitingChildWorkflowRequestSchema = type({
+	status: "'awaiting_child_workflow'",
+	childWorkflowRunId: "string > 0",
 	childWorkflowRunStatus: workflowRunStatusSchema,
-	timeoutInMs: z.number().positive().optional(),
+	"timeoutInMs?": "number.integer > 0 | undefined",
 });
 
-const taskStateOutputSchema = z.discriminatedUnion("status", [
-	z.object({ status: z.literal("completed"), output: z.unknown() }),
-	z.object({ status: z.literal("failed"), error: serializedErrorSchema }),
-]);
+const taskStateOutputSchema = type({
+	status: "'completed'",
+	output: "unknown",
+}).or({
+	status: "'failed'",
+	error: serializedErrorSchema,
+});
 
-export const workflowRunSetTaskStateRequestSchema = z.discriminatedUnion("type", [
-	z.object({
-		type: z.literal("new"),
-		id: z.string().min(1),
-		taskName: z.string().min(1),
-		input: z.unknown(),
-		reference: z.object({ id: z.string().min(1) }).optional(),
-		state: taskStateOutputSchema,
-	}),
-	z.object({
-		type: z.literal("existing"),
-		id: z.string().min(1),
-		taskId: z.string().min(1),
-		state: taskStateOutputSchema,
-	}),
-]);
+export const workflowRunSetTaskStateRequestSchema = type({
+	type: "'new'",
+	id: "string > 0",
+	taskName: "string > 0",
+	input: "unknown",
+	"reference?": { id: "string > 0" },
+	state: taskStateOutputSchema,
+}).or({
+	type: "'existing'",
+	id: "string > 0",
+	taskId: "string > 0",
+	state: taskStateOutputSchema,
+});

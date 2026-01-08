@@ -1,11 +1,12 @@
-import type { SerializableError } from "@aikirun/types/serializable";
-import { z } from "zod";
+import { scope } from "arktype";
 
-import type { Zt } from "./helpers/schema";
+const errorScope = scope({
+	serializableError: {
+		message: "string",
+		name: "string",
+		"stack?": "string | undefined",
+		"cause?": "serializableError | undefined",
+	},
+}).export();
 
-export const serializedErrorSchema: Zt<SerializableError> = z.object({
-	message: z.string(),
-	name: z.string(),
-	stack: z.string().optional(),
-	cause: z.lazy(() => serializedErrorSchema).optional(),
-});
+export const serializedErrorSchema = errorScope.serializableError;

@@ -22,7 +22,7 @@ import type {
 	WorkflowRunTransitionTaskStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
 import { oc } from "@orpc/contract";
-import { z } from "zod";
+import { type } from "arktype";
 
 import {
 	workflowOptionsSchema,
@@ -55,81 +55,71 @@ import {
 
 const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
 	.input(
-		z.object({
-			limit: z.number().optional(),
-			offset: z.number().optional(),
-			filters: z
-				.object({
-					workflows: z
-						.array(
-							z.object({
-								id: z.string().optional(),
-								versionId: z.string().optional(),
-							})
-						)
-						.optional(),
-					status: z.array(workflowRunStatusSchema).optional(),
-				})
-				.optional(),
-			sort: z
-				.object({
-					field: z.literal("createdAt"),
-					order: z.enum(["asc", "desc"]),
-				})
-				.optional(),
+		type({
+			"limit?": "number.integer > 0 | undefined",
+			"offset?": "number.integer >= 0 | undefined",
+			"filters?": {
+				"workflows?": type({
+					"id?": "string > 0 | undefined",
+					"versionId?": "string > 0 | undefined",
+				}).array(),
+				"status?": workflowRunStatusSchema.array(),
+			},
+			"sort?": {
+				field: "'createdAt'",
+				order: "'asc' | 'desc'",
+			},
 		})
 	)
 	.output(
-		z.object({
-			runs: z.array(
-				z.object({
-					id: z.string(),
-					name: z.string(),
-					versionId: z.string(),
-					createdAt: z.number(),
-					status: workflowRunStatusSchema,
-				})
-			),
-			total: z.number(),
+		type({
+			runs: type({
+				id: "string > 0",
+				name: "string > 0",
+				versionId: "string > 0",
+				createdAt: "number > 0",
+				status: workflowRunStatusSchema,
+			}).array(),
+			total: "number.integer >= 0",
 		})
 	);
 
 const getByIdV1: ContractProcedure<WorkflowRunGetByIdRequestV1, WorkflowRunGetByIdResponseV1> = oc
 	.input(
-		z.object({
-			id: z.string().min(1),
+		type({
+			id: "string > 0",
 		})
 	)
 	.output(
-		z.object({
+		type({
 			run: workflowRunSchema,
 		})
 	);
 
 const getStateV1: ContractProcedure<WorkflowRunGetStateRequestV1, WorkflowRunGetStateResponseV1> = oc
 	.input(
-		z.object({
-			id: z.string().min(1),
+		type({
+			id: "string > 0",
 		})
 	)
 	.output(
-		z.object({
+		type({
 			state: workflowRunStateSchema,
 		})
 	);
 
 const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateResponseV1> = oc
 	.input(
-		z.object({
-			name: z.string().min(1),
-			versionId: z.string().min(1),
-			input: z.unknown(),
-			parentWorkflowRunId: z.string().min(1).optional(),
-			options: workflowOptionsSchema.optional(),
+		type({
+			name: "string > 0",
+			versionId: "string > 0",
+			input: "unknown",
+			"parentWorkflowRunId?": "string > 0 | undefined",
+			"options?": workflowOptionsSchema,
 		})
 	)
 	.output(
-		z.object({
+		type({
 			run: workflowRunSchema,
 		})
 	);
@@ -137,36 +127,29 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, WorkflowRunTransitionStateResponseV1> =
 	oc
 		.input(
-			z.discriminatedUnion("type", [
-				z.object({
-					type: z.literal("optimistic"),
-					id: z.string().min(1),
-					state: z.discriminatedUnion("status", [
-						workflowRunStateScheduledRequestOptimisticSchema,
-						workflowRunStateQueuedSchema,
-						workflowRunStateRunningSchema,
-						workflowRunStateSleepingSchema,
-						workflowRunStateAwaitingEventRequestSchema,
-						workflowRunStateAwaitingRetryRequestSchema,
-						workflowRunStateAwaitingChildWorkflowRequestSchema,
-						workflowRunStateCompletedSchema,
-						workflowRunStateFailedSchema,
-					]),
-					expectedRevision: z.number(),
-				}),
-				z.object({
-					type: z.literal("pessimistic"),
-					id: z.string().min(1),
-					state: z.discriminatedUnion("status", [
-						workflowRunStateScheduledRequestPessimisticSchema,
-						workflowRunStatePausedSchema,
-						workflowRunStateCancelledSchema,
-					]),
-				}),
-			])
+			type({
+				type: "'optimistic'",
+				id: "string > 0",
+				state: workflowRunStateScheduledRequestOptimisticSchema
+					.or(workflowRunStateQueuedSchema)
+					.or(workflowRunStateRunningSchema)
+					.or(workflowRunStateSleepingSchema)
+					.or(workflowRunStateAwaitingEventRequestSchema)
+					.or(workflowRunStateAwaitingRetryRequestSchema)
+					.or(workflowRunStateAwaitingChildWorkflowRequestSchema)
+					.or(workflowRunStateCompletedSchema)
+					.or(workflowRunStateFailedSchema),
+				expectedRevision: "number.integer >= 0",
+			}).or({
+				type: "'pessimistic'",
+				id: "string > 0",
+				state: workflowRunStateScheduledRequestPessimisticSchema
+					.or(workflowRunStatePausedSchema)
+					.or(workflowRunStateCancelledSchema),
+			})
 		)
 		.output(
-			z.object({
+			type({
 				run: workflowRunSchema,
 			})
 		);
@@ -176,56 +159,52 @@ const transitionTaskStateV1: ContractProcedure<
 	WorkflowRunTransitionTaskStateResponseV1
 > = oc
 	.input(
-		z.union([
-			z.discriminatedUnion("type", [
-				z.object({
-					type: z.literal("create"),
-					id: z.string().min(1),
-					taskName: z.string().min(1),
-					options: taskOptionsSchema.optional(),
-					taskState: taskStateRunningSchema,
-					expectedRevision: z.number(),
-				}),
-				z.object({
-					type: z.literal("retry"),
-					id: z.string().min(1),
-					taskId: z.string().min(1),
-					options: taskOptionsSchema.optional(),
-					taskState: taskStateRunningSchema,
-					expectedRevision: z.number(),
-				}),
-			]),
-			z.object({
-				id: z.string().min(1),
-				taskId: z.string().min(1),
+		type({
+			type: "'create'",
+			id: "string > 0",
+			taskName: "string > 0",
+			"options?": taskOptionsSchema,
+			taskState: taskStateRunningSchema,
+			expectedRevision: "number.integer >= 0",
+		})
+			.or({
+				type: "'retry'",
+				id: "string > 0",
+				taskId: "string > 0",
+				"options?": taskOptionsSchema,
+				taskState: taskStateRunningSchema,
+				expectedRevision: "number.integer >= 0",
+			})
+			.or({
+				id: "string > 0",
+				taskId: "string > 0",
 				taskState: taskStateCompletedSchema,
-				expectedRevision: z.number(),
-			}),
-			z.object({
-				id: z.string().min(1),
-				taskId: z.string().min(1),
+				expectedRevision: "number.integer >= 0",
+			})
+			.or({
+				id: "string > 0",
+				taskId: "string > 0",
 				taskState: taskStateFailedSchema,
-				expectedRevision: z.number(),
-			}),
-			z.object({
-				id: z.string().min(1),
-				taskId: z.string().min(1),
+				expectedRevision: "number.integer >= 0",
+			})
+			.or({
+				id: "string > 0",
+				taskId: "string > 0",
 				taskState: taskStateAwaitingRetryRequestSchema,
-				expectedRevision: z.number(),
-			}),
-		])
+				expectedRevision: "number.integer >= 0",
+			})
 	)
 	.output(
-		z.object({
+		type({
 			run: workflowRunSchema,
-			taskId: z.string(),
+			taskId: "string > 0",
 		})
 	);
 
 const setTaskStateV1: ContractProcedure<WorkflowRunSetTaskStateRequestV1, WorkflowRunSetTaskStateResponseV1> = oc
 	.input(workflowRunSetTaskStateRequestSchema)
 	.output(
-		z.object({
+		type({
 			run: workflowRunSchema,
 		})
 	);
@@ -233,58 +212,52 @@ const setTaskStateV1: ContractProcedure<WorkflowRunSetTaskStateRequestV1, Workfl
 const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, WorkflowRunListTransitionsResponseV1> =
 	oc
 		.input(
-			z.object({
-				id: z.string().min(1),
-				limit: z.number().optional(),
-				offset: z.number().optional(),
-				sort: z
-					.object({
-						field: z.literal("createdAt"),
-						order: z.enum(["asc", "desc"]),
-					})
-					.optional(),
+			type({
+				id: "string > 0",
+				"limit?": "number.integer > 0 | undefined",
+				"offset?": "number.integer >= 0 | undefined",
+				"sort?": {
+					field: "'createdAt'",
+					order: "'asc' | 'desc'",
+				},
 			})
 		)
 		.output(
-			z.object({
-				transitions: z.array(workflowRunTransitionSchema),
-				total: z.number(),
+			type({
+				transitions: workflowRunTransitionSchema.array(),
+				total: "number.integer >= 0",
 			})
 		);
 
 const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, WorkflowRunSendEventResponseV1> = oc
 	.input(
-		z.object({
-			id: z.string().min(1),
-			eventName: z.string().min(1),
-			data: z.unknown(),
-			options: z
-				.object({
-					reference: z.object({ id: z.string().min(1) }).optional(),
-				})
-				.optional(),
+		type({
+			id: "string > 0",
+			eventName: "string > 0",
+			data: "unknown",
+			"options?": {
+				"reference?": { id: "string > 0" },
+			},
 		})
 	)
 	.output(
-		z.object({
+		type({
 			run: workflowRunSchema,
 		})
 	);
 
 const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, void> = oc
 	.input(
-		z.object({
-			ids: z.array(z.string().min(1)),
-			eventName: z.string().min(1),
-			data: z.unknown(),
-			options: z
-				.object({
-					reference: z.object({ id: z.string().min(1) }).optional(),
-				})
-				.optional(),
+		type({
+			ids: type("string > 0").array(),
+			eventName: "string > 0",
+			data: "unknown",
+			"options?": {
+				"reference?": { id: "string > 0" },
+			},
 		})
 	)
-	.output(z.void());
+	.output(type("undefined"));
 
 export const workflowRunContract = {
 	listV1,

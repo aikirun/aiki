@@ -1,63 +1,55 @@
-import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { DurationObject } from "@aikirun/types/duration";
-import type { TriggerStrategy } from "@aikirun/types/trigger";
-import { z } from "zod";
+import { type } from "arktype";
 
-import type { Zt } from "../helpers/schema";
+export const durationObjectSchema = type({
+	"days?": "number.integer > 0 | undefined",
+	"hours?": "number.integer > 0 | undefined",
+	"minutes?": "number.integer > 0 | undefined",
+	"seconds?": "number.integer > 0 | undefined",
+	"milliseconds?": "number.integer > 0 | undefined",
+}).narrow((obj): obj is DurationObject => {
+	return (
+		obj.days !== undefined ||
+		obj.hours !== undefined ||
+		obj.minutes !== undefined ||
+		obj.seconds !== undefined ||
+		obj.milliseconds !== undefined
+	);
+});
 
-export const durationObjectSchema: Zt<DurationObject> = z.union([
-	z.object({
-		days: z.number(),
-		hours: z.number().optional(),
-		minutes: z.number().optional(),
-		seconds: z.number().optional(),
-		milliseconds: z.number().optional(),
-	}),
-	z.object({
-		days: z.number().optional(),
-		hours: z.number(),
-		minutes: z.number().optional(),
-		seconds: z.number().optional(),
-		milliseconds: z.number().optional(),
-	}),
-	z.object({
-		days: z.number().optional(),
-		hours: z.number().optional(),
-		minutes: z.number(),
-		seconds: z.number().optional(),
-		milliseconds: z.number().optional(),
-	}),
-	z.object({
-		days: z.number().optional(),
-		hours: z.number().optional(),
-		minutes: z.number().optional(),
-		seconds: z.number(),
-		milliseconds: z.number().optional(),
-	}),
-	z.object({
-		days: z.number().optional(),
-		hours: z.number().optional(),
-		minutes: z.number().optional(),
-		seconds: z.number().optional(),
-		milliseconds: z.number(),
-	}),
-]);
+export const triggerStrategySchema = type({
+	type: "'immediate'",
+})
+	.or({
+		type: "'delayed'",
+		delayMs: "number.integer > 0",
+	})
+	.or({
+		type: "'delayed'",
+		delay: durationObjectSchema,
+	})
+	.or({
+		type: "'startAt'",
+		startAt: "number",
+	});
 
-export const triggerStrategySchema: Zt<TriggerStrategy> = z.discriminatedUnion("type", [
-	z.object({ type: z.literal("immediate") }),
-	z.object({ type: z.literal("delayed"), delayMs: z.number() }),
-	z.object({ type: z.literal("delayed"), delay: durationObjectSchema }),
-	z.object({ type: z.literal("startAt"), startAt: z.number() }),
-]);
-
-export const retryStrategySchema: Zt<RetryStrategy> = z.discriminatedUnion("type", [
-	z.object({ type: z.literal("never") }),
-	z.object({ type: z.literal("fixed"), maxAttempts: z.number(), delayMs: z.number() }),
-	z.object({
-		type: z.literal("exponential"),
-		maxAttempts: z.number(),
-		baseDelayMs: z.number(),
-		maxDelayMs: z.number(),
-	}),
-	z.object({ type: z.literal("jittered"), maxAttempts: z.number(), baseDelayMs: z.number(), maxDelayMs: z.number() }),
-]);
+export const retryStrategySchema = type({
+	type: "'never'",
+})
+	.or({
+		type: "'fixed'",
+		maxAttempts: "number.integer > 0",
+		delayMs: "number.integer > 0",
+	})
+	.or({
+		type: "'exponential'",
+		maxAttempts: "number.integer > 0",
+		baseDelayMs: "number.integer > 0",
+		maxDelayMs: "number.integer > 0",
+	})
+	.or({
+		type: "'jittered'",
+		maxAttempts: "number.integer > 0",
+		baseDelayMs: "number.integer > 0",
+		maxDelayMs: "number.integer > 0",
+	});

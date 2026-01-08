@@ -3,6 +3,7 @@
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { type } from "arktype";
 import { config } from "dotenv";
 
 import { type Config, configSchema } from "./schema";
@@ -25,12 +26,10 @@ export async function loadConfig(): Promise<Config> {
 		prettyLogs: process.env.PRETTY_LOGS,
 	};
 
-	const result = configSchema.safeParse(raw);
-	if (!result.success) {
-		console.error("Invalid configuration:");
-		console.error(result.error.issues);
-		process.exit(1);
+	const result = configSchema(raw ?? {});
+	if (result instanceof type.errors) {
+		throw new Error(`Invalid config: ${result.summary}`);
 	}
 
-	return result.data;
+	return result;
 }

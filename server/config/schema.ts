@@ -1,18 +1,20 @@
+import { type } from "arktype";
 import { logLevels } from "server/logger";
-import { z } from "zod";
 
-export const redisConfigSchema = z.object({
-	host: z.string().default("localhost"),
-	port: z.coerce.number().int().positive().default(6379),
-	password: z.string().optional(),
+export const redisConfigSchema = type({
+	host: "string = 'localhost'",
+	port: "string.integer.parse | number.integer > 0 = 6379",
+	"password?": "string | undefined",
 });
 
-export const configSchema = z.object({
-	port: z.coerce.number().int().positive().default(9876),
+const coerceBool = type("'true' | 'false' | '1' | '0'").pipe((v) => v === "true" || v === "1");
+
+export const configSchema = type({
+	port: "string.integer.parse | number.integer > 0 = 9876",
 	redis: redisConfigSchema,
-	logLevel: z.enum(logLevels).default("info"),
-	prettyLogs: z.coerce.boolean().default(false),
+	logLevel: type.enumerated(...logLevels).default("info"),
+	prettyLogs: type("boolean").or(coerceBool).default(false),
 });
 
-export type RedisConfig = z.infer<typeof redisConfigSchema>;
-export type Config = z.infer<typeof configSchema>;
+export type RedisConfig = typeof redisConfigSchema.infer;
+export type Config = typeof configSchema.infer;

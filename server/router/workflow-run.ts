@@ -69,7 +69,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 });
 
 const getByIdV1 = os.getByIdV1.handler(({ input: request, context }) => {
-	context.logger.info({ runId: request.id }, "Fetching workflow run by id");
+	context.logger.debug({ runId: request.id }, "Fetching workflow run by id");
 
 	const run = workflowRuns.get(request.id as WorkflowRunId);
 	if (!run) {
@@ -80,7 +80,7 @@ const getByIdV1 = os.getByIdV1.handler(({ input: request, context }) => {
 });
 
 const getStateV1 = os.getStateV1.handler(({ input: request, context }) => {
-	context.logger.info({ runId: request.id }, "Fetching workflow run state");
+	context.logger.debug({ runId: request.id }, "Fetching workflow run state");
 
 	const run = workflowRuns.get(request.id as WorkflowRunId);
 	if (!run) {
@@ -114,7 +114,7 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 
 	const inputHash = await hashInput(request.input);
 
-	const path = getWorkflowRunPath(name, versionId, request.options?.reference?.id ?? inputHash);
+	const path = getWorkflowRunPath(name, versionId, referenceId ?? inputHash);
 	const trigger = request.options?.trigger;
 
 	const run: WorkflowRun = {

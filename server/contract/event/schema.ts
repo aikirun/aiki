@@ -1,21 +1,17 @@
-import type { EventQueue, EventState } from "@aikirun/types/event";
-import { z } from "zod";
+import { type } from "arktype";
 
-import type { Zt } from "../helpers/schema";
+export const eventStateSchema = type({
+	status: "'received'",
+	data: "unknown",
+	receivedAt: "number",
+	"reference?": {
+		id: "string > 0",
+	},
+}).or({
+	status: "'timeout'",
+	timedOutAt: "number",
+});
 
-export const eventStateSchema: Zt<EventState<unknown>> = z.discriminatedUnion("status", [
-	z.object({
-		status: z.literal("received"),
-		data: z.unknown(),
-		receivedAt: z.number(),
-		reference: z.object({ id: z.string().min(1) }).optional(),
-	}),
-	z.object({
-		status: z.literal("timeout"),
-		timedOutAt: z.number(),
-	}),
-]);
-
-export const eventsQueueSchema: Zt<EventQueue<unknown>> = z.object({
-	events: z.array(eventStateSchema),
+export const eventsQueueSchema = type({
+	events: eventStateSchema.array(),
 });
