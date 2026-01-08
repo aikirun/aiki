@@ -168,10 +168,7 @@ await restaurantOrderV1.start(aikiClient, {
 
 ## Documentation
 
-- **[Getting Started](./docs/getting-started/quick-start.md)** — Setup guide and first workflow
-- **[Core Concepts](./docs/core-concepts/)** — Workflows, tasks, events, sleeps, workers, client
-- **[Architecture](./docs/architecture/)** — System design
-- **[Guides](./docs/guides/)** — Best practices
+Read the [docs](./docs/README.md)
 
 ## Requirements
 
