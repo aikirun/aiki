@@ -153,10 +153,10 @@ export function createRedisStreamsStrategy(
 					"aiki.messageId": meta.messageId,
 				});
 			} else {
-				// logger.debug("Message acknowledged", {
-				// 	"aiki.workflowRunId": workflowRunId,
-				// 	"aiki.messageId": meta.messageId,
-				// });
+				logger.debug("Message acknowledged", {
+					"aiki.workflowRunId": workflowRunId,
+					"aiki.messageId": meta.messageId,
+				});
 			}
 		} catch (error) {
 			logger.error("Failed to acknowledge message", {
@@ -313,7 +313,7 @@ async function processRedisStreamMessages(
 ): Promise<WorkflowRunBatch[]> {
 	const workflowRuns: WorkflowRunBatch[] = [];
 	for (const streamEntriesRaw of streamsEntries) {
-		// logger.debug("Raw stream entries", { entries: streamEntriesRaw });
+		logger.debug("Raw stream entries", { entries: streamEntriesRaw });
 
 		const streamEntriesResult = RedisStreamEntriesSchema.safeParse(streamEntriesRaw);
 		if (!streamEntriesResult.success) {
