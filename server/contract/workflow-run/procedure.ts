@@ -137,11 +137,11 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, WorkflowRunTransitionStateResponseV1> =
 	oc
 		.input(
-			z.union([
+			z.discriminatedUnion("type", [
 				z.object({
 					type: z.literal("optimistic"),
 					id: z.string().min(1),
-					state: z.union([
+					state: z.discriminatedUnion("status", [
 						workflowRunStateScheduledRequestOptimisticSchema,
 						workflowRunStateQueuedSchema,
 						workflowRunStateRunningSchema,
@@ -157,7 +157,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 				z.object({
 					type: z.literal("pessimistic"),
 					id: z.string().min(1),
-					state: z.union([
+					state: z.discriminatedUnion("status", [
 						workflowRunStateScheduledRequestPessimisticSchema,
 						workflowRunStatePausedSchema,
 						workflowRunStateCancelledSchema,
@@ -177,22 +177,24 @@ const transitionTaskStateV1: ContractProcedure<
 > = oc
 	.input(
 		z.union([
-			z.object({
-				type: z.literal("create"),
-				id: z.string().min(1),
-				taskName: z.string().min(1),
-				options: taskOptionsSchema.optional(),
-				taskState: taskStateRunningSchema,
-				expectedRevision: z.number(),
-			}),
-			z.object({
-				type: z.literal("retry"),
-				id: z.string().min(1),
-				taskId: z.string().min(1),
-				options: taskOptionsSchema.optional(),
-				taskState: taskStateRunningSchema,
-				expectedRevision: z.number(),
-			}),
+			z.discriminatedUnion("type", [
+				z.object({
+					type: z.literal("create"),
+					id: z.string().min(1),
+					taskName: z.string().min(1),
+					options: taskOptionsSchema.optional(),
+					taskState: taskStateRunningSchema,
+					expectedRevision: z.number(),
+				}),
+				z.object({
+					type: z.literal("retry"),
+					id: z.string().min(1),
+					taskId: z.string().min(1),
+					options: taskOptionsSchema.optional(),
+					taskState: taskStateRunningSchema,
+					expectedRevision: z.number(),
+				}),
+			]),
 			z.object({
 				id: z.string().min(1),
 				taskId: z.string().min(1),

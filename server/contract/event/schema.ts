@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { Zt } from "../helpers/schema";
 
-export const eventStateSchema: Zt<EventState<unknown>> = z.union([
+export const eventStateSchema: Zt<EventState<unknown>> = z.discriminatedUnion("status", [
 	z.object({
 		status: z.literal("received"),
 		data: z.unknown(),

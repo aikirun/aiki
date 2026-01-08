@@ -61,7 +61,7 @@ export type WorkflowRunScheduledReason =
 	| "event"
 	| "child_workflow";
 
-interface WorkflowRunStateScheduledBase extends WorkflowRunStateBase {
+export interface WorkflowRunStateScheduledBase extends WorkflowRunStateBase {
 	status: "scheduled";
 	scheduledAt: number;
 	reason: WorkflowRunScheduledReason;

@@ -43,7 +43,7 @@ export const durationObjectSchema: Zt<DurationObject> = z.union([
 	}),
 ]);
 
-export const triggerStrategySchema: Zt<TriggerStrategy> = z.union([
+export const triggerStrategySchema: Zt<TriggerStrategy> = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("immediate") }),
 	z.object({ type: z.literal("delayed"), delayMs: z.number() }),
 	z.object({ type: z.literal("delayed"), delay: durationObjectSchema }),
