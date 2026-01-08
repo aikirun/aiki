@@ -64,10 +64,23 @@ export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 
 ## What Just Happened?
 
-This workflow coordinates multiple humans (restaurant staff, courier, customer) over hours or days. Here's what Aiki handles automatically:
+This workflow coordinates multiple humans (restaurant staff, courier, customer) over hours or days:
+
+1. Notify the restaurant about the new order
+2. Wait up to 5 minutes for the restaurant to accept
+3. If no response, notify customer and cancel the order
+4. If accepted, notify customer with estimated delivery time
+5. Start courier delivery as a child workflow (runs in parallel)
+6. Wait for delivery to complete
+7. Notify customer that order was delivered
+8. Sleep for 1 day (releases the worker, resumes automatically)
+9. Send feedback request email
+
+**What Aiki handles automatically:**
 
 - **Crash Recovery** — Server can crash at any point. Workflow resumes exactly where it left off.
 - **Automatic Retries** — Failed tasks retry automatically based on your configured policy.
+- **Event Suspension** — Waiting for the restaurant to accept suspends the workflow and releases the worker until the event arrives.
 - **Durable Sleep** — The 1-day sleep for feedback doesn't block workers or consume resources.
 - **Parallel Execution** — Child workflow runs on a different worker in parallel with the parent.
 - **Horizontal Scaling** — Add more workers and Aiki distributes work automatically.
