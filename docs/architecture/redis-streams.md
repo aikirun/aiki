@@ -1,6 +1,6 @@
 # Redis Streams
 
-Aiki uses Redis Streams for work distribution and fault tolerance. This document explains how Aiki leverages streams, not how Redis Streams work (see the [official Redis documentation](https://redis.io/docs/data-types/streams/) for that).
+Aiki uses Redis Streams for work distribution and fault tolerance. This document explains how Aiki leverages streams, not how Redis Streams work (see the [official Redis documentation](https://redis.io/docs/latest/develop/data-types/streams/) for that).
 
 ## How Aiki Uses Streams
 
