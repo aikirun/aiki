@@ -2,6 +2,17 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.9.0
+
+### Breaking Changes
+
+- Renamed `contextFactory` to `createContext` in client configuration
+- Renamed subscriber type `redis_streams` to `redis`
+
+### New Features
+
+- Schema validation for cached results: when a schema is provided, cached task/child workflow outputs are validated against the schema on replay. If the cached shape doesn't match, the workflow fails immediately.
+
 ## 0.8.0
 
 ### Breaking Changes
