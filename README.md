@@ -4,11 +4,16 @@
 
 **A durable execution platform.**
 
-Some workflows take minutes. Others take days. They need to wait for humans, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means message queues, state machines, and fragile recovery logic. With Aiki, you write normal async code and let the platform handle durability.
+Durable execution is a fault tolerant paradigm for building applications, especially long running workflows. 
+
+Some workflows take minutes, others take days, months or years. They often need to wait for human interaction, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means message queues, crons, state machines, and fragile recovery logic. With Aiki, you focus on writing business logic and let the platform handle durability.
+
+Aiki workflows are like a virtual thread of execution that can be suspended (intentionally or due to crashes/intermittent-failures) and automatically resumed from exactly where they left off.
+
 
 ## Example: Restaurant Order Workflow
 
-A restaurant ordering workflow that coordinates restaurant confirmation, courier delivery, and follow-up email the next day.
+Here's a dummy restaurant ordering workflow that coordinates restaurant confirmation, courier delivery, and follow-up email the next day.
 
 ```typescript
 import { event, workflow } from "@aikirun/workflow";
@@ -23,9 +28,7 @@ export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
     await notifyRestaurant.start(run, input.orderId);
     
     // Wwait for acceptance with 5 mins timeout
-    const response = await run.events.restaurantAccepted.wait({
-      timeout: { minutes: 5 } 
-    });
+    const response = await run.events.restaurantAccepted.wait({ timeout: { minutes: 5 } });
 
     if (response.timeout) {
       await notifyCustomer.start(run, {
@@ -47,11 +50,6 @@ export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
     // Wait for delivery to complete
     await deliveryHandle.waitForStatus("completed");
 
-    await notifyCustomer.start(run, {
-      customerId: input.customerId,
-      message: "Your order has been delivered. Enjoy!"
-    });
-
     // Sleep for 1 day, then request feedback
     await run.sleep("feedback-delay", { days: 1 });
     await sendFeedbackEmail.start(run, input);
@@ -64,21 +62,7 @@ export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 });
 ```
 
-## What Just Happened?
-
-This workflow coordinates multiple humans (restaurant staff, courier, customer) over hours or days:
-
-1. Notify the restaurant about the new order
-2. Wait up to 5 minutes for the restaurant to accept
-3. If no response, notify customer and cancel the order
-4. If accepted, notify customer with estimated delivery time
-5. Start courier delivery as a child workflow (runs in parallel)
-6. Wait for delivery to complete
-7. Notify customer that order was delivered
-8. Sleep for 1 day (releases the worker, resumes automatically)
-9. Send feedback request email
-
-**What Aiki handles automatically:**
+## What Aiki handles automatically
 
 - **Crash Recovery** — Server can crash at any point. Workflow resumes exactly where it left off.
 - **Automatic Retries** — Failed tasks retry automatically based on your configured policy.
