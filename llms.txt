@@ -1,0 +1,25 @@
+# Aiki
+
+> Aiki is a durable execution platform. Write async workflows that survive crashes, retry on failure, and coordinate across systems. Define workflows with tasks, sleeps, events, and child workflows.
+
+## Docs
+
+- [README](https://github.com/aikirun/aiki/blob/main/README.md): Overview and quick start
+- [Workflows](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workflows.md): Define durable workflows with versioning, retries, and child workflows
+- [Tasks](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/tasks.md): Create idempotent task units with automatic retries
+- [Workers](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workers.md): Execute workflows with horizontal scaling
+- [Client](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/client.md): Connect to Aiki server and start workflows
+- [Events](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/events.md): Wait for external signals with typed events
+
+## Guides
+
+- [Determinism](https://github.com/aikirun/aiki/blob/main/docs/guides/determinism.md): Writing deterministic workflows
+- [Retry Strategies](https://github.com/aikirun/aiki/blob/main/docs/guides/retry-strategies.md): Configure retry behavior
+- [Reference IDs](https://github.com/aikirun/aiki/blob/main/docs/guides/reference-ids.md): Deduplication and idempotency
+
+## Packages
+
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow): Workflow SDK
+- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task): Task SDK
+- [@aikirun/client](https://www.npmjs.com/package/@aikirun/client): Client SDK
+- [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker): Worker SDK

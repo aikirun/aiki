@@ -1,5 +1,7 @@
 # Aiki
 
+![Status](https://img.shields.io/badge/status-alpha-orange)
+
 **A durable execution platform.**
 
 Some workflows take minutes. Others take days. They need to wait for humans, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means message queues, state machines, and fragile recovery logic. With Aiki, you write normal async code and let the platform handle durability.
