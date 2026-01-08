@@ -269,6 +269,35 @@ if (result.timeout) {
 
 Like sleeps and events, child workflow waits have an internal queue. On replay, if the parent already waited for a child to complete, the cached result is returned immediately instead of waiting again.
 
+### Parallel Child Workflows
+
+Start multiple child workflows and wait for all of them using `Promise.all`:
+
+```typescript
+const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
+	async handler(run, input) {
+		// Start all child workflows
+		const [userHandle, orderHandle, notifyHandle] = await Promise.all([
+			processUserV1.startAsChild(run, { userId: input.userId }),
+			processOrderV1.startAsChild(run, { orderId: input.orderId }),
+			sendNotificationV1.startAsChild(run, { userId: input.userId }),
+		]);
+
+		// Wait for all to complete
+		const [userResult, orderResult, notifyResult] = await Promise.all([
+			userHandle.waitForStatus("completed"),
+			orderHandle.waitForStatus("completed"),
+			notifyHandle.waitForStatus("completed"),
+		]);
+
+		return {
+			user: userResult.state.output,
+			order: orderResult.state.output,
+		};
+	},
+});
+```
+
 ### Reference IDs for Child Workflows
 
 Use reference IDs to ensure idempotent child workflow creation:
