@@ -1,6 +1,8 @@
 # Refactoring Workflows
 
-This guide is about refactoring workflow code while workflows are in flight. If no workflow runs exist, you can change your code freely - these concerns only arise when running workflows replay with new code.
+This guide is about refactoring workflow versions while it has in-flight runs. If no runs exist, you can change your code freely - these concerns only arise when running workflows replay with new code.
+
+> As a caveat; when in doubt, upgrade the workflow by creating a new version via `workflow.v()`.
 
 Aiki's content-addressable design allows you to safely refactor running workflows in ways that would cause determinism errors in other durable execution platforms. This guide explains what changes are safe and what to watch out for.
 
@@ -404,6 +406,8 @@ This is a design principle, not just a refactoring concern. Even without any cod
 ## Summary
 
 Aiki's content-addressable design gives you freedom to refactor workflows without strict determinism requirements. You can reorder tasks, add new ones, remove old ones, reorder event waits, reorder sleeps, and adjust sleep durations. Just be mindful of tasks with side effects and data dependencies between tasks.
+
+When in doubt, create a new workflow version.
 
 ## Next Steps
 
