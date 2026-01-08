@@ -67,11 +67,11 @@ await aikiClient.close();
 ## Run Your Workflow
 
 ```bash
-# Using Bun
-bun run my-first-workflow.ts
-
 # Using Node.js with tsx
 npx tsx my-first-workflow.ts
+
+# Using Bun
+bun run my-first-workflow.ts
 ```
 
 ## Expected Output
