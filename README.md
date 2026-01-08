@@ -171,6 +171,7 @@ Read the [docs](./docs/README.md)
 ## Requirements
 
 - **Runtime**: Node.js 18+ or Bun 1.0+
+- **ESM (ES Modules)** - This package uses ES modules (`import`/`export`)
 - **Message Queue**: Redis 6.2+
 
 ## Packages
