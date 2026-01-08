@@ -49,12 +49,6 @@ const aikiClient = await client({
 const myWorker = worker({ name: "my-worker", workflows: [helloV1] });
 const workerHandle = await myWorker.spawn(aikiClient);
 
-// Graceful shutdown
-process.on("SIGINT", async () => {
-	await workerHandle.stop();
-	await aikiClient.close();
-});
-
 // 5. Execute your workflow
 console.log("Starting workflow...");
 const run = await helloV1.start(aikiClient, { name: "Alice" });
@@ -66,6 +60,7 @@ if (result.success) {
 }
 
 // Cleanup
+await workerHandle.stop();
 await aikiClient.close();
 ```
 
