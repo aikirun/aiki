@@ -27,7 +27,7 @@ export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 
     await notifyRestaurant.start(run, input.orderId);
     
-    // Wwait for acceptance with 5 mins timeout
+    // Wait for acceptance with 5 mins timeout
     const response = await run.events.restaurantAccepted.wait({ timeout: { minutes: 5 } });
 
     if (response.timeout) {
