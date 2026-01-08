@@ -2,7 +2,7 @@
 
 This guide is about refactoring workflow versions while it has in-flight runs. If no runs exist, you can change your code freely - these concerns only arise when running workflows replay with new code.
 
-> As a caveat; when in doubt, upgrade the workflow by creating a new version via `workflow.v()`.
+> As a caveat; when in doubt, instead of refacotoring, upgrade the workflow by creating a new version via `workflow.v()`.
 
 Aiki's content-addressable design allows you to safely refactor running workflows in ways that would cause determinism errors in other durable execution platforms. This guide explains what changes are safe and what to watch out for.
 
