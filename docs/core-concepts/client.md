@@ -8,7 +8,7 @@ The Aiki client connects to the server and lets you start workflows.
 import { client } from "@aikirun/client";
 
 const aikiClient = await client({
-	url: "localhost:9876",
+	url: "http://localhost:9876",
 	redis: {
 		host: "localhost",
 		port: 6379,
@@ -23,9 +23,7 @@ const aikiClient = await client({
 The URL of the Aiki server:
 
 ```typescript
-url: "localhost:9876"; // Local development
-// or
-url: "https://aiki.example.com"; // Production
+url: "http://localhost:9876"; // Local development
 ```
 
 ### redis
@@ -47,7 +45,7 @@ Optional function to create per-execution context for workflows. Called before e
 
 ```typescript
 const aikiClient = await client<AppContext>({
-	url: "localhost:9876",
+	url: "http://localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 	createContext: (run) => ({
 		traceId: crypto.randomUUID(),
@@ -64,7 +62,7 @@ Optional custom logger implementation. Defaults to console logging:
 
 ```typescript
 const aikiClient = await client({
-	url: "localhost:9876",
+	url: "http://localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 	logger: myCustomLogger, // Must implement Logger interface
 });
