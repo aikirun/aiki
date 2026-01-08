@@ -1,5 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: logger hasn't been configured yet
-
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
