@@ -49,7 +49,7 @@ export const notificationWorkflowV1 = notificationWorkflow.v("1.0.0", {
 
 ## Documentation
 
-For comprehensive documentation including retry strategies, schema validation, and best practices, see the [Tasks Guide](https://aiki.run/docs/core-concepts/tasks).
+For comprehensive documentation including retry strategies, schema validation, and best practices, see the [Tasks Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/tasks.md).
 
 ## Related Packages
 

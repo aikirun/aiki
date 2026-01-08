@@ -45,7 +45,7 @@ process.on("SIGTERM", async () => {
 
 ## Documentation
 
-For comprehensive documentation including scaling strategies, configuration options, and how workers operate, see the [Workers Guide](https://aiki.run/docs/core-concepts/workers).
+For comprehensive documentation including scaling strategies, configuration options, and how workers operate, see the [Workers Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workers.md).
 
 ## Related Packages
 

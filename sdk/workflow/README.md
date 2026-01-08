@@ -56,7 +56,7 @@ const result = await handle.waitForStatus("completed");
 
 ## Documentation
 
-For comprehensive documentation including retry strategies, schema validation, child workflows, and best practices, see the [Workflows Guide](https://aiki.run/docs/core-concepts/workflows).
+For comprehensive documentation including retry strategies, schema validation, child workflows, and best practices, see the [Workflows Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workflows.md).
 
 ## Related Packages
 
