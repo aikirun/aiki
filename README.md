@@ -107,17 +107,15 @@ const myWorker = worker({
 });
 const workerHandle = await myWorker.spawn(aikiClient);
 
-// Graceful shutdown
-process.on("SIGINT", async () => {
-  await workerHandle.stop();
-  await aikiClient.close();
-});
-
 // Start a workflow
 await restaurantOrderV1.start(aikiClient, {
   orderId: "order-123",
   customerId: "customer-456"
 });
+
+// Cleanup
+await workerHandle.stop();
+await aikiClient.close();
 ```
 
 ## Features
