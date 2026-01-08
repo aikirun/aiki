@@ -53,13 +53,13 @@ const workerHandle = await myWorker.spawn(aikiClient);
 console.log("Starting workflow...");
 const run = await helloV1.start(aikiClient, { name: "Alice" });
 
-// Wait for completion
+// 6. Wait for completion
 const result = await run.waitForStatus("completed");
 if (result.success) {
 	console.log("Workflow result:", result.state.output);
 }
 
-// Cleanup
+// 7. Cleanup
 await workerHandle.stop();
 await aikiClient.close();
 ```
