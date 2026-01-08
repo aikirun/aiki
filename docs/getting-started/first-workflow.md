@@ -160,7 +160,7 @@ import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 
 const aikiClient = await client({
-	url: "localhost:9876",
+	url: "http://localhost:9876",
 	redis: { host: "localhost", port: 6379 },
 });
 
