@@ -6,7 +6,7 @@ Welcome to the Aiki documentation! This guide will help you build durable, relia
 
 New to Aiki? Start here:
 
-- **[Quick Start](./getting-started/quick-start.md)** - Get up and running in 5 minutes
+- **[Quick Start](./getting-started/quick-start.md)** - Get up and running
 - **[Installation](./getting-started/installation.md)** - Detailed setup instructions
 - **[Your First Workflow](./getting-started/first-workflow.md)** - Build a complete workflow from scratch
 

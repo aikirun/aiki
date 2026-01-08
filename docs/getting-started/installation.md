@@ -1,6 +1,6 @@
 # Installation
 
-Get Aiki up and running in 5 minutes with these simple steps.
+Get Aiki up and running with these simple steps.
 
 ## Step 1: Check Prerequisites
 
@@ -117,5 +117,5 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 ## Next Steps
 
-- **[Quick Start](./quick-start.md)** - Create your first workflow in 5 minutes
+- **[Quick Start](./quick-start.md)** - Create your first workflow
 - **[Your First Workflow](./first-workflow.md)** - Learn core concepts with a real example
