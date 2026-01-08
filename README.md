@@ -13,7 +13,7 @@ Aiki workflows are like a virtual thread of execution that can be suspended (int
 
 ## Example: Restaurant Order Workflow
 
-Here's a dummy restaurant ordering workflow that coordinates restaurant confirmation, courier delivery, and follow-up email the next day.
+Here's a dummy food ordering workflow that coordinates restaurant confirmation, courier delivery, and follow-up email the next day.
 
 ```typescript
 import { event, workflow } from "@aikirun/workflow";
@@ -73,6 +73,7 @@ export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 
 ## Quick Start
 
+Install the Aiki SDK:
 ```bash
 npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
@@ -144,12 +145,12 @@ await restaurantOrderV1.start(aikiClient, {
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Aiki Server                                    │
-│           Orchestrates workflows, manages state, coordinates workers        │
+│                    Orchestrates workflows, manages state                    │
 └─────────────────────────────────────┬───────────────────────────────────────┘
                                       │
                                       ▼
                      ┌───────────────────────────────────┐
-                     │          Redis Streams            │
+                     │          Message Queue            │
                      │     (Message distribution)        │
                      └───────────────────────────────────┘
                                       │
