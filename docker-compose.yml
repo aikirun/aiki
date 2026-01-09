@@ -14,4 +14,5 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       REDIS_HOST: ${REDIS_HOST:-host.docker.internal}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      PRETTY_LOGS: ${PRETTY_LOGS:-true}
     restart: unless-stopped
