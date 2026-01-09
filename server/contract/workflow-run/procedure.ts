@@ -48,9 +48,9 @@ import type { ContractProcedure, ContractProcedureToApi } from "../helpers/proce
 import {
 	taskOptionsSchema,
 	taskStateAwaitingRetryRequestSchema,
-	taskStateCompletedSchema,
+	taskStateCompletedRequestSchema,
 	taskStateFailedSchema,
-	taskStateRunningSchema,
+	taskStateRunningRequestSchema,
 } from "../task/schema";
 
 const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
@@ -164,7 +164,7 @@ const transitionTaskStateV1: ContractProcedure<
 			id: "string > 0",
 			taskName: "string > 0",
 			"options?": taskOptionsSchema,
-			taskState: taskStateRunningSchema,
+			taskState: taskStateRunningRequestSchema,
 			expectedRevision: "number.integer >= 0",
 		})
 			.or({
@@ -172,13 +172,13 @@ const transitionTaskStateV1: ContractProcedure<
 				id: "string > 0",
 				taskId: "string > 0",
 				"options?": taskOptionsSchema,
-				taskState: taskStateRunningSchema,
+				taskState: taskStateRunningRequestSchema,
 				expectedRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				taskId: "string > 0",
-				taskState: taskStateCompletedSchema,
+				taskState: taskStateCompletedRequestSchema,
 				expectedRevision: "number.integer >= 0",
 			})
 			.or({

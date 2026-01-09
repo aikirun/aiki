@@ -349,7 +349,11 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: r
 		}
 
 		taskId = crypto.randomUUID() as TaskId;
-		taskState = request.taskState;
+		taskState = {
+			status: request.taskState.status,
+			attempts: request.taskState.attempts,
+			input: request.taskState.input,
+		};
 	} else {
 		const existingTaskInfo = findTaskById(run, request.taskId as TaskId);
 		if (!existingTaskInfo) {
@@ -363,14 +367,26 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: r
 
 		existingTaskState = existingTaskInfo.state;
 		taskState =
-			request.taskState.status === "awaiting_retry"
+			request.taskState.status === "running"
 				? {
-						status: "awaiting_retry",
+						status: "running",
 						attempts: request.taskState.attempts,
-						error: request.taskState.error,
-						nextAttemptAt: now + request.taskState.nextAttemptInMs,
+						input: request.taskState.input,
 					}
-				: request.taskState;
+				: request.taskState.status === "completed"
+					? {
+							status: "completed",
+							attempts: request.taskState.attempts,
+							output: request.taskState.output,
+						}
+					: request.taskState.status === "awaiting_retry"
+						? {
+								status: "awaiting_retry",
+								attempts: request.taskState.attempts,
+								error: request.taskState.error,
+								nextAttemptAt: now + request.taskState.nextAttemptInMs,
+							}
+						: request.taskState;
 	}
 
 	assertIsValidTaskStateTransition(runId, taskName, taskId, existingTaskState?.status, taskState.status);

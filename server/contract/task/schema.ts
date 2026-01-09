@@ -8,16 +8,16 @@ export const taskOptionsSchema = type({
 	"reference?": { id: "string > 0" },
 });
 
-export const taskStateRunningSchema = type({
+export const taskStateRunningRequestSchema = type({
 	status: "'running'",
 	attempts: "number.integer > 0",
-	input: "unknown",
+	"input?": "unknown",
 });
 
-export const taskStateCompletedSchema = type({
+export const taskStateCompletedRequestSchema = type({
 	status: "'completed'",
 	attempts: "number.integer > 0",
-	output: "unknown",
+	"output?": "unknown",
 });
 
 export const taskStateFailedSchema = type({
