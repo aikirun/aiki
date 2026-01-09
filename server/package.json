@@ -16,9 +16,7 @@
 		"arktype": "^2.1.29",
 		"dotenv": "^16.4.5",
 		"ioredis": "^5.4.1",
-		"pino": "^9.6.0"
-	},
-	"devDependencies": {
+		"pino": "^9.6.0",
 		"pino-pretty": "^13.0.0"
 	},
 	"license": "Apache-2.0"
