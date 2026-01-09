@@ -187,7 +187,7 @@ This is useful when event sources may retry (webhooks, message queues). See the 
 
 ## Event Queues
 
-Each event type has its own queue, similar to sleeps. Events are matched in sequence during replay.
+Each event type has its own queue. Events are matched in sequence during replay.
 
 ### Why This Matters
 
