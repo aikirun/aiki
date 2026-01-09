@@ -73,7 +73,7 @@ const orderWorker = worker({
 	workflows: [orderWorkflowV1],
 	subscriber: {
 		type: "redis",
-		claimMinIdleTimeMs: 180_000, // Claim messages idle > 3 minutes
+		claimMinIdleTimeMs: 90_000, // Claim messages idle > 90 seconds
 		blockTimeMs: 1000,           // Wait up to 1s for new messages
 	},
 });
@@ -81,7 +81,7 @@ const orderWorker = worker({
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `claimMinIdleTimeMs` | 180,000 | How long a message must be idle before other workers can claim it |
+| `claimMinIdleTimeMs` | 90,000 | How long a message must be idle before other workers can claim it |
 | `blockTimeMs` | 1,000 | How long to wait for new messages before checking for claimable work |
 
 Heartbeat interval is configured separately in worker options:
@@ -90,7 +90,7 @@ Heartbeat interval is configured separately in worker options:
 |--------|---------|-------------|
 | `workflowRun.heartbeatIntervalMs` | 30,000 | How often workers refresh their claim on a message |
 
-**Choosing `claimMinIdleTimeMs`**: Set this higher than the heartbeat interval. Workers refresh their claim every heartbeat, so a message only becomes "idle" when a worker stops heartbeating (crashes or hangs). The default of 3 minutes with 30-second heartbeats gives plenty of margin.
+**Choosing `claimMinIdleTimeMs`**: Set this higher than the heartbeat interval. Workers refresh their claim every heartbeat, so a message only becomes "idle" when a worker stops heartbeating (crashes or hangs). The default of 90 seconds with 30-second heartbeats gives plenty of margin.
 
 ## Next Steps
 

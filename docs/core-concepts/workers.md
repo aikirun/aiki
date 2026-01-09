@@ -31,7 +31,7 @@ Worker definitions are static and reusable. The `worker()` function creates a de
 
 When you call `spawn()`, the worker subscribes to a stream for each registered workflow. When a workflow run is triggered, a message appears on the stream. The worker picks it up, looks up the workflow definition in its registry, and begins execution.
 
-During execution, the worker sends periodic heartbeats by refreshing its claim on the message. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the message remains unacknowledged. After a configurable idle time (default: 3 minutes), other workers detect the orphaned work and claim it. The workflow then re-executes from its last checkpoint.
+During execution, the worker sends periodic heartbeats by refreshing its claim on the message. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the message remains unacknowledged. After a configurable idle time (default: 90 seconds), other workers detect the orphaned work and claim it. The workflow then re-executes from its last checkpoint.
 
 When execution completes successfully or fails in an expected way, the worker acknowledges the message, marking it as processed.
 
@@ -92,7 +92,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `claimMinIdleTimeMs` | 180,000 | Idle time before claiming stuck messages |
+| `claimMinIdleTimeMs` | 90,000 | Idle time before claiming stuck messages |
 | `blockTimeMs` | 1,000 | How long to wait for new messages |
 
 ## Next Steps

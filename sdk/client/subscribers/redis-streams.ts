@@ -84,7 +84,7 @@ export function createRedisStreamsStrategy(
 	const maxRetryIntervalMs = strategy.maxRetryIntervalMs ?? 30_000;
 	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;
 	const blockTimeMs = strategy.blockTimeMs ?? 1_000;
-	const claimMinIdleTimeMs = strategy.claimMinIdleTimeMs ?? 180_000;
+	const claimMinIdleTimeMs = strategy.claimMinIdleTimeMs ?? 90_000;
 
 	const getNextDelay = (params: SubscriberDelayParams) => {
 		switch (params.type) {
