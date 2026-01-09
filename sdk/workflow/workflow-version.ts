@@ -70,7 +70,7 @@ export interface WorkflowVersion<
 
 	getHandle: (
 		client: Client<AppContext>,
-		runId: WorkflowRunId
+		runId: string
 	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
 	[INTERNAL]: {
@@ -269,9 +269,9 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	public async getHandle(
 		client: Client<AppContext>,
-		runId: WorkflowRunId
+		runId: string
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
-		return workflowRunHandle(client, runId, this[INTERNAL].eventsDefinition);
+		return workflowRunHandle(client, runId as WorkflowRunId, this[INTERNAL].eventsDefinition);
 	}
 
 	private async handler(
