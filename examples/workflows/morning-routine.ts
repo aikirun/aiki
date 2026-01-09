@@ -1,6 +1,5 @@
+import { task } from "@aikirun/task";
 import { event, workflow } from "@aikirun/workflow";
-
-import { makeCoffee, stretch } from "./task";
 
 export const morningRoutine = workflow({ name: "morning-routine" });
 
@@ -29,7 +28,7 @@ export const morningRoutineV2 = morningRoutine.v("2.0.0", {
 			});
 		}
 
-		return { bar: `Alarm: ${eventData.ringtone}, Stretched: ${muscles}` };
+		return { summary: `Alarm: ${eventData.ringtone}, Stretched: ${muscles}` };
 	},
 	events: {
 		alarm: event<{ ringtone: string }>(),
@@ -38,6 +37,29 @@ export const morningRoutineV2 = morningRoutine.v("2.0.0", {
 		trigger: {
 			type: "delayed",
 			delay: { seconds: 5 },
+		},
+	},
+});
+
+export const makeCoffee = task({
+	name: "drink-coffee",
+	handler(_input: { withSugar: boolean; withCream: boolean }) {
+		return Promise.resolve();
+	},
+});
+
+export const stretch = task({
+	name: "stretch",
+	handler(_input: { duration: number }) {
+		return Promise.resolve({
+			muscles: ["calf", "hamstring", "neck"],
+		});
+	},
+	opts: {
+		retry: {
+			type: "fixed",
+			maxAttempts: 3,
+			delayMs: 1_000,
 		},
 	},
 });
