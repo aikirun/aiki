@@ -20,7 +20,7 @@ import { task } from "@aikirun/task";
 
 const notifyRestaurant = task({
 	name: "notify-restaurant",
-	handler(input: { orderId: string; items: string[] }) {
+	async handler(input: { orderId: string; items: string[] }) {
 		console.log(`Notifying restaurant about order ${input.orderId}`);
 		console.log(`Items: ${input.items.join(", ")}`);
 	},
@@ -35,14 +35,14 @@ const notifyRestaurant = task({
 
 const notifyCustomer = task({
 	name: "notify-customer",
-	handler(input: { customerId: string; message: string }) {
+	async handler(input: { customerId: string; message: string }) {
 		console.log(`To customer ${input.customerId}: ${input.message}`);
 	},
 });
 
 const sendFeedbackEmail = task({
 	name: "send-feedback-email",
-	handler(input: { orderId: string; customerId: string }) {
+	async handler(input: { orderId: string; customerId: string }) {
 		console.log(`Sending feedback request for order ${input.orderId}`);
 	},
 });
