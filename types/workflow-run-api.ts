@@ -220,7 +220,7 @@ export interface WorkflowRunListTransitionsResponseV1 {
 export interface WorkflowRunSendEventRequestV1 {
 	id: string;
 	eventName: string;
-	data: unknown;
+	data?: unknown;
 	options?: EventSendOptions;
 }
 
@@ -231,6 +231,6 @@ export interface WorkflowRunSendEventResponseV1 {
 export interface WorkflowRunMulticastEventRequestV1 {
 	ids: string[];
 	eventName: string;
-	data: unknown;
+	data?: unknown;
 	options?: EventSendOptions;
 }

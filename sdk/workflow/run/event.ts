@@ -168,7 +168,7 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 			}
 
 			logger.debug("Event received");
-			return { timeout: false, data };
+			return { timeout: false, data: data as Data };
 		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);

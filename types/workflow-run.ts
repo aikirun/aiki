@@ -224,7 +224,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	versionId: string;
 	createdAt: number;
 	revision: number;
-	input: Input;
+	input?: Input;
 	path: string;
 	options: WorkflowOptions;
 	attempts: number;

@@ -20,22 +20,24 @@ import { type } from "arktype";
 /**
  * Redis stream entries structure returned by XREADGROUP command:
  * [
- *   "stream-1",
  *   [
+ *     "stream-1",
  *     [
- *       "message-1",
  *       [
- * 	       "version", 1,
- *         "type", "workflow_run_ready",
- *         "workflowRunId", "1a0dd834-e0a7-4170-b357-a9ce2564900c"
- *       ]
- *     ],
- *     [
- *       "message-2",
+ *         "message-1",
+ *         [
+ *   	       "version", 1,
+ *           "type", "workflow_run_ready",
+ *           "workflowRunId", "1a0dd834-e0a7-4170-b357-a9ce2564900c"
+ *         ]
+ *       ],
  *       [
- *         "version", 1,
- *         "type", "workflow_run_ready",
- *         "workflowRunId", "0bd81dd8-0bbb-4703-9455-afb199979acd"
+ *         "message-2",
+ *         [
+ *           "version", 1,
+ *           "type", "workflow_run_ready",
+ *           "workflowRunId", "0bd81dd8-0bbb-4703-9455-afb199979acd"
+ *         ]
  *       ]
  *     ]
  *   ]

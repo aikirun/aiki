@@ -234,7 +234,7 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, WorkflowRunS
 		type({
 			id: "string > 0",
 			eventName: "string > 0",
-			data: "unknown",
+			"data?": "unknown",
 			"options?": {
 				"reference?": { id: "string > 0" },
 			},
@@ -251,7 +251,7 @@ const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, vo
 		type({
 			ids: type("string > 0").array(),
 			eventName: "string > 0",
-			data: "unknown",
+			"data?": "unknown",
 			"options?": {
 				"reference?": { id: "string > 0" },
 			},

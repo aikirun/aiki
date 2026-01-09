@@ -149,7 +149,7 @@ export const workflowRunSchema = type({
 	versionId: "string > 0",
 	createdAt: "number > 0",
 	revision: "number >= 0",
-	input: "unknown",
+	"input?": "unknown",
 	path: "string > 0",
 	options: workflowOptionsSchema,
 	attempts: "number.integer >= 0",

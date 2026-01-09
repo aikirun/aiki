@@ -10,7 +10,7 @@ interface EventStateBase {
 
 export interface EventStateReceived<Data> extends EventStateBase {
 	status: "received";
-	data: Data;
+	data?: Data;
 	receivedAt: number;
 	reference?: EventReferenceOptions;
 }

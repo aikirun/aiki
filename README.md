@@ -6,7 +6,7 @@
 
 Durable execution is a fault tolerant paradigm for building applications, especially long running workflows. 
 
-Some workflows take minutes, others take days, months or years. They often need to wait for human interaction, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means message queues, crons, state machines, and fragile recovery logic. With Aiki, you focus on writing business logic and let the platform handle durability.
+Some workflows take minutes, others take days, months or years. They often need to wait for human interaction, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means coordinating message queues, crons, state machines, and fragile recovery logic. With Aiki, you focus on writing business logic and let the platform handle durability.
 
 Aiki workflows are like a virtual thread of execution that can be suspended (intentionally or due to crashes/intermittent-failures) and automatically resumed from exactly where they left off.
 
