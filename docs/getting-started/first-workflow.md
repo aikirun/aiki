@@ -48,7 +48,7 @@ const sendFeedbackEmail = task({
 });
 ```
 
-## Step 2: Create the Courier Delivery Workflow
+## Step 2: Define the Courier Delivery Workflow
 
 The courier delivery is a child workflow; a separate workflow that runs independently:
 
@@ -81,7 +81,7 @@ const courierDeliveryV1 = courierDelivery.v("1.0.0", {
 });
 ```
 
-## Step 3: Create the Main Restaurant Order Workflow
+## Step 3: Define the Main Restaurant Order Workflow
 
 This workflow orchestrates the entire order process:
 
