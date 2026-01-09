@@ -193,7 +193,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 	const now = Date.now();
 	let state = convertWorkflowRunStateDurationsToTimestamps(request.state, now);
 
-	context.logger.info({ runId, state, attempts: run.attempts }, "Transitioning workflow run state");
+	context.logger.info({ runId, state, attempts: run.attempts }, "Workflow state transition");
 
 	const transitions = workflowRunTransitions.get(runId) ?? [];
 

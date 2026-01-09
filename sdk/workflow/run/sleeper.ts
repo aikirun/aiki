@@ -28,7 +28,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 		if (!sleepState) {
 			try {
 				await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
-				logger.info("Sleeping", {
+				logger.info("Going to sleeping", {
 					"aiki.sleepName": sleepName,
 					"aiki.durationMs": durationMs,
 				});
@@ -78,11 +78,6 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 			});
 			durationMs -= sleepState.durationMs;
 		} else {
-			logger.warn("Lower sleep duration encountered during replay. Already slept enough", {
-				"aiki.sleepName": sleepName,
-				"aiki.historicDurationMs": sleepState.durationMs,
-				"aiki.latestDurationMs": durationMs,
-			});
 			return { cancelled: false };
 		}
 
