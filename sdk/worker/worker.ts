@@ -239,7 +239,9 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			throw new Error("Subscriber strategy not initialized");
 		}
 
-		this.logger.info("Worker started");
+		this.logger.info("Worker started", {
+			"aiki.registeredWorkflows": this.params.workflows.map((w) => `${w.name}/${w.versionId}`),
+		});
 
 		const maxConcurrentWorkflowRuns = this.params.opts?.maxConcurrentWorkflowRuns ?? 1;
 
@@ -323,7 +325,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			const { run: workflowRun } = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
 			if (!workflowRun) {
 				if (meta && this.subscriberStrategy?.acknowledge) {
-					await this.subscriberStrategy.acknowledge(workflowRunId, meta).catch(() => {});
+					await this.subscriberStrategy.acknowledge(this.id, workflowRunId, meta).catch(() => {});
 				}
 				continue;
 			}
@@ -339,7 +341,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					"aiki.workflowRunId": workflowRun.id,
 				});
 				if (meta && this.subscriberStrategy?.acknowledge) {
-					await this.subscriberStrategy.acknowledge(workflowRunId, meta).catch(() => {});
+					await this.subscriberStrategy.acknowledge(this.id, workflowRunId, meta).catch(() => {});
 				}
 				continue;
 			}
@@ -430,7 +432,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			if (meta && this.subscriberStrategy?.acknowledge) {
 				if (shouldAcknowledge) {
 					try {
-						await this.subscriberStrategy.acknowledge(workflowRun.id as WorkflowRunId, meta);
+						await this.subscriberStrategy.acknowledge(this.id, workflowRun.id as WorkflowRunId, meta);
 					} catch (error) {
 						logger.error("Failed to acknowledge message, it may be reprocessed", {
 							"aiki.errorType": "MESSAGE_ACK_FAILED",

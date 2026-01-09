@@ -87,7 +87,7 @@ export interface ResolvedSubscriberStrategy {
 	getNextDelay: (context: SubscriberDelayParams) => number;
 	getNextBatch: (size: number) => Promise<WorkflowRunBatch[]>;
 	heartbeat?: (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta) => Promise<void>;
-	acknowledge?: (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta) => Promise<void>;
+	acknowledge?: (workerId: string, workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta) => Promise<void>;
 }
 
 export interface PollingSubscriberStrategy {

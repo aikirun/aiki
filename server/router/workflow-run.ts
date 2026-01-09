@@ -68,9 +68,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 	};
 });
 
-const getByIdV1 = os.getByIdV1.handler(({ input: request, context }) => {
-	context.logger.debug({ runId: request.id }, "Fetching workflow run by id");
-
+const getByIdV1 = os.getByIdV1.handler(({ input: request }) => {
 	const run = workflowRuns.get(request.id as WorkflowRunId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${request.id}`);
@@ -79,9 +77,7 @@ const getByIdV1 = os.getByIdV1.handler(({ input: request, context }) => {
 	return { run };
 });
 
-const getStateV1 = os.getStateV1.handler(({ input: request, context }) => {
-	context.logger.debug({ runId: request.id }, "Fetching workflow run state");
-
+const getStateV1 = os.getStateV1.handler(({ input: request }) => {
 	const run = workflowRuns.get(request.id as WorkflowRunId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${request.id}`);
@@ -94,8 +90,6 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
 	const referenceId = request.options?.reference?.id;
-
-	context.logger.info({ name, versionId }, "Creating workflow run");
 
 	if (referenceId) {
 		const existingRunId = workflowRunsByReferenceId.get(name)?.get(versionId)?.get(referenceId);
@@ -175,6 +169,11 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 		referenceIdMap.set(referenceId, runId);
 	}
 
+	context.logger.info(
+		{ workflowName: name, versionId, runId, referenceId, opts: run.options, input: run.input },
+		"Created workflow run"
+	);
+
 	return { run };
 });
 
@@ -194,7 +193,7 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 	const now = Date.now();
 	let state = convertWorkflowRunStateDurationsToTimestamps(request.state, now);
 
-	context.logger.info({ runId, state }, "Transitioning workflow run state");
+	context.logger.info({ runId, state, attempts: run.attempts }, "Transitioning workflow run state");
 
 	const transitions = workflowRunTransitions.get(runId) ?? [];
 

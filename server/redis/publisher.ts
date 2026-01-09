@@ -18,17 +18,18 @@ export async function publishWorkflowReadyBatch(
 
 		for (const run of runs) {
 			const streamName = getWorkflowStreamName(run.name, run.versionId, run.options.shard);
-			pipeline.xadd(streamName, "*", "type", "workflow_run_ready", "workflowRunId", run.id);
+			pipeline.xadd(streamName, "*", "version", 1, "type", "workflow_run_ready", "workflowRunId", run.id);
 		}
 
-		await pipeline.exec();
+		const results = await pipeline.exec();
+		context.logger.debug({ results }, "Pipeline exec completed");
 	} catch (error) {
 		context.logger.error(
 			{
 				messageCount: runs.length,
 				error,
 			},
-			"Failed to publishw orkflow_run_ready messages"
+			"Failed to publishw workflow_run_ready messages"
 		);
 	}
 }

@@ -100,12 +100,15 @@ export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAt
 };
 
 export class TaskFailedError extends Error {
-	constructor(
-		public readonly taskId: TaskId,
-		public readonly attempts: number,
-		public readonly reason: string
-	) {
+	public readonly taskId: TaskId;
+	public readonly attempts: number;
+	public readonly reason: string;
+
+	constructor(taskId: TaskId, attempts: number, reason: string) {
 		super(`Task ${taskId} failed after ${attempts} attempts. Reason: ${reason}`);
 		this.name = "TaskFailedError";
+		this.taskId = taskId;
+		this.attempts = attempts;
+		this.reason = reason;
 	}
 }

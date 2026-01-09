@@ -176,21 +176,21 @@ export const workflowRunTransitionSchema = type({
 
 export const workflowRunStateScheduledRequestOptimisticSchema = type({
 	status: "'scheduled'",
-	scheduledInMs: "number.integer > 0",
+	scheduledInMs: "number.integer >= 0",
 	reason: "'retry'",
 })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'task_retry'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'awake'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'event'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'child_workflow'" });
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'task_retry'" })
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'awake'" })
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'event'" })
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'child_workflow'" });
 
 export const workflowRunStateScheduledRequestPessimisticSchema = type({
 	status: "'scheduled'",
-	scheduledInMs: "number.integer > 0",
+	scheduledInMs: "number.integer >= 0",
 	reason: "'new'",
 })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'awake_early'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer > 0", reason: "'resume'" });
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'awake_early'" })
+	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'resume'" });
 
 export const workflowRunStateAwaitingEventRequestSchema = type({
 	status: "'awaiting_event'",
@@ -236,7 +236,7 @@ export const workflowRunSetTaskStateRequestSchema = type({
 	type: "'new'",
 	id: "string > 0",
 	taskName: "string > 0",
-	input: "unknown",
+	"input?": "unknown",
 	"reference?": { id: "string > 0" },
 	state: taskStateOutputSchema,
 }).or({

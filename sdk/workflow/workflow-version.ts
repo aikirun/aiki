@@ -346,9 +346,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 				for (const [key, value] of Object.entries(awaitingRetryState)) {
 					logMeta[`aiki.${key}`] = value;
 				}
-				run.logger.info("Workflow failed. Awaiting retry", {
+				run.logger.info("Workflow awaiting retry", {
 					"aiki.attempts": attempts,
-					"aiki.delayMs": retryParams.delayMs,
 					...logMeta,
 				});
 

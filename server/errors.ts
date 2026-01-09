@@ -23,47 +23,54 @@ export class UnauthorizedError extends Error {
 }
 
 export class RevisionConflictError extends Error {
-	constructor(
-		public readonly workflowRunId: string,
-		public readonly expectedRevision: number,
-		public readonly actualRevision: number
-	) {
+	public readonly workflowRunId: string;
+	public readonly expectedRevision: number;
+	public readonly actualRevision: number;
+
+	constructor(workflowRunId: string, expectedRevision: number, actualRevision: number) {
 		super(`Revision conflict for workflow ${workflowRunId}: expected ${expectedRevision}, actual is ${actualRevision}`);
 		this.name = "RevisionConflictError";
+		this.workflowRunId = workflowRunId;
+		this.expectedRevision = expectedRevision;
+		this.actualRevision = actualRevision;
 	}
 }
 
 export class InvalidWorkflowRunStateTransitionError extends Error {
-	constructor(
-		public readonly workflowRunId: WorkflowRunId,
-		public readonly from: WorkflowRunStatus,
-		public readonly to: WorkflowRunStatus,
-		public readonly reason?: string
-	) {
-		const message = `Cannot transition workflow ${workflowRunId} from ${from} to ${to}`;
-		if (!reason) {
-			super(message);
-		} else {
-			super(`${message} - ${reason}`);
-		}
+	public readonly workflowRunId: WorkflowRunId;
+	public readonly from: WorkflowRunStatus;
+	public readonly to: WorkflowRunStatus;
+	public readonly reason?: string;
+
+	constructor(workflowRunId: WorkflowRunId, from: WorkflowRunStatus, to: WorkflowRunStatus, reason?: string) {
+		const baseMessage = `Cannot transition workflow ${workflowRunId} from ${from} to ${to}`;
+		const message = reason ? `${baseMessage} - ${reason}` : baseMessage;
+		super(message);
 		this.name = "InvalidWorkflowRunStateTransitionError";
+		this.workflowRunId = workflowRunId;
+		this.from = from;
+		this.to = to;
+		this.reason = reason;
 	}
 }
 
 export class InvalidTaskStateTransitionError extends Error {
+	public readonly workflowRunId: WorkflowRunId;
+	public readonly taskData:
+		| { taskId: TaskId; from: TaskStatus; to: TaskStatus }
+		| { taskName: TaskName; to: TaskStatus };
+
 	constructor(
-		public readonly workflowRunId: WorkflowRunId,
-		public readonly taskData:
-			| { taskId: TaskId; from: TaskStatus; to: TaskStatus }
-			| { taskName: TaskName; to: TaskStatus }
+		workflowRunId: WorkflowRunId,
+		taskData: { taskId: TaskId; from: TaskStatus; to: TaskStatus } | { taskName: TaskName; to: TaskStatus }
 	) {
-		if ("from" in taskData) {
-			super(
-				`Cannot transition task ${taskData.taskId} from ${taskData.from} to ${taskData.to} (workflow ${workflowRunId})`
-			);
-		} else {
-			super(`Cannot create task ${taskData.taskName} directly in ${taskData.to} state (workflow ${workflowRunId})`);
-		}
+		const message =
+			"from" in taskData
+				? `Cannot transition task ${taskData.taskId} from ${taskData.from} to ${taskData.to} (workflow ${workflowRunId})`
+				: `Cannot create task ${taskData.taskName} directly in ${taskData.to} state (workflow ${workflowRunId})`;
+		super(message);
 		this.name = "InvalidTaskStateTransitionError";
+		this.workflowRunId = workflowRunId;
+		this.taskData = taskData;
 	}
 }

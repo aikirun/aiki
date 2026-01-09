@@ -1,7 +1,8 @@
 // biome-ignore-all lint/suspicious/noConsole: this is a console logger
+// biome-ignore-all lint/style/useNamingConvention: upper case for log levels
 import type { Logger } from "@aikirun/types/client";
 
-export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+export type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR";
 
 const colors = {
 	reset: "\x1b[0m",
@@ -17,11 +18,11 @@ const colors = {
 } as const;
 
 const logLevelConfig: Record<LogLevel, { level: number; color: string }> = {
-	trace: { level: 10, color: colors.gray },
-	debug: { level: 20, color: colors.blue },
-	info: { level: 30, color: colors.green },
-	warn: { level: 40, color: colors.yellow },
-	error: { level: 50, color: colors.red },
+	TRACE: { level: 10, color: colors.gray },
+	DEBUG: { level: 20, color: colors.blue },
+	INFO: { level: 30, color: colors.green },
+	WARN: { level: 40, color: colors.yellow },
+	ERROR: { level: 50, color: colors.red },
 };
 
 interface ConsoleLoggerOptions {
@@ -34,37 +35,37 @@ export class ConsoleLogger implements Logger {
 	private readonly context: Record<string, unknown>;
 
 	constructor(options: ConsoleLoggerOptions = {}) {
-		this.level = logLevelConfig[options.level ?? "info"].level;
+		this.level = logLevelConfig[options.level ?? "INFO"].level;
 		this.context = options.context ?? {};
 	}
 
 	trace(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.trace.level) {
-			console.debug(this.format("trace", message, metadata));
+		if (this.level <= logLevelConfig.TRACE.level) {
+			console.debug(this.format("TRACE", message, metadata));
 		}
 	}
 
 	debug(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.debug.level) {
-			console.debug(this.format("debug", message, metadata));
+		if (this.level <= logLevelConfig.DEBUG.level) {
+			console.debug(this.format("DEBUG", message, metadata));
 		}
 	}
 
 	info(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.info.level) {
-			console.info(this.format("info", message, metadata));
+		if (this.level <= logLevelConfig.INFO.level) {
+			console.info(this.format("INFO", message, metadata));
 		}
 	}
 
 	warn(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.warn.level) {
-			console.warn(this.format("warn", message, metadata));
+		if (this.level <= logLevelConfig.WARN.level) {
+			console.warn(this.format("WARN", message, metadata));
 		}
 	}
 
 	error(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.error.level) {
-			console.error(this.format("error", message, metadata));
+		if (this.level <= logLevelConfig.ERROR.level) {
+			console.error(this.format("ERROR", message, metadata));
 		}
 	}
 

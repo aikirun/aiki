@@ -280,40 +280,50 @@ export interface WorkflowRunTaskStateTransition extends WorkflowRunTransitionBas
 export type WorkflowRunTransition = WorkflowRunStateTransition | WorkflowRunTaskStateTransition;
 
 export class WorkflowRunNotExecutableError extends Error {
-	constructor(
-		public readonly id: WorkflowRunId,
-		public readonly status: WorkflowRunStatus
-	) {
+	public readonly id: WorkflowRunId;
+	public readonly status: WorkflowRunStatus;
+
+	constructor(id: WorkflowRunId, status: WorkflowRunStatus) {
 		super(`Workflow ${id} is not executable while ${status}`);
 		this.name = "WorkflowRunNotExecutableError";
+		this.id = id;
+		this.status = status;
 	}
 }
 
 export class WorkflowRunSuspendedError extends Error {
-	constructor(public readonly id: WorkflowRunId) {
+	public readonly id: WorkflowRunId;
+
+	constructor(id: WorkflowRunId) {
 		super(`Workflow ${id} is suspended`);
 		this.name = "WorkflowRunSuspendedError";
+		this.id = id;
 	}
 }
 
 export class WorkflowRunFailedError extends Error {
-	constructor(
-		public readonly id: WorkflowRunId,
-		public readonly attempts: number,
-		public readonly reason?: string
-	) {
-		if (reason) {
-			super(`Workflow ${id} failed after ${attempts} attempt(s): ${reason}`);
-		} else {
-			super(`Workflow ${id} failed after ${attempts} attempt(s)`);
-		}
+	public readonly id: WorkflowRunId;
+	public readonly attempts: number;
+	public readonly reason?: string;
+
+	constructor(id: WorkflowRunId, attempts: number, reason?: string) {
+		const message = reason
+			? `Workflow ${id} failed after ${attempts} attempt(s): ${reason}`
+			: `Workflow ${id} failed after ${attempts} attempt(s)`;
+		super(message);
 		this.name = "WorkflowRunFailedError";
+		this.id = id;
+		this.attempts = attempts;
+		this.reason = reason;
 	}
 }
 
 export class WorkflowRunConflictError extends Error {
-	constructor(public readonly id: WorkflowRunId) {
+	public readonly id: WorkflowRunId;
+
+	constructor(id: WorkflowRunId) {
 		super(`Conflict while trying to update Workflow run ${id}`);
 		this.name = "WorkflowRunConflictError";
+		this.id = id;
 	}
 }

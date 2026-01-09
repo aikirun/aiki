@@ -86,7 +86,7 @@ export interface WorkflowRunGetStateResponseV1 {
 export interface WorkflowRunCreateRequestV1 {
 	name: string;
 	versionId: string;
-	input: unknown;
+	input?: unknown;
 	parentWorkflowRunId?: string;
 	options?: WorkflowOptions;
 }
@@ -175,7 +175,7 @@ export interface WorkflowRunSetTaskStateRequestNew {
 	type: "new";
 	id: string;
 	taskName: string;
-	input: unknown;
+	input?: unknown;
 	reference?: { id: string };
 	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
 }
