@@ -1,5 +1,6 @@
 import type { RetryStrategy } from "./retry";
 import type { SerializableError } from "./serializable";
+import type { OptionalProp } from "./utils";
 
 export type TaskId = string & { _brand: "task_id" };
 
@@ -70,20 +71,24 @@ export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateB
 	type: "create";
 	taskName: string;
 	options?: TaskOptions;
-	taskState: TaskStateRunning<unknown>;
+	taskState: TaskStateRunningRequest;
 }
 
 export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
 	type: "retry";
 	taskId: string;
 	options?: TaskOptions;
-	taskState: TaskStateRunning<unknown>;
+	taskState: TaskStateRunningRequest;
 }
+
+export type TaskStateRunningRequest = OptionalProp<TaskStateRunning<unknown>, "input">;
 
 export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
 	taskId: string;
-	taskState: TaskStateCompleted<unknown>;
+	taskState: TaskStateCompletedRequest;
 }
+
+export type TaskStateCompletedRequest = OptionalProp<TaskStateCompleted<unknown>, "output">;
 
 export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
 	taskId: string;
