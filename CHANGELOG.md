@@ -2,6 +2,41 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.10.0
+
+### Schema Validation Migration
+
+Migrated schema validation from Zod to ArkType across both server and client SDK. ArkType handles nested discriminated unions better than Zod, which was causing issues with complex workflow state types.
+
+### Redis Streams Reliability Fix
+
+Fixed a critical bug where concurrent blocking `XREADGROUP` requests caused messages to get stuck in the Pending Entries List (PEL). The worker now sends blocking requests sequentially instead of concurrently, preventing message loss during workflow execution.
+
+Also changed default `claimMinIdleTimeMs` from 180 seconds to 90 seconds for faster recovery of stuck messages.
+
+### Void Type Support
+
+Added support for `void` types across the SDK:
+- Workflow input and output can now be `void`
+- Task input and output can now be `void`
+- Event data can now be `void`
+
+This allows for cleaner type definitions when workflows, tasks, or events don't require data.
+
+### Console Logger Improvements
+
+- Added configurable log level
+- Pretty logs are now enabled by default
+
+### Breaking Changes
+
+- Removed `startAt` trigger strategy to avoid potential clock skew issues between client and server. Use `delayed` trigger strategy instead.
+- Timestamps are now validated to be positive numbers
+
+### API Improvements
+
+- User-exposed methods no longer require branded types, making the API easier to use
+
 ## 0.9.0
 
 ### Breaking Changes

@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/worker",
-	"version": "0.9.2",
+	"version": "0.10.0",
 	"description": "Worker SDK for Aiki - execute workflows and tasks with durable state management and automatic recovery",
 	"type": "module",
 	"main": "./dist/index.js",
