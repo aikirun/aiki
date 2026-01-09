@@ -224,6 +224,11 @@ export const workflowRunStateAwaitingChildWorkflowRequestSchema = type({
 	"timeoutInMs?": "number.integer > 0 | undefined",
 });
 
+export const workflowRunStateCompletedRequestSchema = type({
+	status: "'completed'",
+	"output?": "unknown",
+});
+
 const taskStateOutputSchema = type({
 	status: "'completed'",
 	output: "unknown",

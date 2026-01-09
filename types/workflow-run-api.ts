@@ -8,7 +8,7 @@ import type {
 	TransitionTaskStateToRunningCreate,
 	TransitionTaskStateToRunningRetry,
 } from "./task";
-import type { DistributiveOmit } from "./utils";
+import type { DistributiveOmit, OptionalProp } from "./utils";
 import type {
 	WorkflowOptions,
 	WorkflowRun,
@@ -17,6 +17,7 @@ import type {
 	WorkflowRunStateAwaitingEvent,
 	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateCancelled,
+	WorkflowRunStateCompleted,
 	WorkflowRunStatePaused,
 	WorkflowRunStateScheduled,
 	WorkflowRunStatus,
@@ -114,12 +115,18 @@ export type WorkflowRunStateAwaitingChildWorkflowRequest = DistributiveOmit<
 	timeoutInMs?: number;
 };
 
+export type WorkflowRunStateCompletedRequest = OptionalProp<WorkflowRunStateCompleted<unknown>, "output">;
+
 export type WorkflowRunStateRequest =
-	| Exclude<WorkflowRunState, { status: "scheduled" | "awaiting_event" | "awaiting_retry" | "awaiting_child_workflow" }>
+	| Exclude<
+			WorkflowRunState,
+			{ status: "scheduled" | "awaiting_event" | "awaiting_retry" | "awaiting_child_workflow" | "completed" }
+	  >
 	| WorkflowRunStateScheduledRequest
 	| WorkflowRunStateAwaitingEventRequest
 	| WorkflowRunStateAwaitingRetryRequest
-	| WorkflowRunStateAwaitingChildWorkflowRequest;
+	| WorkflowRunStateAwaitingChildWorkflowRequest
+	| WorkflowRunStateCompletedRequest;
 
 interface WorkflowRunTransitionStateRequestBase {
 	type: "optimistic" | "pessimistic";

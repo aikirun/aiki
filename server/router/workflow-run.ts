@@ -904,6 +904,13 @@ function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateR
 		};
 	}
 
+	if (request.status === "completed") {
+		return {
+			status: request.status,
+			output: request.output,
+		};
+	}
+
 	return request;
 }
 

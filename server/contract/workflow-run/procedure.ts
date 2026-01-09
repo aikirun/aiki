@@ -32,7 +32,7 @@ import {
 	workflowRunStateAwaitingEventRequestSchema,
 	workflowRunStateAwaitingRetryRequestSchema,
 	workflowRunStateCancelledSchema,
-	workflowRunStateCompletedSchema,
+	workflowRunStateCompletedRequestSchema,
 	workflowRunStateFailedSchema,
 	workflowRunStatePausedSchema,
 	workflowRunStateQueuedSchema,
@@ -137,7 +137,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 					.or(workflowRunStateAwaitingEventRequestSchema)
 					.or(workflowRunStateAwaitingRetryRequestSchema)
 					.or(workflowRunStateAwaitingChildWorkflowRequestSchema)
-					.or(workflowRunStateCompletedSchema)
+					.or(workflowRunStateCompletedRequestSchema)
 					.or(workflowRunStateFailedSchema),
 				expectedRevision: "number.integer >= 0",
 			}).or({

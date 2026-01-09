@@ -22,7 +22,7 @@ export async function publishWorkflowReadyBatch(
 		}
 
 		const results = await pipeline.exec();
-		context.logger.debug({ results }, "Pipeline exec completed");
+		context.logger.debug({ results }, "Messages sent");
 	} catch (error) {
 		context.logger.error(
 			{

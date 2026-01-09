@@ -94,7 +94,7 @@ function initCrons(redis: Redis, logger: Logger) {
 		queueScheduledWorkflowRuns(context, redis).catch((err) => {
 			logger.error({ err }, "Error queueing scheduled workflows");
 		});
-	}, 500);
+	}, 100);
 
 	const scheduleSleepingElapedWorkflowRunsInterval = setInterval(() => {
 		const context = createContext({
@@ -105,7 +105,7 @@ function initCrons(redis: Redis, logger: Logger) {
 		scheduleSleepingElapedWorkflowRuns(context).catch((err) => {
 			logger.error({ err }, "Error scheduling sleeping workflows");
 		});
-	}, 500);
+	}, 100);
 
 	const scheduleRetryableWorkflowRunsInterval = setInterval(() => {
 		const context = createContext({
@@ -116,7 +116,7 @@ function initCrons(redis: Redis, logger: Logger) {
 		scheduleRetryableWorkflowRuns(context).catch((err) => {
 			logger.error({ err }, "Error scheduling retryable workflows");
 		});
-	}, 500);
+	}, 100);
 
 	const scheduleWorkflowRunsWithRetryableTaskInterval = setInterval(() => {
 		const context = createContext({
@@ -127,7 +127,7 @@ function initCrons(redis: Redis, logger: Logger) {
 		scheduleWorkflowRunsWithRetryableTask(context).catch((err) => {
 			logger.error({ err }, "Error scheduling workflows with retryable task");
 		});
-	}, 500);
+	}, 100);
 
 	const scheduleEventWaitTimedOutWorkflowRunsInterval = setInterval(() => {
 		const context = createContext({
@@ -138,7 +138,7 @@ function initCrons(redis: Redis, logger: Logger) {
 		scheduleEventWaitTimedOutWorkflowRuns(context).catch((err) => {
 			logger.error({ err }, "Error scheduling event wait timed out workflows");
 		});
-	}, 500);
+	}, 100);
 
 	const scheduleWorkflowRunsThatTimedOutWaitingForChildInterval = setInterval(() => {
 		const context = createContext({
@@ -149,7 +149,7 @@ function initCrons(redis: Redis, logger: Logger) {
 		scheduleWorkflowRunsThatTimedOutWaitingForChild(context).catch((err) => {
 			logger.error({ err }, "Error scheduling workflows that timed out while waiting for child");
 		});
-	}, 500);
+	}, 100);
 
 	return [
 		queueScheduledWorkflowRunsInterval,
