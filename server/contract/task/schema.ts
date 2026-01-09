@@ -42,7 +42,7 @@ export const taskStateSchema = type({
 		status: "'awaiting_retry'",
 		attempts: "number.integer > 0",
 		error: serializedErrorSchema,
-		nextAttemptAt: "number",
+		nextAttemptAt: "number > 0",
 	})
 	.or({
 		status: "'completed'",
