@@ -249,7 +249,7 @@ Initial release of all Aiki packages:
 **@aikirun/types** - Core type definitions for:
 - Workflow and task execution
 - Workflow run states and transitions
-- Trigger strategies (immediate, delayed, startAt)
+- Trigger strategies (immediate, delayed)
 - Retry configuration
 - Event handling
 - Client interfaces

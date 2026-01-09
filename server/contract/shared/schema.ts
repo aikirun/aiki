@@ -27,10 +27,6 @@ export const triggerStrategySchema = type({
 	.or({
 		type: "'delayed'",
 		delay: durationObjectSchema,
-	})
-	.or({
-		type: "'startAt'",
-		startAt: "number",
 	});
 
 export const retryStrategySchema = type({

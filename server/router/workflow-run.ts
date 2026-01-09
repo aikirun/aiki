@@ -126,11 +126,9 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 			scheduledAt:
 				!trigger || trigger.type === "immediate"
 					? now
-					: trigger.type === "delayed"
-						? "delayMs" in trigger
-							? now + trigger.delayMs
-							: now + toMilliseconds(trigger.delay)
-						: trigger.startAt,
+					: "delayMs" in trigger
+						? now + trigger.delayMs
+						: now + toMilliseconds(trigger.delay),
 			reason: "new",
 		},
 		tasks: {},
