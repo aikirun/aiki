@@ -12,7 +12,7 @@ import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { TaskFailedError } from "@aikirun/types/task";
-import type { Schema } from "@aikirun/types/validator";
+import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type ChildWorkflowRunInfo,
@@ -26,6 +26,7 @@ import {
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/workflow-run-api";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunContext } from "./run/context";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
@@ -41,8 +42,8 @@ export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinit
 	events?: TEventsDefinition;
 	opts?: WorkflowOptions;
 	schema?: RequireAtLeastOneProp<{
-		input?: Schema<Input>;
-		output?: Schema<Output>;
+		input?: StandardSchemaV1<Input>;
+		output?: StandardSchemaV1<Output>;
 	}>;
 }
 
@@ -144,7 +145,18 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		const inputRaw = isNonEmptyArray(args) ? args[0] : undefined;
-		const input = this.params.schema?.input ? this.params.schema.input.parse(inputRaw) : inputRaw;
+
+		let input = inputRaw;
+		const schema = this.params.schema?.input;
+		if (schema) {
+			const schemaValidation = schema["~standard"].validate(inputRaw);
+			const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
+			if (schemaValidationResult.issues) {
+				client.logger.error("Invalid workflow data", { "aiki.issues": schemaValidationResult.issues });
+				throw new SchemaValidationError("Invalid workflow data", schemaValidationResult.issues);
+			}
+			input = schemaValidationResult.value;
+		}
 
 		const { run } = await client.api.workflowRun.createV1({
 			name: this.name,
@@ -172,7 +184,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		const { client } = parentRunHandle[INTERNAL];
 
 		const inputRaw = isNonEmptyArray(args) ? args[0] : (undefined as Input);
-		const input = await this.parse(parentRunHandle, this.params.schema?.input, inputRaw);
+		const input = await this.parse(parentRunHandle, this.params.schema?.input, inputRaw, parentRun.logger);
 		const inputHash = await hashInput(input);
 
 		const reference = this.params.opts?.reference;
@@ -189,7 +201,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 			const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
 			if (existingRun.state.status === "completed") {
-				await this.parse(parentRunHandle, this.params.schema?.output, existingRun.state.output);
+				await this.parse(parentRunHandle, this.params.schema?.output, existingRun.state.output, parentRun.logger);
 			}
 
 			const logger = parentRun.logger.child({
@@ -310,7 +322,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(run, input, context);
-				const output = await this.parse(handle, this.params.schema?.output, outputRaw);
+				const output = await this.parse(handle, this.params.schema?.output, outputRaw, run.logger);
 				return output;
 			} catch (error) {
 				if (
@@ -384,22 +396,30 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	private async parse<T>(
 		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
-		schema: Schema<T> | undefined,
-		data: unknown
+		schema: StandardSchemaV1<T> | undefined,
+		data: unknown,
+		logger: Logger
 	): Promise<T> {
 		if (!schema) {
 			return data as T;
 		}
-		try {
-			return schema.parse(data);
-		} catch (error) {
-			await handle[INTERNAL].transitionState({
-				status: "failed",
-				cause: "self",
-				error: createSerializableError(error),
-			});
-			throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
+
+		const schemaValidation = schema["~standard"].validate(data);
+		const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
+		if (!schemaValidationResult.issues) {
+			return schemaValidationResult.value;
 		}
+
+		logger.error("Invalid workflow data", { "aiki.issues": schemaValidationResult.issues });
+		await handle[INTERNAL].transitionState({
+			status: "failed",
+			cause: "self",
+			error: {
+				name: "SchemaValidationError",
+				message: JSON.stringify(schemaValidationResult.issues),
+			},
+		});
+		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 	}
 
 	private createFailedState(error: unknown): WorkflowRunStateFailed {

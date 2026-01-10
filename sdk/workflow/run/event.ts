@@ -1,10 +1,10 @@
-import { createSerializableError, isNonEmptyArray, toMilliseconds } from "@aikirun/lib";
+import { isNonEmptyArray, toMilliseconds } from "@aikirun/lib";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import type { EventName, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { Schema } from "@aikirun/types/validator";
+import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowRun,
@@ -13,6 +13,7 @@ import {
 	type WorkflowRunId,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunHandle } from "./handle";
 
@@ -47,12 +48,12 @@ export function event<Data>(params?: EventParams<Data>): EventDefinition<Data> {
 }
 
 export interface EventParams<Data> {
-	schema?: Schema<Data>;
+	schema?: StandardSchemaV1<Data>;
 }
 
 interface EventDefinition<Data> {
 	_type: Data;
-	schema?: Schema<Data>;
+	schema?: StandardSchemaV1<Data>;
 }
 
 export type EventsDefinition = Record<string, EventDefinition<unknown>>;
@@ -133,7 +134,7 @@ export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
 export function createEventWaiter<TEventsDefinition extends EventsDefinition, Data>(
 	handle: WorkflowRunHandle<unknown, unknown, unknown, TEventsDefinition>,
 	eventName: EventName,
-	schema: Schema<Data> | undefined,
+	schema: StandardSchemaV1<Data> | undefined,
 	logger: Logger
 ): EventWaiter<Data> {
 	let nextEventIndex = 0;
@@ -154,17 +155,24 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 				return { timeout: true };
 			}
 
-			let data: Data | undefined;
-			try {
-				data = schema ? schema.parse(event.data) : event.data;
-			} catch (error) {
-				logger.error("Invalid event data", { data: event.data, error });
-				await handle[INTERNAL].transitionState({
-					status: "failed",
-					cause: "self",
-					error: createSerializableError(error),
-				});
-				throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
+			let data = event.data;
+			if (schema) {
+				const schemaValidation = schema["~standard"].validate(event.data);
+				const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
+				if (!schemaValidationResult.issues) {
+					data = schemaValidationResult.value;
+				} else {
+					logger.error("Invalid event data", { "aiki.issues": schemaValidationResult.issues });
+					await handle[INTERNAL].transitionState({
+						status: "failed",
+						cause: "self",
+						error: {
+							name: "SchemaValidationError",
+							message: JSON.stringify(schemaValidationResult.issues),
+						},
+					});
+					throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
+				}
 			}
 
 			logger.debug("Event received");
@@ -223,7 +231,7 @@ function createEventSender<Data>(
 	api: ApiClient,
 	workflowRunId: string,
 	eventName: EventName,
-	schema: Schema<Data> | undefined,
+	schema: StandardSchemaV1<Data> | undefined,
 	logger: Logger,
 	onSend: (run: WorkflowRun<unknown, unknown>) => void,
 	options?: EventSendOptions
@@ -237,10 +245,17 @@ function createEventSender<Data>(
 	});
 
 	async function send(...args: Data extends void ? [] : [Data]): Promise<void> {
-		const data = isNonEmptyArray(args) ? args[0] : (undefined as Data);
+		const dataRaw = isNonEmptyArray(args) ? args[0] : (undefined as Data);
 
+		let data = dataRaw;
 		if (schema) {
-			schema.parse(data);
+			const schemaValidation = schema["~standard"].validate(dataRaw);
+			const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
+			if (schemaValidationResult.issues) {
+				logger.error("Invalid event data", { "aiki.issues": schemaValidationResult.issues });
+				throw new SchemaValidationError("Invalid event data", schemaValidationResult.issues);
+			}
+			data = schemaValidationResult.value;
 		}
 
 		const { run } = await api.workflowRun.sendEventV1({
@@ -286,7 +301,7 @@ function createEventMulticaster<Data>(
 	workflowName: WorkflowName,
 	workflowVersionId: WorkflowVersionId,
 	eventName: EventName,
-	schema: Schema<Data> | undefined,
+	schema: StandardSchemaV1<Data> | undefined,
 	options?: EventSendOptions
 ): EventMulticaster<Data> {
 	const optsOverrider = objectOverrider(options ?? {});
@@ -310,22 +325,28 @@ function createEventMulticaster<Data>(
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	): Promise<void> {
-		const data = isNonEmptyArray(args) ? args[0] : (undefined as Data);
+		const dataRaw = isNonEmptyArray(args) ? args[0] : (undefined as Data);
 
+		let data = dataRaw;
 		if (schema) {
-			schema.parse(data);
+			const schemaValidation = schema["~standard"].validate(dataRaw);
+			const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
+			if (schemaValidationResult.issues) {
+				client.logger.error("Invalid event data", {
+					"aiki.workflowName": workflowName,
+					"aiki.workflowVersionId": workflowVersionId,
+					"aiki.eventName": eventName,
+					"aiki.issues": schemaValidationResult.issues,
+				});
+				throw new SchemaValidationError("Invalid event data", schemaValidationResult.issues);
+			}
+			data = schemaValidationResult.value;
 		}
 
 		const runIds = Array.isArray(runId) ? runId : [runId];
 		if (!isNonEmptyArray(runIds)) {
 			return;
 		}
-
-		const logger = client.logger.child({
-			"aiki.workflowName": workflowName,
-			"aiki.workflowVersionId": workflowVersionId,
-			"aiki.eventName": eventName,
-		});
 
 		await client.api.workflowRun.multicastEventV1({
 			ids: runIds,
@@ -334,7 +355,7 @@ function createEventMulticaster<Data>(
 			options,
 		});
 
-		logger.info("Multicasted event to workflows", {
+		client.logger.info("Multicasted event to workflows", {
 			"aiki.workflowName": workflowName,
 			"aiki.workflowVersionId": workflowVersionId,
 			"aiki.workflowRunIds": runIds,

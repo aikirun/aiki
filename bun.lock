@@ -38,6 +38,7 @@
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
+        "@standard-schema/spec": "^1.1.0",
       },
     },
     "sdk/worker": {
@@ -54,6 +55,7 @@
       "version": "0.10.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
+        "@standard-schema/spec": "^1.1.0",
       },
     },
     "server": {

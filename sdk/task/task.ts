@@ -23,7 +23,6 @@ import type {
 	TaskStateRunning,
 } from "@aikirun/types/task";
 import { TaskFailedError, type TaskName } from "@aikirun/types/task";
-import type { Schema } from "@aikirun/types/validator";
 import {
 	WorkflowRunConflictError,
 	WorkflowRunFailedError,
@@ -31,6 +30,7 @@ import {
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { EventsDefinition } from "sdk/workflow/run/event";
 
 /**
@@ -87,8 +87,8 @@ export interface TaskParams<Input, Output> {
 	handler: (input: Input) => Promise<Output>;
 	opts?: TaskOptions;
 	schema?: RequireAtLeastOneProp<{
-		input?: Schema<Input>;
-		output?: Schema<Output>;
+		input?: StandardSchemaV1<Input>;
+		output?: StandardSchemaV1<Output>;
 	}>;
 }
 
@@ -135,7 +135,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const inputRaw = isNonEmptyArray(args) ? args[0] : (undefined as Input);
-		const input = await this.parse(handle, this.params.schema?.input, inputRaw);
+		const input = await this.parse(handle, this.params.schema?.input, inputRaw, run.logger);
 		const inputHash = await hashInput(input);
 
 		const reference = this.params.opts?.reference;
@@ -146,7 +146,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 
 		if (existingTaskInfo?.state.status === "completed") {
-			return this.parse(handle, this.params.schema?.output, existingTaskInfo.state.output);
+			return this.parse(handle, this.params.schema?.output, existingTaskInfo.state.output, run.logger);
 		}
 		if (existingTaskInfo?.state.status === "failed") {
 			const { state } = existingTaskInfo;
@@ -239,7 +239,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(input);
-				const output = await this.parse(handle, this.params.schema?.output, outputRaw);
+				const output = await this.parse(handle, this.params.schema?.output, outputRaw, logger);
 				return { output, lastAttempt: attempts };
 			} catch (error) {
 				if (
@@ -342,21 +342,29 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 	private async parse<T>(
 		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
-		schema: Schema<T> | undefined,
-		data: unknown
+		schema: StandardSchemaV1<T> | undefined,
+		data: unknown,
+		logger: Logger
 	): Promise<T> {
 		if (!schema) {
 			return data as T;
 		}
-		try {
-			return schema.parse(data);
-		} catch (error) {
-			await handle[INTERNAL].transitionState({
-				status: "failed",
-				cause: "self",
-				error: createSerializableError(error),
-			});
-			throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
+
+		const schemaValidation = schema["~standard"].validate(data);
+		const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
+		if (!schemaValidationResult.issues) {
+			return schemaValidationResult.value;
 		}
+
+		logger.error("Invalid task data", { "aiki.issues": schemaValidationResult.issues });
+		await handle[INTERNAL].transitionState({
+			status: "failed",
+			cause: "self",
+			error: {
+				name: "SchemaValidationError",
+				message: JSON.stringify(schemaValidationResult.issues),
+			},
+		});
+		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 	}
 }

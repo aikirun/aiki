@@ -112,7 +112,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 });
 ```
 
-Schemas use any validation library with a `parse(data: unknown) => T` method (Zod, ArkType, etc.).
+Schemas work with any validation library that implements [Standard Schema](https://standardschema.dev/) (Zod, Valibot, ArkType, etc.).
 
 **Why use output schemas?** For child workflows, cached outputs are validated against the schema. If the cached shape doesn't match, the parent workflow fails immediately. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
 
