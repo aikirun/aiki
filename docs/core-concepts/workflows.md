@@ -95,10 +95,6 @@ Define schemas to validate workflow input and output:
 import { z } from "zod";
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(run, input: { orderId: string; items: string[] }) {
-		// ...
-		return { success: true, total: 100 };
-	},
 	schema: {
 		input: z.object({
 			orderId: z.string(),
@@ -108,6 +104,10 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 			success: z.boolean(),
 			total: z.number(),
 		}),
+	},
+	async handler(run, input) {
+		// ...
+		return { success: true, total: 100 };
 	},
 });
 ```

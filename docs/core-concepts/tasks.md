@@ -91,9 +91,6 @@ import { z } from "zod";
 
 const processPayment = task({
 	name: "process-payment",
-	handler(input: { paymentId: string; amount: number }) {
-		return paymentService.charge(input);
-	},
 	schema: {
 		input: z.object({
 			paymentId: z.string(),
@@ -103,6 +100,9 @@ const processPayment = task({
 			transactionId: z.string(),
 			status: z.enum(["success", "failed"]),
 		}),
+	},
+	handler(input) {
+		return paymentService.charge(input);
 	},
 });
 ```
