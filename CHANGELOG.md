@@ -2,6 +2,12 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.11.2
+
+### Fixes
+
+- On client stop, disconnect from redis immediately, no need to wait for pending responses
+
 ## 0.11.1
 
 ### Fixes
