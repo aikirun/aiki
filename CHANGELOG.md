@@ -2,6 +2,12 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.10.1
+
+### Patch Changes
+
+Workflow, Task and Event schemas now work with any validation library that implements [Standard Schema](https://standardschema.dev/) (Zod, Valibot, ArkType, etc.).
+
 ## 0.10.0
 
 ### Schema Validation Migration

@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/task",
-	"version": "0.10.0",
+	"version": "0.10.1",
 	"description": "Task SDK for Aiki - define reliable tasks with automatic retries, idempotency, and error handling",
 	"type": "module",
 	"main": "./dist/index.js",
