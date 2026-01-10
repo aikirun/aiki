@@ -156,6 +156,7 @@ const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 Create the client and worker:
 
 ```typescript
+import process from "node:process";
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 
