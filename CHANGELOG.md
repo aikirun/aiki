@@ -2,6 +2,20 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.11.0
+
+### Breaking Changes
+
+- **Renamed `getHandle` to `getHandleById`** on workflow versions for clarity and consistency with the new reference ID method
+
+### New Features
+
+- **Added `getHandleByReferenceId` method** to workflow versions, allowing retrieval of workflow run handles using a reference ID instead of the run ID
+
+### Fixes
+
+- Fixed retry strategy schema validation
+
 ## 0.10.1
 
 ### Patch Changes
