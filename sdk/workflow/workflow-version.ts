@@ -69,7 +69,7 @@ export interface WorkflowVersion<
 		...args: Input extends void ? [] : [Input]
 	) => Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
-	getHandle: (
+	getHandleById: (
 		client: Client<AppContext>,
 		runId: string
 	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
@@ -284,7 +284,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		}
 	}
 
-	public async getHandle(
+	public async getHandleById(
 		client: Client<AppContext>,
 		runId: string
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
