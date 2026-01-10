@@ -2,6 +2,12 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.11.1
+
+### Fixes
+
+- Fixed bug in set value by path function
+
 ## 0.11.0
 
 ### Breaking Changes
