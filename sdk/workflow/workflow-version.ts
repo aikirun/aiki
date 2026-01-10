@@ -74,6 +74,11 @@ export interface WorkflowVersion<
 		runId: string
 	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
 
+	getHandleByReferenceId: (
+		client: Client<AppContext>,
+		referenceId: string
+	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+
 	[INTERNAL]: {
 		eventsDefinition: TEventsDefinition;
 		handler: (
@@ -284,6 +289,18 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		runId: string
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
 		return workflowRunHandle(client, runId as WorkflowRunId, this[INTERNAL].eventsDefinition);
+	}
+
+	public async getHandleByReferenceId(
+		client: Client<AppContext>,
+		referenceId: string
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+		const { run } = await client.api.workflowRun.getByReferenceIdV1({
+			name: this.name,
+			versionId: this.versionId,
+			referenceId,
+		});
+		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
 	}
 
 	private async handler(

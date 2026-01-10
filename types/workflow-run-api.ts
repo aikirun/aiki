@@ -27,6 +27,7 @@ import type {
 export interface WorkflowRunApi {
 	listV1: (_: WorkflowRunListRequestV1) => Promise<WorkflowRunListResponseV1>;
 	getByIdV1: (_: WorkflowRunGetByIdRequestV1) => Promise<WorkflowRunGetByIdResponseV1>;
+	getByReferenceIdV1: (_: WorkflowRunGetByReferenceIdRequestV1) => Promise<WorkflowRunGetByReferenceIdResponseV1>;
 	getStateV1: (_: WorkflowRunGetStateRequestV1) => Promise<WorkflowRunGetStateResponseV1>;
 	createV1: (_: WorkflowRunCreateRequestV1) => Promise<WorkflowRunCreateResponseV1>;
 	transitionStateV1: (_: WorkflowRunTransitionStateRequestV1) => Promise<WorkflowRunTransitionStateResponseV1>;
@@ -73,6 +74,16 @@ export interface WorkflowRunGetByIdRequestV1 {
 }
 
 export interface WorkflowRunGetByIdResponseV1 {
+	run: WorkflowRun;
+}
+
+export interface WorkflowRunGetByReferenceIdRequestV1 {
+	name: string;
+	versionId: string;
+	referenceId: string;
+}
+
+export interface WorkflowRunGetByReferenceIdResponseV1 {
 	run: WorkflowRun;
 }
 

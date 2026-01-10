@@ -117,11 +117,15 @@ const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 			message: `Order confirmed! Estimated time: ${response.data.estimatedTime} mins`,
 		});
 
-		// Step 4: Start courier delivery as child workflow
-		const deliveryHandle = await courierDeliveryV1.startAsChild(run, {
-			orderId: input.orderId,
-			restaurantId: "restaurant-1",
-		});
+		// Step 4: Start courier delivery as child workflow 
+		// (with  reference ID for external access)
+		const deliveryHandle = await courierDeliveryV1
+			.with()
+			.opt("reference.id", input.orderId)
+			.startAsChild(run, {
+				orderId: input.orderId,
+				restaurantId: "restaurant-1",
+			});
 
 		// Step 5: Wait for delivery to complete
 		const deliveryResult = await deliveryHandle.waitForStatus("completed");
@@ -202,9 +206,9 @@ setTimeout(async () => {
 // In a real app, the restaurant would send the foodReady event via API
 // when the food is prepared. For this demo, we'll simulate it:
 setTimeout(async () => {
-	// Get the child workflow run ID (in production, you'd track this)
-	const childRunId = "..."; // The courier delivery workflow run ID
-	await courierDeliveryV1.events.foodReady.send(aikiClient, childRunId);
+	// Get the courier delivery workflow handle using the order ID as reference
+	const courierHandle = await courierDeliveryV1.getHandleByReferenceId(aikiClient, "order-123");
+	await courierHandle.events.foodReady.send();
 	console.log("Food is ready for pickup!");
 }, 10000);
 

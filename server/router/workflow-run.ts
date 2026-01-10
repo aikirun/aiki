@@ -77,6 +77,24 @@ const getByIdV1 = os.getByIdV1.handler(({ input: request }) => {
 	return { run };
 });
 
+const getByReferenceIdV1 = os.getByReferenceIdV1.handler(({ input: request }) => {
+	const name = request.name as WorkflowName;
+	const versionId = request.versionId as WorkflowVersionId;
+	const referenceId = request.referenceId;
+
+	const runId = workflowRunsByReferenceId.get(name)?.get(versionId)?.get(referenceId);
+	if (!runId) {
+		throw new NotFoundError(`Workflow run not found for reference: ${name}/${versionId}/${referenceId}`);
+	}
+
+	const run = workflowRuns.get(runId);
+	if (!run) {
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
+	}
+
+	return { run };
+});
+
 const getStateV1 = os.getStateV1.handler(({ input: request }) => {
 	const run = workflowRuns.get(request.id as WorkflowRunId);
 	if (!run) {
@@ -931,6 +949,7 @@ function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateR
 export const workflowRunRouter = os.router({
 	listV1,
 	getByIdV1,
+	getByReferenceIdV1,
 	getStateV1,
 	createV1,
 	transitionStateV1,

@@ -5,6 +5,8 @@ import type {
 	WorkflowRunCreateResponseV1,
 	WorkflowRunGetByIdRequestV1,
 	WorkflowRunGetByIdResponseV1,
+	WorkflowRunGetByReferenceIdRequestV1,
+	WorkflowRunGetByReferenceIdResponseV1,
 	WorkflowRunGetStateRequestV1,
 	WorkflowRunGetStateResponseV1,
 	WorkflowRunListRequestV1,
@@ -88,6 +90,23 @@ const getByIdV1: ContractProcedure<WorkflowRunGetByIdRequestV1, WorkflowRunGetBy
 	.input(
 		type({
 			id: "string > 0",
+		})
+	)
+	.output(
+		type({
+			run: workflowRunSchema,
+		})
+	);
+
+const getByReferenceIdV1: ContractProcedure<
+	WorkflowRunGetByReferenceIdRequestV1,
+	WorkflowRunGetByReferenceIdResponseV1
+> = oc
+	.input(
+		type({
+			name: "string > 0",
+			versionId: "string > 0",
+			referenceId: "string > 0",
 		})
 	)
 	.output(
@@ -262,6 +281,7 @@ const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, vo
 export const workflowRunContract = {
 	listV1,
 	getByIdV1,
+	getByReferenceIdV1,
 	getStateV1,
 	createV1,
 	transitionStateV1,
