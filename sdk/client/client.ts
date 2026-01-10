@@ -100,7 +100,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 
 	private async closeRedisConnection(): Promise<void> {
 		if (this.redisConnection) {
-			await this.redisConnection.quit();
+			await this.redisConnection.disconnect();
 			this.redisConnection = undefined;
 		}
 	}

@@ -28,7 +28,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 		if (!sleepState) {
 			try {
 				await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
-				logger.info("Going to sleeping", {
+				logger.info("Going to sleep", {
 					"aiki.sleepName": sleepName,
 					"aiki.durationMs": durationMs,
 				});
