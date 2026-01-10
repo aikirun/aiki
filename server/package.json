@@ -10,7 +10,6 @@
 	"dependencies": {
 		"@aikirun/lib": "workspace:*",
 		"@aikirun/types": "workspace:*",
-		"@orpc/arktype": "^1.13.2",
 		"@orpc/contract": "^1.9.3",
 		"@orpc/server": "^1.9.3",
 		"arktype": "^2.1.29",
