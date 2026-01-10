@@ -180,6 +180,7 @@ const workerHandle = await aikiWorker.spawn(aikiClient);
 process.on("SIGINT", async () => {
 	await workerHandle.stop();
 	await aikiClient.close();
+	process.exit(0);
 });
 ```
 
