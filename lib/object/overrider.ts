@@ -10,11 +10,12 @@ function set(obj: Record<string, unknown>, path: string, value: unknown): void {
 
 	for (let i = 0; i < keys.length - 1; i++) {
 		const key = keys[i] as string;
-		currentValue = currentValue[key] as Record<string, unknown>;
-		if (currentValue === undefined || currentValue === null) {
-			currentValue = {};
-			currentValue[key] = currentValue;
+		let nextValue = currentValue[key];
+		if (nextValue === undefined || nextValue === null) {
+			nextValue = {};
+			currentValue[key] = nextValue;
 		}
+		currentValue = nextValue as Record<string, unknown>;
 	}
 
 	const lastKey = keys[keys.length - 1] as string;
