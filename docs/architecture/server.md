@@ -40,7 +40,7 @@ The server requires:
 
 ```bash
 # .env
-AIKI_PORT=9876
+AIKI_PORT=9850
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ```

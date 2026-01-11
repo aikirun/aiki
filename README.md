@@ -100,7 +100,7 @@ import { restaurantOrderV1 } from "./workflow";
 
 // Connect to Aiki server
 const aikiClient = await client({
-  url: "http://localhost:9876",
+  url: "http://localhost:9850",
   redis: { host: "localhost", port: 6379 }
 });
 

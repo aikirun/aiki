@@ -94,7 +94,7 @@ const auditWorkflowV1 = auditWorkflow.v("1.0.0", {
 
 // Client is typed with AppContext
 const aikiClient = await client<AppContext>({
-	url: "http://localhost:9876",
+	url: "http://localhost:9850",
 	redis: { host: "localhost", port: 6379 },
 	createContext: (run) => ({
 		traceId: crypto.randomUUID(),

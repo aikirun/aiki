@@ -23,7 +23,7 @@ RUN bun run build:server
 
 FROM gcr.io/distroless/cc-debian12
 
-ARG AIKI_PORT=9876
+ARG AIKI_PORT=9850
 ENV AIKI_PORT=${AIKI_PORT}
 
 WORKDIR /app

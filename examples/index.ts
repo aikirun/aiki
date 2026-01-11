@@ -5,7 +5,7 @@ import { echoV1 } from "./workflows/echo";
 import { morningRoutineV2 } from "./workflows/morning-routine";
 
 export const aikiClient = await client({
-	url: "http://localhost:9876",
+	url: "http://localhost:9850",
 	redis: {
 		host: "localhost",
 		port: 6379,

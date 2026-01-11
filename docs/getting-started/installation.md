@@ -46,12 +46,12 @@ docker-compose up
 bun run server
 ```
 
-This starts the **Aiki Server** on `http://localhost:9876`.
+This starts the **Aiki Server** on `http://localhost:9850`.
 
 You'll see output like:
 
 ```
-aiki-server | Server running on 0.0.0.0:9876
+aiki-server | Server running on 0.0.0.0:9850
 ```
 
 Leave this running in one terminal and continue in another.
@@ -98,7 +98,7 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 - Make sure Redis is running (`docker ps` to check)
 - Make sure `docker-compose up` is running in another terminal
-- Verify the server is listening: check the Docker output for "Server running on 0.0.0.0:9876"
+- Verify the server is listening: check the Docker output for "Server running on 0.0.0.0:9850"
 
 **"Cannot find module" error (npm)**
 

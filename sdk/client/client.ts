@@ -15,7 +15,7 @@ import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
  *
  * @template AppContext - Type of application context passed to workflows (default: null)
  * @param params - Client configuration parameters
- * @param params.url - HTTP URL of the Aiki server (e.g., "http://localhost:9876")
+ * @param params.url - HTTP URL of the Aiki server (e.g., "http://localhost:9850")
  * @param params.redis - Redis connection configuration
  * @param params.redis.host - Redis server hostname
  * @param params.redis.port - Redis server port
@@ -27,7 +27,7 @@ import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
  * @example
  * ```typescript
  * const aikiClient = await client({
- *   url: "http://localhost:9876",
+ *   url: "http://localhost:9850",
  *   redis: { host: "localhost", port: 6379 },
  *   createContext: (run) => ({
  *     traceId: generateTraceId(),

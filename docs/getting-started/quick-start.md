@@ -41,7 +41,7 @@ const helloV1 = helloWorkflow.v("1.0.0", {
 
 // 3. Set up the client (connects to Aiki server)
 const aikiClient = await client({
-    url: "http://localhost:9876",
+    url: "http://localhost:9850",
     redis: { host: "localhost", port: 6379 },
 });
 
