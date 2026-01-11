@@ -1,6 +1,10 @@
-# Aiki
+<p align="center">
+  <img src="docs/assets/aiki-logo-combo.svg" alt="Aiki" height="60">
+</p>
 
-![Status](https://img.shields.io/badge/status-alpha-orange)
+<p align="center">
+  <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
+</p>
 
 **A durable execution platform.**
 
