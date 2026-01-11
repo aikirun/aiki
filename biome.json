@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
 	"assist": {
 		"actions": {
 			"source": {
@@ -31,7 +31,13 @@
 				"useNamingConvention": {
 					"level": "warn",
 					"options": {
-						"strictCase": false
+						"strictCase": false,
+						"conventions": [
+							{
+								"selector": { "kind": "objectLiteralProperty" },
+								"formats": ["camelCase", "snake_case", "PascalCase", "CONSTANT_CASE"]
+							}
+						]
 					}
 				}
 			},

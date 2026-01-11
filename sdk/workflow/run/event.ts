@@ -42,6 +42,7 @@ export function event(): EventDefinition<void>;
 export function event<Data extends Serializable>(params?: EventParams<Data>): EventDefinition<Data>;
 export function event<Data>(params?: EventParams<Data>): EventDefinition<Data> {
 	return {
+		// biome-ignore lint/style/useNamingConvention: phantom type marker
 		_type: undefined as Data,
 		schema: params?.schema,
 	};
