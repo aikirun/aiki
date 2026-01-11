@@ -2,6 +2,12 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.13.0
+
+### Breaking Changes
+
+- Client creation is lazy under the hood, no need to may the factory function async
+
 ## 0.12.0
 
 ### Web UI
