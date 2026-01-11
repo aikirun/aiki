@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/aiki-logo-combo.svg" alt="Aiki" height="60">
+  <img src="assets/aiki-logo-combo.svg" alt="Aiki" height="80">
 </p>
 
 Welcome to the Aiki documentation! This guide will help you build durable, reliable workflows in TypeScript.

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/aiki-logo-combo.svg" alt="Aiki" height="60">
+  <img src="docs/assets/aiki-logo-combo.svg" alt="Aiki" height="80">
 </p>
 
 <p align="center">
