@@ -2,6 +2,34 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.12.0
+
+### Web UI
+- New React-based web UI for monitoring workflows
+- View workflow runs, statuses, and details
+- Docker support with nginx for production deployment
+
+### Workflow API
+- `workflow.listV1` - List all workflows with run counts
+- `workflow.listVersionsV1` - List versions for a workflow
+- `workflow.getStatsV1` - Get run statistics by status
+
+### Docker
+- Moved server Dockerfile to `server/Dockerfile`
+- Added `web/Dockerfile` for the web dashboard
+- Docker Compose now starts both server and web services
+
+### Breaking Changes
+- Renamed environment variables:
+  - `AIKI_PORT` → `AIKI_SERVER_PORT`
+  - `AIKI_HOST` → `AIKI_SERVER_HOST`
+- Default server port changed to `9850`
+- Default web port is `9851`
+
+### Other
+- Added `name` and `versionId` to child workflow run info
+- Added Aiki logo assets
+
 ## 0.11.2
 
 ### Fixes
