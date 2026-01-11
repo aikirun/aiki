@@ -78,7 +78,7 @@ Leave this running and continue in another terminal.
 If you need different ports, use environment variables:
 
 ```bash
-AIKI_PORT=9000 AIKI_WEB_PORT=9001 docker-compose up
+AIKI_SERVER_PORT=9000 AIKI_WEB_PORT=9001 docker-compose up
 ```
 
 Or create a `.env` file at the repository root. See `server/.env.example` for available configuration options.
@@ -129,7 +129,7 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 **Port already in use**
 
-- Use different ports: `AIKI_PORT=9000 AIKI_WEB_PORT=9001 docker-compose up`
+- Use different ports: `AIKI_SERVER_PORT=9000 AIKI_WEB_PORT=9001 docker-compose up`
 - Or stop other services using those ports
 
 **Web UI shows "Loading..." or errors**

@@ -14,7 +14,7 @@ export async function loadConfig(): Promise<Config> {
 	config({ path: envPath });
 
 	const raw = {
-		port: process.env.AIKI_PORT,
+		port: process.env.AIKI_SERVER_PORT,
 		redis: {
 			host: process.env.REDIS_HOST,
 			port: process.env.REDIS_PORT,
