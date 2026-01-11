@@ -9,7 +9,8 @@
 		"sdk/task",
 		"sdk/client",
 		"sdk/worker",
-		"server"
+		"server",
+		"web"
 	],
 	"scripts": {
 		"check": "tsc --noEmit",
@@ -20,6 +21,7 @@
 		"test:coverage": "bun test --coverage",
 		"server": "bun run server/server.ts",
 		"server:watch": "bun --watch run server/server.ts",
+		"web": "bun run --cwd web dev",
 		"changeset": "changeset",
 		"bump": "changeset version && rm bun.lock && bun install && bun run lint:fix",
 		"clean": "rm -rf types/dist lib/dist server/dist sdk/*/dist",

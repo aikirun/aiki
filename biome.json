@@ -56,5 +56,27 @@
 	},
 	"files": {
 		"includes": ["**", "!*.md", "!!**/npm", "!!**/dist", "!!**/node_modules", "!!**/coverage"]
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["web/**/*.tsx", "web/**/*.ts"],
+			"linter": {
+				"rules": {
+					"a11y": {
+						"noSvgWithoutTitle": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/*.css"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noUnknownAtRules": "off"
+					}
+				}
+			}
+		}
+	]
 }
