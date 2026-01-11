@@ -18,6 +18,8 @@ export const morningRoutineV2 = morningRoutine.v("2.0.0", {
 
 		await run.sleep("snooze", { seconds: 30 });
 
+		await yawm.start(run);
+
 		const { muscles } = await stretch.start(run, { duration: input.foo });
 
 		const childHandle = await morningRoutineV1.startAsChild(run, { sugar: true });
@@ -42,10 +44,15 @@ export const morningRoutineV2 = morningRoutine.v("2.0.0", {
 });
 
 export const makeCoffee = task({
-	name: "drink-coffee",
+	name: "make-coffee",
 	handler(_input: { withSugar: boolean; withCream: boolean }) {
 		return Promise.resolve();
 	},
+});
+
+export const yawm = task({
+	name: "yawm",
+	async handler() {},
 });
 
 export const stretch = task({

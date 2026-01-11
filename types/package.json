@@ -60,6 +60,10 @@
 			"types": "./dist/workflow-run.d.ts",
 			"import": "./dist/workflow-run.js"
 		},
+		"./workflow-api": {
+			"types": "./dist/workflow-api.d.ts",
+			"import": "./dist/workflow-api.js"
+		},
 		"./workflow-run-api": {
 			"types": "./dist/workflow-run-api.d.ts",
 			"import": "./dist/workflow-run-api.js"

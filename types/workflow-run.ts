@@ -243,6 +243,8 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 
 export interface ChildWorkflowRunInfo {
 	id: string;
+	name: string;
+	versionId: string;
 	inputHash: string;
 	statusWaitResults: ChildWorkflowWaitResult[];
 }

@@ -233,6 +233,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		});
 		parentRunHandle.run.childWorkflowRuns[path] = {
 			id: newRun.id,
+			name: newRun.name,
+			versionId: newRun.versionId,
 			inputHash,
 			statusWaitResults: [],
 		};

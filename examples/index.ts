@@ -16,9 +16,9 @@ export const aikiClient = await client({
 const echoHandle = await echoV1.start(aikiClient);
 
 await delay(5_000);
-await echoHandle.events.echo.send({ message: "Ping" });
+await echoHandle.events.ping.send({ message: "Ping" });
 await delay(5_000);
-await echoHandle.events.echo.send({ message: "Another Ping" });
+await echoHandle.events.ping.send({ message: "Another Ping" });
 await echoHandle.waitForStatus("completed");
 //#endregion
 

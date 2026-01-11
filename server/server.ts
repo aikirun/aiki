@@ -60,13 +60,28 @@ if (import.meta.main) {
 	Bun.serve({
 		port: config.port,
 		fetch: async (request) => {
+			const corsHeaders = {
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+				"Access-Control-Allow-Headers": "Content-Type, x-trace-id",
+			};
+
+			if (request.method === "OPTIONS") {
+				return new Response(null, { status: 204, headers: corsHeaders });
+			}
+
 			const context = createContext({
 				type: "request",
 				request,
 				logger,
 			});
 			const result = await rpcHandler.handle(request, { context });
-			return result.response ?? new Response("Not Found", { status: 404 });
+
+			const response = result.response ?? new Response("Not Found", { status: 404 });
+			for (const [key, value] of Object.entries(corsHeaders)) {
+				response.headers.set(key, value);
+			}
+			return response;
 		},
 	});
 

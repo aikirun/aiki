@@ -139,6 +139,8 @@ const childWorkflowWaitResultSchema = type({
 
 const childWorkflowRunInfoSchema = type({
 	id: "string > 0",
+	name: "string > 0",
+	versionId: "string > 0",
 	inputHash: "string > 0",
 	statusWaitResults: childWorkflowWaitResultSchema.array(),
 });

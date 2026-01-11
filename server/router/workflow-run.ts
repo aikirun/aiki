@@ -5,7 +5,7 @@ import { toMilliseconds } from "@aikirun/lib/duration";
 import { getTaskPath, getWorkflowRunPath } from "@aikirun/lib/path";
 import type { EventReferenceOptions } from "@aikirun/types/event";
 import type { TaskId, TaskInfo, TaskName, TaskPath, TaskState } from "@aikirun/types/task";
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { Workflow, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	isTerminalWorkflowRunStatus,
 	type WorkflowRun,
@@ -31,6 +31,15 @@ const os = baseImplementer.workflowRun;
 const workflowRuns = new Map<WorkflowRunId, WorkflowRun>();
 const workflowRunsByReferenceId = new Map<WorkflowName, Map<WorkflowVersionId, Map<string, WorkflowRunId>>>();
 const workflowRunTransitions = new Map<WorkflowRunId, WorkflowRunTransition[]>();
+const workflows = new Map<WorkflowName, Workflow>();
+
+export function getWorkflowRuns(): Map<WorkflowRunId, WorkflowRun> {
+	return workflowRuns;
+}
+
+export function getWorkflows(): Map<WorkflowName, Workflow> {
+	return workflows;
+}
 
 const listV1 = os.listV1.handler(({ input: request }) => {
 	const { filters, limit = 50, offset = 0, sort } = request;
@@ -158,11 +167,40 @@ const createV1 = os.createV1.handler(async ({ input: request, context }) => {
 
 	workflowRuns.set(runId, run);
 
+	let workflow = workflows.get(name);
+	if (!workflow) {
+		workflow = {
+			name,
+			versions: {},
+			runCount: 0,
+			lastRunAt: now,
+		};
+		workflows.set(name, workflow);
+	}
+
+	workflow.runCount++;
+	workflow.lastRunAt = now;
+
+	let workflowVersion = workflow.versions[versionId];
+	if (!workflowVersion) {
+		workflowVersion = {
+			firstSeenAt: now,
+			lastRunAt: now,
+			runCount: 0,
+		};
+		workflow.versions[versionId] = workflowVersion;
+	}
+
+	workflowVersion.runCount++;
+	workflowVersion.lastRunAt = now;
+
 	if (request.parentWorkflowRunId) {
 		const parentRun = workflowRuns.get(request.parentWorkflowRunId as WorkflowRunId);
 		if (parentRun) {
 			parentRun.childWorkflowRuns[run.path] = {
 				id: runId,
+				name,
+				versionId,
 				inputHash,
 				statusWaitResults: [],
 			};
@@ -322,6 +360,8 @@ const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, 
 			});
 			run.childWorkflowRuns[childRunPath] = {
 				id: childRunInfo.id,
+				name: childRunInfo.name,
+				versionId: childRunInfo.versionId,
 				inputHash: childRunInfo.inputHash,
 				statusWaitResults: [],
 			};

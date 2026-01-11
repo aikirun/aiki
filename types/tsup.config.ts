@@ -16,6 +16,7 @@ export default defineConfig({
 		worker: "worker.ts",
 		workflow: "workflow.ts",
 		"workflow-run": "workflow-run.ts",
+		"workflow-api": "workflow-api.ts",
 		"workflow-run-api": "workflow-run-api.ts",
 	},
 	format: ["esm"],
