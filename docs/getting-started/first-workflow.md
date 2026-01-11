@@ -86,8 +86,6 @@ const courierDeliveryV1 = courierDelivery.v("1.0.0", {
 This workflow orchestrates the entire order process:
 
 ```typescript
-import { event, workflow } from "@aikirun/workflow";
-
 const restaurantOrder = workflow({ name: "restaurant-order" });
 
 const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
