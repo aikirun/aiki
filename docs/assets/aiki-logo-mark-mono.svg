@@ -1,5 +1,7 @@
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <!-- Monochrome version - use currentColor to inherit text color -->
-  <path d="M50 5 A45 45 0 0 1 50 95 A22.5 22.5 0 0 1 50 50 A22.5 22.5 0 0 0 50 5 Z" fill="currentColor"/>
-  <circle cx="50" cy="72.5" r="9" fill="white"/>
+  <g transform="translate(-11.25, 0)">
+    <path d="M50 5 A45 45 0 0 1 50 95 A22.5 22.5 0 0 1 50 50 A22.5 22.5 0 0 0 50 5 Z" fill="currentColor"/>
+    <circle cx="50" cy="72.5" r="9" fill="white"/>
+  </g>
 </svg>

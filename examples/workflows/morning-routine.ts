@@ -18,7 +18,7 @@ export const morningRoutineV2 = morningRoutine.v("2.0.0", {
 
 		await run.sleep("snooze", { seconds: 30 });
 
-		await yawm.start(run);
+		await yawn.start(run);
 
 		const { muscles } = await stretch.start(run, { duration: input.foo });
 
@@ -50,8 +50,8 @@ export const makeCoffee = task({
 	},
 });
 
-export const yawm = task({
-	name: "yawm",
+export const yawn = task({
+	name: "yawn",
 	async handler() {},
 });
 
