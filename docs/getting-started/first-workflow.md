@@ -184,6 +184,8 @@ process.on("SIGINT", async () => {
 });
 ```
 
+> **Note:** In production, workers typically run in a separate terminal or process from your application code. The worker runs continuously, listening for work, while your API or scripts start workflows as needed. For this tutorial, we're combining everything in one file for simplicity.
+
 ## Step 5: Execute the Workflow
 
 Start the workflow and send events:
