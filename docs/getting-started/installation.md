@@ -34,34 +34,51 @@ docker run -d --name redis -p 6379:6379 redis:7
 # Ubuntu: sudo apt install redis-server && sudo systemctl start redis
 ```
 
-## Step 3: Start the Aiki Server
+## Step 3: Start Aiki
 
-Start the server using one of these methods:
+### Option 1: Using Docker Compose
 
 ```bash
-# Option 1: Using Docker Compose
 docker-compose up
-
-# Option 2: Run directly with Bun
-bun run server
 ```
 
-This starts the **Aiki Server** on `http://localhost:9850`.
+This starts both services:
+- **Aiki Server** on `http://localhost:9850`
+- **Aiki Web** on `http://localhost:9851`
 
 You'll see output like:
 
 ```
 aiki-server | Server running on 0.0.0.0:9850
+aiki-web    | ... nginx ready
 ```
 
-Leave this running in one terminal and continue in another.
+### Option 2: Run directly with Bun
+
+```bash
+# In one terminal - start the server
+bun run server
+
+# In another terminal - start the web UI
+bun run web
+```
+
+This starts:
+- **Aiki Server** on `http://localhost:9850`
+- **Aiki Web** on `http://localhost:9851`
+
+---
+
+Open `http://localhost:9851` in your browser to access the web UI and monitor your workflows.
+
+Leave this running and continue in another terminal.
 
 ### Customizing Ports (Optional)
 
 If you need different ports, use environment variables:
 
 ```bash
-AIKI_PORT=9000 docker-compose up
+AIKI_PORT=9000 AIKI_WEB_PORT=9001 docker-compose up
 ```
 
 Or create a `.env` file at the repository root. See `server/.env.example` for available configuration options.
@@ -112,8 +129,14 @@ Your Aiki infrastructure is now running and you have the SDK packages installed.
 
 **Port already in use**
 
-- Use a different port: `AIKI_PORT=9000 docker-compose up`
+- Use different ports: `AIKI_PORT=9000 AIKI_WEB_PORT=9001 docker-compose up`
 - Or stop other services using those ports
+
+**Web UI shows "Loading..." or errors**
+
+- Make sure the Aiki Server is running and accessible
+- Check browser console for connection errors
+- Verify `VITE_AIKI_SERVER_URL` points to the correct server URL if customized
 
 ## Next Steps
 

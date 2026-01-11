@@ -2,7 +2,7 @@ services:
   server:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: server/Dockerfile
       args:
         AIKI_PORT: ${AIKI_PORT:-9850}
     container_name: aiki-server
@@ -15,4 +15,17 @@ services:
       REDIS_HOST: ${REDIS_HOST:-host.docker.internal}
       REDIS_PORT: ${REDIS_PORT:-6379}
       PRETTY_LOGS: ${PRETTY_LOGS:-true}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        VITE_AIKI_SERVER_URL: ${VITE_AIKI_SERVER_URL:-http://localhost:9850}
+    container_name: aiki-web
+    ports:
+      - "${AIKI_WEB_PORT:-9851}:9851"
+    depends_on:
+      - server
     restart: unless-stopped

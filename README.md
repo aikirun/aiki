@@ -83,15 +83,18 @@ Install the Aiki SDK:
 npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
 
-Start the Aiki server:
+Start Aiki:
 
 ```bash
-# Using Docker Compose
+# Using Docker Compose (starts server + web UI)
 docker-compose up
 
 # Or run directly with Bun
-bun run server
+bun run server  # Terminal 1 - start the server
+bun run web     # Terminal 2 - start the web UI
 ```
+
+The server runs on `http://localhost:9850` and the web UI on `http://localhost:9851`.
 
 ```typescript
 import { client } from "@aikirun/client";
