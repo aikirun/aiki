@@ -9,7 +9,7 @@ import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 import { orderWorkflowV1, userWorkflowV1 } from "./workflows";
 
-const aikiClient = await client({
+const aikiClient = client({
   url: "http://localhost:9850",
   redis: { host: "localhost", port: 6379 },
 });

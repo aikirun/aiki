@@ -4,7 +4,7 @@ import { delay } from "@aikirun/lib";
 import { echoV1 } from "./workflows/echo";
 import { morningRoutineV2 } from "./workflows/morning-routine";
 
-export const aikiClient = await client({
+export const aikiClient = client({
 	url: "http://localhost:9850",
 	redis: {
 		host: "localhost",

@@ -7,7 +7,7 @@ The Aiki client connects to the server and lets you start workflows.
 ```typescript
 import { client } from "@aikirun/client";
 
-const aikiClient = await client({
+const aikiClient = client({
 	url: "http://localhost:9850",
 	redis: {
 		host: "localhost",
@@ -61,7 +61,7 @@ See the [Dependency Injection Guide](../guides/dependency-injection.md) for more
 Optional custom logger implementation. Defaults to console logging:
 
 ```typescript
-const aikiClient = await client({
+const aikiClient = client({
 	url: "http://localhost:9850",
 	redis: { host: "localhost", port: 6379 },
 	logger: myCustomLogger, // Must implement Logger interface

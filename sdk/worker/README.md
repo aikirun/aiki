@@ -15,7 +15,7 @@ import { worker } from "@aikirun/worker";
 import { client } from "@aikirun/client";
 import { orderWorkflowV1 } from "./workflows.ts";
 
-const aikiClient = await client({
+const aikiClient = client({
 	url: "http://localhost:9850",
 	redis: { host: "localhost", port: 6379 },
 });

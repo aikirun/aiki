@@ -13,7 +13,7 @@ export const workerA = worker({
 	},
 });
 
-export const aikiClient = await client({
+export const aikiClient = client({
 	url: "http://localhost:9850",
 	redis: {
 		host: "localhost",

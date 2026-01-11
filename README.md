@@ -102,7 +102,7 @@ import { worker } from "@aikirun/worker";
 import { restaurantOrderV1 } from "./workflow";
 
 // Connect to Aiki server
-const aikiClient = await client({
+const aikiClient = client({
   url: "http://localhost:9850",
   redis: { host: "localhost", port: 6379 }
 });

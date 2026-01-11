@@ -32,7 +32,7 @@ Run with a client:
 ```typescript
 import { client } from "@aikirun/client";
 
-const aikiClient = await client({
+const aikiClient = client({
 	url: "http://localhost:9850",
 	redis: { host: "localhost", port: 6379 },
 });

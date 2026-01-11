@@ -26,7 +26,7 @@ import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
  *
  * @example
  * ```typescript
- * const aikiClient = await client({
+ * const aikiClient = client({
  *   url: "http://localhost:9850",
  *   redis: { host: "localhost", port: 6379 },
  *   createContext: (run) => ({
@@ -48,8 +48,8 @@ import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
  * await aikiClient.close();
  * ```
  */
-export function client<AppContext = null>(params: ClientParams<AppContext>): Promise<Client<AppContext>> {
-	return Promise.resolve(new ClientImpl(params));
+export function client<AppContext = null>(params: ClientParams<AppContext>): Client<AppContext> {
+	return new ClientImpl(params);
 }
 
 class ClientImpl<AppContext> implements Client<AppContext> {
@@ -100,7 +100,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 
 	private async closeRedisConnection(): Promise<void> {
 		if (this.redisConnection) {
-			await this.redisConnection.disconnect();
+			this.redisConnection.disconnect();
 			this.redisConnection = undefined;
 		}
 	}
