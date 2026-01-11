@@ -260,14 +260,33 @@
 			}
 
 			.feature-icon {
-				font-size: 40px;
+				width: 48px;
+				height: 48px;
 				margin-bottom: 20px;
-				display: inline-block;
-				transition: transform 0.3s ease;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: #f1f5f9;
+				border-radius: 12px;
+				transition: all 0.3s ease;
+			}
+
+			.feature-icon svg {
+				width: 24px;
+				height: 24px;
+				color: #667eea;
 			}
 
 			.feature:hover .feature-icon {
-				transform: scale(1.1) rotate(5deg);
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			}
+
+			.feature:hover .feature-icon svg {
+				color: white;
+			}
+
+			.feature:hover .feature-icon {
+				transform: scale(1.1);
 			}
 
 			.feature h3 {
@@ -589,7 +608,11 @@
 			<div class="container">
 				<div class="features-grid">
 					<div class="feature">
-						<div class="feature-icon">🔄</div>
+						<div class="feature-icon">
+							<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+							</svg>
+						</div>
 						<h3>Durable Execution</h3>
 						<p>
 							Workflows that run for minutes, days, or months. Survive crashes and restarts automatically — pick up
@@ -597,7 +620,11 @@
 						</p>
 					</div>
 					<div class="feature">
-						<div class="feature-icon">🛡️</div>
+						<div class="feature-icon">
+							<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+							</svg>
+						</div>
 						<h3>Built-in Fault Tolerance</h3>
 						<p>
 							If a worker crashes, another picks up the work automatically. Failed tasks retry based on your policy.
@@ -605,7 +632,11 @@
 						</p>
 					</div>
 					<div class="feature">
-						<div class="feature-icon">🚀</div>
+						<div class="feature-icon">
+							<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+							</svg>
+						</div>
 						<h3>Horizontal Scaling</h3>
 						<p>
 							Add workers to scale effortlessly. Aiki handles work distribution automatically across your
@@ -613,7 +644,11 @@
 						</p>
 					</div>
 					<div class="feature">
-						<div class="feature-icon">🔒</div>
+						<div class="feature-icon">
+							<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z" />
+							</svg>
+						</div>
 						<h3>Run in Your Environment</h3>
 						<p>
 							Workers execute in your infrastructure, not ours. Keep complete control over where your code runs and data
@@ -621,7 +656,11 @@
 						</p>
 					</div>
 					<div class="feature">
-						<div class="feature-icon">🎯</div>
+						<div class="feature-icon">
+							<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+							</svg>
+						</div>
 						<h3>Developer-First</h3>
 						<p>
 							Workflows are just async functions with full TypeScript support. No complex abstractions — just code you
@@ -629,7 +668,12 @@
 						</p>
 					</div>
 					<div class="feature">
-						<div class="feature-icon">📦</div>
+						<div class="feature-icon">
+							<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+								<path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+							</svg>
+						</div>
 						<h3>Workflow Versioning</h3>
 						<p>
 							Deploy new workflow versions without breaking existing runs. Old versions continue running while new
