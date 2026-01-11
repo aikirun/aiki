@@ -2,8 +2,9 @@
   <img src="docs/assets/aiki-logo-combo.svg" alt="Aiki" height="80">
 </p>
 
-<p align="center">
+<p>
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
+  <br>
 </p>
 
 **A durable execution platform.**
