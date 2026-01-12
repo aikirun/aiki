@@ -1,35 +1,30 @@
-import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { useWorkflowRuns, useWorkflowVersions } from "../api/hooks";
 import { BackLink } from "../components/common/BackLink";
+import { CopyButton } from "../components/common/CopyButton";
 import { EmptyState } from "../components/common/EmptyState";
+import { MultiSelectDropdown } from "../components/common/MultiSelectDropdown";
 import { NotFound } from "../components/common/NotFound";
 import { RelativeTime } from "../components/common/RelativeTime";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { TableSkeleton } from "../components/common/TableSkeleton";
-
-const STATUS_OPTIONS: { value: WorkflowRunStatus | ""; label: string }[] = [
-	{ value: "", label: "All Statuses" },
-	{ value: "running", label: "Running" },
-	{ value: "queued", label: "Queued" },
-	{ value: "scheduled", label: "Scheduled" },
-	{ value: "sleeping", label: "Sleeping" },
-	{ value: "awaiting_event", label: "Awaiting Event" },
-	{ value: "awaiting_child_workflow", label: "Awaiting Child" },
-	{ value: "awaiting_retry", label: "Awaiting Retry" },
-	{ value: "paused", label: "Paused" },
-	{ value: "completed", label: "Completed" },
-	{ value: "failed", label: "Failed" },
-	{ value: "cancelled", label: "Cancelled" },
-];
+import { STATUS_OPTIONS, type StatusOption } from "../constants/workflow-status";
+import { useDebounce } from "../hooks/useDebounce";
 
 export function WorkflowDetail() {
 	const { name } = useParams<{ name: string }>();
 	const decodedName = name ? decodeURIComponent(name) : "";
-	const [selectedVersion, setSelectedVersion] = useState<string>("");
-	const [selectedStatus, setSelectedStatus] = useState<WorkflowRunStatus | "">("");
+	const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
+	const [selectedStatuses, setSelectedStatuses] = useState<StatusOption[]>([]);
+	const [referenceIdFilter, setReferenceIdFilter] = useState<string>("");
+	const [runIdFilter, setRunIdFilter] = useState<string>("");
+
+	const debouncedReferenceIdFilter = useDebounce(referenceIdFilter, 500);
+	const debouncedRunIdFilter = useDebounce(runIdFilter, 500);
+
+	const isFilterPending = referenceIdFilter !== debouncedReferenceIdFilter || runIdFilter !== debouncedRunIdFilter;
 
 	const {
 		data: versions,
@@ -39,15 +34,22 @@ export function WorkflowDetail() {
 		sort: { field: "firstSeenAt", order: "desc" },
 	});
 
+	const workflowFilters =
+		selectedVersions.length > 0
+			? selectedVersions.map((versionId) => ({
+					name: decodedName,
+					versionId,
+					...(debouncedReferenceIdFilter && { referenceId: debouncedReferenceIdFilter }),
+				}))
+			: [{ name: decodedName, ...(debouncedReferenceIdFilter && { referenceId: debouncedReferenceIdFilter }) }];
+
+	const selectedStatusValues = selectedStatuses.map((s) => s.value);
+
 	const { data: runs, isLoading: runsLoading } = useWorkflowRuns({
 		filters: {
-			workflows: [
-				{
-					id: decodedName,
-					...(selectedVersion && { versionId: selectedVersion }),
-				},
-			],
-			...(selectedStatus && { status: [selectedStatus] }),
+			workflows: workflowFilters,
+			...(selectedStatusValues.length > 0 && { status: selectedStatusValues }),
+			...(debouncedRunIdFilter && { runId: debouncedRunIdFilter }),
 		},
 		sort: { field: "createdAt", order: "desc" },
 		limit: 20,
@@ -120,39 +122,49 @@ export function WorkflowDetail() {
 			</div>
 
 			{/* Recent Runs Table */}
-			<div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
-				<div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+			<div className="bg-white rounded-2xl border-2 border-slate-200">
+				<div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between overflow-visible">
 					<h2 className="font-heading text-lg font-semibold text-slate-900">Recent Runs</h2>
 					<div className="flex items-center gap-2">
-						<select
-							value={selectedStatus}
-							onChange={(e) => setSelectedStatus(e.target.value as WorkflowRunStatus | "")}
-							className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-aiki-purple focus:border-transparent"
-						>
-							{STATUS_OPTIONS.map((opt) => (
-								<option key={opt.value} value={opt.value}>
-									{opt.label}
-								</option>
-							))}
-						</select>
-						<select
-							value={selectedVersion}
-							onChange={(e) => setSelectedVersion(e.target.value)}
-							className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-aiki-purple focus:border-transparent"
-						>
-							<option value="">All Versions</option>
-							{versions?.versions.map((v) => (
-								<option key={v.versionId} value={v.versionId}>
-									{v.versionId}
-								</option>
-							))}
-						</select>
+						{isFilterPending && <span className="text-xs text-slate-400 animate-pulse">Filtering...</span>}
+						<input
+							type="text"
+							value={runIdFilter}
+							onChange={(e) => setRunIdFilter(e.target.value)}
+							placeholder="Filter by Run ID"
+							aria-label="Filter workflow runs by Run ID"
+							className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-aiki-purple focus:border-transparent"
+						/>
+						<input
+							type="text"
+							value={referenceIdFilter}
+							onChange={(e) => setReferenceIdFilter(e.target.value)}
+							placeholder="Filter by Reference ID"
+							aria-label="Filter workflow runs by Reference ID"
+							className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-aiki-purple focus:border-transparent"
+						/>
+						<MultiSelectDropdown
+							label="All Statuses"
+							options={STATUS_OPTIONS}
+							selected={selectedStatuses}
+							onChange={setSelectedStatuses}
+							getOptionValue={(opt) => opt.value}
+							getOptionLabel={(opt) => opt.label}
+						/>
+						<MultiSelectDropdown
+							label="All Versions"
+							options={versions?.versions ?? []}
+							selected={versions?.versions.filter((v) => selectedVersions.includes(v.versionId)) ?? []}
+							onChange={(selected) => setSelectedVersions(selected.map((v) => v.versionId))}
+							getOptionValue={(v) => v.versionId}
+							getOptionLabel={(v) => v.versionId}
+						/>
 					</div>
 				</div>
 
 				{runsLoading ? (
 					<div className="p-6">
-						<TableSkeleton rows={5} columns={4} />
+						<TableSkeleton rows={5} columns={5} />
 					</div>
 				) : runs?.runs.length === 0 ? (
 					<EmptyState title="No runs yet" description="Runs will appear here when workflows are started" />
@@ -162,6 +174,9 @@ export function WorkflowDetail() {
 							<tr className="border-b border-slate-100">
 								<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
 									Run ID
+								</th>
+								<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+									Reference ID
 								</th>
 								<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
 									Version
@@ -178,12 +193,28 @@ export function WorkflowDetail() {
 							{runs?.runs.map((run) => (
 								<tr key={run.id} className="hover:bg-slate-50 transition-colors">
 									<td className="px-6 py-4">
-										<Link
-											to={`/workflow/${encodeURIComponent(decodedName)}/run/${run.id}`}
-											className="font-mono text-sm font-semibold text-slate-900 hover:text-aiki-purple transition-colors"
-										>
-											{run.id.slice(0, 8)}...
-										</Link>
+										<div className="flex items-center gap-1">
+											<Link
+												to={`/workflow/${encodeURIComponent(decodedName)}/run/${run.id}`}
+												className="font-mono text-sm font-semibold text-slate-900 hover:text-aiki-purple transition-colors max-w-[100px] truncate"
+												title={run.id}
+											>
+												{run.id}
+											</Link>
+											<CopyButton text={run.id} title="Copy Run ID" />
+										</div>
+									</td>
+									<td className="px-6 py-4 font-mono text-sm text-slate-600">
+										{run.referenceId ? (
+											<div className="flex items-center gap-1">
+												<span className="max-w-[120px] truncate" title={run.referenceId}>
+													{run.referenceId}
+												</span>
+												<CopyButton text={run.referenceId} title="Copy Reference ID" />
+											</div>
+										) : (
+											"—"
+										)}
 									</td>
 									<td className="px-6 py-4 font-mono text-sm text-slate-600">{run.versionId}</td>
 									<td className="px-6 py-4">

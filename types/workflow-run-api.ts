@@ -44,16 +44,20 @@ export interface WorkflowRunListRequestV1 {
 	limit?: number;
 	offset?: number;
 	filters?: {
-		workflows?: {
-			id?: string;
-			versionId?: string;
-		}[];
+		runId?: string;
 		status?: WorkflowRunStatus[];
+		workflows?: WorkflowFilter[];
 	};
 	sort?: {
 		field: "createdAt";
 		order: "asc" | "desc";
 	};
+}
+
+export interface WorkflowFilter {
+	name: string;
+	versionId?: string;
+	referenceId?: string;
 }
 
 export interface WorkflowRunListItem {
@@ -62,6 +66,7 @@ export interface WorkflowRunListItem {
 	versionId: string;
 	createdAt: number;
 	status: WorkflowRunStatus;
+	referenceId?: string;
 }
 
 export interface WorkflowRunListResponseV1 {

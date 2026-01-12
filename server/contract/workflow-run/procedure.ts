@@ -61,11 +61,13 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 			"limit?": "number.integer > 0 | undefined",
 			"offset?": "number.integer >= 0 | undefined",
 			"filters?": {
-				"workflows?": type({
-					"id?": "string > 0 | undefined",
-					"versionId?": "string > 0 | undefined",
-				}).array(),
+				"runId?": "string > 0 | undefined",
 				"status?": workflowRunStatusSchema.array(),
+				"workflows?": type({
+					name: "string > 0",
+					"versionId?": "string > 0 | undefined",
+					"referenceId?": "string > 0 | undefined",
+				}).array(),
 			},
 			"sort?": {
 				field: "'createdAt'",
@@ -81,6 +83,7 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 				versionId: "string > 0",
 				createdAt: "number > 0",
 				status: workflowRunStatusSchema,
+				"referenceId?": "string > 0 | undefined",
 			}).array(),
 			total: "number.integer >= 0",
 		})

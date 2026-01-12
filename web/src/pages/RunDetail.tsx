@@ -10,6 +10,7 @@ import { Link, useParams } from "react-router-dom";
 import { client } from "../api/client";
 import { useWorkflowRun, useWorkflowRunTransitions } from "../api/hooks";
 import { BackLink } from "../components/common/BackLink";
+import { CopyButton } from "../components/common/CopyButton";
 import {
 	AwakeIcon,
 	ChevronDownIcon,
@@ -169,9 +170,15 @@ export function RunDetail() {
 			<div className="flex items-center justify-between">
 				<div className="flex items-center gap-4">
 					<BackLink to={`/workflow/${encodeURIComponent(currentRun.name)}`} />
-					<h1 className="font-heading text-2xl font-bold text-slate-900">
-						{currentRun.name} <span className="font-mono text-lg text-slate-500">{currentRun.id.slice(0, 8)}...</span>
-					</h1>
+					<div>
+						<h1 className="font-heading text-2xl font-bold text-slate-900">{currentRun.name}</h1>
+						<div className="flex items-center gap-1">
+							<span className="font-mono text-sm text-slate-500 max-w-[200px] truncate" title={currentRun.id}>
+								{currentRun.id}
+							</span>
+							<CopyButton text={currentRun.id} title="Copy Run ID" />
+						</div>
+					</div>
 					{shouldPollTransitions && <LiveIndicator />}
 				</div>
 
@@ -793,7 +800,12 @@ const TaskCard = memo(function TaskCard({ task }: { task: TaskInfo }) {
 			<div className="flex items-center justify-between">
 				<div>
 					<div className="font-medium text-slate-900">{task.name}</div>
-					<div className="text-xs text-slate-500 font-mono">{task.id.slice(0, 8)}...</div>
+					<div className="flex items-center gap-1">
+						<span className="text-xs text-slate-500 font-mono max-w-[120px] truncate" title={task.id}>
+							{task.id}
+						</span>
+						<CopyButton text={task.id} title="Copy Task ID" />
+					</div>
 				</div>
 				<div className="flex items-center gap-4">
 					<span className={`font-semibold ${statusColor}`}>

@@ -44,26 +44,38 @@ export function getWorkflows(): Map<WorkflowName, Workflow> {
 const listV1 = os.listV1.handler(({ input: request }) => {
 	const { filters, limit = 50, offset = 0, sort } = request;
 
-	const runs: WorkflowRun[] = [];
+	let runs: Iterable<WorkflowRun>;
+	if (filters?.runId) {
+		const run = workflowRuns.get(filters.runId as WorkflowRunId);
+		runs = run ? [run] : [];
+	} else {
+		runs = workflowRuns.values();
+	}
 
-	for (const run of workflowRuns.values()) {
-		if (
-			filters?.workflows &&
-			isNonEmptyArray(filters.workflows) &&
-			filters.workflows.every((w) => (w.id && w.id !== run.name) || (w.versionId && w.versionId !== run.versionId))
-		) {
-			continue;
-		}
+	const filteredRuns: WorkflowRun[] = [];
 
+	for (const run of runs) {
 		if (filters?.status && isNonEmptyArray(filters.status) && filters.status.every((s) => s !== run.state.status)) {
 			continue;
 		}
 
-		runs.push(run);
+		if (filters?.workflows && isNonEmptyArray(filters.workflows)) {
+			const matchesAnyWorkflowFilter = filters.workflows.some(
+				(w) =>
+					w.name === run.name &&
+					(!w.versionId || w.versionId === run.versionId) &&
+					(!w.referenceId || w.referenceId === run.options.reference?.id)
+			);
+			if (!matchesAnyWorkflowFilter) {
+				continue;
+			}
+		}
+
+		filteredRuns.push(run);
 	}
 
 	return {
-		runs: runs
+		runs: filteredRuns
 			.sort((a, b) => (sort?.order === "asc" ? a.createdAt - b.createdAt : b.createdAt - a.createdAt))
 			.slice(offset, offset + limit)
 			.map((run) => ({
@@ -72,8 +84,9 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 				versionId: run.versionId,
 				createdAt: run.createdAt,
 				status: run.state.status,
+				referenceId: run.options.reference?.id,
 			})),
-		total: runs.length,
+		total: filteredRuns.length,
 	};
 });
 
