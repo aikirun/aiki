@@ -40,6 +40,13 @@ export const morningRoutineV2 = morningRoutine.v("2.0.0", {
 			type: "delayed",
 			delay: { seconds: 5 },
 		},
+		retry: {
+			type: "exponential",
+			maxAttempts: 3,
+			baseDelayMs: 500,
+			factor: 2,
+			maxDelayMs: 10_000,
+		},
 	},
 });
 
