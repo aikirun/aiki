@@ -2,6 +2,35 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.14.0
+
+### Bug Fixes
+
+- Fixed infinite task retry bug where tasks would retry indefinitely
+- Fixed `waitForStatus` incorrectly treating non-expected terminal statuses as expected
+
+### Web UI
+
+- Added Run ID and Reference ID filters for workflow runs
+- Added copy buttons for IDs throughout the UI
+- Made status and version filters multi-select dropdowns
+- Added filter debounce for smoother UX
+- Added date dividers to timeline when date changes between transitions
+- Added attempt dividers to timeline (combined with date when both change)
+- Show task name and truncated ID in error section when workflow fails due to task
+- Added distinct orange styling for task `awaiting_retry` status in timeline
+- Removed redundant "Task:" prefix from timeline entries
+- Fixed scroll-to-top issue when filtering
+- Added error state handling for failed filter requests
+- Made live indicator pulse more visible
+- Removed Dashboard heading and Refresh button (use browser refresh)
+
+### API Improvements
+
+- Added `runId` filter to workflow run list API
+- Added `referenceId` filter to workflow run list API
+- Workflow run list now returns `referenceId` in response
+
 ## 0.13.0
 
 ### Breaking Changes
