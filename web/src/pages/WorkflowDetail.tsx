@@ -24,8 +24,6 @@ export function WorkflowDetail() {
 	const debouncedReferenceIdFilter = useDebounce(referenceIdFilter, 500);
 	const debouncedRunIdFilter = useDebounce(runIdFilter, 500);
 
-	const isFilterPending = referenceIdFilter !== debouncedReferenceIdFilter || runIdFilter !== debouncedRunIdFilter;
-
 	const {
 		data: versions,
 		isLoading: versionsLoading,
@@ -45,7 +43,12 @@ export function WorkflowDetail() {
 
 	const selectedStatusValues = selectedStatuses.map((s) => s.value);
 
-	const { data: runs, isLoading: runsLoading } = useWorkflowRuns({
+	const {
+		data: runs,
+		isLoading: runsLoading,
+		isFetching: runsFetching,
+		error: runsError,
+	} = useWorkflowRuns({
 		filters: {
 			workflows: workflowFilters,
 			...(selectedStatusValues.length > 0 && { status: selectedStatusValues }),
@@ -126,7 +129,7 @@ export function WorkflowDetail() {
 				<div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between overflow-visible">
 					<h2 className="font-heading text-lg font-semibold text-slate-900">Recent Runs</h2>
 					<div className="flex items-center gap-2">
-						{isFilterPending && <span className="text-xs text-slate-400 animate-pulse">Filtering...</span>}
+						{runsFetching && <span className="text-xs text-slate-400 animate-pulse">Filtering...</span>}
 						<input
 							type="text"
 							value={runIdFilter}
@@ -162,6 +165,15 @@ export function WorkflowDetail() {
 					</div>
 				</div>
 
+				{runsError && (
+					<div className="px-6 py-3 bg-red-50 border-b border-red-200 text-sm text-red-600">
+						Failed to load runs. {runs ? "Showing previous results." : ""}
+					</div>
+				)}
+
+				{/* runsLoading is only true on initial fetch with no cached data.
+				    With keepPreviousData, filter changes keep previous data visible
+				    while fetching, preventing skeleton flash and scroll jumps. */}
 				{runsLoading ? (
 					<div className="p-6">
 						<TableSkeleton rows={5} columns={5} />

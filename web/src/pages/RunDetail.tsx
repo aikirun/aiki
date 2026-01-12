@@ -65,6 +65,13 @@ export function RunDetail() {
 	);
 
 	const tasks = useMemo(() => (currentRun ? Object.values(currentRun.tasks) : []), [currentRun]);
+	const taskById = useMemo(() => {
+		const map = new Map<string, TaskInfo>();
+		for (const task of tasks) {
+			map.set(task.id, task);
+		}
+		return map;
+	}, [tasks]);
 	const actions = useMemo(
 		() =>
 			currentRun
@@ -302,9 +309,9 @@ export function RunDetail() {
 								{currentRun.state.cause === "self" && "Workflow Error"}
 								{currentRun.state.cause === "task" && (
 									<>
-										Task Failed{" "}
+										Task Failed:{" "}
 										<a href={`#task-${currentRun.state.taskId}`} className="text-aiki-purple hover:underline">
-											({currentRun.state.taskId.slice(0, 8)}...)
+											{taskById.get(currentRun.state.taskId)?.name} ({currentRun.state.taskId.slice(0, 8)}...)
 										</a>
 									</>
 								)}
@@ -341,7 +348,7 @@ export function RunDetail() {
 							eventsQueue={currentRun.eventsQueue}
 							sleepsQueue={currentRun.sleepsQueue}
 							childWorkflowRuns={currentRun.childWorkflowRuns}
-							tasks={currentRun.tasks}
+							taskById={taskById}
 						/>
 					)}
 				</div>
@@ -386,23 +393,18 @@ function Timeline({
 	eventsQueue,
 	sleepsQueue,
 	childWorkflowRuns,
-	tasks,
+	taskById,
 }: {
 	transitions: WorkflowRunTransition[];
 	eventsQueue: Record<string, EventQueue<unknown>>;
 	sleepsQueue: Record<string, SleepQueue>;
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>;
-	tasks: Record<string, TaskInfo>;
+	taskById: Map<string, TaskInfo>;
 }) {
 	const lookups = useMemo<TimelineLookups>(() => {
 		const childWorkflowById = new Map<string, ChildWorkflowRunInfo>();
 		for (const child of Object.values(childWorkflowRuns)) {
 			childWorkflowById.set(child.id, child);
-		}
-
-		const taskById = new Map<string, TaskInfo>();
-		for (const task of Object.values(tasks)) {
-			taskById.set(task.id, task);
 		}
 
 		const scheduledContext = new Map<
@@ -553,24 +555,44 @@ function Timeline({
 		}
 
 		return { childWorkflowById, taskById, scheduledContext };
-	}, [transitions, eventsQueue, sleepsQueue, childWorkflowRuns, tasks]);
+	}, [transitions, eventsQueue, sleepsQueue, childWorkflowRuns, taskById]);
 
-	const transitionsWithDates = useMemo(() => {
+	const transitionsWithMetadata = useMemo(() => {
 		let lastDate = "";
+		let currentAttempt = 1;
+
 		return transitions.map((transition, index) => {
 			const date = new Date(transition.createdAt);
 			const dateStr = date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-			const showDateDivider = dateStr !== lastDate;
+
+			const dateChanged = dateStr !== lastDate;
 			lastDate = dateStr;
-			return { transition, index, dateStr, showDateDivider };
+
+			let attemptChanged = false;
+
+			if (
+				transition.type === "state" &&
+				transition.state?.status === "scheduled" &&
+				(transition.state.reason === "new" || transition.state.reason === "retry")
+			) {
+				currentAttempt++;
+				attemptChanged = true;
+			}
+
+			return { transition, index, dateStr, dateChanged, attemptChanged, attemptNumber: currentAttempt };
 		});
 	}, [transitions]);
 
 	return (
 		<div className="space-y-0">
-			{transitionsWithDates.map(({ transition, index, dateStr, showDateDivider }) => (
+			{transitionsWithMetadata.map(({ transition, index, dateStr, dateChanged, attemptChanged, attemptNumber }) => (
 				<div key={transition.id}>
-					{showDateDivider && <DateDivider date={dateStr} />}
+					{(dateChanged || attemptChanged) && (
+						<TimelineDivider
+							date={dateChanged ? dateStr : undefined}
+							attempt={attemptChanged ? attemptNumber : undefined}
+						/>
+					)}
 					<TimelineItem
 						transition={transition}
 						transitionIndex={index}
@@ -583,11 +605,13 @@ function Timeline({
 	);
 }
 
-function DateDivider({ date }: { date: string }) {
+function TimelineDivider({ date, attempt }: { date?: string; attempt?: number }) {
+	const label = date && attempt ? `${date} · Attempt ${attempt}` : date ? date : `Attempt ${attempt}`;
+
 	return (
 		<div className="flex items-center gap-3 py-2 mb-2">
 			<hr className="h-px bg-slate-200 flex-1 border-0" />
-			<span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{date}</span>
+			<span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</span>
 			<hr className="h-px bg-slate-200 flex-1 border-0" />
 		</div>
 	);
@@ -713,9 +737,16 @@ const TimelineItem = memo(function TimelineItem({
 
 	if (transition.type === "task_state" && transition.taskState) {
 		const taskStatus = transition.taskState.status;
-		const icon = taskStatus === "completed" ? "✓" : taskStatus === "failed" ? "✗" : "●";
+		const icon =
+			taskStatus === "completed" ? "✓" : taskStatus === "failed" ? "✗" : taskStatus === "awaiting_retry" ? "↻" : "●";
 		const color =
-			taskStatus === "completed" ? "text-emerald-600" : taskStatus === "failed" ? "text-red-600" : "text-blue-600";
+			taskStatus === "completed"
+				? "text-emerald-600"
+				: taskStatus === "failed"
+					? "text-red-600"
+					: taskStatus === "awaiting_retry"
+						? "text-orange-600"
+						: "text-blue-600";
 		const taskInfo = lookups.taskById.get(transition.taskId || "");
 
 		return (
@@ -728,7 +759,7 @@ const TimelineItem = memo(function TimelineItem({
 					<div className="text-xs text-slate-500 font-mono">{time}</div>
 					<a href={`#task-${transition.taskId}`} className={`font-medium ${color} hover:underline`}>
 						<span className="mr-2">{icon}</span>
-						Task: {taskInfo && <>{taskInfo.name} </>}
+						{taskInfo && <>{taskInfo.name} </>}
 						{transition.taskId?.slice(0, 8)}... — {taskStatus}
 					</a>
 				</div>

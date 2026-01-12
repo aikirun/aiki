@@ -4,7 +4,7 @@ import type {
 	WorkflowListVersionsRequestV1,
 } from "@aikirun/types/workflow-api";
 import type { WorkflowRunListRequestV1, WorkflowRunListTransitionsRequestV1 } from "@aikirun/types/workflow-run-api";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { client } from "./client";
 
@@ -12,6 +12,7 @@ export function useWorkflows(params: WorkflowListRequestV1 = {}) {
 	return useQuery({
 		queryKey: ["workflows", params],
 		queryFn: () => client.workflow.listV1(params),
+		placeholderData: keepPreviousData,
 	});
 }
 
@@ -34,6 +35,7 @@ export function useWorkflowRuns(params: WorkflowRunListRequestV1 = {}) {
 	return useQuery({
 		queryKey: ["workflow-runs", params],
 		queryFn: () => client.workflowRun.listV1(params),
+		placeholderData: keepPreviousData,
 	});
 }
 
