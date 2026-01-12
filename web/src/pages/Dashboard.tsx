@@ -1,46 +1,19 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { useWorkflowStats, useWorkflows } from "../api/hooks";
 import { EmptyState } from "../components/common/EmptyState";
-import { RefreshIcon } from "../components/common/Icons";
 import { RelativeTime } from "../components/common/RelativeTime";
 import { TableSkeleton } from "../components/common/TableSkeleton";
 import { StatCard } from "../components/stats/StatCard";
 
 export function Dashboard() {
-	const queryClient = useQueryClient();
-	const { data: stats, isLoading: statsLoading, isFetching: statsFetching } = useWorkflowStats();
-	const {
-		data: workflows,
-		isLoading: workflowsLoading,
-		isFetching: workflowsFetching,
-	} = useWorkflows({
+	const { data: stats, isLoading: statsLoading } = useWorkflowStats();
+	const { data: workflows, isLoading: workflowsLoading } = useWorkflows({
 		sort: { field: "name", order: "asc" },
 	});
 
-	const isRefreshing = statsFetching || workflowsFetching;
-
-	const handleRefresh = () => {
-		queryClient.invalidateQueries({ queryKey: ["workflow-stats"] });
-		queryClient.invalidateQueries({ queryKey: ["workflows"] });
-	};
-
 	return (
 		<div className="space-y-8">
-			<div className="flex items-center justify-between">
-				<h1 className="font-heading text-3xl font-bold text-slate-900">Dashboard</h1>
-				<button
-					type="button"
-					onClick={handleRefresh}
-					disabled={isRefreshing}
-					className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border-2 border-slate-200 text-slate-700 font-semibold text-sm hover:border-slate-300 hover:bg-slate-50 transition-colors disabled:opacity-50"
-				>
-					<RefreshIcon className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-					{isRefreshing ? "Refreshing..." : "Refresh"}
-				</button>
-			</div>
-
 			{/* Stats Cards */}
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 				{statsLoading ? (
