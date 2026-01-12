@@ -14,14 +14,7 @@ import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type {
-	TaskId,
-	TaskInfo,
-	TaskOptions,
-	TaskReferenceOptions,
-	TaskStateAwaitingRetry,
-	TaskStateRunning,
-} from "@aikirun/types/task";
+import type { TaskId, TaskInfo, TaskOptions, TaskReferenceOptions } from "@aikirun/types/task";
 import { TaskFailedError, type TaskName } from "@aikirun/types/task";
 import {
 	WorkflowRunConflictError,
@@ -160,19 +153,16 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			const taskId = existingTaskInfo.id as TaskId;
 			const state = existingTaskInfo?.state;
 
-			this.assertRetryAllowed(taskId, state, retryStrategy, run.logger);
+			attempts = state.attempts;
+
+			this.assertRetryAllowed(taskId, attempts, retryStrategy, run.logger);
 
 			run.logger.debug("Retrying task", {
 				"aiki.taskName": this.name,
 				"aiki.taskId": taskId,
-				"aiki.attempts": state.attempts,
+				"aiki.attempts": attempts,
 				"aiki.taskStatus": state.status,
 			});
-			attempts = state.attempts;
-
-			if (state.status === "awaiting_retry" && handle.run.state.status === "running") {
-				throw new WorkflowRunSuspendedError(run.id);
-			}
 		}
 
 		attempts++;
@@ -322,13 +312,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private assertRetryAllowed(
-		taskId: TaskId,
-		state: TaskStateRunning<unknown> | TaskStateAwaitingRetry,
-		retryStrategy: RetryStrategy,
-		logger: Logger
-	): void {
-		const { attempts } = state;
+	private assertRetryAllowed(taskId: TaskId, attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
 			logger.error("Task retry not allowed", {

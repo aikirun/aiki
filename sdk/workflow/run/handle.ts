@@ -259,19 +259,19 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 			return this.run.state;
 		};
 
-		const isNeitherExpectedNorTerminal = async (state: WorkflowRunState<Output>) =>
+		const isNeitherExpectedNorTerminal = (state: WorkflowRunState<Output>) =>
 			state.status !== expectedStatus && !isTerminalWorkflowRunStatus(state.status);
 
 		if (!Number.isFinite(maxAttempts) && !options?.abortSignal) {
 			const maybeResult = await withRetry(loadState, retryStrategy, {
-				shouldRetryOnResult: isNeitherExpectedNorTerminal,
+				shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
 			}).run();
 
 			if (maybeResult.state === "timeout") {
 				throw new Error("Something's wrong, this should've never timed out");
 			}
 
-			if (await isNeitherExpectedNorTerminal(maybeResult.result)) {
+			if (maybeResult.result.status !== expectedStatus) {
 				return {
 					success: false,
 					cause: "run_terminated",
@@ -286,12 +286,16 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 		const maybeResult = options?.abortSignal
 			? await withRetry(loadState, retryStrategy, {
 					abortSignal: options.abortSignal,
-					shouldRetryOnResult: isNeitherExpectedNorTerminal,
+					shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
 				}).run()
-			: await withRetry(loadState, retryStrategy, { shouldRetryOnResult: isNeitherExpectedNorTerminal }).run();
+			: await withRetry(loadState, retryStrategy, {
+					shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
+				}).run();
+
+		this.logger.info("Maybe result", { maybeResult });
 
 		if (maybeResult.state === "completed") {
-			if (await isNeitherExpectedNorTerminal(maybeResult.result)) {
+			if (maybeResult.result.status !== expectedStatus) {
 				return {
 					success: false,
 					cause: "run_terminated",
@@ -302,6 +306,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
 			};
 		}
+
 		return { success: false, cause: maybeResult.state };
 	}
 
