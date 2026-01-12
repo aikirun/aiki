@@ -259,8 +259,8 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends
 			return this.run.state;
 		};
 
-		const isNeitherExpectedNorTerminal = (state: WorkflowRunState<Output>) =>
-			Promise.resolve(state.status !== expectedStatus && !isTerminalWorkflowRunStatus(state.status));
+		const isNeitherExpectedNorTerminal = async (state: WorkflowRunState<Output>) =>
+			state.status !== expectedStatus && !isTerminalWorkflowRunStatus(state.status);
 
 		if (!Number.isFinite(maxAttempts) && !options?.abortSignal) {
 			const maybeResult = await withRetry(loadState, retryStrategy, {

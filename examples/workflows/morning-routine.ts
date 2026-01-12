@@ -45,9 +45,7 @@ export const morningRoutineV2 = morningRoutine.v("2.0.0", {
 
 export const makeCoffee = task({
 	name: "make-coffee",
-	handler(_input: { withSugar: boolean; withCream: boolean }) {
-		return Promise.resolve();
-	},
+	async handler(_input: { withSugar: boolean; withCream: boolean }) {},
 });
 
 export const yawn = task({
@@ -57,10 +55,10 @@ export const yawn = task({
 
 export const stretch = task({
 	name: "stretch",
-	handler(_input: { duration: number }) {
-		return Promise.resolve({
+	async handler(_input: { duration: number }) {
+		return {
 			muscles: ["calf", "hamstring", "neck"],
-		});
+		};
 	},
 	opts: {
 		retry: {

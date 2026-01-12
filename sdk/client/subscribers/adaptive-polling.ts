@@ -31,17 +31,15 @@ export function createAdaptivePollingStrategy(
 		}
 	};
 
-	const getNextBatch = (_size: number): Promise<WorkflowRunBatch[]> => {
-		return Promise.resolve([]);
-	};
+	const getNextBatch = async (_size: number): Promise<WorkflowRunBatch[]> => [];
 
 	return {
-		init(_workerId: string, _callbacks: StrategyCallbacks) {
-			return Promise.resolve({
+		async init(_workerId: string, _callbacks: StrategyCallbacks) {
+			return {
 				type: strategy.type,
 				getNextDelay,
 				getNextBatch,
-			});
+			};
 		},
 	};
 }
