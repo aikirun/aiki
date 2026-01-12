@@ -327,10 +327,10 @@ export function RunDetail() {
 
 			{/* Timeline */}
 			<div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
-				<div className="px-6 py-4 border-b border-slate-200">
+				<div className="px-6 py-4">
 					<h2 className="font-heading text-lg font-semibold text-slate-900">Timeline</h2>
 				</div>
-				<div className="p-6">
+				<div className="px-6 pb-6">
 					{transitionsLoading ? (
 						<TimelineSkeleton />
 					) : transitions?.transitions.length === 0 ? (
@@ -555,17 +555,40 @@ function Timeline({
 		return { childWorkflowById, taskById, scheduledContext };
 	}, [transitions, eventsQueue, sleepsQueue, childWorkflowRuns, tasks]);
 
+	const transitionsWithDates = useMemo(() => {
+		let lastDate = "";
+		return transitions.map((transition, index) => {
+			const date = new Date(transition.createdAt);
+			const dateStr = date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+			const showDateDivider = dateStr !== lastDate;
+			lastDate = dateStr;
+			return { transition, index, dateStr, showDateDivider };
+		});
+	}, [transitions]);
+
 	return (
 		<div className="space-y-0">
-			{transitions.map((transition, index) => (
-				<TimelineItem
-					key={transition.id}
-					transition={transition}
-					transitionIndex={index}
-					lookups={lookups}
-					isLast={index === transitions.length - 1}
-				/>
+			{transitionsWithDates.map(({ transition, index, dateStr, showDateDivider }) => (
+				<div key={transition.id}>
+					{showDateDivider && <DateDivider date={dateStr} />}
+					<TimelineItem
+						transition={transition}
+						transitionIndex={index}
+						lookups={lookups}
+						isLast={index === transitions.length - 1}
+					/>
+				</div>
 			))}
+		</div>
+	);
+}
+
+function DateDivider({ date }: { date: string }) {
+	return (
+		<div className="flex items-center gap-3 py-2 mb-2">
+			<hr className="h-px bg-slate-200 flex-1 border-0" />
+			<span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{date}</span>
+			<hr className="h-px bg-slate-200 flex-1 border-0" />
 		</div>
 	);
 }
