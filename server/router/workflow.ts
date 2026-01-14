@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/useNamingConvention: snake case field is okay */
 import type { WorkflowName } from "@aikirun/types/workflow";
 import type { WorkflowListItem, WorkflowVersionItem } from "@aikirun/types/workflow-api";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";

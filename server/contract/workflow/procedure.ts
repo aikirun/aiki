@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/useNamingConvention: snake case keys are okay */
 import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
 import type {
 	WorkflowApi,

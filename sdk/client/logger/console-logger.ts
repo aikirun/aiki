@@ -1,5 +1,4 @@
 // biome-ignore-all lint/suspicious/noConsole: this is a console logger
-// biome-ignore-all lint/style/useNamingConvention: upper case for log levels
 import type { Logger } from "@aikirun/types/client";
 
 export type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR";

@@ -4,7 +4,7 @@ import type { WorkflowRun } from "@aikirun/types/workflow-run";
 import type { Redis } from "ioredis";
 import type { ServerContext } from "server/middleware/context";
 
-export async function publishWorkflowReadyBatch(
+export async function publishWorkflowRunReadyBatch(
 	context: ServerContext,
 	redis: Redis,
 	runs: WorkflowRun[]
@@ -18,7 +18,7 @@ export async function publishWorkflowReadyBatch(
 
 		for (const run of runs) {
 			const streamName = getWorkflowStreamName(run.name, run.versionId, run.options.shard);
-			pipeline.xadd(streamName, "*", "version", 1, "type", "workflow_run_ready", "workflowRunId", run.id);
+			pipeline.xadd(streamName, "*", "version", "1", "type", "workflow_run_ready", "workflowRunId", run.id);
 		}
 
 		const results = await pipeline.exec();
