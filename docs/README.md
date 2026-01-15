@@ -18,6 +18,7 @@ Understand the building blocks:
 
 - **[Workflows](./core-concepts/workflows.md)** - Define long-running business processes
 - **[Tasks](./core-concepts/tasks.md)** - Individual units of work
+- **[Schedules](./core-concepts/schedules.md)** - Trigger workflows on a recurring basis
 - **[Workers](./core-concepts/workers.md)** - Execute workflows in your infrastructure
 - **[Client](./core-concepts/client.md)** - Interact with the Aiki server
 
