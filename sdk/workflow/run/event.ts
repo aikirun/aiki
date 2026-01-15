@@ -246,11 +246,9 @@ function createEventSender<Data>(
 	});
 
 	async function send(...args: Data extends void ? [] : [Data]): Promise<void> {
-		const dataRaw = isNonEmptyArray(args) ? args[0] : (undefined as Data);
-
-		let data = dataRaw;
+		let data = args[0];
 		if (schema) {
-			const schemaValidation = schema["~standard"].validate(dataRaw);
+			const schemaValidation = schema["~standard"].validate(data);
 			const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
 			if (schemaValidationResult.issues) {
 				logger.error("Invalid event data", { "aiki.issues": schemaValidationResult.issues });
@@ -326,11 +324,9 @@ function createEventMulticaster<Data>(
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	): Promise<void> {
-		const dataRaw = isNonEmptyArray(args) ? args[0] : (undefined as Data);
-
-		let data = dataRaw;
+		let data = args[0];
 		if (schema) {
-			const schemaValidation = schema["~standard"].validate(dataRaw);
+			const schemaValidation = schema["~standard"].validate(data);
 			const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
 			if (schemaValidationResult.issues) {
 				client.logger.error("Invalid event data", {

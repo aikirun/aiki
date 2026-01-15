@@ -1,4 +1,3 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
@@ -129,7 +128,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const handle = run[INTERNAL].handle;
 		handle[INTERNAL].assertExecutionAllowed();
 
-		const inputRaw = isNonEmptyArray(args) ? args[0] : (undefined as Input);
+		const inputRaw = args[0];
 		const input = await this.parse(handle, this.params.schema?.input, inputRaw, run.logger);
 		const inputHash = await hashInput(input);
 

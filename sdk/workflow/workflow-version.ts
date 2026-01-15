@@ -1,4 +1,3 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
 import {
@@ -128,12 +127,10 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		startOpts: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
-		const inputRaw = isNonEmptyArray(args) ? args[0] : undefined;
-
-		let input = inputRaw;
+		let input = args[0];
 		const schema = this.params.schema?.input;
 		if (schema) {
-			const schemaValidation = schema["~standard"].validate(inputRaw);
+			const schemaValidation = schema["~standard"].validate(input);
 			const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
 			if (schemaValidationResult.issues) {
 				client.logger.error("Invalid workflow data", { "aiki.issues": schemaValidationResult.issues });
@@ -175,7 +172,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 		const { client } = parentRunHandle[INTERNAL];
 
-		const inputRaw = isNonEmptyArray(args) ? args[0] : (undefined as Input);
+		const inputRaw = args[0];
 		const input = await this.parse(parentRunHandle, this.params.schema?.input, inputRaw, parentRun.logger);
 		const inputHash = await hashInput(input);
 
