@@ -17,7 +17,7 @@ export interface TaskOptions {
 
 export interface TaskReferenceOptions {
 	id: string;
-	onConflict?: "error" | "return_existing";
+	conflictPolicy?: "error" | "return_existing";
 }
 
 interface TaskStateBase {

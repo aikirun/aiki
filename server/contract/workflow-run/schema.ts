@@ -12,7 +12,7 @@ export const workflowRunStatusSchema = type(
 
 const workflowReferenceOptionsSchema = type({
 	id: "string > 0",
-	"onConflict?": "'error' | 'return_existing' | undefined",
+	"conflictPolicy?": "'error' | 'return_existing' | undefined",
 });
 
 export const workflowOptionsSchema = type({

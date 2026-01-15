@@ -289,8 +289,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		logger: Logger
 	) {
 		if (existingTaskInfo.inputHash !== inputHash && reference) {
-			const onConflict = reference.onConflict ?? "error";
-			if (onConflict !== "error") {
+			const conflictPolicy = reference.conflictPolicy ?? "error";
+			if (conflictPolicy !== "error") {
 				return;
 			}
 			logger.error("Reference ID already used by another task", {

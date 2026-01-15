@@ -325,7 +325,7 @@ const childHandle = await childWorkflowV1
 // Alternative: "return_existing" - returns the existing child run
 const childHandle = await childWorkflowV1
 	.with()
-	.opt("reference", { id: "unique-id", onConflict: "return_existing" })
+	.opt("reference", { id: "unique-id", conflictPolicy: "return_existing" })
 	.startAsChild(run, input);
 ```
 

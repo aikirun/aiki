@@ -37,7 +37,7 @@ export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status i
 
 export interface WorkflowReferenceOptions {
 	id: string;
-	onConflict?: "error" | "return_existing";
+	conflictPolicy?: "error" | "return_existing";
 }
 
 export interface WorkflowOptions {

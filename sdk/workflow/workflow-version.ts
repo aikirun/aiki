@@ -264,8 +264,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		logger: Logger
 	) {
 		if (existingRunInfo.inputHash !== inputHash && reference) {
-			const onConflict = reference.onConflict ?? "error";
-			if (onConflict !== "error") {
+			const conflictPolicy = reference.conflictPolicy ?? "error";
+			if (conflictPolicy !== "error") {
 				return;
 			}
 			logger.error("Reference ID already used by another child workflow", {

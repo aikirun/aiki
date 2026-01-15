@@ -24,22 +24,22 @@ const handle = await orderWorkflowV1
 
 // You can now look up this workflow using "order-123"
 // If you try to start another workflow with the same reference ID,
-// Aiki will throw an error by default (configurable via onConflict)
+// Aiki will throw an error by default (configurable via conflictPolicy)
 ```
 
 ### Conflict Handling
 
-By default, Aiki throws an error when you try to start a workflow with a reference ID that already exists but with different input. You can configure this behavior with the `onConflict` option:
+By default, Aiki throws an error when you try to start a workflow with a reference ID that already exists but with different input. You can configure this behavior with the `conflictPolicy` option:
 
 ```typescript
 // Default behavior: throw error on conflict
 const handle = await orderWorkflowV1
-  .with().opt("reference", { id: "order-123-process", onConflict: "error" })
+  .with().opt("reference", { id: "order-123-process", conflictPolicy: "error" })
   .start(client, { orderId: "order-123", items: [...] });
 
 // Alternative: return existing run on conflict
 const handle = await orderWorkflowV1
-  .with().opt("reference", { id: "order-123-process", onConflict: "return_existing" })
+  .with().opt("reference", { id: "order-123-process", conflictPolicy: "return_existing" })
   .start(client, { orderId: "order-123", items: [...] });
 
 // With "return_existing", duplicate calls return the same workflow run
@@ -104,7 +104,7 @@ Unlike workflows and tasks, events use **silent deduplication** - duplicate even
 
 ### Workflow Level
 
-When you provide a reference ID when starting a workflow, the system checks if a workflow run with that ID already exists. Based on the `onConflict` setting:
+When you provide a reference ID when starting a workflow, the system checks if a workflow run with that ID already exists. Based on the `conflictPolicy` setting:
 - `"error"` (default): Throws an error if a run exists with different input
 - `"return_existing"`: Returns the existing workflow run
 
