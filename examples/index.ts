@@ -23,7 +23,7 @@ export const everyFiveSeconds = schedule({
 });
 const scheduleHandle = await everyFiveSeconds.register(aikiClient, notify, "This is a reminder");
 await delay(20_000);
-await scheduleHandle.delete();
+await scheduleHandle.pause();
 //#endregion
 
 //#region Echo workflow
