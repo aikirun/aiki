@@ -10,8 +10,11 @@ export type TaskPath = string & { _brand: "task_path" };
 
 export type TaskStatus = "running" | "awaiting_retry" | "completed" | "failed";
 
-export interface TaskOptions {
+export interface TaskDefinitionOptions {
 	retry?: RetryStrategy;
+}
+
+export interface TaskStartOptions extends TaskDefinitionOptions {
 	reference?: TaskReferenceOptions;
 }
 
@@ -70,14 +73,14 @@ export interface TransitionTaskStateBase {
 export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateBase {
 	type: "create";
 	taskName: string;
-	options?: TaskOptions;
+	options?: TaskStartOptions;
 	taskState: TaskStateRunningRequest;
 }
 
 export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
 	type: "retry";
 	taskId: string;
-	options?: TaskOptions;
+	options?: TaskStartOptions;
 	taskState: TaskStateRunningRequest;
 }
 

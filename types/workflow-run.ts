@@ -40,10 +40,13 @@ export interface WorkflowReferenceOptions {
 	conflictPolicy?: "error" | "return_existing";
 }
 
-export interface WorkflowOptions {
+export interface WorkflowDefinitionOptions {
 	retry?: RetryStrategy;
-	reference?: WorkflowReferenceOptions;
 	trigger?: TriggerStrategy;
+}
+
+export interface WorkflowStartOptions extends WorkflowDefinitionOptions {
+	reference?: WorkflowReferenceOptions;
 	shard?: string;
 }
 
@@ -226,7 +229,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	revision: number;
 	input?: Input;
 	path: string;
-	options: WorkflowOptions;
+	options: WorkflowStartOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;
 	// TODO:

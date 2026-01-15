@@ -3,6 +3,7 @@ import { delay } from "@aikirun/lib/async";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
 import {
+	type ObjectBuilder,
 	objectOverrider,
 	type PathFromObject,
 	type RequireAtLeastOneProp,
@@ -14,7 +15,13 @@ import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskId, TaskInfo, TaskOptions, TaskReferenceOptions } from "@aikirun/types/task";
+import type {
+	TaskDefinitionOptions,
+	TaskId,
+	TaskInfo,
+	TaskReferenceOptions,
+	TaskStartOptions,
+} from "@aikirun/types/task";
 import { TaskFailedError, type TaskName } from "@aikirun/types/task";
 import {
 	WorkflowRunConflictError,
@@ -78,7 +85,7 @@ export function task<Input extends Serializable, Output extends Serializable>(
 export interface TaskParams<Input, Output> {
 	name: string;
 	handler: (input: Input) => Promise<Output>;
-	opts?: TaskOptions;
+	opts?: TaskDefinitionOptions;
 	schema?: RequireAtLeastOneProp<{
 		input?: StandardSchemaV1<Input>;
 		output?: StandardSchemaV1<Output>;
@@ -94,14 +101,6 @@ export interface Task<Input, Output> {
 	) => Promise<Output>;
 }
 
-export interface TaskBuilder<Input, Output> {
-	opt<Path extends PathFromObject<TaskOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<TaskOptions, Path>
-	): TaskBuilder<Input, Output>;
-	start: Task<Input, Output>["start"];
-}
-
 class TaskImpl<Input, Output> implements Task<Input, Output> {
 	public readonly name: TaskName;
 
@@ -110,18 +109,21 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	public with(): TaskBuilder<Input, Output> {
-		const optsOverrider = objectOverrider(this.params.opts ?? {});
-
-		const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): TaskBuilder<Input, Output> => ({
-			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
-			start: (run, ...args) => new TaskImpl({ ...this.params, opts: optsBuilder.build() }).start(run, ...args),
-		});
-
-		return createBuilder(optsOverrider());
+		const startOpts: TaskStartOptions = this.params.opts ?? {};
+		const startOptsOverrider = objectOverrider(startOpts);
+		return new TaskBuilderImpl(this, startOptsOverrider());
 	}
 
 	public async start(
 		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
+		...args: Input extends void ? [] : [Input]
+	): Promise<Output> {
+		return this.startWithOpts(run, this.params.opts ?? {}, ...args);
+	}
+
+	public async startWithOpts(
+		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
+		startOpts: TaskStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
@@ -131,7 +133,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const input = await this.parse(handle, this.params.schema?.input, inputRaw, run.logger);
 		const inputHash = await hashInput(input);
 
-		const reference = this.params.opts?.reference;
+		const reference = startOpts.reference;
 		const path = getTaskPath(this.name, reference?.id ?? inputHash);
 		const existingTaskInfo = handle.run.tasks[path];
 		if (existingTaskInfo) {
@@ -147,7 +149,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 
 		let attempts = 0;
-		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
+		const retryStrategy = startOpts.retry ?? { type: "never" };
 
 		if (existingTaskInfo?.state) {
 			const taskId = existingTaskInfo.id as TaskId;
@@ -167,19 +169,17 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		attempts++;
 
-		const options: TaskOptions = { retry: retryStrategy, reference };
-
 		const { taskId } = existingTaskInfo
 			? await handle[INTERNAL].transitionTaskState({
 					type: "retry",
 					taskId: existingTaskInfo.id,
-					options,
+					options: startOpts,
 					taskState: { status: "running", attempts, input },
 				})
 			: await handle[INTERNAL].transitionTaskState({
 					type: "create",
 					taskName: this.name,
-					options,
+					options: startOpts,
 					taskState: { status: "running", attempts, input },
 				});
 
@@ -350,5 +350,34 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			},
 		});
 		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
+	}
+}
+
+export interface TaskBuilder<Input, Output> {
+	opt<Path extends PathFromObject<TaskStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<TaskStartOptions, Path>
+	): TaskBuilder<Input, Output>;
+	start: Task<Input, Output>["start"];
+}
+
+class TaskBuilderImpl<Input, Output> implements TaskBuilder<Input, Output> {
+	constructor(
+		private readonly task: TaskImpl<Input, Output>,
+		private readonly startOptsBuilder: ObjectBuilder<TaskStartOptions>
+	) {}
+
+	opt<Path extends PathFromObject<TaskStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<TaskStartOptions, Path>
+	): TaskBuilder<Input, Output> {
+		return new TaskBuilderImpl(this.task, this.startOptsBuilder.with(path, value));
+	}
+
+	start(
+		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
+		...args: Input extends void ? [] : [Input]
+	): Promise<Output> {
+		return this.task.startWithOpts(run, this.startOptsBuilder.build(), ...args);
 	}
 }

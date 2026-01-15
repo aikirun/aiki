@@ -62,6 +62,7 @@ type Or<T extends NonEmptyArray<boolean>> = T extends [infer First, ...infer Res
 			: false
 	: never;
 
+// Thanks to @refined[https://github.com/refined] for this type
 export type PathFromObject<T, IncludeArrayKeys extends boolean = false> = T extends T
 	? PathFromObjectInternal<T, IncludeArrayKeys>
 	: never;

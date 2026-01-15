@@ -27,7 +27,7 @@ interface OverrideEntry {
 	value: unknown;
 }
 
-interface ObjectBuilder<T extends object> {
+export interface ObjectBuilder<T extends object> {
 	with<Path extends PathFromObject<T>>(path: Path, value: TypeOfValueAtPath<T, Path>): ObjectBuilder<T>;
 	build(): T;
 }

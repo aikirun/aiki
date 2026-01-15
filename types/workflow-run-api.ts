@@ -10,7 +10,6 @@ import type {
 } from "./task";
 import type { DistributiveOmit, OptionalProp } from "./utils";
 import type {
-	WorkflowOptions,
 	WorkflowRun,
 	WorkflowRunState,
 	WorkflowRunStateAwaitingChildWorkflow,
@@ -22,6 +21,7 @@ import type {
 	WorkflowRunStateScheduled,
 	WorkflowRunStatus,
 	WorkflowRunTransition,
+	WorkflowStartOptions,
 } from "./workflow-run";
 
 export interface WorkflowRunApi {
@@ -105,7 +105,7 @@ export interface WorkflowRunCreateRequestV1 {
 	versionId: string;
 	input?: unknown;
 	parentWorkflowRunId?: string;
-	options?: WorkflowOptions;
+	options?: WorkflowStartOptions;
 }
 
 export interface WorkflowRunCreateResponseV1 {

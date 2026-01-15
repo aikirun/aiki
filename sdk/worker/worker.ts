@@ -9,7 +9,7 @@ import type {
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { delay, fireAndForget } from "@aikirun/lib/async";
-import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
+import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkerId, WorkerName } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -68,13 +68,16 @@ export interface WorkerParams {
 	// biome-ignore lint/suspicious/noExplicitAny: AppContext is contravariant
 	workflows: WorkflowVersion<any, any, any, any>[];
 	subscriber?: SubscriberStrategy;
-	opts?: WorkerOptions;
+	opts?: WorkerDefinitionOptions;
 }
 
-export interface WorkerOptions {
+export interface WorkerDefinitionOptions {
 	maxConcurrentWorkflowRuns?: number;
 	workflowRun?: WorkflowRunOptions;
 	gracefulShutdownTimeoutMs?: number;
+}
+
+export interface WorkerSpawnOptions extends WorkerDefinitionOptions {
 	/**
 	 * Optional array of shards this worker should process.
 	 * When provided, the worker will only subscribe to sharded streams.
@@ -103,14 +106,6 @@ interface WorkflowRunOptions {
 	spinThresholdMs?: number;
 }
 
-export interface WorkerBuilder {
-	opt<Path extends PathFromObject<WorkerOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<WorkerOptions, Path>
-	): WorkerBuilder;
-	spawn: Worker["spawn"];
-}
-
 export interface Worker {
 	name: WorkerName;
 	with(): WorkerBuilder;
@@ -131,18 +126,20 @@ class WorkerImpl implements Worker {
 	}
 
 	public with(): WorkerBuilder {
-		const optsOverrider = objectOverrider(this.params.opts ?? {});
-
-		const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): WorkerBuilder => ({
-			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
-			spawn: (client) => new WorkerImpl({ ...this.params, opts: optsBuilder.build() }).spawn(client),
-		});
-
-		return createBuilder(optsOverrider());
+		const spawnOpts: WorkerSpawnOptions = this.params.opts ?? {};
+		const spawnOptsOverrider = objectOverrider(spawnOpts);
+		return new WorkerBuilderImpl(this, spawnOptsOverrider());
 	}
 
 	public async spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
-		const handle = new WorkerHandleImpl(client, this.params);
+		return this.spawnWithOpts(client, this.params.opts ?? {});
+	}
+
+	public async spawnWithOpts<AppContext>(
+		client: Client<AppContext>,
+		spawnOpts: WorkerSpawnOptions
+	): Promise<WorkerHandle> {
+		const handle = new WorkerHandleImpl(client, this.params, spawnOpts);
 		await handle._start();
 		return handle;
 	}
@@ -166,17 +163,18 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 	constructor(
 		private readonly client: Client<AppContext>,
-		private readonly params: WorkerParams
+		private readonly params: Omit<WorkerParams, "opts">,
+		private readonly spawnOpts: WorkerSpawnOptions
 	) {
 		this.id = crypto.randomUUID() as WorkerId;
 		this.name = params.name as WorkerName;
 		this.workflowRunOpts = {
-			heartbeatIntervalMs: this.params.opts?.workflowRun?.heartbeatIntervalMs ?? 30_000,
-			spinThresholdMs: this.params.opts?.workflowRun?.spinThresholdMs ?? 10,
+			heartbeatIntervalMs: this.spawnOpts.workflowRun?.heartbeatIntervalMs ?? 30_000,
+			spinThresholdMs: this.spawnOpts.workflowRun?.spinThresholdMs ?? 10,
 		};
 		this.registry = workflowRegistry().addMany(this.params.workflows);
 
-		const reference = this.params.opts?.reference;
+		const reference = this.spawnOpts.reference;
 		this.logger = client.logger.child({
 			"aiki.component": "worker",
 			"aiki.workerId": this.id,
@@ -189,7 +187,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
 			this.params.subscriber ?? { type: "redis" },
 			this.registry.getAll(),
-			this.params.opts?.shards
+			this.spawnOpts.shards
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
 			onError: (error: Error) => this.handleSubscriberError(error),
@@ -218,7 +216,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			return;
 		}
 
-		const timeoutMs = this.params.opts?.gracefulShutdownTimeoutMs ?? 5_000;
+		const timeoutMs = this.spawnOpts.gracefulShutdownTimeoutMs ?? 5_000;
 		if (timeoutMs > 0) {
 			await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
 		}
@@ -243,7 +241,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			"aiki.registeredWorkflows": this.params.workflows.map((w) => `${w.name}/${w.versionId}`),
 		});
 
-		const maxConcurrentWorkflowRuns = this.params.opts?.maxConcurrentWorkflowRuns ?? 1;
+		const maxConcurrentWorkflowRuns = this.spawnOpts.maxConcurrentWorkflowRuns ?? 1;
 
 		let nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: false });
 		let subscriberFailedAttempts = 0;
@@ -453,5 +451,31 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			"aiki.error": error.message,
 			"aiki.stack": error.stack,
 		});
+	}
+}
+
+export interface WorkerBuilder {
+	opt<Path extends PathFromObject<WorkerSpawnOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkerSpawnOptions, Path>
+	): WorkerBuilder;
+	spawn: Worker["spawn"];
+}
+
+class WorkerBuilderImpl implements WorkerBuilder {
+	constructor(
+		private readonly worker: WorkerImpl,
+		private readonly spawnOptsBuilder: ObjectBuilder<WorkerSpawnOptions>
+	) {}
+
+	opt<Path extends PathFromObject<WorkerSpawnOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkerSpawnOptions, Path>
+	): WorkerBuilder {
+		return new WorkerBuilderImpl(this.worker, this.spawnOptsBuilder.with(path, value));
+	}
+
+	spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
+		return this.worker.spawnWithOpts(client, this.spawnOptsBuilder.build());
 	}
 }
