@@ -18,6 +18,8 @@ import {
 
 type Tab = "workflows" | "schedules";
 
+const DEFAULT_SCHEDULE_STATUSES = ["active", "paused"] as const;
+
 export function Dashboard() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const { data: stats, isLoading: statsLoading } = useWorkflowStats();
@@ -33,6 +35,41 @@ export function Dashboard() {
 					next.delete("tab");
 				} else {
 					next.set("tab", tab);
+				}
+				return next;
+			});
+		},
+		[setSearchParams]
+	);
+
+	const statusParam = searchParams.get("status");
+	const selectedStatuses =
+		statusParam === "none"
+			? []
+			: statusParam
+				? SCHEDULE_STATUS_OPTIONS.filter((o) => statusParam.split(",").filter(Boolean).includes(o.value))
+				: SCHEDULE_STATUS_OPTIONS.filter((o) =>
+						DEFAULT_SCHEDULE_STATUSES.includes(o.value as (typeof DEFAULT_SCHEDULE_STATUSES)[number])
+					);
+
+	const setSelectedStatuses = useCallback(
+		(statuses: ScheduleStatusOption[]) => {
+			setSearchParams((prev) => {
+				const next = new URLSearchParams(prev);
+
+				if (statuses.length === 0) {
+					next.set("status", "none");
+				} else {
+					const selectedValues = new Set(statuses.map((s) => s.value));
+					const isDefault =
+						selectedValues.size === DEFAULT_SCHEDULE_STATUSES.length &&
+						DEFAULT_SCHEDULE_STATUSES.every((v) => selectedValues.has(v));
+
+					if (isDefault) {
+						next.delete("status");
+					} else {
+						next.set("status", statuses.map((s) => s.value).join(","));
+					}
 				}
 				return next;
 			});
@@ -92,10 +129,22 @@ export function Dashboard() {
 					>
 						Schedules
 					</button>
+					{activeTab === "schedules" && (
+						<div className="ml-auto flex items-center pr-4">
+							<MultiSelectDropdown
+								label="Status"
+								options={SCHEDULE_STATUS_OPTIONS}
+								selected={selectedStatuses}
+								onChange={setSelectedStatuses}
+								getOptionValue={(o) => o.value}
+								getOptionLabel={(o) => o.label}
+							/>
+						</div>
+					)}
 				</div>
 
 				{/* Tab Content */}
-				{activeTab === "workflows" ? <WorkflowsTab /> : <SchedulesTab />}
+				{activeTab === "workflows" ? <WorkflowsTab /> : <SchedulesTab selectedStatuses={selectedStatuses} />}
 			</div>
 		</div>
 	);
@@ -151,42 +200,11 @@ function WorkflowsTab() {
 	);
 }
 
-const DEFAULT_SCHEDULE_STATUSES = ["active", "paused"] as const;
-
-function SchedulesTab() {
-	const [searchParams, setSearchParams] = useSearchParams();
-
-	const statusParam = searchParams.get("status");
-	const statusValues = statusParam ? statusParam.split(",").filter(Boolean) : [];
-	const selectedStatuses =
-		statusValues.length > 0
-			? SCHEDULE_STATUS_OPTIONS.filter((o) => statusValues.includes(o.value))
-			: SCHEDULE_STATUS_OPTIONS.filter((o) =>
-					DEFAULT_SCHEDULE_STATUSES.includes(o.value as (typeof DEFAULT_SCHEDULE_STATUSES)[number])
-				);
-
-	const setSelectedStatuses = useCallback(
-		(statuses: ScheduleStatusOption[]) => {
-			setSearchParams((prev) => {
-				const next = new URLSearchParams(prev);
-
-				const selectedValues = new Set(statuses.map((s) => s.value));
-				const isDefault =
-					selectedValues.size === DEFAULT_SCHEDULE_STATUSES.length &&
-					DEFAULT_SCHEDULE_STATUSES.every((v) => selectedValues.has(v));
-
-				if (statuses.length === 0 || isDefault) {
-					next.delete("status");
-				} else {
-					next.set("status", statuses.map((s) => s.value).join(","));
-				}
-				return next;
-			});
-		},
-		[setSearchParams]
-	);
-
-	const statusFilters = selectedStatuses.length > 0 ? selectedStatuses.map((s) => s.value) : undefined;
+function SchedulesTab({ selectedStatuses }: { selectedStatuses: ScheduleStatusOption[] }) {
+	// Don't filter if all statuses are selected
+	const isAllSelected = selectedStatuses.length === SCHEDULE_STATUS_OPTIONS.length;
+	const statusFilters =
+		!isAllSelected && selectedStatuses.length > 0 ? selectedStatuses.map((s) => s.value) : undefined;
 
 	const { data, isLoading } = useSchedules({
 		filters: statusFilters ? { status: statusFilters } : undefined,
@@ -194,18 +212,6 @@ function SchedulesTab() {
 
 	return (
 		<>
-			{/* Filter Header */}
-			<div className="px-6 py-3 border-b border-slate-100 flex items-center justify-end relative z-10">
-				<MultiSelectDropdown
-					label="Status"
-					options={SCHEDULE_STATUS_OPTIONS}
-					selected={selectedStatuses}
-					onChange={setSelectedStatuses}
-					getOptionValue={(o) => o.value}
-					getOptionLabel={(o) => o.label}
-				/>
-			</div>
-
 			{isLoading ? (
 				<div className="p-6">
 					<TableSkeleton rows={5} columns={6} />
@@ -213,11 +219,7 @@ function SchedulesTab() {
 			) : data?.schedules.length === 0 ? (
 				<EmptyState
 					title="No schedules found"
-					description={
-						selectedStatuses.length < SCHEDULE_STATUS_OPTIONS.length
-							? "Try adjusting your filters"
-							: "Register a schedule to see it here"
-					}
+					description={statusFilters ? "Try adjusting your filters" : "Activate a schedule to see it here"}
 				/>
 			) : (
 				<table className="w-full">
