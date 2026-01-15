@@ -14,7 +14,7 @@ import type {
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
 import { InvalidWorkflowRunStateTransitionError, NotFoundError, RevisionConflictError } from "server/errors";
-import { workflowRuns, workflowRunTransitions } from "server/infrastructure/persistence/in-memory-store";
+import { workflowRunsById, workflowRunTransitionsById } from "server/infrastructure/persistence/in-memory-store";
 import type { ServerContext } from "server/middleware/context";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
@@ -187,7 +187,7 @@ export async function transitionWorkflowRunState(
 ): Promise<WorkflowRunTransitionStateResponseV1> {
 	const runId = request.id as WorkflowRunId;
 
-	const run = workflowRuns.get(runId);
+	const run = workflowRunsById.get(runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
@@ -202,7 +202,7 @@ export async function transitionWorkflowRunState(
 
 	context.logger.info({ runId, state, attempts: run.attempts }, "Workflow state transition");
 
-	const transitions = workflowRunTransitions.get(runId) ?? [];
+	const transitions = workflowRunTransitionsById.get(runId) ?? [];
 
 	if (run.state.status === "sleeping" && state.status === "scheduled") {
 		const sleepQueue = run.sleepsQueue[run.state.sleepName];
@@ -260,7 +260,7 @@ export async function transitionWorkflowRunState(
 
 	if (state.status === "awaiting_child_workflow") {
 		const childRunId = state.childWorkflowRunId as WorkflowRunId;
-		const childRun = workflowRuns.get(childRunId);
+		const childRun = workflowRunsById.get(childRunId);
 		if (childRun) {
 			const childRunStatus = childRun.state.status;
 			const expectedStatus = state.childWorkflowRunStatus;
@@ -289,7 +289,7 @@ export async function transitionWorkflowRunState(
 	};
 	if (!transitions.length) {
 		transitions.push(transition);
-		workflowRunTransitions.set(runId, transitions);
+		workflowRunTransitionsById.set(runId, transitions);
 	} else {
 		transitions.push(transition);
 	}
@@ -299,7 +299,7 @@ export async function transitionWorkflowRunState(
 
 	if (state.status === "cancelled") {
 		for (const [childRunPath, childRunInfo] of Object.entries(run.childWorkflowRuns)) {
-			const childRun = workflowRuns.get(childRunInfo.id as WorkflowRunId);
+			const childRun = workflowRunsById.get(childRunInfo.id as WorkflowRunId);
 			if (!childRun) {
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
 			}
@@ -332,7 +332,7 @@ async function notifyParentOfStateChangeIfNecessary(
 	context: ServerContext,
 	childRun: RequiredProp<WorkflowRun, "parentWorkflowRunId">
 ): Promise<void> {
-	const parentRun = workflowRuns.get(childRun.parentWorkflowRunId as WorkflowRunId);
+	const parentRun = workflowRunsById.get(childRun.parentWorkflowRunId as WorkflowRunId);
 	if (!parentRun) {
 		return;
 	}

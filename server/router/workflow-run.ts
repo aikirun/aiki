@@ -1,44 +1,35 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { hashInput } from "@aikirun/lib/crypto";
-import { toMilliseconds } from "@aikirun/lib/duration";
-import { getTaskPath, getWorkflowRunPath } from "@aikirun/lib/path";
+import { getTaskPath } from "@aikirun/lib/path";
 import type { EventReferenceOptions } from "@aikirun/types/event";
 import type { TaskId, TaskState } from "@aikirun/types/task";
-import type { Workflow, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
 import { NotFoundError, ValidationError } from "server/errors";
 import {
 	findTaskById,
-	workflowRuns,
+	workflowRunsById,
 	workflowRunsByReferenceId,
-	workflowRunTransitions,
-	workflows,
+	workflowRunTransitionsById,
 } from "server/infrastructure/persistence/in-memory-store";
 import type { ServerContext } from "server/middleware";
-import { transitionTaskState } from "server/services/task/state-machine";
-import { transitionWorkflowRunState } from "server/services/workflow-run/state-machine";
+import { transitionTaskState } from "server/services/task-state-machine";
+import { createWorkflowRun } from "server/services/workflow-run";
+import { transitionWorkflowRunState } from "server/services/workflow-run-state-machine";
 
 import { baseImplementer } from "./base";
 
 const os = baseImplementer.workflowRun;
-
-export function getWorkflowRuns(): Map<WorkflowRunId, WorkflowRun> {
-	return workflowRuns;
-}
-
-export function getWorkflows(): Map<WorkflowName, Workflow> {
-	return workflows;
-}
 
 const listV1 = os.listV1.handler(({ input: request }) => {
 	const { filters, limit = 50, offset = 0, sort } = request;
 
 	let runs: Iterable<WorkflowRun>;
 	if (filters?.runId) {
-		const run = workflowRuns.get(filters.runId as WorkflowRunId);
+		const run = workflowRunsById.get(filters.runId as WorkflowRunId);
 		runs = run ? [run] : [];
 	} else {
-		runs = workflowRuns.values();
+		runs = workflowRunsById.values();
 	}
 
 	const filteredRuns: WorkflowRun[] = [];
@@ -80,7 +71,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 });
 
 const getByIdV1 = os.getByIdV1.handler(({ input: request }) => {
-	const run = workflowRuns.get(request.id as WorkflowRunId);
+	const run = workflowRunsById.get(request.id as WorkflowRunId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${request.id}`);
 	}
@@ -98,7 +89,7 @@ const getByReferenceIdV1 = os.getByReferenceIdV1.handler(({ input: request }) =>
 		throw new NotFoundError(`Workflow run not found for reference: ${name}/${versionId}/${referenceId}`);
 	}
 
-	const run = workflowRuns.get(runId);
+	const run = workflowRunsById.get(runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
@@ -107,7 +98,7 @@ const getByReferenceIdV1 = os.getByReferenceIdV1.handler(({ input: request }) =>
 });
 
 const getStateV1 = os.getStateV1.handler(({ input: request }) => {
-	const run = workflowRuns.get(request.id as WorkflowRunId);
+	const run = workflowRunsById.get(request.id as WorkflowRunId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${request.id}`);
 	}
@@ -116,120 +107,7 @@ const getStateV1 = os.getStateV1.handler(({ input: request }) => {
 });
 
 const createV1 = os.createV1.handler(async ({ input: request, context }) => {
-	const name = request.name as WorkflowName;
-	const versionId = request.versionId as WorkflowVersionId;
-	const referenceId = request.options?.reference?.id;
-
-	if (referenceId) {
-		const existingRunId = workflowRunsByReferenceId.get(name)?.get(versionId)?.get(referenceId);
-		if (existingRunId) {
-			context.logger.info({ runId: existingRunId, referenceId }, "Returning existing run from reference ID");
-			const existingRun = workflowRuns.get(existingRunId);
-			if (!existingRun) {
-				throw new NotFoundError(`Workflow run not found: ${existingRunId}`);
-			}
-			return { run: existingRun };
-		}
-	}
-
-	const now = Date.now();
-	const runId = crypto.randomUUID() as WorkflowRunId;
-
-	const inputHash = await hashInput(request.input);
-
-	const path = getWorkflowRunPath(name, versionId, referenceId ?? inputHash);
-	const trigger = request.options?.trigger;
-
-	const run: WorkflowRun = {
-		id: runId,
-		path,
-		name,
-		versionId,
-		createdAt: now,
-		revision: 0,
-		attempts: 0,
-		input: request.input,
-		options: request.options ?? {},
-		state: {
-			status: "scheduled",
-			scheduledAt:
-				!trigger || trigger.type === "immediate"
-					? now
-					: "delayMs" in trigger
-						? now + trigger.delayMs
-						: now + toMilliseconds(trigger.delay),
-			reason: "new",
-		},
-		tasks: {},
-		sleepsQueue: {},
-		eventsQueue: {},
-		childWorkflowRuns: {},
-		parentWorkflowRunId: request.parentWorkflowRunId,
-	};
-
-	workflowRuns.set(runId, run);
-
-	let workflow = workflows.get(name);
-	if (!workflow) {
-		workflow = {
-			name,
-			versions: {},
-			runCount: 0,
-			lastRunAt: now,
-		};
-		workflows.set(name, workflow);
-	}
-
-	workflow.runCount++;
-	workflow.lastRunAt = now;
-
-	let workflowVersion = workflow.versions[versionId];
-	if (!workflowVersion) {
-		workflowVersion = {
-			firstSeenAt: now,
-			lastRunAt: now,
-			runCount: 0,
-		};
-		workflow.versions[versionId] = workflowVersion;
-	}
-
-	workflowVersion.runCount++;
-	workflowVersion.lastRunAt = now;
-
-	if (request.parentWorkflowRunId) {
-		const parentRun = workflowRuns.get(request.parentWorkflowRunId as WorkflowRunId);
-		if (parentRun) {
-			parentRun.childWorkflowRuns[run.path] = {
-				id: runId,
-				name,
-				versionId,
-				inputHash,
-				statusWaitResults: [],
-			};
-		}
-	}
-
-	if (referenceId) {
-		let versionMap = workflowRunsByReferenceId.get(name);
-		if (!versionMap) {
-			versionMap = new Map();
-			workflowRunsByReferenceId.set(name, versionMap);
-		}
-
-		let referenceIdMap = versionMap.get(versionId);
-		if (!referenceIdMap) {
-			referenceIdMap = new Map();
-			versionMap.set(versionId, referenceIdMap);
-		}
-
-		referenceIdMap.set(referenceId, runId);
-	}
-
-	context.logger.info(
-		{ workflowName: name, versionId, runId, referenceId, opts: run.options, input: run.input },
-		"Created workflow run"
-	);
-
+	const run = await createWorkflowRun(context, request);
 	return { run };
 });
 
@@ -244,7 +122,7 @@ const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: r
 const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, context }) => {
 	const runId = request.id as WorkflowRunId;
 
-	const run = workflowRuns.get(runId);
+	const run = workflowRunsById.get(runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
@@ -291,9 +169,9 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			taskState: finalState,
 		};
 
-		const transitions = workflowRunTransitions.get(runId);
+		const transitions = workflowRunTransitionsById.get(runId);
 		if (!transitions) {
-			workflowRunTransitions.set(runId, [runningTransition, finalTransition]);
+			workflowRunTransitionsById.set(runId, [runningTransition, finalTransition]);
 		} else {
 			transitions.push(runningTransition, finalTransition);
 		}
@@ -326,9 +204,9 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		taskState: finalState,
 	};
 
-	const transitions = workflowRunTransitions.get(runId);
+	const transitions = workflowRunTransitionsById.get(runId);
 	if (!transitions) {
-		workflowRunTransitions.set(runId, [finalTransition]);
+		workflowRunTransitionsById.set(runId, [finalTransition]);
 	} else {
 		transitions.push(finalTransition);
 	}
@@ -347,12 +225,12 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 const listTransitionsV1 = os.listTransitionsV1.handler(({ input: request }) => {
 	const { id, limit = 50, offset = 0, sort } = request;
 
-	const run = workflowRuns.get(id as WorkflowRunId);
+	const run = workflowRunsById.get(id as WorkflowRunId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${id}`);
 	}
 
-	const transitions = workflowRunTransitions.get(id as WorkflowRunId) ?? [];
+	const transitions = workflowRunTransitionsById.get(id as WorkflowRunId) ?? [];
 
 	return {
 		transitions: [...transitions]
@@ -408,7 +286,7 @@ async function sendEventToWorkflowRun(
 const sendEventV1 = os.sendEventV1.handler(async ({ input: request, context }) => {
 	const runId = request.id as WorkflowRunId;
 
-	const run = workflowRuns.get(runId);
+	const run = workflowRunsById.get(runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
@@ -425,7 +303,7 @@ const multicastEventV1 = os.multicastEventV1.handler(async ({ input: request, co
 	const runIds = request.ids as WorkflowRunId[];
 
 	const runs = runIds.map((runId) => {
-		const run = workflowRuns.get(runId);
+		const run = workflowRunsById.get(runId);
 		if (!run) {
 			throw new NotFoundError(`Workflow run not found: ${runId}`);
 		}

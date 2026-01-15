@@ -8,7 +8,11 @@ import type {
 	WorkflowRunTransitionTaskStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
 import { InvalidTaskStateTransitionError, NotFoundError, RevisionConflictError, ValidationError } from "server/errors";
-import { findTaskById, workflowRuns, workflowRunTransitions } from "server/infrastructure/persistence/in-memory-store";
+import {
+	findTaskById,
+	workflowRunsById,
+	workflowRunTransitionsById,
+} from "server/infrastructure/persistence/in-memory-store";
 import type { ServerContext } from "server/middleware";
 
 const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
@@ -50,7 +54,7 @@ export async function transitionTaskState(
 ): Promise<WorkflowRunTransitionTaskStateResponseV1> {
 	const runId = request.id as WorkflowRunId;
 
-	const run = workflowRuns.get(runId);
+	const run = workflowRunsById.get(runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
@@ -129,9 +133,9 @@ export async function transitionTaskState(
 		taskState,
 	};
 
-	const transitions = workflowRunTransitions.get(runId);
+	const transitions = workflowRunTransitionsById.get(runId);
 	if (!transitions) {
-		workflowRunTransitions.set(runId, [transition]);
+		workflowRunTransitionsById.set(runId, [transition]);
 	} else {
 		transitions.push(transition);
 	}

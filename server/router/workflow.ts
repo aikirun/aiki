@@ -2,19 +2,18 @@ import type { WorkflowName } from "@aikirun/types/workflow";
 import type { WorkflowListItem, WorkflowVersionItem } from "@aikirun/types/workflow-api";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { NotFoundError } from "server/errors";
+import { workflowRunsById, workflowsByName } from "server/infrastructure/persistence/in-memory-store";
 
 import { baseImplementer } from "./base";
-import { getWorkflowRuns, getWorkflows } from "./workflow-run";
 
 const os = baseImplementer.workflow;
 
 const listV1 = os.listV1.handler(({ input: request }) => {
 	const { limit = 50, offset = 0, sort } = request;
 
-	const workflows = getWorkflows();
 	const workflowList: WorkflowListItem[] = [];
 
-	for (const workflow of workflows.values()) {
+	for (const workflow of workflowsByName.values()) {
 		workflowList.push({
 			name: workflow.name,
 			runCount: workflow.runCount,
@@ -50,9 +49,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 const listVersionsV1 = os.listVersionsV1.handler(({ input: request }) => {
 	const { name, limit = 50, offset = 0, sort } = request;
 
-	const workflows = getWorkflows();
-	const workflow = workflows.get(name as WorkflowName);
-
+	const workflow = workflowsByName.get(name as WorkflowName);
 	if (!workflow) {
 		throw new NotFoundError(`Workflow not found: ${name}`);
 	}
@@ -109,7 +106,7 @@ const getStatsV1 = os.getStatsV1.handler(({ input: request }) => {
 
 	let totalRuns = 0;
 
-	for (const run of getWorkflowRuns().values()) {
+	for (const run of workflowRunsById.values()) {
 		if (name && run.name !== name) {
 			continue;
 		}

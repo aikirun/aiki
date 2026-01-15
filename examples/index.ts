@@ -1,8 +1,10 @@
 import { client } from "@aikirun/client";
 import { delay } from "@aikirun/lib";
+import { schedule } from "@aikirun/workflow";
 
 import { echoV1 } from "./workflows/echo";
 import { morningRoutineV2 } from "./workflows/morning-routine";
+import { notify } from "./workflows/notify";
 
 export const aikiClient = client({
 	url: "http://localhost:9850",
@@ -11,6 +13,18 @@ export const aikiClient = client({
 		port: 6379,
 	},
 });
+
+//#region Scheduled Notify workflow
+export const everyFiveSeconds = schedule({
+	name: "every-5-seconds",
+	type: "interval",
+	every: { seconds: 5 },
+	overlapPolicy: "skip",
+});
+const scheduleHandle = await everyFiveSeconds.register(aikiClient, notify, "This is a reminder");
+await delay(20_000);
+await scheduleHandle.delete();
+//#endregion
 
 //#region Echo workflow
 const echoHandle = await echoV1.start(aikiClient);

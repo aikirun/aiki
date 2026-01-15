@@ -3,11 +3,12 @@ import { worker } from "@aikirun/worker";
 
 import { echoV1 } from "./workflows/echo";
 import { morningRoutineV1, morningRoutineV2 } from "./workflows/morning-routine";
+import { notify } from "./workflows/notify";
 import { client } from "../sdk/client/client";
 
 export const workerA = worker({
 	name: "worker-A",
-	workflows: [echoV1, morningRoutineV1, morningRoutineV2],
+	workflows: [echoV1, morningRoutineV1, morningRoutineV2, notify],
 	opts: {
 		maxConcurrentWorkflowRuns: 10,
 	},

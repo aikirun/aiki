@@ -1,3 +1,4 @@
+import type { ScheduleApi } from "@aikirun/types/schedule-api";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
@@ -39,6 +40,7 @@ export interface Logger {
 
 export interface ApiClient {
 	workflowRun: WorkflowRunApi;
+	schedule: ScheduleApi;
 }
 
 export interface RedisClient {
