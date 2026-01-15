@@ -86,7 +86,11 @@ npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 Start Aiki:
 
 ```bash
-# Using Docker Compose (starts server + web UI)
+# Fist clone the repo
+git clone https://github.com/aikirun/aiki.git
+cd aiki
+
+# Then start server + web UI using Docker Compose
 docker-compose up
 
 # Or run directly with Bun

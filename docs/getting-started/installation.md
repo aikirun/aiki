@@ -36,6 +36,13 @@ docker run -d --name redis -p 6379:6379 redis:7
 
 ## Step 3: Start Aiki
 
+First, clone the Aiki repository:
+
+```bash
+git clone https://github.com/aikirun/aiki.git
+cd aiki
+```
+
 ### Option 1: Using Docker Compose
 
 ```bash
