@@ -15,7 +15,6 @@ Some workflows take minutes, others take days, months or years. They often need 
 
 Aiki workflows are like a virtual thread of execution that can be suspended (intentionally or due to crashes/intermittent-failures) and automatically resumed from exactly where they left off.
 
-
 ## Example: Restaurant Order Workflow
 
 Here's a dummy food ordering workflow that coordinates restaurant confirmation, courier delivery, and follow-up email the next day.
@@ -129,6 +128,10 @@ await restaurantOrderV1.start(aikiClient, {
 await workerHandle.stop();
 await aikiClient.close();
 ```
+<br>
+<p align="center">
+  <img src="docs/assets/aiki-web-demo.gif" alt="Aiki Web UI Demo" width="800">
+</p>
 
 ## Features
 
