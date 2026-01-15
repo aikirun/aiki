@@ -208,7 +208,7 @@ export async function scheduleWorkflowRunsThatTimedOutWaitingForChild(context: S
 			continue;
 		}
 
-		const statusWaitResults = run.childWorkflowRuns[childRun.path]?.statusWaitResults;
+		const statusWaitResults = run.childWorkflowRuns[childRun.address]?.statusWaitResults;
 		if (statusWaitResults) {
 			statusWaitResults.push({ status: "timeout", timedOutAt: now });
 		}

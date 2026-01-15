@@ -1,3 +1,4 @@
+import { getTaskAddress } from "@aikirun/lib/address";
 import { delay } from "@aikirun/lib/async";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
@@ -8,7 +9,6 @@ import {
 	type RequireAtLeastOneProp,
 	type TypeOfValueAtPath,
 } from "@aikirun/lib/object";
-import { getTaskPath } from "@aikirun/lib/path";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
@@ -133,8 +133,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const inputHash = await hashInput(input);
 
 		const reference = startOpts.reference;
-		const path = getTaskPath(this.name, reference?.id ?? inputHash);
-		const existingTaskInfo = handle.run.tasks[path];
+		const address = getTaskAddress(this.name, reference?.id ?? inputHash);
+		const existingTaskInfo = handle.run.tasks[address];
 		if (existingTaskInfo) {
 			await this.assertUniqueTaskReferenceId(handle, existingTaskInfo, inputHash, reference, run.logger);
 		}

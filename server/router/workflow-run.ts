@@ -1,6 +1,6 @@
+import { getTaskAddress } from "@aikirun/lib/address";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { hashInput } from "@aikirun/lib/crypto";
-import { getTaskPath } from "@aikirun/lib/path";
 import type { EventReferenceOptions } from "@aikirun/types/event";
 import type { TaskId, TaskState } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -131,11 +131,11 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 
 	if (request.type === "new") {
 		const inputHash = await hashInput(request.input);
-		const taskPath = getTaskPath(request.taskName, request.reference?.id ?? inputHash);
+		const taskAddress = getTaskAddress(request.taskName, request.reference?.id ?? inputHash);
 
-		const existingTaskInfo = run.tasks[taskPath];
+		const existingTaskInfo = run.tasks[taskAddress];
 		if (existingTaskInfo) {
-			throw new ValidationError(`Task ${taskPath} already exists. Use type: "existing" to update it.`);
+			throw new ValidationError(`Task ${taskAddress} already exists. Use type: "existing" to update it.`);
 		}
 
 		const taskId = crypto.randomUUID();
@@ -176,7 +176,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			transitions.push(runningTransition, finalTransition);
 		}
 
-		run.tasks[taskPath] = { id: taskId, name: request.taskName, state: finalState, inputHash };
+		run.tasks[taskAddress] = { id: taskId, name: request.taskName, state: finalState, inputHash };
 		run.revision++;
 
 		return { run };
@@ -211,7 +211,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		transitions.push(finalTransition);
 	}
 
-	run.tasks[existingTaskInfo.path] = {
+	run.tasks[existingTaskInfo.address] = {
 		id: existingTaskInfo.id,
 		name: existingTaskInfo.name,
 		state: finalState,

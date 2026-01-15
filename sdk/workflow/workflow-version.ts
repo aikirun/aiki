@@ -1,3 +1,4 @@
+import { getWorkflowRunAddress } from "@aikirun/lib/address";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
 import {
@@ -7,7 +8,6 @@ import {
 	type RequireAtLeastOneProp,
 	type TypeOfValueAtPath,
 } from "@aikirun/lib/object";
-import { getWorkflowRunPath } from "@aikirun/lib/path";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -168,8 +168,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		const inputHash = await hashInput(input);
 
 		const reference = startOpts.reference;
-		const path = getWorkflowRunPath(this.name, this.versionId, reference?.id ?? inputHash);
-		const existingRunInfo = parentRunHandle.run.childWorkflowRuns[path];
+		const address = getWorkflowRunAddress(this.name, this.versionId, reference?.id ?? inputHash);
+		const existingRunInfo = parentRunHandle.run.childWorkflowRuns[address];
 		if (existingRunInfo) {
 			await this.assertUniqueChildRunReferenceId(
 				parentRunHandle,
@@ -206,7 +206,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 			parentWorkflowRunId: parentRun.id,
 			options: startOpts,
 		});
-		parentRunHandle.run.childWorkflowRuns[path] = {
+		parentRunHandle.run.childWorkflowRuns[address] = {
 			id: newRun.id,
 			name: newRun.name,
 			versionId: newRun.versionId,

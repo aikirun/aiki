@@ -6,7 +6,7 @@ export type TaskId = string & { _brand: "task_id" };
 
 export type TaskName = string & { _brand: "task_name" };
 
-export type TaskPath = string & { _brand: "task_path" };
+export type TaskAddress = string & { _brand: "task_address" };
 
 export type TaskStatus = "running" | "awaiting_retry" | "completed" | "failed";
 

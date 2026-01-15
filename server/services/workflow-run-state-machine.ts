@@ -245,13 +245,13 @@ export async function transitionWorkflowRunState(
 	}
 
 	if (state.status === "scheduled" && state.reason === "retry") {
-		for (const [taskPath, taskInfo] of Object.entries(run.tasks)) {
+		for (const [taskAddress, taskInfo] of Object.entries(run.tasks)) {
 			if (
 				taskInfo.state.status === "running" ||
 				taskInfo.state.status === "awaiting_retry" ||
 				taskInfo.state.status === "failed"
 			) {
-				delete run.tasks[taskPath];
+				delete run.tasks[taskAddress];
 			} else {
 				taskInfo.state.status satisfies "completed";
 			}
@@ -266,7 +266,7 @@ export async function transitionWorkflowRunState(
 			const expectedStatus = state.childWorkflowRunStatus;
 
 			if (childRunStatus === expectedStatus || isTerminalWorkflowRunStatus(childRunStatus)) {
-				const statusWaitResults = run.childWorkflowRuns[childRun.path]?.statusWaitResults;
+				const statusWaitResults = run.childWorkflowRuns[childRun.address]?.statusWaitResults;
 				if (statusWaitResults) {
 					statusWaitResults.push({
 						status: "completed",
@@ -298,7 +298,7 @@ export async function transitionWorkflowRunState(
 	run.revision++;
 
 	if (state.status === "cancelled") {
-		for (const [childRunPath, childRunInfo] of Object.entries(run.childWorkflowRuns)) {
+		for (const [childRunAddress, childRunInfo] of Object.entries(run.childWorkflowRuns)) {
 			const childRun = workflowRunsById.get(childRunInfo.id as WorkflowRunId);
 			if (!childRun) {
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
@@ -311,7 +311,7 @@ export async function transitionWorkflowRunState(
 					reason: "Parent cancelled",
 				},
 			});
-			run.childWorkflowRuns[childRunPath] = {
+			run.childWorkflowRuns[childRunAddress] = {
 				id: childRunInfo.id,
 				name: childRunInfo.name,
 				versionId: childRunInfo.versionId,
@@ -347,7 +347,7 @@ async function notifyParentOfStateChangeIfNecessary(
 			"Notifying parent of child state change"
 		);
 
-		const statusWaitResults = parentRun.childWorkflowRuns[childRun.path]?.statusWaitResults;
+		const statusWaitResults = parentRun.childWorkflowRuns[childRun.address]?.statusWaitResults;
 		if (statusWaitResults) {
 			statusWaitResults.push({
 				status: "completed",

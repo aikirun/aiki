@@ -1,5 +1,5 @@
+import { getWorkerConsumerGroupName, getWorkflowStreamName } from "@aikirun/lib/address";
 import { distributeRoundRobin, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aikirun/lib/array";
-import { getWorkerConsumerGroupName, getWorkflowStreamName } from "@aikirun/lib/path";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type {
 	Client,

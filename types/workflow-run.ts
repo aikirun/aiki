@@ -6,7 +6,7 @@ import type { TaskInfo, TaskState } from "./task";
 import type { TriggerStrategy } from "./trigger";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
-export type WorkflowRunPath = string & { _brand: "workflow_run_path" };
+export type WorkflowRunAddress = string & { _brand: "workflow_run_address" };
 
 export type WorkflowRunStatus =
 	| "scheduled"
@@ -228,7 +228,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	createdAt: number;
 	revision: number;
 	input?: Input;
-	path: string;
+	address: string;
 	options: WorkflowStartOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;

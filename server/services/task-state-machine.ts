@@ -1,6 +1,6 @@
 import { hashInput } from "@aikirun/lib";
-import { getTaskPath } from "@aikirun/lib/path";
-import type { TaskId, TaskName, TaskPath, TaskState, TaskStatus } from "@aikirun/types/task";
+import { getTaskAddress } from "@aikirun/lib/address";
+import type { TaskAddress, TaskId, TaskName, TaskState, TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
 import type {
 	TransitionTaskStateToRunning,
@@ -64,7 +64,7 @@ export async function transitionTaskState(
 
 	let inputHash: string;
 	let taskName: TaskName;
-	let taskPath: TaskPath;
+	let taskAddress: TaskAddress;
 	let taskId: TaskId;
 	let existingTaskState: TaskState | undefined;
 	let taskState: TaskState;
@@ -73,11 +73,11 @@ export async function transitionTaskState(
 	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
 		inputHash = await hashInput(request.taskState.input);
 		taskName = request.taskName as TaskName;
-		taskPath = getTaskPath(taskName, request.options?.reference?.id ?? inputHash);
+		taskAddress = getTaskAddress(taskName, request.options?.reference?.id ?? inputHash);
 
-		const existingTaskInfo = run.tasks[taskPath];
+		const existingTaskInfo = run.tasks[taskAddress];
 		if (existingTaskInfo) {
-			throw new ValidationError(`Task ${taskPath} already exists. Use type: "retry" to retry it.`);
+			throw new ValidationError(`Task ${taskAddress} already exists. Use type: "retry" to retry it.`);
 		}
 
 		taskId = crypto.randomUUID() as TaskId;
@@ -94,7 +94,7 @@ export async function transitionTaskState(
 
 		inputHash = existingTaskInfo.inputHash;
 		taskName = existingTaskInfo.name as TaskName;
-		taskPath = existingTaskInfo.path;
+		taskAddress = existingTaskInfo.address;
 		taskId = existingTaskInfo.id as TaskId;
 
 		existingTaskState = existingTaskInfo.state;
@@ -140,7 +140,7 @@ export async function transitionTaskState(
 		transitions.push(transition);
 	}
 
-	run.tasks[taskPath] = { id: taskId, name: taskName, state: taskState, inputHash };
+	run.tasks[taskAddress] = { id: taskId, name: taskName, state: taskState, inputHash };
 	run.revision++;
 
 	return { run, taskId };

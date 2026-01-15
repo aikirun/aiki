@@ -1,5 +1,5 @@
+import { getWorkflowStreamName } from "@aikirun/lib/address";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import { getWorkflowStreamName } from "@aikirun/lib/path";
 import type { WorkflowRun } from "@aikirun/types/workflow-run";
 import type { Redis } from "ioredis";
 import type { ServerContext } from "server/middleware/context";

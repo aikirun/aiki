@@ -1,5 +1,5 @@
 import { hashInput, toMilliseconds } from "@aikirun/lib";
-import { getWorkflowRunPath } from "@aikirun/lib/path";
+import { getWorkflowRunAddress } from "@aikirun/lib/address";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { WorkflowRunCreateRequestV1 } from "@aikirun/types/workflow-run-api";
@@ -38,7 +38,7 @@ export async function createWorkflowRun(
 
 	const inputHash = await hashInput(input);
 
-	const path = getWorkflowRunPath(name, versionId, referenceId ?? inputHash);
+	const address = getWorkflowRunAddress(name, versionId, referenceId ?? inputHash);
 	const trigger = options?.trigger;
 
 	let scheduledAt = now;
@@ -48,7 +48,7 @@ export async function createWorkflowRun(
 
 	const run: WorkflowRun = {
 		id: runId,
-		path,
+		address,
 		name,
 		versionId,
 		createdAt: now,
@@ -100,7 +100,7 @@ export async function createWorkflowRun(
 	if (parentWorkflowRunId) {
 		const parentRun = workflowRunsById.get(parentWorkflowRunId);
 		if (parentRun) {
-			parentRun.childWorkflowRuns[run.path] = {
+			parentRun.childWorkflowRuns[run.address] = {
 				id: runId,
 				name,
 				versionId,

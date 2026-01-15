@@ -1,25 +1,25 @@
-import type { TaskPath } from "@aikirun/types/task";
-import type { WorkflowRunPath } from "@aikirun/types/workflow-run";
+import type { TaskAddress } from "@aikirun/types/task";
+import type { WorkflowRunAddress } from "@aikirun/types/workflow-run";
 
 /**
- * Generates a path for identifying task executions within a workflow.
+ * Generates an address for identifying task executions within a workflow.
  * @param name - The name of the task
  * @param referenceId - reference ID
- * @returns Task path string
+ * @returns Task address string
  */
-export function getTaskPath(name: string, referenceId: string): TaskPath {
-	return `${name}/${referenceId}` as TaskPath;
+export function getTaskAddress(name: string, referenceId: string): TaskAddress {
+	return `${name}/${referenceId}` as TaskAddress;
 }
 
 /**
- * Generates a path for identifying workflow runs.
+ * Generates an address for identifying workflow runs.
  * @param name - The workflow name
  * @param versionId - The workflow version ID
  * @param referenceId - a reference ID
- * @returns Workflow run path string
+ * @returns Workflow run address string
  */
-export function getWorkflowRunPath(name: string, versionId: string, referenceId: string): WorkflowRunPath {
-	return `${name}/${versionId}/${referenceId}` as WorkflowRunPath;
+export function getWorkflowRunAddress(name: string, versionId: string, referenceId: string): WorkflowRunAddress {
+	return `${name}/${versionId}/${referenceId}` as WorkflowRunAddress;
 }
 
 /**

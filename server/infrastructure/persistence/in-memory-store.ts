@@ -1,5 +1,5 @@
 import type { Schedule, ScheduleId } from "@aikirun/types/schedule";
-import type { TaskId, TaskInfo, TaskPath } from "@aikirun/types/task";
+import type { TaskAddress, TaskId, TaskInfo } from "@aikirun/types/task";
 import type { Workflow, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
 
@@ -10,12 +10,12 @@ export const workflowsByName = new Map<WorkflowName, Workflow>();
 export const schedulesById = new Map<ScheduleId, { schedule: Schedule; definitionHash: string }>();
 export const schedulesByKey = new Map<string, ScheduleId>();
 
-export function findTaskById(run: WorkflowRun, taskId: TaskId): (TaskInfo & { path: TaskPath }) | undefined {
-	for (const [path, info] of Object.entries(run.tasks)) {
+export function findTaskById(run: WorkflowRun, taskId: TaskId): (TaskInfo & { address: TaskAddress }) | undefined {
+	for (const [address, info] of Object.entries(run.tasks)) {
 		if (info.id === taskId) {
 			return {
 				...info,
-				path: path as TaskPath,
+				address: address as TaskAddress,
 			};
 		}
 	}

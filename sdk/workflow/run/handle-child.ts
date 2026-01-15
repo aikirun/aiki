@@ -120,7 +120,7 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, false>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
 
-		const waitResults = parentRunHandle.run.childWorkflowRuns[handle.run.path]?.statusWaitResults ?? [];
+		const waitResults = parentRunHandle.run.childWorkflowRuns[handle.run.address]?.statusWaitResults ?? [];
 
 		const waitResult = waitResults[nextWaitIndex];
 		if (waitResult) {
