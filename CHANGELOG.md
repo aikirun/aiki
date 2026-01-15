@@ -2,6 +2,37 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.15.0
+
+### New Features
+
+- **Scheduled Workflows** - Run workflows on a schedule using cron expressions or intervals. Define schedules with `schedule()` and activate them with `schedule.activate()`.
+
+### Web UI
+
+- Added Schedules tab to the dashboard for viewing and managing scheduled workflows
+- Added status filtering for schedules (active/paused/deleted)
+- Filters now persist in the URL, allowing browser back/forward navigation to restore filter state
+
+### Improvements
+
+- Separated workflow, task, and worker definition options from runtime options for better clarity
+  - `TaskOptions` → `TaskDefinitionOptions` + `TaskStartOptions`
+  - `WorkflowOptions` → `WorkflowDefinitionOptions` + `WorkflowStartOptions`
+
+### Breaking Changes
+
+- **`TaskPath` renamed to `TaskAddress`** - Update type imports if used directly
+- **`WorkflowRunPath` renamed to `WorkflowRunAddress`** - Update type imports if used directly
+- **`onConflict` renamed to `conflictPolicy`** - Update your code:
+  ```typescript
+  // Before
+  task.with().opt("reference.onConflict", "return_existing").start(run, input);
+
+  // After
+  task.with().opt("reference.conflictPolicy", "return_existing").start(run, input);
+  ```
+
 ## 0.14.0
 
 ### Bug Fixes
