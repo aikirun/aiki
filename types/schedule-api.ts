@@ -1,7 +1,7 @@
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "./schedule";
 
 export interface ScheduleApi {
-	registerV1: (_: ScheduleRegisterRequestV1) => Promise<ScheduleRegisterResponseV1>;
+	activateV1: (_: ScheduleActivateRequestV1) => Promise<ScheduleActivateResponseV1>;
 	getByIdV1: (_: ScheduleGetByIdRequestV1) => Promise<ScheduleGetByIdResponseV1>;
 	getByNameV1: (_: ScheduleGetByNameRequestV1) => Promise<ScheduleGetByNameResponseV1>;
 	listV1: (_: ScheduleListRequestV1) => Promise<ScheduleListResponseV1>;
@@ -10,7 +10,7 @@ export interface ScheduleApi {
 	deleteV1: (_: ScheduleDeleteRequestV1) => Promise<void>;
 }
 
-export interface ScheduleRegisterRequestV1 {
+export interface ScheduleActivateRequestV1 {
 	name: string;
 	workflowName: string;
 	workflowVersionId: string;
@@ -18,7 +18,7 @@ export interface ScheduleRegisterRequestV1 {
 	spec: ScheduleSpec;
 }
 
-export interface ScheduleRegisterResponseV1 {
+export interface ScheduleActivateResponseV1 {
 	schedule: Schedule;
 }
 

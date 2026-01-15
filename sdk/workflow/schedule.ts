@@ -32,7 +32,7 @@ export interface ScheduleHandle {
 export type ScheduleDefinition = ScheduleParams & {
 	name: ScheduleName;
 
-	register<Input, Output, AppContext, TEvents extends EventsDefinition>(
+	activate<Input, Output, AppContext, TEvents extends EventsDefinition>(
 		client: Client<AppContext>,
 		workflow: WorkflowVersion<Input, Output, AppContext, TEvents>,
 		...args: Input extends void ? [] : [Input]
@@ -46,7 +46,7 @@ export function schedule(params: { name: string } & ScheduleParams): ScheduleDef
 		name: name as ScheduleName,
 		...scheduleParams,
 
-		async register(client, workflow, ...args) {
+		async activate(client, workflow, ...args) {
 			const input = args[0];
 
 			let scheduleSpec: ScheduleSpec;
@@ -60,14 +60,14 @@ export function schedule(params: { name: string } & ScheduleParams): ScheduleDef
 				scheduleSpec = scheduleParams;
 			}
 
-			const { schedule } = await client.api.schedule.registerV1({
+			const { schedule } = await client.api.schedule.activateV1({
 				name,
 				workflowName: workflow.name,
 				workflowVersionId: workflow.versionId,
 				spec: scheduleSpec,
 				input,
 			});
-			client.logger.info("Scheduled workflow registered", {
+			client.logger.info("Schedule activated", {
 				scheduleSpec,
 				workflowName: workflow.name,
 				workflowVersionId: workflow.versionId,

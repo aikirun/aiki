@@ -20,14 +20,14 @@ const dailyReport = schedule({
 	expression: "0 9 * * *", // Every day at 9 AM UTC
 });
 
-const handle = await dailyReport.register(
+const handle = await dailyReport.activate(
 	aikiClient,
 	dailyReportWorkflowV1,
 	{ reportType: "sales" } // Workflow input
 );
 ```
 
-The `schedule()` function defines a timing configuration. Call `register()` to bind it to a workflow - the workflow will then trigger automatically based on the schedule. The third argument is the input passed to the workflow on each run.
+The `schedule()` function defines a timing configuration. Call `activate()` to bind it to a workflow - the workflow will then trigger automatically based on the schedule. The third argument is the input passed to the workflow on each run.
 
 The same schedule can be bound to different workflows:
 
@@ -39,8 +39,8 @@ const hourly = schedule({
 });
 
 // Schedule 2 different workflows to run hourly
-await hourly.register(aikiClient, inventorySyncV1);
-await hourly.register(aikiClient, pricingSyncV1);
+await hourly.activate(aikiClient, inventorySyncV1);
+await hourly.activate(aikiClient, pricingSyncV1);
 ```
 
 ## Schedule Types
@@ -103,25 +103,31 @@ const syncSchedule = schedule({
 | `"skip"` | Skip this occurrence if a run is still active |
 | `"cancel_previous"` | Cancel the active run and start a new one |
 
-## Managing Schedule Registrations
+## Idempotent Activation
 
-The handle returned from `register()` lets you manage the registration:
+Calling `activate()` is idempotent. If a schedule already exists with the same parameters, the existing schedule is returned unchanged.
+
+If you call `activate()` with a **different input or timing configuration** (such as a new cron expression or interval), the existing schedule is updated with the new values.
+
+## Managing Schedules
+
+The handle returned from `activate()` lets you manage the schedule:
 
 ```typescript
-const handle = await mySchedule.register(aikiClient, workflowV1);
+const handle = await mySchedule.activate(aikiClient, workflowV1);
 
 await handle.pause();  // Stop triggering
 await handle.resume(); // Resume triggering
-await handle.delete(); // Remove registration
+await handle.delete(); // Remove schedule
 ```
 
 | Property/Method | Description |
 |-----------------|-------------|
-| `id` | Unique identifier for this registration |
+| `id` | Unique identifier for this schedule |
 | `name` | The schedule name |
 | `pause()` | Stop triggering |
 | `resume()` | Resume triggering |
-| `delete()` | Remove registration |
+| `delete()` | Remove schedule |
 
 ## Next Steps
 

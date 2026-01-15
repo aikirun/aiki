@@ -21,7 +21,7 @@ export const everyFiveSeconds = schedule({
 	every: { seconds: 5 },
 	overlapPolicy: "skip",
 });
-const scheduleHandle = await everyFiveSeconds.register(aikiClient, notify, "This is a reminder");
+const scheduleHandle = await everyFiveSeconds.activate(aikiClient, notify, "This is a reminder");
 await delay(20_000);
 await scheduleHandle.pause();
 //#endregion

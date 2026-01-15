@@ -1,5 +1,7 @@
 import type { Equal, ExpectTrue } from "@aikirun/lib";
 import type {
+	ScheduleActivateRequestV1,
+	ScheduleActivateResponseV1,
 	ScheduleApi,
 	ScheduleDeleteRequestV1,
 	ScheduleGetByIdRequestV1,
@@ -10,8 +12,6 @@ import type {
 	ScheduleListResponseV1,
 	SchedulePauseRequestV1,
 	SchedulePauseResponseV1,
-	ScheduleRegisterRequestV1,
-	ScheduleRegisterResponseV1,
 	ScheduleResumeRequestV1,
 	ScheduleResumeResponseV1,
 } from "@aikirun/types/schedule-api";
@@ -21,7 +21,7 @@ import { type } from "arktype";
 import { scheduleSchema, scheduleSpecSchema, scheduleStatusSchema } from "./schema";
 import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure";
 
-const registerV1: ContractProcedure<ScheduleRegisterRequestV1, ScheduleRegisterResponseV1> = oc
+const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateResponseV1> = oc
 	.input(
 		type({
 			name: "string > 0",
@@ -73,7 +73,7 @@ const deleteV1: ContractProcedure<ScheduleDeleteRequestV1, void> = oc
 	.output(type("undefined"));
 
 export const scheduleContract = {
-	registerV1,
+	activateV1,
 	getByIdV1,
 	getByNameV1,
 	listV1,

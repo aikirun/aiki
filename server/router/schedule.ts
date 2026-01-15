@@ -8,7 +8,7 @@ import { schedulesById, schedulesByKey } from "../infrastructure/persistence/in-
 
 const os = baseImplementer.schedule;
 
-const registerV1 = os.registerV1.handler(async ({ input: request }) => {
+const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 	const { name, workflowName, workflowVersionId, input, spec } = request;
 	const scheduleName = name as ScheduleName;
 
@@ -160,7 +160,7 @@ const deleteV1 = os.deleteV1.handler(({ input: request }) => {
 });
 
 export const scheduleRouter = os.router({
-	registerV1,
+	activateV1,
 	getByIdV1,
 	getByNameV1,
 	listV1,
