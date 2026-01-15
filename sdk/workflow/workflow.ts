@@ -67,11 +67,11 @@ export interface Workflow {
 		Input extends Serializable,
 		Output extends Serializable,
 		AppContext = null,
-		TEventsDefinition extends EventsDefinition = Record<string, never>,
+		TEvents extends EventsDefinition = Record<string, never>,
 	>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
-	) => WorkflowVersion<Input, Output, AppContext, TEventsDefinition>;
+		params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
+	) => WorkflowVersion<Input, Output, AppContext, TEvents>;
 
 	[INTERNAL]: {
 		getAllVersions: () => WorkflowVersion<unknown, unknown, unknown>[];
@@ -92,10 +92,10 @@ class WorkflowImpl implements Workflow {
 		};
 	}
 
-	v<Input extends Serializable, Output extends Serializable, AppContext, TEventsDefinition extends EventsDefinition>(
+	v<Input extends Serializable, Output extends Serializable, AppContext, TEvents extends EventsDefinition>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
-	): WorkflowVersion<Input, Output, AppContext, TEventsDefinition> {
+		params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
+	): WorkflowVersion<Input, Output, AppContext, TEvents> {
 		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
 			throw new Error(`Workflow "${this.name}/${versionId}" already exists`);
 		}

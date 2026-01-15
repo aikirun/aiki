@@ -34,13 +34,13 @@ import { createEventMulticasters, type EventMulticasters, type EventsDefinition 
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
 
-export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
+export interface WorkflowVersionParams<Input, Output, AppContext, TEvents extends EventsDefinition> {
 	handler: (
-		run: Readonly<WorkflowRunContext<Input, AppContext, TEventsDefinition>>,
+		run: Readonly<WorkflowRunContext<Input, AppContext, TEvents>>,
 		input: Input,
 		context: AppContext
 	) => Promise<Output>;
-	events?: TEventsDefinition;
+	events?: TEvents;
 	opts?: WorkflowDefinitionOptions;
 	schema?: RequireAtLeastOneProp<{
 		input?: StandardSchemaV1<Input>;
@@ -48,60 +48,51 @@ export interface WorkflowVersionParams<Input, Output, AppContext, TEventsDefinit
 	}>;
 }
 
-export interface WorkflowVersion<
-	Input,
-	Output,
-	AppContext,
-	TEventsDefinition extends EventsDefinition = EventsDefinition,
-> {
+export interface WorkflowVersion<Input, Output, AppContext, TEvents extends EventsDefinition = EventsDefinition> {
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
-	events: EventMulticasters<TEventsDefinition>;
+	events: EventMulticasters<TEvents>;
 
-	with(): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>;
+	with(): WorkflowBuilder<Input, Output, AppContext, TEvents>;
 
 	start: (
 		client: Client<AppContext>,
 		...args: Input extends void ? [] : [Input]
-	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
-	startAsChild: <ParentInput, ParentEventsDefinition extends EventsDefinition>(
-		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEventsDefinition>,
+	startAsChild: <ParentInput, ParentEvents extends EventsDefinition>(
+		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
-	) => Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+	) => Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
 	getHandleById: (
 		client: Client<AppContext>,
 		runId: string
-	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
 	getHandleByReferenceId: (
 		client: Client<AppContext>,
 		referenceId: string
-	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
 	[INTERNAL]: {
-		eventsDefinition: TEventsDefinition;
-		handler: (
-			run: WorkflowRunContext<Input, AppContext, TEventsDefinition>,
-			input: Input,
-			context: AppContext
-		) => Promise<void>;
+		eventsDefinition: TEvents;
+		handler: (run: WorkflowRunContext<Input, AppContext, TEvents>, input: Input, context: AppContext) => Promise<void>;
 	};
 }
 
-export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>
-	implements WorkflowVersion<Input, Output, AppContext, TEventsDefinition>
+export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends EventsDefinition>
+	implements WorkflowVersion<Input, Output, AppContext, TEvents>
 {
-	public readonly events: EventMulticasters<TEventsDefinition>;
-	public readonly [INTERNAL]: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>[typeof INTERNAL];
+	public readonly events: EventMulticasters<TEvents>;
+	public readonly [INTERNAL]: WorkflowVersion<Input, Output, AppContext, TEvents>[typeof INTERNAL];
 
 	constructor(
 		public readonly name: WorkflowName,
 		public readonly versionId: WorkflowVersionId,
-		private readonly params: WorkflowVersionParams<Input, Output, AppContext, TEventsDefinition>
+		private readonly params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
 	) {
-		const eventsDefinition = this.params.events ?? ({} as TEventsDefinition);
+		const eventsDefinition = this.params.events ?? ({} as TEvents);
 		this.events = createEventMulticasters(this.name, this.versionId, eventsDefinition);
 		this[INTERNAL] = {
 			eventsDefinition,
@@ -109,7 +100,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		};
 	}
 
-	public with(): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition> {
+	public with(): WorkflowBuilder<Input, Output, AppContext, TEvents> {
 		const startOpts: WorkflowStartOptions = this.params.opts ?? {};
 		const startOptsOverrider = objectOverrider(startOpts);
 		return new WorkflowBuilderImpl(this, startOptsOverrider());
@@ -118,7 +109,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	public async start(
 		client: Client<AppContext>,
 		...args: Input extends void ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		return this.startWithOpts(client, this.params.opts ?? {}, ...args);
 	}
 
@@ -126,7 +117,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		client: Client<AppContext>,
 		startOpts: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		let input = args[0];
 		const schema = this.params.schema?.input;
 		if (schema) {
@@ -158,7 +149,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	public async startAsChild(
 		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 		...args: Input extends void ? [] : [Input]
-	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		return this.startAsChildWithOpts(parentRun, this.params.opts ?? {}, ...args);
 	}
 
@@ -166,7 +157,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 		startOpts: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
-	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
 		parentRunHandle[INTERNAL].assertExecutionAllowed();
 
@@ -273,14 +264,14 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	public async getHandleById(
 		client: Client<AppContext>,
 		runId: string
-	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		return workflowRunHandle(client, runId as WorkflowRunId, this[INTERNAL].eventsDefinition);
 	}
 
 	public async getHandleByReferenceId(
 		client: Client<AppContext>,
 		referenceId: string
-	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		const { run } = await client.api.workflowRun.getByReferenceIdV1({
 			name: this.name,
 			versionId: this.versionId,
@@ -290,7 +281,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	}
 
 	private async handler(
-		run: WorkflowRunContext<Input, AppContext, TEventsDefinition>,
+		run: WorkflowRunContext<Input, AppContext, TEvents>,
 		input: Input,
 		context: AppContext
 	): Promise<void> {
@@ -316,7 +307,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 
 	private async tryExecuteWorkflow(
 		input: Input,
-		run: WorkflowRunContext<Input, AppContext, TEventsDefinition>,
+		run: WorkflowRunContext<Input, AppContext, TEvents>,
 		context: AppContext,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
@@ -375,7 +366,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	}
 
 	private async assertRetryAllowed(
-		handle: WorkflowRunHandle<Input, unknown, AppContext, TEventsDefinition>,
+		handle: WorkflowRunHandle<Input, unknown, AppContext, TEvents>,
 		retryStrategy: RetryStrategy,
 		logger: Logger
 	): Promise<void> {
@@ -460,43 +451,43 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition ex
 	}
 }
 
-export interface WorkflowBuilder<Input, Output, AppContext, TEventsDefinition extends EventsDefinition> {
+export interface WorkflowBuilder<Input, Output, AppContext, TEvents extends EventsDefinition> {
 	opt<Path extends PathFromObject<WorkflowStartOptions>>(
 		path: Path,
 		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
-	): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>;
+	): WorkflowBuilder<Input, Output, AppContext, TEvents>;
 
-	start: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["start"];
+	start: WorkflowVersion<Input, Output, AppContext, TEvents>["start"];
 
-	startAsChild: WorkflowVersion<Input, Output, AppContext, TEventsDefinition>["startAsChild"];
+	startAsChild: WorkflowVersion<Input, Output, AppContext, TEvents>["startAsChild"];
 }
 
-class WorkflowBuilderImpl<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>
-	implements WorkflowBuilder<Input, Output, AppContext, TEventsDefinition>
+class WorkflowBuilderImpl<Input, Output, AppContext, TEvents extends EventsDefinition>
+	implements WorkflowBuilder<Input, Output, AppContext, TEvents>
 {
 	constructor(
-		private readonly workflow: WorkflowVersionImpl<Input, Output, AppContext, TEventsDefinition>,
+		private readonly workflow: WorkflowVersionImpl<Input, Output, AppContext, TEvents>,
 		private readonly startOptsBuilder: ObjectBuilder<WorkflowStartOptions>
 	) {}
 
 	opt<Path extends PathFromObject<WorkflowStartOptions>>(
 		path: Path,
 		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
-	): WorkflowBuilder<Input, Output, AppContext, TEventsDefinition> {
+	): WorkflowBuilder<Input, Output, AppContext, TEvents> {
 		return new WorkflowBuilderImpl(this.workflow, this.startOptsBuilder.with(path, value));
 	}
 
 	start(
 		client: Client<AppContext>,
 		...args: Input extends void ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		return this.workflow.startWithOpts(client, this.startOptsBuilder.build(), ...args);
 	}
 
-	startAsChild<ParentInput, ParentEventsDefinition extends EventsDefinition>(
-		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEventsDefinition>,
+	startAsChild<ParentInput, ParentEvents extends EventsDefinition>(
+		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
-	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		return this.workflow.startAsChildWithOpts(parentRun, this.startOptsBuilder.build(), ...args);
 	}
 }

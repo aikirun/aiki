@@ -18,13 +18,13 @@ import {
 	workflowRunHandle,
 } from "./handle";
 
-export async function childWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
+export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
 	run: WorkflowRun<Input, Output>,
 	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 	logger: Logger,
-	eventsDefinition?: TEventsDefinition
-): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+	eventsDefinition?: TEvents
+): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 	const handle = await workflowRunHandle(client, run, eventsDefinition, logger);
 
 	return {
@@ -44,8 +44,8 @@ export type ChildWorkflowRunHandle<
 	Input,
 	Output,
 	AppContext,
-	TEventsDefinition extends EventsDefinition = EventsDefinition,
-> = Omit<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>, "waitForStatus"> & {
+	TEvents extends EventsDefinition = EventsDefinition,
+> = Omit<WorkflowRunHandle<Input, Output, AppContext, TEvents>, "waitForStatus"> & {
 	/**
 	 * Waits for the child workflow run to reach a terminal status.
 	 *
@@ -97,8 +97,8 @@ export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 	timeout?: Timed extends true ? DurationObject : never;
 }
 
-function createStatusWaiter<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
-	handle: WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>,
+function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDefinition>(
+	handle: WorkflowRunHandle<Input, Output, AppContext, TEvents>,
 	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 	logger: Logger
 ) {

@@ -8,17 +8,17 @@ import type { WorkflowRunId, WorkflowStartOptions } from "@aikirun/types/workflo
 import type { EventsDefinition, EventWaiters } from "./event";
 import type { WorkflowRunHandle } from "./handle";
 
-export interface WorkflowRunContext<Input, AppContext, TEventDefinition extends EventsDefinition> {
+export interface WorkflowRunContext<Input, AppContext, TEvents extends EventsDefinition> {
 	id: WorkflowRunId;
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
 	options: WorkflowStartOptions;
 	logger: Logger;
 	sleep: (name: string, duration: Duration) => Promise<SleepResult>;
-	events: EventWaiters<TEventDefinition>;
+	events: EventWaiters<TEvents>;
 
 	[INTERNAL]: {
-		handle: WorkflowRunHandle<Input, unknown, AppContext, TEventDefinition>;
+		handle: WorkflowRunHandle<Input, unknown, AppContext, TEvents>;
 		options: {
 			spinThresholdMs: number;
 		};

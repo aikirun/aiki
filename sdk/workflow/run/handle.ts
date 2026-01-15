@@ -16,26 +16,26 @@ import type { WorkflowRunStateRequest, WorkflowRunTransitionTaskStateRequestV1 }
 
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
-export function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
+export function workflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
 	id: WorkflowRunId,
-	eventsDefinition?: TEventsDefinition,
+	eventsDefinition?: TEvents,
 	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
-export function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
+export function workflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
 	run: WorkflowRun<Input, Output>,
-	eventsDefinition?: TEventsDefinition,
+	eventsDefinition?: TEvents,
 	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>>;
+): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
-export async function workflowRunHandle<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>(
+export async function workflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
 	runOrId: WorkflowRunId | WorkflowRun<Input, Output>,
-	eventsDefinition?: TEventsDefinition,
+	eventsDefinition?: TEvents,
 	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>> {
+): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 	const run =
 		typeof runOrId !== "string"
 			? runOrId
@@ -44,7 +44,7 @@ export async function workflowRunHandle<Input, Output, AppContext, TEventsDefini
 	return new WorkflowRunHandleImpl(
 		client,
 		run,
-		eventsDefinition ?? ({} as TEventsDefinition),
+		eventsDefinition ?? ({} as TEvents),
 		logger ??
 			client.logger.child({
 				"aiki.workflowName": run.name,
@@ -54,15 +54,10 @@ export async function workflowRunHandle<Input, Output, AppContext, TEventsDefini
 	);
 }
 
-export interface WorkflowRunHandle<
-	Input,
-	Output,
-	AppContext,
-	TEventsDefinition extends EventsDefinition = EventsDefinition,
-> {
+export interface WorkflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition = EventsDefinition> {
 	run: Readonly<WorkflowRun<Input, Output>>;
 
-	events: EventSenders<TEventsDefinition>;
+	events: EventSenders<TEvents>;
 
 	refresh: () => Promise<void>;
 
@@ -172,17 +167,17 @@ export type WorkflowRunWaitResult<
 			state: WorkflowRunWaitResultSuccess<Status, Output>;
 	  };
 
-class WorkflowRunHandleImpl<Input, Output, AppContext, TEventsDefinition extends EventsDefinition>
-	implements WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>
+class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDefinition>
+	implements WorkflowRunHandle<Input, Output, AppContext, TEvents>
 {
 	private readonly api: ApiClient;
-	public readonly events: EventSenders<TEventsDefinition>;
-	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output, AppContext, TEventsDefinition>[typeof INTERNAL];
+	public readonly events: EventSenders<TEvents>;
+	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output, AppContext, TEvents>[typeof INTERNAL];
 
 	constructor(
 		client: Client<AppContext>,
 		private _run: WorkflowRun<Input, Output>,
-		eventsDefinition: TEventsDefinition,
+		eventsDefinition: TEvents,
 		private readonly logger: Logger
 	) {
 		this.api = client.api;

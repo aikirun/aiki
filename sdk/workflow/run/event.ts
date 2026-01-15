@@ -59,10 +59,10 @@ interface EventDefinition<Data> {
 
 export type EventsDefinition = Record<string, EventDefinition<unknown>>;
 
-export type EventData<TEventDefinition> = TEventDefinition extends EventDefinition<infer Data> ? Data : never;
+export type EventData<TEvent> = TEvent extends EventDefinition<infer Data> ? Data : never;
 
-export type EventWaiters<TEventsDefinition extends EventsDefinition> = {
-	[K in keyof TEventsDefinition]: EventWaiter<EventData<TEventsDefinition[K]>>;
+export type EventWaiters<TEvents extends EventsDefinition> = {
+	[K in keyof TEvents]: EventWaiter<EventData<TEvents[K]>>;
 };
 
 export interface EventWaiter<Data> {
@@ -70,8 +70,8 @@ export interface EventWaiter<Data> {
 	wait(options: EventWaitOptions<true>): Promise<EventWaitState<Data, true>>;
 }
 
-export type EventSenders<TEventsDefinition extends EventsDefinition> = {
-	[K in keyof TEventsDefinition]: EventSender<EventData<TEventsDefinition[K]>>;
+export type EventSenders<TEvents extends EventsDefinition> = {
+	[K in keyof TEvents]: EventSender<EventData<TEvents[K]>>;
 };
 
 export interface EventSender<Data> {
@@ -87,8 +87,8 @@ export interface EventSenderBuilder<Data> {
 	send: (...args: Data extends void ? [] : [Data]) => Promise<void>;
 }
 
-export type EventMulticasters<TEventsDefinition extends EventsDefinition> = {
-	[K in keyof TEventsDefinition]: EventMulticaster<EventData<TEventsDefinition[K]>>;
+export type EventMulticasters<TEvents extends EventsDefinition> = {
+	[K in keyof TEvents]: EventMulticaster<EventData<TEvents[K]>>;
 };
 
 export interface EventMulticaster<Data> {
@@ -112,12 +112,12 @@ export interface EventMulticasterBuilder<Data> {
 	) => Promise<void>;
 }
 
-export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
-	handle: WorkflowRunHandle<unknown, unknown, unknown, TEventsDefinition>,
-	eventsDefinition: TEventsDefinition,
+export function createEventWaiters<TEvents extends EventsDefinition>(
+	handle: WorkflowRunHandle<unknown, unknown, unknown, TEvents>,
+	eventsDefinition: TEvents,
 	logger: Logger
-): EventWaiters<TEventsDefinition> {
-	const waiters = {} as EventWaiters<TEventsDefinition>;
+): EventWaiters<TEvents> {
+	const waiters = {} as EventWaiters<TEvents>;
 
 	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
 		const waiter = createEventWaiter(
@@ -125,15 +125,15 @@ export function createEventWaiters<TEventsDefinition extends EventsDefinition>(
 			eventName as EventName,
 			eventDefinition.schema,
 			logger.child({ "aiki.eventName": eventName })
-		) as EventWaiter<EventData<TEventsDefinition[keyof TEventsDefinition]>>;
-		waiters[eventName as keyof TEventsDefinition] = waiter;
+		) as EventWaiter<EventData<TEvents[keyof TEvents]>>;
+		waiters[eventName as keyof TEvents] = waiter;
 	}
 
 	return waiters;
 }
 
-export function createEventWaiter<TEventsDefinition extends EventsDefinition, Data>(
-	handle: WorkflowRunHandle<unknown, unknown, unknown, TEventsDefinition>,
+export function createEventWaiter<TEvents extends EventsDefinition, Data>(
+	handle: WorkflowRunHandle<unknown, unknown, unknown, TEvents>,
 	eventName: EventName,
 	schema: StandardSchemaV1<Data> | undefined,
 	logger: Logger
@@ -204,14 +204,14 @@ export function createEventWaiter<TEventsDefinition extends EventsDefinition, Da
 	return { wait };
 }
 
-export function createEventSenders<TEventsDefinition extends EventsDefinition>(
+export function createEventSenders<TEvents extends EventsDefinition>(
 	api: ApiClient,
 	workflowRunId: string,
-	eventsDefinition: TEventsDefinition,
+	eventsDefinition: TEvents,
 	logger: Logger,
 	onSend: (run: WorkflowRun<unknown, unknown>) => void
-): EventSenders<TEventsDefinition> {
-	const senders = {} as EventSenders<TEventsDefinition>;
+): EventSenders<TEvents> {
+	const senders = {} as EventSenders<TEvents>;
 
 	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
 		const sender = createEventSender(
@@ -221,8 +221,8 @@ export function createEventSenders<TEventsDefinition extends EventsDefinition>(
 			eventDefinition.schema,
 			logger.child({ "aiki.eventName": eventName }),
 			onSend
-		) as EventSender<EventData<TEventsDefinition[keyof TEventsDefinition]>>;
-		senders[eventName as keyof TEventsDefinition] = sender;
+		) as EventSender<EventData<TEvents[keyof TEvents]>>;
+		senders[eventName as keyof TEvents] = sender;
 	}
 
 	return senders;
@@ -276,12 +276,12 @@ function createEventSender<Data>(
 	};
 }
 
-export function createEventMulticasters<TEventsDefinition extends EventsDefinition>(
+export function createEventMulticasters<TEvents extends EventsDefinition>(
 	workflowName: WorkflowName,
 	workflowVersionId: WorkflowVersionId,
-	eventsDefinition: TEventsDefinition
-): EventMulticasters<TEventsDefinition> {
-	const senders = {} as EventMulticasters<TEventsDefinition>;
+	eventsDefinition: TEvents
+): EventMulticasters<TEvents> {
+	const senders = {} as EventMulticasters<TEvents>;
 
 	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
 		const sender = createEventMulticaster(
@@ -289,8 +289,8 @@ export function createEventMulticasters<TEventsDefinition extends EventsDefiniti
 			workflowVersionId,
 			eventName as EventName,
 			eventDefinition.schema
-		) as EventMulticaster<EventData<TEventsDefinition[keyof TEventsDefinition]>>;
-		senders[eventName as keyof TEventsDefinition] = sender;
+		) as EventMulticaster<EventData<TEvents[keyof TEvents]>>;
+		senders[eventName as keyof TEvents] = sender;
 	}
 
 	return senders;
