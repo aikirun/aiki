@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { useWorkflowRuns, useWorkflowVersions } from "../api/hooks";
 import { BackLink } from "../components/common/BackLink";
@@ -15,14 +15,89 @@ import { useDebounce } from "../hooks/useDebounce";
 
 export function WorkflowDetail() {
 	const { name } = useParams<{ name: string }>();
+	const [searchParams, setSearchParams] = useSearchParams();
 	const decodedName = name ? decodeURIComponent(name) : "";
-	const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
-	const [selectedStatuses, setSelectedStatuses] = useState<StatusOption[]>([]);
-	const [referenceIdFilter, setReferenceIdFilter] = useState<string>("");
-	const [runIdFilter, setRunIdFilter] = useState<string>("");
 
-	const debouncedReferenceIdFilter = useDebounce(referenceIdFilter, 500);
-	const debouncedRunIdFilter = useDebounce(runIdFilter, 500);
+	const versionParam = searchParams.get("version");
+	const selectedVersions = versionParam ? versionParam.split(",").filter(Boolean) : [];
+
+	const statusParam = searchParams.get("status");
+	const statusValues = statusParam ? statusParam.split(",").filter(Boolean) : [];
+	const selectedStatuses = STATUS_OPTIONS.filter((o) => statusValues.includes(o.value));
+
+	const [referenceIdFilter, setReferenceIdFilter] = useState("");
+	const [runIdFilter, setRunIdFilter] = useState("");
+
+	const urlRefId = searchParams.get("refId") || "";
+	const urlRunId = searchParams.get("runId") || "";
+
+	useEffect(() => {
+		setReferenceIdFilter(urlRefId);
+		setRunIdFilter(urlRunId);
+	}, [urlRefId, urlRunId]);
+
+	const debouncedRefIdForUrl = useDebounce(referenceIdFilter, 500);
+	const debouncedRunIdForUrl = useDebounce(runIdFilter, 500);
+
+	useEffect(() => {
+		const currentRefId = searchParams.get("refId") || "";
+		const currentRunId = searchParams.get("runId") || "";
+
+		if (debouncedRefIdForUrl === currentRefId && debouncedRunIdForUrl === currentRunId) {
+			return;
+		}
+
+		setSearchParams((prev) => {
+			const next = new URLSearchParams(prev);
+
+			if (!debouncedRefIdForUrl) {
+				next.delete("refId");
+			} else {
+				next.set("refId", debouncedRefIdForUrl);
+			}
+
+			if (!debouncedRunIdForUrl) {
+				next.delete("runId");
+			} else {
+				next.set("runId", debouncedRunIdForUrl);
+			}
+
+			return next;
+		});
+	}, [debouncedRefIdForUrl, debouncedRunIdForUrl, searchParams, setSearchParams]);
+
+	const setSelectedVersions = useCallback(
+		(versions: string[]) => {
+			setSearchParams((prev) => {
+				const next = new URLSearchParams(prev);
+				if (versions.length === 0) {
+					next.delete("version");
+				} else {
+					next.set("version", versions.join(","));
+				}
+				return next;
+			});
+		},
+		[setSearchParams]
+	);
+
+	const setSelectedStatuses = useCallback(
+		(statuses: StatusOption[]) => {
+			setSearchParams((prev) => {
+				const next = new URLSearchParams(prev);
+				if (statuses.length === 0) {
+					next.delete("status");
+				} else {
+					next.set("status", statuses.map((s) => s.value).join(","));
+				}
+				return next;
+			});
+		},
+		[setSearchParams]
+	);
+
+	const debouncedReferenceIdFilter = debouncedRefIdForUrl;
+	const debouncedRunIdFilter = debouncedRunIdForUrl;
 
 	const {
 		data: versions,

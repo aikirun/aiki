@@ -1,3 +1,4 @@
+import type { ScheduleListRequestV1 } from "@aikirun/types/schedule-api";
 import type {
 	WorkflowGetStatsRequestV1,
 	WorkflowListRequestV1,
@@ -66,5 +67,13 @@ export function useWorkflowRunTransitions(
 		queryFn: () => client.workflowRun.listTransitionsV1({ id, ...params }),
 		enabled: !!id,
 		refetchInterval: options?.refetchInterval,
+	});
+}
+
+export function useSchedules(params: ScheduleListRequestV1 = {}) {
+	return useQuery({
+		queryKey: ["schedules", params],
+		queryFn: () => client.schedule.listV1(params),
+		placeholderData: keepPreviousData,
 	});
 }
