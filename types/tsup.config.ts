@@ -5,6 +5,8 @@ export default defineConfig({
 		client: "client.ts",
 		duration: "duration.ts",
 		event: "event.ts",
+		schedule: "schedule.ts",
+		"schedule-api": "schedule-api.ts",
 		retry: "retry.ts",
 		serializable: "serializable.ts",
 		sleep: "sleep.ts",

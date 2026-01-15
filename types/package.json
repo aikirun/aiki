@@ -20,6 +20,14 @@
 			"types": "./dist/retry.d.ts",
 			"import": "./dist/retry.js"
 		},
+		"./schedule": {
+			"types": "./dist/schedule.d.ts",
+			"import": "./dist/schedule.js"
+		},
+		"./schedule-api": {
+			"types": "./dist/schedule-api.d.ts",
+			"import": "./dist/schedule-api.js"
+		},
 		"./serializable": {
 			"types": "./dist/serializable.d.ts",
 			"import": "./dist/serializable.js"
