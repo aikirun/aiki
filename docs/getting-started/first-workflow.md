@@ -190,9 +190,12 @@ Start the workflow and send events:
 
 ```typescript
 // Start the order workflow
+const orderId = crypto.randomUUID();
+const customerId = crypto.randomUUID();
+
 const handle = await restaurantOrderV1.start(aikiClient, {
-	orderId: "order-123",
-	customerId: "customer-456",
+	orderId,
+	customerId,
 	items: ["Burger", "Fries", "Drink"],
 });
 
@@ -208,7 +211,7 @@ setTimeout(async () => {
 // when the food is prepared. For this demo, we'll simulate it:
 setTimeout(async () => {
 	// Get the courier delivery workflow handle using the order ID as reference
-	const courierHandle = await courierDeliveryV1.getHandleByReferenceId(aikiClient, "order-123");
+	const courierHandle = await courierDeliveryV1.getHandleByReferenceId(aikiClient, orderId);
 	await courierHandle.events.foodReady.send();
 	console.log("Food is ready for pickup!");
 }, 10000);
