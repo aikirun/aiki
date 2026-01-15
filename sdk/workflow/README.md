@@ -44,6 +44,22 @@ const handle = await onboardingWorkflowV1.start(aikiClient, {
 const result = await handle.waitForStatus("completed");
 ```
 
+## Scheduling
+
+Run workflows on a schedule using cron expressions or intervals:
+
+```typescript
+import { schedule } from "@aikirun/workflow";
+
+const dailyReport = schedule({
+	name: "daily-report",
+	type: "cron",
+	expression: "0 9 * * *", // Every day at 9 AM
+});
+
+await dailyReport.activate(aikiClient, onboardingWorkflowV1, { email: "daily@example.com" });
+```
+
 ## Features
 
 - **Durable Execution** - Workflows survive crashes and restarts
@@ -53,6 +69,7 @@ const result = await handle.waitForStatus("completed");
 - **Child Workflows** - Compose workflows together
 - **Automatic Retries** - Configurable retry strategies
 - **Versioning** - Run multiple versions simultaneously
+- **Scheduling** - Trigger workflows on cron or interval schedules
 
 ## Documentation
 
