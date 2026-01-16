@@ -31,6 +31,7 @@ Best practices and patterns:
 - **[Retry Strategies](./guides/retry-strategies.md)** - Configure automatic retries for tasks and workflows
 - **[Determinism](./guides/determinism.md)** - Workflow determinism and task idempotency
 - **[Refactoring Workflows](./guides/refactoring-workflows.md)** - Safely modify running workflows
+- **[Reliable Hooks](./guides/reliable-hooks.md)** - Trigger durable follow-up actions on workflow completion/failure/cancellation
 
 ## 🏗️ Architecture
 
