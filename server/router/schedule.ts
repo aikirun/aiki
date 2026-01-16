@@ -1,17 +1,17 @@
+import { isNonEmptyArray } from "@aikirun/lib";
 import { hashInput } from "@aikirun/lib/crypto";
 import type { Schedule, ScheduleId, ScheduleName } from "@aikirun/types/schedule";
-import { getNextOccurrence, getScheduleKey } from "server/services/schedule";
+import { getNextOccurrence } from "server/services/schedule";
 
 import { baseImplementer } from "./base";
-import { NotFoundError } from "../errors";
-import { schedulesById, schedulesByKey } from "../infrastructure/persistence/in-memory-store";
+import { NotFoundError, ScheduleConflictError } from "../errors";
+import { schedulesById, schedulesByReferenceId } from "../infrastructure/persistence/in-memory-store";
 
 const os = baseImplementer.schedule;
 
 const activateV1 = os.activateV1.handler(async ({ input: request }) => {
-	const { name, workflowName, workflowVersionId, input, spec } = request;
+	const { name, workflowName, workflowVersionId, input, spec, options } = request;
 	const scheduleName = name as ScheduleName;
-
 	const definitionHash = await hashInput({
 		name: scheduleName,
 		workflowName,
@@ -19,24 +19,32 @@ const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 		spec,
 		input,
 	});
+	const referenceId = options?.reference?.id ?? definitionHash;
+	const conflictPolicy = options?.reference?.conflictPolicy ?? "upsert";
 
-	const key = getScheduleKey(workflowName, workflowVersionId, name);
-	const existingId = schedulesByKey.get(key);
+	const existingId = schedulesByReferenceId.get(referenceId);
 	if (existingId) {
-		const existing = schedulesById.get(existingId);
-		if (!existing) {
+		const existingSchedule = schedulesById.get(existingId);
+		if (!existingSchedule) {
 			throw new NotFoundError(`Schedule not found: ${existingId}`);
 		}
 
-		if (existing.definitionHash === definitionHash && existing.schedule.status === "active") {
-			return { schedule: existing.schedule };
+		if (existingSchedule.definitionHash === definitionHash && existingSchedule.schedule.status === "active") {
+			return { schedule: existingSchedule.schedule };
+		}
+
+		if (existingSchedule.definitionHash !== definitionHash && conflictPolicy === "error") {
+			throw new ScheduleConflictError(scheduleName, referenceId);
 		}
 
 		const now = Date.now();
 		const updatedSchedule: Schedule = {
-			...existing.schedule,
-			spec,
+			...existingSchedule.schedule,
+			name: scheduleName,
+			workflowName,
+			workflowVersionId,
 			input,
+			spec,
 			status: "active",
 			updatedAt: now,
 			nextRunAt: getNextOccurrence(spec, now),
@@ -57,6 +65,7 @@ const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 		input,
 		spec,
 		status: "active",
+		options,
 		createdAt: now,
 		updatedAt: now,
 		nextRunAt,
@@ -64,7 +73,7 @@ const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 	};
 
 	schedulesById.set(id, { schedule, definitionHash });
-	schedulesByKey.set(key, id);
+	schedulesByReferenceId.set(referenceId, id);
 
 	return { schedule };
 });
@@ -77,15 +86,15 @@ const getByIdV1 = os.getByIdV1.handler(({ input: request }) => {
 	return { schedule: scheduleInfo.schedule };
 });
 
-const getByNameV1 = os.getByNameV1.handler(({ input: request }) => {
-	const key = getScheduleKey(request.workflowName, request.workflowVersionId, request.name);
-	const id = schedulesByKey.get(key);
+const getByReferenceIdV1 = os.getByReferenceIdV1.handler(({ input: request }) => {
+	const { referenceId } = request;
+	const id = schedulesByReferenceId.get(referenceId);
 	if (!id) {
-		throw new NotFoundError(`Schedule not found: ${request.name}`);
+		throw new NotFoundError(`Schedule not found with referenceId: ${referenceId}`);
 	}
 	const scheduleInfo = schedulesById.get(id);
 	if (!scheduleInfo) {
-		throw new NotFoundError(`Schedule not found: ${request.name}`);
+		throw new NotFoundError(`Schedule not found: ${id}`);
 	}
 	return { schedule: scheduleInfo.schedule };
 });
@@ -93,11 +102,39 @@ const getByNameV1 = os.getByNameV1.handler(({ input: request }) => {
 const listV1 = os.listV1.handler(({ input: request }) => {
 	const { limit = 50, offset = 0, filters } = request;
 
+	let scheduleInfos: Iterable<{ schedule: Schedule; definitionHash: string }>;
+	if (filters?.referenceId) {
+		const id = schedulesByReferenceId.get(filters.referenceId);
+		if (id) {
+			const scheduleInfo = schedulesById.get(id);
+			scheduleInfos = scheduleInfo ? [scheduleInfo] : [];
+		} else {
+			scheduleInfos = [];
+		}
+	} else {
+		scheduleInfos = schedulesById.values();
+	}
+
 	const filteredSchedules: Schedule[] = [];
-	for (const { schedule } of schedulesById.values()) {
-		if (filters?.status?.every((s) => s !== schedule.status)) {
+	for (const { schedule } of scheduleInfos) {
+		if (filters?.status && !filters.status.includes(schedule.status)) {
 			continue;
 		}
+
+		if (filters?.name && filters.name !== schedule.name) {
+			continue;
+		}
+
+		if (filters?.workflows && isNonEmptyArray(filters.workflows)) {
+			const matchesAnyWorkflowFilter = filters.workflows.some(
+				(w) =>
+					(!w.name || w.name === schedule.workflowName) && (!w.versionId || w.versionId === schedule.workflowVersionId)
+			);
+			if (!matchesAnyWorkflowFilter) {
+				continue;
+			}
+		}
+
 		filteredSchedules.push(schedule);
 	}
 
@@ -162,7 +199,7 @@ const deleteV1 = os.deleteV1.handler(({ input: request }) => {
 export const scheduleRouter = os.router({
 	activateV1,
 	getByIdV1,
-	getByNameV1,
+	getByReferenceIdV1,
 	listV1,
 	pauseV1,
 	resumeV1,

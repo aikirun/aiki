@@ -35,7 +35,7 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 	const filteredRuns: WorkflowRun[] = [];
 
 	for (const run of runs) {
-		if (filters?.status && isNonEmptyArray(filters.status) && filters.status.every((s) => s !== run.state.status)) {
+		if (filters?.status && !filters.status.includes(run.state.status)) {
 			continue;
 		}
 

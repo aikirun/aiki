@@ -1,9 +1,9 @@
-import type { Schedule, ScheduleSpec, ScheduleStatus } from "./schedule";
+import type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } from "./schedule";
 
 export interface ScheduleApi {
 	activateV1: (_: ScheduleActivateRequestV1) => Promise<ScheduleActivateResponseV1>;
 	getByIdV1: (_: ScheduleGetByIdRequestV1) => Promise<ScheduleGetByIdResponseV1>;
-	getByNameV1: (_: ScheduleGetByNameRequestV1) => Promise<ScheduleGetByNameResponseV1>;
+	getByReferenceIdV1: (_: ScheduleGetByReferenceIdRequestV1) => Promise<ScheduleGetByReferenceIdResponseV1>;
 	listV1: (_: ScheduleListRequestV1) => Promise<ScheduleListResponseV1>;
 	pauseV1: (_: SchedulePauseRequestV1) => Promise<SchedulePauseResponseV1>;
 	resumeV1: (_: ScheduleResumeRequestV1) => Promise<ScheduleResumeResponseV1>;
@@ -16,6 +16,7 @@ export interface ScheduleActivateRequestV1 {
 	workflowVersionId: string;
 	input?: unknown;
 	spec: ScheduleSpec;
+	options?: ScheduleActivateOptions;
 }
 
 export interface ScheduleActivateResponseV1 {
@@ -30,14 +31,17 @@ export interface ScheduleGetByIdResponseV1 {
 	schedule: Schedule;
 }
 
-export interface ScheduleGetByNameRequestV1 {
-	name: string;
-	workflowName: string;
-	workflowVersionId: string;
+export interface ScheduleGetByReferenceIdRequestV1 {
+	referenceId: string;
 }
 
-export interface ScheduleGetByNameResponseV1 {
+export interface ScheduleGetByReferenceIdResponseV1 {
 	schedule: Schedule;
+}
+
+export interface ScheduleWorkflowFilter {
+	name?: string;
+	versionId?: string;
 }
 
 export interface ScheduleListRequestV1 {
@@ -45,6 +49,9 @@ export interface ScheduleListRequestV1 {
 	offset?: number;
 	filters?: {
 		status?: ScheduleStatus[];
+		name?: string;
+		referenceId?: string;
+		workflows?: ScheduleWorkflowFilter[];
 	};
 }
 

@@ -1,7 +1,14 @@
 import { toMilliseconds } from "@aikirun/lib";
+import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { DurationObject } from "@aikirun/types/duration";
-import type { OverlapPolicy, ScheduleId, ScheduleName, ScheduleSpec } from "@aikirun/types/schedule";
+import type {
+	OverlapPolicy,
+	ScheduleActivateOptions,
+	ScheduleId,
+	ScheduleName,
+	ScheduleSpec,
+} from "@aikirun/types/schedule";
 
 import type { EventsDefinition } from "./run/event";
 import type { WorkflowVersion } from "./workflow-version";
@@ -29,8 +36,23 @@ export interface ScheduleHandle {
 	delete(): Promise<void>;
 }
 
+export interface ScheduleBuilder {
+	opt<Path extends PathFromObject<ScheduleActivateOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<ScheduleActivateOptions, Path>
+	): ScheduleBuilder;
+
+	activate<Input, Output, AppContext, TEvents extends EventsDefinition>(
+		client: Client<AppContext>,
+		workflow: WorkflowVersion<Input, Output, AppContext, TEvents>,
+		...args: Input extends void ? [] : [Input]
+	): Promise<ScheduleHandle>;
+}
+
 export type ScheduleDefinition = ScheduleParams & {
 	name: ScheduleName;
+
+	with(): ScheduleBuilder;
 
 	activate<Input, Output, AppContext, TEvents extends EventsDefinition>(
 		client: Client<AppContext>,
@@ -42,53 +64,78 @@ export type ScheduleDefinition = ScheduleParams & {
 export function schedule(params: { name: string } & ScheduleParams): ScheduleDefinition {
 	const { name, ...scheduleParams } = params;
 
+	async function activateWithOpts<Input, Output, AppContext, TEvents extends EventsDefinition>(
+		client: Client<AppContext>,
+		workflow: WorkflowVersion<Input, Output, AppContext, TEvents>,
+		options: ScheduleActivateOptions,
+		...args: Input extends void ? [] : [Input]
+	): Promise<ScheduleHandle> {
+		const input = args[0];
+
+		let scheduleSpec: ScheduleSpec;
+		if (scheduleParams.type === "interval") {
+			const { every, ...rest } = scheduleParams;
+			scheduleSpec = {
+				...rest,
+				everyMs: toMilliseconds(every),
+			};
+		} else {
+			scheduleSpec = scheduleParams;
+		}
+
+		const { schedule } = await client.api.schedule.activateV1({
+			name,
+			workflowName: workflow.name,
+			workflowVersionId: workflow.versionId,
+			spec: scheduleSpec,
+			input,
+			options,
+		});
+		client.logger.info("Schedule activated", {
+			scheduleSpec,
+			workflowName: workflow.name,
+			workflowVersionId: workflow.versionId,
+			referenceId: options?.reference?.id,
+		});
+
+		const scheduleId = schedule.id as ScheduleId;
+
+		return {
+			id: scheduleId,
+			name: name as ScheduleName,
+
+			pause: async () => {
+				await client.api.schedule.pauseV1({ id: scheduleId });
+			},
+			resume: async () => {
+				await client.api.schedule.resumeV1({ id: scheduleId });
+			},
+			delete: async () => {
+				await client.api.schedule.deleteV1({ id: scheduleId });
+			},
+		};
+	}
+
+	function createBuilder(optsBuilder: ObjectBuilder<ScheduleActivateOptions>): ScheduleBuilder {
+		return {
+			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
+			async activate(client, workflow, ...args) {
+				return activateWithOpts(client, workflow, optsBuilder.build(), ...args);
+			},
+		};
+	}
+
 	return {
 		name: name as ScheduleName,
 		...scheduleParams,
 
+		with(): ScheduleBuilder {
+			const optsOverrider = objectOverrider<ScheduleActivateOptions>({});
+			return createBuilder(optsOverrider());
+		},
+
 		async activate(client, workflow, ...args) {
-			const input = args[0];
-
-			let scheduleSpec: ScheduleSpec;
-			if (scheduleParams.type === "interval") {
-				const { every, ...rest } = scheduleParams;
-				scheduleSpec = {
-					...rest,
-					everyMs: toMilliseconds(every),
-				};
-			} else {
-				scheduleSpec = scheduleParams;
-			}
-
-			const { schedule } = await client.api.schedule.activateV1({
-				name,
-				workflowName: workflow.name,
-				workflowVersionId: workflow.versionId,
-				spec: scheduleSpec,
-				input,
-			});
-			client.logger.info("Schedule activated", {
-				scheduleSpec,
-				workflowName: workflow.name,
-				workflowVersionId: workflow.versionId,
-			});
-
-			const scheduleId = schedule.id as ScheduleId;
-
-			return {
-				id: scheduleId,
-				name: name as ScheduleName,
-
-				pause: async () => {
-					await client.api.schedule.pauseV1({ id: scheduleId });
-				},
-				resume: async () => {
-					await client.api.schedule.resumeV1({ id: scheduleId });
-				},
-				delete: async () => {
-					await client.api.schedule.deleteV1({ id: scheduleId });
-				},
-			};
+			return activateWithOpts(client, workflow, {}, ...args);
 		},
 	};
 }

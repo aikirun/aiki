@@ -9,10 +9,6 @@ import {
 	workflowRunsByReferenceId,
 } from "server/infrastructure/persistence/in-memory-store";
 
-export function getScheduleKey(workflowName: string, workflowVersionId: string, scheduleName: string): string {
-	return `${scheduleName}/${workflowName}/${workflowVersionId}`;
-}
-
 export function getReferenceId(scheduleId: string, occurrence: number) {
 	return `schedule:${scheduleId}:${occurrence}`;
 }

@@ -19,6 +19,20 @@ export const scheduleSpecSchema = cronScheduleSpecSchema.or(intervalScheduleSpec
 
 export const scheduleStatusSchema = type("'active' | 'paused' | 'deleted'");
 
+export const scheduleReferenceOptionsSchema = type({
+	id: "string > 0",
+	"conflictPolicy?": "'upsert' | 'error'",
+});
+
+export const scheduleActivateOptionsSchema = type({
+	"reference?": scheduleReferenceOptionsSchema.or("undefined"),
+});
+
+export const scheduleWorkflowFilterSchema = type({
+	"name?": "string > 0 | undefined",
+	"versionId?": "string > 0 | undefined",
+});
+
 export const scheduleSchema = type({
 	id: "string > 0",
 	name: "string > 0",
@@ -27,6 +41,7 @@ export const scheduleSchema = type({
 	"input?": "unknown",
 	spec: scheduleSpecSchema,
 	status: scheduleStatusSchema,
+	"options?": scheduleActivateOptionsSchema.or("undefined"),
 	createdAt: "number > 0",
 	updatedAt: "number > 0",
 	"lastOccurrence?": "number > 0 | undefined",

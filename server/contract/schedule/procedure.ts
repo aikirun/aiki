@@ -6,8 +6,8 @@ import type {
 	ScheduleDeleteRequestV1,
 	ScheduleGetByIdRequestV1,
 	ScheduleGetByIdResponseV1,
-	ScheduleGetByNameRequestV1,
-	ScheduleGetByNameResponseV1,
+	ScheduleGetByReferenceIdRequestV1,
+	ScheduleGetByReferenceIdResponseV1,
 	ScheduleListRequestV1,
 	ScheduleListResponseV1,
 	SchedulePauseRequestV1,
@@ -18,7 +18,13 @@ import type {
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
-import { scheduleSchema, scheduleSpecSchema, scheduleStatusSchema } from "./schema";
+import {
+	scheduleActivateOptionsSchema,
+	scheduleSchema,
+	scheduleSpecSchema,
+	scheduleStatusSchema,
+	scheduleWorkflowFilterSchema,
+} from "./schema";
 import type { ContractProcedure, ContractProcedureToApi } from "../helpers/procedure";
 
 const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateResponseV1> = oc
@@ -29,6 +35,7 @@ const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateR
 			workflowVersionId: "string > 0",
 			"input?": "unknown",
 			spec: scheduleSpecSchema,
+			"options?": scheduleActivateOptionsSchema.or("undefined"),
 		})
 	)
 	.output(
@@ -41,8 +48,8 @@ const getByIdV1: ContractProcedure<ScheduleGetByIdRequestV1, ScheduleGetByIdResp
 	.input(type({ id: "string > 0" }))
 	.output(type({ schedule: scheduleSchema }));
 
-const getByNameV1: ContractProcedure<ScheduleGetByNameRequestV1, ScheduleGetByNameResponseV1> = oc
-	.input(type({ name: "string > 0", workflowName: "string > 0", workflowVersionId: "string > 0" }))
+const getByReferenceIdV1: ContractProcedure<ScheduleGetByReferenceIdRequestV1, ScheduleGetByReferenceIdResponseV1> = oc
+	.input(type({ referenceId: "string > 0" }))
 	.output(type({ schedule: scheduleSchema }));
 
 const listV1: ContractProcedure<ScheduleListRequestV1, ScheduleListResponseV1> = oc
@@ -50,7 +57,12 @@ const listV1: ContractProcedure<ScheduleListRequestV1, ScheduleListResponseV1> =
 		type({
 			"limit?": "number.integer > 0 | undefined",
 			"offset?": "number.integer >= 0 | undefined",
-			"status?": scheduleStatusSchema.or("undefined"),
+			"filters?": type({
+				"status?": scheduleStatusSchema.array().or("undefined"),
+				"name?": "string > 0 | undefined",
+				"referenceId?": "string > 0 | undefined",
+				"workflows?": scheduleWorkflowFilterSchema.array().or("undefined"),
+			}).or("undefined"),
 		})
 	)
 	.output(
@@ -75,7 +87,7 @@ const deleteV1: ContractProcedure<ScheduleDeleteRequestV1, void> = oc
 export const scheduleContract = {
 	activateV1,
 	getByIdV1,
-	getByNameV1,
+	getByReferenceIdV1,
 	listV1,
 	pauseV1,
 	resumeV1,

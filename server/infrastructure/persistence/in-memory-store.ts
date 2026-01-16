@@ -8,7 +8,7 @@ export const workflowRunsByReferenceId = new Map<WorkflowName, Map<WorkflowVersi
 export const workflowRunTransitionsById = new Map<WorkflowRunId, WorkflowRunTransition[]>();
 export const workflowsByName = new Map<WorkflowName, Workflow>();
 export const schedulesById = new Map<ScheduleId, { schedule: Schedule; definitionHash: string }>();
-export const schedulesByKey = new Map<string, ScheduleId>();
+export const schedulesByReferenceId = new Map<string, ScheduleId>();
 
 export function findTaskById(run: WorkflowRun, taskId: TaskId): (TaskInfo & { address: TaskAddress }) | undefined {
 	for (const [address, info] of Object.entries(run.tasks)) {

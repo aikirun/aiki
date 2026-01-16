@@ -5,6 +5,7 @@ import {
 	InvalidWorkflowRunStateTransitionError,
 	NotFoundError,
 	RevisionConflictError,
+	ScheduleConflictError,
 	UnauthorizedError,
 	ValidationError,
 } from "../errors";
@@ -38,6 +39,10 @@ const withErrorHandler = base.middleware(async ({ context, next }) => {
 		}
 
 		if (error instanceof RevisionConflictError) {
+			throw new ORPCError("CONFLICT", { message: error.message });
+		}
+
+		if (error instanceof ScheduleConflictError) {
 			throw new ORPCError("CONFLICT", { message: error.message });
 		}
 

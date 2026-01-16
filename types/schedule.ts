@@ -3,6 +3,15 @@ export type ScheduleName = string & { _brand: "schedule_name" };
 
 export type OverlapPolicy = "allow" | "skip" | "cancel_previous";
 
+export interface ScheduleReferenceOptions {
+	id: string;
+	conflictPolicy?: "upsert" | "error";
+}
+
+export interface ScheduleActivateOptions {
+	reference?: ScheduleReferenceOptions;
+}
+
 export interface CronScheduleSpec {
 	type: "cron";
 	expression: string;
@@ -28,6 +37,7 @@ export interface Schedule {
 	input?: unknown;
 	spec: ScheduleSpec;
 	status: ScheduleStatus;
+	options?: ScheduleActivateOptions;
 	createdAt: number;
 	updatedAt: number;
 	lastOccurrence?: number;
