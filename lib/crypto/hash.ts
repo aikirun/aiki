@@ -1,6 +1,6 @@
 import { stableStringify } from "../json";
 
-async function sha256(input: string): Promise<string> {
+export async function sha256(input: string): Promise<string> {
 	const data = new TextEncoder().encode(input);
 	const hashBuffer = await crypto.subtle.digest("SHA-256", data);
 	const hashArray = Array.from(new Uint8Array(hashBuffer));

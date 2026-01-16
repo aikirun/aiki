@@ -1,5 +1,5 @@
-import { isNonEmptyArray } from "@aikirun/lib";
-import { hashInput } from "@aikirun/lib/crypto";
+import { isNonEmptyArray, stableStringify } from "@aikirun/lib";
+import { sha256 } from "@aikirun/lib/crypto";
 import type { Schedule, ScheduleId } from "@aikirun/types/schedule";
 import { getNextOccurrence } from "server/services/schedule";
 
@@ -11,12 +11,14 @@ const os = baseImplementer.schedule;
 
 const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 	const { workflowName, workflowVersionId, input, spec, options } = request;
-	const definitionHash = await hashInput({
-		workflowName,
-		workflowVersionId,
-		spec,
-		input,
-	});
+	const definitionHash = await sha256(
+		stableStringify({
+			workflowName,
+			workflowVersionId,
+			spec,
+			input,
+		})
+	);
 	const referenceId = options?.reference?.id ?? definitionHash;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "upsert";
 
