@@ -2,6 +2,26 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.16.0
+
+### Breaking Changes
+
+- **Schedule `name` property removed** - Schedules no longer have a `name` property. Use `reference.id` for explicit identity instead
+- **`ScheduleHandle.name` removed** - The handle returned from `activate()` no longer has a `name` property
+- **`getByNameV1` replaced with `getByReferenceIdV1`** - Update API calls accordingly
+- **`WorkflowRunConflictError` renamed to `WorkflowRunRevisionConflictError`**
+
+### New Features
+
+- **Schedule reference IDs with conflict policies** - Assign explicit reference IDs to schedules with configurable conflict behavior (`"upsert"` or `"error"`)
+- **Workflow run conflict detection** - When starting workflows with reference IDs, conflicts are now detected by comparing input hashes. Same reference + same input returns existing run; same reference + different input + `"error"` policy throws an error
+- **`inputHash` added to `WorkflowRun`** - Workflow runs now include an `inputHash` field for conflict detection
+
+### Web UI
+
+- Schedule table improvements (ID/Reference ID columns, filters, removed Name column)
+- Fixed "Clear All" for schedule status filter
+
 ## 0.15.0
 
 ### New Features

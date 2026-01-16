@@ -17,14 +17,14 @@
     },
     "lib": {
       "name": "@aikirun/lib",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
     },
     "sdk/client": {
       "name": "@aikirun/client",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.9.3",
@@ -34,7 +34,7 @@
     },
     "sdk/task": {
       "name": "@aikirun/task",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
@@ -43,7 +43,7 @@
     },
     "sdk/worker": {
       "name": "@aikirun/worker",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "dependencies": {
         "@aikirun/client": "workspace:*",
         "@aikirun/types": "workspace:*",
@@ -52,7 +52,7 @@
     },
     "sdk/workflow": {
       "name": "@aikirun/workflow",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@standard-schema/spec": "^1.1.0",
@@ -60,7 +60,7 @@
     },
     "server": {
       "name": "@aikirun/server",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "dependencies": {
         "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
@@ -76,11 +76,11 @@
     },
     "types": {
       "name": "@aikirun/types",
-      "version": "0.15.0",
+      "version": "0.16.0",
     },
     "web": {
       "name": "@aikirun/web",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.4.3",
