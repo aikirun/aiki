@@ -323,12 +323,12 @@ export class WorkflowRunFailedError extends Error {
 	}
 }
 
-export class WorkflowRunConflictError extends Error {
+export class WorkflowRunRevisionConflictError extends Error {
 	public readonly id: WorkflowRunId;
 
 	constructor(id: WorkflowRunId) {
 		super(`Conflict while trying to update Workflow run ${id}`);
-		this.name = "WorkflowRunConflictError";
+		this.name = "WorkflowRunRevisionConflictError";
 		this.id = id;
 	}
 }

@@ -2,7 +2,11 @@ import { type Duration, toMilliseconds } from "@aikirun/lib";
 import type { Logger } from "@aikirun/types/client";
 import type { SleepName, SleepResult } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { WorkflowRunConflictError, type WorkflowRunId, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run";
+import {
+	type WorkflowRunId,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow-run";
 
 import type { WorkflowRunHandle } from "./handle";
 
@@ -33,7 +37,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 					"aiki.durationMs": durationMs,
 				});
 			} catch (error) {
-				if (error instanceof WorkflowRunConflictError) {
+				if (error instanceof WorkflowRunRevisionConflictError) {
 					throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 				}
 				throw error;
@@ -88,7 +92,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 				"aiki.durationMs": durationMs,
 			});
 		} catch (error) {
-			if (error instanceof WorkflowRunConflictError) {
+			if (error instanceof WorkflowRunRevisionConflictError) {
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
 			throw error;

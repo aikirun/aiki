@@ -7,9 +7,9 @@ import {
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
-	WorkflowRunConflictError,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
+	WorkflowRunRevisionConflictError,
 	type WorkflowRunState,
 } from "@aikirun/types/workflow-run";
 import type { WorkflowRunStateRequest, WorkflowRunTransitionTaskStateRequestV1 } from "@aikirun/types/workflow-run-api";
@@ -350,7 +350,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 			this._run = run as WorkflowRun<Input, Output>;
 		} catch (error) {
 			if (isConflictError(error)) {
-				throw new WorkflowRunConflictError(this.run.id as WorkflowRunId);
+				throw new WorkflowRunRevisionConflictError(this.run.id as WorkflowRunId);
 			}
 			throw error;
 		}
@@ -369,7 +369,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 			return { taskId: taskId as TaskId };
 		} catch (error) {
 			if (isConflictError(error)) {
-				throw new WorkflowRunConflictError(this.run.id as WorkflowRunId);
+				throw new WorkflowRunRevisionConflictError(this.run.id as WorkflowRunId);
 			}
 			throw error;
 		}

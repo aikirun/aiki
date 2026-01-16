@@ -8,9 +8,9 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	type WorkflowRun,
-	WorkflowRunConflictError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
+	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
@@ -192,7 +192,7 @@ export function createEventWaiter<TEvents extends EventsDefinition, Data>(
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
 		} catch (error) {
-			if (error instanceof WorkflowRunConflictError) {
+			if (error instanceof WorkflowRunRevisionConflictError) {
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
 			throw error;

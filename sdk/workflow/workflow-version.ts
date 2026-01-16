@@ -19,9 +19,9 @@ import {
 	type WorkflowDefinitionOptions,
 	type WorkflowReferenceOptions,
 	type WorkflowRun,
-	WorkflowRunConflictError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
+	WorkflowRunRevisionConflictError,
 	type WorkflowRunStateFailed,
 	WorkflowRunSuspendedError,
 	type WorkflowStartOptions,
@@ -322,7 +322,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 				if (
 					error instanceof WorkflowRunSuspendedError ||
 					error instanceof WorkflowRunFailedError ||
-					error instanceof WorkflowRunConflictError
+					error instanceof WorkflowRunRevisionConflictError
 				) {
 					throw error;
 				}

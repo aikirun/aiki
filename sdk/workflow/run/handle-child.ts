@@ -5,7 +5,7 @@ import {
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
-	WorkflowRunConflictError,
+	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 
@@ -186,7 +186,7 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
 		} catch (error) {
-			if (error instanceof WorkflowRunConflictError) {
+			if (error instanceof WorkflowRunRevisionConflictError) {
 				throw new WorkflowRunSuspendedError(parentRun.id);
 			}
 			throw error;

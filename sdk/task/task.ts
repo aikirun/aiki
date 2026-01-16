@@ -23,9 +23,9 @@ import type {
 } from "@aikirun/types/task";
 import { TaskFailedError, type TaskName } from "@aikirun/types/task";
 import {
-	WorkflowRunConflictError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
+	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
@@ -234,7 +234,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				if (
 					error instanceof WorkflowRunFailedError ||
 					error instanceof WorkflowRunSuspendedError ||
-					error instanceof WorkflowRunConflictError
+					error instanceof WorkflowRunRevisionConflictError
 				) {
 					throw error;
 				}
