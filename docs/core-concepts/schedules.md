@@ -28,7 +28,9 @@ const handle = await dailyReport.activate(
 
 The `schedule()` function defines a timing configuration. Call `activate()` to bind it to a workflow - the workflow will then trigger automatically based on the schedule. The third argument is the input passed to the workflow on each run.
 
-The same schedule can be bound to different workflows:
+Each `activate()` call creates a unique schedule instance. The instance is referenced by the workflow name, version, timing spec, and input. Activating the same schedule with different inputs creates independent instances, each with their own overlap tracking.
+
+The same schedule spec can be bound to different workflows:
 
 ```typescript
 const hourly = schedule({
@@ -96,11 +98,47 @@ const syncSchedule = schedule({
 | `"skip"` | Skip this occurrence if a run is still active |
 | `"cancel_previous"` | Cancel the active run and start a new one |
 
+Overlap policies are evaluated per schedule instance, not globally. If you activate the same schedule for multiple tenants with different inputs, each tenant has independent overlap handling.
+
 ## Idempotent Activation
 
 Calling `activate()` is idempotent. If a schedule already exists with the same parameters, the existing schedule is returned unchanged.
 
 If you call `activate()` with a **different input or timing configuration** (such as a new cron expression or interval), the existing schedule is updated with the new values.
+
+## Reference IDs
+
+By default, schedule identity is derived from a hash of the workflow name, version, timing spec, and input. You can provide an explicit reference ID instead:
+
+```typescript
+const handle = await dailyReport
+	.with()
+	.opt("reference.id", "tenant-acme-daily-report")
+	.activate(client, reportWorkflowV1, { tenantId: "acme" });
+```
+
+Reference IDs are useful when you need a stable, predictable identifier for lookups or external integrations.
+
+### Conflict Policy
+
+When activating a schedule with a reference ID that already exists, the conflict policy determines what happens:
+
+```typescript
+const handle = await dailyReport
+	.with()
+	.opt("reference", {
+		id: "my-schedule",
+		conflictPolicy: "error",
+	})
+	.activate(client, workflowV1, input);
+```
+
+| Policy | Behavior |
+|--------|----------|
+| `"upsert"` (default) | Update the existing schedule if parameters differ |
+| `"error"` | Throw an error if parameters differ from existing schedule |
+
+With `"upsert"`, calling `activate()` with the same reference ID but different input or timing will update the existing schedule. With `"error"`, it throws a `ScheduleConflictError` if the parameters don't match.
 
 ## Managing Schedules
 
@@ -120,6 +158,26 @@ await handle.delete(); // Remove schedule
 | `pause()` | Stop triggering |
 | `resume()` | Resume triggering |
 | `delete()` | Remove schedule |
+
+## Multi-Tenant Schedules
+
+For multi-tenant applications, activate the same schedule with different inputs for each tenant. Each activation creates an independent schedule instance:
+
+```typescript
+const dailyReport = schedule({
+	type: "cron",
+	expression: "0 9 * * *",
+	overlapPolicy: "skip",
+});
+
+// Each tenant gets an independent schedule instance
+await dailyReport.activate(client, reportWorkflowV1, { tenantId: "acme" });
+await dailyReport.activate(client, reportWorkflowV1, { tenantId: "globex" });
+
+// These are completely independent:
+// - If Acme's report is still running, Globex's report starts normally
+// - The "skip" policy only skips Acme's next run, not Globex's
+```
 
 ## Next Steps
 
