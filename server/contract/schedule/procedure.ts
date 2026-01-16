@@ -30,7 +30,6 @@ import type { ContractProcedure, ContractProcedureToApi } from "../helpers/proce
 const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateResponseV1> = oc
 	.input(
 		type({
-			name: "string > 0",
 			workflowName: "string > 0",
 			workflowVersionId: "string > 0",
 			"input?": "unknown",
@@ -59,7 +58,7 @@ const listV1: ContractProcedure<ScheduleListRequestV1, ScheduleListResponseV1> =
 			"offset?": "number.integer >= 0 | undefined",
 			"filters?": type({
 				"status?": scheduleStatusSchema.array().or("undefined"),
-				"name?": "string > 0 | undefined",
+				"id?": "string > 0 | undefined",
 				"referenceId?": "string > 0 | undefined",
 				"workflows?": scheduleWorkflowFilterSchema.array().or("undefined"),
 			}).or("undefined"),

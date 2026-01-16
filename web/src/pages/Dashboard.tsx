@@ -1,10 +1,11 @@
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { client } from "../api/client";
 import { useSchedules, useWorkflowStats, useWorkflows } from "../api/hooks";
+import { CopyButton } from "../components/common/CopyButton";
 import { EmptyState } from "../components/common/EmptyState";
 import { MultiSelectDropdown } from "../components/common/MultiSelectDropdown";
 import { RelativeTime } from "../components/common/RelativeTime";
@@ -15,6 +16,7 @@ import {
 	SCHEDULE_STATUS_OPTIONS,
 	type ScheduleStatusOption,
 } from "../constants/schedule-status";
+import { useDebounce } from "../hooks/useDebounce";
 
 type Tab = "workflows" | "schedules";
 
@@ -77,6 +79,51 @@ export function Dashboard() {
 		[setSearchParams]
 	);
 
+	const [idFilter, setIdFilter] = useState(searchParams.get("id") || "");
+	const [referenceIdFilter, setReferenceIdFilter] = useState(searchParams.get("refId") || "");
+	const [workflowFilter, setWorkflowFilter] = useState(searchParams.get("workflow") || "");
+
+	useEffect(() => {
+		const urlId = searchParams.get("id") || "";
+		const urlRefId = searchParams.get("refId") || "";
+		const urlWorkflow = searchParams.get("workflow") || "";
+		setIdFilter(urlId);
+		setReferenceIdFilter(urlRefId);
+		setWorkflowFilter(urlWorkflow);
+	}, [searchParams]);
+
+	const debouncedId = useDebounce(idFilter, 500);
+	const debouncedRefId = useDebounce(referenceIdFilter, 500);
+	const debouncedWorkflow = useDebounce(workflowFilter, 500);
+
+	useEffect(() => {
+		const currentId = searchParams.get("id") || "";
+		const currentRefId = searchParams.get("refId") || "";
+		const currentWorkflow = searchParams.get("workflow") || "";
+
+		if (debouncedId !== currentId || debouncedRefId !== currentRefId || debouncedWorkflow !== currentWorkflow) {
+			setSearchParams((prev) => {
+				const next = new URLSearchParams(prev);
+				if (debouncedId) {
+					next.set("id", debouncedId);
+				} else {
+					next.delete("id");
+				}
+				if (debouncedRefId) {
+					next.set("refId", debouncedRefId);
+				} else {
+					next.delete("refId");
+				}
+				if (debouncedWorkflow) {
+					next.set("workflow", debouncedWorkflow);
+				} else {
+					next.delete("workflow");
+				}
+				return next;
+			});
+		}
+	}, [debouncedId, debouncedRefId, debouncedWorkflow, searchParams, setSearchParams]);
+
 	return (
 		<div className="space-y-8">
 			{/* Stats Cards */}
@@ -130,7 +177,28 @@ export function Dashboard() {
 						Schedules
 					</button>
 					{activeTab === "schedules" && (
-						<div className="ml-auto flex items-center pr-4">
+						<div className="ml-auto flex items-center gap-3 pr-4">
+							<input
+								type="text"
+								placeholder="ID..."
+								value={idFilter}
+								onChange={(e) => setIdFilter(e.target.value)}
+								className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-aiki-purple/20 focus:border-aiki-purple w-40"
+							/>
+							<input
+								type="text"
+								placeholder="Reference ID..."
+								value={referenceIdFilter}
+								onChange={(e) => setReferenceIdFilter(e.target.value)}
+								className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-aiki-purple/20 focus:border-aiki-purple w-40"
+							/>
+							<input
+								type="text"
+								placeholder="Workflow..."
+								value={workflowFilter}
+								onChange={(e) => setWorkflowFilter(e.target.value)}
+								className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-aiki-purple/20 focus:border-aiki-purple w-40"
+							/>
 							<MultiSelectDropdown
 								label="Status"
 								options={SCHEDULE_STATUS_OPTIONS}
@@ -144,7 +212,16 @@ export function Dashboard() {
 				</div>
 
 				{/* Tab Content */}
-				{activeTab === "workflows" ? <WorkflowsTab /> : <SchedulesTab selectedStatuses={selectedStatuses} />}
+				{activeTab === "workflows" ? (
+					<WorkflowsTab />
+				) : (
+					<SchedulesTab
+						selectedStatuses={selectedStatuses}
+						idFilter={debouncedId}
+						referenceIdFilter={debouncedRefId}
+						workflowFilter={debouncedWorkflow}
+					/>
+				)}
 			</div>
 		</div>
 	);
@@ -200,33 +277,51 @@ function WorkflowsTab() {
 	);
 }
 
-function SchedulesTab({ selectedStatuses }: { selectedStatuses: ScheduleStatusOption[] }) {
-	// Don't filter if all statuses are selected
+function SchedulesTab({
+	selectedStatuses,
+	idFilter,
+	referenceIdFilter,
+	workflowFilter,
+}: {
+	selectedStatuses: ScheduleStatusOption[];
+	idFilter: string;
+	referenceIdFilter: string;
+	workflowFilter: string;
+}) {
 	const isAllSelected = selectedStatuses.length === SCHEDULE_STATUS_OPTIONS.length;
 	const statusFilters =
 		!isAllSelected && selectedStatuses.length > 0 ? selectedStatuses.map((s) => s.value) : undefined;
 
+	const filters: { status?: ScheduleStatus[]; id?: string; referenceId?: string; workflows?: { name: string }[] } = {};
+	if (statusFilters) filters.status = statusFilters;
+	if (idFilter) filters.id = idFilter;
+	if (referenceIdFilter) filters.referenceId = referenceIdFilter;
+	if (workflowFilter) filters.workflows = [{ name: workflowFilter }];
+
+	const hasFilters = Object.keys(filters).length > 0;
+
 	const { data, isLoading } = useSchedules({
-		filters: statusFilters ? { status: statusFilters } : undefined,
+		filters: hasFilters ? filters : undefined,
 	});
 
 	return (
 		<>
 			{isLoading ? (
 				<div className="p-6">
-					<TableSkeleton rows={5} columns={6} />
+					<TableSkeleton rows={5} columns={7} />
 				</div>
 			) : data?.schedules.length === 0 ? (
 				<EmptyState
 					title="No schedules found"
-					description={statusFilters ? "Try adjusting your filters" : "Activate a schedule to see it here"}
+					description={hasFilters ? "Try adjusting your filters" : "Activate a schedule to see it here"}
 				/>
 			) : (
 				<table className="w-full">
 					<thead>
 						<tr className="border-b border-slate-100">
+							<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
 							<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-								Name
+								Reference ID
 							</th>
 							<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
 								Workflow
@@ -303,10 +398,29 @@ function ScheduleRow({ schedule }: { schedule: Schedule }) {
 	const canResume = schedule.status === "paused";
 	const canDelete = schedule.status !== "deleted";
 
+	const referenceId = schedule.options?.reference?.id;
+
 	return (
 		<tr className="hover:bg-slate-50 transition-colors">
-			<td className="px-6 py-4">
-				<span className="font-semibold text-slate-900">{schedule.name}</span>
+			<td className="px-6 py-4 font-mono text-sm text-slate-600">
+				<div className="flex items-center gap-1">
+					<span className="max-w-[120px] truncate" title={schedule.id}>
+						{schedule.id}
+					</span>
+					<CopyButton text={schedule.id} title="Copy Schedule ID" />
+				</div>
+			</td>
+			<td className="px-6 py-4 font-mono text-sm text-slate-600">
+				{referenceId ? (
+					<div className="flex items-center gap-1">
+						<span className="max-w-[120px] truncate" title={referenceId}>
+							{referenceId}
+						</span>
+						<CopyButton text={referenceId} title="Copy Reference ID" />
+					</div>
+				) : (
+					"—"
+				)}
 			</td>
 			<td className="px-6 py-4">
 				<Link

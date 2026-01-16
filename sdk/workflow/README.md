@@ -52,7 +52,6 @@ Run workflows on a schedule using cron expressions or intervals:
 import { schedule } from "@aikirun/workflow";
 
 const dailyReport = schedule({
-	name: "daily-report",
 	type: "cron",
 	expression: "0 9 * * *", // Every day at 9 AM
 });

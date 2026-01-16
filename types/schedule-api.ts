@@ -11,7 +11,6 @@ export interface ScheduleApi {
 }
 
 export interface ScheduleActivateRequestV1 {
-	name: string;
 	workflowName: string;
 	workflowVersionId: string;
 	input?: unknown;
@@ -49,7 +48,7 @@ export interface ScheduleListRequestV1 {
 	offset?: number;
 	filters?: {
 		status?: ScheduleStatus[];
-		name?: string;
+		id?: string;
 		referenceId?: string;
 		workflows?: ScheduleWorkflowFilter[];
 	};

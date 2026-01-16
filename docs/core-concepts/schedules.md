@@ -15,7 +15,6 @@ const aikiClient = client({
 });
 
 const dailyReport = schedule({
-	name: "daily-report",
 	type: "cron",
 	expression: "0 9 * * *", // Every day at 9 AM UTC
 });
@@ -33,7 +32,6 @@ The same schedule can be bound to different workflows:
 
 ```typescript
 const hourly = schedule({
-	name: "hourly",
 	type: "interval",
 	every: { hours: 1 },
 });
@@ -51,13 +49,11 @@ Use cron expressions for complex timing patterns:
 
 ```typescript
 const dailyCleanup = schedule({
-	name: "daily-cleanup",
 	type: "cron",
 	expression: "0 0 * * *", // Midnight every day
 });
 
 const weeklyReport = schedule({
-	name: "weekly-report",
 	type: "cron",
 	expression: "0 9 * * 1", // 9 AM every Monday
 	timezone: "America/New_York", // Optional timezone (default: UTC)
@@ -70,13 +66,11 @@ Use intervals for simple recurring patterns:
 
 ```typescript
 const hourlySync = schedule({
-	name: "hourly-sync",
 	type: "interval",
 	every: { hours: 1 },
 });
 
 const frequentCheck = schedule({
-	name: "frequent-check",
 	type: "interval",
 	every: { minutes: 15 },
 });
@@ -90,7 +84,6 @@ When a schedule triggers but a previous run is still active, the overlap policy 
 
 ```typescript
 const syncSchedule = schedule({
-	name: "data-sync",
 	type: "interval",
 	every: { minutes: 5 },
 	overlapPolicy: "skip", // Skip if previous run is still active
@@ -124,7 +117,6 @@ await handle.delete(); // Remove schedule
 | Property/Method | Description |
 |-----------------|-------------|
 | `id` | Unique identifier for this schedule |
-| `name` | The schedule name |
 | `pause()` | Stop triggering |
 | `resume()` | Resume triggering |
 | `delete()` | Remove schedule |

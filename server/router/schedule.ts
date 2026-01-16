@@ -1,6 +1,6 @@
 import { isNonEmptyArray } from "@aikirun/lib";
 import { hashInput } from "@aikirun/lib/crypto";
-import type { Schedule, ScheduleId, ScheduleName } from "@aikirun/types/schedule";
+import type { Schedule, ScheduleId } from "@aikirun/types/schedule";
 import { getNextOccurrence } from "server/services/schedule";
 
 import { baseImplementer } from "./base";
@@ -10,10 +10,8 @@ import { schedulesById, schedulesByReferenceId } from "../infrastructure/persist
 const os = baseImplementer.schedule;
 
 const activateV1 = os.activateV1.handler(async ({ input: request }) => {
-	const { name, workflowName, workflowVersionId, input, spec, options } = request;
-	const scheduleName = name as ScheduleName;
+	const { workflowName, workflowVersionId, input, spec, options } = request;
 	const definitionHash = await hashInput({
-		name: scheduleName,
 		workflowName,
 		workflowVersionId,
 		spec,
@@ -34,13 +32,12 @@ const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 		}
 
 		if (existingSchedule.definitionHash !== definitionHash && conflictPolicy === "error") {
-			throw new ScheduleConflictError(scheduleName, referenceId);
+			throw new ScheduleConflictError(referenceId);
 		}
 
 		const now = Date.now();
 		const updatedSchedule: Schedule = {
 			...existingSchedule.schedule,
-			name: scheduleName,
 			workflowName,
 			workflowVersionId,
 			input,
@@ -59,7 +56,6 @@ const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 
 	const schedule: Schedule = {
 		id,
-		name: scheduleName,
 		workflowName,
 		workflowVersionId,
 		input,
@@ -103,7 +99,10 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 	const { limit = 50, offset = 0, filters } = request;
 
 	let scheduleInfos: Iterable<{ schedule: Schedule; definitionHash: string }>;
-	if (filters?.referenceId) {
+	if (filters?.id) {
+		const scheduleInfo = schedulesById.get(filters.id as ScheduleId);
+		scheduleInfos = scheduleInfo ? [scheduleInfo] : [];
+	} else if (filters?.referenceId) {
 		const id = schedulesByReferenceId.get(filters.referenceId);
 		if (id) {
 			const scheduleInfo = schedulesById.get(id);
@@ -117,18 +116,23 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 
 	const filteredSchedules: Schedule[] = [];
 	for (const { schedule } of scheduleInfos) {
-		if (filters?.status && !filters.status.includes(schedule.status)) {
+		if (filters?.id && filters.id !== schedule.id) {
 			continue;
 		}
 
-		if (filters?.name && filters.name !== schedule.name) {
+		if (filters?.referenceId && filters.referenceId !== schedule.options?.reference?.id) {
+			continue;
+		}
+
+		if (filters?.status && !filters.status.includes(schedule.status)) {
 			continue;
 		}
 
 		if (filters?.workflows && isNonEmptyArray(filters.workflows)) {
 			const matchesAnyWorkflowFilter = filters.workflows.some(
 				(w) =>
-					(!w.name || w.name === schedule.workflowName) && (!w.versionId || w.versionId === schedule.workflowVersionId)
+					(!w.name || schedule.workflowName.startsWith(w.name)) &&
+					(!w.versionId || w.versionId === schedule.workflowVersionId)
 			);
 			if (!matchesAnyWorkflowFilter) {
 				continue;

@@ -16,7 +16,6 @@ export const aikiClient = client({
 
 //#region Scheduled Notify workflow
 export const everyFiveSeconds = schedule({
-	name: "every-5-seconds",
 	type: "interval",
 	every: { seconds: 5 },
 	overlapPolicy: "skip",

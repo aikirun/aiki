@@ -35,7 +35,6 @@ export const scheduleWorkflowFilterSchema = type({
 
 export const scheduleSchema = type({
 	id: "string > 0",
-	name: "string > 0",
 	workflowName: "string > 0",
 	workflowVersionId: "string > 0",
 	"input?": "unknown",

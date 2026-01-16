@@ -76,13 +76,11 @@ export class InvalidTaskStateTransitionError extends Error {
 }
 
 export class ScheduleConflictError extends Error {
-	public readonly scheduleName: string;
 	public readonly referenceId: string;
 
-	constructor(scheduleName: string, referenceId: string) {
-		super(`Schedule "${scheduleName}" already exists with reference: ${referenceId}`);
+	constructor(referenceId: string) {
+		super(`Schedule already exists with reference: ${referenceId}`);
 		this.name = "ScheduleConflictError";
-		this.scheduleName = scheduleName;
 		this.referenceId = referenceId;
 	}
 }
