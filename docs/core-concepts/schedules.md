@@ -140,6 +140,8 @@ const handle = await dailyReport
 
 With `"upsert"`, calling `activate()` with the same reference ID but different input or timing will update the existing schedule. With `"error"`, it throws a `ScheduleConflictError` if the parameters don't match.
 
+For more on reference IDs in workflows and tasks, see the [Reference IDs guide](../guides/reference-ids.md).
+
 ## Managing Schedules
 
 The handle returned from `activate()` lets you manage the schedule:

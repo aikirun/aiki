@@ -100,6 +100,31 @@ await handle.events.approved.send({ by: "manager@example.com" });
 
 Unlike workflows and tasks, events use **silent deduplication** - duplicate events are simply ignored rather than throwing an error.
 
+## Schedule Reference IDs
+
+When activating schedules, you can provide a reference ID for explicit identity:
+
+```typescript
+const handle = await dailyReport
+	.with()
+	.opt("reference", {
+		id: "tenant-acme-daily-report",
+		conflictPolicy: "error",
+	})
+	.activate(client, reportWorkflowV1, { tenantId: "acme" });
+```
+
+Schedule conflict policies differ from workflows:
+
+| Policy | Behavior |
+|--------|----------|
+| `"upsert"` (default) | Update existing schedule if parameters differ |
+| `"error"` | Throw error if parameters differ from existing |
+
+With `"upsert"`, re-activating a schedule with different timing or input updates it. With `"error"`, it throws a `ScheduleConflictError` if the parameters don't match.
+
+See the [Schedules documentation](../core-concepts/schedules.md#reference-ids) for more details.
+
 ## How It Works
 
 ### Workflow Level

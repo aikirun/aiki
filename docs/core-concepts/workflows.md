@@ -152,6 +152,17 @@ if (result.success) {
 }
 ```
 
+Use reference IDs for idempotent workflow starts:
+
+```typescript
+const handle = await orderWorkflowV1
+	.with()
+	.opt("reference.id", "order-123")
+	.start(client, { orderId: "123" });
+```
+
+With a reference ID, calling `start()` again with the same input returns the existing run. If the input differs, the default behavior throws an error. Use `conflictPolicy: "return_existing"` to return the existing run regardless of input differences. See the [Reference IDs guide](../guides/reference-ids.md) for more details.
+
 ## Workflow Runs
 
 A workflow run is an instance of a workflow execution. It has:
