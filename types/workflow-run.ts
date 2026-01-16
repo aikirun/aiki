@@ -228,6 +228,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	createdAt: number;
 	revision: number;
 	input?: Input;
+	inputHash: string;
 	address: string;
 	options: WorkflowStartOptions;
 	attempts: number;

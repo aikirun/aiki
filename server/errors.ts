@@ -84,3 +84,13 @@ export class ScheduleConflictError extends Error {
 		this.referenceId = referenceId;
 	}
 }
+
+export class WorkflowRunConflictError extends Error {
+	public readonly referenceId: string;
+
+	constructor(referenceId: string) {
+		super(`Workflow run already exists with reference: ${referenceId}`);
+		this.name = "WorkflowRunConflictError";
+		this.referenceId = referenceId;
+	}
+}
