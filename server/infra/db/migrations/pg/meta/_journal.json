@@ -8,6 +8,13 @@
 			"when": 1768796181456,
 			"tag": "0000_flashy_virginia_dare",
 			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1768796273506,
+			"tag": "0001_updated_at_triggers",
+			"breakpoints": true
 		}
 	]
 }
