@@ -5,7 +5,7 @@ import { getNextOccurrence } from "server/services/schedule";
 
 import { baseImplementer } from "./base";
 import { NotFoundError, ScheduleConflictError } from "../errors";
-import { schedulesById, schedulesByReferenceId } from "../infrastructure/persistence/in-memory-store";
+import { schedulesById, schedulesByReferenceId } from "../infra/db/in-memory-store";
 
 const os = baseImplementer.schedule;
 

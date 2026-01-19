@@ -3,11 +3,7 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import { isTerminalWorkflowRunStatus, type WorkflowRun } from "@aikirun/types/workflow-run";
 import CronExpressionParser from "cron-parser";
 import { NotFoundError } from "server/errors";
-import {
-	schedulesById,
-	workflowRunsById,
-	workflowRunsByReferenceId,
-} from "server/infrastructure/persistence/in-memory-store";
+import { schedulesById, workflowRunsById, workflowRunsByReferenceId } from "server/infra/db/in-memory-store";
 
 export function getReferenceId(scheduleId: string, occurrence: number) {
 	return `schedule:${scheduleId}:${occurrence}`;

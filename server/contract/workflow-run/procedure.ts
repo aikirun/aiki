@@ -42,7 +42,7 @@ import {
 	workflowRunStateScheduledRequestOptimisticSchema,
 	workflowRunStateScheduledRequestPessimisticSchema,
 	workflowRunStateSchema,
-	workflowRunStateSleepingSchema,
+	workflowRunStateSleepingRequestSchema,
 	workflowRunStatusSchema,
 	workflowRunTransitionSchema,
 } from "./schema";
@@ -61,7 +61,7 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 			"limit?": "number.integer > 0 | undefined",
 			"offset?": "number.integer >= 0 | undefined",
 			"filters?": {
-				"runId?": "string > 0 | undefined",
+				"id?": "string > 0 | undefined",
 				"status?": workflowRunStatusSchema.array(),
 				"workflows?": type({
 					name: "string > 0",
@@ -155,7 +155,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 				state: workflowRunStateScheduledRequestOptimisticSchema
 					.or(workflowRunStateQueuedSchema)
 					.or(workflowRunStateRunningSchema)
-					.or(workflowRunStateSleepingSchema)
+					.or(workflowRunStateSleepingRequestSchema)
 					.or(workflowRunStateAwaitingEventRequestSchema)
 					.or(workflowRunStateAwaitingRetryRequestSchema)
 					.or(workflowRunStateAwaitingChildWorkflowRequestSchema)

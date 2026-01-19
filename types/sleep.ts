@@ -1,6 +1,7 @@
 export type SleepName = string & { _brand: "sleep_name" };
 
-export type SleepStatus = "sleeping" | "completed" | "cancelled";
+export const SLEEP_STATUSES = ["sleeping", "completed", "cancelled"] as const;
+export type SleepStatus = (typeof SLEEP_STATUSES)[number];
 
 interface SleepStateBase {
 	status: SleepStatus;

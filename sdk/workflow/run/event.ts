@@ -1,7 +1,13 @@
 import { isNonEmptyArray, toMilliseconds } from "@aikirun/lib";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
-import type { EventName, EventSendOptions, EventState, EventWaitOptions, EventWaitState } from "@aikirun/types/event";
+import type {
+	EventName,
+	EventSendOptions,
+	EventWaitOptions,
+	EventWaitResult,
+	EventWaitState,
+} from "@aikirun/types/event";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
@@ -66,8 +72,8 @@ export type EventWaiters<TEvents extends EventsDefinition> = {
 };
 
 export interface EventWaiter<Data> {
-	wait(options?: EventWaitOptions<false>): Promise<EventWaitState<Data, false>>;
-	wait(options: EventWaitOptions<true>): Promise<EventWaitState<Data, true>>;
+	wait(options?: EventWaitOptions<false>): Promise<EventWaitResult<Data, false>>;
+	wait(options: EventWaitOptions<true>): Promise<EventWaitResult<Data, true>>;
 }
 
 export type EventSenders<TEvents extends EventsDefinition> = {
@@ -140,25 +146,25 @@ export function createEventWaiter<TEvents extends EventsDefinition, Data>(
 ): EventWaiter<Data> {
 	let nextEventIndex = 0;
 
-	async function wait(options?: EventWaitOptions<false>): Promise<EventWaitState<Data, false>>;
-	async function wait(options: EventWaitOptions<true>): Promise<EventWaitState<Data, true>>;
-	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitState<Data, boolean>> {
+	async function wait(options?: EventWaitOptions<false>): Promise<EventWaitResult<Data, false>>;
+	async function wait(options: EventWaitOptions<true>): Promise<EventWaitResult<Data, true>>;
+	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitResult<Data, boolean>> {
 		await handle.refresh();
 
-		const events = handle.run.eventsQueue[eventName]?.events ?? [];
+		const eventWaits = handle.run.eventWaitQueues[eventName]?.eventWaits ?? [];
 
-		const event = events[nextEventIndex] as EventState<Data> | undefined;
-		if (event) {
+		const eventWait = eventWaits[nextEventIndex] as EventWaitState<Data> | undefined;
+		if (eventWait) {
 			nextEventIndex++;
 
-			if (event.status === "timeout") {
+			if (eventWait.status === "timeout") {
 				logger.debug("Timed out waiting for event");
 				return { timeout: true };
 			}
 
-			let data = event.data;
+			let data = eventWait.data;
 			if (schema) {
-				const schemaValidation = schema["~standard"].validate(event.data);
+				const schemaValidation = schema["~standard"].validate(eventWait.data);
 				const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
 				if (!schemaValidationResult.issues) {
 					data = schemaValidationResult.value;

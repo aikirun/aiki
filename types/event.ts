@@ -2,35 +2,36 @@ import type { DurationObject } from "./duration";
 
 export type EventName = string & { _brand: "event_name" };
 
-export type EventStatus = "received" | "timeout";
+export const EVENT_WAIT_STATUSES = ["received", "timeout"] as const;
+export type EventWaitStatus = (typeof EVENT_WAIT_STATUSES)[number];
 
-interface EventStateBase {
-	status: EventStatus;
+interface EventWaitStateBase {
+	status: EventWaitStatus;
 }
 
-export interface EventStateReceived<Data> extends EventStateBase {
+export interface EventWaitStateReceived<Data> extends EventWaitStateBase {
 	status: "received";
 	data?: Data;
 	receivedAt: number;
 	reference?: EventReferenceOptions;
 }
 
-export interface EventStateTimeout extends EventStateBase {
+export interface EventWaitStateTimeout extends EventWaitStateBase {
 	status: "timeout";
 	timedOutAt: number;
 }
 
-export type EventState<Data> = EventStateReceived<Data> | EventStateTimeout;
+export type EventWaitState<Data> = EventWaitStateReceived<Data> | EventWaitStateTimeout;
 
-export interface EventQueue<Data> {
-	events: EventState<Data>[];
+export interface EventWaitQueue<Data> {
+	eventWaits: EventWaitState<Data>[];
 }
 
 export interface EventWaitOptions<Timed extends boolean> {
 	timeout?: Timed extends true ? DurationObject : never;
 }
 
-export type EventWaitState<Data, Timed extends boolean> = Timed extends false
+export type EventWaitResult<Data, Timed extends boolean> = Timed extends false
 	? { data: Data }
 	: { timeout: false; data: Data } | { timeout: true };
 

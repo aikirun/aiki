@@ -2,7 +2,7 @@ import { toMilliseconds } from "@aikirun/lib";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { DurationObject } from "@aikirun/types/duration";
-import type { OverlapPolicy, ScheduleActivateOptions, ScheduleId, ScheduleSpec } from "@aikirun/types/schedule";
+import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, ScheduleSpec } from "@aikirun/types/schedule";
 
 import type { EventsDefinition } from "./run/event";
 import type { WorkflowVersion } from "./workflow-version";
@@ -11,13 +11,13 @@ export interface CronScheduleParams {
 	type: "cron";
 	expression: string;
 	timezone?: string;
-	overlapPolicy?: OverlapPolicy;
+	overlapPolicy?: ScheduleOverlapPolicy;
 }
 
 export interface IntervalScheduleParams {
 	type: "interval";
 	every: DurationObject;
-	overlapPolicy?: OverlapPolicy;
+	overlapPolicy?: ScheduleOverlapPolicy;
 }
 
 export type ScheduleParams = CronScheduleParams | IntervalScheduleParams;

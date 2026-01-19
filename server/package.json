@@ -7,17 +7,29 @@
 	"exports": {
 		".": "./index.ts"
 	},
+	"scripts": {
+		"db:generate": "drizzle-kit generate --config infra/db/drizzle.config.ts",
+		"db:migrate": "drizzle-kit migrate --config infra/db/drizzle.config.ts",
+		"db:push": "drizzle-kit push --config infra/db/drizzle.config.ts"
+	},
 	"dependencies": {
 		"@aikirun/lib": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"@orpc/contract": "^1.9.3",
 		"@orpc/server": "^1.9.3",
 		"arktype": "^2.1.29",
+		"better-auth": "^1.4.14",
+		"cron-parser": "^5.4.0",
 		"dotenv": "^16.4.5",
+		"drizzle-orm": "^0.45.1",
 		"ioredis": "^5.4.1",
 		"pino": "^9.6.0",
 		"pino-pretty": "^13.0.0",
-		"cron-parser": "^5.4.0"
+		"postgres": "^3.4.8",
+		"ulidx": "^2.4.1"
+	},
+	"devDependencies": {
+		"drizzle-kit": "^0.31.8"
 	},
 	"license": "Apache-2.0"
 }

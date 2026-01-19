@@ -2,7 +2,7 @@ import type { WorkflowName } from "@aikirun/types/workflow";
 import type { WorkflowListItem, WorkflowVersionItem } from "@aikirun/types/workflow-api";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { NotFoundError } from "server/errors";
-import { workflowRunsById, workflowsByName } from "server/infrastructure/persistence/in-memory-store";
+import { workflowRunsById, workflowsByName } from "server/infra/db/in-memory-store";
 
 import { baseImplementer } from "./base";
 

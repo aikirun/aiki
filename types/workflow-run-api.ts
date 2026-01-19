@@ -19,6 +19,7 @@ import type {
 	WorkflowRunStateCompleted,
 	WorkflowRunStatePaused,
 	WorkflowRunStateScheduled,
+	WorkflowRunStateSleeping,
 	WorkflowRunStatus,
 	WorkflowRunTransition,
 	WorkflowStartOptions,
@@ -44,7 +45,7 @@ export interface WorkflowRunListRequestV1 {
 	limit?: number;
 	offset?: number;
 	filters?: {
-		runId?: string;
+		id?: string;
 		status?: WorkflowRunStatus[];
 		workflows?: WorkflowFilter[];
 	};
@@ -57,6 +58,7 @@ export interface WorkflowRunListRequestV1 {
 export interface WorkflowFilter {
 	name: string;
 	versionId?: string;
+	// TODO: move ref to top level? also consider that ref is scoped to workflow version
 	referenceId?: string;
 }
 
@@ -116,6 +118,10 @@ export type WorkflowRunStateScheduledRequest = DistributiveOmit<WorkflowRunState
 	scheduledInMs: number;
 };
 
+export type WorkflowRunStateSleepingRequest = DistributiveOmit<WorkflowRunStateSleeping, "awakeAt"> & {
+	durationMs: number;
+};
+
 export type WorkflowRunStateAwaitingEventRequest = DistributiveOmit<WorkflowRunStateAwaitingEvent, "timeoutAt"> & {
 	timeoutInMs?: number;
 };
@@ -136,9 +142,18 @@ export type WorkflowRunStateCompletedRequest = OptionalProp<WorkflowRunStateComp
 export type WorkflowRunStateRequest =
 	| Exclude<
 			WorkflowRunState,
-			{ status: "scheduled" | "awaiting_event" | "awaiting_retry" | "awaiting_child_workflow" | "completed" }
+			{
+				status:
+					| "scheduled"
+					| "sleeping"
+					| "awaiting_event"
+					| "awaiting_retry"
+					| "awaiting_child_workflow"
+					| "completed";
+			}
 	  >
 	| WorkflowRunStateScheduledRequest
+	| WorkflowRunStateSleepingRequest
 	| WorkflowRunStateAwaitingEventRequest
 	| WorkflowRunStateAwaitingRetryRequest
 	| WorkflowRunStateAwaitingChildWorkflowRequest

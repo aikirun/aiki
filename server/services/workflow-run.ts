@@ -4,11 +4,7 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { WorkflowRunCreateRequestV1 } from "@aikirun/types/workflow-run-api";
 import { NotFoundError, WorkflowRunConflictError } from "server/errors";
-import {
-	workflowRunsById,
-	workflowRunsByReferenceId,
-	workflowsByName,
-} from "server/infrastructure/persistence/in-memory-store";
+import { workflowRunsById, workflowRunsByReferenceId, workflowsByName } from "server/infra/db/in-memory-store";
 import type { ServerContext } from "server/middleware";
 
 export async function createWorkflowRun(
@@ -71,7 +67,7 @@ export async function createWorkflowRun(
 		},
 		tasks: {},
 		sleepsQueue: {},
-		eventsQueue: {},
+		eventWaitQueues: {},
 		childWorkflowRuns: {},
 		parentWorkflowRunId,
 	};

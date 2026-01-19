@@ -8,11 +8,7 @@ import type {
 	WorkflowRunTransitionTaskStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
 import { InvalidTaskStateTransitionError, NotFoundError, RevisionConflictError, ValidationError } from "server/errors";
-import {
-	findTaskById,
-	workflowRunsById,
-	workflowRunTransitionsById,
-} from "server/infrastructure/persistence/in-memory-store";
+import { findTaskById, workflowRunsById, workflowRunTransitionsById } from "server/infra/db/in-memory-store";
 import type { ServerContext } from "server/middleware";
 
 const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {

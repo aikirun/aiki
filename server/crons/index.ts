@@ -1,8 +1,8 @@
 import { isNonEmptyArray } from "@aikirun/lib";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { Redis } from "ioredis";
-import { publishWorkflowRunReadyBatch } from "server/infrastructure/messaging/redis-publisher";
-import { workflowRunsById } from "server/infrastructure/persistence/in-memory-store";
+import { workflowRunsById } from "server/infra/db/in-memory-store";
+import { publishWorkflowRunReadyBatch } from "server/infra/messaging/redis-publisher";
 import type { ServerContext } from "server/middleware";
 import {
 	findActiveRunForSchedule,
@@ -160,13 +160,13 @@ export async function scheduleEventWaitTimedOutWorkflowRuns(context: ServerConte
 		const eventName = run.state.eventName;
 		const now = Date.now();
 
-		let eventQueue = run.eventsQueue[eventName];
-		if (!eventQueue) {
-			eventQueue = { events: [] };
-			run.eventsQueue[eventName] = eventQueue;
+		let eventWaitQueue = run.eventWaitQueues[eventName];
+		if (!eventWaitQueue) {
+			eventWaitQueue = { eventWaits: [] };
+			run.eventWaitQueues[eventName] = eventWaitQueue;
 		}
 
-		eventQueue.events.push({ status: "timeout", timedOutAt: now });
+		eventWaitQueue.eventWaits.push({ status: "timeout", timedOutAt: now });
 
 		await transitionWorkflowRunState(context, {
 			type: "optimistic",

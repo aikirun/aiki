@@ -1,6 +1,6 @@
 import { type } from "arktype";
 
-export const eventStateSchema = type({
+export const eventWaitStateSchema = type({
 	status: "'received'",
 	"data?": "unknown",
 	receivedAt: "number > 0",
@@ -12,6 +12,6 @@ export const eventStateSchema = type({
 	timedOutAt: "number > 0",
 });
 
-export const eventsQueueSchema = type({
-	events: eventStateSchema.array(),
+export const eventWaitQueueSchema = type({
+	eventWaits: eventWaitStateSchema.array(),
 });

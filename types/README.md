@@ -24,6 +24,8 @@ npm install @aikirun/types
 - `/error` - Serializable error types
 - `/sleep` - Sleep definition types
 - `/event` - Event definition types
+- `/schedule` - Schedule definition types
+- `/schedule-api` - API contract types
 
 ## Usage
 

@@ -8,7 +8,8 @@ export type TaskName = string & { _brand: "task_name" };
 
 export type TaskAddress = string & { _brand: "task_address" };
 
-export type TaskStatus = "running" | "awaiting_retry" | "completed" | "failed";
+export const TASK_STATUSES = ["running", "awaiting_retry", "completed", "failed"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export interface TaskDefinitionOptions {
 	retry?: RetryStrategy;
@@ -18,9 +19,12 @@ export interface TaskStartOptions extends TaskDefinitionOptions {
 	reference?: TaskReferenceOptions;
 }
 
+export const TASK_CONFLICT_POLICIES = ["error", "return_existing"] as const;
+export type TaskConflictPolicy = (typeof TASK_CONFLICT_POLICIES)[number];
+
 export interface TaskReferenceOptions {
 	id: string;
-	conflictPolicy?: "error" | "return_existing";
+	conflictPolicy?: TaskConflictPolicy;
 }
 
 interface TaskStateBase {

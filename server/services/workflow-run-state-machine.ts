@@ -14,7 +14,7 @@ import type {
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
 import { InvalidWorkflowRunStateTransitionError, NotFoundError, RevisionConflictError } from "server/errors";
-import { workflowRunsById, workflowRunTransitionsById } from "server/infrastructure/persistence/in-memory-store";
+import { workflowRunsById, workflowRunTransitionsById } from "server/infra/db/in-memory-store";
 import type { ServerContext } from "server/middleware/context";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
@@ -208,10 +208,11 @@ export async function transitionWorkflowRunState(
 		const sleepQueue = run.sleepsQueue[run.state.sleepName];
 		if (sleepQueue && isNonEmptyArray(sleepQueue.sleeps)) {
 			if (state.reason === "awake") {
-				const startedSleepingAt = transitions[transitions.length - 1]?.createdAt;
+				// biome-ignore lint/style/noNonNullAssertion: there must have been a previous transition into sleeping
+				const startedSleepingAt = transitions[transitions.length - 1]!.createdAt;
 				sleepQueue.sleeps[sleepQueue.sleeps.length - 1] = {
 					status: "completed",
-					durationMs: startedSleepingAt ? now - startedSleepingAt : run.state.durationMs,
+					durationMs: now - startedSleepingAt,
 					completedAt: now,
 				};
 			} else {
@@ -224,8 +225,7 @@ export async function transitionWorkflowRunState(
 	}
 
 	if (state.status === "sleeping") {
-		const { sleepName, durationMs } = state;
-		const awakeAt = now + durationMs;
+		const { sleepName, awakeAt } = state;
 		const sleepQueue = run.sleepsQueue[sleepName];
 		if (sleepQueue?.sleeps) {
 			sleepQueue.sleeps.push({ status: "sleeping", awakeAt });
@@ -366,7 +366,7 @@ async function notifyParentOfStateChangeIfNecessary(
 }
 
 function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateRequest, now: number): WorkflowRunState {
-	if (request.status === "scheduled" && "scheduledInMs" in request) {
+	if (request.status === "scheduled") {
 		return {
 			status: "scheduled",
 			reason: request.reason,
@@ -374,7 +374,23 @@ function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateR
 		};
 	}
 
-	if (request.status === "awaiting_retry" && "nextAttemptInMs" in request) {
+	if (request.status === "sleeping") {
+		return {
+			status: request.status,
+			sleepName: request.sleepName,
+			awakeAt: now + request.durationMs,
+		};
+	}
+
+	if (request.status === "awaiting_event" && request.timeoutInMs !== undefined) {
+		return {
+			status: request.status,
+			eventName: request.eventName,
+			timeoutAt: now + request.timeoutInMs,
+		};
+	}
+
+	if (request.status === "awaiting_retry") {
 		const nextAttemptAt = now + request.nextAttemptInMs;
 		switch (request.cause) {
 			case "task":
@@ -401,15 +417,7 @@ function convertWorkflowRunStateDurationsToTimestamps(request: WorkflowRunStateR
 		}
 	}
 
-	if (request.status === "awaiting_event" && "timeoutInMs" in request && request.timeoutInMs !== undefined) {
-		return {
-			status: request.status,
-			eventName: request.eventName,
-			timeoutAt: now + request.timeoutInMs,
-		};
-	}
-
-	if (request.status === "awaiting_child_workflow" && "timeoutInMs" in request && request.timeoutInMs !== undefined) {
+	if (request.status === "awaiting_child_workflow" && request.timeoutInMs !== undefined) {
 		return {
 			status: request.status,
 			childWorkflowRunId: request.childWorkflowRunId,

@@ -1,6 +1,6 @@
 import { type } from "arktype";
 
-import { eventsQueueSchema } from "../event/schema";
+import { eventWaitQueueSchema } from "../event/schema";
 import { serializedErrorSchema } from "../serializable";
 import { retryStrategySchema, triggerStrategySchema } from "../shared/schema";
 import { sleepQueueSchema } from "../sleep/schema";
@@ -9,6 +9,8 @@ import { taskInfoSchema, taskStateSchema } from "../task/schema";
 export const workflowRunStatusSchema = type(
 	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_child_workflow' | 'cancelled' | 'failed' | 'completed'"
 );
+
+export const terminalWorkflowRunStatusSchema = type("'cancelled' | 'failed' | 'completed'");
 
 const workflowReferenceOptionsSchema = type({
 	id: "string > 0",
@@ -55,7 +57,7 @@ export const workflowRunStatePausedSchema = type({
 export const workflowRunStateSleepingSchema = type({
 	status: "'sleeping'",
 	sleepName: "string > 0",
-	durationMs: "number > 0",
+	awakeAt: "number > 0",
 });
 
 export const workflowRunStateAwaitingEventSchema = type({
@@ -86,7 +88,7 @@ export const workflowRunStateAwaitingRetrySchema = type({
 export const workflowRunStateAwaitingChildWorkflowSchema = type({
 	status: "'awaiting_child_workflow'",
 	childWorkflowRunId: "string > 0",
-	childWorkflowRunStatus: workflowRunStatusSchema,
+	childWorkflowRunStatus: terminalWorkflowRunStatusSchema,
 	"timeoutAt?": "number > 0 | undefined",
 });
 
@@ -159,7 +161,7 @@ export const workflowRunSchema = type({
 	state: workflowRunStateSchema,
 	tasks: type({ "[string]": taskInfoSchema }),
 	sleepsQueue: type({ "[string]": sleepQueueSchema }),
-	eventsQueue: type({ "[string]": eventsQueueSchema }),
+	eventWaitQueues: type({ "[string]": eventWaitQueueSchema }),
 	childWorkflowRuns: type({ "[string]": childWorkflowRunInfoSchema }),
 	"parentWorkflowRunId?": "string > 0 | undefined",
 });
@@ -195,6 +197,12 @@ export const workflowRunStateScheduledRequestPessimisticSchema = type({
 	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'awake_early'" })
 	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'resume'" });
 
+export const workflowRunStateSleepingRequestSchema = type({
+	status: "'sleeping'",
+	sleepName: "string > 0",
+	durationMs: "number > 0",
+});
+
 export const workflowRunStateAwaitingEventRequestSchema = type({
 	status: "'awaiting_event'",
 	eventName: "string > 0",
@@ -223,7 +231,7 @@ export const workflowRunStateAwaitingRetryRequestSchema = type({
 export const workflowRunStateAwaitingChildWorkflowRequestSchema = type({
 	status: "'awaiting_child_workflow'",
 	childWorkflowRunId: "string > 0",
-	childWorkflowRunStatus: workflowRunStatusSchema,
+	childWorkflowRunStatus: terminalWorkflowRunStatusSchema,
 	"timeoutInMs?": "number.integer > 0 | undefined",
 });
 

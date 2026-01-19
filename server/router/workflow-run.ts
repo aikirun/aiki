@@ -11,7 +11,7 @@ import {
 	workflowRunsById,
 	workflowRunsByReferenceId,
 	workflowRunTransitionsById,
-} from "server/infrastructure/persistence/in-memory-store";
+} from "server/infra/db/in-memory-store";
 import type { ServerContext } from "server/middleware";
 import { transitionTaskState } from "server/services/task-state-machine";
 import { createWorkflowRun } from "server/services/workflow-run";
@@ -25,8 +25,8 @@ const listV1 = os.listV1.handler(({ input: request }) => {
 	const { filters, limit = 50, offset = 0, sort } = request;
 
 	let runs: Iterable<WorkflowRun>;
-	if (filters?.runId) {
-		const run = workflowRunsById.get(filters.runId as WorkflowRunId);
+	if (filters?.id) {
+		const run = workflowRunsById.get(filters.id as WorkflowRunId);
 		runs = run ? [run] : [];
 	} else {
 		runs = workflowRunsById.values();
@@ -248,14 +248,14 @@ async function sendEventToWorkflowRun(
 	data: unknown,
 	reference: EventReferenceOptions | undefined
 ): Promise<void> {
-	let eventQueue = run.eventsQueue[eventName];
-	if (!eventQueue) {
-		eventQueue = { events: [] };
-		run.eventsQueue[eventName] = eventQueue;
+	let eventWaitQueue = run.eventWaitQueues[eventName];
+	if (!eventWaitQueue) {
+		eventWaitQueue = { eventWaits: [] };
+		run.eventWaitQueues[eventName] = eventWaitQueue;
 	}
 
 	if (reference) {
-		const isDuplicate = eventQueue.events.some(
+		const isDuplicate = eventWaitQueue.eventWaits.some(
 			(event) => event.status === "received" && event.reference?.id === reference.id
 		);
 		if (isDuplicate) {
@@ -264,7 +264,7 @@ async function sendEventToWorkflowRun(
 		}
 	}
 
-	eventQueue.events.push({
+	eventWaitQueue.eventWaits.push({
 		status: "received",
 		data,
 		receivedAt,
