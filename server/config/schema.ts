@@ -2,6 +2,8 @@ import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
 import { type } from "arktype";
 import { logLevels } from "server/logger";
 
+const coerceBool = type("'true' | 'false' | '1' | '0'").pipe((v) => v === "true" || v === "1");
+
 export const redisConfigSchema = type({
 	host: "string = 'localhost'",
 	port: "string.integer.parse | number.integer > 0 = 6379",
@@ -22,14 +24,14 @@ export const pgDatabaseConfigSchema = type({
 	provider: "'pg'",
 	url: "string",
 	maxConnections: "string.integer.parse | number.integer > 0 = 10",
-	ssl: "boolean = false",
+	ssl: type("boolean").or(coerceBool).default(false),
 });
 
 export const mysqlDatabaseConfigSchema = type({
 	provider: "'mysql'",
 	url: "string",
 	maxConnections: "string.integer.parse | number.integer > 0 = 10",
-	ssl: "boolean = false",
+	ssl: type("boolean").or(coerceBool).default(false),
 });
 
 export const sqliteDatabaseConfigSchema = type({
@@ -38,8 +40,6 @@ export const sqliteDatabaseConfigSchema = type({
 });
 
 export const databaseConfigSchema = pgDatabaseConfigSchema.or(mysqlDatabaseConfigSchema).or(sqliteDatabaseConfigSchema);
-
-const coerceBool = type("'true' | 'false' | '1' | '0'").pipe((v) => v === "true" || v === "1");
 
 export const configSchema = type({
 	port: "string.integer.parse | number.integer > 0 = 9850",
