@@ -95,6 +95,7 @@ export const organization = pgTable("organization", {
 	metadata: jsonb("metadata"),
 	status: organizationStatusEnum("status").notNull().default("active"),
 	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const organizationMember = pgTable(
@@ -133,6 +134,7 @@ export const organizationInvitation = pgTable(
 		namespaceId: text("namespace_id"),
 		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
 		foreignKey({

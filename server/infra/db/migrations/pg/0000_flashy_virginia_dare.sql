@@ -181,6 +181,7 @@ CREATE TABLE "organization" (
 	"metadata" jsonb,
 	"status" "organization_status" DEFAULT 'active' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "uq_organization_slug" UNIQUE("slug")
 );
 --> statement-breakpoint
@@ -193,7 +194,8 @@ CREATE TABLE "organization_invitation" (
 	"status" "organization_invitation_status" NOT NULL,
 	"namespace_id" text,
 	"expires_at" timestamp with time zone NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "organization_member" (
