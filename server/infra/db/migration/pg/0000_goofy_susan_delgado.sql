@@ -307,5 +307,7 @@ CREATE UNIQUE INDEX "uqidx_api_key_org_namespace_created_by_user_name" ON "api_k
 CREATE INDEX "idx_api_key_org_namespace_name" ON "api_key" USING btree ("organization_id","namespace_id","name");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_namespace_org_name" ON "namespace" USING btree ("organization_id","name");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_namespace_member_namespace_user" ON "namespace_member" USING btree ("namespace_id","user_id");--> statement-breakpoint
+CREATE INDEX "idx_namespace_member_user_id" ON "namespace_member" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_org_invitation_pending_email_org_namespace" ON "organization_invitation" USING btree ("email","organization_id","namespace_id") WHERE "organization_invitation"."status" = 'pending';--> statement-breakpoint
-CREATE UNIQUE INDEX "uqidx_org_member_org_user" ON "organization_member" USING btree ("organization_id","user_id");
+CREATE UNIQUE INDEX "uqidx_org_member_org_user" ON "organization_member" USING btree ("organization_id","user_id");--> statement-breakpoint
+CREATE INDEX "idx_org_member_user_id" ON "organization_member" USING btree ("user_id");

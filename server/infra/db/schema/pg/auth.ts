@@ -122,6 +122,7 @@ export const organizationMember = pgTable(
 			foreignColumns: [organization.id],
 		}),
 		uniqueIndex("uqidx_org_member_org_user").on(table.organizationId, table.userId),
+		index("idx_org_member_user_id").on(table.userId),
 	]
 );
 
@@ -197,6 +198,7 @@ export const namespaceMember = pgTable(
 			foreignColumns: [user.id],
 		}),
 		uniqueIndex("uqidx_namespace_member_namespace_user").on(table.namespaceId, table.userId),
+		index("idx_namespace_member_user_id").on(table.userId),
 	]
 );
 

@@ -1,6 +1,6 @@
 {
-	"id": "e81bb45a-fc31-4869-b03a-5eec0ac1a38c",
-	"prevId": "afc01566-b18e-4d55-a61d-0a4294f7c9b6",
+	"id": "dcf94179-fdc5-442e-980a-e457df2ecca2",
+	"prevId": "ea8d4a12-c39f-4ece-86c0-f5b595ae62bc",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
@@ -1725,6 +1725,21 @@
 					"with": {},
 					"method": "btree",
 					"concurrently": false
+				},
+				"idx_namespace_member_user_id": {
+					"name": "idx_namespace_member_user_id",
+					"columns": [
+						{
+							"expression": "user_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
 				}
 			},
 			"foreignKeys": {
@@ -2004,6 +2019,21 @@
 						}
 					],
 					"isUnique": true,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_org_member_user_id": {
+					"name": "idx_org_member_user_id",
+					"columns": [
+						{
+							"expression": "user_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
 					"with": {},
 					"method": "btree",
 					"concurrently": false

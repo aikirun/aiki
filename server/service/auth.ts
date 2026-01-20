@@ -14,7 +14,12 @@ export function createAuthService(options: AuthOptions) {
 	return betterAuth({
 		database: drizzleAdapter(options.db, { provider: "pg" }),
 		baseURL: options.baseURL,
+		basePath: "/auth",
 		secret: options.secret,
+
+		emailAndPassword: {
+			enabled: true,
+		},
 
 		user: {
 			fields: {

@@ -49,7 +49,7 @@ if (import.meta.main) {
 	const corsHeaders = {
 		"Access-Control-Allow-Origin": "*",
 		"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-		"Access-Control-Allow-Headers": "Content-Type, x-trace-id, Accept",
+		"Access-Control-Allow-Headers": "Content-Type, Authorization, x-trace-id, Accept",
 	};
 	const corsResponse = new Response(null, { status: 204, headers: corsHeaders });
 	function withCorsHeaders(response: Response): Response {
@@ -68,6 +68,10 @@ if (import.meta.main) {
 					return withCorsHeaders(new Response("Method Not Allowed", { status: 405 }));
 				}
 				return withCorsHeaders(Response.json({ status: "ok" }));
+			},
+			"/auth/*": async (request) => {
+				if (request.method === "OPTIONS") return corsResponse;
+				return withCorsHeaders(await authService.handler(request));
 			},
 			"/api/*": async (request) => {
 				if (request.method === "OPTIONS") return corsResponse;
