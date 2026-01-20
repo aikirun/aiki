@@ -17,13 +17,8 @@ import { createDatabaseConn } from "./infra/db";
 import { createApiKeyRepository } from "./infra/db/repository/api-key";
 import { createLogger, type Logger } from "./infra/logger";
 import { createAuthorizer } from "./middleware/authorization";
-import {
-	type AuthedRequestContext,
-	createAuthedRequestContext,
-	createCronContext,
-	createPublicRequestContext,
-} from "./middleware/context";
-import { authedRouter, publicRouter } from "./router/index";
+import { type AuthedRequestContext, createAuthedRequestContext, createCronContext } from "./middleware/context";
+import { authedRouter } from "./router/index";
 import { createApiKeyService } from "./service/api-key";
 import { createAuthService } from "./service/auth";
 
@@ -49,7 +44,6 @@ if (import.meta.main) {
 
 	const { authorizeByApiKey, authorizeBySession } = createAuthorizer(apiKeyService, authService);
 
-	const publicHandler = new RPCHandler(publicRouter, {});
 	const authedHandler = new RPCHandler(authedRouter, {});
 
 	const corsHeaders = {
@@ -70,9 +64,10 @@ if (import.meta.main) {
 		routes: {
 			"/health": async (request) => {
 				if (request.method === "OPTIONS") return corsResponse;
-				const context = createPublicRequestContext({ request, logger });
-				const result = await publicHandler.handle(request, { context });
-				return withCorsHeaders(result.response ?? new Response("Not Found", { status: 404 }));
+				if (request.method !== "GET") {
+					return withCorsHeaders(new Response("Method Not Allowed", { status: 405 }));
+				}
+				return withCorsHeaders(Response.json({ status: "ok" }));
 			},
 			"/api/*": async (request) => {
 				if (request.method === "OPTIONS") return corsResponse;

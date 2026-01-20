@@ -1,5 +1,3 @@
-import { healthContract } from "./procedure/health";
-
-export const publicContract = { health: healthContract };
+export const publicContract = {};
 
 export type PublicContract = typeof publicContract;
