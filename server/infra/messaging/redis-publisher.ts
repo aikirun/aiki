@@ -2,13 +2,9 @@ import { getWorkflowStreamName } from "@aikirun/lib/address";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRun } from "@aikirun/types/workflow-run";
 import type { Redis } from "ioredis";
-import type { ServerContext } from "server/middleware/context";
+import type { Context } from "server/middleware/context";
 
-export async function publishWorkflowRunReadyBatch(
-	context: ServerContext,
-	redis: Redis,
-	runs: WorkflowRun[]
-): Promise<void> {
+export async function publishWorkflowRunReadyBatch(context: Context, redis: Redis, runs: WorkflowRun[]): Promise<void> {
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}

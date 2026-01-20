@@ -8,7 +8,7 @@ import type { WorkflowRunAddress } from "@aikirun/types/workflow-run";
  * @returns Task address string
  */
 export function getTaskAddress(name: string, referenceId: string): TaskAddress {
-	return `${name}/${referenceId}` as TaskAddress;
+	return `${name}:${referenceId}` as TaskAddress;
 }
 
 /**
@@ -19,7 +19,7 @@ export function getTaskAddress(name: string, referenceId: string): TaskAddress {
  * @returns Workflow run address string
  */
 export function getWorkflowRunAddress(name: string, versionId: string, referenceId: string): WorkflowRunAddress {
-	return `${name}/${versionId}/${referenceId}` as WorkflowRunAddress;
+	return `${name}:${versionId}:${referenceId}` as WorkflowRunAddress;
 }
 
 /**
@@ -30,7 +30,7 @@ export function getWorkflowRunAddress(name: string, versionId: string, reference
  * @returns Redis stream name
  */
 export function getWorkflowStreamName(name: string, versionId: string, shard?: string): string {
-	return shard ? `workflow/${name}/${versionId}/${shard}` : `workflow/${name}/${versionId}`;
+	return shard ? `workflow:${name}:${versionId}:${shard}` : `workflow:${name}:${versionId}`;
 }
 
 /**
@@ -41,5 +41,5 @@ export function getWorkflowStreamName(name: string, versionId: string, shard?: s
  * @returns Redis consumer group name
  */
 export function getWorkerConsumerGroupName(workflowName: string, workflowVersionId: string, shard?: string): string {
-	return shard ? `worker/${workflowName}/${workflowVersionId}/${shard}` : `worker/${workflowName}/${workflowVersionId}`;
+	return shard ? `worker:${workflowName}:${workflowVersionId}:${shard}` : `worker:${workflowName}:${workflowVersionId}`;
 }

@@ -1,4 +1,10 @@
+import { createHash } from "node:crypto";
+
 import { stableStringify } from "../json";
+
+export function sha256Sync(input: string): string {
+	return createHash("sha256").update(input).digest("hex");
+}
 
 export async function sha256(input: string): Promise<string> {
 	const data = new TextEncoder().encode(input);

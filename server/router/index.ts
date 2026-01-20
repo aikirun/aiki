@@ -1,9 +1,14 @@
-import { baseImplementer } from "./base";
-import { scheduleRouter } from "./schedule";
-import { workflowRouter } from "./workflow";
-import { workflowRunRouter } from "./workflow-run";
+import { scheduleRouter } from "./authed/schedule";
+import { workflowRouter } from "./authed/workflow";
+import { workflowRunRouter } from "./authed/workflow-run";
+import { authedImplementer, publicImplementer } from "./implementer";
+import { healthRouter } from "./public/health";
 
-export const router = baseImplementer.router({
+export const publicRouter = publicImplementer.router({
+	health: healthRouter,
+});
+
+export const authedRouter = authedImplementer.router({
 	schedule: scheduleRouter,
 	workflow: workflowRouter,
 	workflowRun: workflowRunRouter,

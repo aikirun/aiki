@@ -40,12 +40,16 @@ export async function loadConfig(): Promise<Config> {
 
 	const raw = {
 		port: process.env.AIKI_SERVER_PORT,
+		baseURL: process.env.AIKI_SERVER_BASE_URL,
 		redis: {
 			host: process.env.REDIS_HOST,
 			port: process.env.REDIS_PORT,
 			password: process.env.REDIS_PASSWORD,
 		},
 		database: loadDatabaseConfig(),
+		auth: {
+			secret: process.env.AIKI_SERVER_AUTH_SECRET,
+		},
 		logLevel: process.env.LOG_LEVEL,
 		prettyLogs: process.env.PRETTY_LOGS,
 	};

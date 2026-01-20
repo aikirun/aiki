@@ -3,7 +3,7 @@ import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { Redis } from "ioredis";
 import { workflowRunsById } from "server/infra/db/in-memory-store";
 import { publishWorkflowRunReadyBatch } from "server/infra/messaging/redis-publisher";
-import type { ServerContext } from "server/middleware";
+import type { Context } from "server/middleware/context";
 import {
 	findActiveRunForSchedule,
 	getDueOccurrences,
@@ -11,9 +11,9 @@ import {
 	getNextOccurrence,
 	getReferenceId,
 	updateSchedule,
-} from "server/services/schedule";
-import { createWorkflowRun } from "server/services/workflow-run";
-import { transitionWorkflowRunState } from "server/services/workflow-run-state-machine";
+} from "server/service/schedule";
+import { createWorkflowRun } from "server/service/workflow-run";
+import { transitionWorkflowRunState } from "server/service/workflow-run-state-machine";
 
 function getWorkflowRunsWithElapsedSchedule(): WorkflowRun[] {
 	const now = Date.now();
@@ -31,7 +31,7 @@ function getWorkflowRunsWithElapsedSchedule(): WorkflowRun[] {
 // TODO:
 // 		- add back pressure so we do not overwhelm workers
 // 		- ensure db update and event publish are atomic
-export async function queueScheduledWorkflowRuns(context: ServerContext, redis: Redis) {
+export async function queueScheduledWorkflowRuns(context: Context, redis: Redis) {
 	const runs = getWorkflowRunsWithElapsedSchedule();
 
 	for (const run of runs) {
@@ -63,7 +63,7 @@ function getRetryableWorkflows(): WorkflowRun[] {
 	return retryableRuns;
 }
 
-export async function scheduleRetryableWorkflowRuns(context: ServerContext) {
+export async function scheduleRetryableWorkflowRuns(context: Context) {
 	const runs = getRetryableWorkflows();
 
 	for (const run of runs) {
@@ -93,7 +93,7 @@ function getWorkflowRunsWithRetryableTask(): WorkflowRun[] {
 	return runsWithRetryableTask;
 }
 
-export async function scheduleWorkflowRunsWithRetryableTask(context: ServerContext) {
+export async function scheduleWorkflowRunsWithRetryableTask(context: Context) {
 	const runs = getWorkflowRunsWithRetryableTask();
 
 	for (const run of runs) {
@@ -123,7 +123,7 @@ function getSleepingElapsedWorkflowRuns(): WorkflowRun[] {
 	return sleepingRuns;
 }
 
-export async function scheduleSleepingElapedWorkflowRuns(context: ServerContext) {
+export async function scheduleSleepingElapedWorkflowRuns(context: Context) {
 	const runs = getSleepingElapsedWorkflowRuns();
 
 	for (const run of runs) {
@@ -149,7 +149,7 @@ function getEventWaitTimedOutWorkflowRuns(): WorkflowRun[] {
 	return eventWaitTimedOutRuns;
 }
 
-export async function scheduleEventWaitTimedOutWorkflowRuns(context: ServerContext) {
+export async function scheduleEventWaitTimedOutWorkflowRuns(context: Context) {
 	const runs = getEventWaitTimedOutWorkflowRuns();
 
 	for (const run of runs) {
@@ -194,7 +194,7 @@ function getWorkflowRunsThatTimedOutWaitingForChild(): WorkflowRun[] {
 	return workflowRunsThatTimedoutWaitingForChild;
 }
 
-export async function scheduleWorkflowRunsThatTimedOutWaitingForChild(context: ServerContext) {
+export async function scheduleWorkflowRunsThatTimedOutWaitingForChild(context: Context) {
 	const runs = getWorkflowRunsThatTimedOutWaitingForChild();
 	const now = Date.now();
 
@@ -222,7 +222,7 @@ export async function scheduleWorkflowRunsThatTimedOutWaitingForChild(context: S
 	}
 }
 
-export async function scheduleRecurringWorkflows(context: ServerContext) {
+export async function scheduleRecurringWorkflows(context: Context) {
 	const now = Date.now();
 	const dueSchedules = getDueSchedules(now);
 

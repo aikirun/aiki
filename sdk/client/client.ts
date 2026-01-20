@@ -1,3 +1,4 @@
+import process from "node:process";
 import type { ApiClient, Client, ClientParams, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { createORPCClient } from "@orpc/client";
@@ -6,6 +7,8 @@ import { Redis } from "ioredis";
 
 import { ConsoleLogger } from "./logger/index";
 import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
+
+const AIKI_API_KEY_ENV_NAME = "AIKI_API_KEY";
 
 /**
  * Creates an Aiki client for starting and managing workflows.
@@ -16,6 +19,7 @@ import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
  * @template AppContext - Type of application context passed to workflows (default: null)
  * @param params - Client configuration parameters
  * @param params.url - HTTP URL of the Aiki server (e.g., "http://localhost:9850")
+ * @param params.apiKey - API key for authentication. Falls back to AIKI_API_KEY env variable if not provided.
  * @param params.redis - Redis connection configuration
  * @param params.redis.host - Redis server hostname
  * @param params.redis.port - Redis server port
@@ -28,6 +32,7 @@ import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
  * ```typescript
  * const aikiClient = client({
  *   url: "http://localhost:9850",
+ *   apiKey: "yourApiKey", // or omit to use AIKI_API_KEY env variable
  *   redis: { host: "localhost", port: 6379 },
  *   createContext: (run) => ({
  *     traceId: generateTraceId(),
@@ -61,7 +66,17 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 	constructor(private readonly params: ClientParams<AppContext>) {
 		this.logger = params.logger ?? new ConsoleLogger();
 
-		const rpcLink = new RPCLink({ url: `${params.url}` });
+		const apiKey = params.apiKey ?? process.env[AIKI_API_KEY_ENV_NAME];
+		if (!apiKey) {
+			throw new Error(`API key is required. Provide it via 'apiKey' param or ${AIKI_API_KEY_ENV_NAME} env variable`);
+		}
+
+		const rpcLink = new RPCLink({
+			url: `${params.url}/api`,
+			headers: () => ({
+				Authorization: `Bearer ${apiKey}`,
+			}),
+		});
 		// Type safety: The server package has compile-time tests (see server/contract/workflow-run/procedure.ts)
 		// that verify the contract matches WorkflowRunApi. If the contract changes, server won't compile.
 		this.api = createORPCClient(rpcLink) as unknown as ApiClient;

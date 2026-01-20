@@ -1,9 +1,10 @@
 import { sql } from "drizzle-orm";
-import { boolean, foreignKey, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
-import { NAMESPACE_ROLES, NAMESPACE_STATUSES } from "../../models/namespace";
-import { ORGANIZATION_INVITATION_STATUSES, ORGANIZATION_ROLES, ORGANIZATION_STATUSES } from "../../models/organization";
-import { USER_STATUSES } from "../../models/user";
+import { API_KEY_STATUSES } from "../../model/api-key";
+import { NAMESPACE_ROLES, NAMESPACE_STATUSES } from "../../model/namespace";
+import { ORGANIZATION_INVITATION_STATUSES, ORGANIZATION_ROLES, ORGANIZATION_STATUSES } from "../../model/organization";
+import { USER_STATUSES } from "../../model/user";
 
 export const userStatusEnum = pgEnum("user_status", USER_STATUSES);
 
@@ -16,6 +17,8 @@ export const organizationInvitationStatusEnum = pgEnum(
 
 export const namespaceStatusEnum = pgEnum("namespace_status", NAMESPACE_STATUSES);
 export const namespaceRoleEnum = pgEnum("namespace_role", NAMESPACE_ROLES);
+
+export const apiKeyStatusEnum = pgEnum("api_key_status", API_KEY_STATUSES);
 
 export const user = pgTable("user", {
 	id: text("id").primaryKey(),
@@ -194,5 +197,47 @@ export const namespaceMember = pgTable(
 			foreignColumns: [user.id],
 		}),
 		uniqueIndex("uqidx_namespace_member_namespace_user").on(table.namespaceId, table.userId),
+	]
+);
+
+export const apiKey = pgTable(
+	"api_key",
+	{
+		id: text("id").primaryKey(),
+		namespaceId: text("namespace_id").notNull(),
+		organizationId: text("organization_id").notNull(),
+		createdByUserId: text("created_by_user_id").notNull(),
+		name: text("name").notNull(),
+		keyHash: text("key_hash").notNull().unique("uq_api_key_key_hash"),
+		keyPrefix: text("key_prefix").notNull(),
+		status: apiKeyStatusEnum("status").notNull().default("active"),
+		expiresAt: timestamp("expires_at", { withTimezone: true }),
+		revokedAt: timestamp("revoked_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		foreignKey({
+			name: "fk_api_key_namespace_id",
+			columns: [table.namespaceId],
+			foreignColumns: [namespace.id],
+		}).onDelete("cascade"),
+		foreignKey({
+			name: "fk_api_key_organization_id",
+			columns: [table.organizationId],
+			foreignColumns: [organization.id],
+		}).onDelete("cascade"),
+		foreignKey({
+			name: "fk_api_key_created_by_user_id",
+			columns: [table.createdByUserId],
+			foreignColumns: [user.id],
+		}),
+		uniqueIndex("uqidx_api_key_org_namespace_created_by_user_name").on(
+			table.organizationId,
+			table.namespaceId,
+			table.createdByUserId,
+			table.name
+		),
+		index("idx_api_key_org_namespace_name").on(table.organizationId, table.namespaceId, table.name),
 	]
 );

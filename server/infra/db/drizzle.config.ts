@@ -21,7 +21,7 @@ if (!connectionString) {
 
 export default {
 	schema: `./infra/db/schema/${provider}/*.ts`,
-	out: `./infra/db/migrations/${provider}`,
+	out: `./infra/db/migration/${provider}`,
 	dialect: providerDialects[provider],
 	dbCredentials: {
 		url: connectionString,

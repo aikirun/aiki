@@ -20,6 +20,7 @@
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage",
 		"db:generate": "bun run --cwd server db:generate",
+		"db:generate:custom": "bun run --cwd server db:generate:custom",
 		"db:migrate": "bun run --cwd server db:migrate",
 		"db:push": "bun run --cwd server db:push",
 		"server": "bun run server/index.ts",

@@ -5,7 +5,7 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
 const API_URL = import.meta.env.VITE_AIKI_SERVER_URL || "http://localhost:9850";
-const rpcLink = new RPCLink({ url: API_URL });
+const rpcLink = new RPCLink({ url: `${API_URL}/web` });
 
 export const client = createORPCClient(rpcLink) as unknown as {
 	schedule: ScheduleApi;
