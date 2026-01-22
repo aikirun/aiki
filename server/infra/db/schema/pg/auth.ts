@@ -1,7 +1,7 @@
+import { API_KEY_STATUSES } from "@aikirun/types/api-key-api";
 import { sql } from "drizzle-orm";
 import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
-import { API_KEY_STATUSES } from "../../model/api-key";
 import { NAMESPACE_ROLES, NAMESPACE_STATUSES } from "../../model/namespace";
 import {
 	ORGANIZATION_INVITATION_STATUSES,
