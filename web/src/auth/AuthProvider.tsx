@@ -49,7 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const [namespaces, setNamespaces] = useState<Namespace[]>([]);
 	const [activeOrganization, setActiveOrganizationState] = useState<Organization | null>(null);
 	const [activeNamespace, setActiveNamespaceState] = useState<Namespace | null>(null);
+	const [orgsInitialized, setOrgsInitialized] = useState(false);
 	const [orgsLoading, setOrgsLoading] = useState(false);
+	const [namespacesInitialized, setNamespacesInitialized] = useState(false);
 	const [namespacesLoading, setNamespacesLoading] = useState(false);
 
 	const isAuthenticated = !!session?.user;
@@ -65,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			}
 		} finally {
 			setOrgsLoading(false);
+			setOrgsInitialized(true);
 		}
 	}, [isAuthenticated]);
 
@@ -84,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				}
 			} finally {
 				setNamespacesLoading(false);
+				setNamespacesInitialized(true);
 			}
 		},
 		[activeOrganization]
@@ -110,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			}
 		} finally {
 			setNamespacesLoading(false);
+			setNamespacesInitialized(true);
 		}
 	}, []);
 
@@ -124,6 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		setNamespaces([]);
 		setActiveOrganizationState(null);
 		setActiveNamespaceState(null);
+		setOrgsInitialized(false);
+		setNamespacesInitialized(false);
 	}, []);
 
 	const refetchSession = useCallback(async () => {
@@ -139,19 +146,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		if (session?.session?.activeOrganizationId && organizations.length > 0) {
 			const activeOrg = organizations.find((org) => org.id === session.session.activeOrganizationId);
-			if (activeOrg) {
+			if (activeOrg && activeOrg.id !== activeOrganization?.id) {
 				setActiveOrganizationState(activeOrg);
+				setNamespacesLoading(true);
+				authClient.organization
+					.listTeams({ query: { organizationId: activeOrg.id } })
+					.then((result) => {
+						if (result.data) {
+							setNamespaces(result.data as Namespace[]);
+						}
+					})
+					.catch((err) => {
+						console.error("Failed to fetch namespaces:", err);
+					})
+					.finally(() => {
+						setNamespacesLoading(false);
+						setNamespacesInitialized(true);
+					});
 			}
 		} else if (organizations.length > 0 && !activeOrganization) {
 			setActiveOrganization(organizations[0]);
 		}
 	}, [session?.session?.activeOrganizationId, organizations, activeOrganization, setActiveOrganization]);
-
-	useEffect(() => {
-		if (activeOrganization) {
-			refreshNamespaces();
-		}
-	}, [activeOrganization, refreshNamespaces]);
 
 	useEffect(() => {
 		const activeTeamId = (session?.session as { activeTeamId?: string } | undefined)?.activeTeamId;
@@ -165,7 +181,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		}
 	}, [session?.session, namespaces, activeNamespace, setActiveNamespace]);
 
-	const isLoading = sessionLoading || orgsLoading || namespacesLoading;
+	const isLoading =
+		sessionLoading ||
+		orgsLoading ||
+		namespacesLoading ||
+		(isAuthenticated && !orgsInitialized) ||
+		(isAuthenticated && orgsInitialized && organizations.length > 0 && !activeOrganization) ||
+		(isAuthenticated && !!activeOrganization && !namespacesInitialized);
 
 	return (
 		<AuthContext.Provider
