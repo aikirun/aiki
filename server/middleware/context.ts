@@ -1,8 +1,13 @@
 import type { Logger } from "server/infra/logger";
 
-import type { Authorization } from "./authorization";
+import type {
+	ApiKeyAuthorization,
+	AuthorizationMethod,
+	NamespaceSessionAuthorization,
+	OrganizationSessionAuthorization,
+} from "./authorization";
 
-interface ContextBase {
+export interface ContextBase {
 	type: "request" | "cron";
 	traceId: string;
 	logger: Logger;
@@ -22,21 +27,33 @@ export interface PublicRequestContext extends RequestContextBase {
 
 export interface AuthedRequestContextBase extends RequestContextBase {
 	requestType: "authed";
-	organizationId: string;
-	namespaceId: string;
-	authMethod: "session" | "api_key";
+	authMethod: AuthorizationMethod;
 }
 
-export interface SessionAuthedRequestContext extends AuthedRequestContextBase {
-	authMethod: "session";
+export interface OrganizationSessionRequestContext extends AuthedRequestContextBase {
+	authMethod: "organization_session";
+	organizationId: string;
 	userId: string;
 }
 
-export interface ApiKeyAuthedRequestContext extends AuthedRequestContextBase {
-	authMethod: "api_key";
+export interface NamespaceSessionRequestContext extends AuthedRequestContextBase {
+	authMethod: "namespace_session";
+	organizationId: string;
+	namespaceId: string;
+	userId: string;
 }
 
-export type AuthedRequestContext = SessionAuthedRequestContext | ApiKeyAuthedRequestContext;
+export interface ApiKeyRequestContext extends AuthedRequestContextBase {
+	authMethod: "api_key";
+	organizationId: string;
+	namespaceId: string;
+}
+
+export type OrganizationRequestContext = OrganizationSessionRequestContext;
+
+export type NamespaceRequestContext = NamespaceSessionRequestContext | ApiKeyRequestContext;
+
+export type AuthedRequestContext = OrganizationRequestContext | NamespaceRequestContext;
 
 export type RequestContext = PublicRequestContext | AuthedRequestContext;
 
@@ -65,17 +82,44 @@ export function createPublicRequestContext(params: { request: Request; logger: L
 	};
 }
 
-export async function createAuthedRequestContext(params: {
+export async function createOrganizationRequestContext(params: {
 	request: Request;
 	logger: Logger;
-	authorizer: (_: Request) => Promise<Authorization>;
-}): Promise<AuthedRequestContext> {
-	const { request, logger, authorizer: getAuthorization } = params;
+	authorizer: (_: Request) => Promise<OrganizationSessionAuthorization>;
+}): Promise<OrganizationRequestContext> {
+	const { request, logger, authorizer } = params;
 	const traceId = request.headers.get("x-trace-id") ?? crypto.randomUUID();
+	const authorization = await authorizer(request);
+	return {
+		type: "request",
+		traceId,
+		logger: logger.child({
+			method: request.method,
+			url: request.url,
+			traceId,
+		}),
+		requestType: "authed",
+		headers: request.headers,
+		method: request.method,
+		url: request.url,
 
-	const authorization = await getAuthorization(request);
+		authMethod: "organization_session",
+		organizationId: authorization.organizationId,
+		userId: authorization.userId,
+	};
+}
+
+export async function createNamespaceRequestContext(params: {
+	request: Request;
+	logger: Logger;
+	authorizer: (_: Request) => Promise<NamespaceSessionAuthorization | ApiKeyAuthorization>;
+}): Promise<NamespaceRequestContext> {
+	const { request, logger, authorizer } = params;
+	const traceId = request.headers.get("x-trace-id") ?? crypto.randomUUID();
+	const authorization = await authorizer(request);
+
 	switch (authorization.method) {
-		case "session":
+		case "namespace_session":
 			return {
 				type: "request",
 				traceId,
@@ -89,7 +133,7 @@ export async function createAuthedRequestContext(params: {
 				method: request.method,
 				url: request.url,
 
-				authMethod: "session",
+				authMethod: "namespace_session",
 				organizationId: authorization.organizationId,
 				namespaceId: authorization.namespaceId,
 				userId: authorization.userId,

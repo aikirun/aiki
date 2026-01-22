@@ -77,3 +77,10 @@ export function useSchedules(params: ScheduleListRequestV1 = {}) {
 		placeholderData: keepPreviousData,
 	});
 }
+
+export function useApiKeys() {
+	return useQuery({
+		queryKey: ["api-keys"],
+		queryFn: () => client.apiKey.listV1(),
+	});
+}

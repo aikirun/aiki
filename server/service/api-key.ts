@@ -80,14 +80,14 @@ export function createApiKeyService(repo: ApiKeyRepository, redis: Redis) {
 			if (!keyInfo) {
 				return null;
 			}
-			if (keyInfo.expiresAt && keyInfo.expiresAt <= new Date()) {
+			if (keyInfo.expiresAt && keyInfo.expiresAt <= Date.now()) {
 				return null;
 			}
 
 			const cachedKeyInfo: CachedKeyInfo = {
 				organizationId: keyInfo.organizationId,
 				namespaceId: keyInfo.namespaceId,
-				expiresAt: keyInfo.expiresAt?.getTime() ?? null,
+				expiresAt: keyInfo.expiresAt,
 			};
 			await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(cachedKeyInfo));
 
@@ -95,6 +95,14 @@ export function createApiKeyService(repo: ApiKeyRepository, redis: Redis) {
 				namespaceId: keyInfo.namespaceId,
 				organizationId: keyInfo.organizationId,
 			};
+		},
+
+		async list(filters: { organizationId: string; namespaceId: string }) {
+			return repo.list(filters);
+		},
+
+		async revoke(id: string) {
+			await repo.revoke(id);
 		},
 	};
 }

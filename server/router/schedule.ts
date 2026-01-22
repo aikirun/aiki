@@ -3,11 +3,11 @@ import { sha256 } from "@aikirun/lib/crypto";
 import type { Schedule, ScheduleId } from "@aikirun/types/schedule";
 import { getNextOccurrence } from "server/service/schedule";
 
-import { NotFoundError, ScheduleConflictError } from "../../errors";
-import { schedulesById, schedulesByReferenceId } from "../../infra/db/in-memory-store";
-import { authedImplementer } from "../implementer";
+import { namespaceAuthedImplementer } from "./implementer";
+import { NotFoundError, ScheduleConflictError } from "../errors";
+import { schedulesById, schedulesByReferenceId } from "../infra/db/in-memory-store";
 
-const os = authedImplementer.schedule;
+const os = namespaceAuthedImplementer.schedule;
 
 const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 	const { workflowName, workflowVersionId, input, spec, options } = request;

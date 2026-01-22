@@ -1,4 +1,4 @@
-import type { EventQueue } from "@aikirun/types/event";
+import type { EventWaitQueue } from "@aikirun/types/event";
 import type { SleepQueue } from "@aikirun/types/sleep";
 import type { TaskInfo } from "@aikirun/types/task";
 import type { ChildWorkflowRunInfo, WorkflowRunStatus, WorkflowRunTransition } from "@aikirun/types/workflow-run";
@@ -345,7 +345,7 @@ export function RunDetail() {
 					) : (
 						<Timeline
 							transitions={transitions?.transitions || []}
-							eventsQueue={currentRun.eventsQueue}
+							eventWaitQueues={currentRun.eventWaitQueues}
 							sleepsQueue={currentRun.sleepsQueue}
 							childWorkflowRuns={currentRun.childWorkflowRuns}
 							taskById={taskById}
@@ -390,13 +390,13 @@ interface TimelineLookups {
 
 function Timeline({
 	transitions,
-	eventsQueue,
+	eventWaitQueues,
 	sleepsQueue,
 	childWorkflowRuns,
 	taskById,
 }: {
 	transitions: WorkflowRunTransition[];
-	eventsQueue: Record<string, EventQueue<unknown>>;
+	eventWaitQueues: Record<string, EventWaitQueue<unknown>>;
 	sleepsQueue: Record<string, SleepQueue>;
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>;
 	taskById: Map<string, TaskInfo>;
@@ -490,8 +490,8 @@ function Timeline({
 						if (prev.type === "state" && prev.state?.status === "awaiting_event") {
 							const eventName = prev.state.eventName;
 							context.eventDataName = eventName;
-							const queue = eventsQueue[eventName];
-							if (queue?.events.length > 0) {
+							const queue = eventWaitQueues[eventName];
+							if (queue?.eventWaits.length > 0) {
 								let eventIndex = 0;
 								for (let k = 0; k < j; k++) {
 									const t2 = transitions[k];
@@ -503,7 +503,7 @@ function Timeline({
 										eventIndex++;
 									}
 								}
-								const event = queue.events[eventIndex];
+								const event = queue.eventWaits[eventIndex];
 								if (event?.status === "received") {
 									context.eventData = event.data;
 								} else if (event?.status === "timeout") {
@@ -555,7 +555,7 @@ function Timeline({
 		}
 
 		return { childWorkflowById, taskById, scheduledContext };
-	}, [transitions, eventsQueue, sleepsQueue, childWorkflowRuns, taskById]);
+	}, [transitions, eventWaitQueues, sleepsQueue, childWorkflowRuns, taskById]);
 
 	const transitionsWithMetadata = useMemo(() => {
 		let lastDate = "";
@@ -654,7 +654,8 @@ const TimelineItem = memo(function TimelineItem({
 
 		let sleepDuration: string | undefined;
 		if (state.status === "sleeping") {
-			sleepDuration = formatDuration(state.durationMs);
+			const remainingMs = state.awakeAt - Date.now();
+			sleepDuration = remainingMs > 0 ? formatDuration(remainingMs) : "waking up";
 		}
 
 		let childWorkflowRunId: string | undefined;

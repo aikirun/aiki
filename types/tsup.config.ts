@@ -2,9 +2,11 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
 	entry: {
+		"api-key-api": "api-key-api.ts",
 		client: "client.ts",
 		duration: "duration.ts",
 		event: "event.ts",
+		"namespace-api": "namespace-api.ts",
 		schedule: "schedule.ts",
 		"schedule-api": "schedule-api.ts",
 		retry: "retry.ts",

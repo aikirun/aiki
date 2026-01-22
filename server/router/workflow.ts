@@ -4,9 +4,9 @@ import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { NotFoundError } from "server/errors";
 import { workflowRunsById, workflowsByName } from "server/infra/db/in-memory-store";
 
-import { authedImplementer } from "../implementer";
+import { namespaceAuthedImplementer } from "./implementer";
 
-const os = authedImplementer.workflow;
+const os = namespaceAuthedImplementer.workflow;
 
 const listV1 = os.listV1.handler(({ input: request }) => {
 	const { limit = 50, offset = 0, sort } = request;

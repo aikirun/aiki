@@ -2,20 +2,28 @@ import { UnauthorizedError } from "../errors";
 import type { ApiKeyService } from "../service/api-key";
 import type { AuthService } from "../service/auth";
 
+export type AuthorizationMethod = "api_key" | "organization_session" | "namespace_session";
+
 export interface ApiKeyAuthorization {
 	method: "api_key";
 	organizationId: string;
 	namespaceId: string;
 }
 
-export interface SessionAuthorization {
-	method: "session";
+export interface OrganizationSessionAuthorization {
+	method: "organization_session";
+	organizationId: string;
+	userId: string;
+}
+
+export interface NamespaceSessionAuthorization {
+	method: "namespace_session";
 	organizationId: string;
 	namespaceId: string;
 	userId: string;
 }
 
-export type Authorization = ApiKeyAuthorization | SessionAuthorization;
+export type Authorization = ApiKeyAuthorization | OrganizationSessionAuthorization | NamespaceSessionAuthorization;
 
 const BEARER_PREFIX = "Bearer ";
 const BEARER_PREFIX_LENGTH = BEARER_PREFIX.length;
@@ -47,7 +55,7 @@ export function createAuthorizer(apiKeyService: ApiKeyService, authService: Auth
 		};
 	}
 
-	async function authorizeBySession(request: Request): Promise<SessionAuthorization> {
+	async function authorizeByOrganizationSession(request: Request): Promise<OrganizationSessionAuthorization> {
 		const session = await authService.api.getSession({ headers: request.headers });
 		if (!session?.session) {
 			throw new UnauthorizedError("Not authenticated");
@@ -58,22 +66,40 @@ export function createAuthorizer(apiKeyService: ApiKeyService, authService: Auth
 			throw new UnauthorizedError("No active organization selected");
 		}
 
-		// TODO: investigate why better auth doesn't infer the proper type
-		const activeNamespaceId = (session.session as { activeNamespaceId?: string }).activeNamespaceId;
+		return {
+			method: "organization_session",
+			organizationId: activeOrganizationId,
+			userId: session.session.userId,
+		};
+	}
+
+	async function authorizeByNamespaceSession(request: Request): Promise<NamespaceSessionAuthorization> {
+		const session = await authService.api.getSession({ headers: request.headers });
+		if (!session?.session) {
+			throw new UnauthorizedError("Not authenticated");
+		}
+
+		const activeOrganizationId = session.session.activeOrganizationId;
+		if (!activeOrganizationId) {
+			throw new UnauthorizedError("No active organization selected");
+		}
+
+		const activeNamespaceId = session.session.activeTeamId;
 		if (!activeNamespaceId) {
 			throw new UnauthorizedError("No active namespace selected");
 		}
 
 		return {
-			method: "session",
-			namespaceId: activeNamespaceId,
+			method: "namespace_session",
 			organizationId: activeOrganizationId,
+			namespaceId: activeNamespaceId,
 			userId: session.session.userId,
 		};
 	}
 
 	return {
 		authorizeByApiKey,
-		authorizeBySession,
+		authorizeByNamespaceSession,
+		authorizeByOrganizationSession,
 	};
 }

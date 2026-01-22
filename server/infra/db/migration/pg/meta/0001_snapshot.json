@@ -1,6 +1,6 @@
 {
-	"id": "dcf94179-fdc5-442e-980a-e457df2ecca2",
-	"prevId": "ea8d4a12-c39f-4ece-86c0-f5b595ae62bc",
+	"id": "eb952035-870f-451d-8a49-1e8d42f87232",
+	"prevId": "c2ca1b3a-abc8-49a7-acca-a312b737d6c6",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
@@ -1624,7 +1624,8 @@
 					"name": "updated_at",
 					"type": "timestamp with time zone",
 					"primaryKey": false,
-					"notNull": false
+					"notNull": true,
+					"default": "now()"
 				}
 			},
 			"indexes": {
@@ -1801,6 +1802,13 @@
 					"type": "jsonb",
 					"primaryKey": false,
 					"notNull": false
+				},
+				"type": {
+					"name": "type",
+					"type": "organization_type",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true
 				},
 				"status": {
 					"name": "status",
@@ -2399,6 +2407,11 @@
 			"name": "organization_status",
 			"schema": "public",
 			"values": ["active", "suspended", "deleted"]
+		},
+		"public.organization_type": {
+			"name": "organization_type",
+			"schema": "public",
+			"values": ["personal", "team"]
 		},
 		"public.user_status": {
 			"name": "user_status",

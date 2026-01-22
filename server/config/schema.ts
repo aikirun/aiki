@@ -4,6 +4,15 @@ import { logLevels } from "server/infra/logger";
 
 const coerceBool = type("'true' | 'false' | '1' | '0'").pipe((v) => v === "true" || v === "1");
 
+const uniqueCommaSeparatedToItems = type("string > 0").pipe((v) => [
+	...new Set(
+		v
+			.split(",")
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0)
+	),
+]);
+
 export const redisConfigSchema = type({
 	host: "string > 0 = 'localhost'",
 	port: "string.integer.parse | number.integer > 0 = 6379",
@@ -48,6 +57,7 @@ export const authConfigSchema = type({
 export const configSchema = type({
 	port: "string.integer.parse | number.integer > 0 = 9850",
 	baseURL: "string > 0",
+	corsOrigins: uniqueCommaSeparatedToItems,
 	redis: redisConfigSchema,
 	database: databaseConfigSchema,
 	auth: authConfigSchema,

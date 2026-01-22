@@ -25,14 +25,16 @@ export function createApiKeyRepository(db: DatabaseConn) {
 			return result[0] ?? null;
 		},
 
-		async list(filters: {
-			organizationId: string;
-			namespaceId: string;
-			createdByUserId?: string;
-			name?: string;
-		}): Promise<ApiKeyRow[]> {
+		async list(filters: { organizationId: string; namespaceId: string; createdByUserId?: string; name?: string }) {
 			return db
-				.select()
+				.select({
+					id: apiKey.id,
+					name: apiKey.name,
+					keyPrefix: apiKey.keyPrefix,
+					status: apiKey.status,
+					createdAt: apiKey.createdAt,
+					expiresAt: apiKey.expiresAt,
+				})
 				.from(apiKey)
 				.where(
 					and(
@@ -53,7 +55,7 @@ export function createApiKeyRepository(db: DatabaseConn) {
 				.update(apiKey)
 				.set({
 					status: "revoked",
-					revokedAt: new Date(),
+					revokedAt: Date.now(),
 				})
 				.where(eq(apiKey.id, id));
 		},

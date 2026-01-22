@@ -17,6 +17,7 @@ CREATE TYPE "public"."namespace_status" AS ENUM('active', 'suspended', 'deleted'
 CREATE TYPE "public"."organization_invitation_status" AS ENUM('pending', 'accepted', 'rejected', 'expired', 'cancelled');--> statement-breakpoint
 CREATE TYPE "public"."organization_role" AS ENUM('owner', 'admin', 'member');--> statement-breakpoint
 CREATE TYPE "public"."organization_status" AS ENUM('active', 'suspended', 'deleted');--> statement-breakpoint
+CREATE TYPE "public"."organization_type" AS ENUM('personal', 'team');--> statement-breakpoint
 CREATE TYPE "public"."user_status" AS ENUM('active', 'suspended', 'deleted');--> statement-breakpoint
 CREATE TABLE "event_wait_queue" (
 	"id" text PRIMARY KEY NOT NULL,
@@ -179,7 +180,7 @@ CREATE TABLE "namespace" (
 	"organization_id" text NOT NULL,
 	"status" "namespace_status" DEFAULT 'active' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "namespace_member" (
@@ -196,6 +197,7 @@ CREATE TABLE "organization" (
 	"slug" text NOT NULL,
 	"logo" text,
 	"metadata" jsonb,
+	"type" "organization_type" NOT NULL,
 	"status" "organization_status" DEFAULT 'active' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,

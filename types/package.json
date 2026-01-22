@@ -4,6 +4,10 @@
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"type": "module",
 	"exports": {
+		"./api-key-api": {
+			"types": "./dist/api-key-api.d.ts",
+			"import": "./dist/api-key-api.js"
+		},
 		"./client": {
 			"types": "./dist/client.d.ts",
 			"import": "./dist/client.js"
@@ -15,6 +19,10 @@
 		"./event": {
 			"types": "./dist/event.d.ts",
 			"import": "./dist/event.js"
+		},
+		"./namespace-api": {
+			"types": "./dist/namespace-api.d.ts",
+			"import": "./dist/namespace-api.js"
 		},
 		"./retry": {
 			"types": "./dist/retry.d.ts",

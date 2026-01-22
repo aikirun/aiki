@@ -12,14 +12,14 @@ import {
 	workflowRunsByReferenceId,
 	workflowRunTransitionsById,
 } from "server/infra/db/in-memory-store";
-import type { Context } from "server/middleware/context";
+import type { NamespaceRequestContext } from "server/middleware/context";
 import { transitionTaskState } from "server/service/task-state-machine";
 import { createWorkflowRun } from "server/service/workflow-run";
 import { transitionWorkflowRunState } from "server/service/workflow-run-state-machine";
 
-import { authedImplementer } from "../implementer";
+import { namespaceAuthedImplementer } from "./implementer";
 
-const os = authedImplementer.workflowRun;
+const os = namespaceAuthedImplementer.workflowRun;
 
 const listV1 = os.listV1.handler(({ input: request }) => {
 	const { filters, limit = 50, offset = 0, sort } = request;
@@ -241,7 +241,7 @@ const listTransitionsV1 = os.listTransitionsV1.handler(({ input: request }) => {
 });
 
 async function sendEventToWorkflowRun(
-	context: Context,
+	context: NamespaceRequestContext,
 	run: WorkflowRun<unknown, unknown>,
 	receivedAt: number,
 	eventName: string,

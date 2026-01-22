@@ -1,14 +1,21 @@
 import { sql } from "drizzle-orm";
-import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { API_KEY_STATUSES } from "../../model/api-key";
 import { NAMESPACE_ROLES, NAMESPACE_STATUSES } from "../../model/namespace";
-import { ORGANIZATION_INVITATION_STATUSES, ORGANIZATION_ROLES, ORGANIZATION_STATUSES } from "../../model/organization";
+import {
+	ORGANIZATION_INVITATION_STATUSES,
+	ORGANIZATION_ROLES,
+	ORGANIZATION_STATUSES,
+	ORGANIZATION_TYPES,
+} from "../../model/organization";
 import { USER_STATUSES } from "../../model/user";
+import { timestampMs } from "../../timestamp";
 
 export const userStatusEnum = pgEnum("user_status", USER_STATUSES);
 
 export const organizationStatusEnum = pgEnum("organization_status", ORGANIZATION_STATUSES);
+export const organizationTypeEnum = pgEnum("organization_type", ORGANIZATION_TYPES);
 export const organizationRoleEnum = pgEnum("organization_role", ORGANIZATION_ROLES);
 export const organizationInvitationStatusEnum = pgEnum(
 	"organization_invitation_status",
@@ -27,8 +34,8 @@ export const user = pgTable("user", {
 	emailVerified: boolean("email_verified").notNull().default(false),
 	image: text("image"),
 	status: userStatusEnum("status").notNull().default("active"),
-	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+	updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 });
 
 export const session = pgTable(
@@ -37,13 +44,13 @@ export const session = pgTable(
 		id: text("id").primaryKey(),
 		userId: text("user_id").notNull(),
 		token: text("token").notNull().unique("uq_session_token"),
-		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+		expiresAt: timestampMs("expires_at").notNull(),
 		ipAddress: text("ip_address"),
 		userAgent: text("user_agent"),
 		activeOrganizationId: text("active_organization_id"),
 		activeNamespaceId: text("active_namespace_id"),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -63,13 +70,13 @@ export const account = pgTable(
 		providerId: text("provider_id").notNull(),
 		accessToken: text("access_token"),
 		refreshToken: text("refresh_token"),
-		accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
-		refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+		accessTokenExpiresAt: timestampMs("access_token_expires_at"),
+		refreshTokenExpiresAt: timestampMs("refresh_token_expires_at"),
 		scope: text("scope"),
 		idToken: text("id_token"),
 		password: text("password"),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -85,9 +92,9 @@ export const verification = pgTable("verification", {
 	id: text("id").primaryKey(),
 	identifier: text("identifier").notNull(),
 	value: text("value").notNull(),
-	expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	expiresAt: timestampMs("expires_at").notNull(),
+	createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+	updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 });
 
 export const organization = pgTable("organization", {
@@ -96,9 +103,10 @@ export const organization = pgTable("organization", {
 	slug: text("slug").notNull().unique("uq_organization_slug"),
 	logo: text("logo"),
 	metadata: jsonb("metadata"),
+	type: organizationTypeEnum("type").notNull(),
 	status: organizationStatusEnum("status").notNull().default("active"),
-	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+	updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 });
 
 export const organizationMember = pgTable(
@@ -108,7 +116,7 @@ export const organizationMember = pgTable(
 		userId: text("user_id").notNull(),
 		organizationId: text("organization_id").notNull(),
 		role: organizationRoleEnum("role").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -136,9 +144,9 @@ export const organizationInvitation = pgTable(
 		role: organizationRoleEnum("role").notNull(),
 		status: organizationInvitationStatusEnum("status").notNull(),
 		namespaceId: text("namespace_id"),
-		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		expiresAt: timestampMs("expires_at").notNull(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -164,8 +172,8 @@ export const namespace = pgTable(
 		name: text("name").notNull(),
 		organizationId: text("organization_id").notNull(),
 		status: namespaceStatusEnum("status").notNull().default("active"),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -184,7 +192,7 @@ export const namespaceMember = pgTable(
 		namespaceId: text("namespace_id").notNull(),
 		userId: text("user_id").notNull(),
 		role: namespaceRoleEnum("role").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -213,10 +221,10 @@ export const apiKey = pgTable(
 		keyHash: text("key_hash").notNull().unique("uq_api_key_key_hash"),
 		keyPrefix: text("key_prefix").notNull(),
 		status: apiKeyStatusEnum("status").notNull().default("active"),
-		expiresAt: timestamp("expires_at", { withTimezone: true }),
-		revokedAt: timestamp("revoked_at", { withTimezone: true }),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		expiresAt: timestampMs("expires_at"),
+		revokedAt: timestampMs("revoked_at"),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({

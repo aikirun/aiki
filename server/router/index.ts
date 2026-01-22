@@ -1,12 +1,28 @@
-import { scheduleRouter } from "./authed/schedule";
-import { workflowRouter } from "./authed/workflow";
-import { workflowRunRouter } from "./authed/workflow-run";
-import { authedImplementer, publicImplementer } from "./implementer";
+import type { ApiKeyService } from "server/service/api-key";
+import type { NamespaceService } from "server/service/namespace";
 
-export const publicRouter = publicImplementer.router({});
+import { createApiKeyRouter } from "./api-key";
+import { namespaceAuthedImplementer, organizationAuthedImplementer, publicImplementer } from "./implementer";
+import { createNamespaceRouter } from "./namespace";
+import { scheduleRouter } from "./schedule";
+import { workflowRouter } from "./workflow";
+import { workflowRunRouter } from "./workflow-run";
 
-export const authedRouter = authedImplementer.router({
-	schedule: scheduleRouter,
-	workflow: workflowRouter,
-	workflowRun: workflowRunRouter,
-});
+export function createPublicRouter() {
+	return publicImplementer.router({});
+}
+
+export function createOrganizationAuthedRouter(namespaceService: NamespaceService) {
+	return organizationAuthedImplementer.router({
+		namespace: createNamespaceRouter(namespaceService),
+	});
+}
+
+export function createNamespaceAuthedRouter(apiKeyService: ApiKeyService) {
+	return namespaceAuthedImplementer.router({
+		apiKey: createApiKeyRouter(apiKeyService),
+		schedule: scheduleRouter,
+		workflow: workflowRouter,
+		workflowRun: workflowRunRouter,
+	});
+}
