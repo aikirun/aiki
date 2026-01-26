@@ -2,6 +2,79 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.17.0
+
+### New Features
+
+- **Authentication and Authorization** - Full authentication system with better-auth integration
+  - Sign in/sign up flows with email/password
+  - Session-based authentication for the web dashboard
+  - API key authentication for SDK clients
+  - Organization and namespace multi-tenancy support
+
+- **API Key Management** - Create, list, and revoke API keys from the web dashboard
+  - API keys are scoped to namespaces
+  - Keys are hashed for secure storage
+
+- **Organization and Namespace Support** - Multi-tenant architecture
+  - Create and switch between organizations
+  - Create namespaces within organizations
+  - Onboarding flow for new users to create organization and namespace
+
+- **Database Persistence Layer** - PostgreSQL schema for Aiki core entities
+  - Workflow, workflow run, task, schedule persistence
+  - Sleep queue and event wait queue tables
+  - State transition tracking tables
+  - Drizzle ORM with migrations
+
+### Web UI
+
+- Added sign in and sign up pages
+- Added organization and namespace selectors in header
+- Added user menu with sign out
+- Added settings page with API key management
+- Added onboarding flow for new users
+- Protected routes require authentication
+
+### Improvements
+
+- SDK client now requires API key authentication (via `apiKey` param or `AIKI_API_KEY` env variable)
+- SDK client URL path changed to include `/api` prefix
+- Added database migration commands to root package.json (`db:generate`, `db:migrate`, `db:push`)
+
+### Breaking Changes
+
+- **SDK client requires API key** - Update your client initialization:
+  ```typescript
+  // Before
+  const aikiClient = client({
+    url: "http://localhost:9850",
+    redis: { host: "localhost", port: 6379 },
+  });
+
+  // After
+  const aikiClient = client({
+    url: "http://localhost:9850",
+    apiKey: "your-api-key", // or set AIKI_API_KEY env variable
+    redis: { host: "localhost", port: 6379 },
+  });
+  ```
+
+- **`OverlapPolicy` renamed to `ScheduleOverlapPolicy`** - Update your imports:
+  ```typescript
+  // Before
+  import type { OverlapPolicy } from "@aikirun/types/schedule";
+
+  // After
+  import type { ScheduleOverlapPolicy } from "@aikirun/types/schedule";
+  ```
+
+- **`eventsQueue` renamed to `eventWaitQueues`** in `WorkflowRun` type
+- **`EventState` renamed to `EventWaitState`** - Types for event waiting have been renamed for clarity
+- **`EventQueue` renamed to `EventWaitQueue`**
+- **`WorkflowFailureCause` renamed to `WorkflowRunFailureCause`**
+- **Workflow run list filter `runId` renamed to `id`**
+
 ## 0.16.0
 
 ### Breaking Changes

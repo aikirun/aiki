@@ -156,8 +156,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 							setNamespaces(result.data as Namespace[]);
 						}
 					})
-					.catch((err) => {
-						console.error("Failed to fetch namespaces:", err);
+					.catch((_err) => {
+						// console.error("Failed to fetch namespaces:", err);
 					})
 					.finally(() => {
 						setNamespacesLoading(false);
