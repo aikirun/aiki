@@ -187,7 +187,10 @@ Read the [docs](./docs/README.md)
 
 - **Runtime**: Node.js 18+ or Bun 1.0+
 - **ESM (ES Modules)** - This package uses ES modules (`import`/`export`)
+- **Database**: PostgreSQL 14+
 - **Message Queue**: Redis 6.2+
+
+See the [Installation Guide](./docs/getting-started/installation.md) for detailed setup instructions including environment variable configuration.
 
 ## Packages
 
