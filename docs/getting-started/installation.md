@@ -1,151 +1,147 @@
 # Installation
 
-Get Aiki up and running with these simple steps.
+This guide covers two ways to run Aiki:
 
-## Step 1: Check Prerequisites
+- **Option A: Docker Compose** — Runs Aiki server and web UI in containers
+- **Option B: Direct with Bun** — Runs Aiki directly on your machine
 
-Before you begin, make sure you have the required tools installed:
+Both options require PostgreSQL and Redis running externally.
 
-```bash
-# Check Docker and Docker Compose
-docker --version
-docker-compose --version
+---
 
-# Check Node.js (v18+) or Bun (v1.0+)
-node --version      # or: bun --version
-```
+## Option A: Using Docker Compose
 
-If any of these are missing:
+### Prerequisites
 
-- **Docker**: https://docs.docker.com/get-docker/
-- **Node.js**: https://nodejs.org/en/
-- **Bun**: https://bun.sh/docs/installation
+- Docker and Docker Compose
+- PostgreSQL 14+
+- Redis 6.2+
 
-## Step 2: Start Redis
-
-Aiki requires a Redis instance for message queue functionality. Start Redis locally:
-
-```bash
-# Using Docker
-docker run -d --name redis -p 6379:6379 redis:7
-
-# Or using your system's package manager
-# macOS: brew install redis && brew services start redis
-# Ubuntu: sudo apt install redis-server && sudo systemctl start redis
-```
-
-## Step 3: Start Aiki
-
-First, clone the Aiki repository:
+### Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/aikirun/aiki.git
 cd aiki
 ```
 
-### Option 1: Using Docker Compose
+### Step 2: Configure Environment
+
+Create a `.env` file in the repository root with your PostgreSQL and Redis connection details:
+
+```bash
+# .env
+DATABASE_URL=postgresql://user:password@host.docker.internal:5432/aiki
+REDIS_HOST=host.docker.internal
+REDIS_PORT=6379
+REDIS_PASSWORD=
+```
+
+Replace with your actual credentials. Use `host.docker.internal` to connect to services running on your host machine.
+
+### Step 3: Start Aiki
 
 ```bash
 docker-compose up
 ```
 
-This starts both services:
-- **Aiki Server** on `http://localhost:9850`
-- **Aiki Web** on `http://localhost:9851`
+This starts:
+- **Aiki Server** on http://localhost:9850
+- **Aiki Web UI** on http://localhost:9851
 
-You'll see output like:
+### Step 4: Install SDK Packages
 
-```
-aiki-server | Server running on 0.0.0.0:9850
-aiki-web    | ... nginx ready
-```
-
-### Option 2: Run directly with Bun
+In a separate terminal, navigate to your own application project (not the aiki directory) and install the SDK:
 
 ```bash
-# In one terminal - start the server
+npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
+# or: bun add, pnpm add, yarn add
+```
+
+You're ready! Continue to the [Quick Start](./quick-start.md) guide.
+
+---
+
+## Option B: Running Directly with Bun
+
+### Prerequisites
+
+- Bun 1.0+
+- PostgreSQL 14+
+- Redis 6.2+
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/aikirun/aiki.git
+cd aiki
+bun install
+```
+
+### Step 2: Configure Environment
+
+```bash
+cp server/.env.example server/.env
+```
+
+Edit `server/.env` with your PostgreSQL and Redis connection details.
+
+### Step 3: Start Aiki
+
+```bash
+# Terminal 1 - Start the server
 bun run server
 
-# In another terminal - start the web UI
+# Terminal 2 - Start the web UI
 bun run web
 ```
 
 This starts:
-- **Aiki Server** on `http://localhost:9850`
-- **Aiki Web** on `http://localhost:9851`
+- **Aiki Server** on http://localhost:9850
+- **Aiki Web UI** on http://localhost:9851
 
----
+### Step 4: Install SDK Packages
 
-Open `http://localhost:9851` in your browser to access the web UI and monitor your workflows.
-
-Leave this running and continue in another terminal.
-
-### Customizing Ports (Optional)
-
-If you need different ports, use environment variables:
-
-```bash
-AIKI_SERVER_PORT=9000 AIKI_WEB_PORT=9001 docker-compose up
-```
-
-Or create a `.env` file at the repository root. See `server/.env.example` for available configuration options.
-
-## Step 4: Install SDK Packages
-
-In a new terminal, install the Aiki packages for your project:
+In a separate terminal, navigate to your own application project (not the aiki directory) and install the SDK:
 
 ```bash
 npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
+# or: bun add, pnpm add, yarn add
 ```
 
-Or with other package managers:
+You're ready! Continue to the [Quick Start](./quick-start.md) guide.
 
-```bash
-# Using Bun
-bun add @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
+---
 
-# Using pnpm
-pnpm add @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
+## Environment Variable Reference
 
-# Using yarn
-yarn add @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
-```
+### Server
 
-## Step 5: You're Ready!
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_PROVIDER` | Yes | - | Database type: `pg`, `mysql`, or `sqlite` |
+| `DATABASE_URL` | Yes | - | Connection string (e.g., `postgresql://user:password@host:port/database`) |
+| `DATABASE_MAX_CONNECTIONS` | No | `10` | Maximum database connections in pool |
+| `DATABASE_SSL` | No | `false` | Enable SSL for database connection |
+| `AIKI_SERVER_PORT` | No | `9850` | Port for the Aiki server |
+| `AIKI_SERVER_BASE_URL` | Yes | - | Public URL of the Aiki server |
+| `AIKI_SERVER_AUTH_SECRET` | Yes | - | Secret key for authentication |
+| `CORS_ORIGINS` | No | - | Comma-separated list of allowed origins |
+| `REDIS_HOST` | Yes | - | Redis server hostname |
+| `REDIS_PORT` | No | `6379` | Redis server port |
+| `REDIS_PASSWORD` | No | - | Redis password (if required) |
 
-Your Aiki infrastructure is now running and you have the SDK packages installed. Proceed to the
-[Quick Start](./quick-start.md) guide to create your first workflow.
+### Web UI
 
-## Troubleshooting
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `VITE_AIKI_SERVER_URL` | No | `http://localhost:9850` | Server URL for the web UI to connect to |
+| `AIKI_WEB_PORT` | No | `9851` | Port for the web UI |
 
-**"Connection refused" error**
+Note: `VITE_AIKI_SERVER_URL` is a build-time variable. If you change it, you need to rebuild the web image.
 
-- Make sure Redis is running (`docker ps` to check)
-- Make sure `docker-compose up` is running in another terminal
-- Verify the server is listening: check the Docker output for "Server running on 0.0.0.0:9850"
-
-**"Cannot find module" error (npm)**
-
-- Run `npm install` first to ensure all packages are installed
-- Check that you're in the correct project directory
-
-**"Permission denied" error (Docker)**
-
-- Try running Docker commands with `sudo` if needed
-- Or add your user to the docker group (consult Docker documentation)
-
-**Port already in use**
-
-- Use different ports: `AIKI_SERVER_PORT=9000 AIKI_WEB_PORT=9001 docker-compose up`
-- Or stop other services using those ports
-
-**Web UI shows "Loading..." or errors**
-
-- Make sure the Aiki Server is running and accessible
-- Check browser console for connection errors
-- Verify `VITE_AIKI_SERVER_URL` points to the correct server URL if customized
+---
 
 ## Next Steps
 
-- **[Quick Start](./quick-start.md)** - Create your first workflow
-- **[Your First Workflow](./first-workflow.md)** - Learn core concepts with a real example
+- [Quick Start](./quick-start.md) — Create your first workflow
+- [Your First Workflow](./first-workflow.md) — Learn core concepts with a real example

@@ -8,8 +8,6 @@ import { Redis } from "ioredis";
 import { ConsoleLogger } from "./logger/index";
 import { resolveSubscriberStrategy } from "./subscribers/strategy-resolver";
 
-const AIKI_API_KEY_ENV_NAME = "AIKI_API_KEY";
-
 /**
  * Creates an Aiki client for starting and managing workflows.
  *
@@ -66,9 +64,9 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 	constructor(private readonly params: ClientParams<AppContext>) {
 		this.logger = params.logger ?? new ConsoleLogger();
 
-		const apiKey = params.apiKey ?? process.env[AIKI_API_KEY_ENV_NAME];
+		const apiKey = params.apiKey ?? process.env.AIKI_API_KEY;
 		if (!apiKey) {
-			throw new Error(`API key is required. Provide it via 'apiKey' param or ${AIKI_API_KEY_ENV_NAME} env variable`);
+			throw new Error(`API key is required. Provide it via 'apiKey' param or AIKI_API_KEY env variable`);
 		}
 
 		const rpcLink = new RPCLink({

@@ -7,6 +7,7 @@ The Aiki client connects to the server and lets you start workflows.
 ```typescript
 import { client } from "@aikirun/client";
 
+// Set AIKI_API_KEY env variable or pass apiKey option inline
 const aikiClient = client({
 	url: "http://localhost:9850",
 	redis: {
@@ -17,6 +18,14 @@ const aikiClient = client({
 ```
 
 ## Configuration Options
+
+### apiKey
+
+API key for authentication. Create one from the web UI. Can also be set via `AIKI_API_KEY` environment variable:
+
+```typescript
+apiKey: "your-api-key"  // Or set AIKI_API_KEY env variable
+```
 
 ### url
 

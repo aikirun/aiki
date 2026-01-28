@@ -82,14 +82,14 @@ Install the Aiki SDK:
 npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
 ```
 
-Start Aiki:
+Start Aiki (requires PostgreSQL and Redis — see [Installation Guide](./docs/getting-started/installation.md)):
 
 ```bash
-# Fist clone the repo
+# First clone the repo
 git clone https://github.com/aikirun/aiki.git
 cd aiki
 
-# Then start server + web UI using Docker Compose
+# Configure your database and Redis connection, then start
 docker-compose up
 
 # Or run directly with Bun
@@ -104,7 +104,7 @@ import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 import { restaurantOrderV1 } from "./workflow";
 
-// Connect to Aiki server
+// Connect to Aiki server (set AIKI_API_KEY env variable or pass apiKey option)
 const aikiClient = client({
   url: "http://localhost:9850",
   redis: { host: "localhost", port: 6379 }
