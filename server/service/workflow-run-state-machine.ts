@@ -191,11 +191,12 @@ export async function transitionWorkflowRunState(
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
+
+	assertIsValidWorkflowRunStateTransition(runId, run.state, request.state);
+
 	if (request.type === "optimistic" && run.revision !== request.expectedRevision) {
 		throw new RevisionConflictError(runId, request.expectedRevision, run.revision);
 	}
-
-	assertIsValidWorkflowRunStateTransition(runId, run.state, request.state);
 
 	const now = Date.now();
 	let state = convertWorkflowRunStateDurationsToTimestamps(request.state, now);
