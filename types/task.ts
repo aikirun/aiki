@@ -71,7 +71,7 @@ export interface TaskInfo {
 
 export interface TransitionTaskStateBase {
 	id: string;
-	expectedRevision: number;
+	expectedWorkflowRunRevision: number;
 }
 
 export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateBase {

@@ -135,7 +135,7 @@ export interface WorkflowRunHandle<Input, Output, AppContext, TEvents extends Ev
 		client: Client<AppContext>;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (
-			request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedRevision">
+			request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedWorkflowRunRevision">
 		) => Promise<{ taskId: TaskId }>;
 		assertExecutionAllowed: () => void;
 	};
@@ -357,13 +357,13 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 	}
 
 	private async transitionTaskState(
-		request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedRevision">
+		request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedWorkflowRunRevision">
 	): Promise<{ taskId: TaskId }> {
 		try {
 			const { run, taskId } = await this.api.workflowRun.transitionTaskStateV1({
 				...request,
 				id: this.run.id,
-				expectedRevision: this.run.revision,
+				expectedWorkflowRunRevision: this.run.revision,
 			});
 			this._run = run as WorkflowRun<Input, Output>;
 			return { taskId: taskId as TaskId };

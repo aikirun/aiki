@@ -54,8 +54,8 @@ export async function transitionTaskState(
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
-	if (run.revision !== request.expectedRevision) {
-		throw new RevisionConflictError(runId, request.expectedRevision, run.revision);
+	if (run.revision !== request.expectedWorkflowRunRevision) {
+		throw new RevisionConflictError(runId, request.expectedWorkflowRunRevision, run.revision);
 	}
 
 	let inputHash: string;

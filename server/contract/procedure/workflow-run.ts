@@ -188,7 +188,7 @@ const transitionTaskStateV1: ContractProcedure<
 			taskName: "string > 0",
 			"options?": taskOptionsSchema,
 			taskState: taskStateRunningRequestSchema,
-			expectedRevision: "number.integer >= 0",
+			expectedWorkflowRunRevision: "number.integer >= 0",
 		})
 			.or({
 				type: "'retry'",
@@ -196,25 +196,25 @@ const transitionTaskStateV1: ContractProcedure<
 				taskId: "string > 0",
 				"options?": taskOptionsSchema,
 				taskState: taskStateRunningRequestSchema,
-				expectedRevision: "number.integer >= 0",
+				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				taskId: "string > 0",
 				taskState: taskStateCompletedRequestSchema,
-				expectedRevision: "number.integer >= 0",
+				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				taskId: "string > 0",
 				taskState: taskStateFailedSchema,
-				expectedRevision: "number.integer >= 0",
+				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				taskId: "string > 0",
 				taskState: taskStateAwaitingRetryRequestSchema,
-				expectedRevision: "number.integer >= 0",
+				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 	)
 	.output(
