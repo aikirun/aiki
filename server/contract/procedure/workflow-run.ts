@@ -13,6 +13,7 @@ import type {
 	WorkflowRunListResponseV1,
 	WorkflowRunListTransitionsRequestV1,
 	WorkflowRunListTransitionsResponseV1,
+	WorkflowRunMulticastEventByReferenceRequestV1,
 	WorkflowRunMulticastEventRequestV1,
 	WorkflowRunSendEventRequestV1,
 	WorkflowRunSendEventResponseV1,
@@ -281,6 +282,23 @@ const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, vo
 	)
 	.output(type("undefined"));
 
+const multicastEventByReferenceV1: ContractProcedure<WorkflowRunMulticastEventByReferenceRequestV1, void> = oc
+	.input(
+		type({
+			references: type({
+				name: "string > 0",
+				versionId: "string > 0",
+				referenceId: "string > 0",
+			}).array(),
+			eventName: "string > 0",
+			"data?": "unknown",
+			"options?": {
+				"reference?": { id: "string > 0" },
+			},
+		})
+	)
+	.output(type("undefined"));
+
 export const workflowRunContract = {
 	listV1,
 	getByIdV1,
@@ -293,6 +311,7 @@ export const workflowRunContract = {
 	listTransitionsV1,
 	sendEventV1,
 	multicastEventV1,
+	multicastEventByReferenceV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

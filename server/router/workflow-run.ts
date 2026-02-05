@@ -318,6 +318,31 @@ const multicastEventV1 = os.multicastEventV1.handler(async ({ input: request, co
 	}
 });
 
+const multicastEventByReferenceV1 = os.multicastEventByReferenceV1.handler(async ({ input: request, context }) => {
+	const runs = request.references.map(({ name, versionId, referenceId }) => {
+		const runId = workflowRunsByReferenceId
+			.get(name as WorkflowName)
+			?.get(versionId as WorkflowVersionId)
+			?.get(referenceId);
+		if (!runId) {
+			throw new NotFoundError(`Workflow run not found: ${name}:${versionId}:${referenceId}`);
+		}
+
+		const run = workflowRunsById.get(runId);
+		if (!run) {
+			throw new NotFoundError(`Workflow run not found: ${runId}`);
+		}
+		return run;
+	});
+
+	const { eventName, data, options } = request;
+	const now = Date.now();
+
+	for (const run of runs) {
+		await sendEventToWorkflowRun(context, run, now, eventName, data, options?.reference);
+	}
+});
+
 export const workflowRunRouter = os.router({
 	listV1,
 	getByIdV1,
@@ -330,4 +355,5 @@ export const workflowRunRouter = os.router({
 	listTransitionsV1,
 	sendEventV1,
 	multicastEventV1,
+	multicastEventByReferenceV1,
 });

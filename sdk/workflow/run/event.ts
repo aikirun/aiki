@@ -104,6 +104,11 @@ export interface EventMulticaster<Data> {
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	) => Promise<void>;
+	sendByReferenceId: <AppContext>(
+		client: Client<AppContext>,
+		referenceId: string | string[],
+		...args: Data extends void ? [] : [Data]
+	) => Promise<void>;
 }
 
 export interface EventMulticasterBuilder<Data> {
@@ -114,6 +119,11 @@ export interface EventMulticasterBuilder<Data> {
 	send: <AppContext>(
 		client: Client<AppContext>,
 		runId: string | string[],
+		...args: Data extends void ? [] : [Data]
+	) => Promise<void>;
+	sendByReferenceId: <AppContext>(
+		client: Client<AppContext>,
+		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	) => Promise<void>;
 }
@@ -323,6 +333,16 @@ function createEventMulticaster<Data>(
 				runId,
 				...args
 			),
+		sendByReferenceId: <AppContext>(
+			client: Client<AppContext>,
+			referenceId: string | string[],
+			...args: Data extends void ? [] : [Data]
+		) =>
+			createEventMulticaster(workflowName, workflowVersionId, eventName, schema, optsBuilder.build()).sendByReferenceId(
+				client,
+				referenceId,
+				...args
+			),
 	});
 
 	async function send<AppContext>(
@@ -363,12 +383,59 @@ function createEventMulticaster<Data>(
 			"aiki.workflowVersionId": workflowVersionId,
 			"aiki.workflowRunIds": runIds,
 			"aiki.eventName": eventName,
-			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
+			...(options?.reference ? { "aiki.eventReferenceId": options.reference.id } : {}),
+		});
+	}
+
+	async function sendByReferenceId<AppContext>(
+		client: Client<AppContext>,
+		referenceId: string | string[],
+		...args: Data extends void ? [] : [Data]
+	): Promise<void> {
+		let data = args[0];
+		if (schema) {
+			const schemaValidation = schema["~standard"].validate(data);
+			const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
+			if (schemaValidationResult.issues) {
+				client.logger.error("Invalid event data", {
+					"aiki.workflowName": workflowName,
+					"aiki.workflowVersionId": workflowVersionId,
+					"aiki.eventName": eventName,
+					"aiki.issues": schemaValidationResult.issues,
+				});
+				throw new SchemaValidationError("Invalid event data", schemaValidationResult.issues);
+			}
+			data = schemaValidationResult.value;
+		}
+
+		const referenceIds = Array.isArray(referenceId) ? referenceId : [referenceId];
+		if (!isNonEmptyArray(referenceIds)) {
+			return;
+		}
+
+		await client.api.workflowRun.multicastEventByReferenceV1({
+			references: referenceIds.map((referenceId) => ({
+				name: workflowName,
+				versionId: workflowVersionId,
+				referenceId,
+			})),
+			eventName,
+			data,
+			options,
+		});
+
+		client.logger.info("Multicasted event by reference", {
+			"aiki.workflowName": workflowName,
+			"aiki.workflowVersionId": workflowVersionId,
+			"aiki.referenceIds": referenceIds,
+			"aiki.eventName": eventName,
+			...(options?.reference ? { "aiki.eventReferenceId": options.reference.id } : {}),
 		});
 	}
 
 	return {
 		with: () => createBuilder(optsOverrider()),
 		send,
+		sendByReferenceId,
 	};
 }

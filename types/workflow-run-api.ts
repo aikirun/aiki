@@ -39,6 +39,7 @@ export interface WorkflowRunApi {
 	listTransitionsV1: (_: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
 	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<WorkflowRunSendEventResponseV1>;
 	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<void>;
+	multicastEventByReferenceV1: (_: WorkflowRunMulticastEventByReferenceRequestV1) => Promise<void>;
 }
 
 export interface WorkflowRunListRequestV1 {
@@ -84,11 +85,13 @@ export interface WorkflowRunGetByIdResponseV1 {
 	run: WorkflowRun;
 }
 
-export interface WorkflowRunGetByReferenceIdRequestV1 {
+export interface WorkflowRunReference {
 	name: string;
 	versionId: string;
 	referenceId: string;
 }
+
+export type WorkflowRunGetByReferenceIdRequestV1 = WorkflowRunReference;
 
 export interface WorkflowRunGetByReferenceIdResponseV1 {
 	run: WorkflowRun;
@@ -261,6 +264,13 @@ export interface WorkflowRunSendEventResponseV1 {
 
 export interface WorkflowRunMulticastEventRequestV1 {
 	ids: string[];
+	eventName: string;
+	data?: unknown;
+	options?: EventSendOptions;
+}
+
+export interface WorkflowRunMulticastEventByReferenceRequestV1 {
+	references: WorkflowRunReference[];
 	eventName: string;
 	data?: unknown;
 	options?: EventSendOptions;
