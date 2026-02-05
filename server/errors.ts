@@ -22,14 +22,14 @@ export class UnauthorizedError extends Error {
 	}
 }
 
-export class RevisionConflictError extends Error {
+export class WorkflowRunRevisionConflictError extends Error {
 	public readonly workflowRunId: string;
 	public readonly expectedRevision: number;
 	public readonly actualRevision: number;
 
 	constructor(workflowRunId: string, expectedRevision: number, actualRevision: number) {
 		super(`Revision conflict for workflow ${workflowRunId}: expected ${expectedRevision}, actual is ${actualRevision}`);
-		this.name = "RevisionConflictError";
+		this.name = "WorkflowRunRevisionConflictError";
 		this.workflowRunId = workflowRunId;
 		this.expectedRevision = expectedRevision;
 		this.actualRevision = actualRevision;

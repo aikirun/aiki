@@ -7,7 +7,12 @@ import type {
 	WorkflowRunTransitionTaskStateRequestV1,
 	WorkflowRunTransitionTaskStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
-import { InvalidTaskStateTransitionError, NotFoundError, RevisionConflictError, ValidationError } from "server/errors";
+import {
+	InvalidTaskStateTransitionError,
+	NotFoundError,
+	ValidationError,
+	WorkflowRunRevisionConflictError,
+} from "server/errors";
 import { findTaskById, workflowRunsById, workflowRunTransitionsById } from "server/infra/db/in-memory-store";
 import type { Context } from "server/middleware/context";
 
@@ -55,7 +60,7 @@ export async function transitionTaskState(
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
 	if (run.revision !== request.expectedWorkflowRunRevision) {
-		throw new RevisionConflictError(runId, request.expectedWorkflowRunRevision, run.revision);
+		throw new WorkflowRunRevisionConflictError(runId, request.expectedWorkflowRunRevision, run.revision);
 	}
 
 	let inputHash: string;

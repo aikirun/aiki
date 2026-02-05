@@ -6,10 +6,10 @@ import { organizationAuthedContract } from "../contract/organization-authed";
 import {
 	InvalidWorkflowRunStateTransitionError,
 	NotFoundError,
-	RevisionConflictError,
 	ScheduleConflictError,
 	UnauthorizedError,
 	ValidationError,
+	WorkflowRunRevisionConflictError,
 } from "../errors";
 import type {
 	ContextBase,
@@ -39,7 +39,7 @@ function handleError<T extends ContextBase>(context: T, error: unknown) {
 		throw new ORPCError("UNAUTHORIZED", { message: error.message });
 	}
 
-	if (error instanceof RevisionConflictError) {
+	if (error instanceof WorkflowRunRevisionConflictError) {
 		throw new ORPCError("CONFLICT", { message: error.message });
 	}
 

@@ -13,7 +13,7 @@ import type {
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
-import { InvalidWorkflowRunStateTransitionError, NotFoundError, RevisionConflictError } from "server/errors";
+import { InvalidWorkflowRunStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "server/errors";
 import { workflowRunsById, workflowRunTransitionsById } from "server/infra/db/in-memory-store";
 import type { Context } from "server/middleware/context";
 
@@ -195,7 +195,7 @@ export async function transitionWorkflowRunState(
 	assertIsValidWorkflowRunStateTransition(runId, run.state, request.state);
 
 	if (request.type === "optimistic" && run.revision !== request.expectedRevision) {
-		throw new RevisionConflictError(runId, request.expectedRevision, run.revision);
+		throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision, run.revision);
 	}
 
 	const now = Date.now();
