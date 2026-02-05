@@ -238,7 +238,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 
 		this.logger.info("Worker started", {
-			"aiki.registeredWorkflows": this.params.workflows.map((w) => `${w.name}/${w.versionId}`),
+			"aiki.registeredWorkflows": this.params.workflows.map((w) => `${w.name}:${w.versionId}`),
 		});
 
 		const maxConcurrentWorkflowRuns = this.spawnOpts.maxConcurrentWorkflowRuns ?? 1;

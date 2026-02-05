@@ -86,7 +86,7 @@ const getByReferenceIdV1 = os.getByReferenceIdV1.handler(({ input: request }) =>
 
 	const runId = workflowRunsByReferenceId.get(name)?.get(versionId)?.get(referenceId);
 	if (!runId) {
-		throw new NotFoundError(`Workflow run not found for reference: ${name}/${versionId}/${referenceId}`);
+		throw new NotFoundError(`Workflow run not found for reference: ${name}:${versionId}:${referenceId}`);
 	}
 
 	const run = workflowRunsById.get(runId);

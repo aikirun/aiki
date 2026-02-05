@@ -97,7 +97,7 @@ class WorkflowImpl implements Workflow {
 		params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
 	): WorkflowVersion<Input, Output, AppContext, TEvents> {
 		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
-			throw new Error(`Workflow "${this.name}/${versionId}" already exists`);
+			throw new Error(`Workflow "${this.name}:${versionId}" already exists`);
 		}
 
 		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);

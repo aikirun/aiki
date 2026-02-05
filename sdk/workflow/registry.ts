@@ -28,7 +28,7 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 			return this;
 		}
 		if (workflows.has(workflow.versionId)) {
-			throw new Error(`Workflow "${workflow.name}/${workflow.versionId}" is already registered`);
+			throw new Error(`Workflow "${workflow.name}:${workflow.versionId}" is already registered`);
 		}
 		workflows.set(workflow.versionId, workflow);
 		return this;
