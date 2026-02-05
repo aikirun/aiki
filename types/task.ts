@@ -1,6 +1,7 @@
 import type { RetryStrategy } from "./retry";
 import type { SerializableError } from "./serializable";
 import type { OptionalProp } from "./utils";
+import type { WorkflowRunId } from "./workflow-run";
 
 export type TaskId = string & { _brand: "task_id" };
 
@@ -122,5 +123,17 @@ export class TaskFailedError extends Error {
 		this.taskId = taskId;
 		this.attempts = attempts;
 		this.reason = reason;
+	}
+}
+
+export class TaskConflictError extends Error {
+	public readonly workflowRunId: WorkflowRunId;
+	public readonly taskName: string;
+
+	constructor(workflowRunId: WorkflowRunId, taskName: string) {
+		super(`Task ${taskName} already exists with same input in workflow ${workflowRunId}`);
+		this.name = "TaskConflictError";
+		this.workflowRunId = workflowRunId;
+		this.taskName = taskName;
 	}
 }

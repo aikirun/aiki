@@ -1,4 +1,4 @@
-import { and, eq, lte, sql } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 
 import type { DatabaseConn } from "..";
 import { task, taskStateTransition } from "../schema/pg";
@@ -18,15 +18,8 @@ export function createTaskRepository(db: DatabaseConn) {
 			return created;
 		},
 
-		async updateState(id: string, revision: number, changes: TaskRowUpdate): Promise<TaskRow | null> {
-			const result = await db
-				.update(task)
-				.set({
-					...changes,
-					revision: sql`${task.revision} + 1`,
-				})
-				.where(and(eq(task.id, id), eq(task.revision, revision)))
-				.returning();
+		async updateState(id: string, changes: TaskRowUpdate): Promise<TaskRow | null> {
+			const result = await db.update(task).set(changes).where(eq(task.id, id)).returning();
 
 			return result[0] ?? null;
 		},

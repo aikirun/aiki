@@ -10,7 +10,7 @@ import type {
 import {
 	InvalidTaskStateTransitionError,
 	NotFoundError,
-	ValidationError,
+	TaskConflictError,
 	WorkflowRunRevisionConflictError,
 } from "server/errors";
 import { findTaskById, workflowRunsById, workflowRunTransitionsById } from "server/infra/db/in-memory-store";
@@ -78,7 +78,7 @@ export async function transitionTaskState(
 
 		const existingTaskInfo = run.tasks[taskAddress];
 		if (existingTaskInfo) {
-			throw new ValidationError(`Task ${taskAddress} already exists. Use type: "retry" to retry it.`);
+			throw new TaskConflictError(runId, taskName);
 		}
 
 		taskId = crypto.randomUUID() as TaskId;
@@ -141,8 +141,8 @@ export async function transitionTaskState(
 		transitions.push(transition);
 	}
 
-	run.tasks[taskAddress] = { id: taskId, name: taskName, state: taskState, inputHash };
-	run.revision++;
+	const taskInfo = { id: taskId, name: taskName, state: taskState, inputHash };
+	run.tasks[taskAddress] = taskInfo;
 
-	return { run, taskId };
+	return { taskInfo };
 }

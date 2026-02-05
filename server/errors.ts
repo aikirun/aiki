@@ -75,6 +75,18 @@ export class InvalidTaskStateTransitionError extends Error {
 	}
 }
 
+export class TaskConflictError extends Error {
+	public readonly workflowRunId: string;
+	public readonly taskName: string;
+
+	constructor(workflowRunId: string, taskName: string) {
+		super(`Task ${taskName} already exists with same input in workflow ${workflowRunId}`);
+		this.name = "TaskConflictError";
+		this.workflowRunId = workflowRunId;
+		this.taskName = taskName;
+	}
+}
+
 export class ScheduleConflictError extends Error {
 	public readonly referenceId: string;
 

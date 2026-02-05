@@ -15,13 +15,14 @@ import type { Logger } from "@aikirun/types/client";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
+	TaskAddress,
 	TaskDefinitionOptions,
 	TaskId,
 	TaskInfo,
 	TaskReferenceOptions,
 	TaskStartOptions,
 } from "@aikirun/types/task";
-import { TaskFailedError, type TaskName } from "@aikirun/types/task";
+import { TaskConflictError, TaskFailedError, type TaskName } from "@aikirun/types/task";
 import {
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -168,14 +169,14 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		attempts++;
 
-		const { taskId } = existingTaskInfo
-			? await handle[INTERNAL].transitionTaskState({
+		const { id: taskId } = existingTaskInfo
+			? await handle[INTERNAL].transitionTaskState(address, {
 					type: "retry",
 					taskId: existingTaskInfo.id,
 					options: startOpts,
 					taskState: { status: "running", attempts, input },
 				})
-			: await handle[INTERNAL].transitionTaskState({
+			: await handle[INTERNAL].transitionTaskState(address, {
 					type: "create",
 					taskName: this.name,
 					options: startOpts,
@@ -192,14 +193,15 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const { output, lastAttempt } = await this.tryExecuteTask(
 			handle,
 			input,
-			taskId,
+			address,
+			taskId as TaskId,
 			retryStrategy,
 			attempts,
 			run[INTERNAL].options.spinThresholdMs,
 			logger
 		);
 
-		await handle[INTERNAL].transitionTaskState({
+		await handle[INTERNAL].transitionTaskState(address, {
 			taskId,
 			taskState: { status: "completed", attempts: lastAttempt, output },
 		});
@@ -211,6 +213,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private async tryExecuteTask(
 		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
 		input: Input,
+		address: TaskAddress,
 		taskId: TaskId,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
@@ -232,9 +235,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				return { output, lastAttempt: attempts };
 			} catch (error) {
 				if (
-					error instanceof WorkflowRunFailedError ||
 					error instanceof WorkflowRunSuspendedError ||
-					error instanceof WorkflowRunRevisionConflictError
+					error instanceof WorkflowRunFailedError ||
+					error instanceof WorkflowRunRevisionConflictError ||
+					error instanceof TaskConflictError
 				) {
 					throw error;
 				}
@@ -247,7 +251,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						"aiki.attempts": attempts,
 						"aiki.reason": serializableError.message,
 					});
-					await handle[INTERNAL].transitionTaskState({
+					await handle[INTERNAL].transitionTaskState(address, {
 						taskId,
 						taskState: { status: "failed", attempts, error: serializableError },
 					});
@@ -266,7 +270,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					continue;
 				}
 
-				await handle[INTERNAL].transitionTaskState({
+				await handle[INTERNAL].transitionTaskState(address, {
 					taskId,
 					taskState: {
 						status: "awaiting_retry",

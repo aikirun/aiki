@@ -11,7 +11,7 @@ import {
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { TaskFailedError } from "@aikirun/types/task";
+import { TaskConflictError, TaskFailedError } from "@aikirun/types/task";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
@@ -322,7 +322,8 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 				if (
 					error instanceof WorkflowRunSuspendedError ||
 					error instanceof WorkflowRunFailedError ||
-					error instanceof WorkflowRunRevisionConflictError
+					error instanceof WorkflowRunRevisionConflictError ||
+					error instanceof TaskConflictError
 				) {
 					throw error;
 				}

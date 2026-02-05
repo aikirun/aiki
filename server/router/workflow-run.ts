@@ -5,7 +5,7 @@ import type { EventReferenceOptions } from "@aikirun/types/event";
 import type { TaskId, TaskState } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
-import { NotFoundError, ValidationError } from "server/errors";
+import { NotFoundError, TaskConflictError } from "server/errors";
 import {
 	findTaskById,
 	workflowRunsById,
@@ -135,7 +135,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 
 		const existingTaskInfo = run.tasks[taskAddress];
 		if (existingTaskInfo) {
-			throw new ValidationError(`Task ${taskAddress} already exists. Use type: "existing" to update it.`);
+			throw new TaskConflictError(runId, request.taskName);
 		}
 
 		const taskId = crypto.randomUUID();

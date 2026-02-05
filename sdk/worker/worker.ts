@@ -18,6 +18,7 @@ import {
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
+	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
 import type { WorkflowVersion } from "@aikirun/workflow";
@@ -414,7 +415,13 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			if (
 				error instanceof WorkflowRunNotExecutableError ||
 				error instanceof WorkflowRunSuspendedError ||
-				error instanceof WorkflowRunFailedError
+				error instanceof WorkflowRunFailedError ||
+				error instanceof WorkflowRunRevisionConflictError
+				// TaskConflictError is retryable, hence we need not ack it.
+				// 	* The only way it can occur is with something like Promise.all([task.start(same-input), task.start(same-input)])
+				// 	  On retry, the cached result will be used to resolve both promises.
+				// 	* If 2 workers attempt to start the same task in the same workflow, it will cause a WorkflowRunRevisionConflictError instead
+				// 	  because workers always increment workflow revision before running it, and this revision is checked before stating a task
 			) {
 				shouldAcknowledge = true;
 			} else {

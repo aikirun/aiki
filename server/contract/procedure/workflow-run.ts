@@ -29,6 +29,7 @@ import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 import {
+	taskInfoSchema,
 	taskOptionsSchema,
 	taskStateAwaitingRetryRequestSchema,
 	taskStateCompletedRequestSchema,
@@ -219,8 +220,7 @@ const transitionTaskStateV1: ContractProcedure<
 	)
 	.output(
 		type({
-			run: workflowRunSchema,
-			taskId: "string > 0",
+			taskInfo: taskInfoSchema,
 		})
 	);
 

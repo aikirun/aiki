@@ -1,5 +1,6 @@
 import type { EventSendOptions } from "./event";
 import type {
+	TaskInfo,
 	TaskStateCompleted,
 	TaskStateFailed,
 	TransitionTaskStateToAwaitingRetry,
@@ -208,8 +209,7 @@ export type WorkflowRunTransitionTaskStateRequestV1 =
 	| TransitionTaskStateToAwaitingRetry;
 
 export interface WorkflowRunTransitionTaskStateResponseV1 {
-	run: WorkflowRun;
-	taskId: string;
+	taskInfo: TaskInfo;
 }
 
 export interface WorkflowRunSetTaskStateRequestNew {
