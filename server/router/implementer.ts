@@ -40,11 +40,11 @@ function handleError<T extends ContextBase>(context: T, error: unknown) {
 	}
 
 	if (error instanceof WorkflowRunRevisionConflictError) {
-		throw new ORPCError("CONFLICT", { message: error.message });
+		throw new ORPCError("WORKFLOW_RUN_CONFLICT", { message: error.message });
 	}
 
 	if (error instanceof ScheduleConflictError) {
-		throw new ORPCError("CONFLICT", { message: error.message });
+		throw new ORPCError("SCHEDULE_CONFLICT", { message: error.message, status: 409 });
 	}
 
 	if (error instanceof InvalidWorkflowRunStateTransitionError) {

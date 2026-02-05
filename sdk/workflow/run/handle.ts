@@ -384,5 +384,5 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 }
 
 function isConflictError(error: unknown): boolean {
-	return error != null && typeof error === "object" && "code" in error && error.code === "CONFLICT";
+	return error != null && typeof error === "object" && "code" in error && error.code === "WORKFLOW_RUN_CONFLICT";
 }
