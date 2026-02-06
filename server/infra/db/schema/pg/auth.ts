@@ -117,6 +117,7 @@ export const organizationMember = pgTable(
 		organizationId: text("organization_id").notNull(),
 		role: organizationRoleEnum("role").notNull(),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -193,6 +194,7 @@ export const namespaceMember = pgTable(
 		userId: text("user_id").notNull(),
 		role: namespaceRoleEnum("role").notNull(),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({

@@ -4,12 +4,14 @@ import { publicContract } from "server/contract/public";
 import { namespaceAuthedContract } from "../contract/namespace-authed";
 import { organizationAuthedContract } from "../contract/organization-authed";
 import {
+	InvalidTaskStateTransitionError,
 	InvalidWorkflowRunStateTransitionError,
 	NotFoundError,
 	ScheduleConflictError,
 	TaskConflictError,
 	UnauthorizedError,
 	ValidationError,
+	WorkflowRunConflictError,
 	WorkflowRunRevisionConflictError,
 } from "../errors";
 import type {
@@ -44,6 +46,10 @@ function handleError<T extends ContextBase>(context: T, error: unknown) {
 		throw new ORPCError("WORKFLOW_RUN_REVISION_CONFLICT", { message: error.message, status: 409 });
 	}
 
+	if (error instanceof WorkflowRunConflictError) {
+		throw new ORPCError("WORKFLOW_RUN_CONFLICT", { message: error.message, status: 409 });
+	}
+
 	if (error instanceof TaskConflictError) {
 		throw new ORPCError("TASK_CONFLICT", { message: error.message, status: 409 });
 	}
@@ -53,6 +59,10 @@ function handleError<T extends ContextBase>(context: T, error: unknown) {
 	}
 
 	if (error instanceof InvalidWorkflowRunStateTransitionError) {
+		throw new ORPCError("BAD_REQUEST", { message: error.message });
+	}
+
+	if (error instanceof InvalidTaskStateTransitionError) {
 		throw new ORPCError("BAD_REQUEST", { message: error.message });
 	}
 

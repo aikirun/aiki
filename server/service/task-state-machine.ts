@@ -1,7 +1,8 @@
 import { hashInput } from "@aikirun/lib";
 import { getTaskAddress } from "@aikirun/lib/address";
+import type { StateTransition } from "@aikirun/types/state-transition";
 import type { TaskAddress, TaskId, TaskName, TaskState, TaskStatus } from "@aikirun/types/task";
-import type { WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
+import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type {
 	TransitionTaskStateToRunning,
 	WorkflowRunTransitionTaskStateRequestV1,
@@ -13,7 +14,7 @@ import {
 	TaskConflictError,
 	WorkflowRunRevisionConflictError,
 } from "server/errors";
-import { findTaskById, workflowRunsById, workflowRunTransitionsById } from "server/infra/db/in-memory-store";
+import { findTaskById, stateTransitionsByWorkflowRunId, workflowRunsById } from "server/infra/db/in-memory-store";
 import type { Context } from "server/middleware/context";
 
 const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
@@ -135,17 +136,17 @@ export async function transitionTaskState(
 
 	context.logger.info({ runId, taskId, taskState }, "Transitioning task state");
 
-	const transition: WorkflowRunTransition = {
+	const transition: StateTransition = {
 		id: crypto.randomUUID(),
-		type: "task_state",
+		type: "task",
 		createdAt: now,
 		taskId,
 		taskState,
 	};
 
-	const transitions = workflowRunTransitionsById.get(runId);
+	const transitions = stateTransitionsByWorkflowRunId.get(runId);
 	if (!transitions) {
-		workflowRunTransitionsById.set(runId, [transition]);
+		stateTransitionsByWorkflowRunId.set(runId, [transition]);
 	} else {
 		transitions.push(transition);
 	}

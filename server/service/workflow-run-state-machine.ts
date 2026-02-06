@@ -1,12 +1,12 @@
 import { propsDefined, type RequiredProp } from "@aikirun/lib";
 import { isNonEmptyArray } from "@aikirun/lib/array";
+import type { StateTransition } from "@aikirun/types/state-transition";
 import {
 	isTerminalWorkflowRunStatus,
 	type WorkflowRun,
 	type WorkflowRunId,
 	type WorkflowRunState,
 	type WorkflowRunStatus,
-	type WorkflowRunTransition,
 } from "@aikirun/types/workflow-run";
 import type {
 	WorkflowRunStateRequest,
@@ -14,7 +14,7 @@ import type {
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
 import { InvalidWorkflowRunStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "server/errors";
-import { workflowRunsById, workflowRunTransitionsById } from "server/infra/db/in-memory-store";
+import { stateTransitionsByWorkflowRunId, workflowRunsById } from "server/infra/db/in-memory-store";
 import type { Context } from "server/middleware/context";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
@@ -203,7 +203,7 @@ export async function transitionWorkflowRunState(
 
 	context.logger.info({ runId, state, attempts: run.attempts }, "Workflow state transition");
 
-	const transitions = workflowRunTransitionsById.get(runId) ?? [];
+	const transitions = stateTransitionsByWorkflowRunId.get(runId) ?? [];
 
 	if (run.state.status === "sleeping" && state.status === "scheduled") {
 		const sleepQueue = run.sleepsQueue[run.state.sleepName];
@@ -282,15 +282,15 @@ export async function transitionWorkflowRunState(
 		}
 	}
 
-	const transition: WorkflowRunTransition = {
+	const transition: StateTransition = {
 		id: crypto.randomUUID(),
-		type: "state",
+		type: "workflow_run",
 		createdAt: now,
 		state,
 	};
 	if (!transitions.length) {
 		transitions.push(transition);
-		workflowRunTransitionsById.set(runId, transitions);
+		stateTransitionsByWorkflowRunId.set(runId, transitions);
 	} else {
 		transitions.push(transition);
 	}

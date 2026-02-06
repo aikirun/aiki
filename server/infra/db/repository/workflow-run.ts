@@ -1,7 +1,7 @@
 import { and, eq, lte, sql } from "drizzle-orm";
 
 import type { DatabaseConn } from "..";
-import { workflowRun, workflowRunStateTransition } from "../schema/pg";
+import { workflowRun } from "../schema/pg";
 
 type WorkflowRunRow = typeof workflowRun.$inferSelect;
 type WorkflowRunRowInsert = typeof workflowRun.$inferInsert;
@@ -97,24 +97,3 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 }
 
 export type WorkflowRunRepository = ReturnType<typeof createWorkflowRunRepository>;
-
-type WorkflowRunStateTransitionRow = typeof workflowRunStateTransition.$inferSelect;
-type WorkflowRunStateTransitionRowInsert = typeof workflowRunStateTransition.$inferInsert;
-
-export function createWorkflowRunStateTransitionRepository(db: DatabaseConn) {
-	return {
-		async append(input: WorkflowRunStateTransitionRowInsert): Promise<void> {
-			await db.insert(workflowRunStateTransition).values(input);
-		},
-
-		async listByRunId(runId: string): Promise<WorkflowRunStateTransitionRow[]> {
-			return db
-				.select()
-				.from(workflowRunStateTransition)
-				.where(eq(workflowRunStateTransition.workflowRunId, runId))
-				.orderBy(workflowRunStateTransition.createdAt);
-		},
-	};
-}
-
-export type WorkflowRunStateTransitionRepository = ReturnType<typeof createWorkflowRunStateTransitionRepository>;

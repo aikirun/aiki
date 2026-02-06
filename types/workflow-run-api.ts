@@ -1,4 +1,5 @@
 import type { EventSendOptions } from "./event";
+import type { StateTransition } from "./state-transition";
 import type {
 	TaskInfo,
 	TaskStateCompleted,
@@ -22,7 +23,6 @@ import type {
 	WorkflowRunStateScheduled,
 	WorkflowRunStateSleeping,
 	WorkflowRunStatus,
-	WorkflowRunTransition,
 	WorkflowStartOptions,
 } from "./workflow-run";
 
@@ -243,7 +243,7 @@ export interface WorkflowRunListTransitionsRequestV1 {
 }
 
 export interface WorkflowRunListTransitionsResponseV1 {
-	transitions: WorkflowRunTransition[];
+	transitions: StateTransition[];
 	total: number;
 }
 

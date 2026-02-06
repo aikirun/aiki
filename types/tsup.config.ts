@@ -12,6 +12,7 @@ export default defineConfig({
 		retry: "retry.ts",
 		serializable: "serializable.ts",
 		sleep: "sleep.ts",
+		"state-transition": "state-transition.ts",
 		symbols: "symbols.ts",
 		task: "task.ts",
 		trigger: "trigger.ts",

@@ -27,6 +27,7 @@ import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
+import { stateTransitionSchema } from "../schema/state-transition";
 import {
 	taskInfoSchema,
 	taskOptionsSchema,
@@ -53,7 +54,6 @@ import {
 	workflowRunStateSchema,
 	workflowRunStateSleepingRequestSchema,
 	workflowRunStatusSchema,
-	workflowRunTransitionSchema,
 } from "../schema/workflow-run";
 
 const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
@@ -242,7 +242,7 @@ const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, 
 		)
 		.output(
 			type({
-				transitions: workflowRunTransitionSchema.array(),
+				transitions: stateTransitionSchema.array(),
 				total: "number.integer >= 0",
 			})
 		);

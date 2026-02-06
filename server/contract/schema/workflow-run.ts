@@ -4,7 +4,7 @@ import { eventWaitQueueSchema } from "./event";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
 import { sleepQueueSchema } from "./sleep";
-import { taskInfoSchema, taskStateSchema } from "./task";
+import { taskInfoSchema } from "./task";
 import { triggerStrategySchema } from "./trigger";
 
 export const workflowRunStatusSchema = type(
@@ -165,19 +165,6 @@ export const workflowRunSchema = type({
 	eventWaitQueues: type({ "[string]": eventWaitQueueSchema }),
 	childWorkflowRuns: type({ "[string]": childWorkflowRunInfoSchema }),
 	"parentWorkflowRunId?": "string > 0 | undefined",
-});
-
-export const workflowRunTransitionSchema = type({
-	id: "string > 0",
-	createdAt: "number > 0",
-	type: "'state'",
-	state: workflowRunStateSchema,
-}).or({
-	id: "string > 0",
-	createdAt: "number > 0",
-	type: "'task_state'",
-	taskId: "string > 0",
-	taskState: taskStateSchema,
 });
 
 export const workflowRunStateScheduledRequestOptimisticSchema = type({

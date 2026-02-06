@@ -2,15 +2,16 @@ import { getTaskAddress } from "@aikirun/lib/address";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import type { EventReferenceOptions } from "@aikirun/types/event";
+import type { StateTransition } from "@aikirun/types/state-transition";
 import type { TaskId, TaskState } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId, WorkflowRunTransition } from "@aikirun/types/workflow-run";
+import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
 import { NotFoundError, TaskConflictError } from "server/errors";
 import {
 	findTaskById,
+	stateTransitionsByWorkflowRunId,
 	workflowRunsById,
 	workflowRunsByReferenceId,
-	workflowRunTransitionsById,
 } from "server/infra/db/in-memory-store";
 import type { NamespaceRequestContext } from "server/middleware/context";
 import { transitionTaskState } from "server/service/task-state-machine";
@@ -152,9 +153,9 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			input: request.input,
 		};
 
-		const runningTransition: WorkflowRunTransition = {
+		const runningTransition: StateTransition = {
 			id: crypto.randomUUID(),
-			type: "task_state",
+			type: "task",
 			createdAt: now,
 			taskId,
 			taskState: runningState,
@@ -165,17 +166,17 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 				? { status: "completed", attempts: 1, output: request.state.output }
 				: { status: request.state.status satisfies "failed", attempts: 1, error: request.state.error };
 
-		const finalTransition: WorkflowRunTransition = {
+		const finalTransition: StateTransition = {
 			id: crypto.randomUUID(),
-			type: "task_state",
+			type: "task",
 			createdAt: now,
 			taskId,
 			taskState: finalState,
 		};
 
-		const transitions = workflowRunTransitionsById.get(runId);
+		const transitions = stateTransitionsByWorkflowRunId.get(runId);
 		if (!transitions) {
-			workflowRunTransitionsById.set(runId, [runningTransition, finalTransition]);
+			stateTransitionsByWorkflowRunId.set(runId, [runningTransition, finalTransition]);
 		} else {
 			transitions.push(runningTransition, finalTransition);
 		}
@@ -198,17 +199,17 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			? { status: "completed", attempts: attempts + 1, output: request.state.output }
 			: { status: request.state.status satisfies "failed", attempts: attempts + 1, error: request.state.error };
 
-	const finalTransition: WorkflowRunTransition = {
+	const finalTransition: StateTransition = {
 		id: crypto.randomUUID(),
-		type: "task_state",
+		type: "task",
 		createdAt: now,
 		taskId: existingTaskInfo.id,
 		taskState: finalState,
 	};
 
-	const transitions = workflowRunTransitionsById.get(runId);
+	const transitions = stateTransitionsByWorkflowRunId.get(runId);
 	if (!transitions) {
-		workflowRunTransitionsById.set(runId, [finalTransition]);
+		stateTransitionsByWorkflowRunId.set(runId, [finalTransition]);
 	} else {
 		transitions.push(finalTransition);
 	}
@@ -229,7 +230,7 @@ const listTransitionsV1 = os.listTransitionsV1.handler(({ input: request }) => {
 		throw new NotFoundError(`Workflow run not found: ${id}`);
 	}
 
-	const transitions = workflowRunTransitionsById.get(id as WorkflowRunId) ?? [];
+	const transitions = stateTransitionsByWorkflowRunId.get(id as WorkflowRunId) ?? [];
 
 	return {
 		transitions: [...transitions]

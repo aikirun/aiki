@@ -6,6 +6,7 @@ import {
 	SCHEDULE_TYPES,
 } from "@aikirun/types/schedule";
 import { SLEEP_STATUSES } from "@aikirun/types/sleep";
+import { STATE_TRANSITION_TYPES } from "@aikirun/types/state-transition";
 import { TASK_CONFLICT_POLICIES, TASK_STATUSES } from "@aikirun/types/task";
 import {
 	WORKFLOW_RUN_CONFLICT_POLICIES,
@@ -13,8 +14,19 @@ import {
 	WORKFLOW_RUN_SCHEDULED_REASON,
 	WORKFLOW_RUN_STATUSES,
 } from "@aikirun/types/workflow-run";
-import { relations } from "drizzle-orm";
-import { foreignKey, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+	check,
+	foreignKey,
+	index,
+	integer,
+	jsonb,
+	pgEnum,
+	pgTable,
+	text,
+	timestamp,
+	uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { namespace } from "./auth";
 
@@ -31,6 +43,8 @@ export const workflowRunFailureCause = pgEnum("workflow_run_failure_cause", WORK
 
 export const taskStatusEnum = pgEnum("task_status", TASK_STATUSES);
 export const taskConflictPolicyEnum = pgEnum("task_conflict_policy", TASK_CONFLICT_POLICIES);
+
+export const stateTransitionTypeEnum = pgEnum("state_transition_type", STATE_TRANSITION_TYPES);
 
 export const sleepStatusEnum = pgEnum("sleep_status", SLEEP_STATUSES);
 export const eventWaitStatusEnum = pgEnum("event_wait_status", EVENT_WAIT_STATUSES);
@@ -142,7 +156,7 @@ export const workflowRun = pgTable(
 		}),
 		// Circular FKs - defined here but deferred to avoid insert order issues
 		foreignKey({
-			name: "fk_workflow_run_parent_workflow_run_id",
+			name: "fk_workflow_run_parent_workflow_run",
 			columns: [table.parentWorkflowRunId],
 			foreignColumns: [table.id],
 		}),
@@ -186,7 +200,7 @@ export const task = pgTable(
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_task_workflow_run_id",
+			name: "fk_task_workflow_run",
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
@@ -196,81 +210,38 @@ export const task = pgTable(
 	]
 );
 
-export const workflowRunStateTransition = pgTable(
-	"workflow_run_state_transition",
+export const stateTransition = pgTable(
+	"state_transition",
 	{
 		id: text("id").primaryKey(),
 		workflowRunId: text("workflow_run_id").notNull(),
-
-		status: workflowRunStatusEnum("status").notNull(),
-		attempt: integer("attempt").notNull(),
-
-		scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
-		scheduledReason: workflowRunScheduledReason("scheduled_reason"),
-
-		sleepName: text("sleep_name"),
-		sleepDurationMs: integer("sleep_duration_ms"),
-		awakeAt: timestamp("awake_at", { withTimezone: true }),
-
-		eventName: text("event_name"),
-		timeoutAt: timestamp("timeout_at", { withTimezone: true }),
-
-		failureCause: workflowRunFailureCause("failure_cause"),
+		type: stateTransitionTypeEnum("type").notNull(),
 		taskId: text("task_id"),
-		childWorkflowRunId: text("child_workflow_run_id"),
-		error: jsonb("error"),
-		nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
-
-		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status"),
-
-		cancelledReason: text("cancelled_reason"),
-
-		output: jsonb("output"),
-
+		status: text("status").notNull(),
+		attempt: integer("attempt").notNull(),
+		state: jsonb("state").notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_wtransition_workflow_run_id",
+			name: "fk_state_transition_workflow_run",
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
 		foreignKey({
-			name: "fk_wtransition_task_id",
+			name: "fk_state_transition_task",
 			columns: [table.taskId],
 			foreignColumns: [task.id],
 		}),
-		foreignKey({
-			name: "fk_wtransition_child_workflow_run_id",
-			columns: [table.childWorkflowRunId],
-			foreignColumns: [workflowRun.id],
-		}),
-		index("idx_wtransition_workflow_run_created").on(table.workflowRunId, table.createdAt),
-	]
-);
-
-export const taskStateTransition = pgTable(
-	"task_state_transition",
-	{
-		id: text("id").primaryKey(),
-		taskId: text("task_id").notNull(),
-		status: taskStatusEnum("status").notNull(),
-		attempt: integer("attempt").notNull(),
-
-		error: jsonb("error"),
-		nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
-
-		output: jsonb("output"),
-
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-	},
-	(table) => [
-		foreignKey({
-			name: "fk_ttransition_task_id",
-			columns: [table.taskId],
-			foreignColumns: [task.id],
-		}),
-		index("idx_ttransition_task_created").on(table.taskId, table.createdAt),
+		index("idx_state_transition_workflow_run_id").on(table.workflowRunId, table.id),
+		check(
+			"chk_task_state_transition_requires_task_id",
+			sql`(${table.type} = 'task' AND ${table.taskId} IS NOT NULL) OR (${table.type} = 'workflow_run' AND ${table.taskId} IS NULL)`
+		),
+		check(
+			"chk_state_transition_status_matches_type",
+			sql`(${table.type} = 'workflow_run' AND ${table.status} = ANY(enum_range(NULL::workflow_run_status)::text[])) OR (${table.type} = 'task' AND ${table.status} = ANY(enum_range(NULL::task_status)::text[]))`
+		),
 	]
 );
 
@@ -291,11 +262,11 @@ export const sleepQueue = pgTable(
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_sleep_queue_workflow_run_id",
+			name: "fk_sleep_queue_workflow_run",
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
-		index("idx_sleep_queue_workflow_run_name_created").on(table.workflowRunId, table.name, table.createdAt),
+		index("idx_sleep_queue_workflow_run_name_id").on(table.workflowRunId, table.name, table.id),
 	]
 );
 
@@ -317,7 +288,7 @@ export const eventWaitQueue = pgTable(
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_event_wait_queue_workflow_run_id",
+			name: "fk_event_wait_queue_workflow_run",
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
@@ -326,7 +297,7 @@ export const eventWaitQueue = pgTable(
 			table.name,
 			table.referenceId
 		),
-		index("idx_event_wait_queue_workflow_run_name_created").on(table.workflowRunId, table.name, table.createdAt),
+		index("idx_event_wait_queue_workflow_run_name_id").on(table.workflowRunId, table.name, table.id),
 	]
 );
 
@@ -337,15 +308,15 @@ export const workflowRunRelations = relations(workflowRun, ({ one }) => ({
 		fields: [workflowRun.parentWorkflowRunId],
 		references: [workflowRun.id],
 	}),
-	latestStateTransition: one(workflowRunStateTransition, {
+	latestStateTransition: one(stateTransition, {
 		fields: [workflowRun.latestStateTransitionId],
-		references: [workflowRunStateTransition.id],
+		references: [stateTransition.id],
 	}),
 }));
 
 export const taskRelations = relations(task, ({ one }) => ({
-	latestStateTransition: one(taskStateTransition, {
+	latestStateTransition: one(stateTransition, {
 		fields: [task.latestStateTransitionId],
-		references: [taskStateTransition.id],
+		references: [stateTransition.id],
 	}),
 }));

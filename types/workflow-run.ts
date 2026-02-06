@@ -2,7 +2,7 @@ import type { EventWaitQueue } from "./event";
 import type { RetryStrategy } from "./retry";
 import type { SerializableError } from "./serializable";
 import type { SleepQueue } from "./sleep";
-import type { TaskInfo, TaskState } from "./task";
+import type { TaskInfo } from "./task";
 import type { TriggerStrategy } from "./trigger";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
@@ -243,7 +243,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	attempts: number;
 	state: WorkflowRunState<Output>;
 	// TODO:
-	// for workflows with a large number of tasks and/or deeply nested child workflows,
+	// for workflows with a large number of tasks/sleeps/eventWaits/childWorkflowRuns,
 	// prefetching all results might be problematic.
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
@@ -274,25 +274,6 @@ export interface ChildWorkflowWaitResultTimeout {
 	status: "timeout";
 	timedOutAt: number;
 }
-
-export interface WorkflowRunTransitionBase {
-	id: string;
-	createdAt: number;
-	type: "state" | "task_state";
-}
-
-export interface WorkflowRunStateTransition extends WorkflowRunTransitionBase {
-	type: "state";
-	state: WorkflowRunState;
-}
-
-export interface WorkflowRunTaskStateTransition extends WorkflowRunTransitionBase {
-	type: "task_state";
-	taskId: string;
-	taskState: TaskState;
-}
-
-export type WorkflowRunTransition = WorkflowRunStateTransition | WorkflowRunTaskStateTransition;
 
 export class WorkflowRunNotExecutableError extends Error {
 	public readonly id: WorkflowRunId;

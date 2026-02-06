@@ -44,6 +44,10 @@
 			"types": "./dist/sleep.d.ts",
 			"import": "./dist/sleep.js"
 		},
+		"./state-transition": {
+			"types": "./dist/state-transition.d.ts",
+			"import": "./dist/state-transition.js"
+		},
 		"./symbols": {
 			"types": "./dist/symbols.d.ts",
 			"import": "./dist/symbols.js"

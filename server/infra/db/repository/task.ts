@@ -1,7 +1,7 @@
 import { and, eq, lte } from "drizzle-orm";
 
 import type { DatabaseConn } from "..";
-import { task, taskStateTransition } from "../schema/pg";
+import { task } from "../schema/pg";
 
 type TaskRow = typeof task.$inferSelect;
 type TaskRowInsert = typeof task.$inferInsert;
@@ -53,24 +53,3 @@ export function createTaskRepository(db: DatabaseConn) {
 }
 
 export type TaskRepository = ReturnType<typeof createTaskRepository>;
-
-type TaskStateTransitionRow = typeof taskStateTransition.$inferSelect;
-type TaskStateTransitionRowInsert = typeof taskStateTransition.$inferInsert;
-
-export function createTaskStateTransitionRepository(db: DatabaseConn) {
-	return {
-		async append(input: TaskStateTransitionRowInsert): Promise<void> {
-			await db.insert(taskStateTransition).values(input);
-		},
-
-		async listByTaskId(taskId: string): Promise<TaskStateTransitionRow[]> {
-			return db
-				.select()
-				.from(taskStateTransition)
-				.where(eq(taskStateTransition.taskId, taskId))
-				.orderBy(taskStateTransition.createdAt);
-		},
-	};
-}
-
-export type TaskStateTransitionRepository = ReturnType<typeof createTaskStateTransitionRepository>;

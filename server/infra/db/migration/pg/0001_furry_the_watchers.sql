@@ -31,6 +31,11 @@ CREATE TRIGGER trg_organization_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();--> statement-breakpoint
 
+CREATE TRIGGER trg_organization_member_updated_at
+  BEFORE UPDATE ON "organization_member"
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();--> statement-breakpoint
+
 CREATE TRIGGER trg_organization_invitation_updated_at
   BEFORE UPDATE ON "organization_invitation"
   FOR EACH ROW
@@ -38,6 +43,11 @@ CREATE TRIGGER trg_organization_invitation_updated_at
 
 CREATE TRIGGER trg_namespace_updated_at
   BEFORE UPDATE ON "namespace"
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();--> statement-breakpoint
+
+CREATE TRIGGER trg_namespace_member_updated_at
+  BEFORE UPDATE ON "namespace_member"
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();--> statement-breakpoint
 

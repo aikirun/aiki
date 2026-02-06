@@ -4,6 +4,7 @@ CREATE TYPE "public"."schedule_overlap_policy" AS ENUM('allow', 'skip', 'cancel_
 CREATE TYPE "public"."schedule_status" AS ENUM('active', 'paused', 'deleted');--> statement-breakpoint
 CREATE TYPE "public"."schedule_type" AS ENUM('cron', 'interval');--> statement-breakpoint
 CREATE TYPE "public"."sleep_status" AS ENUM('sleeping', 'completed', 'cancelled');--> statement-breakpoint
+CREATE TYPE "public"."state_transition_type" AS ENUM('workflow_run', 'task');--> statement-breakpoint
 CREATE TYPE "public"."task_conflict_policy" AS ENUM('error', 'return_existing');--> statement-breakpoint
 CREATE TYPE "public"."task_status" AS ENUM('running', 'awaiting_retry', 'completed', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."terminal_workflow_run_status" AS ENUM('scheduled', 'queued', 'running', 'paused', 'sleeping', 'awaiting_event', 'awaiting_retry', 'awaiting_child_workflow', 'cancelled', 'completed', 'failed');--> statement-breakpoint
@@ -60,12 +61,24 @@ CREATE TABLE "sleep_queue" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "state_transition" (
+	"id" text PRIMARY KEY NOT NULL,
+	"workflow_run_id" text NOT NULL,
+	"type" "state_transition_type" NOT NULL,
+	"task_id" text,
+	"status" text NOT NULL,
+	"attempt" integer NOT NULL,
+	"state" jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "chk_task_state_transition_requires_task_id" CHECK (("state_transition"."type" = 'task' AND "state_transition"."task_id" IS NOT NULL) OR ("state_transition"."type" = 'workflow_run' AND "state_transition"."task_id" IS NULL)),
+	CONSTRAINT "chk_state_transition_status_matches_type" CHECK (("state_transition"."type" = 'workflow_run' AND "state_transition"."status" = ANY(enum_range(NULL::workflow_run_status)::text[])) OR ("state_transition"."type" = 'task' AND "state_transition"."status" = ANY(enum_range(NULL::task_status)::text[])))
+);
+--> statement-breakpoint
 CREATE TABLE "task" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"workflow_run_id" text,
-	"status" "task_status",
-	"revision" integer DEFAULT 0 NOT NULL,
+	"status" "task_status" NOT NULL,
 	"attempts" integer NOT NULL,
 	"input" jsonb,
 	"input_hash" text NOT NULL,
@@ -76,17 +89,6 @@ CREATE TABLE "task" (
 	"next_attempt_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "task_state_transition" (
-	"id" text PRIMARY KEY NOT NULL,
-	"task_id" text NOT NULL,
-	"status" "task_status",
-	"attempt" integer NOT NULL,
-	"error" jsonb,
-	"next_attempt_at" timestamp with time zone,
-	"output" jsonb,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "workflow" (
@@ -117,29 +119,6 @@ CREATE TABLE "workflow_run" (
 	"next_attempt_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "workflow_run_state_transition" (
-	"id" text PRIMARY KEY NOT NULL,
-	"workflow_run_id" text NOT NULL,
-	"status" "workflow_run_status" NOT NULL,
-	"attempt" integer NOT NULL,
-	"scheduled_at" timestamp with time zone,
-	"scheduled_reason" "workflow_run_scheduled_reason",
-	"sleep_name" text,
-	"sleep_duration_ms" integer,
-	"awake_at" timestamp with time zone,
-	"event_name" text,
-	"timeout_at" timestamp with time zone,
-	"failure_cause" "workflow_run_failure_cause",
-	"task_id" text,
-	"child_workflow_run_id" text,
-	"error" jsonb,
-	"next_attempt_at" timestamp with time zone,
-	"child_workflow_run_status" "terminal_workflow_run_status",
-	"cancelled_reason" text,
-	"output" jsonb,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "account" (
@@ -188,7 +167,8 @@ CREATE TABLE "namespace_member" (
 	"namespace_id" text NOT NULL,
 	"user_id" text NOT NULL,
 	"role" "namespace_role" NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "organization" (
@@ -222,7 +202,8 @@ CREATE TABLE "organization_member" (
 	"user_id" text NOT NULL,
 	"organization_id" text NOT NULL,
 	"role" "organization_role" NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "session" (
@@ -260,19 +241,17 @@ CREATE TABLE "verification" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "event_wait_queue" ADD CONSTRAINT "fk_event_wait_queue_workflow_run_id" FOREIGN KEY ("workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "event_wait_queue" ADD CONSTRAINT "fk_event_wait_queue_workflow_run" FOREIGN KEY ("workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "schedule" ADD CONSTRAINT "fk_schedule_namespace_id" FOREIGN KEY ("namespace_id") REFERENCES "public"."namespace"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "schedule" ADD CONSTRAINT "fk_schedule_workflow_id" FOREIGN KEY ("workflow_id") REFERENCES "public"."workflow"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "sleep_queue" ADD CONSTRAINT "fk_sleep_queue_workflow_run_id" FOREIGN KEY ("workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "task" ADD CONSTRAINT "fk_task_workflow_run_id" FOREIGN KEY ("workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "task_state_transition" ADD CONSTRAINT "fk_ttransition_task_id" FOREIGN KEY ("task_id") REFERENCES "public"."task"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sleep_queue" ADD CONSTRAINT "fk_sleep_queue_workflow_run" FOREIGN KEY ("workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "state_transition" ADD CONSTRAINT "fk_state_transition_workflow_run" FOREIGN KEY ("workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "state_transition" ADD CONSTRAINT "fk_state_transition_task" FOREIGN KEY ("task_id") REFERENCES "public"."task"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task" ADD CONSTRAINT "fk_task_workflow_run" FOREIGN KEY ("workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workflow" ADD CONSTRAINT "fk_workflow_namespace_id" FOREIGN KEY ("namespace_id") REFERENCES "public"."namespace"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workflow_run" ADD CONSTRAINT "fk_workflow_run_workflow_id" FOREIGN KEY ("workflow_id") REFERENCES "public"."workflow"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workflow_run" ADD CONSTRAINT "fk_workflow_run_schedule_id" FOREIGN KEY ("schedule_id") REFERENCES "public"."schedule"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workflow_run" ADD CONSTRAINT "fk_workflow_run_parent_workflow_run_id" FOREIGN KEY ("parent_workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workflow_run_state_transition" ADD CONSTRAINT "fk_wtransition_workflow_run_id" FOREIGN KEY ("workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workflow_run_state_transition" ADD CONSTRAINT "fk_wtransition_task_id" FOREIGN KEY ("task_id") REFERENCES "public"."task"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workflow_run_state_transition" ADD CONSTRAINT "fk_wtransition_child_workflow_run_id" FOREIGN KEY ("child_workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "workflow_run" ADD CONSTRAINT "fk_workflow_run_parent_workflow_run" FOREIGN KEY ("parent_workflow_run_id") REFERENCES "public"."workflow_run"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "fk_account_user_id" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "api_key" ADD CONSTRAINT "fk_api_key_namespace_id" FOREIGN KEY ("namespace_id") REFERENCES "public"."namespace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "api_key" ADD CONSTRAINT "fk_api_key_organization_id" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -292,9 +271,9 @@ CREATE UNIQUE INDEX "uqidx_schedule_namespace_reference" ON "schedule" USING btr
 CREATE INDEX "idx_schedule_namespace_workflow" ON "schedule" USING btree ("namespace_id","workflow_id");--> statement-breakpoint
 CREATE INDEX "idx_schedule_status_next_run_at" ON "schedule" USING btree ("status","next_run_at");--> statement-breakpoint
 CREATE INDEX "idx_sleep_queue_workflow_run_name_created" ON "sleep_queue" USING btree ("workflow_run_id","name","created_at");--> statement-breakpoint
+CREATE INDEX "idx_state_transition_workflow_run_id" ON "state_transition" USING btree ("workflow_run_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_task_workflow_run_reference" ON "task" USING btree ("workflow_run_id","reference_id");--> statement-breakpoint
 CREATE INDEX "idx_task_status_next_attempt_at" ON "task" USING btree ("status","next_attempt_at");--> statement-breakpoint
-CREATE INDEX "idx_ttransition_task_created" ON "task_state_transition" USING btree ("task_id","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_workflow_namespace_name_version" ON "workflow" USING btree ("namespace_id","name","version");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_workflow_run_workflow_reference" ON "workflow_run" USING btree ("workflow_id","reference_id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_schedule" ON "workflow_run" USING btree ("schedule_id");--> statement-breakpoint
@@ -303,7 +282,6 @@ CREATE INDEX "idx_workflow_run_status_scheduled_at" ON "workflow_run" USING btre
 CREATE INDEX "idx_workflow_run_status_awake_at" ON "workflow_run" USING btree ("status","awake_at");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_status_timeout_at" ON "workflow_run" USING btree ("status","timeout_at");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_status_next_attempt_at" ON "workflow_run" USING btree ("status","next_attempt_at");--> statement-breakpoint
-CREATE INDEX "idx_wtransition_workflow_run_created" ON "workflow_run_state_transition" USING btree ("workflow_run_id","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_account_user_provider" ON "account" USING btree ("user_id","provider_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_api_key_org_namespace_created_by_user_name" ON "api_key" USING btree ("organization_id","namespace_id","created_by_user_id","name");--> statement-breakpoint
 CREATE INDEX "idx_api_key_org_namespace_name" ON "api_key" USING btree ("organization_id","namespace_id","name");--> statement-breakpoint
