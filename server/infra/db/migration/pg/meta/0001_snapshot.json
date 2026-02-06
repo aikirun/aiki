@@ -1,6 +1,6 @@
 {
-	"id": "ac4632eb-6719-4e05-b799-8a92fbc1c672",
-	"prevId": "cbde2caf-4faa-4512-a84d-00d0077be22c",
+	"id": "b65a1f5c-99c9-4063-aa71-0848bc48a3cc",
+	"prevId": "6462088c-543a-4adb-b618-2cf338ca39a2",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
@@ -680,6 +680,27 @@
 					"method": "btree",
 					"concurrently": false
 				},
+				"idx_task_workflow_run_id": {
+					"name": "idx_task_workflow_run_id",
+					"columns": [
+						{
+							"expression": "workflow_run_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
 				"idx_task_status_next_attempt_at": {
 					"name": "idx_task_status_next_attempt_at",
 					"columns": [
@@ -943,6 +964,27 @@
 						}
 					],
 					"isUnique": true,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_workflow_run_workflow_id": {
+					"name": "idx_workflow_run_workflow_id",
+					"columns": [
+						{
+							"expression": "workflow_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
 					"with": {},
 					"method": "btree",
 					"concurrently": false

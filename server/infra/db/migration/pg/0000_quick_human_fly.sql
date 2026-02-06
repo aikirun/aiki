@@ -273,9 +273,11 @@ CREATE INDEX "idx_schedule_status_next_run_at" ON "schedule" USING btree ("statu
 CREATE INDEX "idx_sleep_queue_workflow_run_name_id" ON "sleep_queue" USING btree ("workflow_run_id","name","id");--> statement-breakpoint
 CREATE INDEX "idx_state_transition_workflow_run_id" ON "state_transition" USING btree ("workflow_run_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_task_workflow_run_reference" ON "task" USING btree ("workflow_run_id","reference_id");--> statement-breakpoint
+CREATE INDEX "idx_task_workflow_run_id" ON "task" USING btree ("workflow_run_id","id");--> statement-breakpoint
 CREATE INDEX "idx_task_status_next_attempt_at" ON "task" USING btree ("status","next_attempt_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_workflow_namespace_name_version" ON "workflow" USING btree ("namespace_id","name","version");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_workflow_run_workflow_reference" ON "workflow_run" USING btree ("workflow_id","reference_id");--> statement-breakpoint
+CREATE INDEX "idx_workflow_run_workflow_id" ON "workflow_run" USING btree ("workflow_id","id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_schedule" ON "workflow_run" USING btree ("schedule_id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_parent_workflow_run" ON "workflow_run" USING btree ("parent_workflow_run_id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_status_scheduled_at" ON "workflow_run" USING btree ("status","scheduled_at");--> statement-breakpoint

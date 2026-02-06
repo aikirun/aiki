@@ -109,7 +109,6 @@ export const schedule = pgTable(
 		uniqueIndex("uqidx_schedule_namespace_definition").on(table.namespaceId, table.definitionHash),
 		uniqueIndex("uqidx_schedule_namespace_reference").on(table.namespaceId, table.referenceId),
 		index("idx_schedule_namespace_workflow").on(table.namespaceId, table.workflowId),
-		// TODO: should nextRunAt be first?
 		// TODO: how to prevent certain namespaces from starving others
 		index("idx_schedule_status_next_run_at").on(table.status, table.nextRunAt),
 	]
@@ -161,7 +160,8 @@ export const workflowRun = pgTable(
 			foreignColumns: [table.id],
 		}),
 		uniqueIndex("uqidx_workflow_run_workflow_reference").on(table.workflowId, table.referenceId),
-		// TODO: will this help with sorting? index("idx_workflow_run_workflow_created").on(table.workflowId, table.createdAt),
+
+		index("idx_workflow_run_workflow_id").on(table.workflowId, table.id),
 
 		index("idx_workflow_run_schedule").on(table.scheduleId),
 		index("idx_workflow_run_parent_workflow_run").on(table.parentWorkflowRunId),
@@ -205,8 +205,8 @@ export const task = pgTable(
 			foreignColumns: [workflowRun.id],
 		}),
 		uniqueIndex("uqidx_task_workflow_run_reference").on(table.workflowRunId, table.referenceId),
+		index("idx_task_workflow_run_id").on(table.workflowRunId, table.id),
 		index("idx_task_status_next_attempt_at").on(table.status, table.nextAttemptAt),
-		// TODO: should I add index on created at to help with sorting?
 	]
 );
 
