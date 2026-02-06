@@ -18,7 +18,6 @@ import type {
 	WorkflowRunSendEventRequestV1,
 	WorkflowRunSendEventResponseV1,
 	WorkflowRunSetTaskStateRequestV1,
-	WorkflowRunSetTaskStateResponseV1,
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
 	WorkflowRunTransitionTaskStateRequestV1,
@@ -224,13 +223,9 @@ const transitionTaskStateV1: ContractProcedure<
 		})
 	);
 
-const setTaskStateV1: ContractProcedure<WorkflowRunSetTaskStateRequestV1, WorkflowRunSetTaskStateResponseV1> = oc
+const setTaskStateV1: ContractProcedure<WorkflowRunSetTaskStateRequestV1, void> = oc
 	.input(workflowRunSetTaskStateRequestSchema)
-	.output(
-		type({
-			run: workflowRunSchema,
-		})
-	);
+	.output(type("undefined"));
 
 const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, WorkflowRunListTransitionsResponseV1> =
 	oc

@@ -168,8 +168,7 @@ export const task = pgTable(
 		name: text("name").notNull(),
 		workflowRunId: text("workflow_run_id"),
 
-		status: taskStatusEnum("status"),
-		revision: integer("revision").notNull().default(0),
+		status: taskStatusEnum("status").notNull(),
 		attempts: integer("attempts").notNull(),
 
 		input: jsonb("input"),
@@ -255,7 +254,7 @@ export const taskStateTransition = pgTable(
 	{
 		id: text("id").primaryKey(),
 		taskId: text("task_id").notNull(),
-		status: taskStatusEnum("status"),
+		status: taskStatusEnum("status").notNull(),
 		attempt: integer("attempt").notNull(),
 
 		error: jsonb("error"),

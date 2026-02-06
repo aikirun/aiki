@@ -1,4 +1,5 @@
 import type { TaskId, TaskName, TaskStatus } from "@aikirun/types/task";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunStatus } from "@aikirun/types/workflow-run";
 
 export class NotFoundError extends Error {
@@ -23,11 +24,11 @@ export class UnauthorizedError extends Error {
 }
 
 export class WorkflowRunRevisionConflictError extends Error {
-	public readonly workflowRunId: string;
+	public readonly workflowRunId: WorkflowRunId;
 	public readonly expectedRevision: number;
 	public readonly actualRevision: number;
 
-	constructor(workflowRunId: string, expectedRevision: number, actualRevision: number) {
+	constructor(workflowRunId: WorkflowRunId, expectedRevision: number, actualRevision: number) {
 		super(`Revision conflict for workflow ${workflowRunId}: expected ${expectedRevision}, actual is ${actualRevision}`);
 		this.name = "WorkflowRunRevisionConflictError";
 		this.workflowRunId = workflowRunId;
@@ -75,18 +76,6 @@ export class InvalidTaskStateTransitionError extends Error {
 	}
 }
 
-export class TaskConflictError extends Error {
-	public readonly workflowRunId: string;
-	public readonly taskName: string;
-
-	constructor(workflowRunId: string, taskName: string) {
-		super(`Task ${taskName} already exists with same input in workflow ${workflowRunId}`);
-		this.name = "TaskConflictError";
-		this.workflowRunId = workflowRunId;
-		this.taskName = taskName;
-	}
-}
-
 export class ScheduleConflictError extends Error {
 	public readonly referenceId: string;
 
@@ -98,11 +87,27 @@ export class ScheduleConflictError extends Error {
 }
 
 export class WorkflowRunConflictError extends Error {
+	public readonly workflowName: WorkflowName;
+	public readonly workflowVersionId: WorkflowVersionId;
 	public readonly referenceId: string;
 
-	constructor(referenceId: string) {
-		super(`Workflow run already exists with reference: ${referenceId}`);
+	constructor(workflowName: WorkflowName, workflowVersionId: WorkflowVersionId, referenceId: string) {
+		super(`Workflow ${workflowName}:${workflowVersionId} run already exists with reference: ${referenceId}`);
 		this.name = "WorkflowRunConflictError";
+		this.workflowName = workflowName;
+		this.workflowVersionId = workflowVersionId;
 		this.referenceId = referenceId;
+	}
+}
+
+export class TaskConflictError extends Error {
+	public readonly workflowRunId: WorkflowRunId;
+	public readonly taskName: string;
+
+	constructor(workflowRunId: WorkflowRunId, taskName: string, referenceId: string) {
+		super(`Task ${taskName} already exists with reference ${referenceId} in workflow ${workflowRunId}`);
+		this.name = "TaskConflictError";
+		this.workflowRunId = workflowRunId;
+		this.taskName = taskName;
 	}
 }

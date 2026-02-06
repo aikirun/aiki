@@ -131,11 +131,15 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 
 	if (request.type === "new") {
 		const inputHash = await hashInput(request.input);
-		const taskAddress = getTaskAddress(request.taskName, request.reference?.id ?? inputHash);
+		const reference = request.reference;
+		const taskAddress = getTaskAddress(request.taskName, reference?.id ?? inputHash);
 
 		const existingTaskInfo = run.tasks[taskAddress];
 		if (existingTaskInfo) {
-			throw new TaskConflictError(runId, request.taskName);
+			if (reference && existingTaskInfo.inputHash !== inputHash) {
+				throw new TaskConflictError(runId, request.taskName, reference.id);
+			}
+			return;
 		}
 
 		const taskId = crypto.randomUUID();
@@ -177,9 +181,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		}
 
 		run.tasks[taskAddress] = { id: taskId, name: request.taskName, state: finalState, inputHash };
-		run.revision++;
-
-		return { run };
+		return;
 	}
 
 	const existingTaskInfo = findTaskById(run, request.taskId as TaskId);
@@ -217,9 +219,6 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		state: finalState,
 		inputHash: existingTaskInfo.inputHash,
 	};
-	run.revision++;
-
-	return { run };
 });
 
 const listTransitionsV1 = os.listTransitionsV1.handler(({ input: request }) => {

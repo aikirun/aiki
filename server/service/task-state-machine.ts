@@ -74,11 +74,20 @@ export async function transitionTaskState(
 	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
 		inputHash = await hashInput(request.taskState.input);
 		taskName = request.taskName as TaskName;
-		taskAddress = getTaskAddress(taskName, request.options?.reference?.id ?? inputHash);
+		const reference = request.options?.reference;
+		taskAddress = getTaskAddress(taskName, reference?.id ?? inputHash);
 
 		const existingTaskInfo = run.tasks[taskAddress];
 		if (existingTaskInfo) {
-			throw new TaskConflictError(runId, taskName);
+			if (reference && existingTaskInfo.inputHash !== inputHash) {
+				const conflictPolicy = reference.conflictPolicy ?? "error";
+				if (conflictPolicy === "error") {
+					throw new TaskConflictError(runId, taskName, reference.id);
+				}
+			}
+
+			context.logger.info({ runId, taskAddress, taskId: existingTaskInfo.id }, "Returning existing task");
+			return { taskInfo: existingTaskInfo };
 		}
 
 		taskId = crypto.randomUUID() as TaskId;

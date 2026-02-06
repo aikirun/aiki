@@ -169,7 +169,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		attempts++;
 
-		const { id: taskId } = existingTaskInfo
+		const taskInfo = existingTaskInfo
 			? await handle[INTERNAL].transitionTaskState(address, {
 					type: "retry",
 					taskId: existingTaskInfo.id,
@@ -182,6 +182,15 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					options: startOpts,
 					taskState: { status: "running", attempts, input },
 				});
+		if (taskInfo.state.status === "completed") {
+			return this.parse(handle, this.params.schema?.output, taskInfo.state.output, run.logger);
+		}
+		if (taskInfo.state.status === "failed") {
+			const { state } = taskInfo;
+			throw new TaskFailedError(taskInfo.id as TaskId, state.attempts, state.error.message);
+		}
+
+		const taskId = taskInfo.id;
 
 		const logger = run.logger.child({
 			"aiki.component": "task-execution",

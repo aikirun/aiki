@@ -36,7 +36,7 @@ export interface WorkflowRunApi {
 	transitionTaskStateV1: (
 		_: WorkflowRunTransitionTaskStateRequestV1
 	) => Promise<WorkflowRunTransitionTaskStateResponseV1>;
-	setTaskStateV1: (_: WorkflowRunSetTaskStateRequestV1) => Promise<WorkflowRunSetTaskStateResponseV1>;
+	setTaskStateV1: (_: WorkflowRunSetTaskStateRequestV1) => Promise<void>;
 	listTransitionsV1: (_: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
 	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<WorkflowRunSendEventResponseV1>;
 	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<void>;
@@ -217,7 +217,7 @@ export interface WorkflowRunSetTaskStateRequestNew {
 	id: string;
 	taskName: string;
 	input?: unknown;
-	reference?: { id: string };
+	reference?: { id: string }; // TODO: should conflict policy be added?
 	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
 }
 
@@ -231,10 +231,6 @@ export interface WorkflowRunSetTaskStateRequestExisting {
 export type WorkflowRunSetTaskStateRequestV1 =
 	| WorkflowRunSetTaskStateRequestNew
 	| WorkflowRunSetTaskStateRequestExisting;
-
-export interface WorkflowRunSetTaskStateResponseV1 {
-	run: WorkflowRun;
-}
 
 export interface WorkflowRunListTransitionsRequestV1 {
 	id: string;

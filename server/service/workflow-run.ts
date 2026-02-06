@@ -26,7 +26,7 @@ export async function createWorkflowRun(context: Context, request: WorkflowRunCr
 			if (existingRun.inputHash !== inputHash) {
 				const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 				if (conflictPolicy === "error") {
-					throw new WorkflowRunConflictError(referenceId);
+					throw new WorkflowRunConflictError(name, versionId, referenceId);
 				}
 			}
 
