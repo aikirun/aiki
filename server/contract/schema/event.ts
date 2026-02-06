@@ -1,6 +1,6 @@
 import { type } from "arktype";
 
-export const eventWaitStateSchema = type({
+export const eventWaitSchema = type({
 	status: "'received'",
 	"data?": "unknown",
 	receivedAt: "number > 0",
@@ -13,5 +13,5 @@ export const eventWaitStateSchema = type({
 });
 
 export const eventWaitQueueSchema = type({
-	eventWaits: eventWaitStateSchema.array(),
+	eventWaits: eventWaitSchema.array(),
 });

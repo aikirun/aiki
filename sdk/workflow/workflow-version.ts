@@ -211,7 +211,11 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 			name: newRun.name,
 			versionId: newRun.versionId,
 			inputHash,
-			statusWaitResults: [],
+			statusWaitQueues: {
+				cancelled: { statusWaits: [] },
+				completed: { statusWaits: [] },
+				failed: { statusWaits: [] },
+			},
 		};
 
 		const logger = parentRun.logger.child({

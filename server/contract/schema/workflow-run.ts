@@ -131,13 +131,21 @@ export const workflowRunStateSchema = workflowRunStateScheduledSchema
 	.or(workflowRunStateCompletedSchema)
 	.or(workflowRunStateFailedSchema);
 
-const childWorkflowWaitResultSchema = type({
+export const terminalWorkflowRunStateSchema = workflowRunStateCancelledSchema
+	.or(workflowRunStateCompletedSchema)
+	.or(workflowRunStateFailedSchema);
+
+const childWorkflowRunStatusWait = type({
 	status: "'completed'",
 	completedAt: "number > 0",
-	childWorkflowRunState: workflowRunStateSchema,
+	childWorkflowRunState: terminalWorkflowRunStateSchema,
 }).or({
 	status: "'timeout'",
 	timedOutAt: "number > 0",
+});
+
+const childWorkflowRunStatusWaitQueue = type({
+	statusWaits: childWorkflowRunStatusWait.array(),
 });
 
 const childWorkflowRunInfoSchema = type({
@@ -145,7 +153,7 @@ const childWorkflowRunInfoSchema = type({
 	name: "string > 0",
 	versionId: "string > 0",
 	inputHash: "string > 0",
-	statusWaitResults: childWorkflowWaitResultSchema.array(),
+	statusWaitQueues: type({ "['cancelled'|'completed'|'failed']": childWorkflowRunStatusWaitQueue }),
 });
 
 export const workflowRunSchema = type({
@@ -161,7 +169,7 @@ export const workflowRunSchema = type({
 	attempts: "number.integer >= 0",
 	state: workflowRunStateSchema,
 	tasks: type({ "[string]": taskInfoSchema }),
-	sleepsQueue: type({ "[string]": sleepQueueSchema }),
+	sleepQueues: type({ "[string]": sleepQueueSchema }),
 	eventWaitQueues: type({ "[string]": eventWaitQueueSchema }),
 	childWorkflowRuns: type({ "[string]": childWorkflowRunInfoSchema }),
 	"parentWorkflowRunId?": "string > 0 | undefined",

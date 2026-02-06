@@ -1,13 +1,7 @@
 import { isNonEmptyArray, toMilliseconds } from "@aikirun/lib";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
-import type {
-	EventName,
-	EventSendOptions,
-	EventWaitOptions,
-	EventWaitResult,
-	EventWaitState,
-} from "@aikirun/types/event";
+import type { EventName, EventSendOptions, EventWait, EventWaitOptions, EventWaitResult } from "@aikirun/types/event";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
@@ -154,7 +148,7 @@ export function createEventWaiter<TEvents extends EventsDefinition, Data>(
 	schema: StandardSchemaV1<Data> | undefined,
 	logger: Logger
 ): EventWaiter<Data> {
-	let nextEventIndex = 0;
+	let nextIndex = 0;
 
 	async function wait(options?: EventWaitOptions<false>): Promise<EventWaitResult<Data, false>>;
 	async function wait(options: EventWaitOptions<true>): Promise<EventWaitResult<Data, true>>;
@@ -163,18 +157,18 @@ export function createEventWaiter<TEvents extends EventsDefinition, Data>(
 
 		const eventWaits = handle.run.eventWaitQueues[eventName]?.eventWaits ?? [];
 
-		const eventWait = eventWaits[nextEventIndex] as EventWaitState<Data> | undefined;
-		if (eventWait) {
-			nextEventIndex++;
+		const existingEventWait = eventWaits[nextIndex] as EventWait<Data> | undefined;
+		if (existingEventWait) {
+			nextIndex++;
 
-			if (eventWait.status === "timeout") {
+			if (existingEventWait.status === "timeout") {
 				logger.debug("Timed out waiting for event");
 				return { timeout: true };
 			}
 
-			let data = eventWait.data;
+			let data = existingEventWait.data;
 			if (schema) {
-				const schemaValidation = schema["~standard"].validate(eventWait.data);
+				const schemaValidation = schema["~standard"].validate(existingEventWait.data);
 				const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
 				if (!schemaValidationResult.issues) {
 					data = schemaValidationResult.value;

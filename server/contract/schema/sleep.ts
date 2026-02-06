@@ -1,6 +1,6 @@
 import { type } from "arktype";
 
-export const sleepStateSchema = type({
+export const sleepSchema = type({
 	status: "'sleeping'",
 	awakeAt: "number > 0",
 })
@@ -15,5 +15,5 @@ export const sleepStateSchema = type({
 	});
 
 export const sleepQueueSchema = type({
-	sleeps: sleepStateSchema.array(),
+	sleeps: sleepSchema.array(),
 });

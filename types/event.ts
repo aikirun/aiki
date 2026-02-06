@@ -5,26 +5,26 @@ export type EventName = string & { _brand: "event_name" };
 export const EVENT_WAIT_STATUSES = ["received", "timeout"] as const;
 export type EventWaitStatus = (typeof EVENT_WAIT_STATUSES)[number];
 
-interface EventWaitStateBase {
+interface EventWaitBase {
 	status: EventWaitStatus;
 }
 
-export interface EventWaitStateReceived<Data> extends EventWaitStateBase {
+export interface EventWaitReceived<Data> extends EventWaitBase {
 	status: "received";
 	data?: Data;
 	receivedAt: number;
 	reference?: EventReferenceOptions;
 }
 
-export interface EventWaitStateTimeout extends EventWaitStateBase {
+export interface EventWaitTimeout extends EventWaitBase {
 	status: "timeout";
 	timedOutAt: number;
 }
 
-export type EventWaitState<Data> = EventWaitStateReceived<Data> | EventWaitStateTimeout;
+export type EventWait<Data> = EventWaitReceived<Data> | EventWaitTimeout;
 
 export interface EventWaitQueue<Data> {
-	eventWaits: EventWaitState<Data>[];
+	eventWaits: EventWait<Data>[];
 }
 
 export interface EventWaitOptions<Timed extends boolean> {

@@ -346,7 +346,7 @@ export function RunDetail() {
 						<Timeline
 							transitions={transitions?.transitions || []}
 							eventWaitQueues={currentRun.eventWaitQueues}
-							sleepsQueue={currentRun.sleepsQueue}
+							sleepQueues={currentRun.sleepQueues}
 							childWorkflowRuns={currentRun.childWorkflowRuns}
 							taskById={taskById}
 						/>
@@ -391,13 +391,13 @@ interface TimelineLookups {
 function Timeline({
 	transitions,
 	eventWaitQueues,
-	sleepsQueue,
+	sleepQueues,
 	childWorkflowRuns,
 	taskById,
 }: {
 	transitions: WorkflowRunTransition[];
 	eventWaitQueues: Record<string, EventWaitQueue<unknown>>;
-	sleepsQueue: Record<string, SleepQueue>;
+	sleepQueues: Record<string, SleepQueue>;
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>;
 	taskById: Map<string, TaskInfo>;
 }) {
@@ -463,7 +463,7 @@ function Timeline({
 						const prev = transitions[j];
 						if (prev.type === "state" && prev.state?.status === "sleeping") {
 							const sleepName = prev.state.sleepName;
-							const queue = sleepsQueue[sleepName];
+							const queue = sleepQueues[sleepName];
 							if (queue?.sleeps.length > 0) {
 								// Count sleeps before index j
 								let sleepIndex = 0;
@@ -555,7 +555,7 @@ function Timeline({
 		}
 
 		return { childWorkflowById, taskById, scheduledContext };
-	}, [transitions, eventWaitQueues, sleepsQueue, childWorkflowRuns, taskById]);
+	}, [transitions, eventWaitQueues, sleepQueues, childWorkflowRuns, taskById]);
 
 	const transitionsWithMetadata = useMemo(() => {
 		let lastDate = "";

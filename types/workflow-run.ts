@@ -230,6 +230,8 @@ export type WorkflowRunStateInComplete =
 
 export type WorkflowRunState<Output = unknown> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
 
+export type TerminalWorkflowRunState = Extract<WorkflowRunState, { status: "cancelled" | "completed" | "failed" }>;
+
 export interface WorkflowRun<Input = unknown, Output = unknown> {
 	id: string;
 	name: string;
@@ -248,7 +250,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
 	tasks: Record<string, TaskInfo>;
-	sleepsQueue: Record<string, SleepQueue>;
+	sleepQueues: Record<string, SleepQueue>;
 	eventWaitQueues: Record<string, EventWaitQueue<unknown>>;
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>;
 	parentWorkflowRunId?: string;
@@ -259,20 +261,31 @@ export interface ChildWorkflowRunInfo {
 	name: string;
 	versionId: string;
 	inputHash: string;
-	statusWaitResults: ChildWorkflowWaitResult[];
+	statusWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunStatusWaitQueue>;
 }
 
-export type ChildWorkflowWaitResult = ChildWorkflowWaitResultCompleted | ChildWorkflowWaitResultTimeout;
+export const CHILD_WORKFLOW_RUN_WAIT_STATUSES = ["completed", "timeout"] as const;
+export type ChildWorkflowRunWaitStatus = (typeof CHILD_WORKFLOW_RUN_WAIT_STATUSES)[number];
 
-export interface ChildWorkflowWaitResultCompleted {
+export interface ChildWorkflowRunStatusWaitBase {
+	status: ChildWorkflowRunWaitStatus;
+}
+
+export interface ChildWorkflowRunStatusWaitCompleted extends ChildWorkflowRunStatusWaitBase {
 	status: "completed";
 	completedAt: number;
-	childWorkflowRunState: WorkflowRunState;
+	childWorkflowRunState: TerminalWorkflowRunState;
 }
 
-export interface ChildWorkflowWaitResultTimeout {
+export interface ChildWorkflowRunStatusWaitTimeout extends ChildWorkflowRunStatusWaitBase {
 	status: "timeout";
 	timedOutAt: number;
+}
+
+export type ChildWorkflowRunStatusWait = ChildWorkflowRunStatusWaitCompleted | ChildWorkflowRunStatusWaitTimeout;
+
+export interface ChildWorkflowRunStatusWaitQueue {
+	statusWaits: ChildWorkflowRunStatusWait[];
 }
 
 export class WorkflowRunNotExecutableError extends Error {

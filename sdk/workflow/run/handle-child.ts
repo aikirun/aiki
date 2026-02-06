@@ -102,7 +102,11 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 	logger: Logger
 ) {
-	let nextWaitIndex = 0;
+	const nextIndexByStatus: Record<TerminalWorkflowRunStatus, number> = {
+		cancelled: 0,
+		completed: 0,
+		failed: 0,
+	};
 
 	async function waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
@@ -120,13 +124,16 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, false>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
 
-		const waitResults = parentRunHandle.run.childWorkflowRuns[handle.run.address]?.statusWaitResults ?? [];
+		const nextIndex = nextIndexByStatus[expectedStatus];
 
-		const waitResult = waitResults[nextWaitIndex];
-		if (waitResult) {
-			nextWaitIndex++;
+		const statusWaitQueues = parentRunHandle.run.childWorkflowRuns[handle.run.address]?.statusWaitQueues;
+		const statusWaits = statusWaitQueues ? statusWaitQueues[expectedStatus].statusWaits : [];
+		const existingStatusWait = statusWaits[nextIndex];
 
-			if (waitResult.status === "timeout") {
+		if (existingStatusWait) {
+			nextIndexByStatus[expectedStatus] = nextIndex + 1;
+
+			if (existingStatusWait.status === "timeout") {
 				logger.debug("Timed out waiting for child workflow status", {
 					"aiki.childWorkflowExpectedStatus": expectedStatus,
 				});
@@ -136,41 +143,36 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 				};
 			}
 
-			if (waitResult.childWorkflowRunState.status === expectedStatus) {
+			const childWorkflowRunStatus = existingStatusWait.childWorkflowRunState.status;
+
+			if (childWorkflowRunStatus === expectedStatus) {
 				return {
 					success: true,
-					state: waitResult.childWorkflowRunState as WorkflowRunWaitResultSuccess<Status, Output>,
+					state: existingStatusWait.childWorkflowRunState as WorkflowRunWaitResultSuccess<Status, Output>,
 				};
 			}
 
-			if (isTerminalWorkflowRunStatus(waitResult.childWorkflowRunState.status)) {
+			if (isTerminalWorkflowRunStatus(childWorkflowRunStatus)) {
 				logger.debug("Child workflow run reached termnial state", {
-					"aiki.childWorkflowTerminalStatus": waitResult.childWorkflowRunState.status,
+					"aiki.childWorkflowTerminalStatus": childWorkflowRunStatus,
 				});
 				return {
 					success: false,
 					cause: "run_terminated",
 				};
 			}
+
+			childWorkflowRunStatus satisfies never;
 		}
 
-		const { state } = handle.run;
-		if (state.status === expectedStatus) {
-			return {
-				success: true,
-				state: state as WorkflowRunWaitResultSuccess<Status, Output>,
-			};
-		}
-
-		if (isTerminalWorkflowRunStatus(state.status)) {
-			logger.debug("Child workflow run reached termnial state", {
-				"aiki.childWorkflowTerminalStatus": state.status,
-			});
-			return {
-				success: false,
-				cause: "run_terminated",
-			};
-		}
+		// TODO: if the child workflow is already in the expectedStatus or a terminal status,
+		// 		 we might return early, but it is tricky and could lead to bugs.
+		// Example:
+		// - wait for child to complete
+		// - realises child already completed, so return early
+		// - on replay, wait for child to complete, but child is not longer in completed state
+		// - now it starts waiting, which is a different outcome from the first run
+		// For now, let's persist this waiting in the server, so that the replay will work nicely
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
 

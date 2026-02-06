@@ -14,7 +14,7 @@ const MAX_SLEEP_YEARS = 10;
 const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1000;
 
 export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknown>, logger: Logger) {
-	const nextSleepIndexByName: Record<SleepName, number> = {};
+	const nextIndexBySleepName: Record<SleepName, number> = {};
 
 	return async (name: string, duration: Duration): Promise<SleepResult> => {
 		const sleepName = name as SleepName;
@@ -24,12 +24,12 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 			throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years`);
 		}
 
-		const nextSleepIndex = nextSleepIndexByName[sleepName] ?? 0;
+		const nextIndex = nextIndexBySleepName[sleepName] ?? 0;
 
-		const sleepQueue = handle.run.sleepsQueue[sleepName] ?? { sleeps: [] };
-		const sleepState = sleepQueue.sleeps[nextSleepIndex];
+		const sleepQueue = handle.run.sleepQueues[sleepName] ?? { sleeps: [] };
+		const existingSleep = sleepQueue.sleeps[nextIndex];
 
-		if (!sleepState) {
+		if (!existingSleep) {
 			try {
 				await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
 				logger.info("Going to sleep", {
@@ -46,41 +46,41 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 		}
 
-		if (sleepState.status === "sleeping") {
+		if (existingSleep.status === "sleeping") {
 			logger.debug("Already sleeping", {
 				"aiki.sleepName": sleepName,
-				"aiki.awakeAt": sleepState.awakeAt,
+				"aiki.awakeAt": existingSleep.awakeAt,
 			});
 			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 		}
 
-		sleepState.status satisfies "cancelled" | "completed";
-		nextSleepIndexByName[sleepName] = nextSleepIndex + 1;
+		existingSleep.status satisfies "cancelled" | "completed";
+		nextIndexBySleepName[sleepName] = nextIndex + 1;
 
-		if (sleepState.status === "cancelled") {
+		if (existingSleep.status === "cancelled") {
 			logger.debug("Sleep cancelled", {
 				"aiki.sleepName": sleepName,
-				"aiki.cancelledAt": sleepState.cancelledAt,
+				"aiki.cancelledAt": existingSleep.cancelledAt,
 			});
 			return { cancelled: true };
 		}
 
-		if (durationMs === sleepState.durationMs) {
+		if (durationMs === existingSleep.durationMs) {
 			logger.debug("Sleep completed", {
 				"aiki.sleepName": sleepName,
 				"aiki.durationMs": durationMs,
-				"aiki.completedAt": sleepState.completedAt,
+				"aiki.completedAt": existingSleep.completedAt,
 			});
 			return { cancelled: false };
 		}
 
-		if (durationMs > sleepState.durationMs) {
+		if (durationMs > existingSleep.durationMs) {
 			logger.warn("Higher sleep duration encountered during replay. Sleeping for remaining duration", {
 				"aiki.sleepName": sleepName,
-				"aiki.historicDurationMs": sleepState.durationMs,
+				"aiki.historicDurationMs": existingSleep.durationMs,
 				"aiki.latestDurationMs": durationMs,
 			});
-			durationMs -= sleepState.durationMs;
+			durationMs -= existingSleep.durationMs;
 		} else {
 			return { cancelled: false };
 		}
