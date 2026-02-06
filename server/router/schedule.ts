@@ -2,6 +2,7 @@ import { isNonEmptyArray, stableStringify } from "@aikirun/lib";
 import { sha256 } from "@aikirun/lib/crypto";
 import type { Schedule, ScheduleId } from "@aikirun/types/schedule";
 import { getNextOccurrence } from "server/service/schedule";
+import { ulid } from "ulidx";
 
 import { namespaceAuthedImplementer } from "./implementer";
 import { NotFoundError, ScheduleConflictError } from "../errors";
@@ -52,7 +53,7 @@ const activateV1 = os.activateV1.handler(async ({ input: request }) => {
 		return { schedule: updatedSchedule };
 	}
 
-	const id = crypto.randomUUID() as ScheduleId;
+	const id = ulid() as ScheduleId;
 	const now = Date.now();
 	const nextRunAt = getNextOccurrence(spec, now);
 

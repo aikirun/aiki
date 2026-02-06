@@ -48,6 +48,7 @@
         "@aikirun/client": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
+        "ulidx": "^2.4.1",
       },
     },
     "sdk/workflow": {

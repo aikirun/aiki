@@ -17,6 +17,7 @@ import type { NamespaceRequestContext } from "server/middleware/context";
 import { transitionTaskState } from "server/service/task-state-machine";
 import { createWorkflowRun } from "server/service/workflow-run";
 import { transitionWorkflowRunState } from "server/service/workflow-run-state-machine";
+import { ulid } from "ulidx";
 
 import { namespaceAuthedImplementer } from "./implementer";
 
@@ -143,7 +144,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			return;
 		}
 
-		const taskId = crypto.randomUUID();
+		const taskId = ulid();
 
 		context.logger.info({ runId, taskId, state: request.state }, "Setting task state (new task)");
 
@@ -154,7 +155,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 		};
 
 		const runningTransition: StateTransition = {
-			id: crypto.randomUUID(),
+			id: ulid(),
 			type: "task",
 			createdAt: now,
 			taskId,
@@ -167,7 +168,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 				: { status: request.state.status satisfies "failed", attempts: 1, error: request.state.error };
 
 		const finalTransition: StateTransition = {
-			id: crypto.randomUUID(),
+			id: ulid(),
 			type: "task",
 			createdAt: now,
 			taskId,
@@ -200,7 +201,7 @@ const setTaskStateV1 = os.setTaskStateV1.handler(async ({ input: request, contex
 			: { status: request.state.status satisfies "failed", attempts: attempts + 1, error: request.state.error };
 
 	const finalTransition: StateTransition = {
-		id: crypto.randomUUID(),
+		id: ulid(),
 		type: "task",
 		createdAt: now,
 		taskId: existingTaskInfo.id,

@@ -1,4 +1,5 @@
 import type { Logger } from "server/infra/logger";
+import { ulid } from "ulidx";
 
 import type {
 	ApiKeyAuthorization,
@@ -66,7 +67,7 @@ export type Context = RequestContext | CronContext;
 
 export function createPublicRequestContext(params: { request: Request; logger: Logger }): PublicRequestContext {
 	const { request, logger } = params;
-	const traceId = request.headers.get("x-trace-id") ?? crypto.randomUUID();
+	const traceId = request.headers.get("x-trace-id") ?? ulid();
 	return {
 		type: "request",
 		traceId,
@@ -88,7 +89,7 @@ export async function createOrganizationRequestContext(params: {
 	authorizer: (_: Request) => Promise<OrganizationSessionAuthorization>;
 }): Promise<OrganizationRequestContext> {
 	const { request, logger, authorizer } = params;
-	const traceId = request.headers.get("x-trace-id") ?? crypto.randomUUID();
+	const traceId = request.headers.get("x-trace-id") ?? ulid();
 	const authorization = await authorizer(request);
 	return {
 		type: "request",
@@ -115,7 +116,7 @@ export async function createNamespaceRequestContext(params: {
 	authorizer: (_: Request) => Promise<NamespaceSessionAuthorization | ApiKeyAuthorization>;
 }): Promise<NamespaceRequestContext> {
 	const { request, logger, authorizer } = params;
-	const traceId = request.headers.get("x-trace-id") ?? crypto.randomUUID();
+	const traceId = request.headers.get("x-trace-id") ?? ulid();
 	const authorization = await authorizer(request);
 
 	switch (authorization.method) {
@@ -163,7 +164,7 @@ export async function createNamespaceRequestContext(params: {
 
 export function createCronContext(params: { name: string; logger: Logger }): CronContext {
 	const { name, logger } = params;
-	const traceId = crypto.randomUUID();
+	const traceId = ulid();
 	return {
 		type: "cron",
 		traceId,

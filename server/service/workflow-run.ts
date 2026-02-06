@@ -6,6 +6,7 @@ import type { WorkflowRunCreateRequestV1 } from "@aikirun/types/workflow-run-api
 import { NotFoundError, WorkflowRunConflictError } from "server/errors";
 import { workflowRunsById, workflowRunsByReferenceId, workflowsByName } from "server/infra/db/in-memory-store";
 import type { Context } from "server/middleware/context";
+import { ulid } from "ulidx";
 
 export async function createWorkflowRun(context: Context, request: WorkflowRunCreateRequestV1): Promise<WorkflowRun> {
 	const name = request.name as WorkflowName;
@@ -36,7 +37,7 @@ export async function createWorkflowRun(context: Context, request: WorkflowRunCr
 	}
 
 	const now = Date.now();
-	const runId = crypto.randomUUID() as WorkflowRunId;
+	const runId = ulid() as WorkflowRunId;
 
 	const address = getWorkflowRunAddress(name, versionId, referenceId ?? inputHash);
 	const trigger = options?.trigger;

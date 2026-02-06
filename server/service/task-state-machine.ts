@@ -16,6 +16,7 @@ import {
 } from "server/errors";
 import { findTaskById, stateTransitionsByWorkflowRunId, workflowRunsById } from "server/infra/db/in-memory-store";
 import type { Context } from "server/middleware/context";
+import { ulid } from "ulidx";
 
 const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
 	running: ["running", "awaiting_retry", "completed", "failed"],
@@ -91,7 +92,7 @@ export async function transitionTaskState(
 			return { taskInfo: existingTaskInfo };
 		}
 
-		taskId = crypto.randomUUID() as TaskId;
+		taskId = ulid() as TaskId;
 		taskState = {
 			status: request.taskState.status,
 			attempts: request.taskState.attempts,
@@ -137,7 +138,7 @@ export async function transitionTaskState(
 	context.logger.info({ runId, taskId, taskState }, "Transitioning task state");
 
 	const transition: StateTransition = {
-		id: crypto.randomUUID(),
+		id: ulid(),
 		type: "task",
 		createdAt: now,
 		taskId,

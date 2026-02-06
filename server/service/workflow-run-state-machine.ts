@@ -16,6 +16,7 @@ import type {
 import { InvalidWorkflowRunStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "server/errors";
 import { stateTransitionsByWorkflowRunId, workflowRunsById } from "server/infra/db/in-memory-store";
 import type { Context } from "server/middleware/context";
+import { ulid } from "ulidx";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
 
@@ -283,7 +284,7 @@ export async function transitionWorkflowRunState(
 	}
 
 	const transition: StateTransition = {
-		id: crypto.randomUUID(),
+		id: ulid(),
 		type: "workflow_run",
 		createdAt: now,
 		state,

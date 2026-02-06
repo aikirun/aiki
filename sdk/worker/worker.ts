@@ -29,6 +29,7 @@ import {
 	workflowRegistry,
 	workflowRunHandle,
 } from "@aikirun/workflow";
+import { ulid } from "ulidx";
 
 /**
  * Creates an Aiki worker definition for executing workflows.
@@ -167,7 +168,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		private readonly params: Omit<WorkerParams, "opts">,
 		private readonly spawnOpts: WorkerSpawnOptions
 	) {
-		this.id = crypto.randomUUID() as WorkerId;
+		this.id = ulid() as WorkerId;
 		this.name = params.name as WorkerName;
 		this.workflowRunOpts = {
 			heartbeatIntervalMs: this.spawnOpts.workflowRun?.heartbeatIntervalMs ?? 30_000,

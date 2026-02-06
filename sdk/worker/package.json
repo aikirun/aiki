@@ -20,7 +20,8 @@
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
 		"@aikirun/client": "workspace:*",
-		"@aikirun/workflow": "workspace:*"
+		"@aikirun/workflow": "workspace:*",
+		"ulidx": "^2.4.1"
 	},
 	"publishConfig": {
 		"access": "public"
