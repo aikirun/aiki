@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { sha256Sync } from "@aikirun/lib/crypto";
 import type { Redis } from "ioredis";
+import { ulid } from "ulidx";
 
 import type { ApiKeyRepository, ApiKeyRowInsert } from "../infra/db/repository/api-key";
-import { generateUlid } from "../infra/db/ulid";
 
 const PLATFORM = "aiki";
 const PREFIX_LENGTH = 8;
@@ -42,7 +42,7 @@ export function createApiKeyService(repo: ApiKeyRepository, redis: Redis) {
 			const keyHash = sha256Sync(key);
 
 			const keyInfo = await repo.create({
-				id: generateUlid(),
+				id: ulid(),
 				organizationId: input.organizationId,
 				namespaceId: input.namespaceId,
 				createdByUserId: input.createdByUserId,

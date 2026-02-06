@@ -1,6 +1,7 @@
+import { ulid } from "ulidx";
+
 import type { DatabaseConn } from "..";
 import { namespace, namespaceMember } from "../schema/pg";
-import { generateUlid } from "../ulid";
 
 export type NamespaceRow = typeof namespace.$inferSelect;
 export type NamespaceRowInsert = Pick<typeof namespace.$inferInsert, "name" | "organizationId">;
@@ -12,8 +13,8 @@ export function createNamespaceRepository(db: DatabaseConn) {
 			namespaceParams: NamespaceRowInsert,
 			memberParams: NamespaceMemberRowInsert
 		): Promise<NamespaceRow> {
-			const namespaceId = generateUlid();
-			const memberId = generateUlid();
+			const namespaceId = ulid();
+			const memberId = ulid();
 
 			return db.transaction(async (tx) => {
 				const [createdNamespace] = await tx
