@@ -1,5 +1,5 @@
 {
-	"id": "7c5f37c3-855e-4bfa-9535-49ec2b0f41fd",
+	"id": "cbde2caf-4faa-4512-a84d-00d0077be22c",
 	"prevId": "00000000-0000-0000-0000-000000000000",
 	"version": "7",
 	"dialect": "postgresql",
@@ -87,8 +87,8 @@
 					"method": "btree",
 					"with": {}
 				},
-				"idx_event_wait_queue_workflow_run_name_created": {
-					"name": "idx_event_wait_queue_workflow_run_name_created",
+				"idx_event_wait_queue_workflow_run_name_id": {
+					"name": "idx_event_wait_queue_workflow_run_name_id",
 					"columns": [
 						{
 							"expression": "workflow_run_id",
@@ -103,7 +103,7 @@
 							"nulls": "last"
 						},
 						{
-							"expression": "created_at",
+							"expression": "id",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -407,8 +407,8 @@
 				}
 			},
 			"indexes": {
-				"idx_sleep_queue_workflow_run_name_created": {
-					"name": "idx_sleep_queue_workflow_run_name_created",
+				"idx_sleep_queue_workflow_run_name_id": {
+					"name": "idx_sleep_queue_workflow_run_name_id",
 					"columns": [
 						{
 							"expression": "workflow_run_id",
@@ -423,7 +423,7 @@
 							"nulls": "last"
 						},
 						{
-							"expression": "created_at",
+							"expression": "id",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"

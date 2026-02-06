@@ -265,12 +265,12 @@ ALTER TABLE "organization_member" ADD CONSTRAINT "fk_org_member_user_id" FOREIGN
 ALTER TABLE "organization_member" ADD CONSTRAINT "fk_org_member_org_id" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "fk_session_user_id" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_event_wait_queue_workflow_run_name_reference" ON "event_wait_queue" USING btree ("workflow_run_id","name","reference_id");--> statement-breakpoint
-CREATE INDEX "idx_event_wait_queue_workflow_run_name_created" ON "event_wait_queue" USING btree ("workflow_run_id","name","created_at");--> statement-breakpoint
+CREATE INDEX "idx_event_wait_queue_workflow_run_name_id" ON "event_wait_queue" USING btree ("workflow_run_id","name","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_schedule_namespace_definition" ON "schedule" USING btree ("namespace_id","definition_hash");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_schedule_namespace_reference" ON "schedule" USING btree ("namespace_id","reference_id");--> statement-breakpoint
 CREATE INDEX "idx_schedule_namespace_workflow" ON "schedule" USING btree ("namespace_id","workflow_id");--> statement-breakpoint
 CREATE INDEX "idx_schedule_status_next_run_at" ON "schedule" USING btree ("status","next_run_at");--> statement-breakpoint
-CREATE INDEX "idx_sleep_queue_workflow_run_name_created" ON "sleep_queue" USING btree ("workflow_run_id","name","created_at");--> statement-breakpoint
+CREATE INDEX "idx_sleep_queue_workflow_run_name_id" ON "sleep_queue" USING btree ("workflow_run_id","name","id");--> statement-breakpoint
 CREATE INDEX "idx_state_transition_workflow_run_id" ON "state_transition" USING btree ("workflow_run_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_task_workflow_run_reference" ON "task" USING btree ("workflow_run_id","reference_id");--> statement-breakpoint
 CREATE INDEX "idx_task_status_next_attempt_at" ON "task" USING btree ("status","next_attempt_at");--> statement-breakpoint
