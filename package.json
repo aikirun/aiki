@@ -13,7 +13,7 @@
 		"web"
 	],
 	"scripts": {
-		"check": "tsc -b tsconfig.check.json --noEmit",
+		"check": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
 		"lint": "bunx @biomejs/biome check .",
 		"lint:fix": "bunx @biomejs/biome check --write .",
 		"test": "bun test",

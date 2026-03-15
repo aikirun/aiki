@@ -1,5 +1,10 @@
 {
 	"compilerOptions": {
+		"baseUrl": "..",
+		"paths": {
+			"@aikirun/types": ["./types/index.ts"],
+			"@aikirun/types/*": ["./types/*.ts"]
+		},
 		"target": "ES2022",
 		"useDefineForClassFields": true,
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
