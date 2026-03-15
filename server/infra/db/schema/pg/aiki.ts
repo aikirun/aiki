@@ -7,8 +7,10 @@ import {
 } from "@aikirun/types/schedule";
 import { SLEEP_STATUSES } from "@aikirun/types/sleep";
 import { STATE_TRANSITION_TYPES } from "@aikirun/types/state-transition";
-import { TASK_CONFLICT_POLICIES, TASK_STATUSES } from "@aikirun/types/task";
+import { TASK_STATUSES } from "@aikirun/types/task";
 import {
+	CHILD_WORKFLOW_RUN_WAIT_STATUSES,
+	TERMINAL_WORKFLOW_RUN_STATUSES,
 	WORKFLOW_RUN_CONFLICT_POLICIES,
 	WORKFLOW_RUN_FAILURE_CAUSE,
 	WORKFLOW_RUN_SCHEDULED_REASON,
@@ -36,18 +38,23 @@ export const scheduleOverlapPolicyEnum = pgEnum("schedule_overlap_policy", SCHED
 export const scheduleConflictPolicyEnum = pgEnum("schedule_conflict_policy", SCHEDULE_CONFLICT_POLICIES);
 
 export const workflowRunStatusEnum = pgEnum("workflow_run_status", WORKFLOW_RUN_STATUSES);
-export const terminalWorkflowRunStatusEnum = pgEnum("terminal_workflow_run_status", WORKFLOW_RUN_STATUSES);
+export const terminalWorkflowRunStatusEnum = pgEnum("terminal_workflow_run_status", TERMINAL_WORKFLOW_RUN_STATUSES);
 export const workflowRunConflictPolicyEnum = pgEnum("workflow_run_conflict_policy", WORKFLOW_RUN_CONFLICT_POLICIES);
 export const workflowRunScheduledReason = pgEnum("workflow_run_scheduled_reason", WORKFLOW_RUN_SCHEDULED_REASON);
 export const workflowRunFailureCause = pgEnum("workflow_run_failure_cause", WORKFLOW_RUN_FAILURE_CAUSE);
 
 export const taskStatusEnum = pgEnum("task_status", TASK_STATUSES);
-export const taskConflictPolicyEnum = pgEnum("task_conflict_policy", TASK_CONFLICT_POLICIES);
 
 export const stateTransitionTypeEnum = pgEnum("state_transition_type", STATE_TRANSITION_TYPES);
 
 export const sleepStatusEnum = pgEnum("sleep_status", SLEEP_STATUSES);
 export const eventWaitStatusEnum = pgEnum("event_wait_status", EVENT_WAIT_STATUSES);
+export const childWorkflowRunWaitStatusEnum = pgEnum(
+	"child_workflow_run_wait_status",
+	CHILD_WORKFLOW_RUN_WAIT_STATUSES
+);
+
+export const workflowRunOutboxStatusEnum = pgEnum("workflow_run_outbox_status", ["pending", "published"]);
 
 export const workflow = pgTable(
 	"workflow",
@@ -55,7 +62,7 @@ export const workflow = pgTable(
 		id: text("id").primaryKey(),
 		namespaceId: text("namespace_id").notNull(),
 		name: text("name").notNull(),
-		version: text("version").notNull(),
+		versionId: text("version_id").notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
@@ -64,7 +71,7 @@ export const workflow = pgTable(
 			columns: [table.namespaceId],
 			foreignColumns: [namespace.id],
 		}),
-		uniqueIndex("uqidx_workflow_namespace_name_version").on(table.namespaceId, table.name, table.version),
+		uniqueIndex("uqidx_workflow_namespace_name_version").on(table.namespaceId, table.name, table.versionId),
 	]
 );
 
@@ -83,6 +90,7 @@ export const schedule = pgTable(
 		overlapPolicy: scheduleOverlapPolicyEnum("overlap_policy"),
 
 		workflowRunInput: jsonb("workflow_run_input"),
+		workflowRunInputHash: text("workflow_run_input_hash").notNull(),
 
 		definitionHash: text("definition_hash").notNull(),
 
@@ -118,13 +126,14 @@ export const workflowRun = pgTable(
 	"workflow_run",
 	{
 		id: text("id").primaryKey(),
+		namespaceId: text("namespace_id").notNull(),
 		workflowId: text("workflow_id").notNull(),
 		scheduleId: text("schedule_id"),
 		parentWorkflowRunId: text("parent_workflow_run_id"),
 
 		status: workflowRunStatusEnum("status").notNull(),
 		revision: integer("revision").notNull().default(0),
-		attempts: integer("attempts").notNull(),
+		attempts: integer("attempts").notNull().default(0),
 
 		input: jsonb("input"),
 		inputHash: text("input_hash").notNull(),
@@ -144,6 +153,11 @@ export const workflowRun = pgTable(
 	},
 	(table) => [
 		foreignKey({
+			name: "fk_workflow_run_namespace_id",
+			columns: [table.namespaceId],
+			foreignColumns: [namespace.id],
+		}),
+		foreignKey({
 			name: "fk_workflow_run_workflow_id",
 			columns: [table.workflowId],
 			foreignColumns: [workflow.id],
@@ -161,7 +175,11 @@ export const workflowRun = pgTable(
 		}),
 		uniqueIndex("uqidx_workflow_run_workflow_reference").on(table.workflowId, table.referenceId),
 
+		index("idx_workflow_run_namespace_id").on(table.namespaceId, table.id),
+		index("idx_workflow_run_namespace_status_id").on(table.namespaceId, table.status, table.id),
+
 		index("idx_workflow_run_workflow_id").on(table.workflowId, table.id),
+		index("idx_workflow_run_workflow_status_id").on(table.workflowId, table.status, table.id),
 
 		index("idx_workflow_run_schedule").on(table.scheduleId),
 		index("idx_workflow_run_parent_workflow_run").on(table.parentWorkflowRunId),
@@ -180,7 +198,7 @@ export const task = pgTable(
 	{
 		id: text("id").primaryKey(),
 		name: text("name").notNull(),
-		workflowRunId: text("workflow_run_id"),
+		workflowRunId: text("workflow_run_id").notNull(),
 
 		status: taskStatusEnum("status").notNull(),
 		attempts: integer("attempts").notNull(),
@@ -188,9 +206,6 @@ export const task = pgTable(
 		input: jsonb("input"),
 		inputHash: text("input_hash").notNull(),
 		options: jsonb("options"),
-
-		referenceId: text("reference_id"),
-		conflictPolicy: taskConflictPolicyEnum("conflict_policy"),
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
 		nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
@@ -204,8 +219,8 @@ export const task = pgTable(
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
-		uniqueIndex("uqidx_task_workflow_run_reference").on(table.workflowRunId, table.referenceId),
 		index("idx_task_workflow_run_id").on(table.workflowRunId, table.id),
+		index("idx_task_workflow_run_status").on(table.workflowRunId, table.status),
 		index("idx_task_status_next_attempt_at").on(table.status, table.nextAttemptAt),
 	]
 );
@@ -254,7 +269,7 @@ export const sleepQueue = pgTable(
 		name: text("name").notNull(),
 		status: sleepStatusEnum("status").notNull(),
 
-		awakeAt: timestamp("awake_at", { withTimezone: true }),
+		awakeAt: timestamp("awake_at", { withTimezone: true }).notNull(),
 		completedAt: timestamp("completed_at", { withTimezone: true }),
 		cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
 
@@ -266,7 +281,18 @@ export const sleepQueue = pgTable(
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
-		index("idx_sleep_queue_workflow_run_name_id").on(table.workflowRunId, table.name, table.id),
+		uniqueIndex("uqidx_sleep_queue_one_active_per_run")
+			.on(table.workflowRunId)
+			.where(sql`${table.status} = 'sleeping'`),
+		index("idx_sleep_queue_workflow_run_id").on(table.workflowRunId, table.id),
+		check(
+			"chk_sleep_queue_completed_requires_completed_at",
+			sql`${table.status} != 'completed' OR ${table.completedAt} IS NOT NULL`
+		),
+		check(
+			"chk_sleep_queue_cancelled_requires_cancelled_at",
+			sql`${table.status} != 'cancelled' OR ${table.cancelledAt} IS NOT NULL`
+		),
 	]
 );
 
@@ -282,7 +308,7 @@ export const eventWaitQueue = pgTable(
 
 		data: jsonb("data"),
 
-		timeoutAt: timestamp("timeout_at", { withTimezone: true }),
+		timedOutAt: timestamp("timed_out_at", { withTimezone: true }),
 
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
@@ -297,7 +323,90 @@ export const eventWaitQueue = pgTable(
 			table.name,
 			table.referenceId
 		),
-		index("idx_event_wait_queue_workflow_run_name_id").on(table.workflowRunId, table.name, table.id),
+		index("idx_event_wait_queue_workflow_run_id").on(table.workflowRunId, table.id),
+		check(
+			"chk_event_wait_queue_timeout_requires_timed_out_at",
+			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
+		),
+	]
+);
+
+export const childWorkflowRunWaitQueue = pgTable(
+	"child_workflow_run_wait_queue",
+	{
+		id: text("id").primaryKey(),
+		parentWorkflowRunId: text("parent_workflow_run_id").notNull(),
+		childWorkflowRunId: text("child_workflow_run_id").notNull(),
+		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status").notNull(),
+
+		status: childWorkflowRunWaitStatusEnum("status").notNull(),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+		timedOutAt: timestamp("timed_out_at", { withTimezone: true }),
+
+		childWorkflowRunStateTransitionId: text("child_workflow_run_state_transition_id"),
+
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		foreignKey({
+			name: "fk_child_workflow_run_wait_queue_parent",
+			columns: [table.parentWorkflowRunId],
+			foreignColumns: [workflowRun.id],
+		}),
+		foreignKey({
+			name: "fk_child_workflow_run_wait_queue_child",
+			columns: [table.childWorkflowRunId],
+			foreignColumns: [workflowRun.id],
+		}),
+		foreignKey({
+			name: "fk_child_workflow_run_wait_queue_state_transition",
+			columns: [table.childWorkflowRunStateTransitionId],
+			foreignColumns: [stateTransition.id],
+		}),
+		index("idx_child_workflow_run_wait_queue_parent_id").on(table.parentWorkflowRunId, table.id),
+		check(
+			"chk_child_workflow_run_wait_completed_invariants",
+			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL)`
+		),
+		check(
+			"chk_child_workflow_run_wait_timeout_requires_timed_out_at",
+			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
+		),
+	]
+);
+
+export const workflowRunOutbox = pgTable(
+	"workflow_run_outbox",
+	{
+		id: text("id").primaryKey(),
+		namespaceId: text("namespace_id").notNull(),
+		workflowRunId: text("workflow_run_id").notNull(),
+		workflowName: text("workflow_name").notNull(),
+		workflowVersionId: text("workflow_version_id").notNull(),
+		shard: text("shard"),
+
+		status: workflowRunOutboxStatusEnum("status").notNull(),
+
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(table) => [
+		index("idx_workflow_run_outbox_worker_poll").on(
+			table.status,
+			table.namespaceId,
+			table.workflowName,
+			table.workflowVersionId,
+			table.createdAt
+		),
+		index("idx_workflow_run_outbox_worker_poll_shard").on(
+			table.status,
+			table.namespaceId,
+			table.workflowName,
+			table.workflowVersionId,
+			table.shard,
+			table.createdAt
+		),
+		index("idx_workflow_run_outbox_publish").on(table.status, table.createdAt),
 	]
 );
 

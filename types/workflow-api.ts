@@ -1,28 +1,15 @@
 import type { WorkflowRunStatus } from "./workflow-run";
 
 export interface WorkflowApi {
-	getStatsV1: (_: WorkflowGetStatsRequestV1) => Promise<WorkflowGetStatsResponseV1>;
 	listV1: (_: WorkflowListRequestV1) => Promise<WorkflowListResponseV1>;
 	listVersionsV1: (_: WorkflowListVersionsRequestV1) => Promise<WorkflowListVersionsResponseV1>;
-}
-
-export interface WorkflowGetStatsRequestV1 {
-	name?: string;
-	versionId?: string;
-}
-
-export interface WorkflowGetStatsResponseV1 {
-	stats: WorkflowStats;
-}
-
-export interface WorkflowStats {
-	totalRuns: number;
-	runsByStatus: Record<WorkflowRunStatus, number>;
+	getStatsV1: (_: WorkflowGetStatsRequestV1) => Promise<WorkflowGetStatsResponseV1>;
 }
 
 export interface WorkflowListRequestV1 {
 	limit?: number;
 	offset?: number;
+	// TODO: maybe add namePrefix filter
 	sort?: {
 		field: "name" | "runCount" | "lastRunAt";
 		order: "asc" | "desc";
@@ -60,4 +47,14 @@ export interface WorkflowVersionItem {
 export interface WorkflowListVersionsResponseV1 {
 	versions: WorkflowVersionItem[];
 	total: number;
+}
+
+export type WorkflowGetStatsRequestV1 = { name: string; versionId?: string } | undefined;
+
+export interface WorkflowGetStatsResponseV1 {
+	stats: WorkflowStats;
+}
+
+export interface WorkflowStats {
+	runsByStatus: Record<WorkflowRunStatus, number>;
 }

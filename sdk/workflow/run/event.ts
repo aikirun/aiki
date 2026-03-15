@@ -7,7 +7,6 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunRevisionConflictError,
@@ -218,8 +217,7 @@ export function createEventSenders<TEvents extends EventsDefinition>(
 	api: ApiClient,
 	workflowRunId: string,
 	eventsDefinition: TEvents,
-	logger: Logger,
-	onSend: (run: WorkflowRun<unknown, unknown>) => void
+	logger: Logger
 ): EventSenders<TEvents> {
 	const senders = {} as EventSenders<TEvents>;
 
@@ -229,8 +227,7 @@ export function createEventSenders<TEvents extends EventsDefinition>(
 			workflowRunId,
 			eventName as EventName,
 			eventDefinition.schema,
-			logger.child({ "aiki.eventName": eventName }),
-			onSend
+			logger.child({ "aiki.eventName": eventName })
 		) as EventSender<EventData<TEvents[keyof TEvents]>>;
 		senders[eventName as keyof TEvents] = sender;
 	}
@@ -244,7 +241,6 @@ function createEventSender<Data>(
 	eventName: EventName,
 	schema: StandardSchemaV1<Data> | undefined,
 	logger: Logger,
-	onSend: (run: WorkflowRun<unknown, unknown>) => void,
 	options?: EventSendOptions
 ): EventSender<Data> {
 	const optsOverrider = objectOverrider(options ?? {});
@@ -252,7 +248,7 @@ function createEventSender<Data>(
 	const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): EventSenderBuilder<Data> => ({
 		opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
 		send: (...args: Data extends void ? [] : [Data]) =>
-			createEventSender(api, workflowRunId, eventName, schema, logger, onSend, optsBuilder.build()).send(...args),
+			createEventSender(api, workflowRunId, eventName, schema, logger, optsBuilder.build()).send(...args),
 	});
 
 	async function send(...args: Data extends void ? [] : [Data]): Promise<void> {
@@ -267,13 +263,12 @@ function createEventSender<Data>(
 			data = schemaValidationResult.value;
 		}
 
-		const { run } = await api.workflowRun.sendEventV1({
+		await api.workflowRun.sendEventV1({
 			id: workflowRunId,
 			eventName,
 			data,
 			options,
 		});
-		onSend(run);
 
 		logger.info("Sent event to workflow", {
 			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),

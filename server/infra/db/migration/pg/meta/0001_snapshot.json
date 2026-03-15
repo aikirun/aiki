@@ -1,9 +1,138 @@
 {
-	"id": "b65a1f5c-99c9-4063-aa71-0848bc48a3cc",
-	"prevId": "6462088c-543a-4adb-b618-2cf338ca39a2",
+	"id": "fc725801-fc44-4b14-8f42-8c1d941e1a8c",
+	"prevId": "75c38166-1acd-4b3d-8111-d01aa6fcfdd1",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
+		"public.child_workflow_run_wait_queue": {
+			"name": "child_workflow_run_wait_queue",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"parent_workflow_run_id": {
+					"name": "parent_workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"child_workflow_run_id": {
+					"name": "child_workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"child_workflow_run_status": {
+					"name": "child_workflow_run_status",
+					"type": "terminal_workflow_run_status",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "child_workflow_run_wait_status",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"timed_out_at": {
+					"name": "timed_out_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"child_workflow_run_state_transition_id": {
+					"name": "child_workflow_run_state_transition_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {
+				"idx_child_workflow_run_wait_queue_parent_id": {
+					"name": "idx_child_workflow_run_wait_queue_parent_id",
+					"columns": [
+						{
+							"expression": "parent_workflow_run_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				}
+			},
+			"foreignKeys": {
+				"fk_child_workflow_run_wait_queue_parent": {
+					"name": "fk_child_workflow_run_wait_queue_parent",
+					"tableFrom": "child_workflow_run_wait_queue",
+					"columnsFrom": ["parent_workflow_run_id"],
+					"tableTo": "workflow_run",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "no action"
+				},
+				"fk_child_workflow_run_wait_queue_child": {
+					"name": "fk_child_workflow_run_wait_queue_child",
+					"tableFrom": "child_workflow_run_wait_queue",
+					"columnsFrom": ["child_workflow_run_id"],
+					"tableTo": "workflow_run",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "no action"
+				},
+				"fk_child_workflow_run_wait_queue_state_transition": {
+					"name": "fk_child_workflow_run_wait_queue_state_transition",
+					"tableFrom": "child_workflow_run_wait_queue",
+					"columnsFrom": ["child_workflow_run_state_transition_id"],
+					"tableTo": "state_transition",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {
+				"chk_child_workflow_run_wait_completed_invariants": {
+					"name": "chk_child_workflow_run_wait_completed_invariants",
+					"value": "\"child_workflow_run_wait_queue\".\"status\" != 'completed' OR (\"child_workflow_run_wait_queue\".\"completed_at\" IS NOT NULL AND \"child_workflow_run_wait_queue\".\"child_workflow_run_state_transition_id\" IS NOT NULL)"
+				},
+				"chk_child_workflow_run_wait_timeout_requires_timed_out_at": {
+					"name": "chk_child_workflow_run_wait_timeout_requires_timed_out_at",
+					"value": "\"child_workflow_run_wait_queue\".\"status\" != 'timeout' OR \"child_workflow_run_wait_queue\".\"timed_out_at\" IS NOT NULL"
+				}
+			},
+			"isRLSEnabled": false
+		},
 		"public.event_wait_queue": {
 			"name": "event_wait_queue",
 			"schema": "",
@@ -45,8 +174,8 @@
 					"primaryKey": false,
 					"notNull": false
 				},
-				"timeout_at": {
-					"name": "timeout_at",
+				"timed_out_at": {
+					"name": "timed_out_at",
 					"type": "timestamp with time zone",
 					"primaryKey": false,
 					"notNull": false
@@ -87,17 +216,11 @@
 					"method": "btree",
 					"concurrently": false
 				},
-				"idx_event_wait_queue_workflow_run_name_id": {
-					"name": "idx_event_wait_queue_workflow_run_name_id",
+				"idx_event_wait_queue_workflow_run_id": {
+					"name": "idx_event_wait_queue_workflow_run_id",
 					"columns": [
 						{
 							"expression": "workflow_run_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						},
-						{
-							"expression": "name",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -129,7 +252,12 @@
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"policies": {},
-			"checkConstraints": {},
+			"checkConstraints": {
+				"chk_event_wait_queue_timeout_requires_timed_out_at": {
+					"name": "chk_event_wait_queue_timeout_requires_timed_out_at",
+					"value": "\"event_wait_queue\".\"status\" != 'timeout' OR \"event_wait_queue\".\"timed_out_at\" IS NOT NULL"
+				}
+			},
 			"isRLSEnabled": false
 		},
 		"public.schedule": {
@@ -192,6 +320,12 @@
 					"type": "jsonb",
 					"primaryKey": false,
 					"notNull": false
+				},
+				"workflow_run_input_hash": {
+					"name": "workflow_run_input_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
 				},
 				"definition_hash": {
 					"name": "definition_hash",
@@ -384,7 +518,7 @@
 					"name": "awake_at",
 					"type": "timestamp with time zone",
 					"primaryKey": false,
-					"notNull": false
+					"notNull": true
 				},
 				"completed_at": {
 					"name": "completed_at",
@@ -407,17 +541,27 @@
 				}
 			},
 			"indexes": {
-				"idx_sleep_queue_workflow_run_name_id": {
-					"name": "idx_sleep_queue_workflow_run_name_id",
+				"uqidx_sleep_queue_one_active_per_run": {
+					"name": "uqidx_sleep_queue_one_active_per_run",
 					"columns": [
 						{
 							"expression": "workflow_run_id",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
-						},
+						}
+					],
+					"isUnique": true,
+					"with": {},
+					"method": "btree",
+					"where": "\"sleep_queue\".\"status\" = 'sleeping'",
+					"concurrently": false
+				},
+				"idx_sleep_queue_workflow_run_id": {
+					"name": "idx_sleep_queue_workflow_run_id",
+					"columns": [
 						{
-							"expression": "name",
+							"expression": "workflow_run_id",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -449,7 +593,16 @@
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"policies": {},
-			"checkConstraints": {},
+			"checkConstraints": {
+				"chk_sleep_queue_completed_requires_completed_at": {
+					"name": "chk_sleep_queue_completed_requires_completed_at",
+					"value": "\"sleep_queue\".\"status\" != 'completed' OR \"sleep_queue\".\"completed_at\" IS NOT NULL"
+				},
+				"chk_sleep_queue_cancelled_requires_cancelled_at": {
+					"name": "chk_sleep_queue_cancelled_requires_cancelled_at",
+					"value": "\"sleep_queue\".\"status\" != 'cancelled' OR \"sleep_queue\".\"cancelled_at\" IS NOT NULL"
+				}
+			},
 			"isRLSEnabled": false
 		},
 		"public.state_transition": {
@@ -585,7 +738,7 @@
 					"name": "workflow_run_id",
 					"type": "text",
 					"primaryKey": false,
-					"notNull": false
+					"notNull": true
 				},
 				"status": {
 					"name": "status",
@@ -618,19 +771,6 @@
 					"primaryKey": false,
 					"notNull": false
 				},
-				"reference_id": {
-					"name": "reference_id",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": false
-				},
-				"conflict_policy": {
-					"name": "conflict_policy",
-					"type": "task_conflict_policy",
-					"typeSchema": "public",
-					"primaryKey": false,
-					"notNull": false
-				},
 				"latest_state_transition_id": {
 					"name": "latest_state_transition_id",
 					"type": "text",
@@ -659,27 +799,6 @@
 				}
 			},
 			"indexes": {
-				"uqidx_task_workflow_run_reference": {
-					"name": "uqidx_task_workflow_run_reference",
-					"columns": [
-						{
-							"expression": "workflow_run_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						},
-						{
-							"expression": "reference_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						}
-					],
-					"isUnique": true,
-					"with": {},
-					"method": "btree",
-					"concurrently": false
-				},
 				"idx_task_workflow_run_id": {
 					"name": "idx_task_workflow_run_id",
 					"columns": [
@@ -691,6 +810,27 @@
 						},
 						{
 							"expression": "id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_task_workflow_run_status": {
+					"name": "idx_task_workflow_run_status",
+					"columns": [
+						{
+							"expression": "workflow_run_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "status",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -762,8 +902,8 @@
 					"primaryKey": false,
 					"notNull": true
 				},
-				"version": {
-					"name": "version",
+				"version_id": {
+					"name": "version_id",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true
@@ -793,7 +933,7 @@
 							"nulls": "last"
 						},
 						{
-							"expression": "version",
+							"expression": "version_id",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -832,6 +972,12 @@
 					"primaryKey": true,
 					"notNull": true
 				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
 				"workflow_id": {
 					"name": "workflow_id",
 					"type": "text",
@@ -868,7 +1014,8 @@
 					"name": "attempts",
 					"type": "integer",
 					"primaryKey": false,
-					"notNull": true
+					"notNull": true,
+					"default": 0
 				},
 				"input": {
 					"name": "input",
@@ -968,11 +1115,86 @@
 					"method": "btree",
 					"concurrently": false
 				},
+				"idx_workflow_run_namespace_id": {
+					"name": "idx_workflow_run_namespace_id",
+					"columns": [
+						{
+							"expression": "namespace_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_workflow_run_namespace_status_id": {
+					"name": "idx_workflow_run_namespace_status_id",
+					"columns": [
+						{
+							"expression": "namespace_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
 				"idx_workflow_run_workflow_id": {
 					"name": "idx_workflow_run_workflow_id",
 					"columns": [
 						{
 							"expression": "workflow_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_workflow_run_workflow_status_id": {
+					"name": "idx_workflow_run_workflow_status_id",
+					"columns": [
+						{
+							"expression": "workflow_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "status",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -1105,6 +1327,15 @@
 				}
 			},
 			"foreignKeys": {
+				"fk_workflow_run_namespace_id": {
+					"name": "fk_workflow_run_namespace_id",
+					"tableFrom": "workflow_run",
+					"columnsFrom": ["namespace_id"],
+					"tableTo": "namespace",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "no action"
+				},
 				"fk_workflow_run_workflow_id": {
 					"name": "fk_workflow_run_workflow_id",
 					"tableFrom": "workflow_run",
@@ -1133,6 +1364,182 @@
 					"onDelete": "no action"
 				}
 			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.workflow_run_outbox": {
+			"name": "workflow_run_outbox",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"workflow_run_id": {
+					"name": "workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"workflow_name": {
+					"name": "workflow_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"workflow_version_id": {
+					"name": "workflow_version_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"shard": {
+					"name": "shard",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"status": {
+					"name": "status",
+					"type": "workflow_run_outbox_status",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp with time zone",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {
+				"idx_workflow_run_outbox_worker_poll": {
+					"name": "idx_workflow_run_outbox_worker_poll",
+					"columns": [
+						{
+							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "namespace_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "workflow_name",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "workflow_version_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "created_at",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_workflow_run_outbox_worker_poll_shard": {
+					"name": "idx_workflow_run_outbox_worker_poll_shard",
+					"columns": [
+						{
+							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "namespace_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "workflow_name",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "workflow_version_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "shard",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "created_at",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_workflow_run_outbox_publish": {
+					"name": "idx_workflow_run_outbox_publish",
+					"columns": [
+						{
+							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "created_at",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				}
+			},
+			"foreignKeys": {},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"policies": {},
@@ -2168,6 +2575,11 @@
 		}
 	},
 	"enums": {
+		"public.child_workflow_run_wait_status": {
+			"name": "child_workflow_run_wait_status",
+			"schema": "public",
+			"values": ["completed", "timeout"]
+		},
 		"public.event_wait_status": {
 			"name": "event_wait_status",
 			"schema": "public",
@@ -2203,11 +2615,6 @@
 			"schema": "public",
 			"values": ["workflow_run", "task"]
 		},
-		"public.task_conflict_policy": {
-			"name": "task_conflict_policy",
-			"schema": "public",
-			"values": ["error", "return_existing"]
-		},
 		"public.task_status": {
 			"name": "task_status",
 			"schema": "public",
@@ -2216,19 +2623,7 @@
 		"public.terminal_workflow_run_status": {
 			"name": "terminal_workflow_run_status",
 			"schema": "public",
-			"values": [
-				"scheduled",
-				"queued",
-				"running",
-				"paused",
-				"sleeping",
-				"awaiting_event",
-				"awaiting_retry",
-				"awaiting_child_workflow",
-				"cancelled",
-				"completed",
-				"failed"
-			]
+			"values": ["cancelled", "completed", "failed"]
 		},
 		"public.workflow_run_conflict_policy": {
 			"name": "workflow_run_conflict_policy",
@@ -2239,6 +2634,11 @@
 			"name": "workflow_run_failure_cause",
 			"schema": "public",
 			"values": ["task", "child_workflow", "self"]
+		},
+		"public.workflow_run_outbox_status": {
+			"name": "workflow_run_outbox_status",
+			"schema": "public",
+			"values": ["pending", "published"]
 		},
 		"public.workflow_run_scheduled_reason": {
 			"name": "workflow_run_scheduled_reason",

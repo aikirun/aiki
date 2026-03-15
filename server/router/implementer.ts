@@ -8,7 +8,6 @@ import {
 	InvalidWorkflowRunStateTransitionError,
 	NotFoundError,
 	ScheduleConflictError,
-	TaskConflictError,
 	UnauthorizedError,
 	ValidationError,
 	WorkflowRunConflictError,
@@ -48,10 +47,6 @@ function handleError<T extends ContextBase>(context: T, error: unknown) {
 
 	if (error instanceof WorkflowRunConflictError) {
 		throw new ORPCError("WORKFLOW_RUN_CONFLICT", { message: error.message, status: 409 });
-	}
-
-	if (error instanceof TaskConflictError) {
-		throw new ORPCError("TASK_CONFLICT", { message: error.message, status: 409 });
 	}
 
 	if (error instanceof ScheduleConflictError) {

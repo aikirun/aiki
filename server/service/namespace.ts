@@ -1,10 +1,12 @@
+import type { OrganizationId } from "@aikirun/types/organization";
+
 import type { NamespaceRepository, NamespaceRow } from "../infra/db/repository/namespace";
 
 export function createNamespaceService(namespaceRepository: NamespaceRepository) {
 	return {
 		async createNamespaceWithMember(params: {
 			name: string;
-			organizationId: string;
+			organizationId: OrganizationId;
 			userId: string;
 		}): Promise<NamespaceRow> {
 			const createdNamespace = await namespaceRepository.createWithMember(

@@ -1,7 +1,6 @@
 import type { RetryStrategy } from "./retry";
 import type { SerializableError } from "./serializable";
 import type { OptionalProp } from "./utils";
-import type { WorkflowRunId } from "./workflow-run";
 
 export type TaskId = string & { _brand: "task_id" };
 
@@ -16,17 +15,7 @@ export interface TaskDefinitionOptions {
 	retry?: RetryStrategy;
 }
 
-export interface TaskStartOptions extends TaskDefinitionOptions {
-	reference?: TaskReferenceOptions;
-}
-
-export const TASK_CONFLICT_POLICIES = ["error", "return_existing"] as const;
-export type TaskConflictPolicy = (typeof TASK_CONFLICT_POLICIES)[number];
-
-export interface TaskReferenceOptions {
-	id: string;
-	conflictPolicy?: TaskConflictPolicy;
-}
+export interface TaskStartOptions extends TaskDefinitionOptions {}
 
 interface TaskStateBase {
 	status: TaskStatus;
@@ -112,6 +101,10 @@ export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAt
 	nextAttemptInMs: number;
 };
 
+export interface TaskQueue {
+	tasks: TaskInfo[];
+}
+
 export class TaskFailedError extends Error {
 	public readonly taskId: TaskId;
 	public readonly attempts: number;
@@ -123,17 +116,5 @@ export class TaskFailedError extends Error {
 		this.taskId = taskId;
 		this.attempts = attempts;
 		this.reason = reason;
-	}
-}
-
-export class TaskConflictError extends Error {
-	public readonly workflowRunId: WorkflowRunId;
-	public readonly taskName: string;
-
-	constructor(workflowRunId: WorkflowRunId, taskName: string) {
-		super(`Task ${taskName} already exists with same input in workflow ${workflowRunId}`);
-		this.name = "TaskConflictError";
-		this.workflowRunId = workflowRunId;
-		this.taskName = taskName;
 	}
 }

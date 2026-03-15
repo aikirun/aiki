@@ -14,6 +14,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkerId, WorkerName } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
+	NonDeterminismError,
 	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -24,6 +25,7 @@ import {
 import type { WorkflowVersion } from "@aikirun/workflow";
 import {
 	createEventWaiters,
+	createReplayManifest,
 	createSleeper,
 	type WorkflowRegistry,
 	workflowRegistry,
@@ -401,11 +403,15 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					id: workflowRun.id as WorkflowRunId,
 					name: workflowRun.name as WorkflowName,
 					versionId: workflowRun.versionId as WorkflowVersionId,
-					options: workflowRun.options,
+					options: workflowRun.options ?? {},
 					logger,
 					sleep: createSleeper(handle, logger),
 					events: createEventWaiters(handle, eventsDefinition, logger),
-					[INTERNAL]: { handle, options: { spinThresholdMs: this.workflowRunOpts.spinThresholdMs } },
+					[INTERNAL]: {
+						handle,
+						replayManifest: createReplayManifest(workflowRun),
+						options: { spinThresholdMs: this.workflowRunOpts.spinThresholdMs },
+					},
 				},
 				workflowRun.input,
 				appContext
@@ -417,12 +423,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				error instanceof WorkflowRunNotExecutableError ||
 				error instanceof WorkflowRunSuspendedError ||
 				error instanceof WorkflowRunFailedError ||
-				error instanceof WorkflowRunRevisionConflictError
-				// TaskConflictError is retryable, hence we need not ack it.
-				// 	* The only way it can occur is with something like Promise.all([task.start(same-input), task.start(same-input)])
-				// 	  On retry, the cached result will be used to resolve both promises.
-				// 	* If 2 workers attempt to start the same task in the same workflow, it will cause a WorkflowRunRevisionConflictError instead
-				// 	  because workers always increment workflow revision before running it, and this revision is checked before stating a task
+				error instanceof WorkflowRunRevisionConflictError ||
+				error instanceof NonDeterminismError
 			) {
 				shouldAcknowledge = true;
 			} else {

@@ -1,16 +1,17 @@
-import { and, eq, lte } from "drizzle-orm";
+import type { NonEmptyArray } from "@aikirun/lib";
+import { and, eq, inArray, lte } from "drizzle-orm";
 
-import type { DatabaseConn } from "..";
+import type { DatabaseConn, DbTransaction } from "..";
 import { task } from "../schema/pg";
 
-type TaskRow = typeof task.$inferSelect;
+export type TaskRow = typeof task.$inferSelect;
 type TaskRowInsert = typeof task.$inferInsert;
 type TaskRowUpdate = Partial<Pick<TaskRowInsert, "status" | "attempts" | "latestStateTransitionId" | "nextAttemptAt">>;
 
 export function createTaskRepository(db: DatabaseConn) {
 	return {
-		async create(input: TaskRowInsert): Promise<TaskRow> {
-			const result = await db.insert(task).values(input).returning();
+		async create(input: TaskRowInsert, tx?: DbTransaction): Promise<TaskRow> {
+			const result = await (tx ?? db).insert(task).values(input).returning();
 			const created = result[0];
 			if (!created) {
 				throw new Error("Failed to create task - no row returned");
@@ -18,36 +19,42 @@ export function createTaskRepository(db: DatabaseConn) {
 			return created;
 		},
 
-		async updateState(id: string, changes: TaskRowUpdate): Promise<TaskRow | null> {
-			const result = await db.update(task).set(changes).where(eq(task.id, id)).returning();
-
+		async getById(id: string, tx?: DbTransaction): Promise<TaskRow | null> {
+			const result = await (tx ?? db).select().from(task).where(eq(task.id, id)).limit(1);
 			return result[0] ?? null;
 		},
 
-		async getById(id: string): Promise<TaskRow | null> {
-			const result = await db.select().from(task).where(eq(task.id, id)).limit(1);
+		async update(id: string, updates: TaskRowUpdate, tx?: DbTransaction): Promise<TaskRow | null> {
+			const result = await (tx ?? db).update(task).set(updates).where(eq(task.id, id)).returning();
 			return result[0] ?? null;
 		},
 
-		async getByWorkflowRunAndReference(workflowRunId: string, referenceId: string): Promise<TaskRow | null> {
-			const result = await db
-				.select()
+		async listByWorkflowRunId(workflowRunId: string, tx?: DbTransaction): Promise<TaskRow[]> {
+			// TODO: explore loading in chunks
+			return (tx ?? db).select().from(task).where(eq(task.workflowRunId, workflowRunId)).orderBy(task.id).limit(10_000);
+		},
+
+		async listRetryableTaskWorkflowRunIds(limit = 100, tx?: DbTransaction): Promise<string[]> {
+			const rows = await (tx ?? db)
+				.selectDistinct({ workflowRunId: task.workflowRunId })
 				.from(task)
-				.where(and(eq(task.workflowRunId, workflowRunId), eq(task.referenceId, referenceId)))
-				.limit(1);
-			return result[0] ?? null;
-		},
-
-		async listByWorkflowRunId(workflowRunId: string): Promise<TaskRow[]> {
-			return db.select().from(task).where(eq(task.workflowRunId, workflowRunId));
-		},
-
-		async listRetryableTasks(before: Date, limit = 100): Promise<TaskRow[]> {
-			return db
-				.select()
-				.from(task)
-				.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, before)))
+				.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, new Date())))
+				.orderBy(task.nextAttemptAt)
 				.limit(limit);
+			return rows.map((row) => row.workflowRunId);
+		},
+
+		async deleteStaleByWorkflowRunIds(
+			workflowRunIds: string | NonEmptyArray<string>,
+			tx?: DbTransaction
+		): Promise<void> {
+			const runIdsFilter =
+				typeof workflowRunIds === "string"
+					? eq(task.workflowRunId, workflowRunIds)
+					: inArray(task.workflowRunId, workflowRunIds);
+			await (tx ?? db)
+				.delete(task)
+				.where(and(runIdsFilter, inArray(task.status, ["running", "awaiting_retry", "failed"])));
 		},
 	};
 }

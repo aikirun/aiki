@@ -1,3 +1,6 @@
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OrganizationId } from "@aikirun/types/organization";
+
 import { UnauthorizedError } from "../errors";
 import type { ApiKeyService } from "../service/api-key";
 import type { AuthService } from "../service/auth";
@@ -6,20 +9,20 @@ export type AuthorizationMethod = "api_key" | "organization_session" | "namespac
 
 export interface ApiKeyAuthorization {
 	method: "api_key";
-	organizationId: string;
-	namespaceId: string;
+	organizationId: OrganizationId;
+	namespaceId: NamespaceId;
 }
 
 export interface OrganizationSessionAuthorization {
 	method: "organization_session";
-	organizationId: string;
+	organizationId: OrganizationId;
 	userId: string;
 }
 
 export interface NamespaceSessionAuthorization {
 	method: "namespace_session";
-	organizationId: string;
-	namespaceId: string;
+	organizationId: OrganizationId;
+	namespaceId: NamespaceId;
 	userId: string;
 }
 
@@ -50,8 +53,8 @@ export function createAuthorizer(apiKeyService: ApiKeyService, authService: Auth
 
 		return {
 			method: "api_key",
-			namespaceId: result.namespaceId,
-			organizationId: result.organizationId,
+			namespaceId: result.namespaceId as NamespaceId,
+			organizationId: result.organizationId as OrganizationId,
 		};
 	}
 
@@ -68,7 +71,7 @@ export function createAuthorizer(apiKeyService: ApiKeyService, authService: Auth
 
 		return {
 			method: "organization_session",
-			organizationId: activeOrganizationId,
+			organizationId: activeOrganizationId as OrganizationId,
 			userId: session.session.userId,
 		};
 	}
@@ -91,8 +94,8 @@ export function createAuthorizer(apiKeyService: ApiKeyService, authService: Auth
 
 		return {
 			method: "namespace_session",
-			organizationId: activeOrganizationId,
-			namespaceId: activeNamespaceId,
+			organizationId: activeOrganizationId as OrganizationId,
+			namespaceId: activeNamespaceId as NamespaceId,
 			userId: session.session.userId,
 		};
 	}

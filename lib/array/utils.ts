@@ -19,8 +19,16 @@ export function groupBy<Item, Key, Value>(
 	return result;
 }
 
-export function isNonEmptyArray<T>(value: T[]): value is NonEmptyArray<T> {
-	return value.length > 0;
+export function isNonEmptyArray<T>(value: T[] | undefined): value is NonEmptyArray<T> {
+	return value !== undefined && value.length > 0;
+}
+
+export function* chunkLazy<T>(items: T[], size: number): Generator<NonEmptyArray<T>> {
+	let sliceStart = 0;
+	while (sliceStart < items.length) {
+		yield items.slice(sliceStart, sliceStart + size) as NonEmptyArray<T>;
+		sliceStart += size;
+	}
 }
 
 /**

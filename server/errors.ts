@@ -26,14 +26,12 @@ export class UnauthorizedError extends Error {
 export class WorkflowRunRevisionConflictError extends Error {
 	public readonly workflowRunId: WorkflowRunId;
 	public readonly expectedRevision: number;
-	public readonly actualRevision: number;
 
-	constructor(workflowRunId: WorkflowRunId, expectedRevision: number, actualRevision: number) {
-		super(`Revision conflict for workflow ${workflowRunId}: expected ${expectedRevision}, actual is ${actualRevision}`);
+	constructor(workflowRunId: WorkflowRunId, expectedRevision: number) {
+		super(`Revision conflict for workflow ${workflowRunId}: expected ${expectedRevision}`);
 		this.name = "WorkflowRunRevisionConflictError";
 		this.workflowRunId = workflowRunId;
 		this.expectedRevision = expectedRevision;
-		this.actualRevision = actualRevision;
 	}
 }
 
@@ -97,17 +95,5 @@ export class WorkflowRunConflictError extends Error {
 		this.workflowName = workflowName;
 		this.workflowVersionId = workflowVersionId;
 		this.referenceId = referenceId;
-	}
-}
-
-export class TaskConflictError extends Error {
-	public readonly workflowRunId: WorkflowRunId;
-	public readonly taskName: string;
-
-	constructor(workflowRunId: WorkflowRunId, taskName: string, referenceId: string) {
-		super(`Task ${taskName} already exists with reference ${referenceId} in workflow ${workflowRunId}`);
-		this.name = "TaskConflictError";
-		this.workflowRunId = workflowRunId;
-		this.taskName = taskName;
 	}
 }

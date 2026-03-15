@@ -16,7 +16,6 @@ import type {
 	WorkflowRunMulticastEventByReferenceRequestV1,
 	WorkflowRunMulticastEventRequestV1,
 	WorkflowRunSendEventRequestV1,
-	WorkflowRunSendEventResponseV1,
 	WorkflowRunSetTaskStateRequestV1,
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
@@ -64,14 +63,20 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 			"filters?": {
 				"id?": "string > 0 | undefined",
 				"status?": workflowRunStatusSchema.array(),
-				"workflows?": type({
+				"workflow?": type({
 					name: "string > 0",
-					"versionId?": "string > 0 | undefined",
-					"referenceId?": "string > 0 | undefined",
-				}).array(),
+				})
+					.or({
+						name: "string > 0",
+						versionId: "string > 0",
+					})
+					.or({
+						name: "string > 0",
+						versionId: "string > 0",
+						referenceId: "string > 0",
+					}),
 			},
 			"sort?": {
-				field: "'createdAt'",
 				order: "'asc' | 'desc'",
 			},
 		})
@@ -143,7 +148,7 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 	)
 	.output(
 		type({
-			run: workflowRunSchema,
+			id: "string > 0",
 		})
 	);
 
@@ -235,7 +240,6 @@ const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, 
 				"limit?": "number.integer > 0 | undefined",
 				"offset?": "number.integer >= 0 | undefined",
 				"sort?": {
-					field: "'createdAt'",
 					order: "'asc' | 'desc'",
 				},
 			})
@@ -247,7 +251,7 @@ const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, 
 			})
 		);
 
-const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, WorkflowRunSendEventResponseV1> = oc
+const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, void> = oc
 	.input(
 		type({
 			id: "string > 0",
@@ -258,16 +262,12 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, WorkflowRunS
 			},
 		})
 	)
-	.output(
-		type({
-			run: workflowRunSchema,
-		})
-	);
+	.output(type("undefined"));
 
 const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, void> = oc
 	.input(
 		type({
-			ids: type("string > 0").array(),
+			ids: type("string > 0").array().atLeastLength(1).atMostLength(10),
 			eventName: "string > 0",
 			"data?": "unknown",
 			"options?": {
@@ -284,7 +284,10 @@ const multicastEventByReferenceV1: ContractProcedure<WorkflowRunMulticastEventBy
 				name: "string > 0",
 				versionId: "string > 0",
 				referenceId: "string > 0",
-			}).array(),
+			})
+				.array()
+				.atLeastLength(1)
+				.atMostLength(10),
 			eventName: "string > 0",
 			"data?": "unknown",
 			"options?": {

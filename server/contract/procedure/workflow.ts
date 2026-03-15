@@ -16,14 +16,13 @@ import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 const getStatsV1: ContractProcedure<WorkflowGetStatsRequestV1, WorkflowGetStatsResponseV1> = oc
 	.input(
 		type({
-			"name?": "string > 0 | undefined",
+			name: "string > 0",
 			"versionId?": "string > 0 | undefined",
-		})
+		}).or("undefined")
 	)
 	.output(
 		type({
 			stats: {
-				totalRuns: "number.integer >= 0",
 				runsByStatus: {
 					scheduled: "number.integer >= 0",
 					queued: "number.integer >= 0",

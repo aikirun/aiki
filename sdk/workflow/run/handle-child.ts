@@ -2,6 +2,7 @@ import { type DurationObject, toMilliseconds } from "@aikirun/lib";
 import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
+	type ChildWorkflowRunWaitQueue,
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
@@ -22,6 +23,7 @@ export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents 
 	client: Client<AppContext>,
 	run: WorkflowRun<Input, Output>,
 	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
+	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger,
 	eventsDefinition?: TEvents
 ): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
@@ -31,7 +33,7 @@ export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents 
 		run: handle.run,
 		events: handle.events,
 		refresh: handle.refresh.bind(handle),
-		waitForStatus: createStatusWaiter(handle, parentRun, logger),
+		waitForStatus: createStatusWaiter(handle, parentRun, childWorkflowRunWaitQueues, logger),
 		cancel: handle.cancel.bind(handle),
 		pause: handle.pause.bind(handle),
 		resume: handle.resume.bind(handle),
@@ -100,6 +102,7 @@ export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	handle: WorkflowRunHandle<Input, Output, AppContext, TEvents>,
 	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
+	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger
 ) {
 	const nextIndexByStatus: Record<TerminalWorkflowRunStatus, number> = {
@@ -126,14 +129,15 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 
 		const nextIndex = nextIndexByStatus[expectedStatus];
 
-		const statusWaitQueues = parentRunHandle.run.childWorkflowRuns[handle.run.address]?.statusWaitQueues;
-		const statusWaits = statusWaitQueues ? statusWaitQueues[expectedStatus].statusWaits : [];
-		const existingStatusWait = statusWaits[nextIndex];
+		const { run } = handle;
 
-		if (existingStatusWait) {
+		const childWorkflowRunWaits = childWorkflowRunWaitQueues[expectedStatus].childWorkflowRunWaits;
+		const existingChildWorkflowRunWait = childWorkflowRunWaits[nextIndex];
+
+		if (existingChildWorkflowRunWait) {
 			nextIndexByStatus[expectedStatus] = nextIndex + 1;
 
-			if (existingStatusWait.status === "timeout") {
+			if (existingChildWorkflowRunWait.status === "timeout") {
 				logger.debug("Timed out waiting for child workflow status", {
 					"aiki.childWorkflowExpectedStatus": expectedStatus,
 				});
@@ -143,12 +147,12 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 				};
 			}
 
-			const childWorkflowRunStatus = existingStatusWait.childWorkflowRunState.status;
+			const childWorkflowRunStatus = existingChildWorkflowRunWait.childWorkflowRunState.status;
 
 			if (childWorkflowRunStatus === expectedStatus) {
 				return {
 					success: true,
-					state: existingStatusWait.childWorkflowRunState as WorkflowRunWaitResultSuccess<Status, Output>,
+					state: existingChildWorkflowRunWait.childWorkflowRunState as WorkflowRunWaitResultSuccess<Status, Output>,
 				};
 			}
 
@@ -179,7 +183,7 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 		try {
 			await parentRunHandle[INTERNAL].transitionState({
 				status: "awaiting_child_workflow",
-				childWorkflowRunId: handle.run.id,
+				childWorkflowRunId: run.id,
 				childWorkflowRunStatus: expectedStatus,
 				timeoutInMs,
 			});

@@ -38,7 +38,7 @@ export interface WorkflowRunApi {
 	) => Promise<WorkflowRunTransitionTaskStateResponseV1>;
 	setTaskStateV1: (_: WorkflowRunSetTaskStateRequestV1) => Promise<void>;
 	listTransitionsV1: (_: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
-	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<WorkflowRunSendEventResponseV1>;
+	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<void>;
 	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<void>;
 	multicastEventByReferenceV1: (_: WorkflowRunMulticastEventByReferenceRequestV1) => Promise<void>;
 }
@@ -49,20 +49,17 @@ export interface WorkflowRunListRequestV1 {
 	filters?: {
 		id?: string;
 		status?: WorkflowRunStatus[];
-		workflows?: WorkflowFilter[];
+		workflow?: WorkflowFilter;
 	};
 	sort?: {
-		field: "createdAt";
 		order: "asc" | "desc";
 	};
 }
 
-export interface WorkflowFilter {
-	name: string;
-	versionId?: string;
-	// TODO: move ref to top level? also consider that ref is scoped to workflow version
-	referenceId?: string;
-}
+export type WorkflowFilter =
+	| { name: string }
+	| { name: string; versionId: string }
+	| { name: string; versionId: string; referenceId: string };
 
 export interface WorkflowRunListItem {
 	id: string;
@@ -115,7 +112,7 @@ export interface WorkflowRunCreateRequestV1 {
 }
 
 export interface WorkflowRunCreateResponseV1 {
-	run: WorkflowRun;
+	id: string;
 }
 
 export type WorkflowRunStateScheduledRequest = DistributiveOmit<WorkflowRunStateScheduled, "scheduledAt"> & {
@@ -217,7 +214,6 @@ export interface WorkflowRunSetTaskStateRequestNew {
 	id: string;
 	taskName: string;
 	input?: unknown;
-	reference?: { id: string }; // TODO: should conflict policy be added?
 	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
 }
 
@@ -237,7 +233,6 @@ export interface WorkflowRunListTransitionsRequestV1 {
 	limit?: number;
 	offset?: number;
 	sort?: {
-		field: "createdAt";
 		order: "asc" | "desc";
 	};
 }
@@ -252,10 +247,6 @@ export interface WorkflowRunSendEventRequestV1 {
 	eventName: string;
 	data?: unknown;
 	options?: EventSendOptions;
-}
-
-export interface WorkflowRunSendEventResponseV1 {
-	run: WorkflowRun;
 }
 
 export interface WorkflowRunMulticastEventRequestV1 {

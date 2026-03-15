@@ -4,11 +4,11 @@ import type { WorkflowRunAddress } from "@aikirun/types/workflow-run";
 /**
  * Generates an address for identifying task executions within a workflow.
  * @param name - The name of the task
- * @param referenceId - reference ID
+ * @param inputHash - The hash of the task input
  * @returns Task address string
  */
-export function getTaskAddress(name: string, referenceId: string): TaskAddress {
-	return `${name}:${referenceId}` as TaskAddress;
+export function getTaskAddress(name: string, inputHash: string): TaskAddress {
+	return `${name}:${inputHash}` as TaskAddress;
 }
 
 /**

@@ -5,7 +5,6 @@ import { serializedErrorSchema } from "./serializable";
 
 export const taskOptionsSchema = type({
 	"retry?": retryStrategySchema,
-	"reference?": { id: "string > 0" },
 });
 
 export const taskStateRunningRequestSchema = type({
@@ -60,4 +59,8 @@ export const taskInfoSchema = type({
 	name: "string > 0",
 	state: taskStateSchema,
 	inputHash: "string > 0",
+});
+
+export const taskQueueSchema = type({
+	tasks: taskInfoSchema.array(),
 });

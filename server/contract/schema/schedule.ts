@@ -29,7 +29,7 @@ export const scheduleActivateOptionsSchema = type({
 });
 
 export const scheduleWorkflowFilterSchema = type({
-	"name?": "string > 0 | undefined",
+	name: "string > 0",
 	"versionId?": "string > 0 | undefined",
 });
 
@@ -45,5 +45,4 @@ export const scheduleSchema = type({
 	updatedAt: "number > 0",
 	"lastOccurrence?": "number > 0 | undefined",
 	nextRunAt: "number > 0",
-	runCount: "number.integer >= 0",
 });

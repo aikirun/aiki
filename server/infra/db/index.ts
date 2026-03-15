@@ -4,6 +4,7 @@ import type { SqliteDatabaseOptions } from "./provider/sqlite";
 
 export type DatabaseOptions = PgDatabaseOptions | MySqlDatabaseOptions | SqliteDatabaseOptions;
 export type DatabaseConn = PgDatabaseConn;
+export type DbTransaction = Parameters<Parameters<DatabaseConn["transaction"]>[0]>[0];
 
 export function createDatabaseConn(options: DatabaseOptions): DatabaseConn {
 	switch (options.provider) {

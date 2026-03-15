@@ -5,8 +5,8 @@ export interface ScheduleApi {
 	getByIdV1: (_: ScheduleGetByIdRequestV1) => Promise<ScheduleGetByIdResponseV1>;
 	getByReferenceIdV1: (_: ScheduleGetByReferenceIdRequestV1) => Promise<ScheduleGetByReferenceIdResponseV1>;
 	listV1: (_: ScheduleListRequestV1) => Promise<ScheduleListResponseV1>;
-	pauseV1: (_: SchedulePauseRequestV1) => Promise<SchedulePauseResponseV1>;
-	resumeV1: (_: ScheduleResumeRequestV1) => Promise<ScheduleResumeResponseV1>;
+	pauseV1: (_: SchedulePauseRequestV1) => Promise<void>;
+	resumeV1: (_: ScheduleResumeRequestV1) => Promise<void>;
 	deleteV1: (_: ScheduleDeleteRequestV1) => Promise<void>;
 }
 
@@ -28,6 +28,7 @@ export interface ScheduleGetByIdRequestV1 {
 
 export interface ScheduleGetByIdResponseV1 {
 	schedule: Schedule;
+	runCount: number;
 }
 
 export interface ScheduleGetByReferenceIdRequestV1 {
@@ -36,10 +37,11 @@ export interface ScheduleGetByReferenceIdRequestV1 {
 
 export interface ScheduleGetByReferenceIdResponseV1 {
 	schedule: Schedule;
+	runCount: number;
 }
 
 export interface ScheduleWorkflowFilter {
-	name?: string;
+	name: string;
 	versionId?: string;
 }
 
@@ -55,7 +57,7 @@ export interface ScheduleListRequestV1 {
 }
 
 export interface ScheduleListResponseV1 {
-	schedules: Schedule[];
+	schedules: { schedule: Schedule; runCount: number }[];
 	total: number;
 }
 
@@ -63,16 +65,8 @@ export interface SchedulePauseRequestV1 {
 	id: string;
 }
 
-export interface SchedulePauseResponseV1 {
-	schedule: Schedule;
-}
-
 export interface ScheduleResumeRequestV1 {
 	id: string;
-}
-
-export interface ScheduleResumeResponseV1 {
-	schedule: Schedule;
 }
 
 export interface ScheduleDeleteRequestV1 {

@@ -11,13 +11,12 @@ import {
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { TaskConflictError, TaskFailedError } from "@aikirun/types/task";
+import { TaskFailedError } from "@aikirun/types/task";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	type ChildWorkflowRunInfo,
+	NonDeterminismError,
 	type WorkflowDefinitionOptions,
-	type WorkflowReferenceOptions,
 	type WorkflowRun,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -33,6 +32,7 @@ import type { WorkflowRunContext } from "./run/context";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
+import type { ReplayManifest } from "./run/replay-manifest";
 
 export interface WorkflowVersionParams<Input, Output, AppContext, TEvents extends EventsDefinition> {
 	handler: (
@@ -130,7 +130,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 			input = schemaValidationResult.value;
 		}
 
-		const { run } = await client.api.workflowRun.createV1({
+		const { id } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
 			input,
@@ -140,10 +140,10 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		client.logger.info("Created workflow", {
 			"aiki.workflowName": this.name,
 			"aiki.workflowVersionId": this.versionId,
-			"aiki.workflowRunId": run.id,
+			"aiki.workflowRunId": id,
 		});
 
-		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
+		return workflowRunHandle(client, id as WorkflowRunId, this[INTERNAL].eventsDefinition);
 	}
 
 	public async startAsChild(
@@ -167,56 +167,45 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		const input = await this.parse(parentRunHandle, this.params.schema?.input, inputRaw, parentRun.logger);
 		const inputHash = await hashInput(input);
 
-		const reference = startOpts.reference;
-		const address = getWorkflowRunAddress(this.name, this.versionId, reference?.id ?? inputHash);
-		const existingRunInfo = parentRunHandle.run.childWorkflowRuns[address];
-		if (existingRunInfo) {
-			await this.assertUniqueChildRunReferenceId(
-				parentRunHandle,
-				existingRunInfo,
-				inputHash,
-				reference,
-				parentRun.logger
-			);
+		const referenceId = startOpts.reference?.id;
+		const address = getWorkflowRunAddress(this.name, this.versionId, referenceId ?? inputHash);
+		const replayManifest = parentRun[INTERNAL].replayManifest;
 
-			const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
-			if (existingRun.state.status === "completed") {
-				await this.parse(parentRunHandle, this.params.schema?.output, existingRun.state.output, parentRun.logger);
+		if (replayManifest.hasUnconsumedEntries()) {
+			const existingRunInfo = replayManifest.consumeNextChildWorkflowRun(address);
+			if (existingRunInfo) {
+				const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
+				if (existingRun.state.status === "completed") {
+					await this.parse(parentRunHandle, this.params.schema?.output, existingRun.state.output, parentRun.logger);
+				}
+
+				const logger = parentRun.logger.child({
+					"aiki.childWorkflowName": existingRun.name,
+					"aiki.childWorkflowVersionId": existingRun.versionId,
+					"aiki.childWorkflowRunId": existingRun.id,
+				});
+
+				return childWorkflowRunHandle(
+					client,
+					existingRun as WorkflowRun<Input, Output>,
+					parentRun,
+					existingRunInfo.childWorkflowRunWaitQueues,
+					logger,
+					this[INTERNAL].eventsDefinition
+				);
 			}
 
-			const logger = parentRun.logger.child({
-				"aiki.childWorkflowName": existingRun.name,
-				"aiki.childWorkflowVersionId": existingRun.versionId,
-				"aiki.childWorkflowRunId": existingRun.id,
-			});
-
-			return childWorkflowRunHandle(
-				client,
-				existingRun as WorkflowRun<Input, Output>,
-				parentRun,
-				logger,
-				this[INTERNAL].eventsDefinition
-			);
+			await this.throwNonDeterminismError(parentRun, parentRunHandle, inputHash, referenceId, replayManifest);
 		}
 
-		const { run: newRun } = await client.api.workflowRun.createV1({
+		const { id: newRunId } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
 			input,
 			parentWorkflowRunId: parentRun.id,
 			options: startOpts,
 		});
-		parentRunHandle.run.childWorkflowRuns[address] = {
-			id: newRun.id,
-			name: newRun.name,
-			versionId: newRun.versionId,
-			inputHash,
-			statusWaitQueues: {
-				cancelled: { statusWaits: [] },
-				completed: { statusWaits: [] },
-				failed: { statusWaits: [] },
-			},
-		};
+		const { run: newRun } = await client.api.workflowRun.getByIdV1({ id: newRunId });
 
 		const logger = parentRun.logger.child({
 			"aiki.childWorkflowName": newRun.name,
@@ -230,39 +219,42 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 			client,
 			newRun as WorkflowRun<Input, Output>,
 			parentRun,
+			{
+				cancelled: { childWorkflowRunWaits: [] },
+				completed: { childWorkflowRunWaits: [] },
+				failed: { childWorkflowRunWaits: [] },
+			},
 			logger,
 			this[INTERNAL].eventsDefinition
 		);
 	}
 
-	private async assertUniqueChildRunReferenceId(
+	private async throwNonDeterminismError(
+		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 		parentRunHandle: WorkflowRunHandle<unknown, unknown, AppContext, EventsDefinition>,
-		existingRunInfo: ChildWorkflowRunInfo,
 		inputHash: string,
-		reference: WorkflowReferenceOptions | undefined,
-		logger: Logger
-	) {
-		if (existingRunInfo.inputHash !== inputHash && reference) {
-			const conflictPolicy = reference.conflictPolicy ?? "error";
-			if (conflictPolicy !== "error") {
-				return;
-			}
-			logger.error("Reference ID already used by another child workflow", {
-				"aiki.referenceId": reference.id,
-				"aiki.existingChildWorkflowRunId": existingRunInfo.id,
-			});
-			const error = new WorkflowRunFailedError(
-				parentRunHandle.run.id as WorkflowRunId,
-				parentRunHandle.run.attempts,
-				`Reference ID "${reference.id}" already used by another child workflow run ${existingRunInfo.id}`
-			);
-			await parentRunHandle[INTERNAL].transitionState({
-				status: "failed",
-				cause: "self",
-				error: createSerializableError(error),
-			});
-			throw error;
+		referenceId: string | undefined,
+		manifest: ReplayManifest
+	): Promise<never> {
+		const unconsumedManifestEntries = manifest.getUnconsumedEntries();
+
+		const logMeta: Record<string, unknown> = {
+			"aiki.workflowName": this.name,
+			"aiki.inputHash": inputHash,
+			"aiki.unconsumedManifestEntries": unconsumedManifestEntries,
+		};
+		if (referenceId !== undefined) {
+			logMeta["aiki.referenceId"] = referenceId;
 		}
+		parentRun.logger.error("Replay divergence", logMeta);
+
+		const error = new NonDeterminismError(parentRun.id, parentRunHandle.run.attempts, unconsumedManifestEntries);
+		await parentRunHandle[INTERNAL].transitionState({
+			status: "failed",
+			cause: "self",
+			error: createSerializableError(error),
+		});
+		throw error;
 	}
 
 	public async getHandleById(
@@ -327,7 +319,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 					error instanceof WorkflowRunSuspendedError ||
 					error instanceof WorkflowRunFailedError ||
 					error instanceof WorkflowRunRevisionConflictError ||
-					error instanceof TaskConflictError
+					error instanceof NonDeterminismError
 				) {
 					throw error;
 				}

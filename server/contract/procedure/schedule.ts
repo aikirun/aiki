@@ -11,9 +11,7 @@ import type {
 	ScheduleListRequestV1,
 	ScheduleListResponseV1,
 	SchedulePauseRequestV1,
-	SchedulePauseResponseV1,
 	ScheduleResumeRequestV1,
-	ScheduleResumeResponseV1,
 } from "@aikirun/types/schedule-api";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
@@ -45,11 +43,11 @@ const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateR
 
 const getByIdV1: ContractProcedure<ScheduleGetByIdRequestV1, ScheduleGetByIdResponseV1> = oc
 	.input(type({ id: "string > 0" }))
-	.output(type({ schedule: scheduleSchema }));
+	.output(type({ schedule: scheduleSchema, runCount: "number.integer >= 0" }));
 
 const getByReferenceIdV1: ContractProcedure<ScheduleGetByReferenceIdRequestV1, ScheduleGetByReferenceIdResponseV1> = oc
 	.input(type({ referenceId: "string > 0" }))
-	.output(type({ schedule: scheduleSchema }));
+	.output(type({ schedule: scheduleSchema, runCount: "number.integer >= 0" }));
 
 const listV1: ContractProcedure<ScheduleListRequestV1, ScheduleListResponseV1> = oc
 	.input(
@@ -66,18 +64,18 @@ const listV1: ContractProcedure<ScheduleListRequestV1, ScheduleListResponseV1> =
 	)
 	.output(
 		type({
-			schedules: scheduleSchema.array(),
+			schedules: type({ schedule: scheduleSchema, runCount: "number.integer >= 0" }).array(),
 			total: "number.integer >= 0",
 		})
 	);
 
-const pauseV1: ContractProcedure<SchedulePauseRequestV1, SchedulePauseResponseV1> = oc
+const pauseV1: ContractProcedure<SchedulePauseRequestV1, void> = oc
 	.input(type({ id: "string > 0" }))
-	.output(type({ schedule: scheduleSchema }));
+	.output(type("undefined"));
 
-const resumeV1: ContractProcedure<ScheduleResumeRequestV1, ScheduleResumeResponseV1> = oc
+const resumeV1: ContractProcedure<ScheduleResumeRequestV1, void> = oc
 	.input(type({ id: "string > 0" }))
-	.output(type({ schedule: scheduleSchema }));
+	.output(type("undefined"));
 
 const deleteV1: ContractProcedure<ScheduleDeleteRequestV1, void> = oc
 	.input(type({ id: "string > 0" }))

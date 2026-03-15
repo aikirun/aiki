@@ -3,23 +3,24 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { Redis } from "ioredis";
 
 import { loadConfig } from "./config/index";
-import {
-	queueScheduledWorkflowRuns,
-	scheduleEventWaitTimedOutWorkflowRuns,
-	scheduleRecurringWorkflows,
-	scheduleRetryableWorkflowRuns,
-	scheduleSleepingElapedWorkflowRuns,
-	scheduleWorkflowRunsThatTimedOutWaitingForChild,
-	scheduleWorkflowRunsWithRetryableTask,
-} from "./crons";
+import { initCrons } from "./crons";
 import { UnauthorizedError } from "./errors";
 import { createDatabaseConn } from "./infra/db";
 import { createApiKeyRepository } from "./infra/db/repository/api-key";
+import { createChildWorkflowRunWaitQueueRepository } from "./infra/db/repository/child-workflow-run-wait-queue";
+import { createEventWaitQueueRepository } from "./infra/db/repository/event-wait-queue";
 import { createNamespaceRepository } from "./infra/db/repository/namespace";
-import { createLogger, type Logger } from "./infra/logger";
+import { createScheduleRepository } from "./infra/db/repository/schedule";
+import { createSleepQueueRepository } from "./infra/db/repository/sleep-queue";
+import { createStateTransitionRepository } from "./infra/db/repository/state-transition";
+import { createTaskRepository } from "./infra/db/repository/task";
+import { createWorkflowRepository } from "./infra/db/repository/workflow";
+import { createWorkflowRunRepository } from "./infra/db/repository/workflow-run";
+import { createWorkflowRunOutboxRepository } from "./infra/db/repository/workflow-run-outbox";
+import { createLogger } from "./infra/logger";
+import { createWorkflowRunPublisher } from "./infra/messaging/redis-publisher";
 import { createAuthorizer } from "./middleware/authorization";
 import {
-	createCronContext,
 	createNamespaceRequestContext,
 	createOrganizationRequestContext,
 	type NamespaceRequestContext,
@@ -29,6 +30,11 @@ import { createNamespaceAuthedRouter, createOrganizationAuthedRouter } from "./r
 import { createApiKeyService } from "./service/api-key";
 import { createAuthService } from "./service/auth";
 import { createNamespaceService } from "./service/namespace";
+import { createScheduleService } from "./service/schedule";
+import { createTaskStateMachineService } from "./service/task-state-machine";
+import { createWorkflowService } from "./service/workflow";
+import { createWorkflowRunService } from "./service/workflow-run";
+import { createWorkflowRunStateMachineService } from "./service/workflow-run-state-machine";
 
 if (import.meta.main) {
 	const config = await loadConfig();
@@ -45,9 +51,19 @@ if (import.meta.main) {
 		logger.error({ err }, "Redis connection error");
 	});
 
-	const apiKeyRepository = createApiKeyRepository(db);
+	const workflowRunPublisher = createWorkflowRunPublisher(redis);
 
+	const apiKeyRepository = createApiKeyRepository(db);
 	const namespaceRepository = createNamespaceRepository(db);
+	const workflowRepo = createWorkflowRepository(db);
+	const workflowRunRepo = createWorkflowRunRepository(db);
+	const workflowRunOutboxRepo = createWorkflowRunOutboxRepository(db);
+	const taskRepo = createTaskRepository(db);
+	const stateTransitionRepo = createStateTransitionRepository(db);
+	const scheduleRepo = createScheduleRepository(db);
+	const sleepQueueRepo = createSleepQueueRepository(db);
+	const eventWaitQueueRepo = createEventWaitQueueRepository(db);
+	const childWorkflowRunWaitQueueRepo = createChildWorkflowRunWaitQueueRepository(db);
 
 	const apiKeyService = createApiKeyService(apiKeyRepository, redis);
 	const authService = createAuthService({
@@ -63,9 +79,66 @@ if (import.meta.main) {
 	);
 
 	const namespaceService = createNamespaceService(namespaceRepository);
+	const workflowRunStateMachineService = createWorkflowRunStateMachineService({
+		db,
+		workflowRunRepo,
+		stateTransitionRepo,
+		sleepQueueRepo,
+		taskRepo,
+		childWorkflowRunWaitQueueRepo,
+	});
+	const taskStateMachineService = createTaskStateMachineService({
+		db,
+		workflowRunRepo,
+		taskRepo,
+		stateTransitionRepo,
+	});
+	const workflowRunService = createWorkflowRunService({
+		db,
+		workflowRunRepo,
+		workflowRepo,
+		stateTransitionRepo,
+		taskRepo,
+		sleepQueueRepo,
+		eventWaitQueueRepo,
+		childWorkflowRunWaitQueueRepo,
+		workflowRunStateMachineService,
+	});
+	const workflowService = createWorkflowService({
+		workflowRepo,
+		workflowRunRepo,
+	});
+	const scheduleService = createScheduleService({
+		db,
+		scheduleRepo,
+		workflowRepo,
+		workflowRunRepo,
+	});
+
+	const crons = initCrons(logger, {
+		db,
+		workflowRunPublisher,
+		workflowRunOutboxRepo,
+		workflowRunRepo,
+		stateTransitionRepo,
+		sleepQueueRepo,
+		taskRepo,
+		workflowRepo,
+		scheduleRepo,
+		eventWaitQueueRepo,
+		childWorkflowRunWaitQueueRepo,
+		scheduleService,
+	});
 
 	const organizationAuthedRouter = createOrganizationAuthedRouter(namespaceService);
-	const namespaceAuthedRouter = createNamespaceAuthedRouter(apiKeyService);
+	const namespaceAuthedRouter = createNamespaceAuthedRouter({
+		apiKeyService,
+		workflowRunService,
+		workflowRunStateMachineService,
+		taskStateMachineService,
+		workflowService,
+		scheduleService,
+	});
 
 	const organizationAuthedHandler = new RPCHandler(organizationAuthedRouter, {});
 	const namespaceAuthedHandler = new RPCHandler(namespaceAuthedRouter, {});
@@ -145,12 +218,8 @@ if (import.meta.main) {
 		fetch: async (request) => withCorsHeaders(request, new Response("Not Found", { status: 404 })),
 	});
 
-	const cronIntervals = initCrons(redis, logger);
-
 	const shutdown = async () => {
-		for (const interval of cronIntervals) {
-			clearInterval(interval);
-		}
+		crons.shutdown();
 		await redis.quit();
 		process.exit(0);
 	};
@@ -159,67 +228,6 @@ if (import.meta.main) {
 	process.on("SIGINT", shutdown);
 
 	logger.info(`Server running on port ${config.port}`);
-}
-
-function initCrons(redis: Redis, logger: Logger) {
-	const queueScheduledWorkflowRunsInterval = setInterval(() => {
-		const context = createCronContext({ name: "queueScheduledWorkflowRuns", logger });
-		queueScheduledWorkflowRuns(context, redis).catch((err) => {
-			logger.error({ err }, "Error queueing scheduled workflows");
-		});
-	}, 500);
-
-	const scheduleSleepingElapedWorkflowRunsInterval = setInterval(() => {
-		const context = createCronContext({ name: "scheduleSleepingElapedWorkflowRuns", logger });
-		scheduleSleepingElapedWorkflowRuns(context).catch((err) => {
-			logger.error({ err }, "Error scheduling sleeping workflows");
-		});
-	}, 500);
-
-	const scheduleRetryableWorkflowRunsInterval = setInterval(() => {
-		const context = createCronContext({ name: "scheduleRetryableWorkflowRuns", logger });
-		scheduleRetryableWorkflowRuns(context).catch((err) => {
-			logger.error({ err }, "Error scheduling retryable workflows");
-		});
-	}, 500);
-
-	const scheduleWorkflowRunsWithRetryableTaskInterval = setInterval(() => {
-		const context = createCronContext({ name: "scheduleWorkflowRunsWithRetryableTask", logger });
-		scheduleWorkflowRunsWithRetryableTask(context).catch((err) => {
-			logger.error({ err }, "Error scheduling workflows with retryable task");
-		});
-	}, 500);
-
-	const scheduleEventWaitTimedOutWorkflowRunsInterval = setInterval(() => {
-		const context = createCronContext({ name: "scheduleEventWaitTimedOutWorkflowRuns", logger });
-		scheduleEventWaitTimedOutWorkflowRuns(context).catch((err) => {
-			logger.error({ err }, "Error scheduling event wait timed out workflows");
-		});
-	}, 500);
-
-	const scheduleWorkflowRunsThatTimedOutWaitingForChildInterval = setInterval(() => {
-		const context = createCronContext({ name: "scheduleWorkflowRunsThatTimedOutWaitingForChild", logger });
-		scheduleWorkflowRunsThatTimedOutWaitingForChild(context).catch((err) => {
-			logger.error({ err }, "Error scheduling workflows that timed out while waiting for child");
-		});
-	}, 100);
-
-	const scheduleRecurringWorkflowsInterval = setInterval(() => {
-		const context = createCronContext({ name: "scheduleRecurringWorkflows", logger });
-		scheduleRecurringWorkflows(context).catch((err) => {
-			logger.error({ err }, "Error scheduling recurring workflows");
-		});
-	}, 1000);
-
-	return [
-		queueScheduledWorkflowRunsInterval,
-		scheduleSleepingElapedWorkflowRunsInterval,
-		scheduleRetryableWorkflowRunsInterval,
-		scheduleWorkflowRunsWithRetryableTaskInterval,
-		scheduleEventWaitTimedOutWorkflowRunsInterval,
-		scheduleWorkflowRunsThatTimedOutWaitingForChildInterval,
-		scheduleRecurringWorkflowsInterval,
-	];
 }
 
 function createCorsHelpers(corsOrigins: string[]) {

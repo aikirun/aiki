@@ -2,7 +2,7 @@ import type { EventWaitQueue } from "./event";
 import type { RetryStrategy } from "./retry";
 import type { SerializableError } from "./serializable";
 import type { SleepQueue } from "./sleep";
-import type { TaskInfo } from "./task";
+import type { TaskQueue } from "./task";
 import type { TriggerStrategy } from "./trigger";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
@@ -24,9 +24,12 @@ export const WORKFLOW_RUN_STATUSES = [
 
 export type WorkflowRunStatus = (typeof WORKFLOW_RUN_STATUSES)[number];
 
-const TERMINAL_WORKFLOW_RUN_STATUSES = ["cancelled", "completed", "failed"] as const;
+export const TERMINAL_WORKFLOW_RUN_STATUSES = ["cancelled", "completed", "failed"] as const;
 export type TerminalWorkflowRunStatus = (typeof TERMINAL_WORKFLOW_RUN_STATUSES)[number];
 
+export const NON_TERMINAL_WORKFLOW_RUN_STATUSES = WORKFLOW_RUN_STATUSES.filter(
+	(status) => !(TERMINAL_WORKFLOW_RUN_STATUSES as unknown as string[]).includes(status)
+);
 export type NonTerminalWorkflowRunStatus = Exclude<WorkflowRunStatus, TerminalWorkflowRunStatus>;
 
 export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status is TerminalWorkflowRunStatus {
@@ -240,8 +243,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	revision: number;
 	input?: Input;
 	inputHash: string;
-	address: string;
-	options: WorkflowStartOptions;
+	options?: WorkflowStartOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;
 	// TODO:
@@ -249,11 +251,15 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	// prefetching all results might be problematic.
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
-	tasks: Record<string, TaskInfo>;
+	taskQueues: Record<string, TaskQueue>;
 	sleepQueues: Record<string, SleepQueue>;
 	eventWaitQueues: Record<string, EventWaitQueue<unknown>>;
-	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>;
+	childWorkflowRunQueues: Record<string, ChildWorkflowRunQueue>;
 	parentWorkflowRunId?: string;
+}
+
+export interface ChildWorkflowRunQueue {
+	childWorkflowRuns: ChildWorkflowRunInfo[];
 }
 
 export interface ChildWorkflowRunInfo {
@@ -261,31 +267,31 @@ export interface ChildWorkflowRunInfo {
 	name: string;
 	versionId: string;
 	inputHash: string;
-	statusWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunStatusWaitQueue>;
+	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>;
 }
 
 export const CHILD_WORKFLOW_RUN_WAIT_STATUSES = ["completed", "timeout"] as const;
 export type ChildWorkflowRunWaitStatus = (typeof CHILD_WORKFLOW_RUN_WAIT_STATUSES)[number];
 
-export interface ChildWorkflowRunStatusWaitBase {
+export interface ChildWorkflowRunWaitBase {
 	status: ChildWorkflowRunWaitStatus;
 }
 
-export interface ChildWorkflowRunStatusWaitCompleted extends ChildWorkflowRunStatusWaitBase {
+export interface ChildWorkflowRunWaitCompleted extends ChildWorkflowRunWaitBase {
 	status: "completed";
 	completedAt: number;
 	childWorkflowRunState: TerminalWorkflowRunState;
 }
 
-export interface ChildWorkflowRunStatusWaitTimeout extends ChildWorkflowRunStatusWaitBase {
+export interface ChildWorkflowRunWaitTimeout extends ChildWorkflowRunWaitBase {
 	status: "timeout";
 	timedOutAt: number;
 }
 
-export type ChildWorkflowRunStatusWait = ChildWorkflowRunStatusWaitCompleted | ChildWorkflowRunStatusWaitTimeout;
+export type ChildWorkflowRunWait = ChildWorkflowRunWaitCompleted | ChildWorkflowRunWaitTimeout;
 
-export interface ChildWorkflowRunStatusWaitQueue {
-	statusWaits: ChildWorkflowRunStatusWait[];
+export interface ChildWorkflowRunWaitQueue {
+	childWorkflowRunWaits: ChildWorkflowRunWait[];
 }
 
 export class WorkflowRunNotExecutableError extends Error {
@@ -334,5 +340,23 @@ export class WorkflowRunRevisionConflictError extends Error {
 		super(`Conflict while trying to update Workflow run ${id}`);
 		this.name = "WorkflowRunRevisionConflictError";
 		this.id = id;
+	}
+}
+
+export class NonDeterminismError extends Error {
+	public readonly id: WorkflowRunId;
+	public readonly attempts: number;
+	public readonly unconsumedManifestEntries: { taskIds: string[]; childWorkflowRunIds: string[] };
+
+	constructor(
+		id: WorkflowRunId,
+		attempts: number,
+		unconsumedManifestEntries: { taskIds: string[]; childWorkflowRunIds: string[] }
+	) {
+		super(`Replay divergence for Workflow run ${id}`);
+		this.name = "NonDeterminismError";
+		this.id = id;
+		this.attempts = attempts;
+		this.unconsumedManifestEntries = unconsumedManifestEntries;
 	}
 }

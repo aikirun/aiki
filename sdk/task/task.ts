@@ -14,22 +14,16 @@ import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type {
-	TaskAddress,
-	TaskDefinitionOptions,
-	TaskId,
-	TaskInfo,
-	TaskReferenceOptions,
-	TaskStartOptions,
-} from "@aikirun/types/task";
-import { TaskConflictError, TaskFailedError, type TaskName } from "@aikirun/types/task";
+import type { TaskDefinitionOptions, TaskId, TaskInfo, TaskStartOptions } from "@aikirun/types/task";
+import { TaskFailedError, type TaskName } from "@aikirun/types/task";
 import {
+	NonDeterminismError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow-run";
-import type { WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
+import type { ReplayManifest, WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { EventsDefinition } from "sdk/workflow/run/event";
 
@@ -132,86 +126,151 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const inputRaw = args[0];
 		const input = await this.parse(handle, this.params.schema?.input, inputRaw, run.logger);
 		const inputHash = await hashInput(input);
+		const address = getTaskAddress(this.name, inputHash);
 
-		const reference = startOpts.reference;
-		const address = getTaskAddress(this.name, reference?.id ?? inputHash);
-		const existingTaskInfo = handle.run.tasks[address];
-		if (existingTaskInfo) {
-			await this.assertUniqueTaskReferenceId(handle, existingTaskInfo, inputHash, reference, run.logger);
+		const replayManifest = run[INTERNAL].replayManifest;
+
+		if (replayManifest.hasUnconsumedEntries()) {
+			const existingTaskInfo = replayManifest.consumeNextTask(address);
+			if (existingTaskInfo) {
+				return this.getExistingTaskResult(run, handle, startOpts, input, existingTaskInfo);
+			}
+
+			await this.throwNonDeterminismError(run, handle, inputHash, replayManifest);
 		}
 
-		if (existingTaskInfo?.state.status === "completed") {
-			return this.parse(handle, this.params.schema?.output, existingTaskInfo.state.output, run.logger);
-		}
-		if (existingTaskInfo?.state.status === "failed") {
-			const { state } = existingTaskInfo;
-			throw new TaskFailedError(existingTaskInfo.id as TaskId, state.attempts, state.error.message);
-		}
-
-		let attempts = 0;
+		const attempts = 1;
 		const retryStrategy = startOpts.retry ?? { type: "never" };
 
-		if (existingTaskInfo?.state) {
-			const taskId = existingTaskInfo.id as TaskId;
-			const state = existingTaskInfo?.state;
-
-			attempts = state.attempts;
-
-			this.assertRetryAllowed(taskId, attempts, retryStrategy, run.logger);
-
-			run.logger.debug("Retrying task", {
-				"aiki.taskName": this.name,
-				"aiki.taskId": taskId,
-				"aiki.attempts": attempts,
-				"aiki.taskStatus": state.status,
-			});
-		}
-
-		attempts++;
-
-		const taskInfo = existingTaskInfo
-			? await handle[INTERNAL].transitionTaskState(address, {
-					type: "retry",
-					taskId: existingTaskInfo.id,
-					options: startOpts,
-					taskState: { status: "running", attempts, input },
-				})
-			: await handle[INTERNAL].transitionTaskState(address, {
-					type: "create",
-					taskName: this.name,
-					options: startOpts,
-					taskState: { status: "running", attempts, input },
-				});
-		if (taskInfo.state.status === "completed") {
-			return this.parse(handle, this.params.schema?.output, taskInfo.state.output, run.logger);
-		}
-		if (taskInfo.state.status === "failed") {
-			const { state } = taskInfo;
-			throw new TaskFailedError(taskInfo.id as TaskId, state.attempts, state.error.message);
-		}
-
-		const taskId = taskInfo.id;
+		const taskInfo = await handle[INTERNAL].transitionTaskState({
+			type: "create",
+			taskName: this.name,
+			options: startOpts,
+			taskState: { status: "running", attempts, input },
+		});
 
 		const logger = run.logger.child({
 			"aiki.component": "task-execution",
 			"aiki.taskName": this.name,
-			"aiki.taskId": taskId,
+			"aiki.taskId": taskInfo.id,
 		});
+
 		logger.info("Task started", { "aiki.attempts": attempts });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(
 			handle,
 			input,
-			address,
-			taskId as TaskId,
+			taskInfo.id as TaskId,
 			retryStrategy,
 			attempts,
 			run[INTERNAL].options.spinThresholdMs,
 			logger
 		);
 
-		await handle[INTERNAL].transitionTaskState(address, {
+		await handle[INTERNAL].transitionTaskState({
+			taskId: taskInfo.id,
+			taskState: { status: "completed", attempts: lastAttempt, output },
+		});
+		logger.info("Task complete", { "aiki.attempts": lastAttempt });
+
+		return output;
+	}
+
+	private async getExistingTaskResult(
+		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
+		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		startOpts: TaskStartOptions,
+		input: Input,
+		existingTaskInfo: TaskInfo
+	) {
+		const existingTaskState = existingTaskInfo.state;
+
+		if (existingTaskState.status === "completed") {
+			return this.parse(handle, this.params.schema?.output, existingTaskState.output, run.logger);
+		}
+
+		if (existingTaskState.status === "failed") {
+			throw new TaskFailedError(
+				existingTaskInfo.id as TaskId,
+				existingTaskState.attempts,
+				existingTaskState.error.message
+			);
+		}
+
+		existingTaskState.status satisfies "running" | "awaiting_retry";
+
+		const attempts = existingTaskState.attempts;
+		const retryStrategy = startOpts.retry ?? { type: "never" };
+		this.assertRetryAllowed(existingTaskInfo.id as TaskId, attempts, retryStrategy, run.logger);
+
+		run.logger.debug("Retrying task", {
+			"aiki.taskName": this.name,
+			"aiki.taskId": existingTaskInfo.id,
+			"aiki.attempts": attempts,
+			"aiki.taskStatus": existingTaskState.status,
+		});
+
+		return this.retryAndExecute(run, handle, input, existingTaskInfo.id, startOpts, retryStrategy, attempts);
+	}
+
+	private async throwNonDeterminismError(
+		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
+		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		inputHash: string,
+		manifest: ReplayManifest
+	) {
+		const unconsumedManifestEntries = manifest.getUnconsumedEntries();
+		run.logger.error("Replay divergence", {
+			"aiki.taskName": this.name,
+			"aiki.inputHash": inputHash,
+			"aiki.unconsumedManifestEntries": unconsumedManifestEntries,
+		});
+		const error = new NonDeterminismError(run.id, handle.run.attempts, unconsumedManifestEntries);
+		await handle[INTERNAL].transitionState({
+			status: "failed",
+			cause: "self",
+			error: createSerializableError(error),
+		});
+		throw error;
+	}
+
+	private async retryAndExecute(
+		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
+		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		input: Input,
+		taskId: string,
+		startOpts: TaskStartOptions,
+		retryStrategy: RetryStrategy,
+		previousAttempts: number
+	): Promise<Output> {
+		const attempts = previousAttempts + 1;
+
+		const taskInfo = await handle[INTERNAL].transitionTaskState({
+			type: "retry",
 			taskId,
+			options: startOpts,
+			taskState: { status: "running", attempts, input },
+		});
+
+		const logger = run.logger.child({
+			"aiki.component": "task-execution",
+			"aiki.taskName": this.name,
+			"aiki.taskId": taskInfo.id,
+		});
+		logger.info("Task started", { "aiki.attempts": attempts });
+
+		const { output, lastAttempt } = await this.tryExecuteTask(
+			handle,
+			input,
+			taskInfo.id as TaskId,
+			retryStrategy,
+			attempts,
+			run[INTERNAL].options.spinThresholdMs,
+			logger
+		);
+
+		await handle[INTERNAL].transitionTaskState({
+			taskId: taskInfo.id,
 			taskState: { status: "completed", attempts: lastAttempt, output },
 		});
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
@@ -222,7 +281,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private async tryExecuteTask(
 		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
 		input: Input,
-		address: TaskAddress,
 		taskId: TaskId,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
@@ -246,8 +304,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				if (
 					error instanceof WorkflowRunSuspendedError ||
 					error instanceof WorkflowRunFailedError ||
-					error instanceof WorkflowRunRevisionConflictError ||
-					error instanceof TaskConflictError
+					error instanceof WorkflowRunRevisionConflictError
 				) {
 					throw error;
 				}
@@ -260,7 +317,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						"aiki.attempts": attempts,
 						"aiki.reason": serializableError.message,
 					});
-					await handle[INTERNAL].transitionTaskState(address, {
+					await handle[INTERNAL].transitionTaskState({
 						taskId,
 						taskState: { status: "failed", attempts, error: serializableError },
 					});
@@ -279,7 +336,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					continue;
 				}
 
-				await handle[INTERNAL].transitionTaskState(address, {
+				await handle[INTERNAL].transitionTaskState({
 					taskId,
 					taskState: {
 						status: "awaiting_retry",
@@ -290,37 +347,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				});
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
-		}
-	}
-
-	private async assertUniqueTaskReferenceId(
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
-		existingTaskInfo: TaskInfo,
-		inputHash: string,
-		reference: TaskReferenceOptions | undefined,
-		logger: Logger
-	) {
-		if (existingTaskInfo.inputHash !== inputHash && reference) {
-			const conflictPolicy = reference.conflictPolicy ?? "error";
-			if (conflictPolicy !== "error") {
-				return;
-			}
-			logger.error("Reference ID already used by another task", {
-				"aiki.taskName": this.name,
-				"aiki.referenceId": reference.id,
-				"aiki.existingTaskId": existingTaskInfo.id,
-			});
-			const error = new WorkflowRunFailedError(
-				handle.run.id as WorkflowRunId,
-				handle.run.attempts,
-				`Reference ID "${reference.id}" already used by another task ${existingTaskInfo.id}`
-			);
-			await handle[INTERNAL].transitionState({
-				status: "failed",
-				cause: "self",
-				error: createSerializableError(error),
-			});
-			throw error;
 		}
 	}
 

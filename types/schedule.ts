@@ -51,5 +51,4 @@ export interface Schedule {
 	updatedAt: number;
 	lastOccurrence?: number;
 	nextRunAt: number;
-	runCount: number;
 }

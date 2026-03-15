@@ -1,3 +1,5 @@
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OrganizationId } from "@aikirun/types/organization";
 import type { Logger } from "server/infra/logger";
 import { ulid } from "ulidx";
 
@@ -11,7 +13,9 @@ import type {
 export interface ContextBase {
 	type: "request" | "cron";
 	traceId: string;
+	spanId: string;
 	logger: Logger;
+	signal?: AbortSignal;
 }
 
 export interface RequestContextBase extends ContextBase {
@@ -33,21 +37,21 @@ export interface AuthedRequestContextBase extends RequestContextBase {
 
 export interface OrganizationSessionRequestContext extends AuthedRequestContextBase {
 	authMethod: "organization_session";
-	organizationId: string;
+	organizationId: OrganizationId;
 	userId: string;
 }
 
 export interface NamespaceSessionRequestContext extends AuthedRequestContextBase {
 	authMethod: "namespace_session";
-	organizationId: string;
-	namespaceId: string;
+	organizationId: OrganizationId;
+	namespaceId: NamespaceId;
 	userId: string;
 }
 
 export interface ApiKeyRequestContext extends AuthedRequestContextBase {
 	authMethod: "api_key";
-	organizationId: string;
-	namespaceId: string;
+	organizationId: OrganizationId;
+	namespaceId: NamespaceId;
 }
 
 export type OrganizationRequestContext = OrganizationSessionRequestContext;
@@ -68,13 +72,16 @@ export type Context = RequestContext | CronContext;
 export function createPublicRequestContext(params: { request: Request; logger: Logger }): PublicRequestContext {
 	const { request, logger } = params;
 	const traceId = request.headers.get("x-trace-id") ?? ulid();
+	const spanId = ulid();
 	return {
 		type: "request",
 		traceId,
+		spanId,
 		logger: logger.child({
 			method: request.method,
 			url: request.url,
 			traceId,
+			spanId,
 		}),
 		requestType: "public",
 		headers: request.headers,
@@ -90,14 +97,17 @@ export async function createOrganizationRequestContext(params: {
 }): Promise<OrganizationRequestContext> {
 	const { request, logger, authorizer } = params;
 	const traceId = request.headers.get("x-trace-id") ?? ulid();
+	const spanId = ulid();
 	const authorization = await authorizer(request);
 	return {
 		type: "request",
 		traceId,
+		spanId,
 		logger: logger.child({
 			method: request.method,
 			url: request.url,
 			traceId,
+			spanId,
 		}),
 		requestType: "authed",
 		headers: request.headers,
@@ -117,6 +127,7 @@ export async function createNamespaceRequestContext(params: {
 }): Promise<NamespaceRequestContext> {
 	const { request, logger, authorizer } = params;
 	const traceId = request.headers.get("x-trace-id") ?? ulid();
+	const spanId = ulid();
 	const authorization = await authorizer(request);
 
 	switch (authorization.method) {
@@ -124,10 +135,12 @@ export async function createNamespaceRequestContext(params: {
 			return {
 				type: "request",
 				traceId,
+				spanId,
 				logger: logger.child({
 					method: request.method,
 					url: request.url,
 					traceId,
+					spanId,
 				}),
 				requestType: "authed",
 				headers: request.headers,
@@ -143,10 +156,12 @@ export async function createNamespaceRequestContext(params: {
 			return {
 				type: "request",
 				traceId,
+				spanId,
 				logger: logger.child({
 					method: request.method,
 					url: request.url,
 					traceId,
+					spanId,
 				}),
 				requestType: "authed",
 				headers: request.headers,
@@ -162,13 +177,25 @@ export async function createNamespaceRequestContext(params: {
 	}
 }
 
-export function createCronContext(params: { name: string; logger: Logger }): CronContext {
-	const { name, logger } = params;
+export function createCronContext(params: { name: string; logger: Logger; signal?: AbortSignal }): CronContext {
+	const { name, logger, signal } = params;
 	const traceId = ulid();
+	const spanId = ulid();
 	return {
 		type: "cron",
 		traceId,
-		logger: logger.child({ cronName: name, traceId }),
+		spanId,
+		logger: logger.child({ cronName: name, traceId, spanId }),
 		name,
+		signal,
+	};
+}
+
+export function forkContext<TContext extends Context>(context: TContext): TContext {
+	const spanId = ulid();
+	return {
+		...context,
+		spanId,
+		logger: context.logger.child({ spanId }),
 	};
 }

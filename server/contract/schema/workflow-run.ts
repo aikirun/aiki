@@ -4,7 +4,7 @@ import { eventWaitQueueSchema } from "./event";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
 import { sleepQueueSchema } from "./sleep";
-import { taskInfoSchema } from "./task";
+import { taskQueueSchema } from "./task";
 import { triggerStrategySchema } from "./trigger";
 
 export const workflowRunStatusSchema = type(
@@ -135,7 +135,7 @@ export const terminalWorkflowRunStateSchema = workflowRunStateCancelledSchema
 	.or(workflowRunStateCompletedSchema)
 	.or(workflowRunStateFailedSchema);
 
-const childWorkflowRunStatusWait = type({
+const childWorkflowRunWaitSchema = type({
 	status: "'completed'",
 	completedAt: "number > 0",
 	childWorkflowRunState: terminalWorkflowRunStateSchema,
@@ -144,8 +144,8 @@ const childWorkflowRunStatusWait = type({
 	timedOutAt: "number > 0",
 });
 
-const childWorkflowRunStatusWaitQueue = type({
-	statusWaits: childWorkflowRunStatusWait.array(),
+const childWorkflowRunWaitQueueSchema = type({
+	childWorkflowRunWaits: childWorkflowRunWaitSchema.array(),
 });
 
 const childWorkflowRunInfoSchema = type({
@@ -153,7 +153,11 @@ const childWorkflowRunInfoSchema = type({
 	name: "string > 0",
 	versionId: "string > 0",
 	inputHash: "string > 0",
-	statusWaitQueues: type({ "['cancelled'|'completed'|'failed']": childWorkflowRunStatusWaitQueue }),
+	childWorkflowRunWaitQueues: type({ "['cancelled'|'completed'|'failed']": childWorkflowRunWaitQueueSchema }),
+});
+
+const childWorkflowRunQueueSchema = type({
+	childWorkflowRuns: childWorkflowRunInfoSchema.array(),
 });
 
 export const workflowRunSchema = type({
@@ -164,14 +168,13 @@ export const workflowRunSchema = type({
 	revision: "number >= 0",
 	"input?": "unknown",
 	inputHash: "string > 0",
-	address: "string > 0",
-	options: workflowOptionsSchema,
+	"options?": workflowOptionsSchema.or("undefined"),
 	attempts: "number.integer >= 0",
 	state: workflowRunStateSchema,
-	tasks: type({ "[string]": taskInfoSchema }),
+	taskQueues: type({ "[string]": taskQueueSchema }),
 	sleepQueues: type({ "[string]": sleepQueueSchema }),
 	eventWaitQueues: type({ "[string]": eventWaitQueueSchema }),
-	childWorkflowRuns: type({ "[string]": childWorkflowRunInfoSchema }),
+	childWorkflowRunQueues: type({ "[string]": childWorkflowRunQueueSchema }),
 	"parentWorkflowRunId?": "string > 0 | undefined",
 });
 
@@ -249,7 +252,6 @@ export const workflowRunSetTaskStateRequestSchema = type({
 	id: "string > 0",
 	taskName: "string > 0",
 	"input?": "unknown",
-	"reference?": { id: "string > 0" },
 	state: taskStateOutputSchema,
 }).or({
 	type: "'existing'",

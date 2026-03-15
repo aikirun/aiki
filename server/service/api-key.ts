@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { sha256Sync } from "@aikirun/lib/crypto";
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OrganizationId } from "@aikirun/types/organization";
 import type { Redis } from "ioredis";
 import { ulid } from "ulidx";
 
@@ -12,8 +14,8 @@ const CACHE_TTL_SECONDS = 24 * 60 * 60;
 const CACHE_KEY_PREFIX = `${PLATFORM}:api_key:`;
 
 interface CachedKeyInfo {
-	organizationId: string;
-	namespaceId: string;
+	organizationId: OrganizationId;
+	namespaceId: NamespaceId;
 	expiresAt: number | null;
 }
 
@@ -85,8 +87,8 @@ export function createApiKeyService(repo: ApiKeyRepository, redis: Redis) {
 			}
 
 			const cachedKeyInfo: CachedKeyInfo = {
-				organizationId: keyInfo.organizationId,
-				namespaceId: keyInfo.namespaceId,
+				organizationId: keyInfo.organizationId as OrganizationId,
+				namespaceId: keyInfo.namespaceId as NamespaceId,
 				expiresAt: keyInfo.expiresAt,
 			};
 			await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(cachedKeyInfo));
@@ -97,7 +99,7 @@ export function createApiKeyService(repo: ApiKeyRepository, redis: Redis) {
 			};
 		},
 
-		async list(filters: { organizationId: string; namespaceId: string }) {
+		async list(filters: { organizationId: OrganizationId; namespaceId: NamespaceId }) {
 			return repo.list(filters);
 		},
 

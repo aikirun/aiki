@@ -1,3 +1,5 @@
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OrganizationId } from "@aikirun/types/organization";
 import { and, eq } from "drizzle-orm";
 
 import type { DatabaseConn } from "..";
@@ -25,7 +27,12 @@ export function createApiKeyRepository(db: DatabaseConn) {
 			return result[0] ?? null;
 		},
 
-		async list(filters: { organizationId: string; namespaceId: string; createdByUserId?: string; name?: string }) {
+		async list(filters: {
+			organizationId: OrganizationId;
+			namespaceId: NamespaceId;
+			createdByUserId?: string;
+			name?: string;
+		}) {
 			return db
 				.select({
 					id: apiKey.id,

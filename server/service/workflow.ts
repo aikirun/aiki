@@ -1,0 +1,86 @@
+import { isNonEmptyArray } from "@aikirun/lib";
+import type {
+	WorkflowGetStatsRequestV1,
+	WorkflowListRequestV1,
+	WorkflowListVersionsRequestV1,
+} from "@aikirun/types/workflow-api";
+import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { WorkflowRepository } from "server/infra/db/repository/workflow";
+import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
+import type { NamespaceRequestContext } from "server/middleware/context";
+import { decodeTime } from "ulidx";
+
+export interface WorkflowServiceDeps {
+	workflowRepo: WorkflowRepository;
+	workflowRunRepo: WorkflowRunRepository;
+}
+
+export function createWorkflowService(deps: WorkflowServiceDeps) {
+	const { workflowRepo, workflowRunRepo } = deps;
+
+	return {
+		async listWorkflowsWithStats(context: NamespaceRequestContext, request: WorkflowListRequestV1) {
+			const { items, total } = await workflowRepo.listWithStats(context.namespaceId, request);
+			return {
+				workflows: items.map((item) => ({
+					name: item.name,
+					runCount: item.runCount,
+					lastRunAt: item.lastRunId ? decodeTime(item.lastRunId) : null,
+				})),
+				total,
+			};
+		},
+
+		async listWorkflowVersionsWithStats(context: NamespaceRequestContext, request: WorkflowListVersionsRequestV1) {
+			const { items, total } = await workflowRepo.listVersionsWithStats(context.namespaceId, request);
+			return {
+				versions: items.map((item) => ({
+					versionId: item.versionId,
+					firstSeenAt: item.firstSeenAt.getTime(),
+					lastRunAt: item.lastRunId ? decodeTime(item.lastRunId) : null,
+					runCount: item.runCount,
+				})),
+				total,
+			};
+		},
+
+		async getWorkflowStats(context: NamespaceRequestContext, request: WorkflowGetStatsRequestV1) {
+			const namespaceId = context.namespaceId;
+
+			const workflowIds = request
+				? (await workflowRepo.listByNameAndVersion(namespaceId, request)).map((workflow) => workflow.id)
+				: undefined;
+
+			const statusCounts = request
+				? isNonEmptyArray(workflowIds)
+					? await workflowRunRepo.countByStatus({ workflowIds })
+					: []
+				: await workflowRunRepo.countByStatus({ namespaceId });
+
+			const workflowRunsByStatus: Record<WorkflowRunStatus, number> = {
+				scheduled: 0,
+				queued: 0,
+				running: 0,
+				paused: 0,
+				sleeping: 0,
+				awaiting_event: 0,
+				awaiting_retry: 0,
+				awaiting_child_workflow: 0,
+				cancelled: 0,
+				completed: 0,
+				failed: 0,
+			};
+			for (const { status, count } of statusCounts) {
+				workflowRunsByStatus[status] = count;
+			}
+
+			return {
+				stats: {
+					runsByStatus: workflowRunsByStatus,
+				},
+			};
+		},
+	};
+}
+
+export type WorkflowService = ReturnType<typeof createWorkflowService>;

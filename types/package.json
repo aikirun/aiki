@@ -20,9 +20,17 @@
 			"types": "./dist/event.d.ts",
 			"import": "./dist/event.js"
 		},
+		"./namespace": {
+			"types": "./dist/namespace.d.ts",
+			"import": "./dist/namespace.js"
+		},
 		"./namespace-api": {
 			"types": "./dist/namespace-api.d.ts",
 			"import": "./dist/namespace-api.js"
+		},
+		"./organization": {
+			"types": "./dist/organization.d.ts",
+			"import": "./dist/organization.js"
 		},
 		"./retry": {
 			"types": "./dist/retry.d.ts",

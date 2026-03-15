@@ -7,6 +7,7 @@ import type { WorkflowRunId, WorkflowStartOptions } from "@aikirun/types/workflo
 
 import type { EventsDefinition, EventWaiters } from "./event";
 import type { WorkflowRunHandle } from "./handle";
+import type { ReplayManifest } from "./replay-manifest";
 
 export interface WorkflowRunContext<Input, AppContext, TEvents extends EventsDefinition> {
 	id: WorkflowRunId;
@@ -19,6 +20,7 @@ export interface WorkflowRunContext<Input, AppContext, TEvents extends EventsDef
 
 	[INTERNAL]: {
 		handle: WorkflowRunHandle<Input, unknown, AppContext, TEvents>;
+		replayManifest: ReplayManifest;
 		options: {
 			spinThresholdMs: number;
 		};

@@ -1,8 +1,7 @@
 import { type DurationObject, type RetryStrategy, toMilliseconds, withRetry } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskAddress, TaskInfo, TaskName } from "@aikirun/types/task";
-import { TaskConflictError } from "@aikirun/types/task";
+import type { TaskInfo } from "@aikirun/types/task";
 import type { DistributiveOmit } from "@aikirun/types/utils";
 import {
 	isTerminalWorkflowRunStatus,
@@ -136,7 +135,6 @@ export interface WorkflowRunHandle<Input, Output, AppContext, TEvents extends Ev
 		client: Client<AppContext>;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (
-			taskAddress: TaskAddress,
 			request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedWorkflowRunRevision">
 		) => Promise<TaskInfo>;
 		assertExecutionAllowed: () => void;
@@ -183,9 +181,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 		private readonly logger: Logger
 	) {
 		this.api = client.api;
-		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger, (run) => {
-			this._run = run as WorkflowRun<Input, Output>;
-		});
+		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger);
 
 		this[INTERNAL] = {
 			client,
@@ -359,7 +355,6 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 	}
 
 	private async transitionTaskState(
-		taskAddress: TaskAddress,
 		request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedWorkflowRunRevision">
 	): Promise<TaskInfo> {
 		try {
@@ -368,14 +363,10 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 				id: this.run.id,
 				expectedWorkflowRunRevision: this.run.revision,
 			});
-			this._run.tasks[taskAddress] = taskInfo;
 			return taskInfo;
 		} catch (error) {
 			if (isWorkflowRunRevisionConflictError(error)) {
 				throw new WorkflowRunRevisionConflictError(this.run.id as WorkflowRunId);
-			}
-			if (isTaskConflictError(error) && "taskName" in request) {
-				throw new TaskConflictError(this.run.id as WorkflowRunId, request.taskName as TaskName);
 			}
 			throw error;
 		}
@@ -393,8 +384,4 @@ function isWorkflowRunRevisionConflictError(error: unknown): boolean {
 	return (
 		error != null && typeof error === "object" && "code" in error && error.code === "WORKFLOW_RUN_REVISION_CONFLICT"
 	);
-}
-
-function isTaskConflictError(error: unknown): boolean {
-	return error != null && typeof error === "object" && "code" in error && error.code === "TASK_CONFLICT";
 }

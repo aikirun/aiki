@@ -1,21 +1,16 @@
 import { hashInput } from "@aikirun/lib";
-import { getTaskAddress } from "@aikirun/lib/address";
-import type { StateTransition } from "@aikirun/types/state-transition";
-import type { TaskAddress, TaskId, TaskName, TaskState, TaskStatus } from "@aikirun/types/task";
+import type { TaskId, TaskInfo, TaskName, TaskState, TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type {
 	TransitionTaskStateToRunning,
 	WorkflowRunTransitionTaskStateRequestV1,
-	WorkflowRunTransitionTaskStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
-import {
-	InvalidTaskStateTransitionError,
-	NotFoundError,
-	TaskConflictError,
-	WorkflowRunRevisionConflictError,
-} from "server/errors";
-import { findTaskById, stateTransitionsByWorkflowRunId, workflowRunsById } from "server/infra/db/in-memory-store";
-import type { Context } from "server/middleware/context";
+import { InvalidTaskStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "server/errors";
+import type { DatabaseConn, DbTransaction } from "server/infra/db";
+import type { StateTransitionRepository } from "server/infra/db/repository/state-transition";
+import type { TaskRepository } from "server/infra/db/repository/task";
+import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
+import type { NamespaceRequestContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
@@ -51,66 +46,88 @@ export function isTaskStateTransitionToRunning(
 	return request.taskState.status === "running";
 }
 
-export async function transitionTaskState(
-	context: Context,
-	request: WorkflowRunTransitionTaskStateRequestV1
-): Promise<WorkflowRunTransitionTaskStateResponseV1> {
-	const runId = request.id as WorkflowRunId;
+export interface TaskStateMachineServiceDeps {
+	db: DatabaseConn;
+	workflowRunRepo: WorkflowRunRepository;
+	taskRepo: TaskRepository;
+	stateTransitionRepo: StateTransitionRepository;
+}
 
-	const run = workflowRunsById.get(runId);
-	if (!run) {
-		throw new NotFoundError(`Workflow run not found: ${runId}`);
-	}
-	if (run.revision !== request.expectedWorkflowRunRevision) {
-		throw new WorkflowRunRevisionConflictError(runId, request.expectedWorkflowRunRevision, run.revision);
-	}
+export function createTaskStateMachineService(deps: TaskStateMachineServiceDeps) {
+	async function transitionState(
+		context: NamespaceRequestContext,
+		request: WorkflowRunTransitionTaskStateRequestV1,
+		tx: DbTransaction
+	): Promise<TaskInfo> {
+		const namespaceId = context.namespaceId;
+		const runId = request.id as WorkflowRunId;
 
-	let inputHash: string;
-	let taskName: TaskName;
-	let taskAddress: TaskAddress;
-	let taskId: TaskId;
-	let existingTaskState: TaskState | undefined;
-	let taskState: TaskState;
-	const now = Date.now();
-
-	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
-		inputHash = await hashInput(request.taskState.input);
-		taskName = request.taskName as TaskName;
-		const reference = request.options?.reference;
-		taskAddress = getTaskAddress(taskName, reference?.id ?? inputHash);
-
-		const existingTaskInfo = run.tasks[taskAddress];
-		if (existingTaskInfo) {
-			if (reference && existingTaskInfo.inputHash !== inputHash) {
-				const conflictPolicy = reference.conflictPolicy ?? "error";
-				if (conflictPolicy === "error") {
-					throw new TaskConflictError(runId, taskName, reference.id);
-				}
-			}
-
-			context.logger.info({ runId, taskAddress, taskId: existingTaskInfo.id }, "Returning existing task");
-			return { taskInfo: existingTaskInfo };
+		const run = await deps.workflowRunRepo.getById(namespaceId, runId, tx);
+		if (!run) {
+			throw new NotFoundError(`Workflow run not found: ${runId}`);
+		}
+		if (run.revision !== request.expectedWorkflowRunRevision) {
+			throw new WorkflowRunRevisionConflictError(runId, request.expectedWorkflowRunRevision);
 		}
 
-		taskId = ulid() as TaskId;
-		taskState = {
-			status: request.taskState.status,
-			attempts: request.taskState.attempts,
-			input: request.taskState.input,
-		};
-	} else {
-		const existingTaskInfo = findTaskById(run, request.taskId as TaskId);
-		if (!existingTaskInfo) {
+		const now = Date.now();
+
+		if (isTaskStateTransitionToRunning(request) && request.type === "create") {
+			const inputHash = await hashInput(request.taskState.input);
+			const taskName = request.taskName as TaskName;
+			const taskId = ulid() as TaskId;
+			const stateTransitionId = ulid();
+
+			const taskState: TaskState = {
+				status: "running",
+				attempts: request.taskState.attempts,
+				input: request.taskState.input,
+			};
+
+			assertIsValidTaskStateTransition(runId, taskName, taskId, undefined, taskState.status);
+
+			await deps.taskRepo.create(
+				{
+					id: taskId,
+					name: taskName,
+					workflowRunId: runId,
+					status: taskState.status,
+					attempts: taskState.attempts,
+					input: request.taskState.input,
+					inputHash,
+					options: request.options,
+					latestStateTransitionId: stateTransitionId,
+				},
+				tx
+			);
+			await deps.stateTransitionRepo.appendReturning(
+				{
+					id: stateTransitionId,
+					workflowRunId: runId,
+					type: "task",
+					taskId,
+					status: taskState.status,
+					attempt: taskState.attempts,
+					state: taskState,
+				},
+				tx
+			);
+
+			context.logger.info({ runId, taskId, taskState }, "Created new task");
+
+			return { id: taskId, name: taskName, state: taskState, inputHash };
+		}
+
+		const existingTask = await deps.taskRepo.getById(request.taskId, tx);
+		if (!existingTask) {
 			throw new NotFoundError(`Task not found: ${request.taskId}`);
 		}
 
-		inputHash = existingTaskInfo.inputHash;
-		taskName = existingTaskInfo.name as TaskName;
-		taskAddress = existingTaskInfo.address;
-		taskId = existingTaskInfo.id as TaskId;
+		const inputHash = existingTask.inputHash;
+		const taskName = existingTask.name as TaskName;
+		const taskId = existingTask.id as TaskId;
 
-		existingTaskState = existingTaskInfo.state;
-		taskState =
+		const taskState: TaskState =
 			request.taskState.status === "running"
 				? {
 						status: "running",
@@ -131,29 +148,52 @@ export async function transitionTaskState(
 								nextAttemptAt: now + request.taskState.nextAttemptInMs,
 							}
 						: request.taskState;
+
+		assertIsValidTaskStateTransition(runId, taskName, taskId, existingTask.status, taskState.status);
+
+		const stateTransitionId = ulid();
+		await deps.stateTransitionRepo.append(
+			{
+				id: stateTransitionId,
+				workflowRunId: runId,
+				type: "task",
+				taskId,
+				status: taskState.status,
+				attempt: taskState.attempts,
+				state: taskState,
+			},
+			tx
+		);
+
+		await deps.taskRepo.update(
+			taskId,
+			{
+				status: taskState.status,
+				attempts: taskState.attempts,
+				latestStateTransitionId: stateTransitionId,
+				nextAttemptAt: taskState.status === "awaiting_retry" ? new Date(taskState.nextAttemptAt) : null,
+			},
+			tx
+		);
+
+		context.logger.info({ runId, taskId, taskState }, "Transitioning task state");
+
+		return { id: taskId, name: taskName, state: taskState, inputHash };
 	}
 
-	assertIsValidTaskStateTransition(runId, taskName, taskId, existingTaskState?.status, taskState.status);
-
-	context.logger.info({ runId, taskId, taskState }, "Transitioning task state");
-
-	const transition: StateTransition = {
-		id: ulid(),
-		type: "task",
-		createdAt: now,
-		taskId,
-		taskState,
+	return {
+		transitionState: async (
+			context: NamespaceRequestContext,
+			request: WorkflowRunTransitionTaskStateRequestV1,
+			tx?: DbTransaction
+		): Promise<TaskInfo> => {
+			if (tx) {
+				return transitionState(context, request, tx);
+			} else {
+				return deps.db.transaction(async (newTx) => transitionState(context, request, newTx));
+			}
+		},
 	};
-
-	const transitions = stateTransitionsByWorkflowRunId.get(runId);
-	if (!transitions) {
-		stateTransitionsByWorkflowRunId.set(runId, [transition]);
-	} else {
-		transitions.push(transition);
-	}
-
-	const taskInfo = { id: taskId, name: taskName, state: taskState, inputHash };
-	run.tasks[taskAddress] = taskInfo;
-
-	return { taskInfo };
 }
+
+export type TaskStateMachineService = ReturnType<typeof createTaskStateMachineService>;

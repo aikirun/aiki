@@ -15,7 +15,14 @@ type TestNonArrayObjectArray = ExpectTrue<Equal<NonArrayObject<[]>, never>>;
 type TestNonArrayReadonlyArray = ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>;
 //#endregion
 
-export type RequiredProp<T, K extends keyof T> = T & Required<Pick<T, K>>;
+// export type RequiredProp<T, K extends keyof T> = T & Required<Pick<T, K>>;
+export type RequiredProp<T, K extends keyof T> = T & {
+	[Key in K]-?: Exclude<T[K], undefined>;
+};
+
+export type RequiredNonNullableProp<T, K extends keyof T> = T & {
+	[Key in K]-?: NonNullable<T[K]>;
+};
 
 export type UnionToRecord<T extends string> = {
 	[K in T]: K;

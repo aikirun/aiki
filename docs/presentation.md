@@ -558,62 +558,67 @@ Replay-based resumption faces two fundamental challenges:
 
 **Result Matching:** Tasks are identified by `hash(name + input)`
 
+Results are stored in a **map**, not an ordered log.
+
 ```typescript
-// Same task + same input = same cached result
-await sendEmail.start(run, { to: "user@a.com" });  // executes
-await sendEmail.start(run, { to: "user@a.com" });  // cached ✅
+// Different inputs → different addresses
+await getCreditScore.start(run, { ssn: borrowerSsn });   // address A
+await getCreditScore.start(run, { ssn: guarantorSsn });   // address B
+
+// Reorder freely — each address resolves independently
+```
+
+---
+
+# Same Task, Same Input
+
+Each address maps to a **result queue**. Multiple calls = multiple entries.
+
+```typescript
+await sendEmail.start(run, { to: "user@a.com" }); // → queue[0]
+await sendEmail.start(run, { to: "user@a.com" }); // → queue[1]
+// Both execute. Each result stored in order.
+
+// On replay, each call consumes the next entry:
+await sendEmail.start(run, { to: "user@a.com" }); // ← queue[0]
+await sendEmail.start(run, { to: "user@a.com" }); // ← queue[1]
 ```
 
 ---
 
 # Flexible Code Evolution
 
-```typescript
-// old: deployed Monday              // new: deployed Wednesday
-await taskA.start(run, input);       await taskB.start(run, input);  // cached
-await taskB.start(run, input);       await taskA.start(run, input);  // cached
-                                     await taskC.start(run, input);  // runs fresh
+Three structural changes are safe during replay:
+
+```
+Original: taskA → taskB → taskC    (all executed)
+
+Reorder:  taskC → taskA → taskB           ✅ same addresses, any order
+Remove:   taskA → taskC                   ✅ fewer entries consumed
+Append:   taskA → taskB → taskC → taskD   ✅ all previous consumed
 ```
 
 **Deploy code changes without migrating active workflows.**
 
 ---
 
-# Same Task, Same Input, Different Intent
+# Divergence Detection
 
-```typescript
-await sendEmail.start(run, { to: "user@a.com" }); // welcome email
-await sendEmail.start(run, { to: "user@a.com" }); // reminder → cached!
+What if code changes while a workflow is in flight?
+
+```
+Insert:   Previous: taskA →           taskC
+          Current:  taskA → taskB → taskC
+                                ↑
+          taskC unconsumed, taskB is new → Error
+
+Append:   Previous: taskA → taskB
+          Current:  taskA → taskB → taskC
+                                     ↑
+          all previous consumed → taskC executes safely
 ```
 
-**Fix:** Use reference IDs to distinguish calls with identical inputs.
-
-```typescript
-await sendEmail.with()
-  .opt("reference.id", "welcome")
-  .start(run, { to: "user@a.com" });
-
-await sendEmail.with()
-  .opt("reference.id", "reminder")
-  .start(run, { to: "user@a.com" });
-// Both execute independently ✅
-```
-
----
-
-# Reference IDs & Conflict Policy
-
-What happens on replay when a task's input has changed?
-
-```typescript
-await charge.with()
-  .opt("reference", { id: "main-charge", conflictPolicy: "error" | "return_existing" })
-  .start(run, { amount: orderTotal });
-
-// Error: if orderTotal changed → workflow fails (caught input drift)
-
-// Return Existing: if orderTotal changed → returns original result silently
-```
+**Rule:** No new task executes while unconsumed entries remain.
 
 ---
 
