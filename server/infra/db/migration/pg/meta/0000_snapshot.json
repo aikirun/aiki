@@ -1,5 +1,5 @@
 {
-	"id": "75c38166-1acd-4b3d-8111-d01aa6fcfdd1",
+	"id": "0cf7701c-f6ca-492c-9d8f-109421ea9aeb",
 	"prevId": "00000000-0000-0000-0000-000000000000",
 	"version": "7",
 	"dialect": "postgresql",
@@ -841,11 +841,17 @@
 					"method": "btree",
 					"with": {}
 				},
-				"idx_task_status_next_attempt_at": {
-					"name": "idx_task_status_next_attempt_at",
+				"idx_task_status_workflow_run_next_attempt_at": {
+					"name": "idx_task_status_workflow_run_next_attempt_at",
 					"columns": [
 						{
 							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "workflow_run_id",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"

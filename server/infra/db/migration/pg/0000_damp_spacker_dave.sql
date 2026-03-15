@@ -310,7 +310,7 @@ CREATE INDEX "idx_sleep_queue_workflow_run_id" ON "sleep_queue" USING btree ("wo
 CREATE INDEX "idx_state_transition_workflow_run_id" ON "state_transition" USING btree ("workflow_run_id","id");--> statement-breakpoint
 CREATE INDEX "idx_task_workflow_run_id" ON "task" USING btree ("workflow_run_id","id");--> statement-breakpoint
 CREATE INDEX "idx_task_workflow_run_status" ON "task" USING btree ("workflow_run_id","status");--> statement-breakpoint
-CREATE INDEX "idx_task_status_next_attempt_at" ON "task" USING btree ("status","next_attempt_at");--> statement-breakpoint
+CREATE INDEX "idx_task_status_workflow_run_next_attempt_at" ON "task" USING btree ("status","workflow_run_id","next_attempt_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_workflow_namespace_name_version" ON "workflow" USING btree ("namespace_id","name","version_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_workflow_run_workflow_reference" ON "workflow_run" USING btree ("workflow_id","reference_id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_namespace_id" ON "workflow_run" USING btree ("namespace_id","id");--> statement-breakpoint

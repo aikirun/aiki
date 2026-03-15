@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib";
-import { and, eq, inArray, lte } from "drizzle-orm";
+import { and, eq, inArray, lte, min } from "drizzle-orm";
 
 import type { DatabaseConn, DbTransaction } from "..";
 import { task } from "../schema/pg";
@@ -36,10 +36,11 @@ export function createTaskRepository(db: DatabaseConn) {
 
 		async listRetryableTaskWorkflowRunIds(limit = 100, tx?: DbTransaction): Promise<string[]> {
 			const rows = await (tx ?? db)
-				.selectDistinct({ workflowRunId: task.workflowRunId })
+				.select({ workflowRunId: task.workflowRunId })
 				.from(task)
 				.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, new Date())))
-				.orderBy(task.nextAttemptAt)
+				.groupBy(task.workflowRunId)
+				.orderBy(min(task.nextAttemptAt))
 				.limit(limit);
 			return rows.map((row) => row.workflowRunId);
 		},

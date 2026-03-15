@@ -221,7 +221,7 @@ export const task = pgTable(
 		}),
 		index("idx_task_workflow_run_id").on(table.workflowRunId, table.id),
 		index("idx_task_workflow_run_status").on(table.workflowRunId, table.status),
-		index("idx_task_status_next_attempt_at").on(table.status, table.nextAttemptAt),
+		index("idx_task_status_workflow_run_next_attempt_at").on(table.status, table.workflowRunId, table.nextAttemptAt),
 	]
 );
 
