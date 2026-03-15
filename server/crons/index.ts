@@ -42,14 +42,17 @@ export interface CronHandle {
 	shutdown(): void;
 }
 
-function initCron(
+function initCron<Deps, Opts>(
 	logger: Logger,
-	fn: (context: CronContext) => Promise<void>,
-	intervalMs: number
+	intervalMs: number,
+	fn: (context: CronContext, deps: Deps, opts?: Opts) => Promise<void>,
+	deps: Deps,
+	opts?: Opts
 ): {
 	interval: ReturnType<typeof setInterval>;
 	abortController: AbortController;
 } {
+	const name = fn.name;
 	const abortController = new AbortController();
 	const { signal } = abortController;
 
@@ -61,9 +64,9 @@ function initCron(
 		}
 		running = true;
 
-		const context = createCronContext({ name: fn.name, logger, signal });
+		const context = createCronContext({ name, logger, signal });
 		const start = performance.now();
-		fn(context)
+		fn(context, deps, opts)
 			.then(() => {
 				const durationMs = Math.round(performance.now() - start);
 				context.logger.debug({ durationMs }, `Cron ${name} completed`);
@@ -82,14 +85,14 @@ function initCron(
 
 export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 	const crons = [
-		initCron(logger, (context) => publishReadyRuns(context, deps), 500),
-		initCron(logger, (context) => queueScheduledWorkflowRuns(context, deps), 500),
-		initCron(logger, (context) => scheduleSleepElapsedWorkflowRuns(context, deps), 500),
-		initCron(logger, (context) => scheduleRetryableWorkflowRuns(context, deps), 500),
-		initCron(logger, (context) => scheduleWorkflowRunsWithRetryableTask(context, deps), 500),
-		initCron(logger, (context) => scheduleEventWaitTimedOutWorkflowRuns(context, deps), 500),
-		initCron(logger, (context) => scheduleChildRunWaitTimedOutWorkflowRuns(context, deps), 500),
-		initCron(logger, (context) => scheduleRecurringWorkflows(context, deps), 500),
+		initCron(logger, 500, publishReadyRuns, deps),
+		initCron(logger, 500, queueScheduledWorkflowRuns, deps),
+		initCron(logger, 500, scheduleSleepElapsedWorkflowRuns, deps),
+		initCron(logger, 500, scheduleRetryableWorkflowRuns, deps),
+		initCron(logger, 500, scheduleWorkflowRunsWithRetryableTask, deps),
+		initCron(logger, 500, scheduleEventWaitTimedOutWorkflowRuns, deps),
+		initCron(logger, 500, scheduleChildRunWaitTimedOutWorkflowRuns, deps),
+		initCron(logger, 500, scheduleRecurringWorkflows, deps),
 	];
 
 	return {
