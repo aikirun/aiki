@@ -8,7 +8,11 @@ import type {
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow-run";
 import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow-run";
-import type { WorkflowRunStateRequest, WorkflowRunTransitionStateRequestV1 } from "@aikirun/types/workflow-run-api";
+import type {
+	WorkflowRunStateRequest,
+	WorkflowRunTransitionStateRequestV1,
+	WorkflowRunTransitionStateResponseV1,
+} from "@aikirun/types/workflow-run-api";
 import { InvalidWorkflowRunStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "server/errors";
 import type { DatabaseConn, DbTransaction } from "server/infra/db";
 import type { ChildWorkflowRunWaitQueueRepository } from "server/infra/db/repository/child-workflow-run-wait-queue";
@@ -197,7 +201,7 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 		context: NamespaceRequestContext,
 		request: WorkflowRunTransitionStateRequestV1,
 		tx: DbTransaction
-	): Promise<void> {
+	): Promise<WorkflowRunTransitionStateResponseV1> {
 		const namespaceId = context.namespaceId;
 		const runId = request.id as WorkflowRunId;
 
@@ -269,7 +273,7 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 			tx
 		);
 
-		await updateWorkflowRun(runId, request, toState, stateTransitionId, attempts, tx);
+		const newRevision = await updateWorkflowRun(runId, request, toState, stateTransitionId, attempts, tx);
 
 		// TODO: do this using workflows
 
@@ -321,6 +325,8 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 				tx
 			);
 		}
+
+		return { revision: newRevision, state: toState, attempts };
 	}
 
 	async function finalizeSleep(
@@ -401,7 +407,7 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 		stateTransitionId: string,
 		attempts: number,
 		tx: DbTransaction
-	) {
+	): Promise<number> {
 		const updates: Record<string, unknown> = {
 			status: toState.status,
 			attempts,
@@ -425,7 +431,7 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 		}
 
 		if (request.type === "optimistic") {
-			const updated = await deps.workflowRunRepo.update(
+			const result = await deps.workflowRunRepo.update(
 				{
 					id: runId,
 					revision: request.expectedRevision,
@@ -433,14 +439,16 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 				updates,
 				tx
 			);
-			if (!updated) {
+			if (!result) {
 				throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
 			}
+			return result.revision;
 		} else {
-			const updated = await deps.workflowRunRepo.update({ id: runId }, updates, tx);
-			if (!updated) {
+			const result = await deps.workflowRunRepo.update({ id: runId }, updates, tx);
+			if (!result) {
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
 			}
+			return result.revision;
 		}
 	}
 
@@ -508,12 +516,11 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 			context: NamespaceRequestContext,
 			request: WorkflowRunTransitionStateRequestV1,
 			tx?: DbTransaction
-		) => {
+		): Promise<WorkflowRunTransitionStateResponseV1> => {
 			if (tx) {
-				await transitionStateInTx(context, request, tx);
-			} else {
-				await deps.db.transaction(async (newTx) => transitionStateInTx(context, request, newTx));
+				return transitionStateInTx(context, request, tx);
 			}
+			return deps.db.transaction(async (newTx) => transitionStateInTx(context, request, newTx));
 		},
 	};
 }

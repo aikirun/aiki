@@ -178,7 +178,9 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 		)
 		.output(
 			type({
-				run: workflowRunSchema,
+				revision: "number.integer >= 0",
+				state: workflowRunStateSchema,
+				attempts: "number.integer >= 0",
 			})
 		);
 

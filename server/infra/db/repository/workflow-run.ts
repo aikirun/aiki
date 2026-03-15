@@ -27,7 +27,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			filters: { id: WorkflowRunId; revision?: number },
 			updates: WorkflowRunRowUpdate,
 			tx?: DbTransaction
-		): Promise<boolean> {
+		): Promise<{ revision: number } | undefined> {
 			const conditions = [eq(workflowRun.id, filters.id)];
 			if (filters.revision !== undefined) {
 				conditions.push(eq(workflowRun.revision, filters.revision));
@@ -42,9 +42,14 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 					revision: sql`${workflowRun.revision} + 1`,
 				})
 				.where(whereClause)
-				.returning({ id: workflowRun.id });
+				.returning({ revision: workflowRun.revision });
 
-			return result.length > 0;
+			const revision = result[0]?.revision;
+			if (revision === undefined) {
+				return undefined;
+			}
+
+			return { revision };
 		},
 
 		async exists(namespaceId: NamespaceId, id: string, tx?: DbTransaction): Promise<boolean> {

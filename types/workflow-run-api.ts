@@ -194,7 +194,9 @@ export type WorkflowRunTransitionStateRequestV1 =
 	| WorkflowRunTransitionStateRequestPessimistic;
 
 export interface WorkflowRunTransitionStateResponseV1 {
-	run: WorkflowRun;
+	revision: number;
+	state: WorkflowRunState;
+	attempts: number;
 }
 
 export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | TransitionTaskStateToRunningRetry;

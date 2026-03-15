@@ -45,10 +45,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	});
 
 	const transitionStateV1 = os.transitionStateV1.handler(async ({ input: request, context }) => {
-		await workflowRunStateMachineService.transitionState(context, request);
-		return {
-			run: await workflowRunService.getWorkflowRunById(context, request.id),
-		};
+		return workflowRunStateMachineService.transitionState(context, request);
 	});
 
 	const transitionTaskStateV1 = os.transitionTaskStateV1.handler(async ({ input: request, context }) => {

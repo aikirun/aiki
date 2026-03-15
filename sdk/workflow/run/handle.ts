@@ -12,7 +12,11 @@ import {
 	WorkflowRunRevisionConflictError,
 	type WorkflowRunState,
 } from "@aikirun/types/workflow-run";
-import type { WorkflowRunStateRequest, WorkflowRunTransitionTaskStateRequestV1 } from "@aikirun/types/workflow-run-api";
+import type {
+	WorkflowRunStateRequest,
+	WorkflowRunTransitionStateResponseV1,
+	WorkflowRunTransitionTaskStateRequestV1,
+} from "@aikirun/types/workflow-run-api";
 
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
@@ -325,27 +329,29 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 
 	private async transitionState(targetState: WorkflowRunStateRequest): Promise<void> {
 		try {
+			let response: WorkflowRunTransitionStateResponseV1;
 			if (
 				(targetState.status === "scheduled" &&
 					(targetState.reason === "new" || targetState.reason === "resume" || targetState.reason === "awake_early")) ||
 				targetState.status === "paused" ||
 				targetState.status === "cancelled"
 			) {
-				const { run } = await this.api.workflowRun.transitionStateV1({
+				response = await this.api.workflowRun.transitionStateV1({
 					type: "pessimistic",
 					id: this.run.id,
 					state: targetState,
 				});
-				this._run = run as WorkflowRun<Input, Output>;
-				return;
+			} else {
+				response = await this.api.workflowRun.transitionStateV1({
+					type: "optimistic",
+					id: this.run.id,
+					state: targetState,
+					expectedRevision: this.run.revision,
+				});
 			}
-			const { run } = await this.api.workflowRun.transitionStateV1({
-				type: "optimistic",
-				id: this.run.id,
-				state: targetState,
-				expectedRevision: this.run.revision,
-			});
-			this._run = run as WorkflowRun<Input, Output>;
+			this._run.revision = response.revision;
+			this._run.state = response.state as WorkflowRunState<Output>;
+			this._run.attempts = response.attempts;
 		} catch (error) {
 			if (isWorkflowRunRevisionConflictError(error)) {
 				throw new WorkflowRunRevisionConflictError(this.run.id as WorkflowRunId);
