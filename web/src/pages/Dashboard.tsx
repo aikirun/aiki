@@ -344,8 +344,8 @@ function SchedulesTab({
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-slate-100">
-						{data?.schedules.map((schedule) => (
-							<ScheduleRow key={schedule.id} schedule={schedule} />
+						{data?.schedules.map((item) => (
+							<ScheduleRow key={item.schedule.id} schedule={item.schedule} runCount={item.runCount} />
 						))}
 					</tbody>
 				</table>
@@ -354,7 +354,7 @@ function SchedulesTab({
 	);
 }
 
-function ScheduleRow({ schedule }: { schedule: Schedule }) {
+function ScheduleRow({ schedule, runCount }: { schedule: Schedule; runCount: number }) {
 	const queryClient = useQueryClient();
 	const [isActioning, setIsActioning] = useState(false);
 
@@ -440,7 +440,7 @@ function ScheduleRow({ schedule }: { schedule: Schedule }) {
 			<td className="px-6 py-4 text-right text-slate-500">
 				{schedule.status === "active" && schedule.nextRunAt ? <RelativeTime timestamp={schedule.nextRunAt} /> : "—"}
 			</td>
-			<td className="px-6 py-4 text-right text-slate-600">{schedule.runCount.toLocaleString()}</td>
+			<td className="px-6 py-4 text-right text-slate-600">{runCount.toLocaleString()}</td>
 			<td className="px-6 py-4 text-right">
 				<div className="flex items-center justify-end gap-2">
 					{canPause && (

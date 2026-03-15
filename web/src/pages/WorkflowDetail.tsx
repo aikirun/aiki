@@ -107,14 +107,11 @@ export function WorkflowDetail() {
 		sort: { field: "firstSeenAt", order: "desc" },
 	});
 
-	const workflowFilters =
-		selectedVersions.length > 0
-			? selectedVersions.map((versionId) => ({
-					name: decodedName,
-					versionId,
-					...(debouncedReferenceIdFilter && { referenceId: debouncedReferenceIdFilter }),
-				}))
-			: [{ name: decodedName, ...(debouncedReferenceIdFilter && { referenceId: debouncedReferenceIdFilter }) }];
+	const workflowFilter: { name: string; versionId?: string; referenceId?: string } = {
+		name: decodedName,
+		...(selectedVersions.length === 1 && { versionId: selectedVersions[0] }),
+		...(debouncedReferenceIdFilter && { referenceId: debouncedReferenceIdFilter }),
+	};
 
 	const selectedStatusValues = selectedStatuses.map((s) => s.value);
 
@@ -125,11 +122,11 @@ export function WorkflowDetail() {
 		error: runsError,
 	} = useWorkflowRuns({
 		filters: {
-			workflows: workflowFilters,
+			workflow: workflowFilter,
 			...(selectedStatusValues.length > 0 && { status: selectedStatusValues }),
-			...(debouncedRunIdFilter && { runId: debouncedRunIdFilter }),
+			...(debouncedRunIdFilter && { id: debouncedRunIdFilter }),
 		},
-		sort: { field: "createdAt", order: "desc" },
+		sort: { order: "desc" },
 		limit: 20,
 	});
 

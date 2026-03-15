@@ -2,6 +2,7 @@ export type { WorkflowRegistry } from "./registry";
 export { workflowRegistry } from "./registry";
 export type { WorkflowRunContext } from "./run/context";
 export type {
+	EventDefinition,
 	EventMulticaster,
 	EventMulticasters,
 	EventSender,

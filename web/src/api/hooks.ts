@@ -25,7 +25,7 @@ export function useWorkflowVersions(name: string, params: Omit<WorkflowListVersi
 	});
 }
 
-export function useWorkflowStats(params: WorkflowGetStatsRequestV1 = {}) {
+export function useWorkflowStats(params: WorkflowGetStatsRequestV1 = undefined) {
 	return useQuery({
 		queryKey: ["workflow-stats", params],
 		queryFn: () => client.workflow.getStatsV1(params),

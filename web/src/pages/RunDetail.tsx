@@ -1,7 +1,8 @@
 import type { EventWaitQueue } from "@aikirun/types/event";
 import type { SleepQueue } from "@aikirun/types/sleep";
+import type { StateTransition } from "@aikirun/types/state-transition";
 import type { TaskInfo } from "@aikirun/types/task";
-import type { ChildWorkflowRunInfo, WorkflowRunStatus, WorkflowRunTransition } from "@aikirun/types/workflow-run";
+import type { ChildWorkflowRunInfo, ChildWorkflowRunQueue, WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { useQueryClient } from "@tanstack/react-query";
 import { memo, useCallback, useMemo, useState } from "react";
@@ -60,11 +61,14 @@ export function RunDetail() {
 
 	const { data: transitions, isLoading: transitionsLoading } = useWorkflowRunTransitions(
 		id || "",
-		{ sort: { field: "createdAt", order: "asc" } },
+		{ sort: { order: "asc" } },
 		{ refetchInterval: shouldPollTransitions ? POLLING_INTERVAL_MS : false }
 	);
 
-	const tasks = useMemo(() => (currentRun ? Object.values(currentRun.tasks) : []), [currentRun]);
+	const tasks = useMemo(
+		() => (currentRun ? Object.values(currentRun.taskQueues).flatMap((q) => q.tasks) : []),
+		[currentRun]
+	);
 	const taskById = useMemo(() => {
 		const map = new Map<string, TaskInfo>();
 		for (const task of tasks) {
@@ -72,6 +76,16 @@ export function RunDetail() {
 		}
 		return map;
 	}, [tasks]);
+	const childWorkflowRuns = useMemo(() => {
+		if (!currentRun) return {};
+		const result: Record<string, ChildWorkflowRunInfo> = {};
+		for (const queue of Object.values(currentRun.childWorkflowRunQueues)) {
+			for (const child of queue.childWorkflowRuns) {
+				result[child.id] = child;
+			}
+		}
+		return result;
+	}, [currentRun]);
 	const actions = useMemo(
 		() =>
 			currentRun
@@ -282,7 +296,7 @@ export function RunDetail() {
 			)}
 
 			{/* Options */}
-			{Object.keys(currentRun.options).length > 0 && (
+			{currentRun.options && Object.keys(currentRun.options).length > 0 && (
 				<CollapsibleSection title="Options" defaultOpen={false}>
 					<pre className="bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto text-sm font-mono">
 						{JSON.stringify(currentRun.options, null, 2)}
@@ -318,7 +332,7 @@ export function RunDetail() {
 								{currentRun.state.cause === "child_workflow" && (
 									<ChildWorkflowFailedLink
 										childWorkflowRunId={currentRun.state.childWorkflowRunId}
-										childWorkflowRuns={currentRun.childWorkflowRuns}
+										childWorkflowRunQueues={currentRun.childWorkflowRunQueues}
 									/>
 								)}
 							</span>
@@ -347,7 +361,7 @@ export function RunDetail() {
 							transitions={transitions?.transitions || []}
 							eventWaitQueues={currentRun.eventWaitQueues}
 							sleepQueues={currentRun.sleepQueues}
-							childWorkflowRuns={currentRun.childWorkflowRuns}
+							childWorkflowRuns={childWorkflowRuns}
 							taskById={taskById}
 						/>
 					)}
@@ -395,7 +409,7 @@ function Timeline({
 	childWorkflowRuns,
 	taskById,
 }: {
-	transitions: WorkflowRunTransition[];
+	transitions: StateTransition[];
 	eventWaitQueues: Record<string, EventWaitQueue<unknown>>;
 	sleepQueues: Record<string, SleepQueue>;
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>;
@@ -430,7 +444,7 @@ function Timeline({
 
 		for (let i = 0; i < transitions.length; i++) {
 			const t = transitions[i];
-			if (t.type !== "state" || !t.state) continue;
+			if (t.type !== "workflow_run") continue;
 			const state = t.state;
 
 			if (state.status === "sleeping") {
@@ -461,7 +475,7 @@ function Timeline({
 					// Find the most recent sleeping transition before this one
 					for (let j = i - 1; j >= 0; j--) {
 						const prev = transitions[j];
-						if (prev.type === "state" && prev.state?.status === "sleeping") {
+						if (prev.type === "workflow_run" && prev.state.status === "sleeping") {
 							const sleepName = prev.state.sleepName;
 							const queue = sleepQueues[sleepName];
 							if (queue?.sleeps.length > 0) {
@@ -469,7 +483,11 @@ function Timeline({
 								let sleepIndex = 0;
 								for (let k = 0; k < j; k++) {
 									const t2 = transitions[k];
-									if (t2.type === "state" && t2.state?.status === "sleeping" && t2.state.sleepName === sleepName) {
+									if (
+										t2.type === "workflow_run" &&
+										t2.state.status === "sleeping" &&
+										t2.state.sleepName === sleepName
+									) {
 										sleepIndex++;
 									}
 								}
@@ -487,7 +505,7 @@ function Timeline({
 				if (reason === "event") {
 					for (let j = i - 1; j >= 0; j--) {
 						const prev = transitions[j];
-						if (prev.type === "state" && prev.state?.status === "awaiting_event") {
+						if (prev.type === "workflow_run" && prev.state.status === "awaiting_event") {
 							const eventName = prev.state.eventName;
 							context.eventDataName = eventName;
 							const queue = eventWaitQueues[eventName];
@@ -496,8 +514,8 @@ function Timeline({
 								for (let k = 0; k < j; k++) {
 									const t2 = transitions[k];
 									if (
-										t2.type === "state" &&
-										t2.state?.status === "awaiting_event" &&
+										t2.type === "workflow_run" &&
+										t2.state.status === "awaiting_event" &&
 										t2.state.eventName === eventName
 									) {
 										eventIndex++;
@@ -519,24 +537,26 @@ function Timeline({
 				if (reason === "child_workflow") {
 					for (let j = i - 1; j >= 0; j--) {
 						const prev = transitions[j];
-						if (prev.type === "state" && prev.state?.status === "awaiting_child_workflow") {
+						if (prev.type === "workflow_run" && prev.state.status === "awaiting_child_workflow") {
 							const childId = prev.state.childWorkflowRunId;
+							const waitForStatus = prev.state.childWorkflowRunStatus;
 							context.scheduledByChildWorkflowRunId = childId;
 							const childInfo = childWorkflowById.get(childId);
-							const statusWaitResults = childInfo?.statusWaitResults;
-							if (statusWaitResults && statusWaitResults.length > 0) {
+							const waitQueue = childInfo?.childWorkflowRunWaitQueues[waitForStatus];
+							const waits = waitQueue?.childWorkflowRunWaits;
+							if (waits && waits.length > 0) {
 								let waitIndex = 0;
 								for (let k = 0; k < j; k++) {
 									const t2 = transitions[k];
 									if (
-										t2.type === "state" &&
-										t2.state?.status === "awaiting_child_workflow" &&
+										t2.type === "workflow_run" &&
+										t2.state.status === "awaiting_child_workflow" &&
 										t2.state.childWorkflowRunId === childId
 									) {
 										waitIndex++;
 									}
 								}
-								const result = statusWaitResults[waitIndex];
+								const result = waits[waitIndex];
 								if (result?.status === "completed") {
 									context.childWorkflowStatus = result.childWorkflowRunState.status;
 								} else if (result?.status === "timeout") {
@@ -571,8 +591,8 @@ function Timeline({
 			let attemptChanged = false;
 
 			if (
-				transition.type === "state" &&
-				transition.state?.status === "scheduled" &&
+				transition.type === "workflow_run" &&
+				transition.state.status === "scheduled" &&
 				(transition.state.reason === "new" || transition.state.reason === "retry")
 			) {
 				currentAttempt++;
@@ -630,14 +650,14 @@ const TimelineItem = memo(function TimelineItem({
 	lookups,
 	isLast,
 }: {
-	transition: WorkflowRunTransition;
+	transition: StateTransition;
 	transitionIndex: number;
 	lookups: TimelineLookups;
 	isLast: boolean;
 }) {
 	const time = new Date(transition.createdAt).toLocaleTimeString();
 
-	if (transition.type === "state" && transition.state) {
+	if (transition.type === "workflow_run") {
 		const state = transition.state;
 		const status = state.status;
 		const statusLabel = status.replace(/_/g, " ").toUpperCase();
@@ -736,7 +756,7 @@ const TimelineItem = memo(function TimelineItem({
 		);
 	}
 
-	if (transition.type === "task_state" && transition.taskState) {
+	if (transition.type === "task") {
 		const taskStatus = transition.taskState.status;
 		const icon =
 			taskStatus === "completed" ? "✓" : taskStatus === "failed" ? "✗" : taskStatus === "awaiting_retry" ? "↻" : "●";
@@ -748,7 +768,7 @@ const TimelineItem = memo(function TimelineItem({
 					: taskStatus === "awaiting_retry"
 						? "text-orange-600"
 						: "text-blue-600";
-		const taskInfo = lookups.taskById.get(transition.taskId || "");
+		const taskInfo = lookups.taskById.get(transition.taskId);
 
 		return (
 			<div className="flex gap-4">
@@ -761,7 +781,7 @@ const TimelineItem = memo(function TimelineItem({
 					<a href={`#task-${transition.taskId}`} className={`font-medium ${color} hover:underline`}>
 						<span className="mr-2">{icon}</span>
 						{taskInfo && <>{taskInfo.name} </>}
-						{transition.taskId?.slice(0, 8)}... — {taskStatus}
+						{transition.taskId.slice(0, 8)}... — {taskStatus}
 					</a>
 				</div>
 			</div>
@@ -991,12 +1011,14 @@ function CollapsibleData({ label, defaultOpen, children }: { label: string; defa
 
 function ChildWorkflowFailedLink({
 	childWorkflowRunId,
-	childWorkflowRuns,
+	childWorkflowRunQueues,
 }: {
 	childWorkflowRunId: string;
-	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>;
+	childWorkflowRunQueues: Record<string, ChildWorkflowRunQueue>;
 }) {
-	const childInfo = Object.values(childWorkflowRuns).find((c) => c.id === childWorkflowRunId);
+	const childInfo = Object.values(childWorkflowRunQueues)
+		.flatMap((q) => q.childWorkflowRuns)
+		.find((c) => c.id === childWorkflowRunId);
 	if (childInfo?.name) {
 		return (
 			<>

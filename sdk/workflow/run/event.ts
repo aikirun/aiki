@@ -51,7 +51,7 @@ export interface EventParams<Data> {
 	schema?: StandardSchemaV1<Data>;
 }
 
-interface EventDefinition<Data> {
+export interface EventDefinition<Data> {
 	_type: Data;
 	schema?: StandardSchemaV1<Data>;
 }

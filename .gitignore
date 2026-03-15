@@ -10,4 +10,5 @@ server/.env
 todo/
 
 **/dist/
+*.tsbuildinfo
 node_modules/
