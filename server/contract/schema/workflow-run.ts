@@ -239,6 +239,28 @@ export const workflowRunStateCompletedRequestSchema = type({
 	"output?": "unknown",
 });
 
+export const listChildRunsRequestSchema = type({
+	parentRunId: "string > 0",
+	"status?": workflowRunStatusSchema.array(),
+});
+
+export const listChildRunsResponseSchema = type({
+	runs: type({
+		id: "string > 0",
+		"options?": type({
+			"shard?": "string | undefined",
+		}).or("undefined"),
+	}).array(),
+});
+
+export const cancelByIdsRequestSchema = type({
+	ids: type("string > 0").array().atLeastLength(1),
+});
+
+export const cancelByIdsResponseSchema = type({
+	cancelledIds: type("string > 0").array(),
+});
+
 const taskStateOutputSchema = type({
 	status: "'completed'",
 	output: "unknown",

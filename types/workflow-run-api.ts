@@ -11,6 +11,7 @@ import type {
 	TransitionTaskStateToRunningRetry,
 } from "./task";
 import type { DistributiveOmit, OptionalProp } from "./utils";
+import type { WorkflowSource } from "./workflow";
 import type {
 	WorkflowRun,
 	WorkflowRunState,
@@ -41,6 +42,8 @@ export interface WorkflowRunApi {
 	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<void>;
 	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<void>;
 	multicastEventByReferenceV1: (_: WorkflowRunMulticastEventByReferenceRequestV1) => Promise<void>;
+	listChildRunsV1: (_: WorkflowRunListChildRunsRequestV1) => Promise<WorkflowRunListChildRunsResponseV1>;
+	cancelByIdsV1: (_: WorkflowRunCancelByIdsRequestV1) => Promise<WorkflowRunCancelByIdsResponseV1>;
 }
 
 export interface WorkflowRunListRequestV1 {
@@ -57,9 +60,9 @@ export interface WorkflowRunListRequestV1 {
 }
 
 export type WorkflowFilter =
-	| { name: string }
-	| { name: string; versionId: string }
-	| { name: string; versionId: string; referenceId: string };
+	| { name: string; source: WorkflowSource }
+	| { name: string; source: WorkflowSource; versionId: string }
+	| { name: string; source: WorkflowSource; versionId: string; referenceId: string };
 
 export interface WorkflowRunListItem {
 	id: string;
@@ -263,4 +266,21 @@ export interface WorkflowRunMulticastEventByReferenceRequestV1 {
 	eventName: string;
 	data?: unknown;
 	options?: EventSendOptions;
+}
+
+export interface WorkflowRunListChildRunsRequestV1 {
+	parentRunId: string;
+	status?: WorkflowRunStatus[];
+}
+
+export interface WorkflowRunListChildRunsResponseV1 {
+	runs: Array<{ id: string; options?: { shard?: string } }>;
+}
+
+export interface WorkflowRunCancelByIdsRequestV1 {
+	ids: string[];
+}
+
+export interface WorkflowRunCancelByIdsResponseV1 {
+	cancelledIds: string[];
 }

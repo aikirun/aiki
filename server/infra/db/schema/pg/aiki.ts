@@ -8,6 +8,7 @@ import {
 import { SLEEP_STATUSES } from "@aikirun/types/sleep";
 import { STATE_TRANSITION_TYPES } from "@aikirun/types/state-transition";
 import { TASK_STATUSES } from "@aikirun/types/task";
+import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
 	CHILD_WORKFLOW_RUN_WAIT_STATUSES,
 	TERMINAL_WORKFLOW_RUN_STATUSES,
@@ -31,6 +32,8 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { namespace } from "./auth";
+
+export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
 
 export const scheduleStatusEnum = pgEnum("schedule_status", SCHEDULE_STATUSES);
 export const scheduleTypeEnum = pgEnum("schedule_type", SCHEDULE_TYPES);
@@ -61,6 +64,7 @@ export const workflow = pgTable(
 	{
 		id: text("id").primaryKey(),
 		namespaceId: text("namespace_id").notNull(),
+		source: workflowSourceEnum("source").notNull().default("user"),
 		name: text("name").notNull(),
 		versionId: text("version_id").notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -71,7 +75,12 @@ export const workflow = pgTable(
 			columns: [table.namespaceId],
 			foreignColumns: [namespace.id],
 		}),
-		uniqueIndex("uqidx_workflow_namespace_name_version").on(table.namespaceId, table.name, table.versionId),
+		uniqueIndex("uqidx_workflow_namespace_source_name_version").on(
+			table.namespaceId,
+			table.source,
+			table.name,
+			table.versionId
+		),
 	]
 );
 
@@ -182,7 +191,7 @@ export const workflowRun = pgTable(
 		index("idx_workflow_run_workflow_status_id").on(table.workflowId, table.status, table.id),
 
 		index("idx_workflow_run_schedule").on(table.scheduleId),
-		index("idx_workflow_run_parent_workflow_run").on(table.parentWorkflowRunId),
+		index("idx_workflow_run_parent_workflow_run_status").on(table.parentWorkflowRunId, table.status),
 
 		// TODO: will adding an index on input hash make conflict resolution faster?
 

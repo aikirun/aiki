@@ -70,6 +70,17 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			return result[0] ?? null;
 		},
 
+		async getByIds(
+			namespaceId: NamespaceId,
+			ids: NonEmptyArray<string>,
+			tx?: DbTransaction
+		): Promise<WorkflowRunRow[]> {
+			return (tx ?? db)
+				.select()
+				.from(workflowRun)
+				.where(and(eq(workflowRun.namespaceId, namespaceId), inArray(workflowRun.id, ids)));
+		},
+
 		async getByIdWithState(
 			namespaceId: NamespaceId,
 			id: string,
@@ -84,6 +95,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 					attempts: workflowRun.attempts,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
 					parentWorkflowRunId: workflowRun.parentWorkflowRunId,
+					options: workflowRun.options,
 					state: stateTransition.state,
 				})
 				.from(workflowRun)
@@ -120,6 +132,31 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			const whereClause = and(...conditions);
 
 			return (tx ?? db).select().from(workflowRun).where(whereClause).limit(10_000);
+		},
+
+		async hasChildRuns(
+			parentRunIds: NonEmptyArray<string>,
+			childRunStatus?: NonEmptyArray<WorkflowRunStatus>,
+			tx?: DbTransaction
+		): Promise<Set<string>> {
+			const conditions = [inArray(workflowRun.parentWorkflowRunId, parentRunIds)];
+			if (childRunStatus) {
+				conditions.push(inArray(workflowRun.status, childRunStatus));
+			}
+
+			const rows = await (tx ?? db)
+				.select({ parentWorkflowRunId: workflowRun.parentWorkflowRunId })
+				.from(workflowRun)
+				.where(and(...conditions))
+				.groupBy(workflowRun.parentWorkflowRunId);
+
+			const result = new Set<string>();
+			for (const row of rows) {
+				if (row.parentWorkflowRunId) {
+					result.add(row.parentWorkflowRunId);
+				}
+			}
+			return result;
 		},
 
 		async getByWorkflowAndReferenceId(

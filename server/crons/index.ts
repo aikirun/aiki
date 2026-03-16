@@ -12,6 +12,7 @@ import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";
 import { createCronContext } from "server/middleware/context";
+import type { ChildRunCanceller } from "server/service/cancel-child-runs";
 import type { ScheduleService } from "server/service/schedule";
 
 import { publishReadyRuns } from "./publish-ready-runs";
@@ -35,6 +36,7 @@ export interface InitCronsDeps {
 	scheduleRepo: ScheduleRepository;
 	eventWaitQueueRepo: EventWaitQueueRepository;
 	childWorkflowRunWaitQueueRepo: ChildWorkflowRunWaitQueueRepository;
+	childRunCanceller: ChildRunCanceller;
 	scheduleService: ScheduleService;
 }
 

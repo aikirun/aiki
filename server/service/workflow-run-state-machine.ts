@@ -6,6 +6,7 @@ import type {
 	WorkflowRunStateAwaitingChildWorkflow,
 	WorkflowRunStateScheduled,
 	WorkflowRunStatus,
+	WorkflowStartOptions,
 } from "@aikirun/types/workflow-run";
 import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow-run";
 import type {
@@ -21,6 +22,7 @@ import type { StateTransitionRepository } from "server/infra/db/repository/state
 import type { TaskRepository } from "server/infra/db/repository/task";
 import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
 import type { NamespaceRequestContext } from "server/middleware/context";
+import type { ChildRunCanceller } from "server/service/cancel-child-runs";
 import { ulid } from "ulidx";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
@@ -194,6 +196,7 @@ export interface WorkflowRunStateMachineServiceDeps {
 	sleepQueueRepo: SleepQueueRepository;
 	taskRepo: TaskRepository;
 	childWorkflowRunWaitQueueRepo: ChildWorkflowRunWaitQueueRepository;
+	childRunCanceller: ChildRunCanceller;
 }
 
 export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachineServiceDeps) {
@@ -275,42 +278,10 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 
 		const newRevision = await updateWorkflowRun(runId, request, toState, stateTransitionId, attempts, tx);
 
-		// TODO: do this using workflows
-
-		// Handle cancellation cascade to children (parallel for siblings at the same level)
-		// if (state.status === "cancelled") {
-		// 	const childRunRows = await deps.workflowRunRepo.getChildRuns(runId, tx);
-
-		// 	// Batch-fetch latest transitions for all children
-		// 	const childTransitionIds = childRunRows.map((r) => r.latestStateTransitionId);
-		// 	const childTransitionRows = await deps.stateTransitionRepo.getByIds(childTransitionIds, tx);
-		// 	const childTransitionMap = new Map(childTransitionRows.map((row) => [row.id, row]));
-
-		// 	const cancellations: Promise<void>[] = [];
-		// 	for (const childRunRow of childRunRows) {
-		// 		// const childTransition = childTransitionMap.get(childRunRow.latestStateTransitionId);
-		// 		if (!childTransition) {
-		// 			throw new Error(`State transition not found: ${childRunRow.latestStateTransitionId}`);
-		// 		}
-		// 		const childStatus = (childTransition.state as WorkflowRunState).status;
-
-		// 		if (!isTerminalWorkflowRunStatus(childStatus)) {
-		// 			cancellations.push(
-		// 				transitionWorkflowRunState(
-		// 					context,
-		// 					{
-		// 						type: "pessimistic",
-		// 						id: childRunRow.id,
-		// 						state: { status: "cancelled", reason: "Parent cancelled" },
-		// 					},
-		// 					tx
-		// 				)
-		// 			);
-		// 		}
-		// 	}
-
-		// 	await Promise.all(cancellations);
-		// }
+		if (toState.status === "cancelled") {
+			const shard = (run.options as WorkflowStartOptions | null)?.shard;
+			await deps.childRunCanceller.cancel([{ namespaceId, runId, shard }], tx, context.logger);
+		}
 
 		if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {
 			await notifyParentOfStateChangeIfNecessary(
@@ -526,43 +497,6 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 }
 
 export type WorkflowRunStateMachineService = ReturnType<typeof createWorkflowRunStateMachineService>;
-
-// const createGetNonTerminatedChildRuns = (workflowRunRepo: WorkflowRunRepository) =>
-// 	task({
-// 		name: "get-non-terminated-child-runs",
-// 		async handler(runId: string) {
-// 			if (!isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
-// 				return [];
-// 			}
-// 			const childRuns = await workflowRunRepo.getChildRuns({
-// 				parentRunId: runId,
-// 				status: NON_TERMINAL_WORKFLOW_RUN_STATUSES,
-// 			});
-// 			return childRuns.map((run) => run.id);
-// 		},
-// 	});
-
-// const getNonTerminatedChildRuns = createGetNonTerminatedChildRuns();
-
-// const cancelChildRuns = workflow({ name: "cancel-child-runs" }).v("1.0.0", {
-// 	async handler(run, runId: string) {
-// 		const childRunIds = await getNonTerminatedChildRuns.start(run, runId);
-// 		for (const childRunId of childRunIds) {
-// 			await cancelRun.startAsChild(run, childRunId);
-// 		}
-// 	},
-// });
-
-// const cancelRun = workflow({ name: "cancel-run" }).v("1.0.0", {
-// 	async handler(run, runId: string) {
-
-// 	},
-// });
-
-// const cancelChildWorkflowRun = task({
-// 	name: "cancel-child-workflow-run",
-// 	async handler(workflowRunId: string) {},
-// });
 
 function convertDurationsToTimestamps(request: WorkflowRunStateRequest, now: number): WorkflowRunState {
 	if (request.status === "scheduled") {

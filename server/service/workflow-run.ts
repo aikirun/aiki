@@ -14,10 +14,13 @@ import type {
 	WorkflowRun,
 	WorkflowRunId,
 	WorkflowRunState,
+	WorkflowRunStateCancelled,
 	WorkflowStartOptions,
 } from "@aikirun/types/workflow-run";
 import type {
+	WorkflowRunCancelByIdsRequestV1,
 	WorkflowRunCreateRequestV1,
+	WorkflowRunListChildRunsRequestV1,
 	WorkflowRunListRequestV1,
 	WorkflowRunListTransitionsRequestV1,
 	WorkflowRunReference,
@@ -35,11 +38,16 @@ import type {
 	EventWaitQueueRowInsert,
 } from "server/infra/db/repository/event-wait-queue";
 import type { SleepQueueRepository, SleepQueueRow } from "server/infra/db/repository/sleep-queue";
-import type { StateTransitionRepository, StateTransitionRow } from "server/infra/db/repository/state-transition";
+import type {
+	StateTransitionRepository,
+	StateTransitionRow,
+	StateTransitionRowInsert,
+} from "server/infra/db/repository/state-transition";
 import type { TaskRepository, TaskRow } from "server/infra/db/repository/task";
 import type { WorkflowRepository, WorkflowRow } from "server/infra/db/repository/workflow";
 import type { WorkflowRunRepository, WorkflowRunRow } from "server/infra/db/repository/workflow-run";
 import type { NamespaceRequestContext } from "server/middleware/context";
+import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
 import type { WorkflowRunStateMachineService } from "server/service/workflow-run-state-machine";
 import { monotonicFactory, ulid } from "ulidx";
 
@@ -52,6 +60,7 @@ export interface WorkflowRunServiceDeps {
 	sleepQueueRepo: SleepQueueRepository;
 	eventWaitQueueRepo: EventWaitQueueRepository;
 	childWorkflowRunWaitQueueRepo: ChildWorkflowRunWaitQueueRepository;
+	childRunCanceller: ChildRunCanceller;
 	workflowRunStateMachineService: WorkflowRunStateMachineService;
 }
 
@@ -65,6 +74,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		sleepQueueRepo,
 		eventWaitQueueRepo,
 		childWorkflowRunWaitQueueRepo,
+		childRunCanceller,
 		workflowRunStateMachineService,
 	} = deps;
 
@@ -91,7 +101,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		const { input, options } = request;
 		const referenceId = options?.reference?.id;
 
-		const workflow = await workflowRepo.getOrCreate(namespaceId, name, versionId, tx);
+		const workflow = await workflowRepo.getOrCreate({ namespaceId, name, versionId, source: "user" }, tx);
 
 		if (referenceId) {
 			const existingRun = await workflowRunRepo.getByWorkflowAndReferenceId(workflow.id, referenceId, tx);
@@ -183,7 +193,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		const { namespaceId } = context;
 		const { name, versionId, referenceId } = filter;
 
-		const workflowRow = await workflowRepo.getByNameAndVersion(namespaceId, { name, versionId });
+		const workflowRow = await workflowRepo.getByNameAndVersion(namespaceId, { name, versionId, source: "user" });
 		if (!workflowRow) {
 			throw new NotFoundError(`Workflow not found: ${name}:${versionId}`);
 		}
@@ -274,8 +284,12 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				? await workflowRepo.listByNameAndVersion(namespaceId, {
 						name: workflowFilter.name,
 						versionId: workflowFilter.versionId,
+						source: workflowFilter.source,
 					})
-				: await workflowRepo.listByNameAndVersion(namespaceId, { name: workflowFilter.name })
+				: await workflowRepo.listByNameAndVersion(namespaceId, {
+						name: workflowFilter.name,
+						source: workflowFilter.source,
+					})
 			: undefined;
 		const workflowIds = workflows?.map((workflow) => workflow.id);
 
@@ -415,11 +429,11 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 	): Promise<WorkflowRunId[]> {
 		const { namespaceId } = context;
 
-		const nameAndVersionIdPairsByKey = new Map<string, { name: string; versionId: string }>();
+		const nameAndVersionIdPairsByKey = new Map<string, { name: string; versionId: string; source: "user" }>();
 		for (const { name, versionId } of references) {
 			const key = `${name}:${versionId}`;
 			if (!nameAndVersionIdPairsByKey.has(key)) {
-				nameAndVersionIdPairsByKey.set(key, { name, versionId });
+				nameAndVersionIdPairsByKey.set(key, { name, versionId, source: "user" });
 			}
 		}
 		const nameAndVersionIdPairs = [...nameAndVersionIdPairsByKey.values()];
@@ -581,6 +595,71 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		});
 	}
 
+	async function listChildRuns(_context: NamespaceRequestContext, request: WorkflowRunListChildRunsRequestV1) {
+		const childRuns = await workflowRunRepo.getChildRuns({
+			parentRunId: request.parentRunId,
+			status: isNonEmptyArray(request.status) ? request.status : undefined,
+		});
+		return {
+			runs: childRuns.map((child) => {
+				const shard = (child.options as WorkflowStartOptions | null)?.shard;
+				return {
+					id: child.id,
+					options: shard ? { shard } : undefined,
+				};
+			}),
+		};
+	}
+
+	async function cancelByIds(context: NamespaceRequestContext, request: WorkflowRunCancelByIdsRequestV1) {
+		const ids = request.ids;
+		if (!isNonEmptyArray(ids)) {
+			return { cancelledIds: [] };
+		}
+
+		return db.transaction(async (tx) => {
+			const cancelledRunIds = await workflowRunRepo.bulkTransitionToCancelled(ids, tx);
+			if (!isNonEmptyArray(cancelledRunIds)) {
+				return { cancelledIds: [] };
+			}
+
+			const cancelledRuns = await workflowRunRepo.getByIds(context.namespaceId, cancelledRunIds, tx);
+
+			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
+			const cancelledRunStateTransitionUpdates: { id: string; stateTransitionId: string }[] = [];
+			const cancelledParentRuns: CancelledParentRun[] = [];
+
+			for (const run of cancelledRuns) {
+				const stateTransitionId = ulid();
+				cancelStateTransitionEntries.push({
+					id: stateTransitionId,
+					workflowRunId: run.id,
+					type: "workflow_run",
+					status: "cancelled",
+					attempt: run.attempts,
+					state: { status: "cancelled", reason: "Bulk cancel" } satisfies WorkflowRunStateCancelled,
+				});
+				cancelledRunStateTransitionUpdates.push({ id: run.id, stateTransitionId });
+				cancelledParentRuns.push({
+					namespaceId: context.namespaceId,
+					runId: run.id,
+					shard: (run.options as WorkflowStartOptions | null)?.shard,
+				});
+			}
+
+			if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionUpdates)) {
+				await stateTransitionRepo.appendBatch(cancelStateTransitionEntries, tx);
+				await workflowRunRepo.bulkSetLatestStateTransitionId(cancelledRunStateTransitionUpdates, tx);
+			}
+
+			if (isNonEmptyArray(cancelledParentRuns)) {
+				await childRunCanceller.cancel(cancelledParentRuns, tx, context.logger);
+			}
+
+			return { cancelledIds: cancelledRunIds };
+		});
+	}
+
 	return {
 		createWorkflowRun: createWorkflowRun,
 		getWorkflowRunById: getWorkflowRunById,
@@ -591,6 +670,8 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		sendEventToWorkflowRun: sendEventToWorkflowRun,
 		resolveRunIdsByReferences: resolveRunIdsByReferences,
 		setTaskState: setTaskState,
+		listChildRuns: listChildRuns,
+		cancelByIds: cancelByIds,
 	};
 }
 

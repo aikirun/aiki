@@ -1,3 +1,4 @@
+import type { WorkflowSource } from "./workflow";
 import type { WorkflowRunStatus } from "./workflow-run";
 
 export interface WorkflowApi {
@@ -7,6 +8,7 @@ export interface WorkflowApi {
 }
 
 export interface WorkflowListRequestV1 {
+	source: WorkflowSource;
 	limit?: number;
 	offset?: number;
 	// TODO: maybe add namePrefix filter
@@ -18,6 +20,7 @@ export interface WorkflowListRequestV1 {
 
 export interface WorkflowListItem {
 	name: string;
+	source: WorkflowSource;
 	runCount: number;
 	lastRunAt: number | null;
 }
@@ -29,6 +32,7 @@ export interface WorkflowListResponseV1 {
 
 export interface WorkflowListVersionsRequestV1 {
 	name: string;
+	source: WorkflowSource;
 	limit?: number;
 	offset?: number;
 	sort?: {
@@ -49,7 +53,7 @@ export interface WorkflowListVersionsResponseV1 {
 	total: number;
 }
 
-export type WorkflowGetStatsRequestV1 = { name: string; versionId?: string } | undefined;
+export type WorkflowGetStatsRequestV1 = { name: string; source: WorkflowSource; versionId?: string } | undefined;
 
 export interface WorkflowGetStatsResponseV1 {
 	stats: WorkflowStats;

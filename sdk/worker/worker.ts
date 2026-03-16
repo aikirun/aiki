@@ -31,6 +31,7 @@ import {
 	workflowRegistry,
 	workflowRunHandle,
 } from "@aikirun/workflow";
+import { getSystemWorkflows } from "sdk/workflow/system";
 import { ulid } from "ulidx";
 
 /**
@@ -176,7 +177,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			heartbeatIntervalMs: this.spawnOpts.workflowRun?.heartbeatIntervalMs ?? 30_000,
 			spinThresholdMs: this.spawnOpts.workflowRun?.spinThresholdMs ?? 10,
 		};
-		this.registry = workflowRegistry().addMany(this.params.workflows);
+		this.registry = workflowRegistry().addMany(getSystemWorkflows(client.api)).addMany(this.params.workflows);
 
 		const reference = this.spawnOpts.reference;
 		this.logger = client.logger.child({

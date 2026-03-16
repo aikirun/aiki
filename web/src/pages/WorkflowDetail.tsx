@@ -1,3 +1,4 @@
+import type { WorkflowFilter } from "@aikirun/types/workflow-run-api";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
@@ -104,11 +105,13 @@ export function WorkflowDetail() {
 		isLoading: versionsLoading,
 		error: versionsError,
 	} = useWorkflowVersions(decodedName, {
+		source: "user",
 		sort: { field: "firstSeenAt", order: "desc" },
 	});
 
-	const workflowFilter: { name: string; versionId?: string; referenceId?: string } = {
+	const workflowFilter: WorkflowFilter = {
 		name: decodedName,
+		source: "user" as const,
 		...(selectedVersions.length === 1 && { versionId: selectedVersions[0] }),
 		...(debouncedReferenceIdFilter && { referenceId: debouncedReferenceIdFilter }),
 	};

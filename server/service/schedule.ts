@@ -163,9 +163,12 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 
 		return db.transaction(async (tx) => {
 			const workflowRow = await workflowRepo.getOrCreate(
-				namespaceId,
-				workflowName as WorkflowName,
-				workflowVersionId as WorkflowVersionId,
+				{
+					namespaceId,
+					name: workflowName as WorkflowName,
+					versionId: workflowVersionId as WorkflowVersionId,
+					source: "user",
+				},
 				tx
 			);
 

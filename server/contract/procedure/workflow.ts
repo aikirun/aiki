@@ -12,11 +12,13 @@ import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
+import { workflowSourceSchema } from "../schema/workflow";
 
 const getStatsV1: ContractProcedure<WorkflowGetStatsRequestV1, WorkflowGetStatsResponseV1> = oc
 	.input(
 		type({
 			name: "string > 0",
+			source: workflowSourceSchema,
 			"versionId?": "string > 0 | undefined",
 		}).or("undefined")
 	)
@@ -43,6 +45,7 @@ const getStatsV1: ContractProcedure<WorkflowGetStatsRequestV1, WorkflowGetStatsR
 const listV1: ContractProcedure<WorkflowListRequestV1, WorkflowListResponseV1> = oc
 	.input(
 		type({
+			source: workflowSourceSchema,
 			"limit?": "number.integer > 0 | undefined",
 			"offset?": "number.integer >= 0 | undefined",
 			"sort?": {
@@ -55,6 +58,7 @@ const listV1: ContractProcedure<WorkflowListRequestV1, WorkflowListResponseV1> =
 		type({
 			workflows: type({
 				name: "string > 0",
+				source: workflowSourceSchema,
 				runCount: "number.integer >= 0",
 				lastRunAt: "number > 0 | null",
 			}).array(),
@@ -66,6 +70,7 @@ const listVersionsV1: ContractProcedure<WorkflowListVersionsRequestV1, WorkflowL
 	.input(
 		type({
 			name: "string > 0",
+			source: workflowSourceSchema,
 			"limit?": "number.integer > 0 | undefined",
 			"offset?": "number.integer >= 0 | undefined",
 			"sort?": {

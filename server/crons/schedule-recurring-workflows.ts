@@ -6,12 +6,14 @@ import {
 	type WorkflowRunId,
 	type WorkflowRunStateCancelled,
 	type WorkflowRunStateScheduled,
+	type WorkflowStartOptions,
 } from "@aikirun/types/workflow-run";
 import type { DatabaseConn } from "server/infra/db";
 import type { ScheduleRepository } from "server/infra/db/repository/schedule";
 import type { StateTransitionRepository, StateTransitionRowInsert } from "server/infra/db/repository/state-transition";
 import type { WorkflowRunRepository, WorkflowRunRowInsert } from "server/infra/db/repository/workflow-run";
 import type { CronContext } from "server/middleware/context";
+import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
 import type { ScheduleService } from "server/service/schedule";
 import { getDueOccurrences, getNextOccurrence, getReferenceId } from "server/service/schedule";
 import { ulid } from "ulidx";
@@ -22,6 +24,7 @@ export interface ScheduleRecurringWorkflowsDeps {
 	scheduleRepo: ScheduleRepository;
 	workflowRunRepo: WorkflowRunRepository;
 	stateTransitionRepo: StateTransitionRepository;
+	childRunCanceller: ChildRunCanceller;
 }
 
 type DueSchedule = Schedule & {
@@ -210,7 +213,7 @@ async function processOverlapSkipSchedules(
 }
 
 async function processOverlapCancelPreviousSchedules(
-	_context: CronContext,
+	context: CronContext,
 	deps: ScheduleRecurringWorkflowsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number
@@ -218,7 +221,7 @@ async function processOverlapCancelPreviousSchedules(
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(deps, schedules);
 
 	const runIdsToCancel: string[] = [];
-	const runsToCancel: Array<{ id: string; attempts: number }> = [];
+	const runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; shard?: string }> = [];
 
 	const newWorkflowRunEntries: WorkflowRunRowInsert[] = [];
 	const newRunStateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -234,7 +237,10 @@ async function processOverlapCancelPreviousSchedules(
 		const activeRun = activeRunsByScheduleId.get(schedule.id);
 		if (activeRun) {
 			runIdsToCancel.push(activeRun.id);
-			runsToCancel.push(activeRun);
+			runsToCancel.push({
+				...activeRun,
+				namespaceId: schedule.namespaceId,
+			});
 		}
 
 		const runId = ulid() as WorkflowRunId;
@@ -291,6 +297,7 @@ async function processOverlapCancelPreviousSchedules(
 			const cancelledRunIdsSet = new Set(cancelledRunIds);
 			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
 			const cancelledRunStateTransitionIdUpdates: { id: string; stateTransitionId: string }[] = [];
+			const cancelledParentRuns: CancelledParentRun[] = [];
 
 			for (const run of runsToCancel) {
 				if (!cancelledRunIdsSet.has(run.id)) {
@@ -306,11 +313,15 @@ async function processOverlapCancelPreviousSchedules(
 					state: { status: "cancelled", reason: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
 				});
 				cancelledRunStateTransitionIdUpdates.push({ id: run.id, stateTransitionId });
+				cancelledParentRuns.push({ namespaceId: run.namespaceId, runId: run.id, shard: run.shard });
 			}
 
 			if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionIdUpdates)) {
 				await deps.stateTransitionRepo.appendBatch(cancelStateTransitionEntries, tx);
 				await deps.workflowRunRepo.bulkSetLatestStateTransitionId(cancelledRunStateTransitionIdUpdates, tx);
+			}
+			if (isNonEmptyArray(cancelledParentRuns)) {
+				await deps.childRunCanceller.cancel(cancelledParentRuns, tx, context.logger);
 			}
 		}
 
@@ -341,20 +352,21 @@ async function fetchActiveRunsBySchedule(deps: ScheduleRecurringWorkflowsDeps, s
 	}
 
 	const scheduleIdsWithActiveRuns = new Set<string>();
-	const activeRunsByScheduleId = new Map<string, { id: string; attempts: number }>();
+	const activeRunsByScheduleId = new Map<string, { id: string; attempts: number; shard?: string }>();
 
 	if (isNonEmptyArray(workflowAndReferenceIdPairs) && isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
-		const existingRuns = await deps.workflowRunRepo.listByWorkflowAndReferenceIdPairs({
+		const activeRuns = await deps.workflowRunRepo.listByWorkflowAndReferenceIdPairs({
 			pairs: workflowAndReferenceIdPairs,
 			status: NON_TERMINAL_WORKFLOW_RUN_STATUSES,
 		});
 
-		for (const run of existingRuns) {
+		for (const run of activeRuns) {
 			if (run.referenceId) {
 				const schedule = schedulesByWorkflowAndReferenceId.get(run.workflowId)?.get(run.referenceId);
 				if (schedule) {
 					scheduleIdsWithActiveRuns.add(schedule.id);
-					activeRunsByScheduleId.set(schedule.id, { id: run.id, attempts: run.attempts });
+					const shard = (run.options as WorkflowStartOptions | null)?.shard;
+					activeRunsByScheduleId.set(schedule.id, { id: run.id, attempts: run.attempts, shard });
 				}
 			}
 		}

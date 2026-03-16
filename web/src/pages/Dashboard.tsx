@@ -1,4 +1,5 @@
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
+import type { ScheduleListRequestV1 } from "@aikirun/types/schedule-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -229,6 +230,7 @@ export function Dashboard() {
 
 function WorkflowsTab() {
 	const { data: workflows, isLoading } = useWorkflows({
+		source: "user",
 		sort: { field: "name", order: "asc" },
 	});
 
@@ -292,11 +294,11 @@ function SchedulesTab({
 	const statusFilters =
 		!isAllSelected && selectedStatuses.length > 0 ? selectedStatuses.map((s) => s.value) : undefined;
 
-	const filters: { status?: ScheduleStatus[]; id?: string; referenceId?: string; workflows?: { name: string }[] } = {};
+	const filters: ScheduleListRequestV1["filters"] = {};
 	if (statusFilters) filters.status = statusFilters;
 	if (idFilter) filters.id = idFilter;
 	if (referenceIdFilter) filters.referenceId = referenceIdFilter;
-	if (workflowFilter) filters.workflows = [{ name: workflowFilter }];
+	if (workflowFilter) filters.workflows = [{ name: workflowFilter, source: "user" }];
 
 	const hasFilters = Object.keys(filters).length > 0;
 

@@ -24,6 +24,7 @@ export function createWorkflowService(deps: WorkflowServiceDeps) {
 			return {
 				workflows: items.map((item) => ({
 					name: item.name,
+					source: request.source,
 					runCount: item.runCount,
 					lastRunAt: item.lastRunId ? decodeTime(item.lastRunId) : null,
 				})),

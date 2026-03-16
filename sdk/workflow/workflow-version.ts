@@ -198,12 +198,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 			await this.throwNonDeterminismError(parentRun, parentRunHandle, inputHash, referenceId, replayManifest);
 		}
 
+		const shard = parentRun.options.shard;
 		const { id: newRunId } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
 			input,
 			parentWorkflowRunId: parentRun.id,
-			options: startOpts,
+			options: shard === undefined ? startOpts : { ...startOpts, shard },
 		});
 		const { run: newRun } = await client.api.workflowRun.getByIdV1({ id: newRunId });
 

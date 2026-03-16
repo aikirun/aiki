@@ -9,7 +9,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { client } from "./client";
 
-export function useWorkflows(params: WorkflowListRequestV1 = {}) {
+export function useWorkflows(params: WorkflowListRequestV1 = { source: "user" }) {
 	return useQuery({
 		queryKey: ["workflows", params],
 		queryFn: () => client.workflow.listV1(params),
@@ -17,7 +17,10 @@ export function useWorkflows(params: WorkflowListRequestV1 = {}) {
 	});
 }
 
-export function useWorkflowVersions(name: string, params: Omit<WorkflowListVersionsRequestV1, "name"> = {}) {
+export function useWorkflowVersions(
+	name: string,
+	params: Omit<WorkflowListVersionsRequestV1, "name"> = { source: "user" }
+) {
 	return useQuery({
 		queryKey: ["workflow-versions", name, params],
 		queryFn: () => client.workflow.listVersionsV1({ name, ...params }),

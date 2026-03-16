@@ -1,6 +1,8 @@
 import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
 import type {
 	WorkflowRunApi,
+	WorkflowRunCancelByIdsRequestV1,
+	WorkflowRunCancelByIdsResponseV1,
 	WorkflowRunCreateRequestV1,
 	WorkflowRunCreateResponseV1,
 	WorkflowRunGetByIdRequestV1,
@@ -9,6 +11,8 @@ import type {
 	WorkflowRunGetByReferenceIdResponseV1,
 	WorkflowRunGetStateRequestV1,
 	WorkflowRunGetStateResponseV1,
+	WorkflowRunListChildRunsRequestV1,
+	WorkflowRunListChildRunsResponseV1,
 	WorkflowRunListRequestV1,
 	WorkflowRunListResponseV1,
 	WorkflowRunListTransitionsRequestV1,
@@ -35,7 +39,12 @@ import {
 	taskStateFailedSchema,
 	taskStateRunningRequestSchema,
 } from "../schema/task";
+import { workflowSourceSchema } from "../schema/workflow";
 import {
+	cancelByIdsRequestSchema,
+	cancelByIdsResponseSchema,
+	listChildRunsRequestSchema,
+	listChildRunsResponseSchema,
 	workflowOptionsSchema,
 	workflowRunSchema,
 	workflowRunSetTaskStateRequestSchema,
@@ -65,13 +74,16 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 				"status?": workflowRunStatusSchema.array(),
 				"workflow?": type({
 					name: "string > 0",
+					source: workflowSourceSchema,
 				})
 					.or({
 						name: "string > 0",
+						source: workflowSourceSchema,
 						versionId: "string > 0",
 					})
 					.or({
 						name: "string > 0",
+						source: workflowSourceSchema,
 						versionId: "string > 0",
 						referenceId: "string > 0",
 					}),
@@ -299,6 +311,14 @@ const multicastEventByReferenceV1: ContractProcedure<WorkflowRunMulticastEventBy
 	)
 	.output(type("undefined"));
 
+const listChildRunsV1: ContractProcedure<WorkflowRunListChildRunsRequestV1, WorkflowRunListChildRunsResponseV1> = oc
+	.input(listChildRunsRequestSchema)
+	.output(listChildRunsResponseSchema);
+
+const cancelByIdsV1: ContractProcedure<WorkflowRunCancelByIdsRequestV1, WorkflowRunCancelByIdsResponseV1> = oc
+	.input(cancelByIdsRequestSchema)
+	.output(cancelByIdsResponseSchema);
+
 export const workflowRunContract = {
 	listV1,
 	getByIdV1,
@@ -312,6 +332,8 @@ export const workflowRunContract = {
 	sendEventV1,
 	multicastEventV1,
 	multicastEventByReferenceV1,
+	listChildRunsV1,
+	cancelByIdsV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

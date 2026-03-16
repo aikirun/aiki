@@ -29,6 +29,7 @@ import {
 import { createNamespaceAuthedRouter, createOrganizationAuthedRouter } from "./router/index";
 import { createApiKeyService } from "./service/api-key";
 import { createAuthService } from "./service/auth";
+import { createChildRunCanceller } from "./service/cancel-child-runs";
 import { createNamespaceService } from "./service/namespace";
 import { createScheduleService } from "./service/schedule";
 import { createTaskStateMachineService } from "./service/task-state-machine";
@@ -79,6 +80,11 @@ if (import.meta.main) {
 	);
 
 	const namespaceService = createNamespaceService(namespaceRepository);
+	const childRunCanceller = createChildRunCanceller({
+		workflowRepo,
+		workflowRunRepo,
+		stateTransitionRepo,
+	});
 	const workflowRunStateMachineService = createWorkflowRunStateMachineService({
 		db,
 		workflowRunRepo,
@@ -86,6 +92,7 @@ if (import.meta.main) {
 		sleepQueueRepo,
 		taskRepo,
 		childWorkflowRunWaitQueueRepo,
+		childRunCanceller,
 	});
 	const taskStateMachineService = createTaskStateMachineService({
 		db,
@@ -102,6 +109,7 @@ if (import.meta.main) {
 		sleepQueueRepo,
 		eventWaitQueueRepo,
 		childWorkflowRunWaitQueueRepo,
+		childRunCanceller,
 		workflowRunStateMachineService,
 	});
 	const workflowService = createWorkflowService({
@@ -127,6 +135,7 @@ if (import.meta.main) {
 		scheduleRepo,
 		eventWaitQueueRepo,
 		childWorkflowRunWaitQueueRepo,
+		childRunCanceller,
 		scheduleService,
 	});
 

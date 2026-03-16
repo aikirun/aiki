@@ -1,5 +1,7 @@
 import { type } from "arktype";
 
+import { workflowSourceSchema } from "./workflow";
+
 export const overlapPolicySchema = type("'allow' | 'skip' | 'cancel_previous'");
 
 export const cronScheduleSpecSchema = type({
@@ -31,6 +33,7 @@ export const scheduleActivateOptionsSchema = type({
 export const scheduleWorkflowFilterSchema = type({
 	name: "string > 0",
 	"versionId?": "string > 0 | undefined",
+	source: workflowSourceSchema,
 });
 
 export const scheduleSchema = type({

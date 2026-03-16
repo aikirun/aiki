@@ -90,6 +90,14 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		});
 	});
 
+	const listChildRunsV1 = os.listChildRunsV1.handler(async ({ input: request, context }) => {
+		return workflowRunService.listChildRuns(context, request);
+	});
+
+	const cancelByIdsV1 = os.cancelByIdsV1.handler(async ({ input: request, context }) => {
+		return workflowRunService.cancelByIds(context, request);
+	});
+
 	return os.router({
 		listV1,
 		getByIdV1,
@@ -103,5 +111,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		sendEventV1,
 		multicastEventV1,
 		multicastEventByReferenceV1,
+		listChildRunsV1,
+		cancelByIdsV1,
 	});
 }

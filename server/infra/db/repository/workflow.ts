@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowSource } from "@aikirun/types/workflow";
 import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/workflow-api";
 import { and, count, eq, inArray, max, or, sql } from "drizzle-orm";
 import { ulid } from "ulidx";
@@ -9,7 +9,7 @@ import type { DatabaseConn, DbTransaction } from "..";
 import { workflow, workflowRun } from "../schema/pg";
 
 export type WorkflowRow = typeof workflow.$inferSelect;
-export type WorkflowRowInsert = typeof workflow.$inferInsert;
+export type WorkflowRowInsert = Omit<typeof workflow.$inferInsert, "id">;
 
 export function createWorkflowRepository(db: DatabaseConn) {
 	return {
@@ -35,7 +35,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 
 		async getByNameAndVersion(
 			namespaceId: NamespaceId,
-			filter: { name: string; versionId: string },
+			filter: { name: string; versionId: string; source: WorkflowSource },
 			tx?: DbTransaction
 		): Promise<WorkflowRow | null> {
 			const result = await (tx ?? db)
@@ -44,6 +44,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 				.where(
 					and(
 						eq(workflow.namespaceId, namespaceId),
+						eq(workflow.source, filter.source),
 						eq(workflow.name, filter.name),
 						eq(workflow.versionId, filter.versionId)
 					)
@@ -53,16 +54,14 @@ export function createWorkflowRepository(db: DatabaseConn) {
 		},
 
 		async getOrCreate(
-			namespaceId: NamespaceId,
-			name: WorkflowName,
-			versionId: WorkflowVersionId,
+			{ namespaceId, name, versionId, source }: WorkflowRowInsert,
 			tx?: DbTransaction
 		): Promise<WorkflowRow> {
 			const result = await (tx ?? db)
 				.insert(workflow)
-				.values({ id: ulid(), namespaceId, name, versionId })
+				.values({ id: ulid(), namespaceId, name, versionId, source })
 				.onConflictDoUpdate({
-					target: [workflow.namespaceId, workflow.name, workflow.versionId],
+					target: [workflow.namespaceId, workflow.source, workflow.name, workflow.versionId],
 					set: { name: sql`excluded.name` },
 				})
 				.returning();
@@ -73,18 +72,30 @@ export function createWorkflowRepository(db: DatabaseConn) {
 			return row;
 		},
 
+		async getOrCreateBulk(entries: NonEmptyArray<WorkflowRowInsert>, tx?: DbTransaction): Promise<WorkflowRow[]> {
+			return (tx ?? db)
+				.insert(workflow)
+				.values(entries.map((entry) => ({ id: ulid(), ...entry })))
+				.onConflictDoUpdate({
+					target: [workflow.namespaceId, workflow.source, workflow.name, workflow.versionId],
+					set: { name: sql`excluded.name` },
+				})
+				.returning();
+		},
+
 		async listByNameAndVersion(
 			namespaceId: NamespaceId,
-			request: { name: string; versionId?: string },
+			request: { name: string; versionId?: string; source: WorkflowSource },
 			tx?: DbTransaction
 		): Promise<WorkflowRow[]> {
-			const { name, versionId } = request;
+			const { name, versionId, source } = request;
 			return (tx ?? db)
 				.select()
 				.from(workflow)
 				.where(
 					and(
 						eq(workflow.namespaceId, namespaceId),
+						eq(workflow.source, source),
 						eq(workflow.name, name),
 						versionId !== undefined ? eq(workflow.versionId, versionId) : undefined
 					)
@@ -93,7 +104,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 
 		async listByNameAndVersionPairs(
 			namespaceId: NamespaceId,
-			pairs: NonEmptyArray<{ name: string; versionId?: string }>,
+			pairs: NonEmptyArray<{ name: string; versionId?: string; source: WorkflowSource }>,
 			tx?: DbTransaction
 		): Promise<WorkflowRow[]> {
 			return (tx ?? db)
@@ -103,8 +114,12 @@ export function createWorkflowRepository(db: DatabaseConn) {
 					and(
 						eq(workflow.namespaceId, namespaceId),
 						or(
-							...pairs.map(({ name, versionId }) =>
-								and(eq(workflow.name, name), versionId ? eq(workflow.versionId, versionId) : undefined)
+							...pairs.map(({ name, versionId, source }) =>
+								and(
+									eq(workflow.source, source),
+									eq(workflow.name, name),
+									versionId ? eq(workflow.versionId, versionId) : undefined
+								)
 							)
 						)
 					)
@@ -121,7 +136,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 		}> {
 			const conn = tx ?? db;
 
-			const { limit = 50, offset = 0, sort } = request;
+			const { source, limit = 50, offset = 0, sort } = request;
 
 			const sortField = sort?.field ?? "name";
 			const sortOrder = sort?.order ?? "asc";
@@ -142,7 +157,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 				})
 				.from(workflow)
 				.leftJoin(workflowRun, eq(workflow.id, workflowRun.workflowId))
-				.where(eq(workflow.namespaceId, namespaceId))
+				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source)))
 				.groupBy(workflow.name)
 				.orderBy(orderByClause)
 				.limit(limit)
@@ -151,7 +166,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 			const totalResult = await conn
 				.select({ count: sql<number>`count(distinct ${workflow.name})` })
 				.from(workflow)
-				.where(eq(workflow.namespaceId, namespaceId));
+				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source)));
 
 			return {
 				items,
@@ -169,7 +184,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 		}> {
 			const conn = tx ?? db;
 
-			const { name, limit = 50, offset = 0, sort } = request;
+			const { name, source, limit = 50, offset = 0, sort } = request;
 
 			const sortField = sort?.field ?? "firstSeenAt";
 			const sortOrder = sort?.order ?? "desc";
@@ -188,7 +203,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 				})
 				.from(workflow)
 				.leftJoin(workflowRun, eq(workflow.id, workflowRun.workflowId))
-				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.name, name)))
+				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), eq(workflow.name, name)))
 				.groupBy(workflow.id)
 				.orderBy(orderByClause)
 				.limit(limit)
@@ -197,7 +212,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 			const totalResult = await conn
 				.select({ count: count() })
 				.from(workflow)
-				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.name, name)));
+				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), eq(workflow.name, name)));
 
 			return {
 				items,
