@@ -17,6 +17,12 @@
 - [Retry Strategies](https://github.com/aikirun/aiki/blob/main/docs/guides/retry-strategies.md): Configure retry behavior
 - [Reference IDs](https://github.com/aikirun/aiki/blob/main/docs/guides/reference-ids.md): Deduplication and idempotency
 
+## Examples
+- [Fan-out/Gather](examples/workflows/fan-out-gather.ts): Parallel child workflows with result aggregation
+- [Long-running Pipeline](examples/workflows/long-running-pipeline.ts): Durable sleep + human-in-the-loop approval
+- [Cancellation Cascade](examples/workflows/cancellation-cascade.ts): Parent-child cancellation propagation
+- [Parallel Tasks](examples/workflows/parallel-tasks.ts): Concurrent task execution
+
 ## Packages
 
 - [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow): Workflow SDK

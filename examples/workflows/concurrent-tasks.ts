@@ -2,7 +2,7 @@ import { task } from "@aikirun/task";
 import { workflow } from "@aikirun/workflow";
 
 /**
- * Demonstrates running multiple tasks in parallel using Promise.all.
+ * Demonstrates running multiple tasks in concurrent using Promise.all.
  */
 
 const taskA = task({
@@ -24,7 +24,7 @@ const taskC = task({
 	},
 });
 
-export const parallelTasksV1 = workflow({ name: "parallel-tasks" }).v("1.0.0", {
+export const concurrentTasksV1 = workflow({ name: "parallel-tasks" }).v("1.0.0", {
 	async handler(run) {
 		const [a, b, c] = await Promise.all([taskA.start(run), taskB.start(run), taskC.start(run)]);
 
