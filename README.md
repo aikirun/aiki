@@ -15,46 +15,80 @@ Some workflows take minutes, others take days, months or years. They often need 
 
 Aiki workflows are like a virtual thread of execution that can be suspended (intentionally or due to crashes/intermittent-failures) and automatically resumed from exactly where they left off.
 
-## Example: Restaurant Order Workflow
+## Example: Subscription Trial
 
-Here's a dummy food ordering workflow that coordinates restaurant confirmation, courier delivery, and follow-up email the next day.
+A workflow that activates a 14-day free trial and waits for the user to pay. If payment arrives early, it completes immediately. If the trial expires, the user is downgraded.
+
+```typescript
+import { event, workflow } from "@aikirun/workflow";
+import { task } from "@aikirun/task";
+
+const activateTrial = task({ name: "activate-trial", async handler(run, userId: string) { /* ... */ } });
+const downgradeToFree = task({ name: "downgrade-to-free", async handler(run, userId: string) { /* ... */ } });
+
+export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
+  async handler(run, input: { userId: string }) {
+    await activateTrial.start(run, input.userId);
+
+    // Wait up to 14 days — ends early if user pays
+    const result = await run.events.paymentReceived.wait({ timeout: { days: 14 } });
+
+    if (result.timeout) {
+      await downgradeToFree.start(run, input.userId);
+    }
+  },
+  events: {
+    paymentReceived: event(),
+  },
+});
+```
+
+This looks like ordinary TypeScript, but behind the scenes Aiki makes it durable. The 14-day wait doesn't block workers or consume resources. If the server crashes mid-workflow, it resumes exactly where it left off.
+
+## What Aiki handles automatically
+
+- **Crash Recovery** — Server can crash at any point. Workflow resumes exactly where it left off.
+- **Automatic Retries** — Failed tasks retry automatically based on your configured policy.
+- **Event Suspension** — Waiting for payment suspends the workflow and releases the worker until the event arrives.
+- **Durable Sleep** — Long waits don't block workers or consume resources.
+- **Parallel Execution** — Child workflows run on different workers in parallel with the parent.
+- **Horizontal Scaling** — Add more workers and Aiki distributes work automatically.
+
+<details>
+<summary><strong>Full example: Restaurant Order Workflow</strong></summary>
+
+A more complete example showing events with typed data, child workflows, and durable sleep working together.
 
 ```typescript
 import { event, workflow } from "@aikirun/workflow";
 import { notifyRestaurant, notifyCustomer, sendFeedbackEmail } from "./tasks";
 import { courierDeliveryV1 } from "./courier-workflow";
 
-export const restaurantOrder = workflow({ name: "restaurant-order" });
-
-export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
-  async handler(run, input: { orderId: string; customerId: string; }) {
-
+export const restaurantOrderV1 = workflow({ name: "restaurant-order" }).v("1.0.0", {
+  async handler(run, input: { orderId: string; customerId: string }) {
     await notifyRestaurant.start(run, input.orderId);
-    
-    // Wait for acceptance with 5 mins timeout
+
+    // Wait for acceptance with 5 min timeout
     const response = await run.events.restaurantAccepted.wait({ timeout: { minutes: 5 } });
 
     if (response.timeout) {
       await notifyCustomer.start(run, {
         customerId: input.customerId,
-        message: "Restaurant didn't respond. Order cancelled."
+        message: "Restaurant didn't respond. Order cancelled.",
       });
       return { status: "cancelled" };
     }
 
     await notifyCustomer.start(run, {
       customerId: input.customerId,
-      message: `Order confirmed! Estimated time: ${response.data.estimatedTime} mins`
+      message: `Order confirmed! Estimated time: ${response.data.estimatedTime} mins`,
     });
 
-    // Start courier delivery as child workflow
-    // (internally: searches for courier, waits for food ready event → pickup → delivery)
+    // Start courier delivery as a child workflow
     const deliveryHandle = await courierDeliveryV1.startAsChild(run, input);
-
-    // Wait for delivery to complete
     await deliveryHandle.waitForStatus("completed");
 
-    // Sleep for 1 day, then request feedback
+    // Sleep 1 day, then request feedback
     await run.sleep("feedback-delay", { days: 1 });
     await sendFeedbackEmail.start(run, input);
 
@@ -66,14 +100,7 @@ export const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 });
 ```
 
-## What Aiki handles automatically
-
-- **Crash Recovery** — Server can crash at any point. Workflow resumes exactly where it left off.
-- **Automatic Retries** — Failed tasks retry automatically based on your configured policy.
-- **Event Suspension** — Waiting for the restaurant to accept suspends the workflow and releases the worker until the event arrives.
-- **Durable Sleep** — The 1-day sleep for feedback doesn't block workers or consume resources.
-- **Parallel Execution** — Child workflow runs on a different worker in parallel with the parent.
-- **Horizontal Scaling** — Add more workers and Aiki distributes work automatically.
+</details>
 
 ## Quick Start
 
@@ -102,7 +129,7 @@ The server runs on `http://localhost:9850` and the web UI on `http://localhost:9
 ```typescript
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
-import { restaurantOrderV1 } from "./workflow";
+import { trialV1 } from "./workflow";
 
 // Connect to Aiki server (set AIKI_API_KEY env variable or pass apiKey option)
 const aikiClient = client({
@@ -112,16 +139,13 @@ const aikiClient = client({
 
 // Start a worker
 const myWorker = worker({
-  name: "order-worker",
-  workflows: [restaurantOrderV1],
+  name: "trial-worker",
+  workflows: [trialV1],
 });
 const workerHandle = await myWorker.spawn(aikiClient);
 
 // Start a workflow
-await restaurantOrderV1.start(aikiClient, {
-  orderId: "order-123",
-  customerId: "customer-456"
-});
+await trialV1.start(aikiClient, { userId: "user-123" });
 
 // Cleanup
 await workerHandle.stop();
