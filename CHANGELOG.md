@@ -2,6 +2,107 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.18.0
+
+### New Features
+
+- **Cancellation cascade** — When a workflow run is cancelled, cancellation now automatically cascades to all non-terminal child and grandchild runs. This is implemented as a bundled system workflow (`aiki:cancel-child-runs`) that the SDK registers automatically.
+- **Replay manifest & non-determinism detection** — The SDK now tracks a `ReplayManifest` that detects when workflow code diverges from its recorded execution history. A new `NonDeterminismError` is thrown with details about unconsumed manifest entries (task IDs, child workflow run IDs) when replay divergence is detected.
+- **Event multicasting by reference ID** — New `sendByReferenceId` method on event multicasters and `multicastEventByReferenceV1` API endpoint allow sending events to workflow runs identified by their reference ID instead of run IDs.
+- **Bulk cancel API** — New `cancelByIdsV1` endpoint for cancelling multiple workflow runs by their IDs in a single call.
+- **List child runs API** — New `listChildRunsV1` endpoint to list child workflow runs of a parent, with optional status filtering.
+- **Workflow source discrimination** — Workflows are now classified as `"user"` or `"system"` source, allowing system workflows (like cancellation cascade) to be separated from user-defined workflows.
+- **Unified state transitions** — Workflow run and task state transitions are now stored in a single table discriminated by `type: "workflow_run" | "task"`, replacing the previous separate transition types.
+
+### Web UI
+
+- Dashboard and workflow detail pages now filter by `source: "user"` to hide system workflows.
+- Schedule list responses now return `{ schedule, runCount }` items instead of embedding `runCount` in the schedule object.
+- Run detail page updated for new queue-based data structures (`taskQueues`, `sleepQueues`, `childWorkflowRunQueues`).
+
+### Improvements
+
+- **CAM queue architecture** — `WorkflowRun` data model restructured from dictionary-based lookups to queue-based structures: `tasks` → `taskQueues`, `sleepsQueue` → `sleepQueues`, `childWorkflowRuns` → `childWorkflowRunQueues`. This supports the Content-Addressed Model where queues are consumed in forward-only fashion.
+- **Lightweight state transition responses** — `transitionStateV1` now returns only `{ revision, state, attempts }` instead of the full `WorkflowRun`.
+- **`createV1` returns only ID** — `WorkflowRunCreateResponseV1` now returns `{ id }` instead of the full `WorkflowRun` object.
+- **Server migrated from in-memory store to Postgres** — The entire server persistence layer has been migrated from in-memory maps to Postgres, including new repositories for sleep queues, event wait queues, child workflow run wait queues, state transitions, and a workflow run outbox.
+- **Server crons decomposed** — The monolithic cron module has been split into focused modules: `publish-ready-runs`, `queue-scheduled-runs`, `schedule-retryable-runs`, `schedule-retryable-task-runs`, `schedule-sleep-elapsed-runs`, `schedule-event-wait-timed-out-runs`, `schedule-child-workflow-run-wait-timed-out-runs`, `schedule-recurring-workflows`.
+- **ULIDs for all IDs** — All entity IDs (workflow runs, workers, etc.) now use ULIDs instead of UUIDs.
+- **Worker graceful shutdown** — `worker.stop()` now awaits the poll loop's abort completion before shutting down, preventing dangling promises.
+- **Concurrent task execution** — Task state transitions no longer increment the parent workflow run's revision, enabling `Promise.all([taskA.start(), taskB.start()])` without revision conflicts.
+- **Validation before revision check** — State transitions now validate the transition itself before checking revision conflicts, providing better error messages.
+- **Child workflow wait queues partitioned by status** — Wait results are now keyed by terminal status (`cancelled`, `completed`, `failed`), fixing a bug where waiting on a different status during replay would return the wrong wait result.
+- **API key validation fix** — API key validation no longer incorrectly splits on underscores within the secret portion.
+
+### Bug Fixes
+
+- Fixed `StatusWaitResults` not being partitioned by status, causing incorrect wait results on replay when the awaited status changed.
+
+### Breaking Changes
+
+- **`WorkflowRun` shape restructured** — Queue-based data model:
+  ```typescript
+  // Before
+  run.tasks["address"]             // TaskInfo
+  run.sleepsQueue["name"]          // SleepQueue
+  run.childWorkflowRuns["address"] // ChildWorkflowRunInfo
+  run.address                      // string
+  run.options                      // WorkflowStartOptions (always present)
+
+  // After
+  run.taskQueues["address"]              // TaskQueue { tasks: TaskInfo[] }
+  run.sleepQueues["name"]                // SleepQueue
+  run.childWorkflowRunQueues["address"]  // ChildWorkflowRunQueue { childWorkflowRuns: ChildWorkflowRunInfo[] }
+  // run.address removed
+  run.options                            // WorkflowStartOptions | undefined
+  ```
+
+- **`expectedRevision` renamed to `expectedWorkflowRunRevision`** on all task state transition requests.
+- **`createV1` response changed** from `{ run: WorkflowRun }` to `{ id: string }`.
+- **`transitionStateV1` response changed** from `{ run: WorkflowRun }` to `{ revision, state, attempts }`.
+- **`transitionTaskStateV1` response changed** from `{ run, taskId }` to `{ taskInfo: TaskInfo }`.
+- **`setTaskStateV1`, `sendEventV1` now return `void`** instead of `{ run: WorkflowRun }`.
+- **`TaskStartOptions.reference` removed** — Task reference IDs are no longer supported:
+  ```typescript
+  // Before
+  await myTask.start(run, input, { reference: { id: "my-ref" } });
+
+  // After
+  await myTask.start(run, input);  // identity is content-addressed
+  ```
+- **`WorkflowRunTransition` replaced by `StateTransition`** — Transition types changed:
+  ```typescript
+  // Before
+  import type { WorkflowRunTransition } from "@aikirun/types/workflow-run";
+  transition.type === "state"       // WorkflowRunStateTransition
+  transition.type === "task_state"  // WorkflowRunTaskStateTransition
+
+  // After
+  import type { StateTransition } from "@aikirun/types/state-transition";
+  transition.type === "workflow_run"  // WorkflowRunStateTransition
+  transition.type === "task"          // TaskStateTransition
+  ```
+- **`ChildWorkflowRunInfo.statusWaitResults` → `childWorkflowRunWaitQueues`** — Now a record keyed by terminal status.
+- **Workflow list/filter APIs require `source` field**:
+  ```typescript
+  // Before
+  client.workflow.listV1({});
+
+  // After
+  client.workflow.listV1({ source: "user" });
+  ```
+- **`WorkflowFilter` restructured** — Now a discriminated union requiring `source`:
+  ```typescript
+  // Before
+  { name: "my-workflow", versionId: "1.0.0", referenceId: "ref" }
+
+  // After
+  { name: "my-workflow", source: "user", versionId: "1.0.0", referenceId: "ref" }
+  ```
+- **Sort `field` removed from list endpoints** — `sort.field` property removed from `listV1` and `listTransitionsV1`; only `sort.order` remains.
+- **Schedule list response changed** — From `{ schedules: Schedule[] }` to `{ schedules: { schedule: Schedule; runCount: number }[] }`. `runCount` removed from the `Schedule` type itself.
+- **Schedule `pauseV1` and `resumeV1` now return `void`** instead of the schedule object.
+
 ## 0.17.0
 
 ### New Features
