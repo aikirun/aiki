@@ -3,6 +3,7 @@ import type { RequireAtLeastOneProp } from "@aikirun/types/utils";
 
 import type { NonEmptyArray } from "../array";
 import type { Equal, ExpectTrue } from "../testing/expect/types";
+
 export type { RequireAtLeastOneProp };
 
 export type EmptyRecord = Record<PropertyKey, never>;
@@ -74,20 +75,19 @@ export type PathFromObject<T, IncludeArrayKeys extends boolean = false> = T exte
 	? PathFromObjectInternal<T, IncludeArrayKeys>
 	: never;
 
-type PathFromObjectInternal<T, IncludeArrayKeys extends boolean> = And<
-	[IsSubtype<T, object>, Or<[IncludeArrayKeys, NonArrayObject<T> extends never ? false : true]>]
-> extends true
-	? {
-			[K in Exclude<keyof T, symbol>]-?: And<
-				[
-					IsSubtype<NonNullable<T[K]>, object>,
-					Or<[IncludeArrayKeys, NonArrayObject<NonNullable<T[K]>> extends never ? false : true]>,
-				]
-			> extends true
-				? K | `${K}.${PathFromObjectInternal<NonNullable<T[K]>, IncludeArrayKeys>}`
-				: K;
-		}[Exclude<keyof T, symbol>]
-	: "";
+type PathFromObjectInternal<T, IncludeArrayKeys extends boolean> =
+	And<[IsSubtype<T, object>, Or<[IncludeArrayKeys, NonArrayObject<T> extends never ? false : true]>]> extends true
+		? {
+				[K in Exclude<keyof T, symbol>]-?: And<
+					[
+						IsSubtype<NonNullable<T[K]>, object>,
+						Or<[IncludeArrayKeys, NonArrayObject<NonNullable<T[K]>> extends never ? false : true]>,
+					]
+				> extends true
+					? K | `${K}.${PathFromObjectInternal<NonNullable<T[K]>, IncludeArrayKeys>}`
+					: K;
+			}[Exclude<keyof T, symbol>]
+		: "";
 
 type ExtractObjectType<T> = T extends object ? T : never;
 
