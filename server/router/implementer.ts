@@ -61,11 +61,15 @@ function handleError<T extends ContextBase>(context: T, error: unknown) {
 		throw new ORPCError("BAD_REQUEST", { message: error.message });
 	}
 
+	const cause = error instanceof Error && "cause" in error ? error.cause : undefined;
 	context.logger.error(
 		{
 			errorName: error instanceof Error ? error.name : "Unknown",
 			errorMessage: error instanceof Error ? error.message : String(error),
 			error,
+			...(cause && typeof cause === "object" && "issues" in cause
+				? { validationIssues: (cause as { issues: unknown }).issues }
+				: {}),
 		},
 		"Request error occurred"
 	);
