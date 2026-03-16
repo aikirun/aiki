@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.3.12/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
 	"assist": {
 		"actions": {
 			"source": {
@@ -59,7 +59,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["web/**/*.tsx", "web/**/*.ts"],
+			"includes": ["web/**/*.tsx", "web/**/*.ts", "docs/**/*.html"],
 			"linter": {
 				"rules": {
 					"a11y": {
