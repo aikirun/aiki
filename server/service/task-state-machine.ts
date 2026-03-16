@@ -100,7 +100,7 @@ export function createTaskStateMachineService(deps: TaskStateMachineServiceDeps)
 				},
 				tx
 			);
-			await deps.stateTransitionRepo.appendReturning(
+			await deps.stateTransitionRepo.append(
 				{
 					id: stateTransitionId,
 					workflowRunId: runId,

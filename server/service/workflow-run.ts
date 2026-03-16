@@ -525,7 +525,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					},
 					tx
 				);
-				await stateTransitionRepo.appendReturning(
+				await stateTransitionRepo.append(
 					{
 						id: runningStateTransitionId,
 						workflowRunId: runId,
@@ -537,7 +537,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					},
 					tx
 				);
-				await stateTransitionRepo.appendReturning(
+				await stateTransitionRepo.append(
 					{
 						id: finalStateTransitionId,
 						workflowRunId: runId,
@@ -570,9 +570,10 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					? { status: "completed", attempts: attempts + 1, output: request.state.output }
 					: { status: request.state.status satisfies "failed", attempts: attempts + 1, error: request.state.error };
 
-			const finalTransition = await stateTransitionRepo.appendReturning(
+			const finalTransitionId = ulid();
+			await stateTransitionRepo.append(
 				{
-					id: ulid(),
+					id: finalTransitionId,
 					workflowRunId: runId,
 					type: "task",
 					taskId: existingTaskRow.id,
@@ -588,7 +589,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				{
 					status: finalState.status,
 					attempts: finalState.attempts,
-					latestStateTransitionId: finalTransition.id,
+					latestStateTransitionId: finalTransitionId,
 				},
 				tx
 			);

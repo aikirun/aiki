@@ -61,9 +61,11 @@ export function createScheduleRepository(db: DatabaseConn) {
 
 			for (const entry of entries) {
 				ids.push(entry.id);
-				nextRunAtCaseFragments.push(sql`WHEN ${entry.id} THEN ${entry.nextRunAt}::timestamptz`);
+				nextRunAtCaseFragments.push(sql`WHEN ${entry.id} THEN ${entry.nextRunAt.toISOString()}::timestamptz`);
 				if (entry.lastOccurrence) {
-					lastOccurrenceCaseFragments.push(sql`WHEN ${entry.id} THEN ${entry.lastOccurrence}::timestamptz`);
+					lastOccurrenceCaseFragments.push(
+						sql`WHEN ${entry.id} THEN ${entry.lastOccurrence.toISOString()}::timestamptz`
+					);
 				}
 			}
 

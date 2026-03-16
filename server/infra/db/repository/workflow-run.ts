@@ -1,9 +1,10 @@
 import type { NonEmptyArray } from "@aikirun/lib";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { WorkflowRunId, WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow-run";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
+import { toWorkflowRunState } from "./state-transition";
 import type { DatabaseConn, DbTransaction } from "..";
 import { stateTransition, workflow, workflowRun } from "../schema/pg";
 
@@ -104,7 +105,12 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				.limit(1);
 
 			const result = options?.forUpdate ? await query.for("update") : await query;
-			return result[0] ?? null;
+			const row = result[0];
+			if (!row) {
+				return null;
+			}
+			(row as Record<string, unknown>).state = toWorkflowRunState(row.state);
+			return row as Omit<typeof row, "state"> & { state: WorkflowRunState };
 		},
 
 		async listByIdsAndStatus(ids: NonEmptyArray<string>, status: WorkflowRunStatus, tx?: DbTransaction) {
@@ -224,7 +230,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			}
 
 			const whereClause = and(...conditions);
-			const orderBy = sql`${workflowRun.id} ${sort.order}`;
+			const orderBy = sql`${workflowRun.id} ${sql.raw(sort.order)}`;
 
 			const [rows, countResult] = await Promise.all([
 				conn

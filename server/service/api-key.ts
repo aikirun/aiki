@@ -27,8 +27,21 @@ function generateKey(): { key: string; keyPrefix: string } {
 }
 
 function isValidKeyFormat(key: string): boolean {
-	const parts = key.split("_");
-	return parts.length === 3 && parts[0] === PLATFORM;
+	const firstSeparator = key.indexOf("_");
+	if (firstSeparator === -1) {
+		return false;
+	}
+
+	const secondSeparator = key.indexOf("_", firstSeparator + 1);
+	if (secondSeparator === -1) {
+		return false;
+	}
+
+	const platform = key.slice(0, firstSeparator);
+	const prefix = key.slice(firstSeparator + 1, secondSeparator);
+	const secret = key.slice(secondSeparator + 1);
+
+	return platform === PLATFORM && prefix.length === PREFIX_LENGTH && secret.length > 0;
 }
 
 function getCacheKey(keyHash: string): string {

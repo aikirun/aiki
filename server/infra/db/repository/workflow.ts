@@ -141,13 +141,15 @@ export function createWorkflowRepository(db: DatabaseConn) {
 			const sortField = sort?.field ?? "name";
 			const sortOrder = sort?.order ?? "asc";
 
+			const dir = sql.raw(sortOrder);
+
 			const orderByClause =
 				sortField === "name"
-					? sql`${workflow.name} ${sortOrder}`
+					? sql`${workflow.name} ${dir}`
 					: sortField === "runCount"
-						? sql`count(${workflowRun.id}) ${sortOrder}`
+						? sql`count(${workflowRun.id}) ${dir}`
 						: (sortField satisfies "lastRunAt") &&
-							sql`max(${workflowRun.id}) ${sortOrder} nulls ${sortOrder === "asc" ? "first" : "last"}`;
+							sql`max(${workflowRun.id}) ${dir} nulls ${sql.raw(sortOrder === "asc" ? "first" : "last")}`;
 
 			const items = await conn
 				.select({
@@ -164,7 +166,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 				.offset(offset);
 
 			const totalResult = await conn
-				.select({ count: sql<number>`count(distinct ${workflow.name})` })
+				.select({ count: sql`count(distinct ${workflow.name})`.mapWith(Number) })
 				.from(workflow)
 				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source)));
 
@@ -189,10 +191,12 @@ export function createWorkflowRepository(db: DatabaseConn) {
 			const sortField = sort?.field ?? "firstSeenAt";
 			const sortOrder = sort?.order ?? "desc";
 
+			const dir = sql.raw(sortOrder);
+
 			const orderByClause =
 				sortField === "firstSeenAt"
-					? sql`${workflow.id} ${sortOrder}`
-					: (sortField satisfies "runCount") && sql`count(${workflowRun.id}) ${sortOrder}`;
+					? sql`${workflow.id} ${dir}`
+					: (sortField satisfies "runCount") && sql`count(${workflowRun.id}) ${dir}`;
 
 			const items = await conn
 				.select({

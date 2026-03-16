@@ -214,7 +214,7 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 		if (!run) {
 			throw new NotFoundError(`Workflow run not found: ${runId}`);
 		}
-		const fromState = run.state as WorkflowRunState;
+		const fromState = run.state;
 
 		assertIsValidWorkflowRunStateTransition(runId, fromState, request.state);
 
@@ -444,7 +444,7 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 			throw new NotFoundError(`Workflow run not found: ${childRun.parentWorkflowRunId}`);
 		}
 
-		const parentRunState = parentRun.state as WorkflowRunState;
+		const parentRunState = parentRun.state;
 
 		if (
 			parentRunState.status === "awaiting_child_workflow" &&
