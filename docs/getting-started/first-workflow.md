@@ -115,8 +115,8 @@ const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 			message: `Order confirmed! Estimated time: ${response.data.estimatedTime} mins`,
 		});
 
-		// Step 4: Start courier delivery as child workflow 
-		// (with  reference ID for external access)
+		// Step 4: Start courier delivery as child workflow
+		// (with reference ID for external access)
 		const deliveryHandle = await courierDeliveryV1
 			.with()
 			.opt("reference.id", input.orderId)

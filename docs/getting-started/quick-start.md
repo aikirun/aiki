@@ -10,7 +10,7 @@ Make sure you've completed the [Installation](./installation.md) steps:
 - Redis running
 - Aiki Server running
 - SDK packages installed
-- API key created Aiki Web UI
+- API key created via the Aiki Web UI
 
 ## Create Your First Workflow File
 
@@ -78,7 +78,6 @@ bun run my-first-workflow.ts
 ## Expected Output
 
 ```
-Starting workflow...
 👋 Hello, Alice!
 I said hello to Alice
 ```

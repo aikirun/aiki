@@ -114,7 +114,6 @@ const aikiClient = client({
 const myWorker = worker({
   name: "order-worker",
   workflows: [restaurantOrderV1],
-  subscriber: { type: "redis" }
 });
 const workerHandle = await myWorker.spawn(aikiClient);
 

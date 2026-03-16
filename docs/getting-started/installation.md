@@ -118,7 +118,7 @@ You're ready! Continue to the [Quick Start](./quick-start.md) guide.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_PROVIDER` | Yes | - | Database type: `pg`, `mysql`, or `sqlite` |
+| `DATABASE_PROVIDER` | No | `pg` | Database type: `pg` (PostgreSQL) |
 | `DATABASE_URL` | Yes | - | Connection string (e.g., `postgresql://user:password@host:port/database`) |
 | `DATABASE_MAX_CONNECTIONS` | No | `10` | Maximum database connections in pool |
 | `DATABASE_SSL` | No | `false` | Enable SSL for database connection |
