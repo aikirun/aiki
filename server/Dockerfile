@@ -19,7 +19,7 @@ COPY types/ ./types/
 COPY server/ ./server/
 COPY tsconfig.json ./
 
-RUN bun run check
+RUN bunx tsc --noEmit
 RUN bun run build:server
 
 FROM gcr.io/distroless/cc-debian12
