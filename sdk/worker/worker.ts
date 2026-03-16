@@ -8,7 +8,7 @@ import type {
 } from "@aikirun/client";
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import { delay, fireAndForget } from "@aikirun/lib/async";
+import { delay } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkerId, WorkerName } from "@aikirun/types/worker";
@@ -164,6 +164,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
+	private pollPromise: Promise<void> | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 
 	constructor(
@@ -202,7 +203,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
 
-		fireAndForget(this.poll(abortSignal), (error) => {
+		this.pollPromise = this.poll(abortSignal).catch((error) => {
 			if (!abortSignal.aborted) {
 				this.logger.error("Unexpected error", {
 					"aiki.error": error.message,
@@ -215,6 +216,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.logger.info("Worker stopping");
 
 		this.abortController?.abort();
+
+		await this.pollPromise;
 
 		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
 		if (activeWorkflowRuns.length === 0) {
