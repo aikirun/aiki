@@ -8,5 +8,10 @@ await runWithWorker([childWorkflowV1, parentWorkflowV1, grandparentWorkflowV1], 
 	// Wait for the hierarchy to start running, then cancel the grandparent
 	await delay(10_000);
 	await handle.cancel("Testing cancellation cascade");
-	client.logger.info("Grandparent cancelled — children should cascade");
+	client.logger.info("Grandparent cancelled — waiting for cascade to propagate to children");
+
+	// The cancellation cascade propagates asynchronously:
+	// grandparent (immediate) → parent → child
+	// Keep the worker alive long enough for the system workflow to complete.
+	await delay(15_000);
 });
