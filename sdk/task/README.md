@@ -43,7 +43,6 @@ export const notificationWorkflowV1 = notificationWorkflow.v("1.0.0", {
 
 - **Automatic Retries** - Configurable retry strategies (fixed, exponential, jittered)
 - **Idempotent Execution** - Same input returns cached result
-- **Reference IDs** - Custom identifiers for deduplication
 - **Schema Validation** - Validate input and output at runtime
 - **Type Safety** - Full TypeScript support
 

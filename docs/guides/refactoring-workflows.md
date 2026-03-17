@@ -12,70 +12,102 @@ Traditional durable execution systems like Temporal require strict determinism; 
 
 - **Tasks are identified by name + input hash** (content-addressable)
 - **Already-executed tasks return cached results** regardless of code order
-- **New tasks execute fresh**
-- **Changed inputs trigger re-execution**
+- **New tasks can be appended** after all previous tasks have been consumed
+- **Non-determinism detection** catches unsafe changes before new tasks execute
 
-This gives you flexibility to evolve your workflows without breaking running executions.
+This gives you flexibility to evolve your workflows without breaking running executions. For the full technical details, see [Content-Addressed Memoization](../architecture/cam.md).
+
+## The Non-Determinism Rule
+
+Whether a refactoring operation is safe depends on one rule:
+
+> When the runtime encounters a task with no memoized result (a new address), it checks whether unconsumed entries remain in the manifest from the previous execution. If they do, it errors immediately — before the new task executes.
+
+In other words: a new task can only execute when all previously-recorded entries have been consumed. This single rule determines whether reordering, removal, appending, and insertion are safe.
 
 ## Safe Refactoring Operations
 
 ### Reordering Tasks
 
-You can change the order of tasks in your workflow code. Content addressing means each task is identified by its name and input, not its position:
+You can change the order of tasks that are all in the manifest. Content addressing means each task is identified by its name and input, not its position:
 
 ```typescript
-// Original workflow
 async handler(run, input) {
-	const user = await fetchUser.start(run, { userId: input.userId });
-	const order = await createOrder.start(run, { userId: input.userId });
-	await sendConfirmation.start(run, { email: user.email, orderId: order.id });
-}
-
-// Refactored - reordered tasks
-async handler(run, input) {
-	const order = await createOrder.start(run, { userId: input.userId }); // Returns cached
-	const user = await fetchUser.start(run, { userId: input.userId });    // Returns cached
-	await sendConfirmation.start(run, { email: user.email, orderId: order.id });
-}
-```
-
-On replay, both `fetchUser` and `createOrder` return their cached results regardless of the new order.
-
-### Adding New Tasks
-
-You can add new tasks to a workflow. Existing tasks return cached results, and new tasks execute fresh:
-
-```typescript
-// Original workflow ran and completed tasks A and B
-async handler(run, input) {
+	// Both tasks complete before the workflow suspends
 	await taskA.start(run, input);
 	await taskB.start(run, input);
+	await run.events.proceed.wait(); // Workflow suspends here
+	// ...
 }
 
-// Refactored with new task C
+// Refactored — swapped order
 async handler(run, input) {
-	await taskA.start(run, input);  // Returns cached result
-	await taskC.start(run, input);  // Executes fresh
-	await taskB.start(run, input);  // Returns cached result
+	await taskB.start(run, input);  // In manifest → returns cached result
+	await taskA.start(run, input);  // In manifest → returns cached result
+	await run.events.proceed.wait();
+	// ...
 }
 ```
+
+Both tasks are in the manifest (both completed before the workflow suspended). The order they're consumed doesn't matter — each address resolves to the same memoized result independently.
+
+### Appending New Tasks
+
+You can append new tasks after all previously-recorded tasks have been consumed:
+
+```typescript
+async handler(run, input) {
+	await taskA.start(run, input);
+	await run.events.proceed.wait(); // Workflow suspends here
+	// ...
+}
+
+// Refactored — appended taskB after the suspension point
+async handler(run, input) {
+	await taskA.start(run, input);     // In manifest → returns cached result
+	await run.events.proceed.wait();
+	await taskB.start(run, input);     // All manifest entries consumed → executes fresh
+}
+```
+
+When `taskB` is encountered, `taskA` has already been consumed — no unconsumed entries remain, so the new task executes safely.
+
+**Important:** Inserting a new task *before* unconsumed entries is not safe. See [Inserting Tasks](#inserting-tasks) below.
 
 ### Removing Tasks
 
-You can remove tasks from your workflow. Their cached results remain in storage but are simply not used:
+You can remove a task from your workflow when the remaining tasks are all in the manifest. The removed task's entry stays unconsumed but no new tasks are executed, so the non-determinism rule is not triggered:
 
 ```typescript
-// Original workflow
 async handler(run, input) {
-	await validateInput.start(run, input);
-	await processData.start(run, input);
-	await sendNotification.start(run, input);
+	await taskA.start(run, input);
+	await taskB.start(run, input);
+	await run.events.proceed.wait(); // Workflow suspends here
+	// ...
 }
 
-// Refactored - removed validateInput
+// Refactored — removed taskA
 async handler(run, input) {
-	await processData.start(run, input);    // Returns cached result
-	await sendNotification.start(run, input); // Returns cached result
+	await taskB.start(run, input);    // In manifest → returns cached result
+	await run.events.proceed.wait();
+	// taskA's entry is unconsumed, but no new tasks encountered → safe
+}
+```
+
+**Removal is only safe when every task in the refactored code is already in the manifest.** If a task after the removal point hasn't executed yet, it becomes a new address encountered while the removed task's entry is unconsumed — triggering a non-determinism error:
+
+```typescript
+async handler(run, input) {
+	await taskA.start(run, input);
+	await run.events.proceed.wait(); // Workflow suspends here — only taskA is in the manifest
+	await taskB.start(run, input);
+}
+
+// Refactored — removed taskA
+async handler(run, input) {
+	await run.events.proceed.wait();
+	await taskB.start(run, input);
+	// taskB is a new address, taskA is unconsumed → NON-DETERMINISM ERROR
 }
 ```
 
@@ -165,11 +197,34 @@ async handler(run, input) {
 }
 ```
 
-## Operations That Cause Re-execution
+## Unsafe Operations (Non-Determinism Errors)
+
+The following changes cause a non-determinism error on replay. When the runtime encounters a new address (no memoized result) while unconsumed entries remain from the previous execution, it errors immediately — before the new task executes. This prevents silent data corruption.
+
+### Inserting Tasks
+
+Inserting a new task before previously-recorded tasks have been consumed triggers a non-determinism error:
+
+```typescript
+// Original workflow ran and completed tasks A and B
+async handler(run, input) {
+	await taskA.start(run, input);
+	await taskB.start(run, input);
+}
+
+// Inserting task C between A and B — NON-DETERMINISM ERROR
+async handler(run, input) {
+	await taskA.start(run, input);  // Returns cached result
+	await taskC.start(run, input);  // New address, but taskB is unconsumed → error
+	await taskB.start(run, input);
+}
+```
+
+To add new work, either append after all existing tasks or create a new workflow version.
 
 ### Changing Task Inputs
 
-If you change the input to a task, the hash changes and the task re-executes:
+Changing a task's input changes the hash, producing a new address. The old address goes unconsumed:
 
 ```typescript
 // Original
@@ -177,39 +232,37 @@ async handler(run, input) {
 	await processOrder.start(run, { orderId: input.orderId, discount: 0 });
 }
 
-// Changed input - WILL RE-EXECUTE
+// Changed input — NON-DETERMINISM ERROR
 async handler(run, input) {
 	await processOrder.start(run, { orderId: input.orderId, discount: 0.1 });
+	// New address (different hash), old address unconsumed → error
 }
 ```
 
-**Important:** If the task has side effects (charging a card, sending an email), this could cause issues. The task will run again with the new input.
-
 ### Changing Task Names
 
-Renaming a task creates a new task from Aiki's perspective:
+Renaming a task changes the address. The old name's entry goes unconsumed:
 
 ```typescript
 // Original
 const processOrder = task({ name: "process-order", ... });
 
-// Renamed - treated as a completely new task
+// Renamed — NON-DETERMINISM ERROR
 const processOrder = task({ name: "handle-order", ... });
+// "process-order" entry unconsumed, "handle-order" is a new address → error
 ```
-
-The old cached result under `"process-order"` won't be found, and `"handle-order"` will execute fresh.
 
 ## What to Watch Out For
 
 ### Tasks with Side Effects
 
-Be cautious when changing inputs to tasks that:
+Non-determinism detection prevents accidental re-execution from input or name changes. But tasks may still execute multiple times due to retries, restarts, or network issues. Tasks that interact with external systems should be idempotent:
 - Charge credit cards
 - Send emails or notifications
 - Write to external databases
 - Call third-party APIs
 
-If the task re-executes, those side effects happen again. Use [idempotency patterns](./determinism.md#task-idempotency) to protect against this.
+Use [idempotency patterns](./determinism.md#task-idempotency) to protect against this.
 
 ### Changing Task or Child-Workflow Output Shapes
 
@@ -272,7 +325,7 @@ async handler(run, input) {
 
 ### Conditional Logic Changes
 
-Changing conditional logic can lead to unexpected execution paths:
+Changing conditional logic can cause non-determinism errors when the new code path introduces tasks that weren't in the original execution:
 
 ```typescript
 // Original - only premium users get discount
@@ -285,10 +338,12 @@ async handler(run, input) {
 
 // Changed - now all users get discount
 async handler(run, input) {
-	await applyDiscount.start(run, input); // Now runs for everyone
+	await applyDiscount.start(run, input); // New address for non-premium runs → non-determinism error
 	await processOrder.start(run, input);
 }
 ```
+
+For non-premium runs, `applyDiscount` was never recorded. It's a new address encountered while `processOrder` is still unconsumed — the runtime errors. For premium runs, `applyDiscount` already exists in the manifest and replays normally.
 
 ### Same-Named Sleeps
 
@@ -397,20 +452,22 @@ This is a design principle, not just a refactoring concern. Even without any cod
 
 2. **Use idempotency for side effects** - Protect external operations with idempotency keys
 
-3. **Keep task names stable** - Avoid renaming tasks in long-running workflows
+3. **Keep task names stable** - Renaming tasks in long-running workflows causes non-determinism errors
 
-4. **Be careful with input changes** - Understand that changed inputs cause re-execution
+4. **Keep task inputs stable** - Changing inputs produces a new address and causes non-determinism errors
 
-5. **Prefer determinism** - While Aiki is flexible, deterministic workflows are still easier to reason about
+5. **Append, don't insert** - New tasks are safe only after all previous tasks have been consumed
+
+6. **Prefer determinism** - While Aiki is flexible, deterministic workflows are still easier to reason about
 
 ## Summary
 
-Aiki's content-addressable design gives you freedom to refactor workflows without strict determinism requirements. You can reorder tasks, add new ones, remove old ones, reorder event waits, reorder sleeps, and adjust sleep durations. Just be mindful of tasks with side effects and data dependencies between tasks.
+Aiki's content-addressable design enforces determinism while allowing structural flexibility that positional replay systems cannot. All safety depends on one rule: a new task can only execute when no unconsumed manifest entries remain. This makes reordering safe (same entries consumed in different order), appending safe (all entries consumed before the new task), and removal safe (fewer entries consumed, nothing new executed). Inserting tasks before unconsumed entries, changing task inputs, and renaming tasks all trigger non-determinism errors — the runtime catches these before any new task executes.
 
 When in doubt, create a new workflow version.
 
 ## Next Steps
 
 - **[Determinism and Idempotency](./determinism.md)** - Best practices for reliable workflows
-- **[Reference IDs](./reference-ids.md)** - Prevent duplicate executions
+- **[Reference IDs](./reference-ids.md)** - Custom identifiers for workflows and events
 - **[Retry Strategies](./retry-strategies.md)** - Configure automatic retries

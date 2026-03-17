@@ -127,41 +127,6 @@ const exampleTask = task({
 });
 ```
 
-## Automatic Idempotency
-
-Tasks within a workflow are automatically idempotent - the same task with the same payload only executes once:
-
-```typescript
-const sendEmail = task({
-	name: "send-email",
-	handler(input: { email: string; message: string }) {
-		return sendEmailToUser(input.email, input.message);
-	},
-});
-
-// In a workflow:
-// First call: Executes the task
-await sendEmail.start(run, {
-	email: "user@example.com",
-	message: "Hello",
-});
-
-// Second call with same input: Returns cached result
-await sendEmail.start(run, {
-	email: "user@example.com",
-	message: "Hello",
-});
-```
-
-To force re-execution, use the `with()` builder:
-
-```typescript
-await sendEmail.with().opt("reference.id", "second-email").start(run, {
-	email: "user@example.com",
-	message: "Hello",
-});
-```
-
 ## Task Best Practices
 
 1. **Keep tasks focused** - One responsibility per task
@@ -173,5 +138,5 @@ await sendEmail.with().opt("reference.id", "second-email").start(run, {
 
 - **[Workflows](./workflows.md)** - Learn about workflow orchestration
 - **[Determinism](../guides/determinism.md)** - Workflow determinism and task idempotency
-- **[Reference IDs](../guides/reference-ids.md)** - Custom identifiers for workflows and tasks
+- **[Reference IDs](../guides/reference-ids.md)** - Custom identifiers for workflows and events
 - **[Dependency Injection](../guides/dependency-injection.md)** - Inject dependencies into tasks

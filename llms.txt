@@ -21,7 +21,7 @@
 - [Fan-out/Gather](examples/workflows/fan-out-gather.ts): Parallel child workflows with result aggregation
 - [Long-running Pipeline](examples/workflows/long-running-pipeline.ts): Durable sleep + human-in-the-loop approval
 - [Cancellation Cascade](examples/workflows/cancellation-cascade.ts): Parent-child cancellation propagation
-- [Parallel Tasks](examples/workflows/parallel-tasks.ts): Concurrent task execution
+- [Parallel Tasks](examples/workflows/concurrent-tasks.ts): Concurrent task execution
 
 ## Packages
 

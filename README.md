@@ -23,8 +23,8 @@ A workflow that activates a 14-day free trial and waits for the user to pay. If 
 import { event, workflow } from "@aikirun/workflow";
 import { task } from "@aikirun/task";
 
-const activateTrial = task({ name: "activate-trial", async handler(run, userId: string) { /* ... */ } });
-const downgradeToFree = task({ name: "downgrade-to-free", async handler(run, userId: string) { /* ... */ } });
+const activateTrial = task({ name: "activate-trial", async handler(userId: string) { /* ... */ } });
+const downgradeToFree = task({ name: "downgrade-to-free", async handler(userId: string) { /* ... */ } });
 
 export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
   async handler(run, input: { userId: string }) {
