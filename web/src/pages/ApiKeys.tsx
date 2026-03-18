@@ -1,154 +1,192 @@
 import type { ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api-key-api";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { client } from "../api/client";
 import { useApiKeys } from "../api/hooks";
-import { EmptyState } from "../components/common/EmptyState";
+import { useAuth } from "../auth/AuthProvider";
 import { RelativeTime } from "../components/common/RelativeTime";
-import { TableSkeleton } from "../components/common/TableSkeleton";
+import { API_KEY_STATUS_COLORS } from "../constants/status-colors";
 
-const STATUS_CONFIG: Record<ApiKeyStatus, { label: string; className: string }> = {
-	active: {
-		label: "Active",
-		className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-	},
-	revoked: {
-		label: "Revoked",
-		className: "bg-red-50 text-red-700 border-red-200",
-	},
-	expired: {
-		label: "Expired",
-		className: "bg-slate-100 text-slate-600 border-slate-200",
-	},
+type PageState = { mode: "idle" } | { mode: "creating" } | { mode: "revealed"; key: string };
+
+const STATUS_GLYPHS: Record<ApiKeyStatus, string> = {
+	active: "●",
+	revoked: "●",
+	expired: "●",
+};
+
+const STATUS_LABELS: Record<ApiKeyStatus, string> = {
+	active: "Active",
+	revoked: "Revoked",
+	expired: "Expired",
 };
 
 export function ApiKeys() {
 	const { data, isLoading } = useApiKeys();
-	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-	const [createdKey, setCreatedKey] = useState<string | null>(null);
+	const { activeOrganization, activeNamespace } = useAuth();
+	const [state, setState] = useState<PageState>({ mode: "idle" });
 
 	const handleKeyCreated = (apiKey: string) => {
-		setCreatedKey(apiKey);
-		setIsCreateModalOpen(false);
+		setState({ mode: "revealed", key: apiKey });
 	};
 
+	const showCreateForm = state.mode === "creating";
+	const revealedKey = state.mode === "revealed" ? state.key : null;
+	// The "Create key" button is hidden while the form is open or a key is being revealed
+	const showCreateButton = state.mode === "idle";
+
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div>
-					<h2 className="text-xl font-semibold text-slate-900">API Keys</h2>
-					<p className="text-slate-500 mt-1">Manage API keys to connect your SDK to the server</p>
-				</div>
-				<button
-					type="button"
-					onClick={() => setIsCreateModalOpen(true)}
-					className="px-4 py-2 bg-aiki-purple text-white font-medium rounded-lg hover:bg-aiki-purple/90 transition-colors"
+		<div style={{ maxWidth: 640, padding: "32px 0" }} className="space-y-8">
+			{/* Page header */}
+			<div>
+				<h1
+					style={{
+						fontSize: 18,
+						fontWeight: 800,
+						color: "var(--t0)",
+						letterSpacing: "-0.03em",
+						lineHeight: 1.2,
+					}}
 				>
-					Create API Key
-				</button>
+					Settings
+				</h1>
+				<p
+					style={{
+						fontSize: 11,
+						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+						color: "var(--t3)",
+						marginTop: 4,
+					}}
+				>
+					{activeOrganization?.name} / {activeNamespace?.name}
+				</p>
 			</div>
 
-			<div className="bg-white rounded-2xl border-2 border-slate-200">
+			{/* API Keys section */}
+			<div className="space-y-3">
+				{/* Section header row */}
+				<div className="flex items-start justify-between gap-4">
+					<div>
+						<h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--t0)" }}>API Keys</h2>
+						<p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
+							Scoped to the current namespace. Use in SDK client config.
+						</p>
+					</div>
+					{showCreateButton && (
+						<button
+							type="button"
+							onClick={() => setState({ mode: "creating" })}
+							style={{
+								background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+								color: "#fff",
+								fontSize: 12,
+								fontWeight: 700,
+								padding: "7px 16px",
+								borderRadius: 7,
+								border: "none",
+								cursor: "pointer",
+								whiteSpace: "nowrap",
+								flexShrink: 0,
+							}}
+						>
+							Create key
+						</button>
+					)}
+				</div>
+
+				{/* Inline create form */}
+				{showCreateForm && <CreateKeyInline onCreated={handleKeyCreated} onCancel={() => setState({ mode: "idle" })} />}
+
+				{/* Inline key reveal */}
+				{revealedKey && <KeyRevealInline apiKey={revealedKey} onDismiss={() => setState({ mode: "idle" })} />}
+
+				{/* Key list */}
 				{isLoading ? (
-					<div className="p-6">
-						<TableSkeleton rows={3} columns={5} />
+					<div className="space-y-2">
+						{["a", "b", "c"].map((key) => (
+							<div
+								key={key}
+								style={{ height: 58, borderRadius: 8, background: "var(--s1)" }}
+								className="animate-pulse"
+							/>
+						))}
 					</div>
 				) : !data || data.keyInfos.length === 0 ? (
-					<EmptyState title="No API keys yet" description="Create an API key to connect your SDK to the server" />
+					<div
+						style={{
+							background: "var(--s1)",
+							border: "1px solid rgba(255,255,255,0.04)",
+							borderRadius: 8,
+							padding: "40px 16px",
+							textAlign: "center",
+						}}
+					>
+						<p style={{ fontSize: 12, color: "var(--t2)" }}>No API keys yet</p>
+						<p style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>
+							Create an API key to connect your SDK to the server
+						</p>
+					</div>
 				) : (
-					<table className="w-full">
-						<thead>
-							<tr className="border-b border-slate-100">
-								<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Name
-								</th>
-								<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Key Prefix
-								</th>
-								<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Status
-								</th>
-								<th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Created
-								</th>
-								<th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Actions
-								</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-slate-100">
-							{data.keyInfos.map((apiKey) => (
-								<ApiKeyRow key={apiKey.id} apiKey={apiKey} />
-							))}
-						</tbody>
-					</table>
+					<div className="space-y-2">
+						{data.keyInfos.map((apiKey) => (
+							<ApiKeyRow key={apiKey.id} apiKey={apiKey} />
+						))}
+					</div>
 				)}
 			</div>
 
-			{isCreateModalOpen && (
-				<CreateApiKeyModal onClose={() => setIsCreateModalOpen(false)} onKeyCreated={handleKeyCreated} />
-			)}
+			{/* Usage snippet */}
+			<div
+				style={{
+					background: "var(--s1)",
+					border: "1px solid rgba(255,255,255,0.04)",
+					borderRadius: 8,
+					padding: "12px 14px",
+				}}
+			>
+				<p
+					style={{
+						fontSize: 10,
+						fontWeight: 700,
+						letterSpacing: "0.08em",
+						color: "var(--t3)",
+						marginBottom: 8,
+						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+					}}
+				>
+					USAGE
+				</p>
+				<pre
+					style={{
+						fontSize: 12,
+						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+						color: "var(--t1)",
+						margin: 0,
+						overflowX: "auto",
+						lineHeight: 1.6,
+					}}
+				>{`import { client } from "@aikirun/client";
 
-			{createdKey && <KeyCreatedModal apiKey={createdKey} onClose={() => setCreatedKey(null)} />}
+const aikiClient = client({
+  url: "http://localhost:9850",
+  apiKey: "YOUR_API_KEY",
+});`}</pre>
+			</div>
 		</div>
 	);
 }
 
-function ApiKeyRow({ apiKey }: { apiKey: ApiKeyInfo }) {
-	const queryClient = useQueryClient();
-	const [isRevoking, setIsRevoking] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const handleRevoke = async () => {
-		setIsRevoking(true);
-		setError(null);
-		try {
-			await client.apiKey.revokeV1({ id: apiKey.id });
-			queryClient.invalidateQueries({ queryKey: ["api-keys"] });
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to revoke key");
-		} finally {
-			setIsRevoking(false);
-		}
-	};
-
-	const config = STATUS_CONFIG[apiKey.status];
-
-	return (
-		<tr className="hover:bg-slate-50 transition-colors">
-			<td className="px-6 py-4 font-medium text-slate-900">{apiKey.name}</td>
-			<td className="px-6 py-4 font-mono text-sm text-slate-600">aiki_{apiKey.keyPrefix}_...</td>
-			<td className="px-6 py-4">
-				<span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border ${config.className}`}>
-					{config.label}
-				</span>
-			</td>
-			<td className="px-6 py-4 text-slate-500">
-				<RelativeTime timestamp={apiKey.createdAt} />
-			</td>
-			<td className="px-6 py-4 text-right">
-				{error && <span className="text-red-600 text-sm mr-2">{error}</span>}
-				{apiKey.status === "active" && (
-					<button
-						type="button"
-						onClick={handleRevoke}
-						disabled={isRevoking}
-						className="px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
-					>
-						{isRevoking ? "Revoking..." : "Revoke"}
-					</button>
-				)}
-			</td>
-		</tr>
-	);
-}
-
-function CreateApiKeyModal({ onClose, onKeyCreated }: { onClose: () => void; onKeyCreated: (apiKey: string) => void }) {
+function CreateKeyInline({ onCreated, onCancel }: { onCreated: (key: string) => void; onCancel: () => void }) {
 	const queryClient = useQueryClient();
 	const [name, setName] = useState("");
 	const [isCreating, setIsCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const nameInputRef = useRef<HTMLInputElement>(null);
+
+	useEffect(() => {
+		nameInputRef.current?.focus();
+	}, []);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -160,7 +198,7 @@ function CreateApiKeyModal({ onClose, onKeyCreated }: { onClose: () => void; onK
 		try {
 			const result = await client.apiKey.createV1({ name: name.trim() });
 			queryClient.invalidateQueries({ queryKey: ["api-keys"] });
-			onKeyCreated(result.key);
+			onCreated(result.key);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to create API key");
 		} finally {
@@ -169,47 +207,86 @@ function CreateApiKeyModal({ onClose, onKeyCreated }: { onClose: () => void; onK
 	};
 
 	return (
-		<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-			<div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-				<h2 className="text-xl font-bold text-slate-900 mb-4">Create API Key</h2>
-				<form onSubmit={handleSubmit}>
-					<div className="mb-4">
-						<label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
-							Name
-						</label>
-						<input
-							id="name"
-							type="text"
-							value={name}
-							onChange={(e) => setName(e.target.value)}
-							placeholder="e.g., Production SDK"
-							className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-aiki-purple/20 focus:border-aiki-purple"
-						/>
-					</div>
-					{error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-					<div className="flex gap-3 justify-end">
-						<button
-							type="button"
-							onClick={onClose}
-							className="px-4 py-2 text-slate-700 font-medium rounded-lg hover:bg-slate-100 transition-colors"
-						>
-							Cancel
-						</button>
-						<button
-							type="submit"
-							disabled={!name.trim() || isCreating}
-							className="px-4 py-2 bg-aiki-purple text-white font-medium rounded-lg hover:bg-aiki-purple/90 transition-colors disabled:opacity-50"
-						>
-							{isCreating ? "Creating..." : "Create"}
-						</button>
-					</div>
-				</form>
-			</div>
+		<div
+			style={{
+				background: "var(--s1)",
+				border: "1px solid rgba(255,255,255,0.06)",
+				borderRadius: 8,
+				padding: "14px 16px",
+			}}
+		>
+			<p
+				style={{
+					fontSize: 10,
+					fontWeight: 700,
+					letterSpacing: "0.08em",
+					color: "var(--t3)",
+					marginBottom: 10,
+					fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+				}}
+			>
+				NEW API KEY
+			</p>
+			<form onSubmit={handleSubmit}>
+				<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+					<input
+						type="text"
+						value={name}
+						onChange={(e) => setName(e.target.value)}
+						placeholder="Key name (e.g. Production SDK)"
+						ref={nameInputRef}
+						style={{
+							flex: 1,
+							background: "var(--s2)",
+							border: "1px solid rgba(255,255,255,0.08)",
+							borderRadius: 6,
+							padding: "8px 12px",
+							fontSize: 12,
+							color: "var(--t0)",
+							outline: "none",
+							fontFamily: "inherit",
+						}}
+					/>
+					<button
+						type="submit"
+						disabled={!name.trim() || isCreating}
+						style={{
+							background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+							color: "#fff",
+							fontSize: 12,
+							fontWeight: 700,
+							padding: "8px 14px",
+							borderRadius: 6,
+							border: "none",
+							cursor: !name.trim() || isCreating ? "not-allowed" : "pointer",
+							opacity: !name.trim() || isCreating ? 0.5 : 1,
+							whiteSpace: "nowrap",
+						}}
+					>
+						{isCreating ? "Creating..." : "Create"}
+					</button>
+					<button
+						type="button"
+						onClick={onCancel}
+						style={{
+							background: "none",
+							border: "none",
+							fontSize: 12,
+							color: "var(--t2)",
+							cursor: "pointer",
+							padding: "8px 4px",
+						}}
+					>
+						Cancel
+					</button>
+				</div>
+				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 8 }}>{error}</p>}
+			</form>
 		</div>
 	);
 }
 
-function KeyCreatedModal({ apiKey, onClose }: { apiKey: string; onClose: () => void }) {
+function KeyRevealInline({ apiKey, onDismiss }: { apiKey: string; onDismiss: () => void }) {
 	const [copied, setCopied] = useState(false);
 
 	const handleCopy = async () => {
@@ -219,61 +296,195 @@ function KeyCreatedModal({ apiKey, onClose }: { apiKey: string; onClose: () => v
 	};
 
 	return (
-		<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-			<div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl">
-				<div className="flex items-center gap-3 mb-4">
-					<div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-						<svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-						</svg>
-					</div>
-					<h2 className="text-xl font-bold text-slate-900">API Key Created</h2>
-				</div>
-
-				<div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-					<div className="flex items-start gap-2">
-						<svg
-							className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-							/>
-						</svg>
-						<p className="text-sm text-amber-800">Copy this key now. You won't be able to see it again.</p>
-					</div>
-				</div>
-
-				<div className="bg-slate-100 rounded-lg p-4 mb-6">
-					<div className="flex items-center justify-between gap-2">
-						<code className="text-sm font-mono text-slate-800 break-all">{apiKey}</code>
-						<button
-							type="button"
-							onClick={handleCopy}
-							className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex-shrink-0 ${
-								copied
-									? "bg-emerald-100 text-emerald-700"
-									: "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"
-							}`}
-						>
-							{copied ? "Copied!" : "Copy"}
-						</button>
-					</div>
-				</div>
-
+		<div
+			style={{
+				background: "rgba(226, 163, 54, 0.06)",
+				border: "1px solid rgba(226, 163, 54, 0.2)",
+				borderRadius: 8,
+				padding: "14px 16px",
+			}}
+		>
+			<p style={{ fontSize: 12, color: "#E2A336", marginBottom: 12, lineHeight: 1.5 }}>
+				Copy this key now — it won't be shown again.
+			</p>
+			<div
+				style={{
+					background: "var(--s2)",
+					border: "1px solid rgba(255,255,255,0.04)",
+					borderRadius: 6,
+					padding: "10px 12px",
+					display: "flex",
+					alignItems: "center",
+					gap: 10,
+					marginBottom: 12,
+				}}
+			>
+				<code
+					style={{
+						flex: 1,
+						fontSize: 12,
+						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+						color: "var(--t0)",
+						wordBreak: "break-all",
+						userSelect: "all",
+					}}
+				>
+					{apiKey}
+				</code>
 				<button
 					type="button"
-					onClick={onClose}
-					className="w-full px-4 py-2 bg-aiki-purple text-white font-medium rounded-lg hover:bg-aiki-purple/90 transition-colors"
+					onClick={handleCopy}
+					style={{
+						background: copied ? "rgba(52, 211, 153, 0.12)" : "rgba(255,255,255,0.06)",
+						border: "none",
+						borderRadius: 5,
+						padding: "5px 10px",
+						fontSize: 11,
+						fontWeight: 600,
+						color: copied ? "#34D399" : "var(--t1)",
+						cursor: "pointer",
+						whiteSpace: "nowrap",
+						flexShrink: 0,
+						transition: "background 0.15s, color 0.15s",
+					}}
 				>
-					Done
+					{copied ? "Copied!" : "Copy"}
 				</button>
 			</div>
+			<button
+				type="button"
+				onClick={onDismiss}
+				style={{
+					background: "none",
+					border: "none",
+					fontSize: 12,
+					color: "var(--t2)",
+					cursor: "pointer",
+					padding: 0,
+					textDecoration: "underline",
+					textDecorationColor: "rgba(128,123,112,0.4)",
+					textUnderlineOffset: 2,
+				}}
+			>
+				Dismiss
+			</button>
+		</div>
+	);
+}
+
+function ApiKeyRow({ apiKey }: { apiKey: ApiKeyInfo }) {
+	const queryClient = useQueryClient();
+	const [isRevoking, setIsRevoking] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const color = API_KEY_STATUS_COLORS[apiKey.status] ?? "var(--t3)";
+
+	const handleRevoke = async () => {
+		setIsRevoking(true);
+		setError(null);
+		try {
+			await client.apiKey.revokeV1({ id: apiKey.id });
+			queryClient.invalidateQueries({ queryKey: ["api-keys"] });
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to revoke key");
+			setIsRevoking(false);
+		}
+	};
+
+	return (
+		<div
+			style={{
+				background: "var(--s1)",
+				border: "1px solid rgba(255,255,255,0.04)",
+				borderRadius: 8,
+				padding: "10px 14px",
+				display: "flex",
+				alignItems: "center",
+				gap: 10,
+			}}
+		>
+			<div style={{ flex: 1, minWidth: 0 }}>
+				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+					<span
+						style={{
+							fontSize: 12.5,
+							fontWeight: 600,
+							color: "var(--t0)",
+							overflow: "hidden",
+							textOverflow: "ellipsis",
+							whiteSpace: "nowrap",
+						}}
+					>
+						{apiKey.name}
+					</span>
+					{/* Glyph-style status pill */}
+					<span
+						style={{
+							fontSize: 11,
+							fontWeight: 500,
+							color,
+							display: "flex",
+							alignItems: "center",
+							gap: 4,
+						}}
+					>
+						<span style={{ fontSize: 8 }}>{STATUS_GLYPHS[apiKey.status]}</span>
+						{STATUS_LABELS[apiKey.status]}
+					</span>
+				</div>
+				<div
+					style={{
+						display: "flex",
+						alignItems: "center",
+						gap: 10,
+						marginTop: 3,
+					}}
+				>
+					<span
+						style={{
+							fontSize: 10,
+							fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+							color: "var(--t3)",
+						}}
+					>
+						{apiKey.keyPrefix}••••
+					</span>
+					<span style={{ fontSize: 10, color: "var(--t3)" }}>
+						Created <RelativeTime timestamp={apiKey.createdAt} />
+					</span>
+					{apiKey.expiresAt && (
+						<span style={{ fontSize: 10, color: "var(--t3)" }}>
+							expires <RelativeTime timestamp={apiKey.expiresAt} />
+						</span>
+					)}
+				</div>
+			</div>
+
+			{error && <span style={{ fontSize: 11, color: "#F87171", flexShrink: 0 }}>{error}</span>}
+
+			{apiKey.status === "active" && (
+				<button
+					type="button"
+					onClick={handleRevoke}
+					disabled={isRevoking}
+					style={{
+						background: "none",
+						border: "1px solid rgba(248, 113, 113, 0.25)",
+						borderRadius: 6,
+						padding: "4px 10px",
+						fontSize: 11,
+						fontWeight: 600,
+						color: "#F87171",
+						cursor: isRevoking ? "not-allowed" : "pointer",
+						opacity: isRevoking ? 0.5 : 1,
+						whiteSpace: "nowrap",
+						flexShrink: 0,
+						transition: "border-color 0.15s, opacity 0.15s",
+					}}
+				>
+					{isRevoking ? "Revoking..." : "Revoke"}
+				</button>
+			)}
 		</div>
 	);
 }

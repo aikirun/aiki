@@ -81,8 +81,21 @@ export function SignUp() {
 
 	return (
 		<AuthLayout title="Create your account" subtitle="Get started with Aiki workflow automation">
-			<form onSubmit={handleSubmit} className="space-y-5">
-				{error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
+			<form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+				{error && (
+					<div
+						style={{
+							padding: 10,
+							borderRadius: 8,
+							background: "rgba(248,113,113,0.08)",
+							border: "1px solid rgba(248,113,113,0.2)",
+							color: "#F87171",
+							fontSize: 13,
+						}}
+					>
+						{error}
+					</div>
+				)}
 
 				<FormInput
 					label="Name"
@@ -122,14 +135,26 @@ export function SignUp() {
 				<button
 					type="submit"
 					disabled={isLoading}
-					className="w-full py-3 px-4 bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-medium rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-aiki-purple focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+					style={{
+						width: "100%",
+						padding: "10px 16px",
+						background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+						color: "#fff",
+						fontSize: 14,
+						fontWeight: 700,
+						borderRadius: 8,
+						border: "none",
+						cursor: isLoading ? "not-allowed" : "pointer",
+						opacity: isLoading ? 0.5 : 1,
+						fontFamily: "inherit",
+					}}
 				>
 					{isLoading ? "Creating account..." : "Create account"}
 				</button>
 
-				<p className="text-center text-sm text-slate-600">
+				<p style={{ textAlign: "center", fontSize: 13, color: "var(--t2)" }}>
 					Already have an account?{" "}
-					<Link to="/auth/sign-in" className="text-aiki-purple hover:underline font-medium">
+					<Link to="/auth/sign-in" style={{ color: "#667eea", fontWeight: 600, textDecoration: "none" }}>
 						Sign in
 					</Link>
 				</p>

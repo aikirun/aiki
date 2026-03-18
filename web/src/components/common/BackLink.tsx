@@ -9,7 +9,7 @@ interface BackLinkProps {
 
 export function BackLink({ to, label = "Back" }: BackLinkProps) {
 	return (
-		<Link to={to} className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors">
+		<Link to={to} className="inline-flex items-center gap-1 text-t-2 hover:text-t-0 transition-colors">
 			<BackArrowIcon />
 			{label}
 		</Link>

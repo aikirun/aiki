@@ -1,20 +1,22 @@
 import type { ScheduleStatus } from "@aikirun/types/schedule";
 
-export const SCHEDULE_STATUS_CONFIG: Record<ScheduleStatus, { label: string; className: string; icon: string }> = {
+import { SCHEDULE_STATUS_COLORS } from "./status-colors";
+
+export const SCHEDULE_STATUS_CONFIG: Record<ScheduleStatus, { label: string; color: string; glyph: string }> = {
 	active: {
 		label: "Active",
-		className: "bg-emerald-100 text-emerald-700 border-emerald-300",
-		icon: "play",
+		color: SCHEDULE_STATUS_COLORS.active,
+		glyph: "●",
 	},
 	paused: {
 		label: "Paused",
-		className: "bg-amber-100 text-amber-700 border-amber-300",
-		icon: "pause",
+		color: SCHEDULE_STATUS_COLORS.paused,
+		glyph: "❙❙",
 	},
 	deleted: {
 		label: "Deleted",
-		className: "bg-red-100 text-red-700 border-red-300",
-		icon: "trash",
+		color: SCHEDULE_STATUS_COLORS.deleted,
+		glyph: "⊘",
 	},
 };
 

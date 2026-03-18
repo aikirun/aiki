@@ -71,7 +71,11 @@ export function CreateOrganization() {
 	return (
 		<AuthLayout title="Create your organization" subtitle="Organizations help you manage workflows and team members">
 			<form onSubmit={handleSubmit} className="space-y-5">
-				{error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
+				{error && (
+					<div className="p-3 rounded-lg bg-status-failed/10 border border-status-failed/30 text-status-failed text-sm">
+						{error}
+					</div>
+				)}
 
 				<FormInput
 					label="Organization name"
@@ -94,7 +98,7 @@ export function CreateOrganization() {
 						required
 						pattern="[a-z0-9-]+"
 					/>
-					<p className="mt-1.5 text-xs text-slate-500">
+					<p className="mt-1.5 text-xs text-t-3">
 						Only lowercase letters, numbers, and hyphens. This will be used in URLs.
 					</p>
 				</div>
@@ -102,7 +106,8 @@ export function CreateOrganization() {
 				<button
 					type="submit"
 					disabled={isLoading || !name || !slug}
-					className="w-full py-3 px-4 bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-medium rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-aiki-purple focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+					style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
+					className="w-full py-3 px-4 text-white font-medium rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
 				>
 					{isLoading ? "Creating..." : "Create organization"}
 				</button>

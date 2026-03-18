@@ -32,20 +32,20 @@ export class ErrorBoundary extends Component<Props, State> {
 	render() {
 		if (this.state.hasError) {
 			return (
-				<div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-					<div className="bg-white rounded-2xl border-2 border-slate-200 p-8 max-w-md w-full text-center">
-						<div className="text-6xl mb-4">💥</div>
-						<h1 className="text-2xl font-bold text-slate-900 mb-2">Something went wrong</h1>
-						<p className="text-slate-500 mb-6">An unexpected error occurred. Please try reloading the page.</p>
+				<div className="min-h-screen bg-surface-bg flex items-center justify-center p-4">
+					<div className="bg-surface-s1 border border-surface-s3 rounded-xl p-8 max-w-md w-full text-center">
+						<h1 className="text-2xl font-bold text-t-0 mb-2">Something went wrong</h1>
+						<p className="text-t-2 mb-6">An unexpected error occurred. Please try reloading the page.</p>
 						{this.state.error && (
-							<pre className="bg-slate-100 rounded-lg p-3 text-xs text-left text-red-600 mb-6 overflow-x-auto">
+							<pre className="bg-surface-s2 rounded-lg p-3 text-xs text-left text-status-failed mb-6 overflow-x-auto">
 								{this.state.error.message}
 							</pre>
 						)}
 						<button
 							type="button"
 							onClick={this.handleReload}
-							className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-aiki-purple text-white font-medium hover:bg-purple-700 transition-colors"
+							style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
+							className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-opacity"
 						>
 							<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path

@@ -5,22 +5,34 @@ interface FormInputProps extends InputHTMLAttributes<HTMLInputElement> {
 	error?: string;
 }
 
-export function FormInput({ label, error, id, className = "", ...props }: FormInputProps) {
+export function FormInput({ label, error, id, ...props }: FormInputProps) {
 	const inputId = id || props.name;
 
 	return (
 		<div>
-			<label htmlFor={inputId} className="block text-sm font-medium text-slate-700 mb-1.5">
+			<label
+				htmlFor={inputId}
+				style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--t1)", marginBottom: 6 }}
+			>
 				{label}
 			</label>
 			<input
 				id={inputId}
-				className={`w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-aiki-purple focus:border-transparent transition-shadow ${
-					error ? "border-red-300 focus:ring-red-500" : ""
-				} ${className}`}
+				style={{
+					width: "100%",
+					padding: "10px 14px",
+					background: "var(--s2)",
+					border: `1px solid ${error ? "#F87171" : "var(--b0)"}`,
+					borderRadius: 8,
+					fontSize: 13,
+					color: "var(--t0)",
+					outline: "none",
+					fontFamily: "inherit",
+					boxSizing: "border-box",
+				}}
 				{...props}
 			/>
-			{error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
+			{error && <p style={{ marginTop: 6, fontSize: 12, color: "#F87171" }}>{error}</p>}
 		</div>
 	);
 }

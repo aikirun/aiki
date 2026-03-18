@@ -9,10 +9,10 @@ export function TableSkeleton({ rows, columns = 4 }: TableSkeletonProps) {
 			{Array.from({ length: rows }).map((_, i) => (
 				// biome-ignore lint/suspicious/noArrayIndexKey: static skeleton items
 				<div key={i} className="flex gap-4 animate-pulse">
-					<div className="h-4 bg-slate-200 rounded flex-1" />
+					<div className="h-4 bg-surface-s3 rounded flex-1" />
 					{Array.from({ length: columns - 1 }).map((_, j) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: static skeleton items
-						<div key={j} className="h-4 bg-slate-200 rounded w-20" />
+						<div key={j} className="h-4 bg-surface-s3 rounded w-20" />
 					))}
 				</div>
 			))}

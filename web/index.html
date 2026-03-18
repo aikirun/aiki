@@ -5,6 +5,12 @@
 		<link rel="icon" type="image/svg+xml" href="/aiki-favicon-white.svg" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Aiki Dashboard</title>
+		<script>
+			(() => {
+				var t = localStorage.getItem('aiki-theme');
+				if (t === 'light') document.documentElement.dataset.theme = 'light';
+			})();
+		</script>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link

@@ -43,7 +43,11 @@ export function CreateNamespace() {
 			subtitle={`Namespaces help you organize workflows within ${activeOrganization?.name || "your organization"}`}
 		>
 			<form onSubmit={handleSubmit} className="space-y-5">
-				{error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
+				{error && (
+					<div className="p-3 rounded-lg bg-status-failed/10 border border-status-failed/30 text-status-failed text-sm">
+						{error}
+					</div>
+				)}
 
 				<FormInput
 					label="Namespace name"
@@ -55,14 +59,15 @@ export function CreateNamespace() {
 					required
 				/>
 
-				<p className="text-sm text-slate-600">
+				<p className="text-sm text-t-2">
 					Common namespace names include: production, staging, development, or team names.
 				</p>
 
 				<button
 					type="submit"
 					disabled={isLoading || !name}
-					className="w-full py-3 px-4 bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-medium rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-aiki-purple focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+					style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
+					className="w-full py-3 px-4 text-white font-medium rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
 				>
 					{isLoading ? "Creating..." : "Create namespace"}
 				</button>

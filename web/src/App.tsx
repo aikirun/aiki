@@ -1,16 +1,15 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import { NotFound } from "./components/common/NotFound";
-import { Layout } from "./components/layout/Layout";
-import { SettingsLayout } from "./components/layout/SettingsLayout";
+import { AppShell } from "./components/layout/AppShell";
 import { ApiKeys } from "./pages/ApiKeys";
 import { SignIn } from "./pages/auth/SignIn";
 import { SignUp } from "./pages/auth/SignUp";
-import { Dashboard } from "./pages/Dashboard";
 import { CreateNamespace } from "./pages/onboarding/CreateNamespace";
 import { CreateOrganization } from "./pages/onboarding/CreateOrganization";
 import { RunDetail } from "./pages/RunDetail";
-import { WorkflowDetail } from "./pages/WorkflowDetail";
+import { RunsList } from "./pages/RunsList";
+import { SchedulesList } from "./pages/SchedulesList";
 import { OnboardingRoute, ProtectedRoute } from "./routes/ProtectedRoute";
 
 export default function App() {
@@ -42,18 +41,27 @@ export default function App() {
 			<Route
 				element={
 					<ProtectedRoute>
-						<Layout />
+						<AppShell />
 					</ProtectedRoute>
 				}
 			>
-				<Route path="/" element={<Dashboard />} />
-				<Route path="/settings" element={<SettingsLayout />}>
-					<Route path="api-keys" element={<ApiKeys />} />
-				</Route>
-				<Route path="/workflow/:name" element={<WorkflowDetail />} />
-				<Route path="/workflow/:name/run/:id" element={<RunDetail />} />
+				<Route path="/" element={<RunsList />} />
+				<Route path="/runs/:id" element={<RunDetail />} />
+				<Route path="/schedules" element={<SchedulesList />} />
+				<Route path="/settings" element={<ApiKeys />} />
+
+				{/* Redirects from old routes */}
+				<Route path="/workflow/:name/run/:id" element={<OldRunRedirect />} />
+				<Route path="/workflow/:name" element={<Navigate to="/" replace />} />
+				<Route path="/settings/api-keys" element={<Navigate to="/settings" replace />} />
+
 				<Route path="*" element={<NotFound />} />
 			</Route>
 		</Routes>
 	);
+}
+
+function OldRunRedirect() {
+	const id = window.location.pathname.split("/run/")[1];
+	return <Navigate to={`/runs/${id}`} replace />;
 }
