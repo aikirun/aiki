@@ -7,7 +7,6 @@ Build your first workflow!
 Make sure you've completed the [Installation](./installation.md) steps:
 
 - PostgreSQL running
-- Redis running
 - Aiki Server running
 - SDK packages installed
 - API key created via the Aiki Web UI
@@ -44,7 +43,6 @@ const helloV1 = helloWorkflow.v("1.0.0", {
 // 3. Set up the client (set AIKI_API_KEY env variable or pass apiKey option inline)
 const aikiClient = client({
     url: "http://localhost:9850",
-    redis: { host: "localhost", port: 6379 },
 });
 
 // 4. Create a worker (executes workflows)

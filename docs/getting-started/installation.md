@@ -5,7 +5,7 @@ This guide covers two ways to run Aiki:
 - **Option A: Docker Compose** — Runs Aiki server and web UI in containers
 - **Option B: Direct with Bun** — Runs Aiki directly on your machine
 
-Both options require PostgreSQL and Redis running externally.
+Both options require PostgreSQL running externally. Redis is optional — it enables lower-latency message delivery but Aiki works without it.
 
 ---
 
@@ -15,7 +15,7 @@ Both options require PostgreSQL and Redis running externally.
 
 - Docker and Docker Compose
 - PostgreSQL 14+
-- Redis 6.2+
+- Redis 6.2+ (optional, for lower-latency message delivery)
 
 ### Step 1: Clone the Repository
 
@@ -26,14 +26,16 @@ cd aiki
 
 ### Step 2: Configure Environment
 
-Create a `.env` file in the repository root with your PostgreSQL and Redis connection details:
+Create a `.env` file in the repository root with your connection details:
 
 ```bash
 # .env
 DATABASE_URL=postgresql://user:password@host.docker.internal:5432/aiki
-REDIS_HOST=host.docker.internal
-REDIS_PORT=6379
-REDIS_PASSWORD=
+
+# Optional: Redis for lower-latency message delivery
+# REDIS_HOST=host.docker.internal
+# REDIS_PORT=6379
+# REDIS_PASSWORD=
 ```
 
 Replace with your actual credentials. Use `host.docker.internal` to connect to services running on your host machine.
@@ -67,7 +69,7 @@ You're ready! Continue to the [Quick Start](./quick-start.md) guide.
 
 - Bun 1.0+
 - PostgreSQL 14+
-- Redis 6.2+
+- Redis 6.2+ (optional, for lower-latency message delivery)
 
 ### Step 1: Clone the Repository
 
@@ -83,7 +85,7 @@ bun install
 cp server/.env.example server/.env
 ```
 
-Edit `server/.env` with your PostgreSQL and Redis connection details.
+Edit `server/.env` with your PostgreSQL connection details (and optionally Redis).
 
 ### Step 3: Start Aiki
 
@@ -126,7 +128,7 @@ You're ready! Continue to the [Quick Start](./quick-start.md) guide.
 | `AIKI_SERVER_BASE_URL` | Yes | - | Public URL of the Aiki server |
 | `AIKI_SERVER_AUTH_SECRET` | Yes | - | Secret key for authentication |
 | `CORS_ORIGINS` | No | - | Comma-separated list of allowed origins |
-| `REDIS_HOST` | Yes | - | Redis server hostname |
+| `REDIS_HOST` | No | - | Redis server hostname (enables Redis-based message delivery) |
 | `REDIS_PORT` | No | `6379` | Redis server port |
 | `REDIS_PASSWORD` | No | - | Redis password (if required) |
 

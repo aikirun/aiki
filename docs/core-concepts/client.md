@@ -10,10 +10,6 @@ import { client } from "@aikirun/client";
 // Set AIKI_API_KEY env variable or pass apiKey option inline
 const aikiClient = client({
 	url: "http://localhost:9850",
-	redis: {
-		host: "localhost",
-		port: 6379,
-	},
 });
 ```
 
@@ -35,9 +31,9 @@ The URL of the Aiki server:
 url: "http://localhost:9850"; // Local development
 ```
 
-### redis
+### redis (optional)
 
-Redis connection configuration:
+Redis connection configuration. Only needed when using `{ type: "redis" }` subscriber strategy for lower-latency message delivery:
 
 ```typescript
 redis: {
@@ -55,7 +51,6 @@ Optional function to create per-execution context for workflows. Called before e
 ```typescript
 const aikiClient = await client<AppContext>({
 	url: "http://localhost:9850",
-	redis: { host: "localhost", port: 6379 },
 	createContext: (run) => ({
 		traceId: crypto.randomUUID(),
 		workflowRunId: run.id,
@@ -72,7 +67,6 @@ Optional custom logger implementation. Defaults to console logging:
 ```typescript
 const aikiClient = client({
 	url: "http://localhost:9850",
-	redis: { host: "localhost", port: 6379 },
 	logger: myCustomLogger, // Must implement Logger interface
 });
 ```

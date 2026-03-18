@@ -12,7 +12,6 @@ import { orderWorkflowV1, userWorkflowV1 } from "./workflows";
 // Set AIKI_API_KEY env variable or pass apiKey option inline
 const aikiClient = client({
   url: "http://localhost:9850",
-  redis: { host: "localhost", port: 6379 },
 });
 
 const aikiWorker = worker({
@@ -78,7 +77,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 |-------|-------------|
 | `name` | Unique worker identifier |
 | `workflows` | Workflow versions this worker executes |
-| `subscriber` | Subscriber config (default: `{ type: "redis" }`) |
+| `subscriber` | Subscriber config (default: `{ type: "db" }`). Use `{ type: "redis" }` for lower-latency delivery |
 
 **Options** are passed via `opts` param or `with()` builder:
 

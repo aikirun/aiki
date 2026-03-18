@@ -11,7 +11,6 @@ import { dailyReportWorkflowV1 } from "./workflows";
 
 const aikiClient = client({
 	url: "http://localhost:9850",
-	redis: { host: "localhost", port: 6379 },
 });
 
 const dailyReport = schedule({

@@ -38,15 +38,19 @@ export async function loadConfig(): Promise<Config> {
 
 	config({ path: envPath });
 
+	const redis = process.env.REDIS_HOST
+		? {
+				host: process.env.REDIS_HOST,
+				port: process.env.REDIS_PORT,
+				password: process.env.REDIS_PASSWORD,
+			}
+		: undefined;
+
 	const raw = {
 		port: process.env.AIKI_SERVER_PORT,
 		baseURL: process.env.AIKI_SERVER_BASE_URL,
 		corsOrigins: process.env.CORS_ORIGINS,
-		redis: {
-			host: process.env.REDIS_HOST,
-			port: process.env.REDIS_PORT,
-			password: process.env.REDIS_PASSWORD,
-		},
+		redis,
 		database: loadDatabaseConfig(),
 		auth: {
 			secret: process.env.AIKI_SERVER_AUTH_SECRET,

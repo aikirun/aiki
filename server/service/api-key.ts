@@ -48,7 +48,7 @@ function getCacheKey(keyHash: string): string {
 	return `${CACHE_KEY_PREFIX}${keyHash}`;
 }
 
-export function createApiKeyService(repo: ApiKeyRepository, redis: Redis) {
+export function createApiKeyService(repo: ApiKeyRepository, redis?: Redis) {
 	return {
 		async create(
 			input: Pick<ApiKeyRowInsert, "organizationId" | "namespaceId" | "createdByUserId" | "name" | "expiresAt">
@@ -77,18 +77,20 @@ export function createApiKeyService(repo: ApiKeyRepository, redis: Redis) {
 
 			const keyHash = sha256Sync(key);
 
-			const cacheKey = getCacheKey(keyHash);
-			const cached = await redis.get(cacheKey);
-			if (cached) {
-				const cachedKeyInfo: CachedKeyInfo = JSON.parse(cached);
-				if (cachedKeyInfo.expiresAt && cachedKeyInfo.expiresAt <= Date.now()) {
-					return null;
-				}
+			if (redis) {
+				const cacheKey = getCacheKey(keyHash);
+				const cached = await redis.get(cacheKey);
+				if (cached) {
+					const cachedKeyInfo: CachedKeyInfo = JSON.parse(cached);
+					if (cachedKeyInfo.expiresAt && cachedKeyInfo.expiresAt <= Date.now()) {
+						return null;
+					}
 
-				return {
-					namespaceId: cachedKeyInfo.namespaceId,
-					organizationId: cachedKeyInfo.organizationId,
-				};
+					return {
+						namespaceId: cachedKeyInfo.namespaceId,
+						organizationId: cachedKeyInfo.organizationId,
+					};
+				}
 			}
 
 			const keyInfo = await repo.getByActiveKeyByHash(keyHash);
@@ -99,12 +101,15 @@ export function createApiKeyService(repo: ApiKeyRepository, redis: Redis) {
 				return null;
 			}
 
-			const cachedKeyInfo: CachedKeyInfo = {
-				organizationId: keyInfo.organizationId as OrganizationId,
-				namespaceId: keyInfo.namespaceId as NamespaceId,
-				expiresAt: keyInfo.expiresAt,
-			};
-			await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(cachedKeyInfo));
+			if (redis) {
+				const cacheKey = getCacheKey(keyHash);
+				const cachedKeyInfo: CachedKeyInfo = {
+					organizationId: keyInfo.organizationId as OrganizationId,
+					namespaceId: keyInfo.namespaceId as NamespaceId,
+					expiresAt: keyInfo.expiresAt,
+				};
+				await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(cachedKeyInfo));
+			}
 
 			return {
 				namespaceId: keyInfo.namespaceId,

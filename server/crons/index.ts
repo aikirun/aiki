@@ -27,7 +27,7 @@ import { scheduleSleepElapsedWorkflowRuns } from "./schedule-sleep-elapsed-runs"
 
 export interface InitCronsDeps {
 	db: DatabaseConn;
-	workflowRunPublisher: WorkflowRunPublisher;
+	workflowRunPublisher?: WorkflowRunPublisher;
 	workflowRunOutboxRepo: WorkflowRunOutboxRepository;
 	workflowRunRepo: WorkflowRunRepository;
 	stateTransitionRepo: StateTransitionRepository;
@@ -87,9 +87,17 @@ function initCron<Deps, Opts>(
 }
 
 export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
+	const publisherDeps = deps.workflowRunPublisher
+		? { workflowRunOutboxRepo: deps.workflowRunOutboxRepo, workflowRunPublisher: deps.workflowRunPublisher }
+		: undefined;
+
 	const crons = [
-		initCron(logger, 500, publishReadyRuns, deps),
-		initCron(logger, 500, republishStaleRuns, deps),
+		...(publisherDeps
+			? [
+					initCron(logger, 500, publishReadyRuns, publisherDeps),
+					initCron(logger, 500, republishStaleRuns, publisherDeps),
+				]
+			: []),
 		initCron(logger, 500, queueScheduledWorkflowRuns, deps),
 		initCron(logger, 500, scheduleSleepElapsedWorkflowRuns, deps),
 		initCron(logger, 500, scheduleRetryableWorkflowRuns, deps),

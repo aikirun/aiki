@@ -1,6 +1,6 @@
 # Server
 
-The Aiki server coordinates workflow execution. It receives requests from SDK clients, persists workflow state, publishes work to Redis streams, and runs background jobs that drive workflow state transitions.
+The Aiki server coordinates workflow execution. It receives requests from SDK clients, persists workflow state, distributes work to workers, and runs background jobs that drive workflow state transitions.
 
 ## What the Server Does
 
@@ -8,7 +8,7 @@ The Aiki server coordinates workflow execution. It receives requests from SDK cl
 
 The server exposes an RPC API that the SDK client calls to:
 
-- **Create workflow runs** - Validate input, persist state, publish to Redis stream
+- **Create workflow runs** - Validate input, persist state, distribute to workers
 - **Update workflow state** - Process state transitions from workers
 - **Update task state** - Record task results and failures
 - **Send events** - Deliver events to waiting workflows
@@ -16,7 +16,7 @@ The server exposes an RPC API that the SDK client calls to:
 
 ### Work Distribution
 
-When a workflow run is ready for execution, the server publishes a message to the appropriate Redis stream. Workers subscribed to that stream pick up the work. See [Redis Streams](./redis-streams.md) for details.
+When a workflow run is ready for execution, the server makes it available for workers to pick up. By default, workers poll the server directly. When Redis is configured, the server also publishes messages to Redis Streams for lower-latency delivery. See [Redis Streams](./redis-streams.md) for details.
 
 ### Background Jobs
 
@@ -36,13 +36,15 @@ The server runs periodic jobs that drive workflow state transitions:
 The server requires:
 
 - **Port** - HTTP port to listen on
-- **Redis** - Connection for publishing workflow messages
+- **Redis** (optional) - Connection for lower-latency message delivery
 
 ```bash
 # .env
 AIKI_SERVER_PORT=9850
-REDIS_HOST=localhost
-REDIS_PORT=6379
+
+# Optional: Redis for lower-latency message delivery
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
 ```
 
 ## Next Steps

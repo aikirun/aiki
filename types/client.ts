@@ -8,7 +8,7 @@ import { INTERNAL } from "./symbols";
 export interface ClientParams<AppContext = unknown> {
 	url: string;
 	apiKey?: string;
-	redis: RedisConfig;
+	redis?: RedisConfig;
 	logger?: Logger;
 	createContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
 }

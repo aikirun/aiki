@@ -44,16 +44,20 @@ if (import.meta.main) {
 
 	const db = createDatabaseConn(config.database);
 
-	const redis = new Redis({
-		host: config.redis.host,
-		port: config.redis.port,
-		password: config.redis.password,
-	});
-	redis.on("error", (err: Error) => {
-		logger.error({ err }, "Redis connection error");
-	});
+	let redis: Redis | undefined;
+	let workflowRunPublisher: ReturnType<typeof createWorkflowRunPublisher> | undefined;
 
-	const workflowRunPublisher = createWorkflowRunPublisher(redis);
+	if (config.redis) {
+		redis = new Redis({
+			host: config.redis.host,
+			port: config.redis.port,
+			password: config.redis.password,
+		});
+		redis.on("error", (err: Error) => {
+			logger.error({ err }, "Redis connection error");
+		});
+		workflowRunPublisher = createWorkflowRunPublisher(redis);
+	}
 
 	const apiKeyRepository = createApiKeyRepository(db);
 	const namespaceRepository = createNamespaceRepository(db);
@@ -233,7 +237,9 @@ if (import.meta.main) {
 
 	const shutdown = async () => {
 		crons.shutdown();
-		await redis.quit();
+		if (redis) {
+			await redis.quit();
+		}
 		process.exit(0);
 	};
 

@@ -64,7 +64,7 @@ workflow lifecycle, task management tracks task execution, and the storage layer
 The message queue provides high-performance message distribution using consumer groups for work distribution, message
 claiming for fault tolerance, and automatic load balancing (workers pull work when they have capacity).
 
-**Available implementations**: Redis Streams (default). See [Redis Streams](./redis-streams.md) for details.
+**Available implementations**: Database polling (default) and Redis Streams (optional, lower latency). See [Redis Streams](./redis-streams.md) for details on the Redis option.
 
 ### 4. Workers
 

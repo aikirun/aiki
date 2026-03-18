@@ -185,7 +185,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	async _start(): Promise<void> {
 		const workflows = this.registry.getAll();
 
-		const subscriberStrategyParams = this.params.subscriber ?? { type: "redis" };
+		const subscriberStrategyParams = this.params.subscriber ?? { type: "db" };
 		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
 			subscriberStrategyParams,
 			workflows,

@@ -1,5 +1,5 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib";
-import type { WorkflowRunId } from "@aikirun/types/dist/workflow-run.d";
+import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 
 import type { DatabaseConn, DbTransaction } from "..";

@@ -58,7 +58,7 @@ export const configSchema = type({
 	port: "string.integer.parse | number.integer > 0 = 9850",
 	baseURL: "string > 0",
 	corsOrigins: uniqueCommaSeparatedToItems,
-	redis: redisConfigSchema,
+	"redis?": redisConfigSchema.or(type("undefined")),
 	database: databaseConfigSchema,
 	auth: authConfigSchema,
 	logLevel: type.enumerated(...logLevels).default("info"),
