@@ -1,14 +1,12 @@
 export type {
-	AdaptivePollingSubscriberStrategy,
 	ApiClient,
 	Client,
 	ClientParams,
+	DbSubscriberStrategy,
 	Logger,
-	PollingSubscriberStrategy,
 	RedisConfig,
 	RedisStreamsSubscriberStrategy,
 	ResolvedSubscriberStrategy,
-	SubscriberMessageMeta,
 	SubscriberStrategy,
 	WorkflowRunBatch,
 } from "@aikirun/types/client";

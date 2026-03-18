@@ -3,6 +3,8 @@ import type {
 	WorkflowRunApi,
 	WorkflowRunCancelByIdsRequestV1,
 	WorkflowRunCancelByIdsResponseV1,
+	WorkflowRunClaimReadyRequestV1,
+	WorkflowRunClaimReadyResponseV1,
 	WorkflowRunCreateRequestV1,
 	WorkflowRunCreateResponseV1,
 	WorkflowRunGetByIdRequestV1,
@@ -11,6 +13,7 @@ import type {
 	WorkflowRunGetByReferenceIdResponseV1,
 	WorkflowRunGetStateRequestV1,
 	WorkflowRunGetStateResponseV1,
+	WorkflowRunHeartbeatRequestV1,
 	WorkflowRunListChildRunsRequestV1,
 	WorkflowRunListChildRunsResponseV1,
 	WorkflowRunListRequestV1,
@@ -319,6 +322,35 @@ const cancelByIdsV1: ContractProcedure<WorkflowRunCancelByIdsRequestV1, Workflow
 	.input(cancelByIdsRequestSchema)
 	.output(cancelByIdsResponseSchema);
 
+const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRunClaimReadyResponseV1> = oc
+	.input(
+		type({
+			workerId: "string > 0",
+			workflows: type({
+				name: "string > 0",
+				versionId: "string > 0",
+				"shard?": "string > 0 | undefined",
+			})
+				.array()
+				.atLeastLength(1),
+			limit: "number.integer > 0",
+			claimMinIdleTimeMs: "number.integer > 0",
+		})
+	)
+	.output(
+		type({
+			runs: type({ id: "string > 0" }).array(),
+		})
+	);
+
+const heartbeatV1: ContractProcedure<WorkflowRunHeartbeatRequestV1, void> = oc
+	.input(
+		type({
+			id: "string > 0",
+		})
+	)
+	.output(type("undefined"));
+
 export const workflowRunContract = {
 	listV1,
 	getByIdV1,
@@ -334,6 +366,8 @@ export const workflowRunContract = {
 	multicastEventByReferenceV1,
 	listChildRunsV1,
 	cancelByIdsV1,
+	claimReadyV1,
+	heartbeatV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

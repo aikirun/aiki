@@ -21,6 +21,7 @@ import type { SleepQueueRepository } from "server/infra/db/repository/sleep-queu
 import type { StateTransitionRepository } from "server/infra/db/repository/state-transition";
 import type { TaskRepository } from "server/infra/db/repository/task";
 import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
+import type { WorkflowRunOutboxRepository } from "server/infra/db/repository/workflow-run-outbox";
 import type { NamespaceRequestContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
 import { ulid } from "ulidx";
@@ -197,6 +198,7 @@ export interface WorkflowRunStateMachineServiceDeps {
 	taskRepo: TaskRepository;
 	childWorkflowRunWaitQueueRepo: ChildWorkflowRunWaitQueueRepository;
 	childRunCanceller: ChildRunCanceller;
+	workflowRunOutboxRepo: WorkflowRunOutboxRepository;
 }
 
 export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachineServiceDeps) {
@@ -251,6 +253,10 @@ export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachi
 			(fromState.reason === "retry" || fromState.reason === "new")
 		) {
 			attempts++;
+		}
+
+		if (toState.status === "running") {
+			await deps.workflowRunOutboxRepo.deleteByWorkflowRunId(namespaceId, runId, tx);
 		}
 
 		if (toState.status === "scheduled" && toState.reason === "retry") {

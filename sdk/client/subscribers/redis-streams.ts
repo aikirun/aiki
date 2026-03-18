@@ -8,7 +8,6 @@ import type {
 	RedisStreamsSubscriberStrategy,
 	StrategyCallbacks,
 	SubscriberDelayParams,
-	SubscriberMessageMeta,
 	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
 } from "@aikirun/types/client";
@@ -16,6 +15,17 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { type } from "arktype";
+
+interface StreamMessageMeta {
+	stream: string;
+	messageId: string;
+	consumerGroup: string;
+}
+
+interface StreamMessage {
+	data: { workflowRunId: WorkflowRunId };
+	meta: StreamMessageMeta;
+}
 
 /**
  * Redis stream entries structure returned by XREADGROUP command:
@@ -110,57 +120,6 @@ export function createRedisStreamsStrategy(
 		}
 	};
 
-	const getHeartbeat =
-		(workerId: string) =>
-		async (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta): Promise<void> => {
-			try {
-				await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
-				logger.debug("Heartbeat sent", {
-					"aiki.workerId": workerId,
-					"aiki.workflowRunId": workflowRunId,
-					"aiki.messageId": meta.messageId,
-				});
-			} catch (error) {
-				logger.warn("Heartbeat failed", {
-					"aiki.workerId": workerId,
-					"aiki.workflowRunId": workflowRunId,
-					"aiki.error": error instanceof Error ? error.message : String(error),
-				});
-			}
-		};
-
-	const acknowledge = async (
-		workerId: string,
-		workflowRunId: WorkflowRunId,
-		meta: SubscriberMessageMeta
-	): Promise<void> => {
-		try {
-			const result = await redis.xack(meta.stream, meta.consumerGroup, meta.messageId);
-
-			if (result === 0) {
-				logger.warn("Message already acknowledged", {
-					"aiki.workerId": workerId,
-					"aiki.workflowRunId": workflowRunId,
-					"aiki.messageId": meta.messageId,
-				});
-			} else {
-				logger.debug("Message acknowledged", {
-					"aiki.workerId": workerId,
-					"aiki.workflowRunId": workflowRunId,
-					"aiki.messageId": meta.messageId,
-				});
-			}
-		} catch (error) {
-			logger.error("Failed to acknowledge message", {
-				"aiki.workerId": workerId,
-				"aiki.workflowRunId": workflowRunId,
-				"aiki.messageId": meta.messageId,
-				"aiki.error": error instanceof Error ? error.message : String(error),
-			});
-			throw error;
-		}
-	};
-
 	return {
 		async init(workerId: string, _callbacks: StrategyCallbacks) {
 			for (const [stream, consumerGroup] of streamConsumerGroupMap) {
@@ -173,11 +132,13 @@ export function createRedisStreamsStrategy(
 				}
 			}
 
+			const pendingMessageMetaByWorkflowRunId = new Map<WorkflowRunId, StreamMessageMeta>();
+
 			return {
 				type: strategy.type,
 				getNextDelay,
-				getNextBatch: (size: number) =>
-					fetchRedisStreamMessages(
+				getNextBatch: async (size: number): Promise<WorkflowRunBatch[]> => {
+					const messages = await fetchRedisStreamMessages(
 						redis,
 						logger.child({ "aiki.workerId": workerId }),
 						streams,
@@ -186,9 +147,69 @@ export function createRedisStreamsStrategy(
 						size,
 						blockTimeMs,
 						claimMinIdleTimeMs
-					),
-				heartbeat: getHeartbeat(workerId),
-				acknowledge,
+					);
+
+					const batches: WorkflowRunBatch[] = [];
+					for (const message of messages) {
+						pendingMessageMetaByWorkflowRunId.set(message.data.workflowRunId, message.meta);
+						batches.push({ data: message.data });
+					}
+
+					return batches;
+				},
+				heartbeat: async (workflowRunId: WorkflowRunId): Promise<void> => {
+					const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
+					if (!meta) {
+						return;
+					}
+					try {
+						await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
+						logger.debug("Heartbeat sent", {
+							"aiki.workerId": workerId,
+							"aiki.workflowRunId": workflowRunId,
+							"aiki.messageId": meta.messageId,
+						});
+					} catch (error) {
+						logger.warn("Heartbeat failed", {
+							"aiki.workerId": workerId,
+							"aiki.workflowRunId": workflowRunId,
+							"aiki.error": error instanceof Error ? error.message : String(error),
+						});
+					}
+				},
+				acknowledge: async (workflowRunId: WorkflowRunId): Promise<void> => {
+					const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
+					if (!meta) {
+						return;
+					}
+					try {
+						const result = await redis.xack(meta.stream, meta.consumerGroup, meta.messageId);
+
+						if (result === 0) {
+							logger.warn("Message already acknowledged", {
+								"aiki.workerId": workerId,
+								"aiki.workflowRunId": workflowRunId,
+								"aiki.messageId": meta.messageId,
+							});
+						} else {
+							logger.debug("Message acknowledged", {
+								"aiki.workerId": workerId,
+								"aiki.workflowRunId": workflowRunId,
+								"aiki.messageId": meta.messageId,
+							});
+						}
+					} catch (error) {
+						logger.error("Failed to acknowledge message", {
+							"aiki.workerId": workerId,
+							"aiki.workflowRunId": workflowRunId,
+							"aiki.messageId": meta.messageId,
+							"aiki.error": error instanceof Error ? error.message : String(error),
+						});
+						throw error;
+					} finally {
+						pendingMessageMetaByWorkflowRunId.delete(workflowRunId);
+					}
+				},
 			};
 		},
 	};
@@ -226,7 +247,7 @@ async function fetchRedisStreamMessages(
 	size: number,
 	blockTimeMs: number,
 	claimMinIdleTimeMs: number
-): Promise<WorkflowRunBatch[]> {
+): Promise<StreamMessage[]> {
 	if (!isNonEmptyArray(streams)) {
 		return [];
 	}
@@ -305,8 +326,8 @@ async function processRedisStreamMessages(
 	logger: Logger,
 	streamConsumerGroupMap: Map<string, string>,
 	streamsEntries: NonEmptyArray<unknown>
-): Promise<WorkflowRunBatch[]> {
-	const workflowRuns: WorkflowRunBatch[] = [];
+): Promise<StreamMessage[]> {
+	const workflowRuns: StreamMessage[] = [];
 	for (const streamEntriesRaw of streamsEntries) {
 		logger.debug("Raw stream entries", { "aiki.entries": streamEntriesRaw });
 
@@ -374,7 +395,7 @@ async function claimStuckRedisStreamMessages(
 	workerId: string,
 	maxClaim: number,
 	minIdleMs: number
-): Promise<WorkflowRunBatch[]> {
+): Promise<StreamMessage[]> {
 	if (maxClaim <= 0 || minIdleMs <= 0) {
 		return [];
 	}

@@ -400,22 +400,25 @@ export const workflowRunOutbox = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
-		index("idx_workflow_run_outbox_worker_poll").on(
-			table.status,
+		uniqueIndex("uqidx_workflow_run_outbox_workflow_run_id").on(table.workflowRunId),
+		index("idx_workflow_run_outbox_publish").on(
 			table.namespaceId,
+			table.status,
+			table.createdAt,
 			table.workflowName,
 			table.workflowVersionId,
-			table.createdAt
+			table.shard
 		),
-		index("idx_workflow_run_outbox_worker_poll_shard").on(
-			table.status,
+		index("idx_workflow_run_outbox_claim_stale").on(
 			table.namespaceId,
+			table.status,
+			table.updatedAt,
 			table.workflowName,
 			table.workflowVersionId,
-			table.shard,
-			table.createdAt
+			table.shard
 		),
-		index("idx_workflow_run_outbox_publish").on(table.status, table.createdAt),
+		index("idx_workflow_run_outbox_status_created").on(table.status, table.createdAt),
+		index("idx_workflow_run_outbox_status_updated").on(table.status, table.updatedAt),
 	]
 );
 

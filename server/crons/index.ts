@@ -17,6 +17,7 @@ import type { ScheduleService } from "server/service/schedule";
 
 import { publishReadyRuns } from "./publish-ready-runs";
 import { queueScheduledWorkflowRuns } from "./queue-scheduled-runs";
+import { republishStaleRuns } from "./republish-stale-runs";
 import { scheduleChildRunWaitTimedOutWorkflowRuns } from "./schedule-child-workflow-run-wait-timed-out-runs";
 import { scheduleEventWaitTimedOutWorkflowRuns } from "./schedule-event-wait-timed-out-runs";
 import { scheduleRecurringWorkflows } from "./schedule-recurring-workflows";
@@ -88,6 +89,7 @@ function initCron<Deps, Opts>(
 export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 	const crons = [
 		initCron(logger, 500, publishReadyRuns, deps),
+		initCron(logger, 500, republishStaleRuns, deps),
 		initCron(logger, 500, queueScheduledWorkflowRuns, deps),
 		initCron(logger, 500, scheduleSleepElapsedWorkflowRuns, deps),
 		initCron(logger, 500, scheduleRetryableWorkflowRuns, deps),

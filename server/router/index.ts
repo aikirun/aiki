@@ -1,10 +1,7 @@
 import type { ApiKeyService } from "server/service/api-key";
 import type { NamespaceService } from "server/service/namespace";
 import type { ScheduleService } from "server/service/schedule";
-import type { TaskStateMachineService } from "server/service/task-state-machine";
 import type { WorkflowService } from "server/service/workflow";
-import type { WorkflowRunService } from "server/service/workflow-run";
-import type { WorkflowRunStateMachineService } from "server/service/workflow-run-state-machine";
 
 import { createApiKeyRouter } from "./api-key";
 import { namespaceAuthedImplementer, organizationAuthedImplementer, publicImplementer } from "./implementer";
@@ -27,9 +24,6 @@ export interface NamespaceAuthedRouterDeps extends WorkflowRunRouterDeps {
 	apiKeyService: ApiKeyService;
 	scheduleService: ScheduleService;
 	workflowService: WorkflowService;
-	workflowRunService: WorkflowRunService;
-	workflowRunStateMachineService: WorkflowRunStateMachineService;
-	taskStateMachineService: TaskStateMachineService;
 }
 
 export function createNamespaceAuthedRouter(deps: NamespaceAuthedRouterDeps) {
@@ -41,6 +35,7 @@ export function createNamespaceAuthedRouter(deps: NamespaceAuthedRouterDeps) {
 			workflowRunService: deps.workflowRunService,
 			workflowRunStateMachineService: deps.workflowRunStateMachineService,
 			taskStateMachineService: deps.taskStateMachineService,
+			workflowRunOutboxService: deps.workflowRunOutboxService,
 		}),
 	});
 }

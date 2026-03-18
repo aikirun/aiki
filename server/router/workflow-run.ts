@@ -2,6 +2,7 @@ import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { runConcurrently } from "server/lib/concurrency";
 import type { TaskStateMachineService } from "server/service/task-state-machine";
 import type { WorkflowRunService } from "server/service/workflow-run";
+import type { WorkflowRunOutboxService } from "server/service/workflow-run-outbox";
 import type { WorkflowRunStateMachineService } from "server/service/workflow-run-state-machine";
 
 import { namespaceAuthedImplementer } from "./implementer";
@@ -10,11 +11,13 @@ export interface WorkflowRunRouterDeps {
 	workflowRunService: WorkflowRunService;
 	workflowRunStateMachineService: WorkflowRunStateMachineService;
 	taskStateMachineService: TaskStateMachineService;
+	workflowRunOutboxService: WorkflowRunOutboxService;
 }
 
 export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	const os = namespaceAuthedImplementer.workflowRun;
-	const { workflowRunService, workflowRunStateMachineService, taskStateMachineService } = deps;
+	const { workflowRunService, workflowRunStateMachineService, taskStateMachineService, workflowRunOutboxService } =
+		deps;
 
 	const listV1 = os.listV1.handler(async ({ input: request, context }) => {
 		return workflowRunService.listWorkflowRuns(context, request);
@@ -98,6 +101,14 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		return workflowRunService.cancelByIds(context, request);
 	});
 
+	const claimReadyV1 = os.claimReadyV1.handler(async ({ input: request, context }) => {
+		return { runs: await workflowRunOutboxService.claimReady(context, request) };
+	});
+
+	const heartbeatV1 = os.heartbeatV1.handler(async ({ input: request, context }) => {
+		await workflowRunOutboxService.reclaim(context, request.id as WorkflowRunId);
+	});
+
 	return os.router({
 		listV1,
 		getByIdV1,
@@ -113,5 +124,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		multicastEventByReferenceV1,
 		listChildRunsV1,
 		cancelByIdsV1,
+		claimReadyV1,
+		heartbeatV1,
 	});
 }

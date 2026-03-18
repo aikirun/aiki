@@ -44,6 +44,8 @@ export interface WorkflowRunApi {
 	multicastEventByReferenceV1: (_: WorkflowRunMulticastEventByReferenceRequestV1) => Promise<void>;
 	listChildRunsV1: (_: WorkflowRunListChildRunsRequestV1) => Promise<WorkflowRunListChildRunsResponseV1>;
 	cancelByIdsV1: (_: WorkflowRunCancelByIdsRequestV1) => Promise<WorkflowRunCancelByIdsResponseV1>;
+	claimReadyV1: (_: WorkflowRunClaimReadyRequestV1) => Promise<WorkflowRunClaimReadyResponseV1>;
+	heartbeatV1: (_: WorkflowRunHeartbeatRequestV1) => Promise<void>;
 }
 
 export interface WorkflowRunListRequestV1 {
@@ -283,4 +285,19 @@ export interface WorkflowRunCancelByIdsRequestV1 {
 
 export interface WorkflowRunCancelByIdsResponseV1 {
 	cancelledIds: string[];
+}
+
+export interface WorkflowRunClaimReadyRequestV1 {
+	workerId: string;
+	workflows: Array<{ name: string; versionId: string; shard?: string }>;
+	limit: number;
+	claimMinIdleTimeMs: number;
+}
+
+export interface WorkflowRunClaimReadyResponseV1 {
+	runs: Array<{ id: string }>;
+}
+
+export interface WorkflowRunHeartbeatRequestV1 {
+	id: string;
 }

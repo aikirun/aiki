@@ -35,6 +35,7 @@ export function createWorkflowRunPublisher(redis: Redis) {
 					},
 					"Failed to publish workflow_run_ready messages"
 				);
+				throw error;
 			}
 		},
 	};

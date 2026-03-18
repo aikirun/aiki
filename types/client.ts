@@ -68,15 +68,8 @@ export interface RedisConnection {
 	closeConnection: () => Promise<void>;
 }
 
-export interface SubscriberMessageMeta {
-	stream: string;
-	messageId: string;
-	consumerGroup: string;
-}
-
 export interface WorkflowRunBatch {
 	data: { workflowRunId: WorkflowRunId };
-	meta?: SubscriberMessageMeta;
 }
 
 export type SubscriberDelayParams =
@@ -89,26 +82,8 @@ export interface ResolvedSubscriberStrategy {
 	type: string;
 	getNextDelay: (context: SubscriberDelayParams) => number;
 	getNextBatch: (size: number) => Promise<WorkflowRunBatch[]>;
-	heartbeat?: (workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta) => Promise<void>;
-	acknowledge?: (workerId: string, workflowRunId: WorkflowRunId, meta: SubscriberMessageMeta) => Promise<void>;
-}
-
-export interface PollingSubscriberStrategy {
-	type: "polling";
-	intervalMs?: number;
-	maxRetryIntervalMs?: number;
-	atCapacityIntervalMs?: number;
-}
-
-export interface AdaptivePollingSubscriberStrategy {
-	type: "adaptive_polling";
-	minPollIntervalMs?: number;
-	maxPollIntervalMs?: number;
-	backoffMultiplier?: number;
-	emptyPollThreshold?: number;
-	jitterFactor?: number;
-	successResetThreshold?: number;
-	atCapacityIntervalMs?: number;
+	heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>;
+	acknowledge?: (workflowRunId: WorkflowRunId) => Promise<void>;
 }
 
 export interface RedisStreamsSubscriberStrategy {
@@ -120,9 +95,15 @@ export interface RedisStreamsSubscriberStrategy {
 	claimMinIdleTimeMs?: number;
 }
 
-export type SubscriberStrategy = // | PollingSubscriberStrategy
-	// | AdaptivePollingSubscriberStrategy
-	RedisStreamsSubscriberStrategy;
+export interface DbSubscriberStrategy {
+	type: "db";
+	intervalMs?: number;
+	maxRetryIntervalMs?: number;
+	atCapacityIntervalMs?: number;
+	claimMinIdleTimeMs?: number;
+}
+
+export type SubscriberStrategy = RedisStreamsSubscriberStrategy | DbSubscriberStrategy;
 
 export interface SubscriberStrategyBuilder {
 	init: (workerId: string, callbacks: StrategyCallbacks) => Promise<ResolvedSubscriberStrategy>;

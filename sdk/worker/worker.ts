@@ -1,11 +1,4 @@
-import type {
-	Client,
-	Logger,
-	ResolvedSubscriberStrategy,
-	SubscriberMessageMeta,
-	SubscriberStrategy,
-	WorkflowRunBatch,
-} from "@aikirun/client";
+import type { Client, Logger, ResolvedSubscriberStrategy, SubscriberStrategy, WorkflowRunBatch } from "@aikirun/client";
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
@@ -153,7 +146,6 @@ class WorkerImpl implements Worker {
 interface ActiveWorkflowRun {
 	run: WorkflowRun;
 	executionPromise: Promise<void>;
-	meta?: SubscriberMessageMeta;
 }
 
 class WorkerHandleImpl<AppContext> implements WorkerHandle {
@@ -164,6 +156,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
 	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
+	private fallbackSubscriberStrategy: ResolvedSubscriberStrategy | undefined;
 	private pollPromise: Promise<void> | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 
@@ -190,15 +183,30 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	}
 
 	async _start(): Promise<void> {
+		const workflows = this.registry.getAll();
+
+		const subscriberStrategyParams = this.params.subscriber ?? { type: "redis" };
 		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
-			this.params.subscriber ?? { type: "redis" },
-			this.registry.getAll(),
+			subscriberStrategyParams,
+			workflows,
 			this.spawnOpts.shards
 		);
 		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
 			onError: (error: Error) => this.handleSubscriberError(error),
 			onStop: () => this.stop(),
 		});
+
+		if (subscriberStrategyParams.type !== "db") {
+			const fallbackSubscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
+				{ type: "db" },
+				workflows,
+				this.spawnOpts.shards
+			);
+			this.fallbackSubscriberStrategy = await fallbackSubscriberStrategyBuilder.init(this.id, {
+				onError: (error: Error) => this.handleSubscriberError(error),
+				onStop: () => this.stop(),
+			});
+		}
 
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
@@ -263,7 +271,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				continue;
 			}
 
-			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity);
+			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, subscriberFailedAttempts);
 			if (!nextBatchResponse.success) {
 				subscriberFailedAttempts++;
 				nextDelayMs = this.subscriberStrategy.getNextDelay({
@@ -280,14 +288,18 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				continue;
 			}
 
-			await this.enqueueWorkflowRunBatch(nextBatchResponse.batch, abortSignal);
+			await this.enqueueWorkflowRunBatch(nextBatchResponse.batch, nextBatchResponse.subscriber, abortSignal);
 			nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: true });
 		}
 	}
 
 	private async fetchNextWorkflowRunBatch(
-		size: number
-	): Promise<{ success: true; batch: WorkflowRunBatch[] } | { success: false; error: Error }> {
+		size: number,
+		subscriberFailedAttempts: number
+	): Promise<
+		| { success: true; batch: WorkflowRunBatch[]; subscriber: ResolvedSubscriberStrategy }
+		| { success: false; error: Error }
+	> {
 		if (!this.subscriberStrategy) {
 			return {
 				success: false,
@@ -297,29 +309,34 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		try {
 			const batch = await this.subscriberStrategy.getNextBatch(size);
-			return {
-				success: true,
-				batch,
-			};
+			return { success: true, batch, subscriber: this.subscriberStrategy };
 		} catch (error) {
 			this.logger.error("Error getting next workflow runs batch", {
 				"aiki.error": error instanceof Error ? error.message : String(error),
 			});
 
-			return {
-				success: false,
-				error: error as Error,
-			};
+			if (this.fallbackSubscriberStrategy && subscriberFailedAttempts >= 2) {
+				try {
+					const batch = await this.fallbackSubscriberStrategy.getNextBatch(size);
+					return { success: true, batch, subscriber: this.fallbackSubscriberStrategy };
+				} catch (fallbackError) {
+					this.logger.error("Fallback subscriber strategy for getting next workflow runs batch also failed", {
+						"aiki.error": fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+					});
+				}
+			}
+
+			return { success: false, error: error as Error };
 		}
 	}
 
 	private async enqueueWorkflowRunBatch(
 		batch: NonEmptyArray<WorkflowRunBatch>,
+		subscriber: ResolvedSubscriberStrategy,
 		abortSignal: AbortSignal
 	): Promise<void> {
-		for (const { data, meta } of batch) {
+		for (const { data } of batch) {
 			const { workflowRunId } = data;
-
 			if (this.activeWorkflowRunsById.has(workflowRunId)) {
 				this.logger.info("Workflow already running", {
 					"aiki.workflowRunId": workflowRunId,
@@ -330,8 +347,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			// TODO: maybe load multiple workflows in one request
 			const { run: workflowRun } = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
 			if (!workflowRun) {
-				if (meta && this.subscriberStrategy?.acknowledge) {
-					await this.subscriberStrategy.acknowledge(this.id, workflowRunId, meta).catch(() => {});
+				if (subscriber.acknowledge) {
+					await subscriber.acknowledge(workflowRunId).catch(() => {});
 				}
 				continue;
 			}
@@ -346,8 +363,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					"aiki.workflowVersionId": workflowRun.versionId,
 					"aiki.workflowRunId": workflowRun.id,
 				});
-				if (meta && this.subscriberStrategy?.acknowledge) {
-					await this.subscriberStrategy.acknowledge(this.id, workflowRunId, meta).catch(() => {});
+				if (subscriber.acknowledge) {
+					await subscriber.acknowledge(workflowRunId).catch(() => {});
 				}
 				continue;
 			}
@@ -356,12 +373,11 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				break;
 			}
 
-			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, meta);
+			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber);
 
 			this.activeWorkflowRunsById.set(workflowRun.id, {
 				run: workflowRun,
 				executionPromise: workflowExecutionPromise,
-				meta,
 			});
 		}
 	}
@@ -369,7 +385,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private async executeWorkflow(
 		workflowRun: WorkflowRun,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
-		meta?: SubscriberMessageMeta
+		subscriber: ResolvedSubscriberStrategy
 	): Promise<void> {
 		const logger = this.logger.child({
 			"aiki.component": "workflow-execution",
@@ -382,11 +398,11 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		let shouldAcknowledge = false;
 
 		try {
-			const heartbeat = this.subscriberStrategy?.heartbeat;
-			if (meta && heartbeat) {
+			const heartbeat = subscriber.heartbeat;
+			if (heartbeat) {
 				heartbeatInterval = setInterval(() => {
 					try {
-						heartbeat(workflowRun.id as WorkflowRunId, meta);
+						heartbeat(workflowRun.id as WorkflowRunId);
 					} catch (error) {
 						logger.warn("Failed to send heartbeat", {
 							"aiki.error": error instanceof Error ? error.message : String(error),
@@ -441,10 +457,10 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		} finally {
 			if (heartbeatInterval) clearInterval(heartbeatInterval);
 
-			if (meta && this.subscriberStrategy?.acknowledge) {
+			if (subscriber.acknowledge) {
 				if (shouldAcknowledge) {
 					try {
-						await this.subscriberStrategy.acknowledge(this.id, workflowRun.id as WorkflowRunId, meta);
+						await subscriber.acknowledge(workflowRun.id as WorkflowRunId);
 					} catch (error) {
 						logger.error("Failed to acknowledge message, it may be reprocessed", {
 							"aiki.errorType": "MESSAGE_ACK_FAILED",

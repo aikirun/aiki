@@ -35,6 +35,7 @@ import { createScheduleService } from "./service/schedule";
 import { createTaskStateMachineService } from "./service/task-state-machine";
 import { createWorkflowService } from "./service/workflow";
 import { createWorkflowRunService } from "./service/workflow-run";
+import { createWorkflowRunOutboxService } from "./service/workflow-run-outbox";
 import { createWorkflowRunStateMachineService } from "./service/workflow-run-state-machine";
 
 if (import.meta.main) {
@@ -93,6 +94,7 @@ if (import.meta.main) {
 		taskRepo,
 		childWorkflowRunWaitQueueRepo,
 		childRunCanceller,
+		workflowRunOutboxRepo,
 	});
 	const taskStateMachineService = createTaskStateMachineService({
 		db,
@@ -122,6 +124,7 @@ if (import.meta.main) {
 		workflowRepo,
 		workflowRunRepo,
 	});
+	const workflowRunOutboxService = createWorkflowRunOutboxService({ workflowRunOutboxRepo });
 
 	const crons = initCrons(logger, {
 		db,
@@ -147,6 +150,7 @@ if (import.meta.main) {
 		taskStateMachineService,
 		workflowService,
 		scheduleService,
+		workflowRunOutboxService,
 	});
 
 	const organizationAuthedHandler = new RPCHandler(organizationAuthedRouter, {});

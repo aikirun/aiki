@@ -11,15 +11,15 @@ export interface PublishReadyRunsDeps {
 export async function publishReadyRuns(context: CronContext, deps: PublishReadyRunsDeps, options?: { limit?: number }) {
 	const { limit = 100 } = options ?? {};
 
-	const pendingMessages = await deps.workflowRunOutboxRepo.listPending(limit);
-	const pendingMessageIds = pendingMessages.map((entry) => entry.id);
-	if (!isNonEmptyArray(pendingMessageIds)) {
+	const pendingEntries = await deps.workflowRunOutboxRepo.listPending(limit);
+	const pendingEntryIds = pendingEntries.map((entry) => entry.id);
+	if (!isNonEmptyArray(pendingEntryIds)) {
 		return;
 	}
 
 	await deps.workflowRunPublisher.publishReadyRuns(
 		context,
-		pendingMessages.map((entry) => ({
+		pendingEntries.map((entry) => ({
 			id: entry.workflowRunId,
 			name: entry.workflowName,
 			versionId: entry.workflowVersionId,
@@ -27,5 +27,5 @@ export async function publishReadyRuns(context: CronContext, deps: PublishReadyR
 		}))
 	);
 
-	await deps.workflowRunOutboxRepo.markPublished(pendingMessageIds);
+	await deps.workflowRunOutboxRepo.markPublished(pendingEntryIds);
 }
