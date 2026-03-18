@@ -2,6 +2,26 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.19.0
+
+### New Features
+
+- **DB-based work distribution** — New `db` subscriber strategy that uses the database outbox table for work distribution, eliminating the need for Redis as a message broker. Workers poll the server's new `claimReadyV1` and `heartbeatV1` API endpoints to claim and heartbeat workflow runs directly.
+- **Redis is now optional** — The server can run without a Redis dependency. When `REDIS_HOST` is not set, the server starts without Redis — API key caching gracefully degrades to DB-only lookups, and the Redis publish/republish crons are skipped.
+- **Automatic fallback to DB subscriber** — When using the `redis` subscriber strategy, the worker automatically falls back to the `db` strategy after 2 consecutive Redis failures, improving resilience to Redis outages.
+- **Stale run republishing** — New server cron that detects published outbox entries that haven't been claimed within `claimMinIdleTimeMs` and republishes them to Redis streams, preventing runs from getting stuck.
+
+### Breaking Changes
+
+- **Default subscriber strategy changed from `redis` to `db`** — Workers now default to the `db` strategy. To keep using Redis streams:
+  ```typescript
+  // Before (implicit redis default)
+  worker.start();
+
+  // After (explicit redis)
+  worker.start({ subscriber: { type: "redis" } });
+  ```
+
 ## 0.18.0
 
 ### New Features
