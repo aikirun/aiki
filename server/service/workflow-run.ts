@@ -3,7 +3,7 @@ import { getTaskAddress, getWorkflowRunAddress } from "@aikirun/lib/address";
 import type { EventReferenceOptions, EventWaitQueue } from "@aikirun/types/event";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { SleepQueue } from "@aikirun/types/sleep";
-import type { TaskInfo, TaskQueue, TaskState } from "@aikirun/types/task";
+import type { TaskInfo, TaskQueue, TaskState, TaskStatus } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ChildWorkflowRunInfo,
@@ -22,6 +22,7 @@ import type {
 	WorkflowRunCreateRequestV1,
 	WorkflowRunListChildRunsRequestV1,
 	WorkflowRunListRequestV1,
+	WorkflowRunListResponseV1,
 	WorkflowRunListTransitionsRequestV1,
 	WorkflowRunReference,
 	WorkflowRunSetTaskStateRequestV1,
@@ -274,7 +275,10 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		return transition.state as WorkflowRunState;
 	}
 
-	async function listWorkflowRuns(context: NamespaceRequestContext, request: WorkflowRunListRequestV1) {
+	async function listWorkflowRuns(
+		context: NamespaceRequestContext,
+		request: WorkflowRunListRequestV1
+	): Promise<WorkflowRunListResponseV1> {
 		const { namespaceId } = context;
 		const { filters, sort, limit = 50, offset = 0 } = request;
 		const workflowFilter = filters?.workflow;
@@ -299,6 +303,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 						namespaceId,
 						{
 							id: filters?.id,
+							scheduleId: filters?.scheduleId,
 							status: isNonEmptyArray(filters?.status) ? filters.status : undefined,
 							workflow: {
 								ids: workflowIds,
@@ -314,12 +319,18 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					namespaceId,
 					{
 						id: filters?.id,
+						scheduleId: filters?.scheduleId,
 						status: isNonEmptyArray(filters?.status) ? filters.status : undefined,
 					},
 					limit,
 					offset,
 					{ order: sort?.order ?? "desc" }
 				);
+
+		const runIds = rows.map((row) => row.id);
+		const taskCountsByRunId = isNonEmptyArray(runIds)
+			? await workflowRunRepo.getTaskCountsByRunIds(runIds)
+			: new Map<string, Record<TaskStatus, number>>();
 
 		return {
 			runs: rows.map((row) => ({
@@ -329,6 +340,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				createdAt: row.createdAt.getTime(),
 				status: row.status,
 				referenceId: row.referenceId ?? undefined,
+				taskCounts: taskCountsByRunId.get(row.id),
 			})),
 			total,
 		};

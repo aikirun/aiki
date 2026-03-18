@@ -11,7 +11,7 @@ export interface WorkflowListRequestV1 {
 	source: WorkflowSource;
 	limit?: number;
 	offset?: number;
-	// TODO: maybe add namePrefix filter
+	namePrefix?: string;
 	sort?: {
 		field: "name" | "runCount" | "lastRunAt";
 		order: "asc" | "desc";

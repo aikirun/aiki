@@ -2,7 +2,7 @@ import type { NonEmptyArray } from "@aikirun/lib";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
 import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/workflow-api";
-import { and, count, eq, inArray, max, or, sql } from "drizzle-orm";
+import { and, count, eq, inArray, like, max, or, sql } from "drizzle-orm";
 import { ulid } from "ulidx";
 
 import type { DatabaseConn, DbTransaction } from "..";
@@ -136,7 +136,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 		}> {
 			const conn = tx ?? db;
 
-			const { source, limit = 50, offset = 0, sort } = request;
+			const { source, limit = 50, offset = 0, namePrefix, sort } = request;
 
 			const sortField = sort?.field ?? "name";
 			const sortOrder = sort?.order ?? "asc";
@@ -151,6 +151,11 @@ export function createWorkflowRepository(db: DatabaseConn) {
 						: (sortField satisfies "lastRunAt") &&
 							sql`max(${workflowRun.id}) ${dir} nulls ${sql.raw(sortOrder === "asc" ? "first" : "last")}`;
 
+			const namePrefixCondition =
+				namePrefix !== undefined
+					? like(workflow.name, `${namePrefix.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`)
+					: undefined;
+
 			const items = await conn
 				.select({
 					name: workflow.name,
@@ -159,7 +164,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 				})
 				.from(workflow)
 				.leftJoin(workflowRun, eq(workflow.id, workflowRun.workflowId))
-				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source)))
+				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), namePrefixCondition))
 				.groupBy(workflow.name)
 				.orderBy(orderByClause)
 				.limit(limit)
@@ -168,7 +173,7 @@ export function createWorkflowRepository(db: DatabaseConn) {
 			const totalResult = await conn
 				.select({ count: sql`count(distinct ${workflow.name})`.mapWith(Number) })
 				.from(workflow)
-				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source)));
+				.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), namePrefixCondition));
 
 			return {
 				items,

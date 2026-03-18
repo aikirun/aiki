@@ -48,6 +48,7 @@ const listV1: ContractProcedure<WorkflowListRequestV1, WorkflowListResponseV1> =
 			source: workflowSourceSchema,
 			"limit?": "number.integer > 0 | undefined",
 			"offset?": "number.integer >= 0 | undefined",
+			"namePrefix?": "string > 0 | undefined",
 			"sort?": {
 				field: "'name' | 'runCount' | 'lastRunAt'",
 				order: "'asc' | 'desc'",

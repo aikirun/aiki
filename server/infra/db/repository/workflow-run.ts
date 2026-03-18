@@ -1,12 +1,13 @@
 import type { NonEmptyArray } from "@aikirun/lib";
 import type { NamespaceId } from "@aikirun/types/namespace";
+import type { TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow-run";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
 import { toWorkflowRunState } from "./state-transition";
 import type { DatabaseConn, DbTransaction } from "..";
-import { stateTransition, workflow, workflowRun } from "../schema/pg";
+import { stateTransition, task, workflow, workflowRun } from "../schema/pg";
 
 export type WorkflowRunRow = typeof workflowRun.$inferSelect;
 export type WorkflowRunRowInsert = typeof workflowRun.$inferInsert;
@@ -202,6 +203,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			namespaceId: NamespaceId,
 			filters: {
 				id?: string;
+				scheduleId?: string;
 				status?: NonEmptyArray<WorkflowRunStatus>;
 				workflow?: {
 					ids: NonEmptyArray<string>;
@@ -218,6 +220,9 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			const conditions = [eq(workflowRun.namespaceId, namespaceId)];
 			if (filters.id) {
 				conditions.push(eq(workflowRun.id, filters.id));
+			}
+			if (filters.scheduleId) {
+				conditions.push(eq(workflowRun.scheduleId, filters.scheduleId));
 			}
 			if (filters.status) {
 				conditions.push(inArray(workflowRun.status, filters.status));
@@ -252,6 +257,32 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			]);
 
 			return { rows, total: countResult[0]?.count ?? 0 };
+		},
+
+		async getTaskCountsByRunIds(
+			runIds: NonEmptyArray<string>,
+			tx?: DbTransaction
+		): Promise<Map<string, Record<TaskStatus, number>>> {
+			const rows = await (tx ?? db)
+				.select({
+					workflowRunId: task.workflowRunId,
+					status: task.status,
+					count: count(),
+				})
+				.from(task)
+				.where(inArray(task.workflowRunId, runIds))
+				.groupBy(task.workflowRunId, task.status);
+
+			const result = new Map<string, Record<TaskStatus, number>>();
+			for (const row of rows) {
+				let taskCounts = result.get(row.workflowRunId);
+				if (!taskCounts) {
+					taskCounts = { completed: 0, running: 0, failed: 0, awaiting_retry: 0 };
+					result.set(row.workflowRunId, taskCounts);
+				}
+				taskCounts[row.status] = row.count;
+			}
+			return result;
 		},
 
 		async countByStatus(

@@ -74,6 +74,7 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 			"offset?": "number.integer >= 0 | undefined",
 			"filters?": {
 				"id?": "string > 0 | undefined",
+				"scheduleId?": "string > 0 | undefined",
 				"status?": workflowRunStatusSchema.array(),
 				"workflow?": type({
 					name: "string > 0",
@@ -105,6 +106,12 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 				createdAt: "number > 0",
 				status: workflowRunStatusSchema,
 				"referenceId?": "string > 0 | undefined",
+				"taskCounts?": type({
+					completed: "number.integer >= 0",
+					running: "number.integer >= 0",
+					failed: "number.integer >= 0",
+					awaiting_retry: "number.integer >= 0",
+				}).or("undefined"),
 			}).array(),
 			total: "number.integer >= 0",
 		})

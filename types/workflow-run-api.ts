@@ -4,6 +4,7 @@ import type {
 	TaskInfo,
 	TaskStateCompleted,
 	TaskStateFailed,
+	TaskStatus,
 	TransitionTaskStateToAwaitingRetry,
 	TransitionTaskStateToCompleted,
 	TransitionTaskStateToFailed,
@@ -53,6 +54,7 @@ export interface WorkflowRunListRequestV1 {
 	offset?: number;
 	filters?: {
 		id?: string;
+		scheduleId?: string;
 		status?: WorkflowRunStatus[];
 		workflow?: WorkflowFilter;
 	};
@@ -73,6 +75,7 @@ export interface WorkflowRunListItem {
 	createdAt: number;
 	status: WorkflowRunStatus;
 	referenceId?: string;
+	taskCounts?: Record<TaskStatus, number>;
 }
 
 export interface WorkflowRunListResponseV1 {
