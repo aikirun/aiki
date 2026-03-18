@@ -1,6 +1,6 @@
 {
-	"id": "80001911-dfb7-4d64-8223-092f6ba75e4a",
-	"prevId": "0cf7701c-f6ca-492c-9d8f-109421ea9aeb",
+	"id": "eca35729-a0e9-427c-8145-4f6700c42e58",
+	"prevId": "e7d7b4bb-0ced-4efb-aebd-e59f10f77087",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
@@ -902,6 +902,14 @@
 					"primaryKey": false,
 					"notNull": true
 				},
+				"source": {
+					"name": "source",
+					"type": "workflow_source",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'user'"
+				},
 				"name": {
 					"name": "name",
 					"type": "text",
@@ -923,11 +931,17 @@
 				}
 			},
 			"indexes": {
-				"uqidx_workflow_namespace_name_version": {
-					"name": "uqidx_workflow_namespace_name_version",
+				"uqidx_workflow_namespace_source_name_version": {
+					"name": "uqidx_workflow_namespace_source_name_version",
 					"columns": [
 						{
 							"expression": "namespace_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "source",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -1232,11 +1246,17 @@
 					"method": "btree",
 					"concurrently": false
 				},
-				"idx_workflow_run_parent_workflow_run": {
-					"name": "idx_workflow_run_parent_workflow_run",
+				"idx_workflow_run_parent_workflow_run_status": {
+					"name": "idx_workflow_run_parent_workflow_run_status",
 					"columns": [
 						{
 							"expression": "parent_workflow_run_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "status",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -1439,15 +1459,24 @@
 				}
 			},
 			"indexes": {
-				"idx_workflow_run_outbox_worker_poll": {
-					"name": "idx_workflow_run_outbox_worker_poll",
+				"uqidx_workflow_run_outbox_workflow_run_id": {
+					"name": "uqidx_workflow_run_outbox_workflow_run_id",
 					"columns": [
 						{
-							"expression": "status",
+							"expression": "workflow_run_id",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
-						},
+						}
+					],
+					"isUnique": true,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_workflow_run_outbox_publish": {
+					"name": "idx_workflow_run_outbox_publish",
+					"columns": [
 						{
 							"expression": "namespace_id",
 							"isExpression": false,
@@ -1455,40 +1484,13 @@
 							"nulls": "last"
 						},
 						{
-							"expression": "workflow_name",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						},
-						{
-							"expression": "workflow_version_id",
+							"expression": "status",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
 						},
 						{
 							"expression": "created_at",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						}
-					],
-					"isUnique": false,
-					"with": {},
-					"method": "btree",
-					"concurrently": false
-				},
-				"idx_workflow_run_outbox_worker_poll_shard": {
-					"name": "idx_workflow_run_outbox_worker_poll_shard",
-					"columns": [
-						{
-							"expression": "status",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						},
-						{
-							"expression": "namespace_id",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -1510,6 +1512,66 @@
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_workflow_run_outbox_claim_stale": {
+					"name": "idx_workflow_run_outbox_claim_stale",
+					"columns": [
+						{
+							"expression": "namespace_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "updated_at",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "workflow_name",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "workflow_version_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						},
+						{
+							"expression": "shard",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"with": {},
+					"method": "btree",
+					"concurrently": false
+				},
+				"idx_workflow_run_outbox_status_created": {
+					"name": "idx_workflow_run_outbox_status_created",
+					"columns": [
+						{
+							"expression": "status",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
 						},
 						{
 							"expression": "created_at",
@@ -1523,8 +1585,8 @@
 					"method": "btree",
 					"concurrently": false
 				},
-				"idx_workflow_run_outbox_publish": {
-					"name": "idx_workflow_run_outbox_publish",
+				"idx_workflow_run_outbox_status_updated": {
+					"name": "idx_workflow_run_outbox_status_updated",
 					"columns": [
 						{
 							"expression": "status",
@@ -1533,7 +1595,7 @@
 							"nulls": "last"
 						},
 						{
-							"expression": "created_at",
+							"expression": "updated_at",
 							"isExpression": false,
 							"asc": true,
 							"nulls": "last"
@@ -2667,6 +2729,11 @@
 				"completed",
 				"failed"
 			]
+		},
+		"public.workflow_source": {
+			"name": "workflow_source",
+			"schema": "public",
+			"values": ["user", "system"]
 		},
 		"public.api_key_status": {
 			"name": "api_key_status",

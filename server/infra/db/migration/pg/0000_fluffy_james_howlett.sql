@@ -13,6 +13,7 @@ CREATE TYPE "public"."workflow_run_failure_cause" AS ENUM('task', 'child_workflo
 CREATE TYPE "public"."workflow_run_outbox_status" AS ENUM('pending', 'published');--> statement-breakpoint
 CREATE TYPE "public"."workflow_run_scheduled_reason" AS ENUM('new', 'retry', 'task_retry', 'awake', 'awake_early', 'resume', 'event', 'child_workflow');--> statement-breakpoint
 CREATE TYPE "public"."workflow_run_status" AS ENUM('scheduled', 'queued', 'running', 'paused', 'sleeping', 'awaiting_event', 'awaiting_retry', 'awaiting_child_workflow', 'cancelled', 'completed', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."workflow_source" AS ENUM('user', 'system');--> statement-breakpoint
 CREATE TYPE "public"."api_key_status" AS ENUM('active', 'revoked', 'expired');--> statement-breakpoint
 CREATE TYPE "public"."namespace_role" AS ENUM('admin', 'member', 'viewer');--> statement-breakpoint
 CREATE TYPE "public"."namespace_status" AS ENUM('active', 'suspended', 'deleted');--> statement-breakpoint
@@ -111,6 +112,7 @@ CREATE TABLE "task" (
 CREATE TABLE "workflow" (
 	"id" text PRIMARY KEY NOT NULL,
 	"namespace_id" text NOT NULL,
+	"source" "workflow_source" DEFAULT 'user' NOT NULL,
 	"name" text NOT NULL,
 	"version_id" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -311,21 +313,23 @@ CREATE INDEX "idx_state_transition_workflow_run_id" ON "state_transition" USING 
 CREATE INDEX "idx_task_workflow_run_id" ON "task" USING btree ("workflow_run_id","id");--> statement-breakpoint
 CREATE INDEX "idx_task_workflow_run_status" ON "task" USING btree ("workflow_run_id","status");--> statement-breakpoint
 CREATE INDEX "idx_task_status_workflow_run_next_attempt_at" ON "task" USING btree ("status","workflow_run_id","next_attempt_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "uqidx_workflow_namespace_name_version" ON "workflow" USING btree ("namespace_id","name","version_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "uqidx_workflow_namespace_source_name_version" ON "workflow" USING btree ("namespace_id","source","name","version_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_workflow_run_workflow_reference" ON "workflow_run" USING btree ("workflow_id","reference_id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_namespace_id" ON "workflow_run" USING btree ("namespace_id","id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_namespace_status_id" ON "workflow_run" USING btree ("namespace_id","status","id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_workflow_id" ON "workflow_run" USING btree ("workflow_id","id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_workflow_status_id" ON "workflow_run" USING btree ("workflow_id","status","id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_schedule" ON "workflow_run" USING btree ("schedule_id");--> statement-breakpoint
-CREATE INDEX "idx_workflow_run_parent_workflow_run" ON "workflow_run" USING btree ("parent_workflow_run_id");--> statement-breakpoint
+CREATE INDEX "idx_workflow_run_parent_workflow_run_status" ON "workflow_run" USING btree ("parent_workflow_run_id","status");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_status_scheduled_at" ON "workflow_run" USING btree ("status","scheduled_at");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_status_awake_at" ON "workflow_run" USING btree ("status","awake_at");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_status_timeout_at" ON "workflow_run" USING btree ("status","timeout_at");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_status_next_attempt_at" ON "workflow_run" USING btree ("status","next_attempt_at");--> statement-breakpoint
-CREATE INDEX "idx_workflow_run_outbox_worker_poll" ON "workflow_run_outbox" USING btree ("status","namespace_id","workflow_name","workflow_version_id","created_at");--> statement-breakpoint
-CREATE INDEX "idx_workflow_run_outbox_worker_poll_shard" ON "workflow_run_outbox" USING btree ("status","namespace_id","workflow_name","workflow_version_id","shard","created_at");--> statement-breakpoint
-CREATE INDEX "idx_workflow_run_outbox_publish" ON "workflow_run_outbox" USING btree ("status","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "uqidx_workflow_run_outbox_workflow_run_id" ON "workflow_run_outbox" USING btree ("workflow_run_id");--> statement-breakpoint
+CREATE INDEX "idx_workflow_run_outbox_publish" ON "workflow_run_outbox" USING btree ("namespace_id","status","created_at","workflow_name","workflow_version_id","shard");--> statement-breakpoint
+CREATE INDEX "idx_workflow_run_outbox_claim_stale" ON "workflow_run_outbox" USING btree ("namespace_id","status","updated_at","workflow_name","workflow_version_id","shard");--> statement-breakpoint
+CREATE INDEX "idx_workflow_run_outbox_status_created" ON "workflow_run_outbox" USING btree ("status","created_at");--> statement-breakpoint
+CREATE INDEX "idx_workflow_run_outbox_status_updated" ON "workflow_run_outbox" USING btree ("status","updated_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_account_user_provider" ON "account" USING btree ("user_id","provider_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_api_key_org_namespace_created_by_user_name" ON "api_key" USING btree ("organization_id","namespace_id","created_by_user_id","name");--> statement-breakpoint
 CREATE INDEX "idx_api_key_org_namespace_name" ON "api_key" USING btree ("organization_id","namespace_id","name");--> statement-breakpoint
