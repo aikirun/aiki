@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/client",
-	"version": "0.19.0",
+	"version": "0.20.0",
 	"description": "Client SDK for Aiki - connect to the server, start workflows, and manage execution",
 	"type": "module",
 	"main": "./dist/index.js",

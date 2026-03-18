@@ -2,6 +2,18 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.20.0
+
+### New Features
+
+- **Workflow name prefix search** — The workflow list API now accepts a `namePrefix` filter for searching workflows by name prefix
+- **Filter runs by schedule ID** — Workflow run list API now supports a `scheduleId` filter for finding runs created by a specific schedule
+- **Task counts per run** — Workflow run list responses now include per-run `taskCounts` broken down by status (`completed`, `running`, `failed`, `awaiting_retry`)
+
+### Web UI
+
+- **Complete rewrite of the web console** — The dashboard has been rebuilt with a new sidebar navigation layout, dedicated runs list page with filtering and workflow search, dedicated schedules list page, refactored run detail page with separate data/execution/timeline tabs, redesigned API keys page, and dark/light theme support
+
 ## 0.19.0
 
 ### New Features
