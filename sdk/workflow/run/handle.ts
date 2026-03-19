@@ -4,7 +4,6 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { TaskInfo } from "@aikirun/types/task";
 import type { DistributiveOmit } from "@aikirun/types/utils";
 import {
-	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
 	type WorkflowRunId,
@@ -250,66 +249,45 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 
 		const afterStateTransitionId = this._run.stateTransitionId;
 
-		const loadState = async () => {
+		const checkTerminated = async () => {
 			const { terminated } = await this.api.workflowRun.hasTerminatedV1({
 				id: this._run.id,
 				afterStateTransitionId,
 			});
-			if (terminated) {
-				await this.refresh();
-			}
-			return this.run.state;
+			return terminated;
 		};
 
-		const isNeitherExpectedNorTerminal = (state: WorkflowRunState<Output>) =>
-			state.status !== expectedStatus && !isTerminalWorkflowRunStatus(state.status);
-
-		if (!Number.isFinite(maxAttempts) && !options?.abortSignal) {
-			const maybeResult = await withRetry(loadState, retryStrategy, {
-				shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
-			}).run();
-
-			if (maybeResult.state === "timeout") {
-				throw new Error("Something's wrong, this should've never timed out");
-			}
-
-			if (maybeResult.result.status !== expectedStatus) {
-				return {
-					success: false,
-					cause: "run_terminated",
-				};
-			}
-			return {
-				success: true,
-				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
-			};
-		}
+		const shouldRetryOnResult = async (terminated: boolean) => !terminated;
 
 		const maybeResult = options?.abortSignal
-			? await withRetry(loadState, retryStrategy, {
+			? await withRetry(checkTerminated, retryStrategy, {
 					abortSignal: options.abortSignal,
-					shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
+					shouldRetryOnResult,
 				}).run()
-			: await withRetry(loadState, retryStrategy, {
-					shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
-				}).run();
+			: await withRetry(checkTerminated, retryStrategy, { shouldRetryOnResult }).run();
 
-		this.logger.info("Maybe result", { maybeResult });
-
-		if (maybeResult.state === "completed") {
-			if (maybeResult.result.status !== expectedStatus) {
-				return {
-					success: false,
-					cause: "run_terminated",
-				};
+		if (maybeResult.state === "timeout") {
+			if (!Number.isFinite(maxAttempts)) {
+				throw new Error("Something's wrong, this should've never timed out");
 			}
+			return { success: false, cause: "timeout" };
+		}
+
+		if (maybeResult.state === "aborted") {
+			return { success: false, cause: "aborted" };
+		}
+
+		// Workflow terminated - fetch the final state once
+		await this.refresh();
+
+		if (this._run.state.status === expectedStatus) {
 			return {
 				success: true,
-				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
+				state: this._run.state as WorkflowRunWaitResultSuccess<Status, Output>,
 			};
 		}
 
-		return { success: false, cause: maybeResult.state };
+		return { success: false, cause: "run_terminated" };
 	}
 
 	public async cancel(reason?: string): Promise<void> {
