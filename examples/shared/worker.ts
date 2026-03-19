@@ -1,8 +1,14 @@
+import { dirname, join } from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import type { Client } from "@aikirun/client";
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 import type { WorkflowVersion } from "@aikirun/workflow";
+import { config } from "dotenv";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: join(__dirname, "../.env") });
 
 /**
  * Spawns two workers with the given workflows, runs the callback, then shuts down.

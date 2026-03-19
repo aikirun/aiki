@@ -1,0 +1,10 @@
+{
+	"name": "@aikirun/examples",
+	"version": "0.20.0",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"dotenv": "^16.4.5"
+	},
+	"license": "Apache-2.0"
+}

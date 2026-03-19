@@ -10,7 +10,8 @@
 		"sdk/client",
 		"sdk/worker",
 		"server",
-		"web"
+		"web",
+		"examples"
 	],
 	"scripts": {
 		"check": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
