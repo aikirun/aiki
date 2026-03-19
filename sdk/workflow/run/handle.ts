@@ -4,6 +4,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { TaskInfo } from "@aikirun/types/task";
 import type { DistributiveOmit } from "@aikirun/types/utils";
 import {
+	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
 	type WorkflowRunId,
@@ -249,47 +250,66 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 
 		const afterStateTransitionId = this._run.stateTransitionId;
 
-		const checkTerminated = async () => {
+		const loadState = async () => {
 			const { terminated } = await this.api.workflowRun.hasTerminatedV1({
 				id: this._run.id,
 				afterStateTransitionId,
 			});
-			return terminated;
+			if (terminated) {
+				await this.refresh();
+			}
+			return this.run.state;
 		};
 
-		const shouldRetryOnResult = async (terminated: boolean) => !terminated;
+		const isNeitherExpectedNorTerminal = (state: WorkflowRunState<Output>) =>
+			state.status !== expectedStatus && !isTerminalWorkflowRunStatus(state.status);
 
-		const maybeResult = options?.abortSignal
-			? await withRetry(checkTerminated, retryStrategy, {
-					abortSignal: options.abortSignal,
-					shouldRetryOnResult,
-				}).run()
-			: await withRetry(checkTerminated, retryStrategy, {
-					shouldRetryOnResult,
-				}).run();
+		if (!Number.isFinite(maxAttempts) && !options?.abortSignal) {
+			const maybeResult = await withRetry(loadState, retryStrategy, {
+				shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
+			}).run();
 
-		if (maybeResult.state === "timeout") {
-			if (!Number.isFinite(maxAttempts)) {
+			if (maybeResult.state === "timeout") {
 				throw new Error("Something's wrong, this should've never timed out");
 			}
-			return { success: false, cause: "timeout" };
-		}
 
-		if (maybeResult.state === "aborted") {
-			return { success: false, cause: "aborted" };
-		}
-
-		// Workflow terminated - fetch the final state
-		await this.refresh();
-
-		if (this._run.state.status === expectedStatus) {
+			if (maybeResult.result.status !== expectedStatus) {
+				return {
+					success: false,
+					cause: "run_terminated",
+				};
+			}
 			return {
 				success: true,
-				state: this._run.state as WorkflowRunWaitResultSuccess<Status, Output>,
+				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
 			};
 		}
 
-		return { success: false, cause: "run_terminated" };
+		const maybeResult = options?.abortSignal
+			? await withRetry(loadState, retryStrategy, {
+					abortSignal: options.abortSignal,
+					shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
+				}).run()
+			: await withRetry(loadState, retryStrategy, {
+					shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
+				}).run();
+
+		this.logger.info("Maybe result", { maybeResult });
+
+		if (maybeResult.state === "completed") {
+			if (maybeResult.result.status !== expectedStatus) {
+				return {
+					success: false,
+					cause: "run_terminated",
+				};
+			}
+			return {
+				success: true,
+				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
+			};
+		}
+
+		return { success: false, cause: maybeResult.state };
 	}
 
 	public async cancel(reason?: string): Promise<void> {
