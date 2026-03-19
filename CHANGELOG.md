@@ -2,6 +2,15 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.21.0
+
+### Improvements
+
+- **Unit-of-work pattern for database layer** — Restructured the DB layer to use a `Repositories` interface with a built-in `transaction()` method. Services now receive a single `repos` object instead of individual repository instances, and transactional code operates on `txRepos` (scoped repositories) instead of passing raw `tx` parameters through every call.
+- **Multi-provider database groundwork** — Moved all Postgres-specific code under `server/infra/db/pg/` (repositories, schema, migrations, provider) and introduced provider-agnostic type interfaces in `server/infra/db/types/`. The `createDatabase()` factory now returns `{ conn, repos, betterAuthSchema }` instead of a raw connection. MySQL and SQLite providers are stubbed but not yet implemented.
+- **Auth service decoupled from Postgres** — `createAuthService` now accepts a generic `conn`, `provider`, and `betterAuthSchema` instead of a Postgres-specific `DatabaseConn`, enabling future auth support on other database providers.
+- **Extracted `WorkflowRunOutboxStatus` type** — Moved the outbox status type to a shared constants file for reuse.
+
 ## 0.20.0
 
 ### New Features
