@@ -241,6 +241,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	versionId: string;
 	createdAt: number;
 	revision: number;
+	stateTransitionId: string;
 	input?: Input;
 	inputHash: string;
 	options?: WorkflowStartOptions;

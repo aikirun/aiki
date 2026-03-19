@@ -14,6 +14,7 @@ import type {
 import type { DistributiveOmit, OptionalProp } from "./utils";
 import type { WorkflowSource } from "./workflow";
 import type {
+	TerminalWorkflowRunStatus,
 	WorkflowRun,
 	WorkflowRunState,
 	WorkflowRunStateAwaitingChildWorkflow,
@@ -47,6 +48,7 @@ export interface WorkflowRunApi {
 	cancelByIdsV1: (_: WorkflowRunCancelByIdsRequestV1) => Promise<WorkflowRunCancelByIdsResponseV1>;
 	claimReadyV1: (_: WorkflowRunClaimReadyRequestV1) => Promise<WorkflowRunClaimReadyResponseV1>;
 	heartbeatV1: (_: WorkflowRunHeartbeatRequestV1) => Promise<void>;
+	hasReachedStatusV1: (_: WorkflowRunHasReachedStatusRequestV1) => Promise<WorkflowRunHasReachedStatusResponseV1>;
 }
 
 export interface WorkflowRunListRequestV1 {
@@ -303,4 +305,14 @@ export interface WorkflowRunClaimReadyResponseV1 {
 
 export interface WorkflowRunHeartbeatRequestV1 {
 	id: string;
+}
+
+export interface WorkflowRunHasReachedStatusRequestV1 {
+	id: string;
+	status: TerminalWorkflowRunStatus;
+	afterStateTransitionId: string;
+}
+
+export interface WorkflowRunHasReachedStatusResponseV1 {
+	reached: boolean;
 }

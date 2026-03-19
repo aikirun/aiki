@@ -13,6 +13,8 @@ import type {
 	WorkflowRunGetByReferenceIdResponseV1,
 	WorkflowRunGetStateRequestV1,
 	WorkflowRunGetStateResponseV1,
+	WorkflowRunHasReachedStatusRequestV1,
+	WorkflowRunHasReachedStatusResponseV1,
 	WorkflowRunHeartbeatRequestV1,
 	WorkflowRunListChildRunsRequestV1,
 	WorkflowRunListChildRunsResponseV1,
@@ -48,6 +50,7 @@ import {
 	cancelByIdsResponseSchema,
 	listChildRunsRequestSchema,
 	listChildRunsResponseSchema,
+	terminalWorkflowRunStatusSchema,
 	workflowOptionsSchema,
 	workflowRunSchema,
 	workflowRunSetTaskStateRequestSchema,
@@ -358,6 +361,23 @@ const heartbeatV1: ContractProcedure<WorkflowRunHeartbeatRequestV1, void> = oc
 	)
 	.output(type("undefined"));
 
+const hasReachedStatusV1: ContractProcedure<
+	WorkflowRunHasReachedStatusRequestV1,
+	WorkflowRunHasReachedStatusResponseV1
+> = oc
+	.input(
+		type({
+			id: "string > 0",
+			status: terminalWorkflowRunStatusSchema,
+			afterStateTransitionId: "string > 0",
+		})
+	)
+	.output(
+		type({
+			reached: "boolean",
+		})
+	);
+
 export const workflowRunContract = {
 	listV1,
 	getByIdV1,
@@ -375,6 +395,7 @@ export const workflowRunContract = {
 	cancelByIdsV1,
 	claimReadyV1,
 	heartbeatV1,
+	hasReachedStatusV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

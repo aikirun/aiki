@@ -224,9 +224,6 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 		options: WorkflowRunWaitOptions<true, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
 
-	// TODO: instead checking the current state, use the transition history
-	// because it is possible for a workflow to flash though a state
-	// and the handle will never know that the workflow hit that state
 	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
 		status: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
@@ -251,17 +248,34 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 			: Number.POSITIVE_INFINITY;
 		const retryStrategy: RetryStrategy = { type: "fixed", maxAttempts, delayMs };
 
-		const loadState = async () => {
-			await this.refresh();
-			return this.run.state;
+		const afterStateTransitionId = this._run.stateTransitionId;
+
+		const checkStatus = async () => {
+			const { reached } = await this.api.workflowRun.hasReachedStatusV1({
+				id: this._run.id,
+				status: expectedStatus,
+				afterStateTransitionId,
+			});
+
+			if (reached) {
+				await this.refresh();
+				return { done: true as const, status: expectedStatus };
+			}
+
+			// Check if terminated in a different state
+			const { state } = await this.api.workflowRun.getStateV1({ id: this._run.id });
+			if (isTerminalWorkflowRunStatus(state.status) && state.status !== expectedStatus) {
+				return { done: true as const, status: state.status };
+			}
+
+			return { done: false as const };
 		};
 
-		const isNeitherExpectedNorTerminal = (state: WorkflowRunState<Output>) =>
-			state.status !== expectedStatus && !isTerminalWorkflowRunStatus(state.status);
+		const shouldRetry = (result: { done: boolean }) => !result.done;
 
 		if (!Number.isFinite(maxAttempts) && !options?.abortSignal) {
-			const maybeResult = await withRetry(loadState, retryStrategy, {
-				shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
+			const maybeResult = await withRetry(checkStatus, retryStrategy, {
+				shouldRetryOnResult: async (result) => shouldRetry(result),
 			}).run();
 
 			if (maybeResult.state === "timeout") {
@@ -276,17 +290,17 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 			}
 			return {
 				success: true,
-				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
+				state: this._run.state as WorkflowRunWaitResultSuccess<Status, Output>,
 			};
 		}
 
 		const maybeResult = options?.abortSignal
-			? await withRetry(loadState, retryStrategy, {
+			? await withRetry(checkStatus, retryStrategy, {
 					abortSignal: options.abortSignal,
-					shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
+					shouldRetryOnResult: async (result) => shouldRetry(result),
 				}).run()
-			: await withRetry(loadState, retryStrategy, {
-					shouldRetryOnResult: async (state) => isNeitherExpectedNorTerminal(state),
+			: await withRetry(checkStatus, retryStrategy, {
+					shouldRetryOnResult: async (result) => shouldRetry(result),
 				}).run();
 
 		this.logger.info("Maybe result", { maybeResult });
@@ -300,7 +314,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 			}
 			return {
 				success: true,
-				state: maybeResult.result as WorkflowRunWaitResultSuccess<Status, Output>,
+				state: this._run.state as WorkflowRunWaitResultSuccess<Status, Output>,
 			};
 		}
 

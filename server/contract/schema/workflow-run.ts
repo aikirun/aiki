@@ -166,6 +166,7 @@ export const workflowRunSchema = type({
 	versionId: "string > 0",
 	createdAt: "number > 0",
 	revision: "number >= 0",
+	stateTransitionId: "string > 0",
 	"input?": "unknown",
 	inputHash: "string > 0",
 	"options?": workflowOptionsSchema.or("undefined"),

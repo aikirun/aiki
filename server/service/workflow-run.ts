@@ -154,6 +154,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 			versionId: workflowRow.versionId,
 			createdAt: runRow.createdAt.getTime(),
 			revision: runRow.revision,
+			stateTransitionId: runRow.latestStateTransitionId,
 			input: runRow.input,
 			inputHash: runRow.inputHash,
 			options: runRow.options as WorkflowStartOptions | undefined,

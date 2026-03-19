@@ -36,6 +36,7 @@ export function createNamespaceAuthedRouter(deps: NamespaceAuthedRouterDeps) {
 			workflowRunStateMachineService: deps.workflowRunStateMachineService,
 			taskStateMachineService: deps.taskStateMachineService,
 			workflowRunOutboxService: deps.workflowRunOutboxService,
+			stateTransitionRepository: deps.stateTransitionRepository,
 		}),
 	});
 }

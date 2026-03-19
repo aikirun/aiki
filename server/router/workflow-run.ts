@@ -1,4 +1,5 @@
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { StateTransitionRepository } from "server/infra/db/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { TaskStateMachineService } from "server/service/task-state-machine";
 import type { WorkflowRunService } from "server/service/workflow-run";
@@ -12,12 +13,18 @@ export interface WorkflowRunRouterDeps {
 	workflowRunStateMachineService: WorkflowRunStateMachineService;
 	taskStateMachineService: TaskStateMachineService;
 	workflowRunOutboxService: WorkflowRunOutboxService;
+	stateTransitionRepository: StateTransitionRepository;
 }
 
 export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	const os = namespaceAuthedImplementer.workflowRun;
-	const { workflowRunService, workflowRunStateMachineService, taskStateMachineService, workflowRunOutboxService } =
-		deps;
+	const {
+		workflowRunService,
+		workflowRunStateMachineService,
+		taskStateMachineService,
+		workflowRunOutboxService,
+		stateTransitionRepository,
+	} = deps;
 
 	const listV1 = os.listV1.handler(async ({ input: request, context }) => {
 		return workflowRunService.listWorkflowRuns(context, request);
@@ -109,6 +116,16 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		await workflowRunOutboxService.reclaim(context, request.id as WorkflowRunId);
 	});
 
+	const hasReachedStatusV1 = os.hasReachedStatusV1.handler(async ({ input: request, context }) => {
+		const reached = await stateTransitionRepository.hasReachedStatus(
+			context.namespaceId,
+			request.id,
+			request.status as TerminalWorkflowRunStatus,
+			request.afterStateTransitionId
+		);
+		return { reached };
+	});
+
 	return os.router({
 		listV1,
 		getByIdV1,
@@ -126,5 +143,6 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		cancelByIdsV1,
 		claimReadyV1,
 		heartbeatV1,
+		hasReachedStatusV1,
 	});
 }
