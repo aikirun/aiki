@@ -249,7 +249,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 
 		const afterStateTransitionId = this._run.stateTransitionId;
 
-		const checkTerminated = async () => {
+		const isTerminated = async () => {
 			const { terminated } = await this.api.workflowRun.hasTerminatedV1({
 				id: this._run.id,
 				afterStateTransitionId,
@@ -260,11 +260,11 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 		const shouldRetryOnResult = async (terminated: boolean) => !terminated;
 
 		const maybeResult = options?.abortSignal
-			? await withRetry(checkTerminated, retryStrategy, {
+			? await withRetry(isTerminated, retryStrategy, {
 					abortSignal: options.abortSignal,
 					shouldRetryOnResult,
 				}).run()
-			: await withRetry(checkTerminated, retryStrategy, { shouldRetryOnResult }).run();
+			: await withRetry(isTerminated, retryStrategy, { shouldRetryOnResult }).run();
 
 		if (maybeResult.state === "timeout") {
 			if (!Number.isFinite(maxAttempts)) {
@@ -276,6 +276,8 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 		if (maybeResult.state === "aborted") {
 			return { success: false, cause: "aborted" };
 		}
+
+		maybeResult.state satisfies "completed";
 
 		// Workflow terminated - fetch the final state once
 		await this.refresh();
