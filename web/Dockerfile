@@ -11,6 +11,7 @@ COPY sdk/task/package.json ./sdk/task/
 COPY sdk/worker/package.json ./sdk/worker/
 COPY sdk/workflow/package.json ./sdk/workflow/
 COPY web/package.json ./web/
+COPY examples/package.json ./examples/
 
 RUN bun install --frozen-lockfile
 

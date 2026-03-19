@@ -24,4 +24,5 @@ coverage
 !README.md
 docs
 
-examples
+examples/*
+!examples/package.json
