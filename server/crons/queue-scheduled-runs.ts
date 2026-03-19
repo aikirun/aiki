@@ -5,34 +5,23 @@ import type {
 	WorkflowRunStateQueued,
 	WorkflowStartOptions,
 } from "@aikirun/types/workflow-run";
-import type { DatabaseConn } from "server/infra/db";
-import type { StateTransitionRepository, StateTransitionRowInsert } from "server/infra/db/repository/state-transition";
-import type { WorkflowRepository } from "server/infra/db/repository/workflow";
-import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
-import type {
-	WorkflowRunOutboxRepository,
-	WorkflowRunOutboxRowInsert,
-} from "server/infra/db/repository/workflow-run-outbox";
+import type { Repositories, StateTransitionRowInsert, WorkflowRunOutboxRowInsert } from "server/infra/db/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 export interface QueueScheduledRunsDeps {
-	db: DatabaseConn;
-	workflowRunRepo: WorkflowRunRepository;
-	workflowRepo: WorkflowRepository;
-	stateTransitionRepo: StateTransitionRepository;
-	workflowRunOutboxRepo: WorkflowRunOutboxRepository;
+	repos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition" | "workflowRunOutbox" | "transaction">;
 }
 
 export async function queueScheduledWorkflowRuns(
 	context: CronContext,
-	deps: QueueScheduledRunsDeps,
+	{ repos }: QueueScheduledRunsDeps,
 	options?: { limit?: number; chunkSize?: number }
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const dueRuns = await deps.workflowRunRepo.listDueScheduleRuns(limit);
+	const dueRuns = await repos.workflowRun.listDueScheduleRuns(limit);
 	if (!isNonEmptyArray(dueRuns)) {
 		return;
 	}
@@ -44,8 +33,8 @@ export async function queueScheduledWorkflowRuns(
 	}
 
 	const [stateTransitions, workflows] = await Promise.all([
-		deps.stateTransitionRepo.getByIds(stateTransitionIds),
-		deps.workflowRepo.getByIdsGlobal(workflowIds),
+		repos.stateTransition.getByIds(stateTransitionIds),
+		repos.workflow.getByIdsGlobal(workflowIds),
 	]);
 
 	const stateTransitionsById = new Map(stateTransitions.map((transition) => [transition.id, transition]));
@@ -90,7 +79,7 @@ export async function queueScheduledWorkflowRuns(
 
 	await runConcurrently(context, chunkLazy(enrichedRuns, chunkSize), async (chunk, spanCtx) => {
 		try {
-			await processChunk(spanCtx, deps, chunk);
+			await processChunk(spanCtx, repos, chunk);
 		} catch (error) {
 			spanCtx.logger.warn({ err: error, chunkSize: chunk.length }, "Failed to process chunk, will retry next tick");
 		}
@@ -110,7 +99,7 @@ interface EnrichedWorkflowRun {
 
 async function processChunk(
 	_context: CronContext,
-	deps: QueueScheduledRunsDeps,
+	repos: QueueScheduledRunsDeps["repos"],
 	runs: NonEmptyArray<EnrichedWorkflowRun>
 ) {
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -148,13 +137,13 @@ async function processChunk(
 		return;
 	}
 
-	await deps.db.transaction(async (tx) => {
-		await deps.stateTransitionRepo.appendBatch(stateTransitionEntries, tx);
-		const transitionedRunIds = await deps.workflowRunRepo.bulkTransitionToQueued(workflowRunUpdates, tx);
+	await repos.transaction(async (txRepos) => {
+		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(workflowRunUpdates);
 		const transitionedRunIdsSet = new Set(transitionedRunIds);
 		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
 		if (isNonEmptyArray(outboxEntriesToInsert)) {
-			await deps.workflowRunOutboxRepo.createBatch(outboxEntriesToInsert, tx);
+			await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
 		}
 	});
 }

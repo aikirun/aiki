@@ -2,20 +2,20 @@ import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 
-import type { DatabaseConn, DbTransaction } from "..";
-import { workflowRunOutbox } from "../schema/pg";
+import type { PgDb } from "../provider";
+import { workflowRunOutbox } from "../schema";
 
 export type WorkflowRunOutboxRow = typeof workflowRunOutbox.$inferSelect;
 export type WorkflowRunOutboxRowInsert = typeof workflowRunOutbox.$inferInsert;
 
-export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
+export function createWorkflowRunOutboxRepository(db: PgDb) {
 	return {
-		async createBatch(rows: NonEmptyArray<WorkflowRunOutboxRowInsert>, tx?: DbTransaction): Promise<void> {
-			await (tx ?? db).insert(workflowRunOutbox).values(rows);
+		async createBatch(rows: NonEmptyArray<WorkflowRunOutboxRowInsert>): Promise<void> {
+			await db.insert(workflowRunOutbox).values(rows);
 		},
 
-		async listPending(limit = 100, tx?: DbTransaction): Promise<WorkflowRunOutboxRow[]> {
-			return (tx ?? db)
+		async listPending(limit = 100): Promise<WorkflowRunOutboxRow[]> {
+			return db
 				.select()
 				.from(workflowRunOutbox)
 				.where(eq(workflowRunOutbox.status, "pending"))
@@ -23,29 +23,25 @@ export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
 				.limit(limit);
 		},
 
-		async markPublished(ids: NonEmptyArray<string>, tx?: DbTransaction): Promise<void> {
-			await (tx ?? db)
+		async markPublished(ids: NonEmptyArray<string>): Promise<void> {
+			await db
 				.update(workflowRunOutbox)
 				.set({ status: "published" })
 				.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, ids)));
 		},
 
-		async markAsRepublished(ids: NonEmptyArray<string>, tx?: DbTransaction): Promise<void> {
-			await (tx ?? db)
+		async markAsRepublished(ids: NonEmptyArray<string>): Promise<void> {
+			await db
 				.update(workflowRunOutbox)
 				.set({ updatedAt: new Date() })
 				.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, ids)));
 		},
 
-		async listStalePublished(
-			claimMinIdleTimeMs: number,
-			limit: number,
-			tx?: DbTransaction
-		): Promise<WorkflowRunOutboxRow[]> {
+		async listStalePublished(claimMinIdleTimeMs: number, limit: number): Promise<WorkflowRunOutboxRow[]> {
 			const now = Date.now();
 			const staleThreshold = new Date(now - claimMinIdleTimeMs);
 
-			return (tx ?? db)
+			return db
 				.select()
 				.from(workflowRunOutbox)
 				.where(and(eq(workflowRunOutbox.status, "published"), lt(workflowRunOutbox.updatedAt, staleThreshold)))
@@ -53,8 +49,8 @@ export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
 				.limit(limit);
 		},
 
-		async deleteByWorkflowRunId(namespaceId: string, workflowRunId: string, tx?: DbTransaction): Promise<void> {
-			await (tx ?? db)
+		async deleteByWorkflowRunId(namespaceId: string, workflowRunId: string): Promise<void> {
+			await db
 				.delete(workflowRunOutbox)
 				.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
 		},
@@ -63,11 +59,8 @@ export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
 			namespaceId: string,
 			filters: NonEmptyArray<{ name: string; versionId: string; shard?: string }>,
 			claimMinIdleTimeMs: number,
-			limit: number,
-			tx?: DbTransaction
+			limit: number
 		) {
-			const conn = tx ?? db;
-
 			const now = Date.now();
 			const staleThreshold = new Date(now - claimMinIdleTimeMs);
 
@@ -84,7 +77,7 @@ export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
 						)
 			);
 
-			const staleEntries = await conn
+			const staleEntries = await db
 				.select({ id: workflowRunOutbox.id })
 				.from(workflowRunOutbox)
 				.where(
@@ -103,7 +96,7 @@ export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
 				return [];
 			}
 
-			return conn
+			return db
 				.update(workflowRunOutbox)
 				.set({ updatedAt: new Date(now) })
 				.where(
@@ -119,11 +112,8 @@ export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
 		async claimPending(
 			namespaceId: string,
 			filters: NonEmptyArray<{ name: string; versionId: string; shard?: string }>,
-			limit: number,
-			tx?: DbTransaction
+			limit: number
 		) {
-			const conn = tx ?? db;
-
 			const workflowsFilter = filters.map((filter) =>
 				filter.shard !== undefined
 					? and(
@@ -137,7 +127,7 @@ export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
 						)
 			);
 
-			const pendingEntries = await conn
+			const pendingEntries = await db
 				.select({ id: workflowRunOutbox.id })
 				.from(workflowRunOutbox)
 				.where(
@@ -155,15 +145,15 @@ export function createWorkflowRunOutboxRepository(db: DatabaseConn) {
 				return [];
 			}
 
-			return conn
+			return db
 				.update(workflowRunOutbox)
 				.set({ status: "published" })
 				.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, pendingEntryIds)))
 				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
 		},
 
-		async reclaim(namespaceId: string, workflowRunId: WorkflowRunId, tx?: DbTransaction): Promise<void> {
-			await (tx ?? db)
+		async reclaim(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
+			await db
 				.update(workflowRunOutbox)
 				.set({ updatedAt: new Date() })
 				.where(

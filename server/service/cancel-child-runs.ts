@@ -7,18 +7,14 @@ import {
 	type WorkflowRunStateScheduled,
 	type WorkflowStartOptions,
 } from "@aikirun/types/workflow-run";
-import type { DbTransaction } from "server/infra/db";
-import type { StateTransitionRepository, StateTransitionRowInsert } from "server/infra/db/repository/state-transition";
-import type { WorkflowRepository, WorkflowRowInsert } from "server/infra/db/repository/workflow";
-import type { WorkflowRunRepository, WorkflowRunRowInsert } from "server/infra/db/repository/workflow-run";
+import type {
+	Repositories,
+	StateTransitionRowInsert,
+	WorkflowRowInsert,
+	WorkflowRunRowInsert,
+} from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import { ulid } from "ulidx";
-
-export interface ChildRunCancellerDeps {
-	workflowRepo: WorkflowRepository;
-	workflowRunRepo: WorkflowRunRepository;
-	stateTransitionRepo: StateTransitionRepository;
-}
 
 export interface CancelledParentRun {
 	namespaceId: NamespaceId;
@@ -26,18 +22,21 @@ export interface CancelledParentRun {
 	shard: string | undefined;
 }
 
-export function createChildRunCanceller(deps: ChildRunCancellerDeps) {
+export function createChildRunCanceller() {
 	return {
-		async cancel(parentRuns: NonEmptyArray<CancelledParentRun>, tx: DbTransaction, logger: Logger): Promise<void> {
+		async cancel(
+			parentRuns: NonEmptyArray<CancelledParentRun>,
+			repos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">,
+			logger: Logger
+		): Promise<void> {
 			if (!isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
 				return;
 			}
 
 			const parentRunIds = parentRuns.map((r) => r.runId);
-			const parentRunIdsHavingChildren = await deps.workflowRunRepo.hasChildRuns(
+			const parentRunIdsHavingChildren = await repos.workflowRun.hasChildRuns(
 				parentRunIds as NonEmptyArray<string>,
-				NON_TERMINAL_WORKFLOW_RUN_STATUSES,
-				tx
+				NON_TERMINAL_WORKFLOW_RUN_STATUSES
 			);
 			if (parentRunIdsHavingChildren.size === 0) {
 				return;
@@ -70,7 +69,7 @@ export function createChildRunCanceller(deps: ChildRunCancellerDeps) {
 				return;
 			}
 
-			const workflows = await deps.workflowRepo.getOrCreateBulk(workflowEntries, tx);
+			const workflows = await repos.workflow.getOrCreateBulk(workflowEntries);
 			const workflowsByNamespaceId = new Map(workflows.map((w) => [w.namespaceId, w]));
 
 			const now = Date.now();
@@ -124,8 +123,8 @@ export function createChildRunCanceller(deps: ChildRunCancellerDeps) {
 			}
 
 			if (isNonEmptyArray(workflowRunEntries) && isNonEmptyArray(stateTransitionEntries)) {
-				await deps.workflowRunRepo.insert(workflowRunEntries, tx);
-				await deps.stateTransitionRepo.appendBatch(stateTransitionEntries, tx);
+				await repos.workflowRun.insert(workflowRunEntries);
+				await repos.stateTransition.appendBatch(stateTransitionEntries);
 			}
 		},
 	};

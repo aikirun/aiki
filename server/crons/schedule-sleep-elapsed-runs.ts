@@ -1,35 +1,29 @@
 import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib";
 import type { WorkflowRunStateScheduled } from "@aikirun/types/workflow-run";
-import type { DatabaseConn } from "server/infra/db";
-import type { SleepQueueRepository } from "server/infra/db/repository/sleep-queue";
-import type { StateTransitionRepository, StateTransitionRowInsert } from "server/infra/db/repository/state-transition";
-import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
+import type { Repositories, StateTransitionRowInsert } from "server/infra/db/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 export interface ScheduleSleepElapsedRunsDeps {
-	db: DatabaseConn;
-	workflowRunRepo: WorkflowRunRepository;
-	stateTransitionRepo: StateTransitionRepository;
-	sleepQueueRepo: SleepQueueRepository;
+	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "sleepQueue" | "transaction">;
 }
 
 export async function scheduleSleepElapsedWorkflowRuns(
 	context: CronContext,
-	deps: ScheduleSleepElapsedRunsDeps,
+	{ repos }: ScheduleSleepElapsedRunsDeps,
 	options?: { limit?: number; chunkSize?: number }
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await deps.workflowRunRepo.listSleepElapsedRuns(limit);
+	const runs = await repos.workflowRun.listSleepElapsedRuns(limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}
 
 	await runConcurrently(context, chunkLazy(runs, chunkSize), async (chunk, spanCtx) => {
 		try {
-			await processChunk(spanCtx, deps, chunk);
+			await processChunk(spanCtx, repos, chunk);
 		} catch (error) {
 			spanCtx.logger.warn({ err: error, chunkSize: chunk.length }, "Failed to process chunk, will retry next tick");
 		}
@@ -38,7 +32,7 @@ export async function scheduleSleepElapsedWorkflowRuns(
 
 async function processChunk(
 	_context: CronContext,
-	deps: ScheduleSleepElapsedRunsDeps,
+	repos: ScheduleSleepElapsedRunsDeps["repos"],
 	runs: NonEmptyArray<{ id: string; revision: number; attempts: number }>
 ) {
 	const now = Date.now();
@@ -75,9 +69,9 @@ async function processChunk(
 		return;
 	}
 
-	await deps.db.transaction(async (tx) => {
-		await deps.sleepQueueRepo.bulkCompleteByWorkflowRunIds(workflowRunIds, completedAt, tx);
-		await deps.stateTransitionRepo.appendBatch(stateTransitionEntries, tx);
-		await deps.workflowRunRepo.bulkTransitionToScheduled("sleeping", workflowRunUpdates, completedAt, tx);
+	await repos.transaction(async (txRepos) => {
+		await txRepos.sleepQueue.bulkCompleteByWorkflowRunIds(workflowRunIds, completedAt);
+		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+		await txRepos.workflowRun.bulkTransitionToScheduled("sleeping", workflowRunUpdates, completedAt);
 	});
 }

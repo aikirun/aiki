@@ -32,7 +32,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { namespace } from "./auth";
-import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../../model/workflow-run-outbox";
+import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../../constants/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
 

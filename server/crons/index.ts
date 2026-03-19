@@ -1,13 +1,4 @@
-import type { DatabaseConn } from "server/infra/db";
-import type { ChildWorkflowRunWaitQueueRepository } from "server/infra/db/repository/child-workflow-run-wait-queue";
-import type { EventWaitQueueRepository } from "server/infra/db/repository/event-wait-queue";
-import type { ScheduleRepository } from "server/infra/db/repository/schedule";
-import type { SleepQueueRepository } from "server/infra/db/repository/sleep-queue";
-import type { StateTransitionRepository } from "server/infra/db/repository/state-transition";
-import type { TaskRepository } from "server/infra/db/repository/task";
-import type { WorkflowRepository } from "server/infra/db/repository/workflow";
-import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
-import type { WorkflowRunOutboxRepository } from "server/infra/db/repository/workflow-run-outbox";
+import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";
@@ -26,17 +17,8 @@ import { scheduleWorkflowRunsWithRetryableTask } from "./schedule-retryable-task
 import { scheduleSleepElapsedWorkflowRuns } from "./schedule-sleep-elapsed-runs";
 
 export interface InitCronsDeps {
-	db: DatabaseConn;
+	repos: Repositories;
 	workflowRunPublisher?: WorkflowRunPublisher;
-	workflowRunOutboxRepo: WorkflowRunOutboxRepository;
-	workflowRunRepo: WorkflowRunRepository;
-	stateTransitionRepo: StateTransitionRepository;
-	sleepQueueRepo: SleepQueueRepository;
-	taskRepo: TaskRepository;
-	workflowRepo: WorkflowRepository;
-	scheduleRepo: ScheduleRepository;
-	eventWaitQueueRepo: EventWaitQueueRepository;
-	childWorkflowRunWaitQueueRepo: ChildWorkflowRunWaitQueueRepository;
 	childRunCanceller: ChildRunCanceller;
 	scheduleService: ScheduleService;
 }
@@ -88,7 +70,7 @@ function initCron<Deps, Opts>(
 
 export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 	const publisherDeps = deps.workflowRunPublisher
-		? { workflowRunOutboxRepo: deps.workflowRunOutboxRepo, workflowRunPublisher: deps.workflowRunPublisher }
+		? { repos: deps.repos, workflowRunPublisher: deps.workflowRunPublisher }
 		: undefined;
 
 	const crons = [
@@ -98,13 +80,17 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 					initCron(logger, 500, republishStaleRuns, publisherDeps),
 				]
 			: []),
-		initCron(logger, 500, queueScheduledWorkflowRuns, deps),
-		initCron(logger, 500, scheduleSleepElapsedWorkflowRuns, deps),
-		initCron(logger, 500, scheduleRetryableWorkflowRuns, deps),
-		initCron(logger, 500, scheduleWorkflowRunsWithRetryableTask, deps),
-		initCron(logger, 500, scheduleEventWaitTimedOutWorkflowRuns, deps),
-		initCron(logger, 500, scheduleChildRunWaitTimedOutWorkflowRuns, deps),
-		initCron(logger, 500, scheduleRecurringWorkflows, deps),
+		initCron(logger, 500, queueScheduledWorkflowRuns, { repos: deps.repos }),
+		initCron(logger, 500, scheduleSleepElapsedWorkflowRuns, { repos: deps.repos }),
+		initCron(logger, 500, scheduleRetryableWorkflowRuns, { repos: deps.repos }),
+		initCron(logger, 500, scheduleWorkflowRunsWithRetryableTask, { repos: deps.repos }),
+		initCron(logger, 500, scheduleEventWaitTimedOutWorkflowRuns, { repos: deps.repos }),
+		initCron(logger, 500, scheduleChildRunWaitTimedOutWorkflowRuns, { repos: deps.repos }),
+		initCron(logger, 500, scheduleRecurringWorkflows, {
+			repos: deps.repos,
+			scheduleService: deps.scheduleService,
+			childRunCanceller: deps.childRunCanceller,
+		}),
 	];
 
 	return {

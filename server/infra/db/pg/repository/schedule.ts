@@ -2,8 +2,8 @@ import type { NonEmptyArray } from "@aikirun/lib";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, count, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
 
-import type { DatabaseConn, DbTransaction } from "..";
-import { schedule, workflow } from "../schema/pg";
+import type { PgDb } from "../provider";
+import { schedule, workflow } from "../schema";
 
 export type ScheduleRow = typeof schedule.$inferSelect;
 type ScheduleRowInsert = typeof schedule.$inferInsert;
@@ -26,10 +26,10 @@ type ScheduleRowUpdate = Partial<
 	>
 >;
 
-export function createScheduleRepository(db: DatabaseConn) {
+export function createScheduleRepository(db: PgDb) {
 	return {
-		async create(input: ScheduleRowInsert, tx?: DbTransaction): Promise<ScheduleRow> {
-			const result = await (tx ?? db).insert(schedule).values(input).returning();
+		async create(input: ScheduleRowInsert): Promise<ScheduleRow> {
+			const result = await db.insert(schedule).values(input).returning();
 			const created = result[0];
 			if (!created) {
 				throw new Error("Failed to create schedule - no row returned");
@@ -37,13 +37,8 @@ export function createScheduleRepository(db: DatabaseConn) {
 			return created;
 		},
 
-		async update(
-			namespaceId: NamespaceId,
-			id: string,
-			updates: ScheduleRowUpdate,
-			tx?: DbTransaction
-		): Promise<ScheduleRow | null> {
-			const result = await (tx ?? db)
+		async update(namespaceId: NamespaceId, id: string, updates: ScheduleRowUpdate): Promise<ScheduleRow | null> {
+			const result = await db
 				.update(schedule)
 				.set(updates)
 				.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.id, id)))
@@ -52,8 +47,7 @@ export function createScheduleRepository(db: DatabaseConn) {
 		},
 
 		async bulkUpdateOccurrence(
-			entries: NonEmptyArray<{ id: string; lastOccurrence?: Date; nextRunAt: Date }>,
-			tx?: DbTransaction
+			entries: NonEmptyArray<{ id: string; lastOccurrence?: Date; nextRunAt: Date }>
 		): Promise<void> {
 			const ids: string[] = [];
 			const nextRunAtCaseFragments = [];
@@ -76,15 +70,11 @@ export function createScheduleRepository(db: DatabaseConn) {
 				updates.lastOccurrence = sql`CASE ${schedule.id} ${sql.join(lastOccurrenceCaseFragments, sql` `)} ELSE ${schedule.lastOccurrence} END`;
 			}
 
-			await (tx ?? db).update(schedule).set(updates).where(inArray(schedule.id, ids));
+			await db.update(schedule).set(updates).where(inArray(schedule.id, ids));
 		},
 
-		async getByReferenceId(
-			namespaceId: NamespaceId,
-			referenceId: string,
-			tx?: DbTransaction
-		): Promise<ScheduleRow | null> {
-			const result = await (tx ?? db)
+		async getByReferenceId(namespaceId: NamespaceId, referenceId: string): Promise<ScheduleRow | null> {
+			const result = await db
 				.select()
 				.from(schedule)
 				.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.referenceId, referenceId)))
@@ -92,12 +82,8 @@ export function createScheduleRepository(db: DatabaseConn) {
 			return result[0] ?? null;
 		},
 
-		async getByDefinitionHash(
-			namespaceId: NamespaceId,
-			definitionHash: string,
-			tx?: DbTransaction
-		): Promise<ScheduleRow | null> {
-			const result = await (tx ?? db)
+		async getByDefinitionHash(namespaceId: NamespaceId, definitionHash: string): Promise<ScheduleRow | null> {
+			const result = await db
 				.select()
 				.from(schedule)
 				.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.definitionHash, definitionHash)))
@@ -114,11 +100,8 @@ export function createScheduleRepository(db: DatabaseConn) {
 				workflowIds?: string[];
 			},
 			limit = 50,
-			offset = 0,
-			tx?: DbTransaction
+			offset = 0
 		) {
-			const conn = tx ?? db;
-
 			const conditions = [eq(schedule.namespaceId, namespaceId)];
 
 			if (filters.id) {
@@ -137,7 +120,7 @@ export function createScheduleRepository(db: DatabaseConn) {
 			const whereClause = and(...conditions);
 
 			const [rows, countResult] = await Promise.all([
-				conn
+				db
 					.select({
 						schedule: getTableColumns(schedule),
 						workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
@@ -148,14 +131,14 @@ export function createScheduleRepository(db: DatabaseConn) {
 					.orderBy(schedule.createdAt)
 					.limit(limit)
 					.offset(offset),
-				conn.select({ count: count() }).from(schedule).where(whereClause),
+				db.select({ count: count() }).from(schedule).where(whereClause),
 			]);
 
 			return { rows, total: countResult[0]?.count ?? 0 };
 		},
 
-		async listDueSchedules(before: Date, limit = 100, tx?: DbTransaction) {
-			return (tx ?? db)
+		async listDueSchedules(before: Date, limit = 100) {
+			return db
 				.select({
 					schedule: getTableColumns(schedule),
 					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
@@ -167,8 +150,8 @@ export function createScheduleRepository(db: DatabaseConn) {
 				.limit(limit);
 		},
 
-		async getByIdWithWorkflow(namespaceId: NamespaceId, id: string, tx?: DbTransaction) {
-			const result = await (tx ?? db)
+		async getByIdWithWorkflow(namespaceId: NamespaceId, id: string) {
+			const result = await db
 				.select({
 					schedule: getTableColumns(schedule),
 					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
@@ -180,8 +163,8 @@ export function createScheduleRepository(db: DatabaseConn) {
 			return result[0] ?? null;
 		},
 
-		async getByReferenceIdWithWorkflow(namespaceId: NamespaceId, referenceId: string, tx?: DbTransaction) {
-			const result = await (tx ?? db)
+		async getByReferenceIdWithWorkflow(namespaceId: NamespaceId, referenceId: string) {
+			const result = await db
 				.select({
 					schedule: getTableColumns(schedule),
 					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },

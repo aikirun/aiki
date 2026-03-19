@@ -1,40 +1,34 @@
 import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib";
 import type { WorkflowRunStateScheduled } from "@aikirun/types/workflow-run";
-import type { DatabaseConn } from "server/infra/db";
-import type { StateTransitionRepository, StateTransitionRowInsert } from "server/infra/db/repository/state-transition";
-import type { TaskRepository } from "server/infra/db/repository/task";
-import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
+import type { Repositories, StateTransitionRowInsert } from "server/infra/db/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 export interface ScheduleRetryableTaskRunsDeps {
-	db: DatabaseConn;
-	taskRepo: TaskRepository;
-	workflowRunRepo: WorkflowRunRepository;
-	stateTransitionRepo: StateTransitionRepository;
+	repos: Pick<Repositories, "task" | "workflowRun" | "stateTransition" | "transaction">;
 }
 
 export async function scheduleWorkflowRunsWithRetryableTask(
 	context: CronContext,
-	deps: ScheduleRetryableTaskRunsDeps,
+	{ repos }: ScheduleRetryableTaskRunsDeps,
 	options?: { limit?: number; chunkSize?: number }
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const workflowRunIds = await deps.taskRepo.listRetryableTaskWorkflowRunIds(limit);
+	const workflowRunIds = await repos.task.listRetryableTaskWorkflowRunIds(limit);
 	if (!isNonEmptyArray(workflowRunIds)) {
 		return;
 	}
 
-	const runs = await deps.workflowRunRepo.listByIdsAndStatus(workflowRunIds, "running");
+	const runs = await repos.workflowRun.listByIdsAndStatus(workflowRunIds, "running");
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}
 
 	await runConcurrently(context, chunkLazy(runs, chunkSize), async (chunk, spanCtx) => {
 		try {
-			await processChunk(spanCtx, deps, chunk);
+			await processChunk(spanCtx, repos, chunk);
 		} catch (error) {
 			spanCtx.logger.warn({ err: error, chunkSize: chunk.length }, "Failed to process chunk, will retry next tick");
 		}
@@ -43,7 +37,7 @@ export async function scheduleWorkflowRunsWithRetryableTask(
 
 async function processChunk(
 	_context: CronContext,
-	deps: ScheduleRetryableTaskRunsDeps,
+	repos: ScheduleRetryableTaskRunsDeps["repos"],
 	runs: NonEmptyArray<{ id: string; revision: number; attempts: number }>
 ) {
 	const now = Date.now();
@@ -74,8 +68,8 @@ async function processChunk(
 		return;
 	}
 
-	await deps.db.transaction(async (tx) => {
-		await deps.stateTransitionRepo.appendBatch(stateTransitionEntries, tx);
-		await deps.workflowRunRepo.bulkTransitionToScheduled("running", workflowRunUpdates, scheduledAt, tx);
+	await repos.transaction(async (txRepos) => {
+		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+		await txRepos.workflowRun.bulkTransitionToScheduled("running", workflowRunUpdates, scheduledAt);
 	});
 }

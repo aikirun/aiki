@@ -1,15 +1,25 @@
-import type { MySqlDatabaseOptions } from "./provider/mysql";
-import { createPgDatabaseConn, type PgDatabaseConn, type PgDatabaseOptions } from "./provider/pg";
-import type { SqliteDatabaseOptions } from "./provider/sqlite";
+import { createPgRepositories } from "./pg";
+import { createPgDatabaseConn, type PgDatabaseOptions } from "./pg/provider";
+import { betterAuthSchema as pgBetterAuthSchema } from "./pg/schema";
 
-export type DatabaseOptions = PgDatabaseOptions | MySqlDatabaseOptions | SqliteDatabaseOptions;
-export type DatabaseConn = PgDatabaseConn;
-export type DbTransaction = Parameters<Parameters<DatabaseConn["transaction"]>[0]>[0];
+export type { Repositories } from "./types";
+export * from "./types";
 
-export function createDatabaseConn(options: DatabaseOptions): DatabaseConn {
+export type DatabaseOptions =
+	| PgDatabaseOptions
+	| { provider: "mysql"; url: string; maxConnections?: number; ssl?: boolean }
+	| { provider: "sqlite"; path: string };
+
+export function createDatabase(options: DatabaseOptions) {
 	switch (options.provider) {
-		case "pg":
-			return createPgDatabaseConn(options);
+		case "pg": {
+			const conn = createPgDatabaseConn(options);
+			return {
+				conn,
+				repos: createPgRepositories(conn),
+				betterAuthSchema: pgBetterAuthSchema,
+			};
+		}
 		case "sqlite":
 			throw new Error("SQLite support not yet implemented");
 		case "mysql":

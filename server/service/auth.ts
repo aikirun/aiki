@@ -1,24 +1,13 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
-
-import type { DatabaseConn } from "../infra/db";
-import * as schema from "../infra/db/schema/pg";
-
-const schemaForBetterAuth = {
-	user: schema.user,
-	session: schema.session,
-	account: schema.account,
-	verification: schema.verification,
-	organization: schema.organization,
-	organization_member: schema.organizationMember,
-	organization_invitation: schema.organizationInvitation,
-	namespace: schema.namespace,
-	namespace_member: schema.namespaceMember,
-};
+import type { DatabaseProvider } from "server/config/schema";
+import type { BetterAuthSchema } from "server/infra/db/types";
 
 export interface AuthOptions {
-	db: DatabaseConn;
+	conn: Parameters<typeof drizzleAdapter>[0];
+	provider: DatabaseProvider;
+	betterAuthSchema: BetterAuthSchema;
 	baseURL: string;
 	secret: string;
 	corsOrigins: string[];
@@ -26,7 +15,7 @@ export interface AuthOptions {
 
 export function createAuthService(options: AuthOptions) {
 	return betterAuth({
-		database: drizzleAdapter(options.db, { provider: "pg", schema: schemaForBetterAuth }),
+		database: drizzleAdapter(options.conn, { provider: options.provider, schema: options.betterAuthSchema }),
 		baseURL: options.baseURL,
 		basePath: "/auth",
 		secret: options.secret,

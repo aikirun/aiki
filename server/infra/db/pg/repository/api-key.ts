@@ -2,13 +2,13 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { and, eq } from "drizzle-orm";
 
-import type { DatabaseConn } from "..";
-import { apiKey } from "../schema/pg";
+import type { PgDb } from "../provider";
+import { apiKey } from "../schema";
 
 export type ApiKeyRow = typeof apiKey.$inferSelect;
 export type ApiKeyRowInsert = typeof apiKey.$inferInsert;
 
-export function createApiKeyRepository(db: DatabaseConn) {
+export function createApiKeyRepository(db: PgDb) {
 	return {
 		async create(input: ApiKeyRowInsert): Promise<ApiKeyRow> {
 			const result = await db.insert(apiKey).values(input).returning();

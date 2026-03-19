@@ -1,17 +1,17 @@
 import { isNonEmptyArray } from "@aikirun/lib";
-import type { WorkflowRunOutboxRepository } from "server/infra/db/repository/workflow-run-outbox";
+import type { Repositories } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";
 
 export interface PublishReadyRunsDeps {
-	workflowRunOutboxRepo: WorkflowRunOutboxRepository;
+	repos: Pick<Repositories, "workflowRunOutbox">;
 	workflowRunPublisher: WorkflowRunPublisher;
 }
 
 export async function publishReadyRuns(context: CronContext, deps: PublishReadyRunsDeps, options?: { limit?: number }) {
 	const { limit = 100 } = options ?? {};
 
-	const pendingEntries = await deps.workflowRunOutboxRepo.listPending(limit);
+	const pendingEntries = await deps.repos.workflowRunOutbox.listPending(limit);
 	const pendingEntryIds = pendingEntries.map((entry) => entry.id);
 	if (!isNonEmptyArray(pendingEntryIds)) {
 		return;
@@ -27,5 +27,5 @@ export async function publishReadyRuns(context: CronContext, deps: PublishReadyR
 		}))
 	);
 
-	await deps.workflowRunOutboxRepo.markPublished(pendingEntryIds);
+	await deps.repos.workflowRunOutbox.markPublished(pendingEntryIds);
 }

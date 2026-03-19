@@ -6,8 +6,8 @@ import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow-run"
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
 import { toWorkflowRunState } from "./state-transition";
-import type { DatabaseConn, DbTransaction } from "..";
-import { stateTransition, task, workflow, workflowRun } from "../schema/pg";
+import type { PgDb } from "../provider";
+import { stateTransition, task, workflow, workflowRun } from "../schema";
 
 export type WorkflowRunRow = typeof workflowRun.$inferSelect;
 export type WorkflowRunRowInsert = typeof workflowRun.$inferInsert;
@@ -18,17 +18,16 @@ type WorkflowRunRowUpdate = Partial<
 	>
 >;
 
-export function createWorkflowRunRepository(db: DatabaseConn) {
+export function createWorkflowRunRepository(db: PgDb) {
 	return {
-		async insert(input: WorkflowRunRowInsert | NonEmptyArray<WorkflowRunRowInsert>, tx?: DbTransaction): Promise<void> {
+		async insert(input: WorkflowRunRowInsert | NonEmptyArray<WorkflowRunRowInsert>): Promise<void> {
 			const values = Array.isArray(input) ? input : [input];
-			await (tx ?? db).insert(workflowRun).values(values);
+			await db.insert(workflowRun).values(values);
 		},
 
 		async update(
 			filters: { id: WorkflowRunId; revision?: number },
-			updates: WorkflowRunRowUpdate,
-			tx?: DbTransaction
+			updates: WorkflowRunRowUpdate
 		): Promise<{ revision: number } | undefined> {
 			const conditions = [eq(workflowRun.id, filters.id)];
 			if (filters.revision !== undefined) {
@@ -37,7 +36,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 
 			const whereClause = and(...conditions);
 
-			const result = await (tx ?? db)
+			const result = await db
 				.update(workflowRun)
 				.set({
 					...updates,
@@ -54,8 +53,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			return { revision };
 		},
 
-		async exists(namespaceId: NamespaceId, id: string, tx?: DbTransaction): Promise<boolean> {
-			const result = await (tx ?? db)
+		async exists(namespaceId: NamespaceId, id: string): Promise<boolean> {
+			const result = await db
 				.select({ id: workflowRun.id })
 				.from(workflowRun)
 				.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
@@ -63,8 +62,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			return result.length > 0;
 		},
 
-		async getById(namespaceId: NamespaceId, id: string, tx?: DbTransaction): Promise<WorkflowRunRow | null> {
-			const result = await (tx ?? db)
+		async getById(namespaceId: NamespaceId, id: string): Promise<WorkflowRunRow | null> {
+			const result = await db
 				.select()
 				.from(workflowRun)
 				.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
@@ -72,24 +71,15 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			return result[0] ?? null;
 		},
 
-		async getByIds(
-			namespaceId: NamespaceId,
-			ids: NonEmptyArray<string>,
-			tx?: DbTransaction
-		): Promise<WorkflowRunRow[]> {
-			return (tx ?? db)
+		async getByIds(namespaceId: NamespaceId, ids: NonEmptyArray<string>): Promise<WorkflowRunRow[]> {
+			return db
 				.select()
 				.from(workflowRun)
 				.where(and(eq(workflowRun.namespaceId, namespaceId), inArray(workflowRun.id, ids)));
 		},
 
-		async getByIdWithState(
-			namespaceId: NamespaceId,
-			id: string,
-			tx?: DbTransaction,
-			options?: { forUpdate?: boolean }
-		) {
-			const query = (tx ?? db)
+		async getByIdWithState(namespaceId: NamespaceId, id: string, options?: { forUpdate?: boolean }) {
+			const query = db
 				.select({
 					id: workflowRun.id,
 					status: workflowRun.status,
@@ -114,8 +104,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			return row as Omit<typeof row, "state"> & { state: WorkflowRunState };
 		},
 
-		async listByIdsAndStatus(ids: NonEmptyArray<string>, status: WorkflowRunStatus, tx?: DbTransaction) {
-			return (tx ?? db)
+		async listByIdsAndStatus(ids: NonEmptyArray<string>, status: WorkflowRunStatus) {
+			return db
 				.select({
 					id: workflowRun.id,
 					revision: workflowRun.revision,
@@ -125,10 +115,10 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				.where(and(inArray(workflowRun.id, ids), eq(workflowRun.status, status)));
 		},
 
-		async getChildRuns(
-			filters: { parentRunId: string; status?: NonEmptyArray<WorkflowRunStatus> },
-			tx?: DbTransaction
-		): Promise<WorkflowRunRow[]> {
+		async getChildRuns(filters: {
+			parentRunId: string;
+			status?: NonEmptyArray<WorkflowRunStatus>;
+		}): Promise<WorkflowRunRow[]> {
 			// TODO: explore loading in chunks
 
 			const conditions = [eq(workflowRun.parentWorkflowRunId, filters.parentRunId)];
@@ -138,20 +128,19 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 
 			const whereClause = and(...conditions);
 
-			return (tx ?? db).select().from(workflowRun).where(whereClause).limit(10_000);
+			return db.select().from(workflowRun).where(whereClause).limit(10_000);
 		},
 
 		async hasChildRuns(
 			parentRunIds: NonEmptyArray<string>,
-			childRunStatus?: NonEmptyArray<WorkflowRunStatus>,
-			tx?: DbTransaction
+			childRunStatus?: NonEmptyArray<WorkflowRunStatus>
 		): Promise<Set<string>> {
 			const conditions = [inArray(workflowRun.parentWorkflowRunId, parentRunIds)];
 			if (childRunStatus) {
 				conditions.push(inArray(workflowRun.status, childRunStatus));
 			}
 
-			const rows = await (tx ?? db)
+			const rows = await db
 				.select({ parentWorkflowRunId: workflowRun.parentWorkflowRunId })
 				.from(workflowRun)
 				.where(and(...conditions))
@@ -166,13 +155,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			return result;
 		},
 
-		async getByWorkflowAndReferenceId(
-			workflowId: string,
-			referenceId: string,
-			tx?: DbTransaction
-		): Promise<WorkflowRunRow | null> {
-			const conn = tx ?? db;
-			const result = await conn
+		async getByWorkflowAndReferenceId(workflowId: string, referenceId: string): Promise<WorkflowRunRow | null> {
+			const result = await db
 				.select()
 				.from(workflowRun)
 				.where(and(eq(workflowRun.workflowId, workflowId), eq(workflowRun.referenceId, referenceId)))
@@ -180,13 +164,10 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			return result[0] ?? null;
 		},
 
-		async listByWorkflowAndReferenceIdPairs(
-			filters: {
-				pairs: NonEmptyArray<{ workflowId: string; referenceId: string }>;
-				status?: NonEmptyArray<WorkflowRunStatus>;
-			},
-			tx?: DbTransaction
-		): Promise<WorkflowRunRow[]> {
+		async listByWorkflowAndReferenceIdPairs(filters: {
+			pairs: NonEmptyArray<{ workflowId: string; referenceId: string }>;
+			status?: NonEmptyArray<WorkflowRunStatus>;
+		}): Promise<WorkflowRunRow[]> {
 			const pairConditions = or(
 				...filters.pairs.map(({ workflowId, referenceId }) =>
 					and(eq(workflowRun.workflowId, workflowId), eq(workflowRun.referenceId, referenceId))
@@ -196,7 +177,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				? and(pairConditions, inArray(workflowRun.status, filters.status))
 				: pairConditions;
 
-			return (tx ?? db).select().from(workflowRun).where(conditions);
+			return db.select().from(workflowRun).where(conditions);
 		},
 
 		async listByFilters(
@@ -212,11 +193,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			},
 			limit: number,
 			offset: number,
-			sort: { order: "asc" | "desc" },
-			tx?: DbTransaction
+			sort: { order: "asc" | "desc" }
 		) {
-			const conn = tx ?? db;
-
 			const conditions = [eq(workflowRun.namespaceId, namespaceId)];
 			if (filters.id) {
 				conditions.push(eq(workflowRun.id, filters.id));
@@ -238,7 +216,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			const orderBy = sql`${workflowRun.id} ${sql.raw(sort.order)}`;
 
 			const [rows, countResult] = await Promise.all([
-				conn
+				db
 					.select({
 						id: workflowRun.id,
 						status: workflowRun.status,
@@ -253,17 +231,14 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 					.orderBy(orderBy)
 					.limit(limit)
 					.offset(offset),
-				conn.select({ count: count() }).from(workflowRun).where(whereClause),
+				db.select({ count: count() }).from(workflowRun).where(whereClause),
 			]);
 
 			return { rows, total: countResult[0]?.count ?? 0 };
 		},
 
-		async getTaskCountsByRunIds(
-			runIds: NonEmptyArray<string>,
-			tx?: DbTransaction
-		): Promise<Map<string, Record<TaskStatus, number>>> {
-			const rows = await (tx ?? db)
+		async getTaskCountsByRunIds(runIds: NonEmptyArray<string>): Promise<Map<string, Record<TaskStatus, number>>> {
+			const rows = await db
 				.select({
 					workflowRunId: task.workflowRunId,
 					status: task.status,
@@ -286,15 +261,14 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 		},
 
 		async countByStatus(
-			filter: { namespaceId: NamespaceId } | { workflowIds: NonEmptyArray<string> },
-			tx?: DbTransaction
+			filter: { namespaceId: NamespaceId } | { workflowIds: NonEmptyArray<string> }
 		): Promise<Array<{ status: WorkflowRunStatus; count: number }>> {
 			const whereClause =
 				"workflowIds" in filter
 					? inArray(workflowRun.workflowId, filter.workflowIds)
 					: eq(workflowRun.namespaceId, filter.namespaceId);
 
-			return (tx ?? db)
+			return db
 				.select({
 					status: workflowRun.status,
 					count: count(),
@@ -304,8 +278,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				.groupBy(workflowRun.status);
 		},
 
-		async listDueScheduleRuns(limit = 100, tx?: DbTransaction) {
-			return (tx ?? db)
+		async listDueScheduleRuns(limit = 100) {
+			return db
 				.select({
 					id: workflowRun.id,
 					namespaceId: workflowRun.namespaceId,
@@ -321,8 +295,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				.limit(limit);
 		},
 
-		async listSleepElapsedRuns(limit = 100, tx?: DbTransaction) {
-			return (tx ?? db)
+		async listSleepElapsedRuns(limit = 100) {
+			return db
 				.select({
 					id: workflowRun.id,
 					revision: workflowRun.revision,
@@ -334,8 +308,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				.limit(limit);
 		},
 
-		async listRetryableRuns(limit = 100, tx?: DbTransaction) {
-			return (tx ?? db)
+		async listRetryableRuns(limit = 100) {
+			return db
 				.select({
 					id: workflowRun.id,
 					revision: workflowRun.revision,
@@ -347,8 +321,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				.limit(limit);
 		},
 
-		async listEventWaitTimedOutRuns(limit = 100, tx?: DbTransaction) {
-			return (tx ?? db)
+		async listEventWaitTimedOutRuns(limit = 100) {
+			return db
 				.select({
 					id: workflowRun.id,
 					revision: workflowRun.revision,
@@ -361,8 +335,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				.limit(limit);
 		},
 
-		async listChildRunWaitTimedOutRuns(limit = 100, tx?: DbTransaction) {
-			return (tx ?? db)
+		async listChildRunWaitTimedOutRuns(limit = 100) {
+			return db
 				.select({
 					id: workflowRun.id,
 					revision: workflowRun.revision,
@@ -376,8 +350,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 		},
 
 		async bulkTransitionToQueued(
-			runs: NonEmptyArray<{ id: string; revision: number; stateTransitionId: string }>,
-			tx?: DbTransaction
+			runs: NonEmptyArray<{ id: string; revision: number; stateTransitionId: string }>
 		): Promise<string[]> {
 			const orConditions = [];
 			const caseFragments = [];
@@ -387,7 +360,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				caseFragments.push(sql`WHEN ${run.id} THEN ${run.stateTransitionId}`);
 			}
 
-			const result = await (tx ?? db)
+			const result = await db
 				.update(workflowRun)
 				.set({
 					status: "queued",
@@ -404,8 +377,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 		async bulkTransitionToScheduled(
 			fromStatus: WorkflowRunStatus,
 			runs: NonEmptyArray<{ id: string; revision: number; stateTransitionId: string }>,
-			scheduledAt: Date,
-			tx?: DbTransaction
+			scheduledAt: Date
 		): Promise<string[]> {
 			const orConditions = [];
 			const stateTransitionCaseFragments = [];
@@ -415,7 +387,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				stateTransitionCaseFragments.push(sql`WHEN ${run.id} THEN ${run.stateTransitionId}`);
 			}
 
-			const result = await (tx ?? db)
+			const result = await db
 				.update(workflowRun)
 				.set({
 					status: "scheduled",
@@ -432,8 +404,8 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 			return result.map((row) => row.id);
 		},
 
-		async bulkTransitionToCancelled(runIds: NonEmptyArray<string>, tx?: DbTransaction): Promise<string[]> {
-			const result = await (tx ?? db)
+		async bulkTransitionToCancelled(runIds: NonEmptyArray<string>): Promise<string[]> {
+			const result = await db
 				.update(workflowRun)
 				.set({
 					status: "cancelled",
@@ -450,8 +422,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 		},
 
 		async bulkSetLatestStateTransitionId(
-			runs: NonEmptyArray<{ id: string; stateTransitionId: string }>,
-			tx?: DbTransaction
+			runs: NonEmptyArray<{ id: string; stateTransitionId: string }>
 		): Promise<void> {
 			const ids: string[] = [];
 			const caseFragments = [];
@@ -461,7 +432,7 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				caseFragments.push(sql`WHEN ${run.id} THEN ${run.stateTransitionId}`);
 			}
 
-			await (tx ?? db)
+			await db
 				.update(workflowRun)
 				.set({
 					latestStateTransitionId: sql`CASE ${workflowRun.id} ${sql.join(caseFragments, sql` `)} END`,
@@ -469,16 +440,16 @@ export function createWorkflowRunRepository(db: DatabaseConn) {
 				.where(inArray(workflowRun.id, ids));
 		},
 
-		async getRunCount(scheduleId: string, tx?: DbTransaction): Promise<number> {
-			const result = await (tx ?? db)
+		async getRunCount(scheduleId: string): Promise<number> {
+			const result = await db
 				.select({ count: count() })
 				.from(workflowRun)
 				.where(eq(workflowRun.scheduleId, scheduleId));
 			return result[0]?.count ?? 0;
 		},
 
-		async getRunCounts(scheduleIds: NonEmptyArray<string>, tx?: DbTransaction): Promise<Map<string, number>> {
-			const rows = await (tx ?? db)
+		async getRunCounts(scheduleIds: NonEmptyArray<string>): Promise<Map<string, number>> {
+			const rows = await db
 				.select({ scheduleId: workflowRun.scheduleId, count: count() })
 				.from(workflowRun)
 				.where(inArray(workflowRun.scheduleId, scheduleIds))

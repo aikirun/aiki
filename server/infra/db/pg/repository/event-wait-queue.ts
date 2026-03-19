@@ -1,24 +1,21 @@
 import type { RequiredNonNullableProp } from "@aikirun/lib/object";
 import { eq } from "drizzle-orm";
 
-import type { DatabaseConn, DbTransaction } from "..";
-import { eventWaitQueue } from "../schema/pg";
+import type { PgDb } from "../provider";
+import { eventWaitQueue } from "../schema";
 
 export type EventWaitQueueRow = typeof eventWaitQueue.$inferSelect;
 export type EventWaitQueueRowInsert = typeof eventWaitQueue.$inferInsert;
 
-export function createEventWaitQueueRepository(db: DatabaseConn) {
+export function createEventWaitQueueRepository(db: PgDb) {
 	return {
-		async insert(input: EventWaitQueueRowInsert | EventWaitQueueRowInsert[], tx?: DbTransaction): Promise<void> {
+		async insert(input: EventWaitQueueRowInsert | EventWaitQueueRowInsert[]): Promise<void> {
 			const values = Array.isArray(input) ? input : [input];
-			await (tx ?? db).insert(eventWaitQueue).values(values);
+			await db.insert(eventWaitQueue).values(values);
 		},
 
-		async upsert(
-			input: RequiredNonNullableProp<EventWaitQueueRowInsert, "referenceId">,
-			tx?: DbTransaction
-		): Promise<void> {
-			await (tx ?? db)
+		async upsert(input: RequiredNonNullableProp<EventWaitQueueRowInsert, "referenceId">): Promise<void> {
+			await db
 				.insert(eventWaitQueue)
 				.values(input)
 				.onConflictDoNothing({
@@ -26,9 +23,9 @@ export function createEventWaitQueueRepository(db: DatabaseConn) {
 				});
 		},
 
-		async listByWorkflowRunId(workflowRunId: string, tx?: DbTransaction): Promise<EventWaitQueueRow[]> {
+		async listByWorkflowRunId(workflowRunId: string): Promise<EventWaitQueueRow[]> {
 			// TODO: explore loading in chunks
-			return (tx ?? db)
+			return db
 				.select()
 				.from(eventWaitQueue)
 				.where(eq(eventWaitQueue.workflowRunId, workflowRunId))

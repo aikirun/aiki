@@ -1,24 +1,21 @@
 import { eq } from "drizzle-orm";
 
-import type { DatabaseConn, DbTransaction } from "..";
-import { childWorkflowRunWaitQueue } from "../schema/pg";
+import type { PgDb } from "../provider";
+import { childWorkflowRunWaitQueue } from "../schema";
 
 export type ChildWorkflowRunWaitQueueRow = typeof childWorkflowRunWaitQueue.$inferSelect;
 export type ChildWorkflowRunWaitQueueRowInsert = typeof childWorkflowRunWaitQueue.$inferInsert;
 
-export function createChildWorkflowRunWaitQueueRepository(db: DatabaseConn) {
+export function createChildWorkflowRunWaitQueueRepository(db: PgDb) {
 	return {
-		async insert(
-			input: ChildWorkflowRunWaitQueueRowInsert | ChildWorkflowRunWaitQueueRowInsert[],
-			tx?: DbTransaction
-		): Promise<void> {
+		async insert(input: ChildWorkflowRunWaitQueueRowInsert | ChildWorkflowRunWaitQueueRowInsert[]): Promise<void> {
 			const values = Array.isArray(input) ? input : [input];
-			await (tx ?? db).insert(childWorkflowRunWaitQueue).values(values);
+			await db.insert(childWorkflowRunWaitQueue).values(values);
 		},
 
-		async listByParentRunId(parentRunId: string, tx?: DbTransaction): Promise<ChildWorkflowRunWaitQueueRow[]> {
+		async listByParentRunId(parentRunId: string): Promise<ChildWorkflowRunWaitQueueRow[]> {
 			// TODO: explore loading in chunks
-			return (tx ?? db)
+			return db
 				.select()
 				.from(childWorkflowRunWaitQueue)
 				.where(eq(childWorkflowRunWaitQueue.parentWorkflowRunId, parentRunId))

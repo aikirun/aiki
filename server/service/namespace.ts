@@ -1,20 +1,29 @@
 import type { OrganizationId } from "@aikirun/types/organization";
+import type { NamespaceRow, Repositories } from "server/infra/db/types";
+import { ulid } from "ulidx";
 
-import type { NamespaceRepository, NamespaceRow } from "../infra/db/repository/namespace";
-
-export function createNamespaceService(namespaceRepository: NamespaceRepository) {
+export function createNamespaceService(repos: Pick<Repositories, "namespace" | "transaction">) {
 	return {
 		async createNamespaceWithMember(params: {
 			name: string;
 			organizationId: OrganizationId;
 			userId: string;
 		}): Promise<NamespaceRow> {
-			const createdNamespace = await namespaceRepository.createWithMember(
-				{ name: params.name, organizationId: params.organizationId },
-				{ userId: params.userId, role: "admin" }
-			);
-
-			return createdNamespace;
+			return repos.transaction(async (txRepos) => {
+				const namespaceId = ulid();
+				const createdNamespace = await txRepos.namespace.create({
+					id: namespaceId,
+					name: params.name,
+					organizationId: params.organizationId,
+				});
+				await txRepos.namespace.createMember({
+					id: ulid(),
+					namespaceId,
+					userId: params.userId,
+					role: "admin",
+				});
+				return createdNamespace;
+			});
 		},
 	};
 }

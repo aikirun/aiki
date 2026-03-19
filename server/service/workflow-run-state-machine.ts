@@ -15,13 +15,7 @@ import type {
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/workflow-run-api";
 import { InvalidWorkflowRunStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "server/errors";
-import type { DatabaseConn, DbTransaction } from "server/infra/db";
-import type { ChildWorkflowRunWaitQueueRepository } from "server/infra/db/repository/child-workflow-run-wait-queue";
-import type { SleepQueueRepository } from "server/infra/db/repository/sleep-queue";
-import type { StateTransitionRepository } from "server/infra/db/repository/state-transition";
-import type { TaskRepository } from "server/infra/db/repository/task";
-import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
-import type { WorkflowRunOutboxRepository } from "server/infra/db/repository/workflow-run-outbox";
+import type { Repositories } from "server/infra/db/types";
 import type { NamespaceRequestContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
 import { ulid } from "ulidx";
@@ -190,319 +184,306 @@ export function assertIsValidWorkflowRunStateTransition(
 	}
 }
 
+type TxRepos = Pick<
+	Repositories,
+	| "workflowRun"
+	| "workflow"
+	| "stateTransition"
+	| "sleepQueue"
+	| "task"
+	| "childWorkflowRunWaitQueue"
+	| "workflowRunOutbox"
+>;
+
 export interface WorkflowRunStateMachineServiceDeps {
-	db: DatabaseConn;
-	workflowRunRepo: WorkflowRunRepository;
-	stateTransitionRepo: StateTransitionRepository;
-	sleepQueueRepo: SleepQueueRepository;
-	taskRepo: TaskRepository;
-	childWorkflowRunWaitQueueRepo: ChildWorkflowRunWaitQueueRepository;
+	repos: TxRepos & Pick<Repositories, "transaction">;
 	childRunCanceller: ChildRunCanceller;
-	workflowRunOutboxRepo: WorkflowRunOutboxRepository;
 }
 
 export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachineServiceDeps) {
-	async function transitionStateInTx(
-		context: NamespaceRequestContext,
-		request: WorkflowRunTransitionStateRequestV1,
-		tx: DbTransaction
-	): Promise<WorkflowRunTransitionStateResponseV1> {
-		const namespaceId = context.namespaceId;
-		const runId = request.id as WorkflowRunId;
-
-		const run = await deps.workflowRunRepo.getByIdWithState(namespaceId, runId, tx, {
-			forUpdate: request.type === "pessimistic",
-		});
-		if (!run) {
-			throw new NotFoundError(`Workflow run not found: ${runId}`);
-		}
-		const fromState = run.state;
-
-		assertIsValidWorkflowRunStateTransition(runId, fromState, request.state);
-
-		if (request.type === "optimistic" && run.revision !== request.expectedRevision) {
-			throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
-		}
-
-		const now = Date.now();
-		let toState = convertDurationsToTimestamps(request.state, now);
-
-		context.logger.info({ runId, state: toState, attempts: run.attempts }, "Workflow state transition");
-
-		if (fromState.status === "sleeping" && toState.status === "scheduled") {
-			await finalizeSleep(runId, fromState.sleepName, toState, now, tx);
-		}
-
-		if (toState.status === "sleeping") {
-			await deps.sleepQueueRepo.create(
-				{
-					id: ulid(),
-					workflowRunId: runId,
-					name: toState.sleepName,
-					status: "sleeping",
-					awakeAt: new Date(toState.awakeAt),
-				},
-				tx
-			);
-		}
-
-		let attempts = run.attempts;
-		if (
-			toState.status === "running" &&
-			fromState.status === "queued" &&
-			(fromState.reason === "retry" || fromState.reason === "new")
-		) {
-			attempts++;
-		}
-
-		if (toState.status === "running") {
-			await deps.workflowRunOutboxRepo.deleteByWorkflowRunId(namespaceId, runId, tx);
-		}
-
-		if (toState.status === "scheduled" && toState.reason === "retry") {
-			await deps.taskRepo.deleteStaleByWorkflowRunIds(runId, tx);
-		}
-
-		if (toState.status === "awaiting_child_workflow") {
-			if (await childWorkflowRunWaitNotNeeded(context, runId, toState, now, tx)) {
-				toState = { status: "scheduled", scheduledAt: now, reason: "child_workflow" };
-			}
-		}
-
-		const stateTransitionId = ulid();
-		await deps.stateTransitionRepo.append(
-			{
-				id: stateTransitionId,
-				workflowRunId: runId,
-				type: "workflow_run",
-				status: toState.status,
-				attempt: attempts,
-				state: toState,
-			},
-			tx
-		);
-
-		const newRevision = await updateWorkflowRun(runId, request, toState, stateTransitionId, attempts, tx);
-
-		if (toState.status === "cancelled") {
-			const shard = (run.options as WorkflowStartOptions | null)?.shard;
-			await deps.childRunCanceller.cancel([{ namespaceId, runId, shard }], tx, context.logger);
-		}
-
-		if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {
-			await notifyParentOfStateChangeIfNecessary(
-				context,
-				{
-					id: run.id,
-					latestStateTransitionId: stateTransitionId,
-					parentWorkflowRunId: run.parentWorkflowRunId,
-					status: toState.status,
-				},
-				now,
-				tx
-			);
-		}
-
-		return { revision: newRevision, state: toState, attempts };
-	}
-
-	async function finalizeSleep(
-		runId: WorkflowRunId,
-		sleepName: string,
-		toState: WorkflowRunStateScheduled,
-		now: number,
-		tx: DbTransaction
-	) {
-		const activeSleep = await deps.sleepQueueRepo.getActiveByWorkflowRunIdAndName(runId, sleepName, tx);
-		if (!activeSleep) {
-			return;
-		}
-
-		if (toState.reason === "awake") {
-			await deps.sleepQueueRepo.update(
-				activeSleep.id,
-				{
-					status: "completed",
-					completedAt: new Date(now),
-				},
-				tx
-			);
-		} else {
-			await deps.sleepQueueRepo.update(
-				activeSleep.id,
-				{
-					status: "cancelled",
-					cancelledAt: new Date(now),
-				},
-				tx
-			);
-		}
-	}
-
-	async function childWorkflowRunWaitNotNeeded(
-		context: NamespaceRequestContext,
-		runId: WorkflowRunId,
-		toState: WorkflowRunStateAwaitingChildWorkflow,
-		now: number,
-		tx: DbTransaction
-	) {
-		const childRunId = toState.childWorkflowRunId as WorkflowRunId;
-		const childRun = await deps.workflowRunRepo.getByIdWithState(context.namespaceId, childRunId, tx);
-		if (!childRun) {
-			throw new NotFoundError(`Workflow run not found: ${childRunId}`);
-		}
-
-		if (childRun.status === toState.childWorkflowRunStatus || isTerminalWorkflowRunStatus(childRun.status)) {
-			await deps.childWorkflowRunWaitQueueRepo.insert(
-				{
-					id: ulid(),
-					parentWorkflowRunId: runId,
-					childWorkflowRunId: childRunId,
-					childWorkflowRunStatus: toState.childWorkflowRunStatus,
-					status: "completed",
-					completedAt: new Date(now),
-					childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
-				},
-				tx
-			);
-
-			context.logger.info(
-				{ runId, childRunId, childRunStatus: childRun.status },
-				"Child already at status, scheduling immediately"
-			);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	async function updateWorkflowRun(
-		runId: WorkflowRunId,
-		request: WorkflowRunTransitionStateRequestV1,
-		toState: WorkflowRunState,
-		stateTransitionId: string,
-		attempts: number,
-		tx: DbTransaction
-	): Promise<number> {
-		const updates: Record<string, unknown> = {
-			status: toState.status,
-			attempts,
-			latestStateTransitionId: stateTransitionId,
-			scheduledAt: null,
-			awakeAt: null,
-			timeoutAt: null,
-			nextAttemptAt: null,
-		};
-		if (toState.status === "scheduled") {
-			updates.scheduledAt = new Date(toState.scheduledAt);
-		} else if (toState.status === "sleeping") {
-			updates.awakeAt = new Date(toState.awakeAt);
-		} else if (
-			(toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") &&
-			toState.timeoutAt !== undefined
-		) {
-			updates.timeoutAt = new Date(toState.timeoutAt);
-		} else if (toState.status === "awaiting_retry") {
-			updates.nextAttemptAt = new Date(toState.nextAttemptAt);
-		}
-
-		if (request.type === "optimistic") {
-			const result = await deps.workflowRunRepo.update(
-				{
-					id: runId,
-					revision: request.expectedRevision,
-				},
-				updates,
-				tx
-			);
-			if (!result) {
-				throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
-			}
-			return result.revision;
-		} else {
-			const result = await deps.workflowRunRepo.update({ id: runId }, updates, tx);
-			if (!result) {
-				throw new NotFoundError(`Workflow run not found: ${runId}`);
-			}
-			return result.revision;
-		}
-	}
-
-	// TODO: should this be recursive?
-	async function notifyParentOfStateChangeIfNecessary(
-		context: NamespaceRequestContext,
-		childRun: {
-			id: string;
-			latestStateTransitionId: string;
-			parentWorkflowRunId: string;
-			status: TerminalWorkflowRunStatus;
-		},
-		now: number,
-		tx: DbTransaction
-	): Promise<void> {
-		const parentRun = await deps.workflowRunRepo.getByIdWithState(
-			context.namespaceId,
-			childRun.parentWorkflowRunId,
-			tx
-		);
-		if (!parentRun) {
-			throw new NotFoundError(`Workflow run not found: ${childRun.parentWorkflowRunId}`);
-		}
-
-		const parentRunState = parentRun.state;
-
-		if (
-			parentRunState.status === "awaiting_child_workflow" &&
-			parentRunState.childWorkflowRunId === childRun.id &&
-			parentRunState.childWorkflowRunStatus === childRun.status
-		) {
-			context.logger.info(
-				{ parentRunId: parentRun.id, childRunId: childRun.id, status: childRun.status },
-				"Notifying parent of child state change"
-			);
-
-			await deps.childWorkflowRunWaitQueueRepo.insert(
-				{
-					id: ulid(),
-					parentWorkflowRunId: parentRun.id,
-					childWorkflowRunId: childRun.id,
-					childWorkflowRunStatus: parentRunState.childWorkflowRunStatus,
-					status: "completed",
-					completedAt: new Date(now),
-					childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
-				},
-				tx
-			);
-
-			await transitionStateInTx(
-				context,
-				{
-					type: "optimistic",
-					id: parentRun.id,
-					state: { status: "scheduled", scheduledInMs: 0, reason: "child_workflow" },
-					expectedRevision: parentRun.revision,
-				},
-				tx
-			);
-		}
-	}
+	const { repos, childRunCanceller } = deps;
 
 	return {
 		transitionState: async (
 			context: NamespaceRequestContext,
 			request: WorkflowRunTransitionStateRequestV1,
-			tx?: DbTransaction
+			txRepos?: TxRepos
 		): Promise<WorkflowRunTransitionStateResponseV1> => {
-			if (tx) {
-				return transitionStateInTx(context, request, tx);
+			if (txRepos) {
+				return transitionStateInTx(context, request, childRunCanceller, txRepos);
 			}
-			return deps.db.transaction(async (newTx) => transitionStateInTx(context, request, newTx));
+			return repos.transaction(async (transactionRepos) =>
+				transitionStateInTx(context, request, childRunCanceller, transactionRepos)
+			);
 		},
 	};
 }
 
 export type WorkflowRunStateMachineService = ReturnType<typeof createWorkflowRunStateMachineService>;
+
+async function transitionStateInTx(
+	context: NamespaceRequestContext,
+	request: WorkflowRunTransitionStateRequestV1,
+	childRunCanceller: ChildRunCanceller,
+	txRepos: TxRepos
+): Promise<WorkflowRunTransitionStateResponseV1> {
+	const namespaceId = context.namespaceId;
+	const runId = request.id as WorkflowRunId;
+
+	const run = await txRepos.workflowRun.getByIdWithState(namespaceId, runId, {
+		forUpdate: request.type === "pessimistic",
+	});
+	if (!run) {
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
+	}
+	const fromState = run.state;
+
+	assertIsValidWorkflowRunStateTransition(runId, fromState, request.state);
+
+	if (request.type === "optimistic" && run.revision !== request.expectedRevision) {
+		throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
+	}
+
+	const now = Date.now();
+	let toState = convertDurationsToTimestamps(request.state, now);
+
+	context.logger.info({ runId, state: toState, attempts: run.attempts }, "Workflow state transition");
+
+	if (fromState.status === "sleeping" && toState.status === "scheduled") {
+		await finalizeSleep(runId, fromState.sleepName, toState, now, txRepos);
+	}
+
+	if (toState.status === "sleeping") {
+		await txRepos.sleepQueue.create({
+			id: ulid(),
+			workflowRunId: runId,
+			name: toState.sleepName,
+			status: "sleeping",
+			awakeAt: new Date(toState.awakeAt),
+		});
+	}
+
+	let attempts = run.attempts;
+	if (
+		toState.status === "running" &&
+		fromState.status === "queued" &&
+		(fromState.reason === "retry" || fromState.reason === "new")
+	) {
+		attempts++;
+	}
+
+	if (toState.status === "running") {
+		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
+	}
+
+	if (toState.status === "scheduled" && toState.reason === "retry") {
+		await txRepos.task.deleteStaleByWorkflowRunIds(runId);
+	}
+
+	if (toState.status === "awaiting_child_workflow") {
+		if (await childWorkflowRunWaitNotNeeded(context, runId, toState, now, txRepos)) {
+			toState = { status: "scheduled", scheduledAt: now, reason: "child_workflow" };
+		}
+	}
+
+	const stateTransitionId = ulid();
+	await txRepos.stateTransition.append({
+		id: stateTransitionId,
+		workflowRunId: runId,
+		type: "workflow_run",
+		status: toState.status,
+		attempt: attempts,
+		state: toState,
+	});
+
+	const newRevision = await updateWorkflowRun(runId, request, toState, stateTransitionId, attempts, txRepos);
+
+	if (toState.status === "cancelled") {
+		const shard = (run.options as WorkflowStartOptions | null)?.shard;
+		await childRunCanceller.cancel([{ namespaceId, runId, shard }], txRepos, context.logger);
+	}
+
+	if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {
+		await notifyParentOfStateChangeIfNecessary(
+			context,
+			{
+				id: run.id,
+				latestStateTransitionId: stateTransitionId,
+				parentWorkflowRunId: run.parentWorkflowRunId,
+				status: toState.status,
+			},
+			now,
+			childRunCanceller,
+			txRepos
+		);
+	}
+
+	return { revision: newRevision, state: toState, attempts };
+}
+
+async function finalizeSleep(
+	runId: WorkflowRunId,
+	sleepName: string,
+	toState: WorkflowRunStateScheduled,
+	now: number,
+	txRepos: TxRepos
+) {
+	const activeSleep = await txRepos.sleepQueue.getActiveByWorkflowRunIdAndName(runId, sleepName);
+	if (!activeSleep) {
+		return;
+	}
+
+	if (toState.reason === "awake") {
+		await txRepos.sleepQueue.update(activeSleep.id, {
+			status: "completed",
+			completedAt: new Date(now),
+		});
+	} else {
+		await txRepos.sleepQueue.update(activeSleep.id, {
+			status: "cancelled",
+			cancelledAt: new Date(now),
+		});
+	}
+}
+
+async function childWorkflowRunWaitNotNeeded(
+	context: NamespaceRequestContext,
+	runId: WorkflowRunId,
+	toState: WorkflowRunStateAwaitingChildWorkflow,
+	now: number,
+	txRepos: TxRepos
+) {
+	const childRunId = toState.childWorkflowRunId as WorkflowRunId;
+	const childRun = await txRepos.workflowRun.getByIdWithState(context.namespaceId, childRunId);
+	if (!childRun) {
+		throw new NotFoundError(`Workflow run not found: ${childRunId}`);
+	}
+
+	if (childRun.status === toState.childWorkflowRunStatus || isTerminalWorkflowRunStatus(childRun.status)) {
+		await txRepos.childWorkflowRunWaitQueue.insert({
+			id: ulid(),
+			parentWorkflowRunId: runId,
+			childWorkflowRunId: childRunId,
+			childWorkflowRunStatus: toState.childWorkflowRunStatus,
+			status: "completed",
+			completedAt: new Date(now),
+			childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
+		});
+
+		context.logger.info(
+			{ runId, childRunId, childRunStatus: childRun.status },
+			"Child already at status, scheduling immediately"
+		);
+
+		return true;
+	}
+
+	return false;
+}
+
+async function updateWorkflowRun(
+	runId: WorkflowRunId,
+	request: WorkflowRunTransitionStateRequestV1,
+	toState: WorkflowRunState,
+	stateTransitionId: string,
+	attempts: number,
+	txRepos: TxRepos
+): Promise<number> {
+	const updates: Record<string, unknown> = {
+		status: toState.status,
+		attempts,
+		latestStateTransitionId: stateTransitionId,
+		scheduledAt: null,
+		awakeAt: null,
+		timeoutAt: null,
+		nextAttemptAt: null,
+	};
+	if (toState.status === "scheduled") {
+		updates.scheduledAt = new Date(toState.scheduledAt);
+	} else if (toState.status === "sleeping") {
+		updates.awakeAt = new Date(toState.awakeAt);
+	} else if (
+		(toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") &&
+		toState.timeoutAt !== undefined
+	) {
+		updates.timeoutAt = new Date(toState.timeoutAt);
+	} else if (toState.status === "awaiting_retry") {
+		updates.nextAttemptAt = new Date(toState.nextAttemptAt);
+	}
+
+	if (request.type === "optimistic") {
+		const result = await txRepos.workflowRun.update(
+			{
+				id: runId,
+				revision: request.expectedRevision,
+			},
+			updates
+		);
+		if (!result) {
+			throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
+		}
+		return result.revision;
+	} else {
+		const result = await txRepos.workflowRun.update({ id: runId }, updates);
+		if (!result) {
+			throw new NotFoundError(`Workflow run not found: ${runId}`);
+		}
+		return result.revision;
+	}
+}
+
+async function notifyParentOfStateChangeIfNecessary(
+	context: NamespaceRequestContext,
+	childRun: {
+		id: string;
+		latestStateTransitionId: string;
+		parentWorkflowRunId: string;
+		status: TerminalWorkflowRunStatus;
+	},
+	now: number,
+	childRunCanceller: ChildRunCanceller,
+	txRepos: TxRepos
+): Promise<void> {
+	const parentRun = await txRepos.workflowRun.getByIdWithState(context.namespaceId, childRun.parentWorkflowRunId);
+	if (!parentRun) {
+		throw new NotFoundError(`Workflow run not found: ${childRun.parentWorkflowRunId}`);
+	}
+
+	const parentRunState = parentRun.state;
+
+	if (
+		parentRunState.status === "awaiting_child_workflow" &&
+		parentRunState.childWorkflowRunId === childRun.id &&
+		parentRunState.childWorkflowRunStatus === childRun.status
+	) {
+		context.logger.info(
+			{ parentRunId: parentRun.id, childRunId: childRun.id, status: childRun.status },
+			"Notifying parent of child state change"
+		);
+
+		await txRepos.childWorkflowRunWaitQueue.insert({
+			id: ulid(),
+			parentWorkflowRunId: parentRun.id,
+			childWorkflowRunId: childRun.id,
+			childWorkflowRunStatus: parentRunState.childWorkflowRunStatus,
+			status: "completed",
+			completedAt: new Date(now),
+			childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
+		});
+
+		await transitionStateInTx(
+			context,
+			{
+				type: "optimistic",
+				id: parentRun.id,
+				state: { status: "scheduled", scheduledInMs: 0, reason: "child_workflow" },
+				expectedRevision: parentRun.revision,
+			},
+			childRunCanceller,
+			txRepos
+		);
+	}
+}
 
 function convertDurationsToTimestamps(request: WorkflowRunStateRequest, now: number): WorkflowRunState {
 	if (request.status === "scheduled") {

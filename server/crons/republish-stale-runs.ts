@@ -1,10 +1,10 @@
 import { isNonEmptyArray } from "@aikirun/lib";
-import type { WorkflowRunOutboxRepository } from "server/infra/db/repository/workflow-run-outbox";
+import type { Repositories } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";
 
 export interface RepublishStaleRuns {
-	workflowRunOutboxRepo: WorkflowRunOutboxRepository;
+	repos: Pick<Repositories, "workflowRunOutbox">;
 	workflowRunPublisher: WorkflowRunPublisher;
 }
 
@@ -15,7 +15,7 @@ export async function republishStaleRuns(
 ) {
 	const { claimMinIdleTimeMs = 30_000, limit = 50 } = options ?? {};
 
-	const staleEntries = await deps.workflowRunOutboxRepo.listStalePublished(claimMinIdleTimeMs, limit);
+	const staleEntries = await deps.repos.workflowRunOutbox.listStalePublished(claimMinIdleTimeMs, limit);
 	const staleEntryIds = staleEntries.map((entry) => entry.id);
 	if (!isNonEmptyArray(staleEntryIds)) {
 		return;
@@ -33,5 +33,5 @@ export async function republishStaleRuns(
 		}))
 	);
 
-	await deps.workflowRunOutboxRepo.markAsRepublished(staleEntryIds);
+	await deps.repos.workflowRunOutbox.markAsRepublished(staleEntryIds);
 }

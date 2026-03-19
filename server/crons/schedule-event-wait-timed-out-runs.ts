@@ -1,28 +1,22 @@
 import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib";
 import type { WorkflowRunState, WorkflowRunStateScheduled } from "@aikirun/types/workflow-run";
-import type { DatabaseConn } from "server/infra/db";
-import type { EventWaitQueueRepository, EventWaitQueueRowInsert } from "server/infra/db/repository/event-wait-queue";
-import type { StateTransitionRepository, StateTransitionRowInsert } from "server/infra/db/repository/state-transition";
-import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
+import type { EventWaitQueueRowInsert, Repositories, StateTransitionRowInsert } from "server/infra/db/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 export interface ScheduleEventWaitTimedOutRunsDeps {
-	db: DatabaseConn;
-	workflowRunRepo: WorkflowRunRepository;
-	stateTransitionRepo: StateTransitionRepository;
-	eventWaitQueueRepo: EventWaitQueueRepository;
+	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "eventWaitQueue" | "transaction">;
 }
 
 export async function scheduleEventWaitTimedOutWorkflowRuns(
 	context: CronContext,
-	deps: ScheduleEventWaitTimedOutRunsDeps,
+	{ repos }: ScheduleEventWaitTimedOutRunsDeps,
 	options?: { limit?: number; chunkSize?: number }
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await deps.workflowRunRepo.listEventWaitTimedOutRuns(limit);
+	const runs = await repos.workflowRun.listEventWaitTimedOutRuns(limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}
@@ -32,8 +26,8 @@ export async function scheduleEventWaitTimedOutWorkflowRuns(
 		return;
 	}
 
-	const stateTransitions = await deps.stateTransitionRepo.getByIds(stateTransitionIds);
-	const stateTransitionsById = new Map(stateTransitions.map((t) => [t.id, t]));
+	const stateTransitions = await repos.stateTransition.getByIds(stateTransitionIds);
+	const stateTransitionsById = new Map(stateTransitions.map((transition) => [transition.id, transition]));
 
 	const enrichedRuns: EnrichedWorkflowRun[] = [];
 	for (const run of runs) {
@@ -63,7 +57,7 @@ export async function scheduleEventWaitTimedOutWorkflowRuns(
 
 	await runConcurrently(context, chunkLazy(enrichedRuns, chunkSize), async (chunk, spanCtx) => {
 		try {
-			await processChunk(spanCtx, deps, chunk);
+			await processChunk(spanCtx, repos, chunk);
 		} catch (error) {
 			spanCtx.logger.warn({ err: error, chunkSize: chunk.length }, "Failed to process chunk, will retry next tick");
 		}
@@ -79,7 +73,7 @@ interface EnrichedWorkflowRun {
 
 async function processChunk(
 	_context: CronContext,
-	deps: ScheduleEventWaitTimedOutRunsDeps,
+	repos: ScheduleEventWaitTimedOutRunsDeps["repos"],
 	runs: NonEmptyArray<EnrichedWorkflowRun>
 ) {
 	const now = Date.now();
@@ -123,9 +117,9 @@ async function processChunk(
 		return;
 	}
 
-	await deps.db.transaction(async (tx) => {
-		await deps.eventWaitQueueRepo.insert(eventWaitEntries, tx);
-		await deps.stateTransitionRepo.appendBatch(stateTransitionEntries, tx);
-		await deps.workflowRunRepo.bulkTransitionToScheduled("awaiting_event", workflowRunUpdates, timedOutAt, tx);
+	await repos.transaction(async (txRepos) => {
+		await txRepos.eventWaitQueue.insert(eventWaitEntries);
+		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+		await txRepos.workflowRun.bulkTransitionToScheduled("awaiting_event", workflowRunUpdates, timedOutAt);
 	});
 }

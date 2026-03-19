@@ -2,29 +2,28 @@ import type { NonEmptyArray } from "@aikirun/lib";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { and, eq, inArray } from "drizzle-orm";
 
-import type { DatabaseConn, DbTransaction } from "..";
-import { sleepQueue } from "../schema/pg";
+import type { PgDb } from "../provider";
+import { sleepQueue } from "../schema";
 
 export type SleepQueueRow = typeof sleepQueue.$inferSelect;
 type SleepQueueRowInsert = typeof sleepQueue.$inferInsert;
 
-export function createSleepQueueRepository(db: DatabaseConn) {
+export function createSleepQueueRepository(db: PgDb) {
 	return {
-		async create(input: SleepQueueRowInsert, tx?: DbTransaction): Promise<void> {
-			await (tx ?? db).insert(sleepQueue).values(input);
+		async create(input: SleepQueueRowInsert): Promise<void> {
+			await db.insert(sleepQueue).values(input);
 		},
 
 		async update(
 			id: string,
-			updates: { status: "completed"; completedAt: Date } | { status: "cancelled"; cancelledAt: Date },
-			tx?: DbTransaction
+			updates: { status: "completed"; completedAt: Date } | { status: "cancelled"; cancelledAt: Date }
 		): Promise<void> {
-			await (tx ?? db).update(sleepQueue).set(updates).where(eq(sleepQueue.id, id));
+			await db.update(sleepQueue).set(updates).where(eq(sleepQueue.id, id));
 		},
 
-		async listByWorkflowRunId(workflowRunId: WorkflowRunId, tx?: DbTransaction): Promise<SleepQueueRow[]> {
+		async listByWorkflowRunId(workflowRunId: WorkflowRunId): Promise<SleepQueueRow[]> {
 			// TODO: explore loading in chunks
-			return (tx ?? db)
+			return db
 				.select()
 				.from(sleepQueue)
 				.where(eq(sleepQueue.workflowRunId, workflowRunId))
@@ -32,23 +31,15 @@ export function createSleepQueueRepository(db: DatabaseConn) {
 				.limit(10_000);
 		},
 
-		async bulkCompleteByWorkflowRunIds(
-			workflowRunIds: NonEmptyArray<string>,
-			completedAt: Date,
-			tx?: DbTransaction
-		): Promise<void> {
-			await (tx ?? db)
+		async bulkCompleteByWorkflowRunIds(workflowRunIds: NonEmptyArray<string>, completedAt: Date): Promise<void> {
+			await db
 				.update(sleepQueue)
 				.set({ status: "completed", completedAt })
 				.where(and(inArray(sleepQueue.workflowRunId, workflowRunIds), eq(sleepQueue.status, "sleeping")));
 		},
 
-		async getActiveByWorkflowRunIdAndName(
-			workflowRunId: WorkflowRunId,
-			name: string,
-			tx?: DbTransaction
-		): Promise<SleepQueueRow | null> {
-			const result = await (tx ?? db)
+		async getActiveByWorkflowRunIdAndName(workflowRunId: WorkflowRunId, name: string): Promise<SleepQueueRow | null> {
+			const result = await db
 				.select()
 				.from(sleepQueue)
 				.where(

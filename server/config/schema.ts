@@ -20,7 +20,9 @@ export const redisConfigSchema = type({
 });
 
 export const DATABASE_PROVIDERS = ["pg", "sqlite", "mysql"] as const;
-export function isDatabaseProvider(provider: string): provider is DatabaseConfig["provider"] {
+export type DatabaseProvider = (typeof DATABASE_PROVIDERS)[number];
+
+export function isDatabaseProvider(provider: string): provider is DatabaseProvider {
 	for (const dbProvider of DATABASE_PROVIDERS) {
 		if (provider === dbProvider) {
 			return true;

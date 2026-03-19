@@ -1,15 +1,15 @@
 import { isNonEmptyArray } from "@aikirun/lib";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { WorkflowRunClaimReadyRequestV1 } from "@aikirun/types/workflow-run-api";
-import type { WorkflowRunOutboxRepository } from "server/infra/db/repository/workflow-run-outbox";
+import type { Repositories } from "server/infra/db/types";
 import type { NamespaceRequestContext } from "server/middleware/context";
 
-export interface WorkflowRunStateMachineServiceDeps {
-	workflowRunOutboxRepo: WorkflowRunOutboxRepository;
+export interface WorkflowRunOutboxServiceDeps {
+	repos: Pick<Repositories, "workflowRunOutbox">;
 }
 
-export function createWorkflowRunOutboxService(deps: WorkflowRunStateMachineServiceDeps) {
-	const { workflowRunOutboxRepo } = deps;
+export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDeps) {
+	const { repos } = deps;
 
 	async function claimStalePublished(context: NamespaceRequestContext, request: WorkflowRunClaimReadyRequestV1) {
 		const workflows = request.workflows;
@@ -17,7 +17,7 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunStateMachineServ
 			return [];
 		}
 
-		return workflowRunOutboxRepo.claimStalePublished(
+		return repos.workflowRunOutbox.claimStalePublished(
 			context.namespaceId,
 			workflows,
 			request.claimMinIdleTimeMs,
@@ -34,7 +34,7 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunStateMachineServ
 			return [];
 		}
 
-		return workflowRunOutboxRepo.claimPending(context.namespaceId, workflows, request.limit);
+		return repos.workflowRunOutbox.claimPending(context.namespaceId, workflows, request.limit);
 	}
 
 	async function claimReady(context: NamespaceRequestContext, request: WorkflowRunClaimReadyRequestV1) {
@@ -60,7 +60,7 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunStateMachineServ
 	}
 
 	async function reclaim(context: NamespaceRequestContext, workflowRunId: WorkflowRunId) {
-		return workflowRunOutboxRepo.reclaim(context.namespaceId, workflowRunId);
+		return repos.workflowRunOutbox.reclaim(context.namespaceId, workflowRunId);
 	}
 
 	return {

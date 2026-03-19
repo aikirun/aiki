@@ -3,9 +3,8 @@ import { sha256Sync } from "@aikirun/lib/crypto";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import type { Redis } from "ioredis";
+import type { ApiKeyRepository, ApiKeyRowInsert } from "server/infra/db/types";
 import { ulid } from "ulidx";
-
-import type { ApiKeyRepository, ApiKeyRowInsert } from "../infra/db/repository/api-key";
 
 const PLATFORM = "aiki";
 const PREFIX_LENGTH = 8;

@@ -3,14 +3,14 @@ import { sql } from "drizzle-orm";
 import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { timestampMs } from "./timestamp";
-import { NAMESPACE_ROLES, NAMESPACE_STATUSES } from "../../model/namespace";
+import { NAMESPACE_ROLES, NAMESPACE_STATUSES } from "../../constants/namespace";
 import {
 	ORGANIZATION_INVITATION_STATUSES,
 	ORGANIZATION_ROLES,
 	ORGANIZATION_STATUSES,
 	ORGANIZATION_TYPES,
-} from "../../model/organization";
-import { USER_STATUSES } from "../../model/user";
+} from "../../constants/organization";
+import { USER_STATUSES } from "../../constants/user";
 
 export const userStatusEnum = pgEnum("user_status", USER_STATUSES);
 

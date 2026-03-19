@@ -5,18 +5,7 @@ import { Redis } from "ioredis";
 import { loadConfig } from "./config/index";
 import { initCrons } from "./crons";
 import { UnauthorizedError } from "./errors";
-import { createDatabaseConn } from "./infra/db";
-import { createApiKeyRepository } from "./infra/db/repository/api-key";
-import { createChildWorkflowRunWaitQueueRepository } from "./infra/db/repository/child-workflow-run-wait-queue";
-import { createEventWaitQueueRepository } from "./infra/db/repository/event-wait-queue";
-import { createNamespaceRepository } from "./infra/db/repository/namespace";
-import { createScheduleRepository } from "./infra/db/repository/schedule";
-import { createSleepQueueRepository } from "./infra/db/repository/sleep-queue";
-import { createStateTransitionRepository } from "./infra/db/repository/state-transition";
-import { createTaskRepository } from "./infra/db/repository/task";
-import { createWorkflowRepository } from "./infra/db/repository/workflow";
-import { createWorkflowRunRepository } from "./infra/db/repository/workflow-run";
-import { createWorkflowRunOutboxRepository } from "./infra/db/repository/workflow-run-outbox";
+import { createDatabase } from "./infra/db";
 import { createLogger } from "./infra/logger";
 import { createWorkflowRunPublisher } from "./infra/messaging/redis-publisher";
 import { createAuthorizer } from "./middleware/authorization";
@@ -42,7 +31,7 @@ if (import.meta.main) {
 	const config = await loadConfig();
 	const logger = createLogger(config.logLevel, config.prettyLogs);
 
-	const db = createDatabaseConn(config.database);
+	const { repos, conn, betterAuthSchema } = createDatabase(config.database);
 
 	let redis: Redis | undefined;
 	let workflowRunPublisher: ReturnType<typeof createWorkflowRunPublisher> | undefined;
@@ -59,21 +48,11 @@ if (import.meta.main) {
 		workflowRunPublisher = createWorkflowRunPublisher(redis);
 	}
 
-	const apiKeyRepository = createApiKeyRepository(db);
-	const namespaceRepository = createNamespaceRepository(db);
-	const workflowRepo = createWorkflowRepository(db);
-	const workflowRunRepo = createWorkflowRunRepository(db);
-	const workflowRunOutboxRepo = createWorkflowRunOutboxRepository(db);
-	const taskRepo = createTaskRepository(db);
-	const stateTransitionRepo = createStateTransitionRepository(db);
-	const scheduleRepo = createScheduleRepository(db);
-	const sleepQueueRepo = createSleepQueueRepository(db);
-	const eventWaitQueueRepo = createEventWaitQueueRepository(db);
-	const childWorkflowRunWaitQueueRepo = createChildWorkflowRunWaitQueueRepository(db);
-
-	const apiKeyService = createApiKeyService(apiKeyRepository, redis);
+	const apiKeyService = createApiKeyService(repos.apiKey, redis);
 	const authService = createAuthService({
-		db,
+		conn,
+		provider: config.database.provider,
+		betterAuthSchema,
 		baseURL: config.baseURL,
 		secret: config.auth.secret,
 		corsOrigins: config.corsOrigins,
@@ -84,64 +63,25 @@ if (import.meta.main) {
 		authService
 	);
 
-	const namespaceService = createNamespaceService(namespaceRepository);
-	const childRunCanceller = createChildRunCanceller({
-		workflowRepo,
-		workflowRunRepo,
-		stateTransitionRepo,
-	});
+	const namespaceService = createNamespaceService(repos);
+	const childRunCanceller = createChildRunCanceller();
 	const workflowRunStateMachineService = createWorkflowRunStateMachineService({
-		db,
-		workflowRunRepo,
-		stateTransitionRepo,
-		sleepQueueRepo,
-		taskRepo,
-		childWorkflowRunWaitQueueRepo,
+		repos,
 		childRunCanceller,
-		workflowRunOutboxRepo,
 	});
-	const taskStateMachineService = createTaskStateMachineService({
-		db,
-		workflowRunRepo,
-		taskRepo,
-		stateTransitionRepo,
-	});
+	const taskStateMachineService = createTaskStateMachineService({ repos });
 	const workflowRunService = createWorkflowRunService({
-		db,
-		workflowRunRepo,
-		workflowRepo,
-		stateTransitionRepo,
-		taskRepo,
-		sleepQueueRepo,
-		eventWaitQueueRepo,
-		childWorkflowRunWaitQueueRepo,
+		repos,
 		childRunCanceller,
 		workflowRunStateMachineService,
 	});
-	const workflowService = createWorkflowService({
-		workflowRepo,
-		workflowRunRepo,
-	});
-	const scheduleService = createScheduleService({
-		db,
-		scheduleRepo,
-		workflowRepo,
-		workflowRunRepo,
-	});
-	const workflowRunOutboxService = createWorkflowRunOutboxService({ workflowRunOutboxRepo });
+	const workflowService = createWorkflowService({ repos });
+	const scheduleService = createScheduleService({ repos });
+	const workflowRunOutboxService = createWorkflowRunOutboxService({ repos });
 
 	const crons = initCrons(logger, {
-		db,
+		repos,
 		workflowRunPublisher,
-		workflowRunOutboxRepo,
-		workflowRunRepo,
-		stateTransitionRepo,
-		sleepQueueRepo,
-		taskRepo,
-		workflowRepo,
-		scheduleRepo,
-		eventWaitQueueRepo,
-		childWorkflowRunWaitQueueRepo,
 		childRunCanceller,
 		scheduleService,
 	});

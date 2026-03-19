@@ -8,10 +8,7 @@ import {
 	type WorkflowRunStateScheduled,
 	type WorkflowStartOptions,
 } from "@aikirun/types/workflow-run";
-import type { DatabaseConn } from "server/infra/db";
-import type { ScheduleRepository } from "server/infra/db/repository/schedule";
-import type { StateTransitionRepository, StateTransitionRowInsert } from "server/infra/db/repository/state-transition";
-import type { WorkflowRunRepository, WorkflowRunRowInsert } from "server/infra/db/repository/workflow-run";
+import type { Repositories, StateTransitionRowInsert, WorkflowRunRowInsert } from "server/infra/db/types";
 import type { CronContext } from "server/middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
 import type { ScheduleService } from "server/service/schedule";
@@ -19,11 +16,8 @@ import { getDueOccurrences, getNextOccurrence, getReferenceId } from "server/ser
 import { ulid } from "ulidx";
 
 export interface ScheduleRecurringWorkflowsDeps {
-	db: DatabaseConn;
+	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "schedule" | "transaction">;
 	scheduleService: ScheduleService;
-	scheduleRepo: ScheduleRepository;
-	workflowRunRepo: WorkflowRunRepository;
-	stateTransitionRepo: StateTransitionRepository;
 	childRunCanceller: ChildRunCanceller;
 }
 
@@ -58,8 +52,10 @@ export async function scheduleRecurringWorkflows(context: CronContext, deps: Sch
 	}
 
 	const results = await Promise.allSettled([
-		isNonEmptyArray(allowSchedules) ? processOverlapAllowSchedules(context, deps, allowSchedules, now) : undefined,
-		isNonEmptyArray(skipSchedules) ? processOverlapSkipSchedules(context, deps, skipSchedules, now) : undefined,
+		isNonEmptyArray(allowSchedules)
+			? processOverlapAllowSchedules(context, deps.repos, allowSchedules, now)
+			: undefined,
+		isNonEmptyArray(skipSchedules) ? processOverlapSkipSchedules(context, deps.repos, skipSchedules, now) : undefined,
 		isNonEmptyArray(cancelPreviousSchedules)
 			? processOverlapCancelPreviousSchedules(context, deps, cancelPreviousSchedules, now)
 			: undefined,
@@ -74,7 +70,7 @@ export async function scheduleRecurringWorkflows(context: CronContext, deps: Sch
 
 async function processOverlapAllowSchedules(
 	_context: CronContext,
-	deps: ScheduleRecurringWorkflowsDeps,
+	repos: ScheduleRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number
 ) {
@@ -133,20 +129,20 @@ async function processOverlapAllowSchedules(
 		return;
 	}
 
-	await deps.db.transaction(async (tx) => {
-		await deps.workflowRunRepo.insert(workflowRunEntries, tx);
-		await deps.stateTransitionRepo.appendBatch(stateTransitionEntries, tx);
-		await deps.scheduleRepo.bulkUpdateOccurrence(scheduleUpdates, tx);
+	await repos.transaction(async (txRepos) => {
+		await txRepos.workflowRun.insert(workflowRunEntries);
+		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+		await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
 	});
 }
 
 async function processOverlapSkipSchedules(
 	_context: CronContext,
-	deps: ScheduleRecurringWorkflowsDeps,
+	repos: ScheduleRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number
 ) {
-	const { scheduleIdsWithActiveRuns } = await fetchActiveRunsBySchedule(deps, schedules);
+	const { scheduleIdsWithActiveRuns } = await fetchActiveRunsBySchedule(repos, schedules);
 
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -203,12 +199,12 @@ async function processOverlapSkipSchedules(
 		return;
 	}
 
-	await deps.db.transaction(async (tx) => {
+	await repos.transaction(async (txRepos) => {
 		if (isNonEmptyArray(workflowRunEntries) && isNonEmptyArray(stateTransitionEntries)) {
-			await deps.workflowRunRepo.insert(workflowRunEntries, tx);
-			await deps.stateTransitionRepo.appendBatch(stateTransitionEntries, tx);
+			await txRepos.workflowRun.insert(workflowRunEntries);
+			await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 		}
-		await deps.scheduleRepo.bulkUpdateOccurrence(scheduleUpdates, tx);
+		await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
 	});
 }
 
@@ -218,7 +214,7 @@ async function processOverlapCancelPreviousSchedules(
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number
 ) {
-	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(deps, schedules);
+	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(deps.repos, schedules);
 
 	const runIdsToCancel: string[] = [];
 	const runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; shard?: string }> = [];
@@ -283,13 +279,13 @@ async function processOverlapCancelPreviousSchedules(
 		return;
 	}
 
-	await deps.db.transaction(async (tx) => {
+	await deps.repos.transaction(async (txRepos) => {
 		// To espace the race condition that might arise when a concurrent actor moves the runId to non cancellable state,
 		// we should only insert cancellation state transistions if the cancellation occurred, otherwise, we'll have dangling transitions
 
 		// Step 1: Cancel active runs (without setting latestStateTransitionId)
 		const cancelledRunIds = isNonEmptyArray(runIdsToCancel)
-			? await deps.workflowRunRepo.bulkTransitionToCancelled(runIdsToCancel, tx)
+			? await txRepos.workflowRun.bulkTransitionToCancelled(runIdsToCancel)
 			: [];
 
 		// Step 2: Insert cancel state transitions only for actually cancelled runs, then set latestStateTransitionId
@@ -317,22 +313,25 @@ async function processOverlapCancelPreviousSchedules(
 			}
 
 			if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionIdUpdates)) {
-				await deps.stateTransitionRepo.appendBatch(cancelStateTransitionEntries, tx);
-				await deps.workflowRunRepo.bulkSetLatestStateTransitionId(cancelledRunStateTransitionIdUpdates, tx);
+				await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
+				await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionIdUpdates);
 			}
 			if (isNonEmptyArray(cancelledParentRuns)) {
-				await deps.childRunCanceller.cancel(cancelledParentRuns, tx, context.logger);
+				await deps.childRunCanceller.cancel(cancelledParentRuns, txRepos, context.logger);
 			}
 		}
 
 		// Step 3: Create new workflow runs and their state transitions
-		await deps.workflowRunRepo.insert(newWorkflowRunEntries, tx);
-		await deps.stateTransitionRepo.appendBatch(newRunStateTransitionEntries, tx);
-		await deps.scheduleRepo.bulkUpdateOccurrence(scheduleUpdates, tx);
+		await txRepos.workflowRun.insert(newWorkflowRunEntries);
+		await txRepos.stateTransition.appendBatch(newRunStateTransitionEntries);
+		await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
 	});
 }
 
-async function fetchActiveRunsBySchedule(deps: ScheduleRecurringWorkflowsDeps, schedules: NonEmptyArray<DueSchedule>) {
+async function fetchActiveRunsBySchedule(
+	repos: ScheduleRecurringWorkflowsDeps["repos"],
+	schedules: NonEmptyArray<DueSchedule>
+) {
 	const workflowAndReferenceIdPairs: { workflowId: string; referenceId: string }[] = [];
 	const schedulesByWorkflowAndReferenceId = new Map<string, Map<string, DueSchedule>>();
 
@@ -355,7 +354,7 @@ async function fetchActiveRunsBySchedule(deps: ScheduleRecurringWorkflowsDeps, s
 	const activeRunsByScheduleId = new Map<string, { id: string; attempts: number; shard?: string }>();
 
 	if (isNonEmptyArray(workflowAndReferenceIdPairs) && isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
-		const activeRuns = await deps.workflowRunRepo.listByWorkflowAndReferenceIdPairs({
+		const activeRuns = await repos.workflowRun.listByWorkflowAndReferenceIdPairs({
 			pairs: workflowAndReferenceIdPairs,
 			status: NON_TERMINAL_WORKFLOW_RUN_STATUSES,
 		});

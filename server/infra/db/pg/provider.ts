@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import * as schema from "../schema/pg";
+import * as schema from "./schema";
 
 export interface PgDatabaseOptions {
 	provider: "pg";
@@ -20,3 +20,5 @@ export function createPgDatabaseConn(options: PgDatabaseOptions) {
 }
 
 export type PgDatabaseConn = ReturnType<typeof createPgDatabaseConn>;
+export type PgTransaction = Parameters<Parameters<PgDatabaseConn["transaction"]>[0]>[0];
+export type PgDb = PgDatabaseConn | PgTransaction;

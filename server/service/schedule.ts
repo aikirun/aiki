@@ -12,10 +12,7 @@ import type { ScheduleListRequestV1 } from "@aikirun/types/schedule-api";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import CronExpressionParser from "cron-parser";
 import { NotFoundError, ScheduleConflictError } from "server/errors";
-import type { DatabaseConn, DbTransaction } from "server/infra/db";
-import type { ScheduleRepository, ScheduleRow } from "server/infra/db/repository/schedule";
-import type { WorkflowRepository } from "server/infra/db/repository/workflow";
-import type { WorkflowRunRepository } from "server/infra/db/repository/workflow-run";
+import type { Repositories, ScheduleRow } from "server/infra/db/types";
 import type { Context } from "server/middleware/context";
 import { ulid } from "ulidx";
 
@@ -102,17 +99,14 @@ export function getNextOccurrence(spec: ScheduleSpec, anchor: number): number {
 }
 
 export interface ScheduleServiceDeps {
-	db: DatabaseConn;
-	scheduleRepo: ScheduleRepository;
-	workflowRepo: WorkflowRepository;
-	workflowRunRepo: WorkflowRunRepository;
+	repos: Pick<Repositories, "schedule" | "workflow" | "workflowRun" | "transaction">;
 }
 
 export function createScheduleService(deps: ScheduleServiceDeps) {
-	const { db, scheduleRepo, workflowRepo, workflowRunRepo } = deps;
+	const { repos } = deps;
 
 	async function getDueSchedules(now: number) {
-		const rows = await scheduleRepo.listDueSchedules(new Date(now));
+		const rows = await repos.schedule.listDueSchedules(new Date(now));
 		return rows.map(({ schedule, workflow }) => ({
 			...scheduleRowToDomain(schedule, workflow),
 			workflowId: schedule.workflowId,
@@ -128,10 +122,9 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 			status: ScheduleStatus;
 			lastOccurrence: Date | null;
 			nextRunAt: Date | null;
-		}>,
-		tx?: DbTransaction
+		}>
 	): Promise<void> {
-		const schedule = await scheduleRepo.update(namespaceId, id, updates, tx);
+		const schedule = await repos.schedule.update(namespaceId, id, updates);
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
@@ -161,22 +154,19 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 		const conflictPolicy = options?.reference?.conflictPolicy ?? "upsert";
 		const workflowRunInputHash = await hashInput(input);
 
-		return db.transaction(async (tx) => {
-			const workflowRow = await workflowRepo.getOrCreate(
-				{
-					namespaceId,
-					name: workflowName as WorkflowName,
-					versionId: workflowVersionId as WorkflowVersionId,
-					source: "user",
-				},
-				tx
-			);
+		return repos.transaction(async (txRepos) => {
+			const workflowRow = await txRepos.workflow.getOrCreate({
+				namespaceId,
+				name: workflowName as WorkflowName,
+				versionId: workflowVersionId as WorkflowVersionId,
+				source: "user",
+			});
 
 			const workflowInfo = { workflowName, workflowVersionId };
 
 			const existingSchedule = referenceId
-				? await scheduleRepo.getByReferenceId(namespaceId, referenceId, tx)
-				: await scheduleRepo.getByDefinitionHash(namespaceId, definitionHash, tx);
+				? await txRepos.schedule.getByReferenceId(namespaceId, referenceId)
+				: await txRepos.schedule.getByDefinitionHash(namespaceId, definitionHash);
 
 			if (existingSchedule) {
 				if (existingSchedule.definitionHash === definitionHash && existingSchedule.status === "active") {
@@ -188,23 +178,18 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 				}
 
 				const now = Date.now();
-				const updatedRow = await scheduleRepo.update(
-					namespaceId,
-					existingSchedule.id,
-					{
-						workflowId: workflowRow.id,
-						status: "active",
-						type: spec.type,
-						cronExpression: spec.type === "cron" ? spec.expression : undefined,
-						intervalMs: spec.type === "interval" ? spec.everyMs : undefined,
-						overlapPolicy: spec.overlapPolicy,
-						workflowRunInput: input,
-						workflowRunInputHash,
-						definitionHash,
-						nextRunAt: new Date(getNextOccurrence(spec, now)),
-					},
-					tx
-				);
+				const updatedRow = await txRepos.schedule.update(namespaceId, existingSchedule.id, {
+					workflowId: workflowRow.id,
+					status: "active",
+					type: spec.type,
+					cronExpression: spec.type === "cron" ? spec.expression : undefined,
+					intervalMs: spec.type === "interval" ? spec.everyMs : undefined,
+					overlapPolicy: spec.overlapPolicy,
+					workflowRunInput: input,
+					workflowRunInputHash,
+					definitionHash,
+					nextRunAt: new Date(getNextOccurrence(spec, now)),
+				});
 				if (!updatedRow) {
 					throw new NotFoundError(`Schedule not found: ${existingSchedule.id}`);
 				}
@@ -215,44 +200,41 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 			const now = Date.now();
 			const nextRunAt = getNextOccurrence(spec, now);
 
-			const createdRow = await scheduleRepo.create(
-				{
-					id,
-					namespaceId,
-					workflowId: workflowRow.id,
-					status: "active",
-					type: spec.type,
-					cronExpression: spec.type === "cron" ? spec.expression : null,
-					intervalMs: spec.type === "interval" ? spec.everyMs : null,
-					overlapPolicy: spec.overlapPolicy ?? null,
-					workflowRunInput: input,
-					workflowRunInputHash,
-					definitionHash,
-					referenceId,
-					conflictPolicy: options?.reference?.conflictPolicy ?? null,
-					nextRunAt: new Date(nextRunAt),
-				},
-				tx
-			);
+			const createdRow = await txRepos.schedule.create({
+				id,
+				namespaceId,
+				workflowId: workflowRow.id,
+				status: "active",
+				type: spec.type,
+				cronExpression: spec.type === "cron" ? spec.expression : null,
+				intervalMs: spec.type === "interval" ? spec.everyMs : null,
+				overlapPolicy: spec.overlapPolicy ?? null,
+				workflowRunInput: input,
+				workflowRunInputHash,
+				definitionHash,
+				referenceId,
+				conflictPolicy: options?.reference?.conflictPolicy ?? null,
+				nextRunAt: new Date(nextRunAt),
+			});
 			return { schedule: scheduleRowToDomain(createdRow, workflowInfo) };
 		});
 	}
 
 	async function getScheduleById(namespaceId: NamespaceId, id: string) {
-		const result = await scheduleRepo.getByIdWithWorkflow(namespaceId, id);
+		const result = await repos.schedule.getByIdWithWorkflow(namespaceId, id);
 		if (!result) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
-		const runCount = await workflowRunRepo.getRunCount(result.schedule.id);
+		const runCount = await repos.workflowRun.getRunCount(result.schedule.id);
 		return { schedule: scheduleRowToDomain(result.schedule, result.workflow), runCount };
 	}
 
 	async function getScheduleByReferenceId(namespaceId: NamespaceId, referenceId: string) {
-		const result = await scheduleRepo.getByReferenceIdWithWorkflow(namespaceId, referenceId);
+		const result = await repos.schedule.getByReferenceIdWithWorkflow(namespaceId, referenceId);
 		if (!result) {
 			throw new NotFoundError(`Schedule not found with referenceId: ${referenceId}`);
 		}
-		const runCount = await workflowRunRepo.getRunCount(result.schedule.id);
+		const runCount = await repos.workflowRun.getRunCount(result.schedule.id);
 		return { schedule: scheduleRowToDomain(result.schedule, result.workflow), runCount };
 	}
 
@@ -264,14 +246,14 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 	) {
 		let workflowIds: string[] | undefined;
 		if (isNonEmptyArray(filters?.workflows)) {
-			const workflows = await workflowRepo.listByNameAndVersionPairs(namespaceId, filters.workflows);
+			const workflows = await repos.workflow.listByNameAndVersionPairs(namespaceId, filters.workflows);
 			workflowIds = workflows.map((row) => row.id);
 			if (workflowIds.length === 0) {
 				return { schedules: [], total: 0 };
 			}
 		}
 
-		const { rows: schedules, total } = await scheduleRepo.listByFilters(
+		const { rows: schedules, total } = await repos.schedule.listByFilters(
 			namespaceId,
 			{
 				id: filters?.id,
@@ -287,7 +269,7 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 		if (!isNonEmptyArray(scheduleIds)) {
 			return { schedules: [], total };
 		}
-		const runCountsByScheduleId = await workflowRunRepo.getRunCounts(scheduleIds);
+		const runCountsByScheduleId = await repos.workflowRun.getRunCounts(scheduleIds);
 
 		return {
 			schedules: schedules.map(({ schedule, workflow }) => ({
@@ -299,21 +281,21 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 	}
 
 	async function pauseSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await scheduleRepo.update(namespaceId, id, { status: "paused" });
+		const schedule = await repos.schedule.update(namespaceId, id, { status: "paused" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
 	}
 
 	async function resumeSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await scheduleRepo.update(namespaceId, id, { status: "active" });
+		const schedule = await repos.schedule.update(namespaceId, id, { status: "active" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
 	}
 
 	async function deleteSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await scheduleRepo.update(namespaceId, id, { status: "deleted" });
+		const schedule = await repos.schedule.update(namespaceId, id, { status: "deleted" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
