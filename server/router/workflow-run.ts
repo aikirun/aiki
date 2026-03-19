@@ -1,4 +1,4 @@
-import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type { StateTransitionRepository } from "server/infra/db/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { TaskStateMachineService } from "server/service/task-state-machine";
@@ -116,14 +116,13 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		await workflowRunOutboxService.reclaim(context, request.id as WorkflowRunId);
 	});
 
-	const hasReachedStatusV1 = os.hasReachedStatusV1.handler(async ({ input: request, context }) => {
-		const reached = await stateTransitionRepository.hasReachedStatus(
+	const hasTerminatedV1 = os.hasTerminatedV1.handler(async ({ input: request, context }) => {
+		const terminated = await stateTransitionRepository.hasTerminated(
 			context.namespaceId,
 			request.id,
-			request.status as TerminalWorkflowRunStatus,
 			request.afterStateTransitionId
 		);
-		return { reached };
+		return { terminated };
 	});
 
 	return os.router({
@@ -143,6 +142,6 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		cancelByIdsV1,
 		claimReadyV1,
 		heartbeatV1,
-		hasReachedStatusV1,
+		hasTerminatedV1,
 	});
 }

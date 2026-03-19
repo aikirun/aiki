@@ -1,7 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TaskState } from "@aikirun/types/task";
-import type { TerminalWorkflowRunStatus, WorkflowRunState } from "@aikirun/types/workflow-run";
+import type { WorkflowRunState } from "@aikirun/types/workflow-run";
 import { and, count, eq, gt, inArray, sql } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
@@ -57,10 +57,9 @@ export function createStateTransitionRepository(db: PgDb) {
 			return { rows: rows.map(normalizeRow), total: countResult[0]?.count ?? 0 };
 		},
 
-		async hasReachedStatus(
+		async hasTerminated(
 			namespaceId: NamespaceId,
 			workflowRunId: string,
-			status: TerminalWorkflowRunStatus,
 			afterStateTransitionId: string
 		): Promise<boolean> {
 			const result = await db
@@ -72,7 +71,7 @@ export function createStateTransitionRepository(db: PgDb) {
 						eq(workflowRun.id, workflowRunId),
 						eq(workflowRun.namespaceId, namespaceId),
 						eq(stateTransition.type, "workflow_run"),
-						eq(stateTransition.status, status),
+						inArray(stateTransition.status, ["completed", "failed", "cancelled"]),
 						gt(stateTransition.id, afterStateTransitionId)
 					)
 				)
