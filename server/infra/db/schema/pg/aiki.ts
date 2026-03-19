@@ -32,6 +32,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { namespace } from "./auth";
+import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../../model/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
 
@@ -57,7 +58,7 @@ export const childWorkflowRunWaitStatusEnum = pgEnum(
 	CHILD_WORKFLOW_RUN_WAIT_STATUSES
 );
 
-export const workflowRunOutboxStatusEnum = pgEnum("workflow_run_outbox_status", ["pending", "published"]);
+export const workflowRunOutboxStatusEnum = pgEnum("workflow_run_outbox_status", WORKFLOW_RUN_OUTBOX_STATUSES);
 
 export const workflow = pgTable(
 	"workflow",
