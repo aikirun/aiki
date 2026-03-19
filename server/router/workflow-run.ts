@@ -1,5 +1,4 @@
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
-import type { StateTransitionRepository } from "server/infra/db/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { TaskStateMachineService } from "server/service/task-state-machine";
 import type { WorkflowRunService } from "server/service/workflow-run";
@@ -13,18 +12,12 @@ export interface WorkflowRunRouterDeps {
 	workflowRunStateMachineService: WorkflowRunStateMachineService;
 	taskStateMachineService: TaskStateMachineService;
 	workflowRunOutboxService: WorkflowRunOutboxService;
-	stateTransitionRepository: StateTransitionRepository;
 }
 
 export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	const os = namespaceAuthedImplementer.workflowRun;
-	const {
-		workflowRunService,
-		workflowRunStateMachineService,
-		taskStateMachineService,
-		workflowRunOutboxService,
-		stateTransitionRepository,
-	} = deps;
+	const { workflowRunService, workflowRunStateMachineService, taskStateMachineService, workflowRunOutboxService } =
+		deps;
 
 	const listV1 = os.listV1.handler(async ({ input: request, context }) => {
 		return workflowRunService.listWorkflowRuns(context, request);
@@ -117,11 +110,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	});
 
 	const hasTerminatedV1 = os.hasTerminatedV1.handler(async ({ input: request, context }) => {
-		const terminated = await stateTransitionRepository.hasTerminated(
-			context.namespaceId,
-			request.id,
-			request.afterStateTransitionId
-		);
+		const terminated = await workflowRunService.hasTerminated(context, request.id, request.afterStateTransitionId);
 		return { terminated };
 	});
 

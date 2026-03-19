@@ -566,6 +566,14 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		});
 	}
 
+	async function hasTerminated(
+		context: NamespaceRequestContext,
+		runId: string,
+		afterStateTransitionId: string
+	): Promise<boolean> {
+		return repos.stateTransition.hasTerminated(context.namespaceId, runId, afterStateTransitionId);
+	}
+
 	return {
 		createWorkflowRun: createWorkflowRun,
 		getWorkflowRunById: getWorkflowRunById,
@@ -578,6 +586,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		setTaskState: setTaskState,
 		listChildRuns: listChildRuns,
 		cancelByIds: cancelByIds,
+		hasTerminated: hasTerminated,
 	};
 }
 

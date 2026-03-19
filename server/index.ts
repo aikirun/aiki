@@ -95,7 +95,6 @@ if (import.meta.main) {
 		workflowService,
 		scheduleService,
 		workflowRunOutboxService,
-		stateTransitionRepository: repos.stateTransition,
 	});
 
 	const organizationAuthedHandler = new RPCHandler(organizationAuthedRouter, {});
