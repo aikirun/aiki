@@ -13,6 +13,8 @@ import type {
 	WorkflowRunGetByReferenceIdResponseV1,
 	WorkflowRunGetStateRequestV1,
 	WorkflowRunGetStateResponseV1,
+	WorkflowRunHasTerminatedRequestV1,
+	WorkflowRunHasTerminatedResponseV1,
 	WorkflowRunHeartbeatRequestV1,
 	WorkflowRunListChildRunsRequestV1,
 	WorkflowRunListChildRunsResponseV1,
@@ -358,6 +360,19 @@ const heartbeatV1: ContractProcedure<WorkflowRunHeartbeatRequestV1, void> = oc
 	)
 	.output(type("undefined"));
 
+const hasTerminatedV1: ContractProcedure<WorkflowRunHasTerminatedRequestV1, WorkflowRunHasTerminatedResponseV1> = oc
+	.input(
+		type({
+			id: "string > 0",
+			afterStateTransitionId: "string > 0",
+		})
+	)
+	.output(
+		type({
+			terminated: "boolean",
+		})
+	);
+
 export const workflowRunContract = {
 	listV1,
 	getByIdV1,
@@ -375,6 +390,7 @@ export const workflowRunContract = {
 	cancelByIdsV1,
 	claimReadyV1,
 	heartbeatV1,
+	hasTerminatedV1,
 };
 
 export type WorkflowRunContract = typeof workflowRunContract;

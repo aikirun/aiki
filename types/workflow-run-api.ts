@@ -47,6 +47,7 @@ export interface WorkflowRunApi {
 	cancelByIdsV1: (_: WorkflowRunCancelByIdsRequestV1) => Promise<WorkflowRunCancelByIdsResponseV1>;
 	claimReadyV1: (_: WorkflowRunClaimReadyRequestV1) => Promise<WorkflowRunClaimReadyResponseV1>;
 	heartbeatV1: (_: WorkflowRunHeartbeatRequestV1) => Promise<void>;
+	hasTerminatedV1: (_: WorkflowRunHasTerminatedRequestV1) => Promise<WorkflowRunHasTerminatedResponseV1>;
 }
 
 export interface WorkflowRunListRequestV1 {
@@ -303,4 +304,13 @@ export interface WorkflowRunClaimReadyResponseV1 {
 
 export interface WorkflowRunHeartbeatRequestV1 {
 	id: string;
+}
+
+export interface WorkflowRunHasTerminatedRequestV1 {
+	id: string;
+	afterStateTransitionId: string;
+}
+
+export interface WorkflowRunHasTerminatedResponseV1 {
+	terminated: boolean;
 }

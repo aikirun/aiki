@@ -1,10 +1,11 @@
 import type { NonEmptyArray } from "@aikirun/lib";
+import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TaskState } from "@aikirun/types/task";
-import type { WorkflowRunState } from "@aikirun/types/workflow-run";
-import { count, eq, inArray, sql } from "drizzle-orm";
+import { TERMINAL_WORKFLOW_RUN_STATUSES, type WorkflowRunState } from "@aikirun/types/workflow-run";
+import { and, count, eq, gt, inArray, sql } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { stateTransition } from "../schema";
+import { stateTransition, workflowRun } from "../schema";
 
 type _StateTransitionRow = typeof stateTransition.$inferSelect;
 export type StateTransitionRow = Omit<_StateTransitionRow, "state"> & {
@@ -54,6 +55,29 @@ export function createStateTransitionRepository(db: PgDb) {
 			]);
 
 			return { rows: rows.map(normalizeRow), total: countResult[0]?.count ?? 0 };
+		},
+
+		async hasTerminated(
+			namespaceId: NamespaceId,
+			workflowRunId: string,
+			afterStateTransitionId: string
+		): Promise<boolean> {
+			const result = await db
+				.select({ exists: sql<boolean>`true` })
+				.from(stateTransition)
+				.innerJoin(workflowRun, eq(stateTransition.workflowRunId, workflowRun.id))
+				.where(
+					and(
+						eq(workflowRun.id, workflowRunId),
+						eq(workflowRun.namespaceId, namespaceId),
+						eq(stateTransition.type, "workflow_run"),
+						inArray(stateTransition.status, TERMINAL_WORKFLOW_RUN_STATUSES),
+						gt(stateTransition.id, afterStateTransitionId)
+					)
+				)
+				.limit(1);
+
+			return result.length > 0;
 		},
 	};
 }

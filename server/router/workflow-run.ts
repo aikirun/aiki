@@ -109,6 +109,11 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		await workflowRunOutboxService.reclaim(context, request.id as WorkflowRunId);
 	});
 
+	const hasTerminatedV1 = os.hasTerminatedV1.handler(async ({ input: request, context }) => {
+		const terminated = await workflowRunService.hasTerminated(context, request.id, request.afterStateTransitionId);
+		return { terminated };
+	});
+
 	return os.router({
 		listV1,
 		getByIdV1,
@@ -126,5 +131,6 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		cancelByIdsV1,
 		claimReadyV1,
 		heartbeatV1,
+		hasTerminatedV1,
 	});
 }

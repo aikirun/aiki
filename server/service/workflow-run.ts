@@ -154,6 +154,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 			versionId: workflowRow.versionId,
 			createdAt: runRow.createdAt.getTime(),
 			revision: runRow.revision,
+			stateTransitionId: runRow.latestStateTransitionId,
 			input: runRow.input,
 			inputHash: runRow.inputHash,
 			options: runRow.options as WorkflowStartOptions | undefined,
@@ -565,6 +566,14 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		});
 	}
 
+	async function hasTerminated(
+		context: NamespaceRequestContext,
+		runId: string,
+		afterStateTransitionId: string
+	): Promise<boolean> {
+		return repos.stateTransition.hasTerminated(context.namespaceId, runId, afterStateTransitionId);
+	}
+
 	return {
 		createWorkflowRun: createWorkflowRun,
 		getWorkflowRunById: getWorkflowRunById,
@@ -577,6 +586,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		setTaskState: setTaskState,
 		listChildRuns: listChildRuns,
 		cancelByIds: cancelByIds,
+		hasTerminated: hasTerminated,
 	};
 }
 
