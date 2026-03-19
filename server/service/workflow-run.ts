@@ -391,6 +391,9 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		reference: EventReferenceOptions | undefined
 	): Promise<void> {
 		return db.transaction(async (tx) => {
+			// TODO: should we use getByIdWithState instead?
+			// Con: extra join to get state is pointless if the run is not in awaiting_event state
+			// Pro: If run is awaiting_event, no extra network call to fetch state
 			const run = await workflowRunRepo.getById(context.namespaceId, runId, tx);
 			if (!run) {
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
