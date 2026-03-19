@@ -2,6 +2,7 @@ import { API_KEY_STATUSES } from "@aikirun/types/api-key-api";
 import { sql } from "drizzle-orm";
 import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { timestampMs } from "./timestamp";
 import { NAMESPACE_ROLES, NAMESPACE_STATUSES } from "../../model/namespace";
 import {
 	ORGANIZATION_INVITATION_STATUSES,
@@ -10,7 +11,6 @@ import {
 	ORGANIZATION_TYPES,
 } from "../../model/organization";
 import { USER_STATUSES } from "../../model/user";
-import { timestampMs } from "../../timestamp";
 
 export const userStatusEnum = pgEnum("user_status", USER_STATUSES);
 
