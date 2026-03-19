@@ -279,7 +279,6 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 
 		maybeResult.state satisfies "completed";
 
-		// Workflow terminated - fetch the final state once
 		await this.refresh();
 
 		if (this._run.state.status === expectedStatus) {
