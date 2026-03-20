@@ -6,6 +6,9 @@ const AIKI_SERVER_URL = import.meta.env.VITE_AIKI_SERVER_URL || "http://localhos
 export const authClient = createAuthClient({
 	baseURL: AIKI_SERVER_URL,
 	basePath: "/auth",
+	fetchOptions: {
+		credentials: "include",
+	},
 	plugins: [
 		organizationClient({
 			teams: {
