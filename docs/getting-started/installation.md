@@ -124,6 +124,7 @@ You're ready! Continue to the [Quick Start](./quick-start.md) guide.
 | `DATABASE_URL` | Yes | - | Connection string (e.g., `postgresql://user:password@host:port/database`) |
 | `DATABASE_MAX_CONNECTIONS` | No | `10` | Maximum database connections in pool |
 | `DATABASE_SSL` | No | `false` | Enable SSL for database connection |
+| `AIKI_SERVER_HOST` | No | `0.0.0.0` | Host address to bind the server to |
 | `AIKI_SERVER_PORT` | No | `9850` | Port for the Aiki server |
 | `AIKI_SERVER_BASE_URL` | Yes | - | Public URL of the Aiki server |
 | `AIKI_SERVER_AUTH_SECRET` | Yes | - | Secret key for authentication |

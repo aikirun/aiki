@@ -103,6 +103,7 @@ if (import.meta.main) {
 	const { createCorsResponse, withCorsHeaders } = createCorsHelpers(config.corsOrigins);
 
 	Bun.serve({
+		hostname: config.host,
 		port: config.port,
 		routes: {
 			"/health": async (request) => {
@@ -186,7 +187,7 @@ if (import.meta.main) {
 	process.on("SIGTERM", shutdown);
 	process.on("SIGINT", shutdown);
 
-	logger.info(`Server running on port ${config.port}`);
+	logger.info(`Server running on ${config.host}:${config.port}`);
 }
 
 function createCorsHelpers(corsOrigins: string[]) {

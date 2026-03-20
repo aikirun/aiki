@@ -40,6 +40,7 @@ The server requires:
 
 ```bash
 # .env
+AIKI_SERVER_HOST=0.0.0.0
 AIKI_SERVER_PORT=9850
 
 # Optional: Redis for lower-latency message delivery

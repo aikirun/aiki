@@ -47,6 +47,7 @@ export async function loadConfig(): Promise<Config> {
 		: undefined;
 
 	const raw = {
+		host: process.env.AIKI_SERVER_HOST,
 		port: process.env.AIKI_SERVER_PORT,
 		baseURL: process.env.AIKI_SERVER_BASE_URL,
 		corsOrigins: process.env.CORS_ORIGINS,

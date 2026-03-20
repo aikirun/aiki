@@ -58,6 +58,7 @@ export const authConfigSchema = type({
 
 export const configSchema = type({
 	port: "string.integer.parse | number.integer > 0 = 9850",
+	host: "string > 0 = '0.0.0.0'",
 	baseURL: "string > 0",
 	corsOrigins: uniqueCommaSeparatedToItems,
 	"redis?": redisConfigSchema.or(type("undefined")),
