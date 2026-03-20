@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { client } from "../api/client";
 import { useApiKeys } from "../api/hooks";
-import { useAuth } from "../auth/AuthProvider";
 import { RelativeTime } from "../components/common/RelativeTime";
 import { API_KEY_STATUS_COLORS } from "../constants/status-colors";
 
@@ -24,7 +23,6 @@ const STATUS_LABELS: Record<ApiKeyStatus, string> = {
 
 export function ApiKeys() {
 	const { data, isLoading } = useApiKeys();
-	const { activeOrganization, activeNamespace } = useAuth();
 	const [state, setState] = useState<PageState>({ mode: "idle" });
 
 	const handleKeyCreated = (apiKey: string) => {
@@ -37,32 +35,7 @@ export function ApiKeys() {
 	const showCreateButton = state.mode === "idle";
 
 	return (
-		<div style={{ maxWidth: 640, padding: "32px 0" }} className="space-y-8">
-			{/* Page header */}
-			<div>
-				<h1
-					style={{
-						fontSize: 18,
-						fontWeight: 800,
-						color: "var(--t0)",
-						letterSpacing: "-0.03em",
-						lineHeight: 1.2,
-					}}
-				>
-					Settings
-				</h1>
-				<p
-					style={{
-						fontSize: 11,
-						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
-						color: "var(--t3)",
-						marginTop: 4,
-					}}
-				>
-					{activeOrganization?.name} / {activeNamespace?.name}
-				</p>
-			</div>
-
+		<div className="space-y-8" style={{ paddingTop: 24 }}>
 			{/* API Keys section */}
 			<div className="space-y-3">
 				{/* Section header row */}

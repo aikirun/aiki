@@ -2,9 +2,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { NotFound } from "./components/common/NotFound";
 import { AppShell } from "./components/layout/AppShell";
+import { SettingsLayout } from "./components/layout/SettingsLayout";
 import { ApiKeys } from "./pages/ApiKeys";
 import { SignIn } from "./pages/auth/SignIn";
 import { SignUp } from "./pages/auth/SignUp";
+import { OrganizationSettings } from "./pages/OrganizationSettings";
 import { CreateNamespace } from "./pages/onboarding/CreateNamespace";
 import { CreateOrganization } from "./pages/onboarding/CreateOrganization";
 import { RunDetail } from "./pages/RunDetail";
@@ -48,12 +50,16 @@ export default function App() {
 				<Route path="/" element={<RunsList />} />
 				<Route path="/runs/:id" element={<RunDetail />} />
 				<Route path="/schedules" element={<SchedulesList />} />
-				<Route path="/settings" element={<ApiKeys />} />
+
+				<Route path="/settings" element={<SettingsLayout />}>
+					<Route index element={<Navigate to="api-keys" replace />} />
+					<Route path="api-keys" element={<ApiKeys />} />
+					<Route path="organization" element={<OrganizationSettings />} />
+				</Route>
 
 				{/* Redirects from old routes */}
 				<Route path="/workflow/:name/run/:id" element={<OldRunRedirect />} />
 				<Route path="/workflow/:name" element={<Navigate to="/" replace />} />
-				<Route path="/settings/api-keys" element={<Navigate to="/settings" replace />} />
 
 				<Route path="*" element={<NotFound />} />
 			</Route>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../auth/AuthProvider";
+import { getNamespaceDotColor } from "../../constants/namespace";
 import { useTheme } from "../../hooks/useTheme";
 
 const SIDEBAR_COLLAPSED_KEY = "aiki-sidebar-collapsed";
@@ -47,7 +48,7 @@ export function Sidebar() {
 	const activePage =
 		location.pathname === "/"
 			? "/"
-			: (NAV_ITEMS.find((n) => !n.end && location.pathname.startsWith(n.key))?.key ?? "/");
+			: (NAV_ITEMS.find((n) => !n.end && location.pathname.startsWith(n.key))?.key ?? null);
 
 	return (
 		<aside
@@ -528,6 +529,7 @@ function UserMenu({
 
 function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
 	const { organizations, activeOrganization, setActiveOrganization } = useAuth();
+	const navigate = useNavigate();
 	const [isOpen, setIsOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 
@@ -610,6 +612,16 @@ function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
 							{org.name}
 						</DropdownItem>
 					))}
+					<DropdownDivider />
+					<DropdownItem
+						selected={false}
+						onClick={() => {
+							setIsOpen(false);
+							navigate("/settings/organization?create=org");
+						}}
+					>
+						<span style={{ color: "var(--t2)" }}>+ New organization</span>
+					</DropdownItem>
 				</Dropdown>
 			)}
 		</div>
@@ -620,6 +632,7 @@ function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
 
 function NamespaceSwitcher({ collapsed }: { collapsed: boolean }) {
 	const { namespaces, activeNamespace, setActiveNamespace } = useAuth();
+	const navigate = useNavigate();
 	const [isOpen, setIsOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 
@@ -706,6 +719,16 @@ function NamespaceSwitcher({ collapsed }: { collapsed: boolean }) {
 							</span>
 						</DropdownItem>
 					))}
+					<DropdownDivider />
+					<DropdownItem
+						selected={false}
+						onClick={() => {
+							setIsOpen(false);
+							navigate("/settings/organization?create=namespace");
+						}}
+					>
+						<span style={{ color: "var(--t2)" }}>+ New namespace</span>
+					</DropdownItem>
 				</Dropdown>
 			)}
 		</div>
@@ -730,6 +753,10 @@ function DropdownChevron() {
 			<polyline points="3 4.5 6 7.5 9 4.5" />
 		</svg>
 	);
+}
+
+function DropdownDivider() {
+	return <div style={{ height: 1, background: "var(--b0)", margin: "4px 0" }} />;
 }
 
 function DropdownLabel({ children }: { children: React.ReactNode }) {
@@ -811,13 +838,6 @@ function DropdownItem({
 }
 
 // --- Helpers ---
-
-function getNamespaceDotColor(name: string): string {
-	const lower = name.toLowerCase();
-	if (lower.includes("prod")) return "#34D399";
-	if (lower.includes("stag")) return "#FBBF24";
-	return "#A78BFA";
-}
 
 function useClickOutside(ref: React.RefObject<HTMLDivElement | null>, handler: () => void) {
 	const savedHandler = useRef(handler);

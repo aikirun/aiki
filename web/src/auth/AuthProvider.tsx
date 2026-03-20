@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 
 import { authClient } from "./client";
@@ -43,6 +44,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+	const queryClient = useQueryClient();
 	const { data: session, isPending: sessionLoading, refetch } = authClient.useSession();
 
 	const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -93,35 +95,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		[activeOrganization]
 	);
 
-	const setActiveOrganization = useCallback(async (org: Organization) => {
-		setNamespacesLoading(true);
-		try {
-			await authClient.organization.setActive({ organizationId: org.id });
+	const setActiveOrganization = useCallback(
+		async (org: Organization) => {
+			setNamespacesLoading(true);
+			try {
+				await authClient.organization.setActive({ organizationId: org.id });
 
-			const result = await authClient.organization.listTeams({
-				query: { organizationId: org.id },
-			});
-			const newNamespaces = (result.data || []) as Namespace[];
+				const result = await authClient.organization.listTeams({
+					query: { organizationId: org.id },
+				});
+				const newNamespaces = (result.data || []) as Namespace[];
 
-			setActiveOrganizationState(org);
-			setNamespaces(newNamespaces);
+				setActiveOrganizationState(org);
+				setNamespaces(newNamespaces);
 
-			if (newNamespaces.length > 0) {
-				await authClient.organization.setActiveTeam({ teamId: newNamespaces[0].id });
-				setActiveNamespaceState(newNamespaces[0]);
-			} else {
-				setActiveNamespaceState(null);
+				if (newNamespaces.length > 0) {
+					await authClient.organization.setActiveTeam({ teamId: newNamespaces[0].id });
+					setActiveNamespaceState(newNamespaces[0]);
+				} else {
+					setActiveNamespaceState(null);
+				}
+
+				queryClient.invalidateQueries();
+			} finally {
+				setNamespacesLoading(false);
+				setNamespacesInitialized(true);
 			}
-		} finally {
-			setNamespacesLoading(false);
-			setNamespacesInitialized(true);
-		}
-	}, []);
+		},
+		[queryClient]
+	);
 
-	const setActiveNamespace = useCallback(async (namespace: Namespace) => {
-		await authClient.organization.setActiveTeam({ teamId: namespace.id });
-		setActiveNamespaceState(namespace);
-	}, []);
+	const setActiveNamespace = useCallback(
+		async (namespace: Namespace) => {
+			await authClient.organization.setActiveTeam({ teamId: namespace.id });
+			setActiveNamespaceState(namespace);
+			queryClient.invalidateQueries();
+		},
+		[queryClient]
+	);
 
 	const signOut = useCallback(async () => {
 		await authClient.signOut();
