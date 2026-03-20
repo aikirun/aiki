@@ -13,5 +13,3 @@ todo/
 **/dist/
 *.tsbuildinfo
 node_modules/
-
-fly.toml
