@@ -60,10 +60,23 @@ export async function loadConfig(): Promise<Config> {
 		prettyLogs: process.env.PRETTY_LOGS,
 	};
 
-	const result = configSchema(raw ?? {});
+	const result = configSchema(omitUndefined(raw));
 	if (result instanceof type.errors) {
 		throw new Error(`Invalid config: ${result.summary}`);
 	}
 
+	return result;
+}
+
+function omitUndefined(obj: Record<string, unknown>): Record<string, unknown> {
+	const result: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(obj)) {
+		if (value === undefined) continue;
+		if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+			result[key] = omitUndefined(value as Record<string, unknown>);
+		} else {
+			result[key] = value;
+		}
+	}
 	return result;
 }
