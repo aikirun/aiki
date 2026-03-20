@@ -2,6 +2,18 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.22.0
+
+### New Features
+
+- **`hasTerminatedV1` API endpoint** — New server endpoint that efficiently checks whether a workflow run has reached a terminal state after a given state transition, without fetching the full run object.
+- **Organization management UI** — New settings page for managing organizations.
+
+### Improvements
+
+- **`waitForStatus` optimization** — The SDK `handle.waitForStatus()` now uses the new `hasTerminatedV1` endpoint to detect terminal states via state transition history rather than polling the full run state. This fixes a bug where the handle could miss fast state transitions.
+- **Cross-origin auth support** — Better Auth now sets `SameSite=none; Secure` cookies and the auth client sends credentials, enabling multi-domain deployments.
+
 ## 0.21.0
 
 ### Improvements
