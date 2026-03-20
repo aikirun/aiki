@@ -19,11 +19,11 @@ export function StatusBadge({ status, size = "sm" }: StatusBadgeProps) {
 				gap: big ? 6 : 4,
 				padding: big ? "3px 11px" : "2px 8px",
 				borderRadius: 999,
-				background: `${config.color}20`,
-				border: `1px solid ${config.color}35`,
+				background: `${config.color}30`,
+				border: `1px solid ${config.color}50`,
 				fontSize: big ? 12 : 10.5,
 				fontWeight: 600,
-				color: config.color,
+				color: config.textColor,
 			}}
 		>
 			<span className={config.live ? "anim-blink" : undefined} style={{ fontSize: big ? 10 : 8 }}>

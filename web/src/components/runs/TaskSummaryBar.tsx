@@ -11,10 +11,30 @@ export function TaskSummaryBar({ taskCounts }: TaskSummaryBarProps) {
 	if (total === 0) return null;
 
 	const segments = [
-		{ count: taskCounts.completed, color: TASK_STATUS_COLORS.completed, symbol: "\u2713" },
-		{ count: taskCounts.running, color: TASK_STATUS_COLORS.running, symbol: "\u25CF" },
-		{ count: taskCounts.failed, color: TASK_STATUS_COLORS.failed, symbol: "\u2715" },
-		{ count: taskCounts.awaiting_retry, color: TASK_STATUS_COLORS.awaiting_retry, symbol: "\u21BB" },
+		{
+			count: taskCounts.completed,
+			tint: TASK_STATUS_COLORS.completed.tint,
+			text: TASK_STATUS_COLORS.completed.text,
+			symbol: "\u2713",
+		},
+		{
+			count: taskCounts.running,
+			tint: TASK_STATUS_COLORS.running.tint,
+			text: TASK_STATUS_COLORS.running.text,
+			symbol: "\u25CF",
+		},
+		{
+			count: taskCounts.failed,
+			tint: TASK_STATUS_COLORS.failed.tint,
+			text: TASK_STATUS_COLORS.failed.text,
+			symbol: "\u2715",
+		},
+		{
+			count: taskCounts.awaiting_retry,
+			tint: TASK_STATUS_COLORS.awaiting_retry.tint,
+			text: TASK_STATUS_COLORS.awaiting_retry.text,
+			symbol: "\u21BB",
+		},
 	].filter((s) => s.count > 0);
 
 	return (
@@ -37,7 +57,7 @@ export function TaskSummaryBar({ taskCounts }: TaskSummaryBarProps) {
 						style={{
 							flex: seg.count,
 							minWidth: 2,
-							backgroundColor: seg.color,
+							backgroundColor: seg.tint,
 						}}
 					/>
 				))}
@@ -47,7 +67,7 @@ export function TaskSummaryBar({ taskCounts }: TaskSummaryBarProps) {
 				{segments.map((seg, i) => (
 					<span key={seg.symbol}>
 						{i > 0 && " "}
-						<span style={{ color: seg.color }}>
+						<span style={{ color: seg.text }}>
 							{seg.count}
 							{seg.symbol}
 						</span>

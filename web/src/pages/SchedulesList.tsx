@@ -60,11 +60,11 @@ function SchedulePill({ status }: { status: ScheduleStatus }) {
 				gap: 4,
 				padding: "2px 8px",
 				borderRadius: 999,
-				background: `${config.color}20`,
-				border: `1px solid ${config.color}35`,
+				background: `${config.color}30`,
+				border: `1px solid ${config.color}50`,
 				fontSize: 10.5,
 				fontWeight: 600,
-				color: config.color,
+				color: config.textColor,
 			}}
 		>
 			<span style={{ fontSize: 8 }}>{config.glyph}</span>
@@ -73,15 +73,25 @@ function SchedulePill({ status }: { status: ScheduleStatus }) {
 	);
 }
 
-function ActionBtn({ label, color, onClick }: { label: string; color: string; onClick: () => void }) {
+function ActionBtn({
+	label,
+	color,
+	textColor,
+	onClick,
+}: {
+	label: string;
+	color: string;
+	textColor?: string;
+	onClick: () => void;
+}) {
 	return (
 		<button
 			type="button"
 			onClick={onClick}
 			style={{
-				background: `${color}20`,
-				border: `1px solid ${color}35`,
-				color,
+				background: `${color}30`,
+				border: `1px solid ${color}50`,
+				color: textColor ?? color,
 				fontSize: 11.5,
 				fontWeight: 600,
 				padding: "5px 13px",
@@ -501,9 +511,9 @@ function ScheduleRow({
 									fontSize: 10,
 									padding: "1px 6px",
 									borderRadius: 4,
-									background: isCron ? "rgba(129,140,248,0.08)" : "rgba(56,189,248,0.08)",
-									color: isCron ? "#818CF8" : "#38BDF8",
-									border: `1px solid ${isCron ? "rgba(129,140,248,0.15)" : "rgba(56,189,248,0.15)"}`,
+									background: isCron ? "rgba(129,140,248,0.18)" : "rgba(56,189,248,0.18)",
+									color: isCron ? "var(--accent-indigo)" : "var(--accent-sky)",
+									border: `1px solid ${isCron ? "rgba(129,140,248,0.35)" : "rgba(56,189,248,0.35)"}`,
 								}}
 							>
 								{specLabel}
@@ -528,7 +538,7 @@ function ScheduleRow({
 								type="button"
 								onClick={viewRuns}
 								style={{
-									color: "#38BDF8",
+									color: "var(--accent-sky)",
 									cursor: "pointer",
 									borderBottom: "1px dashed #38BDF8",
 									paddingBottom: 1,
@@ -561,7 +571,7 @@ function ScheduleRow({
 					{/* Right side: next run + last occurrence */}
 					<div style={{ textAlign: "right", flexShrink: 0 }}>
 						{schedule.status === "active" && schedule.nextRunAt > 0 && (
-							<div style={{ fontSize: 11, fontFamily: "monospace", color: "#38BDF8", fontWeight: 500 }}>
+							<div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--accent-sky)", fontWeight: 500 }}>
 								next {timeUntil(schedule.nextRunAt)}
 							</div>
 						)}
@@ -633,22 +643,37 @@ function ScheduleRow({
 					{/* Action buttons */}
 					<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
 						{schedule.status === "active" && (
-							<ActionBtn label="Pause" color="#FBBF24" onClick={() => onAction("pause", schedule.id)} />
+							<ActionBtn
+								label="Pause"
+								color="#FBBF24"
+								textColor="var(--accent-amber)"
+								onClick={() => onAction("pause", schedule.id)}
+							/>
 						)}
 						{schedule.status === "paused" && (
-							<ActionBtn label="Resume" color="#34D399" onClick={() => onAction("resume", schedule.id)} />
+							<ActionBtn
+								label="Resume"
+								color="#34D399"
+								textColor="var(--accent-green)"
+								onClick={() => onAction("resume", schedule.id)}
+							/>
 						)}
 						{schedule.status !== "deleted" && (
-							<ActionBtn label="Delete" color="#F87171" onClick={() => onAction("delete", schedule.id)} />
+							<ActionBtn
+								label="Delete"
+								color="#F87171"
+								textColor="var(--accent-red)"
+								onClick={() => onAction("delete", schedule.id)}
+							/>
 						)}
 						<div style={{ flex: 1 }} />
 						<button
 							type="button"
 							onClick={() => onViewRuns(schedule.id)}
 							style={{
-								background: "none",
-								border: "1px solid var(--b0)",
-								color: "#38BDF8",
+								background: "rgba(56,189,248,0.12)",
+								border: "1px solid rgba(56,189,248,0.35)",
+								color: "var(--accent-sky)",
 								fontSize: 11,
 								fontWeight: 600,
 								fontFamily: "inherit",

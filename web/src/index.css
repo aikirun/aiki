@@ -5,20 +5,30 @@
 @tailwind utilities;
 
 :root {
-	--bg: #131215;
-	--s1: #1a191d;
-	--s2: #222125;
-	--s3: #2b292e;
+	--bg: #18171b;
+	--s1: #201f24;
+	--s2: #28272c;
+	--s3: #323136;
 
 	--t0: #f2ede4;
 	--t1: #d4d0c8;
-	--t2: #9e998f;
-	--t3: #706b62;
+	--t2: #ccc8bf;
+	--t3: #a39e95;
 
 	--amber: #a78bfa;
 
 	/* Border token — sits between s2 and s3 */
-	--b0: #26242a;
+	--b0: #2e2d33;
+
+	--accent-green: #34D399;
+	--accent-amber: #FBBF24;
+	--accent-red: #F87171;
+	--accent-indigo: #818CF8;
+	--accent-sky: #38BDF8;
+	--accent-gray: #9CA3AF;
+	--accent-purple: #C084FC;
+	--accent-pink: #F472B6;
+	--accent-orange: #FB923C;
 
 	--shadow: rgba(0, 0, 0, 0.4);
 }
@@ -37,6 +47,16 @@
 	--amber: #7c3aed;
 
 	--b0: #e4e4e7;
+
+	--accent-green: #047857;
+	--accent-amber: #B45309;
+	--accent-red: #DC2626;
+	--accent-indigo: #4F46E5;
+	--accent-sky: #0369A1;
+	--accent-gray: #4B5563;
+	--accent-purple: #7C3AED;
+	--accent-pink: #DB2777;
+	--accent-orange: #EA580C;
 
 	--shadow: rgba(0, 0, 0, 0.08);
 }

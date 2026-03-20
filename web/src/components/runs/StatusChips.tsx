@@ -37,7 +37,7 @@ export function StatusChips({ selected, onChange }: StatusChipsProps) {
 		<div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
 			{ALL_STATUSES.map((status) => {
 				const config = WORKFLOW_STATUS_CONFIG[status];
-				const color = WORKFLOW_RUN_STATUS_COLORS[status];
+				const color = WORKFLOW_RUN_STATUS_COLORS[status].tint;
 				const isActive = selected.includes(status);
 
 				return (
@@ -55,9 +55,9 @@ export function StatusChips({ selected, onChange }: StatusChipsProps) {
 							lineHeight: "1.4",
 							...(isActive
 								? {
-										color,
-										backgroundColor: `${color}20`,
-										border: `1px solid ${color}35`,
+										color: config.textColor,
+										backgroundColor: `${color}30`,
+										border: `1px solid ${color}50`,
 									}
 								: {
 										color: "var(--t3)",

@@ -158,7 +158,9 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 	const [isOpen, setIsOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 
-	const color = TASK_STATUS_COLORS[task.state.status];
+	const colorEntry = TASK_STATUS_COLORS[task.state.status];
+	const color = colorEntry.tint;
+	const textColor = colorEntry.text;
 	const glyph = TASK_STATUS_GLYPHS[task.state.status];
 	const attempts = task.state.attempts;
 	const canExpand = taskHasExpandableData(task);
@@ -204,13 +206,13 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 						width: 24,
 						height: 24,
 						borderRadius: "50%",
-						background: `${color}20`,
-						border: `1.5px solid ${color}45`,
+						background: `${color}30`,
+						border: `1.5px solid ${color}50`,
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",
 						fontSize: 10,
-						color,
+						color: textColor,
 						flexShrink: 0,
 					}}
 				>
@@ -223,7 +225,9 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 							{task.name}
 						</span>
 						{attempts > 1 && (
-							<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "#FB923C" }}>×{attempts}</span>
+							<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--accent-orange)" }}>
+								×{attempts}
+							</span>
 						)}
 					</div>
 					<div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
@@ -303,7 +307,7 @@ function resolveChildStatus(child: ChildWorkflowRunInfo): {
 	return { status: "running", resolvedWait: null };
 }
 
-function childStatusColor(status: TerminalWorkflowRunStatus | "running"): string {
+function childStatusColor(status: TerminalWorkflowRunStatus | "running"): { tint: string; text: string } {
 	if (status === "completed") return WORKFLOW_RUN_STATUS_COLORS.completed;
 	if (status === "failed") return WORKFLOW_RUN_STATUS_COLORS.failed;
 	if (status === "cancelled") return WORKFLOW_RUN_STATUS_COLORS.cancelled;
@@ -319,7 +323,7 @@ function childStatusGlyph(status: TerminalWorkflowRunStatus | "running"): string
 
 function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; isAwaited: boolean }) {
 	const { status, resolvedWait } = resolveChildStatus(child);
-	const color = childStatusColor(status);
+	const { tint: color, text: textColor } = childStatusColor(status);
 	const glyph = childStatusGlyph(status);
 	const hasResolvedOutput = resolvedWait !== null;
 	const [isOpen, setIsOpen] = useState(false);
@@ -363,13 +367,13 @@ function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; 
 						width: 24,
 						height: 24,
 						borderRadius: "50%",
-						background: `${color}20`,
-						border: `1.5px solid ${color}45`,
+						background: `${color}30`,
+						border: `1.5px solid ${color}50`,
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",
 						fontSize: 10,
-						color,
+						color: textColor,
 						flexShrink: 0,
 					}}
 				>
@@ -424,9 +428,9 @@ function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; 
 					to={`/runs/${child.id}`}
 					onClick={(e) => e.stopPropagation()}
 					style={{
-						background: "none",
-						border: "1px solid var(--b0)",
-						color: "#38BDF8",
+						background: "rgba(56,189,248,0.12)",
+						border: "1px solid rgba(56,189,248,0.35)",
+						color: "var(--accent-sky)",
 						fontSize: 11,
 						fontWeight: 600,
 						padding: "4px 10px",
@@ -434,9 +438,12 @@ function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; 
 						textDecoration: "none",
 						whiteSpace: "nowrap",
 						flexShrink: 0,
+						display: "inline-flex",
+						alignItems: "center",
+						gap: 4,
 					}}
 				>
-					Open →
+					View run →
 				</Link>
 
 				{hasResolvedOutput && <ChevronIcon open={isOpen} />}
@@ -779,7 +786,7 @@ function ErrorBlock({ state }: { state: FailedState }) {
 					}}
 				>
 					Child workflow{" "}
-					<Link to={`/runs/${state.childWorkflowRunId}`} style={{ color: "#C084FC" }}>
+					<Link to={`/runs/${state.childWorkflowRunId}`} style={{ color: "var(--accent-purple)" }}>
 						{shortId(state.childWorkflowRunId)}
 					</Link>{" "}
 					failed

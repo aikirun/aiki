@@ -35,11 +35,13 @@ function timeUntil(ms: number): string {
 function ActionBtn({
 	label,
 	color,
+	textColor,
 	onClick,
 	loading,
 }: {
 	label: string;
 	color: string;
+	textColor?: string;
 	onClick: () => void;
 	loading?: boolean;
 }) {
@@ -49,9 +51,9 @@ function ActionBtn({
 			onClick={onClick}
 			disabled={loading}
 			style={{
-				background: `${color}20`,
-				border: `1px solid ${color}35`,
-				color,
+				background: `${color}30`,
+				border: `1px solid ${color}50`,
+				color: textColor ?? color,
 				fontSize: 11.5,
 				fontWeight: 600,
 				padding: "5px 13px",
@@ -90,7 +92,9 @@ function Meta({ label, children }: MetaProps) {
 			>
 				{label}
 			</div>
-			<div style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 500, color: "var(--t0)" }}>{children}</div>
+			<div style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 500, color: "var(--t0)", lineHeight: "22px" }}>
+				{children}
+			</div>
 		</div>
 	);
 }
@@ -205,7 +209,7 @@ export function RunDetail() {
 	}
 
 	const status = currentRun.state.status;
-	const statusColor = WORKFLOW_RUN_STATUS_COLORS[status];
+	const statusColor = WORKFLOW_RUN_STATUS_COLORS[status].tint;
 	const isTerminal = isTerminalWorkflowRunStatus(status);
 	const canCancel = !isTerminal;
 	const canPause = ["scheduled", "queued", "running"].includes(status);
@@ -240,9 +244,9 @@ export function RunDetail() {
 					<Link
 						to={`/runs/${currentRun.parentWorkflowRunId}`}
 						style={{
-							background: "rgba(192,132,252,0.08)",
-							border: "1px solid rgba(192,132,252,0.2)",
-							color: "#C084FC",
+							background: "rgba(192,132,252,0.18)",
+							border: "1px solid rgba(192,132,252,0.4)",
+							color: "var(--accent-purple)",
 							fontSize: 11,
 							fontWeight: 600,
 							padding: "5px 12px",
@@ -255,6 +259,27 @@ export function RunDetail() {
 						}}
 					>
 						↑ Parent run {shortId(currentRun.parentWorkflowRunId)}
+					</Link>
+				)}
+				{currentRun.scheduleId && (
+					<Link
+						to={`/schedules?id=${currentRun.scheduleId}`}
+						style={{
+							background: "rgba(56,189,248,0.18)",
+							border: "1px solid rgba(56,189,248,0.4)",
+							color: "var(--accent-sky)",
+							fontSize: 11,
+							fontWeight: 600,
+							padding: "5px 12px",
+							borderRadius: 7,
+							textDecoration: "none",
+							display: "inline-flex",
+							alignItems: "center",
+							gap: 4,
+							fontFamily: "inherit",
+						}}
+					>
+						⏱ Schedule {shortId(currentRun.scheduleId)}
 					</Link>
 				)}
 			</div>
@@ -289,9 +314,9 @@ export function RunDetail() {
 								style={{
 									fontSize: 10,
 									fontWeight: 600,
-									color: "#C084FC",
-									background: "rgba(192,132,252,0.08)",
-									border: "1px solid rgba(192,132,252,0.15)",
+									color: "var(--accent-purple)",
+									background: "rgba(192,132,252,0.18)",
+									border: "1px solid rgba(192,132,252,0.3)",
 									padding: "2px 8px",
 									borderRadius: 999,
 								}}
@@ -308,6 +333,7 @@ export function RunDetail() {
 								<ActionBtn
 									label="Resume"
 									color="#34D399"
+									textColor="var(--accent-green)"
 									loading={actionLoading === "resume"}
 									onClick={() =>
 										handleAction("resume", () =>
@@ -324,6 +350,7 @@ export function RunDetail() {
 								<ActionBtn
 									label="Pause"
 									color="#FBBF24"
+									textColor="var(--accent-amber)"
 									loading={actionLoading === "pause"}
 									onClick={() =>
 										handleAction("pause", () =>
@@ -340,6 +367,7 @@ export function RunDetail() {
 								<ActionBtn
 									label="Cancel"
 									color="#F87171"
+									textColor="var(--accent-red)"
 									loading={actionLoading === "cancel"}
 									onClick={() =>
 										handleAction("cancel", () =>
@@ -363,8 +391,18 @@ export function RunDetail() {
 				</div>
 
 				{/* Metadata row */}
-				<div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: tasks.length > 0 ? 14 : 0 }}>
-					<Meta label="Version">v{currentRun.versionId}</Meta>
+				<div
+					style={{
+						display: "flex",
+						flexWrap: "wrap",
+						gap: 20,
+						alignItems: "flex-start",
+						marginBottom: tasks.length > 0 ? 14 : 0,
+					}}
+				>
+					<Meta label="Version">
+						<span style={{ display: "inline-flex", alignItems: "center", minHeight: 22 }}>v{currentRun.versionId}</span>
+					</Meta>
 
 					{currentRun.options?.reference && (
 						<Meta label="Reference">
@@ -388,7 +426,7 @@ export function RunDetail() {
 
 					{currentRun.parentWorkflowRunId && (
 						<Meta label="Parent">
-							<span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "#C084FC" }}>
+							<span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--accent-purple)" }}>
 								{shortId(currentRun.parentWorkflowRunId)}
 								<CopyButton text={currentRun.parentWorkflowRunId} />
 							</span>
@@ -397,42 +435,28 @@ export function RunDetail() {
 
 					<Meta label="Attempts">{String(currentRun.attempts)}</Meta>
 
-					<div>
-						<div
-							style={{
-								fontSize: 9,
-								fontWeight: 600,
-								letterSpacing: "0.07em",
-								color: "var(--t3)",
-								textTransform: "uppercase",
-								marginBottom: 3,
-							}}
-						>
-							Created
-						</div>
-						<span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 500, color: "var(--t0)" }}>
-							<RelativeTime timestamp={currentRun.createdAt} />
-						</span>
-					</div>
+					<Meta label="Created">
+						<RelativeTime timestamp={currentRun.createdAt} />
+					</Meta>
 
 					{/* Contextual: sleeping */}
 					{currentRun.state.status === "sleeping" && (
 						<Meta label="Awakes">
-							<span style={{ color: "#818CF8" }}>{timeUntil(currentRun.state.awakeAt)}</span>
+							<span style={{ color: "var(--accent-indigo)" }}>{timeUntil(currentRun.state.awakeAt)}</span>
 						</Meta>
 					)}
 
 					{/* Contextual: awaiting event */}
 					{currentRun.state.status === "awaiting_event" && (
 						<Meta label="Event">
-							<span style={{ color: "#F472B6" }}>{currentRun.state.eventName}</span>
+							<span style={{ color: "var(--accent-pink)" }}>{currentRun.state.eventName}</span>
 						</Meta>
 					)}
 
 					{/* Contextual: awaiting child workflow */}
 					{currentRun.state.status === "awaiting_child_workflow" && (
 						<Meta label="Waiting on">
-							<span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "#C084FC" }}>
+							<span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--accent-purple)" }}>
 								{shortId(currentRun.state.childWorkflowRunId)}
 								<CopyButton text={currentRun.state.childWorkflowRunId} />
 							</span>

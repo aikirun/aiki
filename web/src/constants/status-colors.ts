@@ -2,25 +2,25 @@ import type { ScheduleStatus } from "@aikirun/types/schedule";
 import type { TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
 
-export const WORKFLOW_RUN_STATUS_COLORS: Record<WorkflowRunStatus, string> = {
-	scheduled: "#A78BFA",
-	queued: "#C084FC",
-	running: "#38BDF8",
-	paused: "#FBBF24",
-	sleeping: "#818CF8",
-	awaiting_event: "#F472B6",
-	awaiting_retry: "#FB923C",
-	awaiting_child_workflow: "#C084FC",
-	cancelled: "#6B7280",
-	completed: "#34D399",
-	failed: "#F87171",
+export const WORKFLOW_RUN_STATUS_COLORS: Record<WorkflowRunStatus, { tint: string; text: string }> = {
+	scheduled: { tint: "#A78BFA", text: "var(--accent-purple)" },
+	queued: { tint: "#C084FC", text: "var(--accent-purple)" },
+	running: { tint: "#38BDF8", text: "var(--accent-sky)" },
+	paused: { tint: "#FBBF24", text: "var(--accent-amber)" },
+	sleeping: { tint: "#818CF8", text: "var(--accent-indigo)" },
+	awaiting_event: { tint: "#F472B6", text: "var(--accent-pink)" },
+	awaiting_retry: { tint: "#FB923C", text: "var(--accent-orange)" },
+	awaiting_child_workflow: { tint: "#C084FC", text: "var(--accent-purple)" },
+	cancelled: { tint: "#6B7280", text: "var(--accent-gray)" },
+	completed: { tint: "#34D399", text: "var(--accent-green)" },
+	failed: { tint: "#F87171", text: "var(--accent-red)" },
 };
 
-export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
-	running: "#38BDF8",
-	awaiting_retry: "#FB923C",
-	completed: "#34D399",
-	failed: "#F87171",
+export const TASK_STATUS_COLORS: Record<TaskStatus, { tint: string; text: string }> = {
+	running: { tint: "#38BDF8", text: "var(--accent-sky)" },
+	awaiting_retry: { tint: "#FB923C", text: "var(--accent-orange)" },
+	completed: { tint: "#34D399", text: "var(--accent-green)" },
+	failed: { tint: "#F87171", text: "var(--accent-red)" },
 };
 
 export const TASK_STATUS_GLYPHS: Record<TaskStatus, string> = {
@@ -31,8 +31,8 @@ export const TASK_STATUS_GLYPHS: Record<TaskStatus, string> = {
 };
 
 export const SCHEDULE_STATUS_COLORS: Record<ScheduleStatus, string> = {
-	active: "#34D399",
-	paused: "#FBBF24",
+	active: "#10B981",
+	paused: "#F59E0B",
 	deleted: "#6B7280",
 };
 

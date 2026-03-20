@@ -210,7 +210,7 @@ function TimelineItem({
 	if (transition.type === "workflow_run") {
 		const { status } = transition.state;
 		const config = WORKFLOW_STATUS_CONFIG[status];
-		const color = WORKFLOW_RUN_STATUS_COLORS[status] ?? "var(--t3)";
+		const color = WORKFLOW_RUN_STATUS_COLORS[status]?.tint ?? "var(--t3)";
 		const isRunning = status === "running";
 
 		let reason: string | undefined;
@@ -222,13 +222,17 @@ function TimelineItem({
 		let inlineContext: React.ReactNode = null;
 
 		if (transition.state.status === "sleeping") {
-			inlineContext = <span style={{ ...contextStyle, color: "#818CF8" }}>{transition.state.sleepName}</span>;
+			inlineContext = (
+				<span style={{ ...contextStyle, color: "var(--accent-indigo)" }}>{transition.state.sleepName}</span>
+			);
 		} else if (transition.state.status === "awaiting_event") {
-			inlineContext = <span style={{ ...contextStyle, color: "#F472B6" }}>{transition.state.eventName}</span>;
+			inlineContext = (
+				<span style={{ ...contextStyle, color: "var(--accent-pink)" }}>{transition.state.eventName}</span>
+			);
 		} else if (transition.state.status === "awaiting_child_workflow") {
 			const childId = transition.state.childWorkflowRunId;
 			inlineContext = (
-				<span style={{ ...contextStyle, color: "#C084FC" }}>
+				<span style={{ ...contextStyle, color: "var(--accent-purple)" }}>
 					child <ChildWorkflowLink id={childId}>{shortId(childId)}</ChildWorkflowLink>
 				</span>
 			);
@@ -258,7 +262,7 @@ function TimelineItem({
 
 	if (transition.type === "task") {
 		const { status } = transition.taskState;
-		const color = TASK_STATUS_COLORS[status] ?? "var(--t3)";
+		const color = TASK_STATUS_COLORS[status]?.tint ?? "var(--t3)";
 		const taskId = transition.taskId;
 
 		const taskName = lookups?.taskById.get(taskId)?.name;

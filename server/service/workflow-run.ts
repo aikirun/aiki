@@ -165,6 +165,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 			eventWaitQueues: eventWaitQueuesByName,
 			childWorkflowRunQueues: childWorkflowRunsByAddress,
 			parentWorkflowRunId: runRow.parentWorkflowRunId ?? undefined,
+			scheduleId: runRow.scheduleId ?? undefined,
 		};
 	}
 

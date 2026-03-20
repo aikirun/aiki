@@ -257,6 +257,7 @@ export interface WorkflowRun<Input = unknown, Output = unknown> {
 	eventWaitQueues: Record<string, EventWaitQueue<unknown>>;
 	childWorkflowRunQueues: Record<string, ChildWorkflowRunQueue>;
 	parentWorkflowRunId?: string;
+	scheduleId?: string;
 }
 
 export interface ChildWorkflowRunQueue {
