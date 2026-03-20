@@ -20,6 +20,12 @@ export function createAuthService(options: AuthOptions) {
 		basePath: "/auth",
 		secret: options.secret,
 		trustedOrigins: options.corsOrigins,
+		advanced: {
+			defaultCookieAttributes: {
+				sameSite: "none",
+				secure: true,
+			},
+		},
 
 		emailAndPassword: {
 			enabled: true,
