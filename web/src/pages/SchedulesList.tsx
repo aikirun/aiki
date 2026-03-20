@@ -601,7 +601,7 @@ function ScheduleRow({
 					</div>
 
 					{/* Input JSON */}
-					{schedule.input !== undefined && Object.keys(schedule.input as Record<string, unknown>).length > 0 && (
+					{schedule.input != null && Object.keys(schedule.input as Record<string, unknown>).length > 0 && (
 						<div style={{ marginBottom: 12 }}>
 							<div
 								style={{
