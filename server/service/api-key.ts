@@ -1,15 +1,18 @@
 import { randomBytes } from "node:crypto";
 import { sha256Sync } from "@aikirun/lib/crypto";
-import type { NamespaceId } from "@aikirun/types/namespace";
+import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import type { Redis } from "ioredis";
-import type { ApiKeyRepository, ApiKeyRowInsert } from "server/infra/db/types";
+import type { NonEmptyArray } from "lib/dist/array";
+import { UnauthorizedError } from "server/errors";
+import type { ApiKeyRepository, ApiKeyRowInsert, Repositories } from "server/infra/db/types";
+import type { NamespaceSessionRequestContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 const PLATFORM = "aiki";
 const PREFIX_LENGTH = 8;
 const SECRET_LENGTH = 32;
-const CACHE_TTL_SECONDS = 24 * 60 * 60;
+const CACHE_TTL_SECONDS = 4 * 60 * 60;
 const CACHE_KEY_PREFIX = `${PLATFORM}:api_key:`;
 
 interface CachedKeyInfo {
@@ -47,15 +50,32 @@ function getCacheKey(keyHash: string): string {
 	return `${CACHE_KEY_PREFIX}${keyHash}`;
 }
 
-export function createApiKeyService(repo: ApiKeyRepository, redis?: Redis) {
+export interface ApiKeyServiceDeps {
+	repos: Pick<Repositories, "apiKey" | "organization" | "namespace">;
+	redis?: Redis;
+}
+
+export function createApiKeyService({ repos, redis }: ApiKeyServiceDeps) {
 	return {
+		async resolveNamespaceRole(context: NamespaceSessionRequestContext): Promise<NamespaceRole> {
+			const organizationRole = await repos.organization.getMemberRole(context.organizationId, context.userId);
+			if (organizationRole === "owner" || organizationRole === "admin") {
+				return "admin";
+			}
+			const namespaceMember = await repos.namespace.getMember(context.namespaceId, context.userId);
+			if (!namespaceMember) {
+				throw new UnauthorizedError("Not a member of this namespace");
+			}
+			return namespaceMember.role;
+		},
+
 		async create(
 			input: Pick<ApiKeyRowInsert, "organizationId" | "namespaceId" | "createdByUserId" | "name" | "expiresAt">
 		) {
 			const { key, keyPrefix } = generateKey();
 			const keyHash = sha256Sync(key);
 
-			const keyInfo = await repo.create({
+			const keyInfo = await repos.apiKey.create({
 				id: ulid(),
 				organizationId: input.organizationId,
 				namespaceId: input.namespaceId,
@@ -92,7 +112,7 @@ export function createApiKeyService(repo: ApiKeyRepository, redis?: Redis) {
 				}
 			}
 
-			const keyInfo = await repo.getByActiveKeyByHash(keyHash);
+			const keyInfo = await repos.apiKey.getByActiveKeyByHash(keyHash);
 			if (!keyInfo) {
 				return null;
 			}
@@ -116,12 +136,28 @@ export function createApiKeyService(repo: ApiKeyRepository, redis?: Redis) {
 			};
 		},
 
-		async list(filters: { organizationId: OrganizationId; namespaceId: NamespaceId }) {
-			return repo.list(filters);
+		async list(filters: { namespaceId: NamespaceId }) {
+			return repos.apiKey.list(filters);
 		},
 
-		async revoke(id: string) {
-			await repo.revoke(id);
+		async revoke(id: string): Promise<string | null> {
+			return repos.apiKey.revoke(id);
+		},
+
+		async revokeByNamespaceId(namespaceId: NamespaceId, txRepo: ApiKeyRepository): Promise<string[]> {
+			return txRepo.revokeByNamespace(namespaceId);
+		},
+
+		async invalidateCacheByHashes(keyHashes: string | NonEmptyArray<string>): Promise<void> {
+			if (redis) {
+				if (Array.isArray(keyHashes)) {
+					const cacheKeys = keyHashes.map(getCacheKey);
+					await redis.del(...cacheKeys);
+				} else {
+					const cacheKey = getCacheKey(keyHashes);
+					await redis.del(cacheKey);
+				}
+			}
 		},
 	};
 }

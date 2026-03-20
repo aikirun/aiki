@@ -1,5 +1,6 @@
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
+import type { OrganizationRole } from "server/infra/db/constants/organization";
 import type { Logger } from "server/infra/logger";
 import { ulid } from "ulidx";
 
@@ -39,6 +40,17 @@ export interface OrganizationSessionRequestContext extends AuthedRequestContextB
 	authMethod: "organization_session";
 	organizationId: OrganizationId;
 	userId: string;
+	organizationRole: OrganizationRole;
+}
+
+export type OrganizationManagerSessionRequestContext = OrganizationSessionRequestContext & {
+	organizationRole: "owner" | "admin";
+};
+export function isOrganizationManager(
+	context: OrganizationSessionRequestContext
+): context is OrganizationManagerSessionRequestContext {
+	const { organizationRole } = context;
+	return organizationRole === "owner" || organizationRole === "admin";
 }
 
 export interface NamespaceSessionRequestContext extends AuthedRequestContextBase {
@@ -117,6 +129,7 @@ export async function createOrganizationRequestContext(params: {
 		authMethod: "organization_session",
 		organizationId: authorization.organizationId,
 		userId: authorization.userId,
+		organizationRole: authorization.organizationRole,
 	};
 }
 

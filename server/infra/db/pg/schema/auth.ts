@@ -1,9 +1,10 @@
 import { API_KEY_STATUSES } from "@aikirun/types/api-key-api";
+import { NAMESPACE_ROLES } from "@aikirun/types/namespace";
 import { sql } from "drizzle-orm";
 import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { timestampMs } from "./timestamp";
-import { NAMESPACE_ROLES, NAMESPACE_STATUSES } from "../../constants/namespace";
+import { NAMESPACE_STATUSES } from "../../constants/namespace";
 import {
 	ORGANIZATION_INVITATION_STATUSES,
 	ORGANIZATION_ROLES,
@@ -58,6 +59,7 @@ export const session = pgTable(
 			columns: [table.userId],
 			foreignColumns: [user.id],
 		}).onDelete("cascade"),
+		index("idx_session_active_namespace_id").on(table.activeNamespaceId),
 	]
 );
 
@@ -244,12 +246,11 @@ export const apiKey = pgTable(
 			columns: [table.createdByUserId],
 			foreignColumns: [user.id],
 		}),
-		uniqueIndex("uqidx_api_key_org_namespace_created_by_user_name").on(
-			table.organizationId,
+		uniqueIndex("uqidx_api_key_namespace_created_by_user_name").on(
 			table.namespaceId,
 			table.createdByUserId,
 			table.name
 		),
-		index("idx_api_key_org_namespace_name").on(table.organizationId, table.namespaceId, table.name),
+		index("idx_api_key_namespace_name").on(table.namespaceId, table.name),
 	]
 );

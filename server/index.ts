@@ -48,7 +48,7 @@ if (import.meta.main) {
 		workflowRunPublisher = createWorkflowRunPublisher(redis);
 	}
 
-	const apiKeyService = createApiKeyService(repos.apiKey, redis);
+	const apiKeyService = createApiKeyService({ repos, redis });
 	const authService = createAuthService({
 		conn,
 		provider: config.database.provider,
@@ -60,10 +60,11 @@ if (import.meta.main) {
 
 	const { authorizeByApiKey, authorizeByOrganizationSession, authorizeByNamespaceSession } = createAuthorizer(
 		apiKeyService,
-		authService
+		authService,
+		repos.organization
 	);
 
-	const namespaceService = createNamespaceService(repos);
+	const namespaceService = createNamespaceService(repos, apiKeyService);
 	const childRunCanceller = createChildRunCanceller();
 	const workflowRunStateMachineService = createWorkflowRunStateMachineService({
 		repos,

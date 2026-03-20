@@ -4,6 +4,7 @@ import { publicContract } from "server/contract/public";
 import { namespaceAuthedContract } from "../contract/namespace-authed";
 import { organizationAuthedContract } from "../contract/organization-authed";
 import {
+	ForbiddenError,
 	InvalidTaskStateTransitionError,
 	InvalidWorkflowRunStateTransitionError,
 	NotFoundError,
@@ -39,6 +40,10 @@ function handleError<T extends ContextBase>(context: T, error: unknown) {
 
 	if (error instanceof UnauthorizedError) {
 		throw new ORPCError("UNAUTHORIZED", { message: error.message });
+	}
+
+	if (error instanceof ForbiddenError) {
+		throw new ORPCError("FORBIDDEN", { message: error.message, status: 403 });
 	}
 
 	if (error instanceof WorkflowRunRevisionConflictError) {

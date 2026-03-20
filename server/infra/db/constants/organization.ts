@@ -7,5 +7,5 @@ export type OrganizationType = (typeof ORGANIZATION_TYPES)[number];
 export const ORGANIZATION_ROLES = ["owner", "admin", "member"] as const;
 export type OrganizationRole = (typeof ORGANIZATION_ROLES)[number];
 
-export const ORGANIZATION_INVITATION_STATUSES = ["pending", "accepted", "rejected", "expired", "cancelled"] as const;
+export const ORGANIZATION_INVITATION_STATUSES = ["pending", "accepted", "rejected", "expired", "canceled"] as const;
 export type OrganizationInvitationStatus = (typeof ORGANIZATION_INVITATION_STATUSES)[number];

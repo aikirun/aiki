@@ -28,7 +28,7 @@ export const client = createORPCClient(namespaceAuthedLink) as unknown as {
 	workflowRun: WorkflowRunApi;
 };
 
-const namespaceManagementClient = createORPCClient(organizationAuthedLink) as unknown as NamespaceApi;
+export const namespaceManagementClient = createORPCClient(organizationAuthedLink) as unknown as NamespaceApi;
 
 export async function createNamespace(name: string) {
 	const data = await namespaceManagementClient.createV1({ name });

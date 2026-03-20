@@ -3,7 +3,9 @@ import { createApiKeyRepository } from "./repository/api-key";
 import { createChildWorkflowRunWaitQueueRepository } from "./repository/child-workflow-run-wait-queue";
 import { createEventWaitQueueRepository } from "./repository/event-wait-queue";
 import { createNamespaceRepository } from "./repository/namespace";
+import { createOrganizationRepository } from "./repository/organization";
 import { createScheduleRepository } from "./repository/schedule";
+import { createSessionRepository } from "./repository/session";
 import { createSleepQueueRepository } from "./repository/sleep-queue";
 import { createStateTransitionRepository } from "./repository/state-transition";
 import { createTaskRepository } from "./repository/task";
@@ -33,6 +35,8 @@ function createRepos(db: PgDb): Omit<Repositories, "transaction"> {
 		childWorkflowRunWaitQueue: createChildWorkflowRunWaitQueueRepository(db),
 		workflowRunOutbox: createWorkflowRunOutboxRepository(db),
 		namespace: createNamespaceRepository(db),
+		organization: createOrganizationRepository(db),
+		session: createSessionRepository(db),
 		apiKey: createApiKeyRepository(db),
 	};
 }

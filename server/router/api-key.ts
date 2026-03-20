@@ -1,14 +1,19 @@
+import { fireAndForget } from "@aikirun/lib";
+import type { NamespaceRole } from "@aikirun/types/namespace";
+
 import { namespaceAuthedImplementer } from "./implementer";
-import { UnauthorizedError } from "../errors";
+import { ForbiddenError, UnauthorizedError } from "../errors";
+import type { NamespaceRequestContext, NamespaceSessionRequestContext } from "../middleware/context";
 import type { ApiKeyService } from "../service/api-key";
 
 export function createApiKeyRouter(apiKeyService: ApiKeyService) {
 	const os = namespaceAuthedImplementer.apiKey;
 
 	const createV1 = os.createV1.handler(async ({ input, context }) => {
-		if (context.authMethod !== "namespace_session") {
-			throw new UnauthorizedError("User not signed in");
-		}
+		assertIsNamespaceSession(context);
+
+		const role = await apiKeyService.resolveNamespaceRole(context);
+		assertIsNamespaceAdmin(role);
 
 		const { key, info } = await apiKeyService.create({
 			organizationId: context.organizationId,
@@ -32,12 +37,9 @@ export function createApiKeyRouter(apiKeyService: ApiKeyService) {
 	});
 
 	const listV1 = os.listV1.handler(async ({ context }) => {
-		if (context.authMethod !== "namespace_session") {
-			throw new UnauthorizedError("User not signed in");
-		}
+		assertIsNamespaceSession(context);
 
 		const keyInfos = await apiKeyService.list({
-			organizationId: context.organizationId,
 			namespaceId: context.namespaceId,
 		});
 
@@ -45,12 +47,28 @@ export function createApiKeyRouter(apiKeyService: ApiKeyService) {
 	});
 
 	const revokeV1 = os.revokeV1.handler(async ({ input, context }) => {
-		if (context.authMethod !== "namespace_session") {
-			throw new UnauthorizedError("User not signed in");
-		}
+		assertIsNamespaceSession(context);
 
-		await apiKeyService.revoke(input.id);
+		const role = await apiKeyService.resolveNamespaceRole(context);
+		assertIsNamespaceAdmin(role);
+
+		const revokedKeyHash = await apiKeyService.revoke(input.id);
+		if (revokedKeyHash) {
+			fireAndForget(apiKeyService.invalidateCacheByHashes(revokedKeyHash), (_error) => {});
+		}
 	});
 
 	return os.router({ createV1, listV1, revokeV1 });
+}
+
+function assertIsNamespaceSession(context: NamespaceRequestContext): asserts context is NamespaceSessionRequestContext {
+	if (context.authMethod !== "namespace_session") {
+		throw new UnauthorizedError("User not signed in");
+	}
+}
+
+export function assertIsNamespaceAdmin(role: NamespaceRole): asserts role is "admin" {
+	if (role !== "admin") {
+		throw new ForbiddenError(`Requires admin role`);
+	}
 }

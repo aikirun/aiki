@@ -1,7 +1,9 @@
+import type { NamespaceRole } from "@aikirun/types/namespace";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 
 import { authClient } from "./client";
+import { namespaceManagementClient } from "../api/client";
 
 interface Organization {
 	id: string;
@@ -14,8 +16,8 @@ interface Namespace {
 	id: string;
 	name: string;
 	organizationId: string;
+	role: NamespaceRole;
 	createdAt: Date;
-	updatedAt?: Date;
 }
 
 interface User {
@@ -73,26 +75,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		}
 	}, [isAuthenticated]);
 
+	const fetchNamespacesForOrg = useCallback(async (_orgId: string): Promise<Namespace[]> => {
+		const result = await namespaceManagementClient.listV1();
+		return result.namespaces.map((ns) => ({
+			id: ns.id,
+			name: ns.name,
+			organizationId: ns.organizationId,
+			role: ns.role,
+			createdAt: new Date(ns.createdAt),
+		}));
+	}, []);
+
 	const refreshNamespaces = useCallback(
 		async (organizationId?: string) => {
 			const orgId = organizationId || activeOrganization?.id;
 			if (!orgId) return;
 			setNamespacesLoading(true);
 			try {
-				const result = await authClient.organization.listTeams({
-					query: {
-						organizationId: orgId,
-					},
-				});
-				if (result.data) {
-					setNamespaces(result.data as Namespace[]);
-				}
+				const newNamespaces = await fetchNamespacesForOrg(orgId);
+				setNamespaces(newNamespaces);
 			} finally {
 				setNamespacesLoading(false);
 				setNamespacesInitialized(true);
 			}
 		},
-		[activeOrganization]
+		[activeOrganization, fetchNamespacesForOrg]
 	);
 
 	const setActiveOrganization = useCallback(
@@ -101,10 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			try {
 				await authClient.organization.setActive({ organizationId: org.id });
 
-				const result = await authClient.organization.listTeams({
-					query: { organizationId: org.id },
-				});
-				const newNamespaces = (result.data || []) as Namespace[];
+				const newNamespaces = await fetchNamespacesForOrg(org.id);
 
 				setActiveOrganizationState(org);
 				setNamespaces(newNamespaces);
@@ -122,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				setNamespacesInitialized(true);
 			}
 		},
-		[queryClient]
+		[queryClient, fetchNamespacesForOrg]
 	);
 
 	const setActiveNamespace = useCallback(
@@ -160,25 +164,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			if (activeOrg && activeOrg.id !== activeOrganization?.id) {
 				setActiveOrganizationState(activeOrg);
 				setNamespacesLoading(true);
-				authClient.organization
-					.listTeams({ query: { organizationId: activeOrg.id } })
-					.then((result) => {
-						if (result.data) {
-							setNamespaces(result.data as Namespace[]);
-						}
+				fetchNamespacesForOrg(activeOrg.id)
+					.then((newNamespaces) => {
+						setNamespaces(newNamespaces);
 					})
 					.catch((_err) => {
-						// console.error("Failed to fetch namespaces:", err);
+						// silently fail — user will see empty state
 					})
 					.finally(() => {
 						setNamespacesLoading(false);
 						setNamespacesInitialized(true);
 					});
+			} else if (!activeOrg) {
+				// activeOrganizationId points to an org the user is no longer a member of.
+				// Fall back to the first available org unless we've already resolved to a valid one.
+				const currentStillValid = activeOrganization && organizations.some((o) => o.id === activeOrganization.id);
+				if (!currentStillValid) {
+					setActiveOrganization(organizations[0]);
+				}
 			}
 		} else if (organizations.length > 0 && !activeOrganization) {
 			setActiveOrganization(organizations[0]);
 		}
-	}, [session?.session?.activeOrganizationId, organizations, activeOrganization, setActiveOrganization]);
+	}, [
+		session?.session?.activeOrganizationId,
+		organizations,
+		activeOrganization,
+		setActiveOrganization,
+		fetchNamespacesForOrg,
+	]);
 
 	useEffect(() => {
 		const activeTeamId = (session?.session as { activeTeamId?: string } | undefined)?.activeTeamId;
@@ -186,6 +200,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			const activeNs = namespaces.find((ns) => ns.id === activeTeamId);
 			if (activeNs) {
 				setActiveNamespaceState(activeNs);
+			} else {
+				// activeTeamId doesn't match any namespace in the filtered list (e.g. namespace
+				// was soft-deleted, or session references old namespace after org invite accept).
+				// Fall back to the first available namespace.
+				setActiveNamespace(namespaces[0]);
 			}
 		} else if (namespaces.length > 0 && !activeNamespace) {
 			setActiveNamespace(namespaces[0]);

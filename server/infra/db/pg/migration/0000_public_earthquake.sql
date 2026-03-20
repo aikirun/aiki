@@ -17,7 +17,7 @@ CREATE TYPE "public"."workflow_source" AS ENUM('user', 'system');--> statement-b
 CREATE TYPE "public"."api_key_status" AS ENUM('active', 'revoked', 'expired');--> statement-breakpoint
 CREATE TYPE "public"."namespace_role" AS ENUM('admin', 'member', 'viewer');--> statement-breakpoint
 CREATE TYPE "public"."namespace_status" AS ENUM('active', 'suspended', 'deleted');--> statement-breakpoint
-CREATE TYPE "public"."organization_invitation_status" AS ENUM('pending', 'accepted', 'rejected', 'expired', 'cancelled');--> statement-breakpoint
+CREATE TYPE "public"."organization_invitation_status" AS ENUM('pending', 'accepted', 'rejected', 'expired', 'canceled');--> statement-breakpoint
 CREATE TYPE "public"."organization_role" AS ENUM('owner', 'admin', 'member');--> statement-breakpoint
 CREATE TYPE "public"."organization_status" AS ENUM('active', 'suspended', 'deleted');--> statement-breakpoint
 CREATE TYPE "public"."organization_type" AS ENUM('personal', 'team');--> statement-breakpoint
@@ -331,11 +331,12 @@ CREATE INDEX "idx_workflow_run_outbox_claim_stale" ON "workflow_run_outbox" USIN
 CREATE INDEX "idx_workflow_run_outbox_status_created" ON "workflow_run_outbox" USING btree ("status","created_at");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_outbox_status_updated" ON "workflow_run_outbox" USING btree ("status","updated_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_account_user_provider" ON "account" USING btree ("user_id","provider_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "uqidx_api_key_org_namespace_created_by_user_name" ON "api_key" USING btree ("organization_id","namespace_id","created_by_user_id","name");--> statement-breakpoint
-CREATE INDEX "idx_api_key_org_namespace_name" ON "api_key" USING btree ("organization_id","namespace_id","name");--> statement-breakpoint
+CREATE UNIQUE INDEX "uqidx_api_key_namespace_created_by_user_name" ON "api_key" USING btree ("namespace_id","created_by_user_id","name");--> statement-breakpoint
+CREATE INDEX "idx_api_key_namespace_name" ON "api_key" USING btree ("namespace_id","name");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_namespace_org_name" ON "namespace" USING btree ("organization_id","name");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_namespace_member_namespace_user" ON "namespace_member" USING btree ("namespace_id","user_id");--> statement-breakpoint
 CREATE INDEX "idx_namespace_member_user_id" ON "namespace_member" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_org_invitation_pending_email_org_namespace" ON "organization_invitation" USING btree ("email","organization_id","namespace_id") WHERE "organization_invitation"."status" = 'pending';--> statement-breakpoint
 CREATE UNIQUE INDEX "uqidx_org_member_org_user" ON "organization_member" USING btree ("organization_id","user_id");--> statement-breakpoint
-CREATE INDEX "idx_org_member_user_id" ON "organization_member" USING btree ("user_id");
+CREATE INDEX "idx_org_member_user_id" ON "organization_member" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_session_active_namespace_id" ON "session" USING btree ("active_namespace_id");

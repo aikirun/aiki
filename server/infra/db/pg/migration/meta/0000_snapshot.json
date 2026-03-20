@@ -1,5 +1,5 @@
 {
-	"id": "e7d7b4bb-0ced-4efb-aebd-e59f10f77087",
+	"id": "a0cb9ab0-f8d7-47e0-9514-11d8dfd56d4a",
 	"prevId": "00000000-0000-0000-0000-000000000000",
 	"version": "7",
 	"dialect": "postgresql",
@@ -1821,15 +1821,9 @@
 				}
 			},
 			"indexes": {
-				"uqidx_api_key_org_namespace_created_by_user_name": {
-					"name": "uqidx_api_key_org_namespace_created_by_user_name",
+				"uqidx_api_key_namespace_created_by_user_name": {
+					"name": "uqidx_api_key_namespace_created_by_user_name",
 					"columns": [
-						{
-							"expression": "organization_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						},
 						{
 							"expression": "namespace_id",
 							"isExpression": false,
@@ -1854,15 +1848,9 @@
 					"method": "btree",
 					"with": {}
 				},
-				"idx_api_key_org_namespace_name": {
-					"name": "idx_api_key_org_namespace_name",
+				"idx_api_key_namespace_name": {
+					"name": "idx_api_key_namespace_name",
 					"columns": [
-						{
-							"expression": "organization_id",
-							"isExpression": false,
-							"asc": true,
-							"nulls": "last"
-						},
 						{
 							"expression": "namespace_id",
 							"isExpression": false,
@@ -2494,7 +2482,23 @@
 					"default": "now()"
 				}
 			},
-			"indexes": {},
+			"indexes": {
+				"idx_session_active_namespace_id": {
+					"name": "idx_session_active_namespace_id",
+					"columns": [
+						{
+							"expression": "active_namespace_id",
+							"isExpression": false,
+							"asc": true,
+							"nulls": "last"
+						}
+					],
+					"isUnique": false,
+					"concurrently": false,
+					"method": "btree",
+					"with": {}
+				}
+			},
 			"foreignKeys": {
 				"fk_session_user_id": {
 					"name": "fk_session_user_id",
@@ -2753,7 +2757,7 @@
 		"public.organization_invitation_status": {
 			"name": "organization_invitation_status",
 			"schema": "public",
-			"values": ["pending", "accepted", "rejected", "expired", "cancelled"]
+			"values": ["pending", "accepted", "rejected", "expired", "canceled"]
 		},
 		"public.organization_role": {
 			"name": "organization_role",

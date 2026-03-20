@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { client } from "../api/client";
 import { useApiKeys } from "../api/hooks";
+import { useAuth } from "../auth/AuthProvider";
 import { RelativeTime } from "../components/common/RelativeTime";
 import { API_KEY_STATUS_COLORS } from "../constants/status-colors";
 
@@ -23,7 +24,10 @@ const STATUS_LABELS: Record<ApiKeyStatus, string> = {
 
 export function ApiKeys() {
 	const { data, isLoading } = useApiKeys();
+	const { activeNamespace } = useAuth();
 	const [state, setState] = useState<PageState>({ mode: "idle" });
+
+	const canManageKeys = activeNamespace?.role === "admin";
 
 	const handleKeyCreated = (apiKey: string) => {
 		setState({ mode: "revealed", key: apiKey });
@@ -32,7 +36,7 @@ export function ApiKeys() {
 	const showCreateForm = state.mode === "creating";
 	const revealedKey = state.mode === "revealed" ? state.key : null;
 	// The "Create key" button is hidden while the form is open or a key is being revealed
-	const showCreateButton = state.mode === "idle";
+	const showCreateButton = canManageKeys && state.mode === "idle";
 
 	return (
 		<div className="space-y-8" style={{ paddingTop: 24 }}>
@@ -103,7 +107,7 @@ export function ApiKeys() {
 				) : (
 					<div className="space-y-2">
 						{data.keyInfos.map((apiKey) => (
-							<ApiKeyRow key={apiKey.id} apiKey={apiKey} />
+							<ApiKeyRow key={apiKey.id} apiKey={apiKey} canManage={canManageKeys} />
 						))}
 					</div>
 				)}
@@ -345,7 +349,7 @@ function KeyRevealInline({ apiKey, onDismiss }: { apiKey: string; onDismiss: () 
 	);
 }
 
-function ApiKeyRow({ apiKey }: { apiKey: ApiKeyInfo }) {
+function ApiKeyRow({ apiKey, canManage }: { apiKey: ApiKeyInfo; canManage: boolean }) {
 	const queryClient = useQueryClient();
 	const [isRevoking, setIsRevoking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -435,7 +439,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeyInfo }) {
 
 			{error && <span style={{ fontSize: 11, color: "#F87171", flexShrink: 0 }}>{error}</span>}
 
-			{apiKey.status === "active" && (
+			{canManage && apiKey.status === "active" && (
 				<button
 					type="button"
 					onClick={handleRevoke}

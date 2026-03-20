@@ -1,5 +1,5 @@
 import { type FormEvent, type KeyboardEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../auth/AuthProvider";
 import { authClient } from "../../auth/client";
@@ -8,7 +8,13 @@ import { FormInput } from "../../components/auth/FormInput";
 
 export function SignIn() {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const { refetchSession } = useAuth();
+
+	// Extract and validate the redirect param — only allow same-origin paths to prevent open redirect
+	const redirectParam = new URLSearchParams(location.search).get("redirect");
+	const safeRedirect = redirectParam?.startsWith("/") ? redirectParam : null;
+
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
@@ -32,7 +38,7 @@ export function SignIn() {
 
 			await refetchSession();
 
-			navigate("/");
+			navigate(safeRedirect ?? "/");
 		} catch {
 			setError("An unexpected error occurred");
 		} finally {
@@ -109,7 +115,10 @@ export function SignIn() {
 
 				<p style={{ textAlign: "center", fontSize: 13, color: "var(--t2)" }}>
 					Don't have an account?{" "}
-					<Link to="/auth/sign-up" style={{ color: "#667eea", fontWeight: 600, textDecoration: "none" }}>
+					<Link
+						to={safeRedirect ? `/auth/sign-up?redirect=${encodeURIComponent(safeRedirect)}` : "/auth/sign-up"}
+						style={{ color: "#667eea", fontWeight: 600, textDecoration: "none" }}
+					>
 						Sign up
 					</Link>
 				</p>

@@ -1,5 +1,5 @@
 import { type FormEvent, type KeyboardEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { createNamespace } from "../../api/client";
 import { useAuth } from "../../auth/AuthProvider";
@@ -18,7 +18,13 @@ function generateSlug(email: string): string {
 
 export function SignUp() {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const { refetchSession, refreshOrganizations, refreshNamespaces, setActiveNamespace } = useAuth();
+
+	// Extract and validate the redirect param — only allow same-origin paths to prevent open redirect
+	const redirectParam = new URLSearchParams(location.search).get("redirect");
+	const safeRedirect = redirectParam?.startsWith("/") ? redirectParam : null;
+
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
@@ -71,7 +77,9 @@ export function SignUp() {
 			await refreshNamespaces(organizationId);
 			await setActiveNamespace(namespaceResult.namespace);
 
-			navigate("/");
+			// If an invite redirect is present, go there so the user can accept the invitation.
+			// better-auth will switch the active org to the invited one upon acceptance.
+			navigate(safeRedirect ?? "/");
 		} catch {
 			setError("An unexpected error occurred");
 		} finally {
@@ -154,7 +162,10 @@ export function SignUp() {
 
 				<p style={{ textAlign: "center", fontSize: 13, color: "var(--t2)" }}>
 					Already have an account?{" "}
-					<Link to="/auth/sign-in" style={{ color: "#667eea", fontWeight: 600, textDecoration: "none" }}>
+					<Link
+						to={safeRedirect ? `/auth/sign-in?redirect=${encodeURIComponent(safeRedirect)}` : "/auth/sign-in"}
+						style={{ color: "#667eea", fontWeight: 600, textDecoration: "none" }}
+					>
 						Sign in
 					</Link>
 				</p>

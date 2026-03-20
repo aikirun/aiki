@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { createNamespace } from "../api/client";
+import { createNamespace, namespaceManagementClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { authClient } from "../auth/client";
 import { getNamespaceDotColor } from "../constants/namespace";
@@ -41,6 +41,8 @@ type PageState =
 	| { mode: "creating-namespace" }
 	| { mode: "confirming-remove"; memberId: string };
 
+type SettingsTab = "members" | "namespaces";
+
 // --- Main Component ---
 
 export function OrganizationSettings() {
@@ -50,6 +52,7 @@ export function OrganizationSettings() {
 	const [orgData, setOrgData] = useState<FullOrganization | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [state, setState] = useState<PageState>({ mode: "idle" });
+	const [activeTab, setActiveTab] = useState<SettingsTab>("members");
 
 	// Handle query params for create flows
 	useEffect(() => {
@@ -58,6 +61,7 @@ export function OrganizationSettings() {
 			setState({ mode: "creating-org" });
 			setSearchParams({}, { replace: true });
 		} else if (create === "namespace") {
+			setActiveTab("namespaces");
 			setState({ mode: "creating-namespace" });
 			setSearchParams({}, { replace: true });
 		}
@@ -109,6 +113,8 @@ export function OrganizationSettings() {
 	const orgType = getOrgType(activeOrganization, orgData);
 	const isPersonal = orgType === "personal";
 	const pendingInvitations = orgData?.invitations.filter((inv) => inv.status === "pending") ?? [];
+	const currentMember = orgData?.members.find((m) => m.userId === user?.id);
+	const canInvite = currentMember?.role === "owner" || currentMember?.role === "admin";
 
 	return (
 		<div className="space-y-6" style={{ paddingTop: 24 }}>
@@ -141,129 +147,181 @@ export function OrganizationSettings() {
 				</div>
 			</Section>
 
-			{/* Members (hidden for personal orgs) */}
+			{/* Tab bar — only for non-personal orgs */}
 			{!isPersonal && (
+				<div
+					style={{
+						display: "flex",
+						gap: 4,
+						background: "var(--s1)",
+						borderRadius: 8,
+						padding: 4,
+						border: "1px solid rgba(255,255,255,0.04)",
+					}}
+				>
+					{(["members", "namespaces"] as const).map((tab) => {
+						const isActive = activeTab === tab;
+						const label = tab === "members" ? `Members${orgData ? ` (${orgData.members.length})` : ""}` : "Namespaces";
+						return (
+							<button
+								key={tab}
+								type="button"
+								onClick={() => {
+									setActiveTab(tab);
+									setState({ mode: "idle" });
+								}}
+								style={{
+									background: isActive ? "var(--s3)" : "transparent",
+									border: "none",
+									borderRadius: 6,
+									color: isActive ? "var(--t0)" : "var(--t3)",
+									fontSize: 12,
+									fontWeight: 600,
+									padding: "5px 13px",
+									cursor: "pointer",
+									fontFamily: "inherit",
+									transition: "background 0.1s, color 0.1s",
+								}}
+							>
+								{label}
+							</button>
+						);
+					})}
+				</div>
+			)}
+
+			{/* Members tab (non-personal orgs only) */}
+			{!isPersonal && activeTab === "members" && (
+				<>
+					{state.mode === "inviting" && (
+						<Section>
+							<div style={{ padding: "8px 16px 14px" }}>
+								<InviteMemberInline
+									organizationId={activeOrganization.id}
+									onInvited={() => {
+										fetchOrgData();
+										setState({ mode: "idle" });
+									}}
+									onCancel={() => setState({ mode: "idle" })}
+								/>
+							</div>
+						</Section>
+					)}
+
+					{canInvite && pendingInvitations.length > 0 && (
+						<Section>
+							<SectionLabel>Pending Invitations</SectionLabel>
+							<div style={{ padding: "0 16px 14px" }} className="space-y-2">
+								{pendingInvitations.map((inv) => (
+									<InvitationRow key={inv.id} invitation={inv} onCancelled={() => fetchOrgData()} />
+								))}
+							</div>
+						</Section>
+					)}
+
+					<Section>
+						<div
+							style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px 0" }}
+						>
+							<SectionLabel style={{ padding: 0 }}>Members{orgData ? ` (${orgData.members.length})` : ""}</SectionLabel>
+							{canInvite && state.mode !== "inviting" && (
+								<ActionButton onClick={() => setState({ mode: "inviting" })}>Invite member</ActionButton>
+							)}
+						</div>
+
+						<div style={{ padding: "8px 16px 14px" }} className="space-y-2">
+							{isLoading ? (
+								<LoadingRows count={2} />
+							) : orgData?.members.length === 0 ? (
+								<EmptyState>No members</EmptyState>
+							) : (
+								orgData?.members.map((member) => {
+									const isOwner = member.role === "owner";
+									const isSelf = member.userId === user?.id;
+									const isConfirmingRemove = state.mode === "confirming-remove" && state.memberId === member.id;
+
+									if (isConfirmingRemove) {
+										return (
+											<ConfirmRemoveRow
+												key={member.id}
+												name={member.user.name}
+												onConfirm={async () => {
+													await authClient.organization.removeMember({
+														memberIdOrEmail: member.id,
+														organizationId: activeOrganization.id,
+													});
+													fetchOrgData();
+													setState({ mode: "idle" });
+												}}
+												onCancel={() => setState({ mode: "idle" })}
+											/>
+										);
+									}
+
+									return (
+										<MemberRow
+											key={member.id}
+											member={member}
+											isOwner={isOwner}
+											isSelf={isSelf}
+											canManage={canInvite}
+											organizationId={activeOrganization.id}
+											onRoleChanged={() => fetchOrgData()}
+											onRemove={() =>
+												setState({
+													mode: "confirming-remove",
+													memberId: member.id,
+												})
+											}
+										/>
+									);
+								})
+							)}
+						</div>
+					</Section>
+				</>
+			)}
+
+			{/* Namespaces tab (or direct content for personal orgs) */}
+			{(isPersonal || activeTab === "namespaces") && (
 				<Section>
 					<div
 						style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px 0" }}
 					>
-						<SectionLabel style={{ padding: 0 }}>Members{orgData ? ` (${orgData.members.length})` : ""}</SectionLabel>
-						{state.mode !== "inviting" && (
-							<ActionButton onClick={() => setState({ mode: "inviting" })}>Invite member</ActionButton>
+						<SectionLabel style={{ padding: 0 }}>Namespaces</SectionLabel>
+						{canInvite && state.mode !== "creating-namespace" && (
+							<ActionButton onClick={() => setState({ mode: "creating-namespace" })}>Create namespace</ActionButton>
 						)}
 					</div>
-
 					<div style={{ padding: "8px 16px 14px" }} className="space-y-2">
-						{/* Invite form */}
-						{state.mode === "inviting" && (
-							<InviteMemberInline
-								organizationId={activeOrganization.id}
-								onInvited={() => {
-									fetchOrgData();
+						{state.mode === "creating-namespace" && (
+							<CreateNamespaceInline
+								onCreated={async () => {
+									await refreshNamespaces();
 									setState({ mode: "idle" });
 								}}
 								onCancel={() => setState({ mode: "idle" })}
 							/>
 						)}
 
-						{/* Member list */}
-						{isLoading ? (
-							<LoadingRows count={2} />
-						) : orgData?.members.length === 0 ? (
-							<EmptyState>No members</EmptyState>
+						{namespaces.length === 0 ? (
+							<EmptyState>No namespaces</EmptyState>
 						) : (
-							orgData?.members.map((member) => {
-								const isOwner = member.role === "owner";
-								const isSelf = member.userId === user?.id;
-								const isConfirmingRemove = state.mode === "confirming-remove" && state.memberId === member.id;
-
-								if (isConfirmingRemove) {
-									return (
-										<ConfirmRemoveRow
-											key={member.id}
-											name={member.user.name}
-											onConfirm={async () => {
-												await authClient.organization.removeMember({
-													memberIdOrEmail: member.id,
-													organizationId: activeOrganization.id,
-												});
-												fetchOrgData();
-												setState({ mode: "idle" });
-											}}
-											onCancel={() => setState({ mode: "idle" })}
-										/>
-									);
-								}
-
-								return (
-									<MemberRow
-										key={member.id}
-										member={member}
-										isOwner={isOwner}
-										isSelf={isSelf}
-										organizationId={activeOrganization.id}
-										onRoleChanged={() => fetchOrgData()}
-										onRemove={() =>
-											setState({
-												mode: "confirming-remove",
-												memberId: member.id,
-											})
-										}
-									/>
-								);
-							})
+							namespaces.map((ns) => (
+								<NamespaceRow
+									key={ns.id}
+									namespace={ns}
+									isLast={namespaces.length <= 1}
+									canManage={canInvite}
+									onRemoved={async () => {
+										await refreshNamespaces();
+									}}
+								/>
+							))
 						)}
 					</div>
 				</Section>
 			)}
-
-			{/* Pending Invitations (hidden for personal orgs) */}
-			{!isPersonal && pendingInvitations.length > 0 && (
-				<Section>
-					<SectionLabel>Pending Invitations</SectionLabel>
-					<div style={{ padding: "0 16px 14px" }} className="space-y-2">
-						{pendingInvitations.map((inv) => (
-							<InvitationRow key={inv.id} invitation={inv} onCancelled={() => fetchOrgData()} />
-						))}
-					</div>
-				</Section>
-			)}
-
-			{/* Namespaces */}
-			<Section>
-				<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px 0" }}>
-					<SectionLabel style={{ padding: 0 }}>Namespaces</SectionLabel>
-					{state.mode !== "creating-namespace" && (
-						<ActionButton onClick={() => setState({ mode: "creating-namespace" })}>Create namespace</ActionButton>
-					)}
-				</div>
-				<div style={{ padding: "8px 16px 14px" }} className="space-y-2">
-					{state.mode === "creating-namespace" && (
-						<CreateNamespaceInline
-							onCreated={async () => {
-								await refreshNamespaces();
-								setState({ mode: "idle" });
-							}}
-							onCancel={() => setState({ mode: "idle" })}
-						/>
-					)}
-
-					{namespaces.length === 0 ? (
-						<EmptyState>No namespaces</EmptyState>
-					) : (
-						namespaces.map((ns) => (
-							<NamespaceRow
-								key={ns.id}
-								namespace={ns}
-								isLast={namespaces.length <= 1}
-								onRemoved={async () => {
-									await refreshNamespaces();
-								}}
-							/>
-						))
-					)}
-				</div>
-			</Section>
 		</div>
 	);
 }
@@ -550,6 +608,7 @@ function MemberRow({
 	member,
 	isOwner,
 	isSelf,
+	canManage,
 	organizationId,
 	onRoleChanged,
 	onRemove,
@@ -557,6 +616,7 @@ function MemberRow({
 	member: Member;
 	isOwner: boolean;
 	isSelf: boolean;
+	canManage: boolean;
 	organizationId: string;
 	onRoleChanged: () => void;
 	onRemove: () => void;
@@ -588,8 +648,8 @@ function MemberRow({
 				<span style={{ fontSize: 11, color: "var(--t3)", marginLeft: 6 }}>({member.user.email})</span>
 			</div>
 			<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-				{isOwner ? (
-					<Badge>owner</Badge>
+				{isOwner || !canManage ? (
+					<Badge>{member.role}</Badge>
 				) : (
 					<select
 						value={member.role}
@@ -610,7 +670,7 @@ function MemberRow({
 						<option value="member">member</option>
 					</select>
 				)}
-				{!isOwner && !isSelf && <DangerButton onClick={onRemove}>Remove</DangerButton>}
+				{canManage && !isOwner && !isSelf && <DangerButton onClick={onRemove}>Remove</DangerButton>}
 			</div>
 			{error && <span style={{ fontSize: 11, color: "#F87171", flexShrink: 0 }}>{error}</span>}
 		</div>
@@ -660,6 +720,7 @@ function ConfirmRemoveRow({
 
 function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; onCancelled: () => void }) {
 	const [isCancelling, setIsCancelling] = useState(false);
+	const [isCopied, setIsCopied] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const handleCancel = async () => {
@@ -677,6 +738,13 @@ function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; on
 		}
 	};
 
+	const handleCopyLink = async () => {
+		const inviteUrl = `${window.location.origin}/invite/${invitation.id}`;
+		await navigator.clipboard.writeText(inviteUrl);
+		setIsCopied(true);
+		setTimeout(() => setIsCopied(false), 2000);
+	};
+
 	return (
 		<div style={rowStyle}>
 			<div style={{ flex: 1, minWidth: 0 }}>
@@ -684,6 +752,26 @@ function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; on
 				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 4 }}>{error}</p>}
 			</div>
 			<span style={{ fontSize: 11, color: "var(--t3)", marginRight: 8, flexShrink: 0 }}>as {invitation.role}</span>
+			<button
+				type="button"
+				onClick={handleCopyLink}
+				style={{
+					background: "none",
+					border: "1px solid rgba(255,255,255,0.12)",
+					borderRadius: 5,
+					padding: "3px 10px",
+					fontSize: 11,
+					fontWeight: 600,
+					color: isCopied ? "#4ADE80" : "var(--t1)",
+					cursor: "pointer",
+					whiteSpace: "nowrap",
+					flexShrink: 0,
+					transition: "color 0.15s, border-color 0.15s",
+					borderColor: isCopied ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.12)",
+				}}
+			>
+				{isCopied ? "Copied!" : "Copy Link"}
+			</button>
 			<DangerButton onClick={handleCancel} disabled={isCancelling}>
 				{isCancelling ? "Cancelling..." : "Cancel"}
 			</DangerButton>
@@ -694,10 +782,12 @@ function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; on
 function NamespaceRow({
 	namespace,
 	isLast,
+	canManage,
 	onRemoved,
 }: {
 	namespace: { id: string; name: string };
 	isLast: boolean;
+	canManage: boolean;
 	onRemoved: () => void;
 }) {
 	const [isRemoving, setIsRemoving] = useState(false);
@@ -708,9 +798,7 @@ function NamespaceRow({
 		setIsRemoving(true);
 		setError(null);
 		try {
-			await authClient.organization.removeTeam({
-				teamId: namespace.id,
-			});
+			await namespaceManagementClient.deleteV1({ id: namespace.id });
 			onRemoved();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to remove namespace");
@@ -744,13 +832,15 @@ function NamespaceRow({
 				</span>
 				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 4 }}>{error}</p>}
 			</div>
-			<DangerButton
-				onClick={handleRemove}
-				disabled={isLast || isRemoving}
-				title={isLast ? "Cannot remove the last namespace" : undefined}
-			>
-				{isRemoving ? "Removing..." : "Remove"}
-			</DangerButton>
+			{canManage && (
+				<DangerButton
+					onClick={handleRemove}
+					disabled={isLast || isRemoving}
+					title={isLast ? "Cannot remove the last namespace" : undefined}
+				>
+					{isRemoving ? "Removing..." : "Remove"}
+				</DangerButton>
+			)}
 		</div>
 	);
 }

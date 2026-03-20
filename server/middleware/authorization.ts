@@ -1,7 +1,9 @@
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
+import type { OrganizationRole } from "server/infra/db/constants/organization";
 
 import { UnauthorizedError } from "../errors";
+import type { OrganizationRepository } from "../infra/db/types/organization";
 import type { ApiKeyService } from "../service/api-key";
 import type { AuthService } from "../service/auth";
 
@@ -17,6 +19,7 @@ export interface OrganizationSessionAuthorization {
 	method: "organization_session";
 	organizationId: OrganizationId;
 	userId: string;
+	organizationRole: OrganizationRole;
 }
 
 export interface NamespaceSessionAuthorization {
@@ -39,7 +42,11 @@ function extractBearerToken(headers: Headers): string | null {
 	return null;
 }
 
-export function createAuthorizer(apiKeyService: ApiKeyService, authService: AuthService) {
+export function createAuthorizer(
+	apiKeyService: ApiKeyService,
+	authService: AuthService,
+	organizationRepo: OrganizationRepository
+) {
 	async function authorizeByApiKey(request: Request): Promise<ApiKeyAuthorization> {
 		const apiKey = extractBearerToken(request.headers);
 		if (!apiKey) {
@@ -69,10 +76,16 @@ export function createAuthorizer(apiKeyService: ApiKeyService, authService: Auth
 			throw new UnauthorizedError("No active organization selected");
 		}
 
+		const organizationRole = await organizationRepo.getMemberRole(activeOrganizationId, session.session.userId);
+		if (!organizationRole) {
+			throw new UnauthorizedError("Not a member of this organization");
+		}
+
 		return {
 			method: "organization_session",
 			organizationId: activeOrganizationId as OrganizationId,
 			userId: session.session.userId,
+			organizationRole: organizationRole,
 		};
 	}
 
@@ -101,8 +114,8 @@ export function createAuthorizer(apiKeyService: ApiKeyService, authService: Auth
 	}
 
 	return {
-		authorizeByApiKey,
-		authorizeByNamespaceSession,
-		authorizeByOrganizationSession,
+		authorizeByApiKey: authorizeByApiKey,
+		authorizeByOrganizationSession: authorizeByOrganizationSession,
+		authorizeByNamespaceSession: authorizeByNamespaceSession,
 	};
 }

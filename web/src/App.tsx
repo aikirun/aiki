@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { NotFound } from "./components/common/NotFound";
 import { AppShell } from "./components/layout/AppShell";
 import { SettingsLayout } from "./components/layout/SettingsLayout";
+import { AcceptInvitation } from "./pages/AcceptInvitation";
 import { ApiKeys } from "./pages/ApiKeys";
 import { SignIn } from "./pages/auth/SignIn";
 import { SignUp } from "./pages/auth/SignUp";
@@ -20,6 +21,9 @@ export default function App() {
 			{/* Public auth routes */}
 			<Route path="/auth/sign-in" element={<SignIn />} />
 			<Route path="/auth/sign-up" element={<SignUp />} />
+
+			{/* Public: invitation acceptance — handles its own auth redirect logic */}
+			<Route path="/invite/:invitationId" element={<AcceptInvitation />} />
 
 			{/* Onboarding routes - authenticated but may not have org/namespace */}
 			<Route

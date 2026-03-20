@@ -33,6 +33,11 @@ export function createAuthService(options: AuthOptions) {
 
 		plugins: [
 			organization({
+				organizationHooks: {
+					beforeDeleteTeam: async () => {
+						throw new Error("Namespaces cannot be hard-deleted");
+					},
+				},
 				teams: {
 					enabled: true,
 					defaultTeam: {

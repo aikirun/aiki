@@ -5,15 +5,15 @@
 		{
 			"idx": 0,
 			"version": "7",
-			"when": 1773807447808,
-			"tag": "0000_fluffy_james_howlett",
+			"when": 1774042757533,
+			"tag": "0000_public_earthquake",
 			"breakpoints": true
 		},
 		{
 			"idx": 1,
 			"version": "7",
-			"when": 1773807489569,
-			"tag": "0001_serious_calypso",
+			"when": 1774042766633,
+			"tag": "0001_windy_darwin",
 			"breakpoints": true
 		}
 	]
