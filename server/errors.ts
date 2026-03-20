@@ -30,6 +30,13 @@ export class ForbiddenError extends Error {
 	}
 }
 
+export class ConflictError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "ConflictError";
+	}
+}
+
 export class WorkflowRunRevisionConflictError extends Error {
 	public readonly workflowRunId: WorkflowRunId;
 	public readonly expectedRevision: number;

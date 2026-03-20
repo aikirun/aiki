@@ -1,5 +1,6 @@
 import type { NamespaceRole } from "@aikirun/types/namespace";
 import { and, eq } from "drizzle-orm";
+import { ConflictError } from "server/errors";
 
 import type { PgDb } from "../provider";
 import { namespace, namespaceMember } from "../schema";
@@ -13,11 +14,10 @@ export type NamespaceRowWithRole = NamespaceRow & { role: NamespaceRole };
 export function createNamespaceRepository(db: PgDb) {
 	return {
 		async create(namespaceParams: NamespaceRowInsert & { id: string }): Promise<NamespaceRow> {
-			const [createdNamespace] = await db.insert(namespace).values(namespaceParams).returning();
+			const [createdNamespace] = await db.insert(namespace).values(namespaceParams).onConflictDoNothing().returning();
 
 			if (!createdNamespace) {
-				// TODO: return 409 on conflict
-				throw new Error("Failed to create namespace");
+				throw new ConflictError(`Namespace with name "${namespaceParams.name}" already exists`);
 			}
 
 			return createdNamespace;
