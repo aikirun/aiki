@@ -7,13 +7,15 @@ import { authClient } from "../../auth/client";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 import { FormInput } from "../../components/auth/FormInput";
 
-function generateSlug(email: string): string {
+function generatePersonalSlug(email: string): string {
 	const username = email.split("@")[0] || "user";
-	return username
+	const base = username
 		.toLowerCase()
 		.replace(/[^a-z0-9]/g, "-")
 		.replace(/-+/g, "-")
 		.replace(/^-|-$/g, "");
+	const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 6);
+	return `${base}-${suffix}`;
 }
 
 export function SignUp() {
@@ -54,7 +56,7 @@ export function SignUp() {
 				return;
 			}
 
-			const slug = `personal-${generateSlug(email)}`;
+			const slug = generatePersonalSlug(email);
 			const orgResult = await authClient.organization.create({
 				name: "Personal",
 				slug,
