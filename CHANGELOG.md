@@ -2,6 +2,12 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.23.1
+
+### Improvements
+
+When waiting on run to hit some terminal state, the state transition id is used as a cursor for cutting of history. This cursor should be advanced on every poll so that is cuts of progressively larger chunks of history
+
 ## 0.23.0
 
 ### New Features
