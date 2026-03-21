@@ -247,13 +247,14 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 			: Number.POSITIVE_INFINITY;
 		const retryStrategy: RetryStrategy = { type: "fixed", maxAttempts, delayMs };
 
-		const afterStateTransitionId = this._run.stateTransitionId;
+		let afterStateTransitionId = this._run.stateTransitionId;
 
 		const hasTerminated = async () => {
-			const { terminated } = await this.api.workflowRun.hasTerminatedV1({
+			const { terminated, latestStateTransitionId } = await this.api.workflowRun.hasTerminatedV1({
 				id: this._run.id,
 				afterStateTransitionId,
 			});
+			afterStateTransitionId = latestStateTransitionId;
 			return terminated;
 		};
 

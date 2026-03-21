@@ -567,12 +567,15 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		});
 	}
 
-	async function hasTerminated(
-		context: NamespaceRequestContext,
-		runId: string,
-		afterStateTransitionId: string
-	): Promise<boolean> {
-		return repos.stateTransition.hasTerminated(context.namespaceId, runId, afterStateTransitionId);
+	async function hasTerminated(context: NamespaceRequestContext, runId: string, afterStateTransitionId: string) {
+		const result = await repos.stateTransition.hasTerminated(context.namespaceId, runId, afterStateTransitionId);
+		if (!result.runFound) {
+			throw new NotFoundError(`Workflow run not found: ${runId}`);
+		}
+		return {
+			terminated: result.terminated,
+			latestStateTransitionId: result.latestStateTransitionId,
+		};
 	}
 
 	return {

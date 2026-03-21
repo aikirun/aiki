@@ -313,4 +313,5 @@ export interface WorkflowRunHasTerminatedRequestV1 {
 
 export interface WorkflowRunHasTerminatedResponseV1 {
 	terminated: boolean;
+	latestStateTransitionId: string;
 }

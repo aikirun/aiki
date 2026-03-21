@@ -61,23 +61,35 @@ export function createStateTransitionRepository(db: PgDb) {
 			namespaceId: NamespaceId,
 			workflowRunId: string,
 			afterStateTransitionId: string
-		): Promise<boolean> {
+		): Promise<{ runFound: true; terminated: boolean; latestStateTransitionId: string } | { runFound: false }> {
 			const result = await db
-				.select({ exists: sql<boolean>`true` })
-				.from(stateTransition)
-				.innerJoin(workflowRun, eq(stateTransition.workflowRunId, workflowRun.id))
-				.where(
+				.select({
+					terminalStateTransitionId: stateTransition.id,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+				})
+				.from(workflowRun)
+				.leftJoin(
+					stateTransition,
 					and(
-						eq(workflowRun.id, workflowRunId),
-						eq(workflowRun.namespaceId, namespaceId),
+						eq(stateTransition.workflowRunId, workflowRun.id),
 						eq(stateTransition.type, "workflow_run"),
 						inArray(stateTransition.status, TERMINAL_WORKFLOW_RUN_STATUSES),
 						gt(stateTransition.id, afterStateTransitionId)
 					)
 				)
+				.where(and(eq(workflowRun.id, workflowRunId), eq(workflowRun.namespaceId, namespaceId)))
 				.limit(1);
 
-			return result.length > 0;
+			const row = result[0];
+			if (!row) {
+				return { runFound: false };
+			}
+
+			return {
+				runFound: true,
+				terminated: row.terminalStateTransitionId !== null,
+				latestStateTransitionId: row.latestStateTransitionId,
+			};
 		},
 	};
 }

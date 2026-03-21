@@ -370,6 +370,7 @@ const hasTerminatedV1: ContractProcedure<WorkflowRunHasTerminatedRequestV1, Work
 	.output(
 		type({
 			terminated: "boolean",
+			latestStateTransitionId: "string > 0",
 		})
 	);
 

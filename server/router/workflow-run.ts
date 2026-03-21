@@ -110,8 +110,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	});
 
 	const hasTerminatedV1 = os.hasTerminatedV1.handler(async ({ input: request, context }) => {
-		const terminated = await workflowRunService.hasTerminated(context, request.id, request.afterStateTransitionId);
-		return { terminated };
+		return workflowRunService.hasTerminated(context, request.id, request.afterStateTransitionId);
 	});
 
 	return os.router({
