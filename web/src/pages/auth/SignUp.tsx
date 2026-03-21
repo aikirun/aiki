@@ -1,8 +1,7 @@
 import { type FormEvent, type KeyboardEvent, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { createNamespace } from "../../api/client";
-import { useAuth } from "../../auth/AuthProvider";
 import { authClient } from "../../auth/client";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 import { FormInput } from "../../components/auth/FormInput";
@@ -19,10 +18,7 @@ function generatePersonalSlug(email: string): string {
 }
 
 export function SignUp() {
-	const navigate = useNavigate();
 	const location = useLocation();
-	const { refetchSession, refreshOrganizations, refreshNamespaces, setActiveNamespace } = useAuth();
-
 	// Extract and validate the redirect param — only allow same-origin paths to prevent open redirect
 	const redirectParam = new URLSearchParams(location.search).get("redirect");
 	const safeRedirect = redirectParam?.startsWith("/") ? redirectParam : null;
@@ -72,16 +68,11 @@ export function SignUp() {
 
 			await authClient.organization.setActive({ organizationId });
 
-			const namespaceResult = await createNamespace("main");
+			await createNamespace("main");
 
-			await refetchSession();
-			await refreshOrganizations();
-			await refreshNamespaces(organizationId);
-			await setActiveNamespace(namespaceResult.namespace);
-
-			// If an invite redirect is present, go there so the user can accept the invitation.
-			// better-auth will switch the active org to the invited one upon acceptance.
-			navigate(safeRedirect ?? "/");
+			// Full reload so AuthProvider reinitializes with the new session state.
+			// If an invite redirect is present, the user lands on the acceptance page.
+			window.location.href = safeRedirect ?? "/";
 		} catch {
 			setError("An unexpected error occurred");
 		} finally {
