@@ -42,15 +42,11 @@ export function ProtectedRoute({ children, requireOrganization = true, requireNa
 		return <Navigate to="/onboarding/organization" replace />;
 	}
 
-	if (requireNamespace && activeOrganization && namespaces.length === 0) {
-		return <Navigate to="/onboarding/namespace" replace />;
-	}
-
 	if (requireOrganization && !activeOrganization) {
 		return <LoadingSpinner />;
 	}
 
-	if (requireNamespace && !activeNamespace) {
+	if (requireNamespace && !activeNamespace && namespaces.length > 0) {
 		return <LoadingSpinner />;
 	}
 

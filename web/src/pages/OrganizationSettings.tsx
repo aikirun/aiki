@@ -1,3 +1,5 @@
+import type { NamespaceRole } from "@aikirun/types/namespace";
+import type { NamespaceMemberInfo } from "@aikirun/types/namespace-api";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -52,18 +54,32 @@ export function OrganizationSettings() {
 	const [orgData, setOrgData] = useState<FullOrganization | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [state, setState] = useState<PageState>({ mode: "idle" });
-	const [activeTab, setActiveTab] = useState<SettingsTab>("members");
+	const tabParam = searchParams.get("tab");
+	const [activeTab, setActiveTab] = useState<SettingsTab>(tabParam === "namespaces" ? "namespaces" : "members");
 
 	// Handle query params for create flows
 	useEffect(() => {
 		const create = searchParams.get("create");
 		if (create === "org") {
 			setState({ mode: "creating-org" });
-			setSearchParams({}, { replace: true });
+			setSearchParams(
+				(prev) => {
+					prev.delete("create");
+					return prev;
+				},
+				{ replace: true }
+			);
 		} else if (create === "namespace") {
 			setActiveTab("namespaces");
 			setState({ mode: "creating-namespace" });
-			setSearchParams({}, { replace: true });
+			setSearchParams(
+				(prev) => {
+					prev.delete("create");
+					prev.set("tab", "namespaces");
+					return prev;
+				},
+				{ replace: true }
+			);
 		}
 	}, [searchParams, setSearchParams]);
 
@@ -168,6 +184,13 @@ export function OrganizationSettings() {
 								type="button"
 								onClick={() => {
 									setActiveTab(tab);
+									setSearchParams(
+										(prev) => {
+											prev.set("tab", tab);
+											return prev;
+										},
+										{ replace: true }
+									);
 									setState({ mode: "idle" });
 								}}
 								style={{
@@ -311,8 +334,11 @@ export function OrganizationSettings() {
 								<NamespaceRow
 									key={ns.id}
 									namespace={ns}
+									namespaceRole={ns.role}
 									isLast={namespaces.length <= 1}
 									canManage={canInvite}
+									isPersonal={isPersonal}
+									orgMembers={orgData?.members ?? []}
 									onRemoved={async () => {
 										await refreshNamespaces();
 									}}
@@ -781,17 +807,44 @@ function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; on
 
 function NamespaceRow({
 	namespace,
+	namespaceRole,
 	isLast,
 	canManage,
+	isPersonal,
+	orgMembers,
 	onRemoved,
 }: {
 	namespace: { id: string; name: string };
+	namespaceRole: NamespaceRole;
 	isLast: boolean;
 	canManage: boolean;
+	isPersonal: boolean;
+	orgMembers: Member[];
 	onRemoved: () => void;
 }) {
+	const isNsAdmin = namespaceRole === "admin";
+	const canViewMembers = namespaceRole === "admin" || namespaceRole === "member";
 	const [isRemoving, setIsRemoving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [showMembers, setShowMembers] = useState(false);
+	const [nsMembers, setNsMembers] = useState<NamespaceMemberInfo[] | null>(null);
+	const [membersLoading, setMembersLoading] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
+	const [addUserId, setAddUserId] = useState("");
+	const [addRole, setAddRole] = useState<NamespaceRole>("member");
+
+	const loadMembers = async () => {
+		if (nsMembers !== null) return;
+		setMembersLoading(true);
+		try {
+			const result = await namespaceManagementClient.listMembersV1({ id: namespace.id });
+			setNsMembers(result.members);
+		} catch {
+			setError("Failed to load members");
+		} finally {
+			setMembersLoading(false);
+		}
+	};
 
 	const handleRemove = async () => {
 		if (isLast) return;
@@ -807,40 +860,259 @@ function NamespaceRow({
 		}
 	};
 
+	const handleRemoveMember = async (userId: string) => {
+		setIsSaving(true);
+		setError(null);
+		try {
+			await namespaceManagementClient.removeMembershipV1({ id: namespace.id, userId });
+			setNsMembers((prev) => prev?.filter((m) => m.userId !== userId) ?? null);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to remove member");
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const [pendingAdds, setPendingAdds] = useState<Array<{ userId: string; role: NamespaceRole }>>([]);
+
+	const handleRoleChange = async (userId: string, newRole: NamespaceRole) => {
+		setIsSaving(true);
+		setError(null);
+		try {
+			await namespaceManagementClient.setMembershipV1({
+				id: namespace.id,
+				members: [{ userId, role: newRole }],
+			});
+			setNsMembers((prev) => prev?.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)) ?? null);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to update role");
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const addPendingMember = () => {
+		if (!addUserId) return;
+		if (pendingAdds.some((p) => p.userId === addUserId)) return;
+		setPendingAdds((prev) => [...prev, { userId: addUserId, role: addRole }]);
+		setAddUserId("");
+		setAddRole("member");
+	};
+
+	const removePendingMember = (userId: string) => {
+		setPendingAdds((prev) => prev.filter((p) => p.userId !== userId));
+	};
+
+	const handleSaveNewMembers = async () => {
+		if (pendingAdds.length === 0) return;
+		setIsSaving(true);
+		setError(null);
+		try {
+			await namespaceManagementClient.setMembershipV1({
+				id: namespace.id,
+				members: pendingAdds.map((p) => ({ userId: p.userId, role: p.role })),
+			});
+			setPendingAdds([]);
+			// Reload to get full user info
+			const result = await namespaceManagementClient.listMembersV1({ id: namespace.id });
+			setNsMembers(result.members);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to add members");
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const allAssignedUserIds = [...(nsMembers?.map((m) => m.userId) ?? []), ...pendingAdds.map((p) => p.userId)];
+	const availableOrgMembers = orgMembers.filter((om) => om.role !== "owner" && !allAssignedUserIds.includes(om.userId));
+
 	return (
-		<div style={rowStyle}>
-			<div style={{ flex: 1, minWidth: 0 }}>
-				<span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-					<span
-						style={{
-							width: 7,
-							height: 7,
-							borderRadius: "50%",
-							background: getNamespaceDotColor(namespace.name),
-							flexShrink: 0,
-						}}
-					/>
-					<span
-						style={{
-							fontSize: 12.5,
-							fontFamily: "IBM Plex Mono, ui-monospace, monospace",
-							color: "var(--t1)",
-						}}
-					>
-						{namespace.name}
+		<div>
+			<div style={rowStyle}>
+				<div style={{ flex: 1, minWidth: 0 }}>
+					<span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+						<span
+							style={{
+								width: 7,
+								height: 7,
+								borderRadius: "50%",
+								background: getNamespaceDotColor(namespace.name),
+								flexShrink: 0,
+							}}
+						/>
+						<span
+							style={{
+								fontSize: 12.5,
+								fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+								color: "var(--t1)",
+							}}
+						>
+							{namespace.name}
+						</span>
 					</span>
-				</span>
-				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 4 }}>{error}</p>}
+				</div>
+				<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+					{canViewMembers && !isPersonal && (
+						<button
+							type="button"
+							onClick={() => {
+								setShowMembers((prev) => !prev);
+								loadMembers();
+							}}
+							style={{
+								background: showMembers ? "rgba(102,126,234,0.1)" : "rgba(102,126,234,0.08)",
+								border: `1px solid ${showMembers ? "rgba(102,126,234,0.3)" : "rgba(102,126,234,0.2)"}`,
+								borderRadius: 5,
+								padding: "3px 10px",
+								fontSize: 11,
+								fontWeight: 600,
+								color: "#667eea",
+								cursor: "pointer",
+								whiteSpace: "nowrap",
+								transition: "background 0.15s, border-color 0.15s",
+							}}
+						>
+							{showMembers ? "Hide members" : "Members"}
+						</button>
+					)}
+					{canManage && (
+						<DangerButton
+							onClick={handleRemove}
+							disabled={isLast || isRemoving}
+							title={isLast ? "Cannot remove the last namespace" : undefined}
+						>
+							{isRemoving ? "Removing..." : "Remove"}
+						</DangerButton>
+					)}
+				</div>
 			</div>
-			{canManage && (
-				<DangerButton
-					onClick={handleRemove}
-					disabled={isLast || isRemoving}
-					title={isLast ? "Cannot remove the last namespace" : undefined}
-				>
-					{isRemoving ? "Removing..." : "Remove"}
-				</DangerButton>
+			{showMembers && canViewMembers && (
+				<div style={{ padding: "8px 12px 10px" }}>
+					{membersLoading ? (
+						<span style={{ fontSize: 11, color: "var(--t3)" }}>Loading...</span>
+					) : (
+						<>
+							{nsMembers && nsMembers.length === 0 && (
+								<p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 8 }}>No members</p>
+							)}
+							{nsMembers?.map((m) => (
+								<div key={m.userId} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+									<span style={{ flex: 1, fontSize: 11, color: "var(--t1)" }}>
+										{m.name || m.email}
+										{m.name && <span style={{ color: "var(--t3)", marginLeft: 4 }}>({m.email})</span>}
+									</span>
+									{isNsAdmin ? (
+										<>
+											<select
+												value={m.role}
+												onChange={(e) => handleRoleChange(m.userId, e.target.value as NamespaceRole)}
+												disabled={isSaving}
+												style={{
+													background: "var(--s2)",
+													border: "1px solid rgba(255,255,255,0.08)",
+													borderRadius: 5,
+													padding: "2px 6px",
+													fontSize: 10,
+													color: "var(--t1)",
+													cursor: isSaving ? "not-allowed" : "pointer",
+													fontFamily: "inherit",
+												}}
+											>
+												<option value="admin">admin</option>
+												<option value="member">member</option>
+												<option value="viewer">viewer</option>
+											</select>
+											<DangerButton onClick={() => handleRemoveMember(m.userId)} disabled={isSaving}>
+												Remove
+											</DangerButton>
+										</>
+									) : (
+										<Badge>{m.role}</Badge>
+									)}
+								</div>
+							))}
+							{isNsAdmin && pendingAdds.length > 0 && (
+								<div style={{ marginTop: 8, marginBottom: 4 }}>
+									<p
+										style={{
+											fontSize: 10,
+											fontWeight: 700,
+											color: "var(--t3)",
+											marginBottom: 4,
+											letterSpacing: "0.05em",
+										}}
+									>
+										PENDING
+									</p>
+									{pendingAdds.map((p) => {
+										const om = orgMembers.find((m) => m.userId === p.userId);
+										return (
+											<div key={p.userId} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+												<span style={{ flex: 1, fontSize: 11, color: "var(--t2)" }}>{om?.user.name ?? p.userId}</span>
+												<Badge>{p.role}</Badge>
+												<button
+													type="button"
+													onClick={() => removePendingMember(p.userId)}
+													style={{
+														background: "none",
+														border: "none",
+														fontSize: 11,
+														color: "var(--t3)",
+														cursor: "pointer",
+														padding: "2px 4px",
+													}}
+												>
+													x
+												</button>
+											</div>
+										);
+									})}
+									<ActionButton onClick={handleSaveNewMembers}>
+										{isSaving ? "Saving..." : `Save (${pendingAdds.length})`}
+									</ActionButton>
+								</div>
+							)}
+							{isNsAdmin && availableOrgMembers.length > 0 && (
+								<div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+									<select
+										value={addUserId}
+										onChange={(e) => setAddUserId(e.target.value)}
+										style={{
+											...inputStyle,
+											flex: 1,
+											fontSize: 11,
+											padding: "4px 8px",
+										}}
+									>
+										<option value="">Add member...</option>
+										{availableOrgMembers.map((om) => (
+											<option key={om.userId} value={om.userId}>
+												{om.user.name} ({om.user.email})
+											</option>
+										))}
+									</select>
+									<select
+										value={addRole}
+										onChange={(e) => setAddRole(e.target.value as NamespaceRole)}
+										style={{
+											...inputStyle,
+											width: 80,
+											fontSize: 11,
+											padding: "4px 8px",
+										}}
+									>
+										<option value="admin">admin</option>
+										<option value="member">member</option>
+										<option value="viewer">viewer</option>
+									</select>
+									<ActionButton onClick={addPendingMember}>Add</ActionButton>
+								</div>
+							)}
+						</>
+					)}
+				</div>
 			)}
+			{error && <p style={{ fontSize: 11, color: "#F87171", padding: "0 12px 4px" }}>{error}</p>}
 		</div>
 	);
 }

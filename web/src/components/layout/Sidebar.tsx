@@ -632,7 +632,6 @@ function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
 
 function NamespaceSwitcher({ collapsed }: { collapsed: boolean }) {
 	const { namespaces, activeNamespace, setActiveNamespace } = useAuth();
-	const navigate = useNavigate();
 	const [isOpen, setIsOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 
@@ -719,16 +718,6 @@ function NamespaceSwitcher({ collapsed }: { collapsed: boolean }) {
 							</span>
 						</DropdownItem>
 					))}
-					<DropdownDivider />
-					<DropdownItem
-						selected={false}
-						onClick={() => {
-							setIsOpen(false);
-							navigate("/settings/organization?create=namespace");
-						}}
-					>
-						<span style={{ color: "var(--t2)" }}>+ New namespace</span>
-					</DropdownItem>
 				</Dropdown>
 			)}
 		</div>

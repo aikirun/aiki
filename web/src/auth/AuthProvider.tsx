@@ -15,7 +15,6 @@ interface Organization {
 interface Namespace {
 	id: string;
 	name: string;
-	organizationId: string;
 	role: NamespaceRole;
 	createdAt: Date;
 }
@@ -80,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		return result.namespaces.map((ns) => ({
 			id: ns.id,
 			name: ns.name,
-			organizationId: ns.organizationId,
 			role: ns.role,
 			createdAt: new Date(ns.createdAt),
 		}));

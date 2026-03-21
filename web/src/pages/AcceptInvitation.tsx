@@ -145,24 +145,9 @@ export function AcceptInvitation() {
 				return;
 			}
 
-			// better-auth sets the newly joined org as active on accept.
-			// Check whether the org has any namespaces (teams) to determine where to send the user.
-			const memberData = result.data as unknown as { member?: { organizationId?: string } } | null;
-			const orgId = memberData?.member?.organizationId;
-
-			if (orgId) {
-				const teamsResult = await authClient.organization.listTeams({
-					query: { organizationId: orgId },
-				});
-				const hasNamespaces = teamsResult.data && teamsResult.data.length > 0;
-
-				// Force a full reload so AuthProvider re-initialises with the updated session/active org.
-				// Navigate to namespace creation if the org has no namespaces yet.
-				window.location.href = hasNamespaces ? "/" : "/onboarding/namespace";
-			} else {
-				// Fallback: reload to root and let AuthProvider/ProtectedRoute resolve the correct destination
-				window.location.href = "/";
-			}
+			// Force a full reload so AuthProvider re-initialises with the updated session/active org.
+			// ProtectedRoute will handle the case where the user has no namespaces.
+			window.location.href = "/";
 		} catch (err) {
 			setActionError(err instanceof Error ? err.message : "An unexpected error occurred.");
 			// Restore ready state so the user can retry — re-fetch invitation details

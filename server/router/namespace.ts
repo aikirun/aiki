@@ -1,3 +1,4 @@
+import { isNonEmptyArray } from "@aikirun/lib";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { ForbiddenError } from "server/errors";
 import {
@@ -21,7 +22,7 @@ export function createNamespaceRouter(namespaceService: NamespaceService) {
 	});
 
 	const listV1 = os.listV1.handler(async ({ context }) => {
-		const namespaces = await namespaceService.listNamespacesForUser(context);
+		const namespaces = await namespaceService.listNamespaces(context);
 		return { namespaces };
 	});
 
@@ -30,10 +31,48 @@ export function createNamespaceRouter(namespaceService: NamespaceService) {
 		await namespaceService.softDeleteNamespaceId(context, input.id as NamespaceId);
 	});
 
+	const listForUserV1 = os.listForUserV1.handler(async ({ input, context }) => {
+		assertIsOrganizationManager(context);
+		const namespaces = await namespaceService.listNamespacesForUser(context, input.userId);
+		return { namespaces };
+	});
+
+	const setMembershipV1 = os.setMembershipV1.handler(async ({ input, context }) => {
+		if (!isNonEmptyArray(input.members)) {
+			return;
+		}
+		const namespaceRole = await namespaceService.resolveRole(context, input.id as NamespaceId);
+		if (namespaceRole !== "admin") {
+			throw new ForbiddenError("Requires namespace admin role");
+		}
+		await namespaceService.setMembership(context, input.id as NamespaceId, input.members);
+	});
+
+	const removeMembershipV1 = os.removeMembershipV1.handler(async ({ input, context }) => {
+		const namespaceRole = await namespaceService.resolveRole(context, input.id as NamespaceId);
+		if (namespaceRole !== "admin") {
+			throw new ForbiddenError("Requires namespace admin role");
+		}
+		await namespaceService.removeMembership(context, input.id as NamespaceId, input.userId);
+	});
+
+	const listMembersV1 = os.listMembersV1.handler(async ({ input, context }) => {
+		const namespaceRole = await namespaceService.resolveRole(context, input.id as NamespaceId);
+		if (namespaceRole !== "admin" && namespaceRole !== "member") {
+			throw new ForbiddenError("Requires namespace admin/member role");
+		}
+		const members = await namespaceService.listMembers(context, input.id as NamespaceId);
+		return { members };
+	});
+
 	return os.router({
 		createV1,
 		listV1,
 		deleteV1,
+		listForUserV1,
+		setMembershipV1,
+		removeMembershipV1,
+		listMembersV1,
 	});
 }
 

@@ -1,9 +1,12 @@
+import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceRole } from "@aikirun/types/namespace";
-import { and, eq } from "drizzle-orm";
+import type { NamespaceMemberInfo, NamespaceMemberInput } from "@aikirun/types/namespace-api";
+import { and, eq, sql } from "drizzle-orm";
 import { ConflictError } from "server/errors";
+import { ulid } from "ulidx";
 
 import type { PgDb } from "../provider";
-import { namespace, namespaceMember } from "../schema";
+import { namespace, namespaceMember, user } from "../schema";
 
 export type NamespaceRow = typeof namespace.$inferSelect;
 export type NamespaceRowInsert = Pick<typeof namespace.$inferInsert, "name" | "organizationId">;
@@ -13,9 +16,16 @@ export type NamespaceRowWithRole = NamespaceRow & { role: NamespaceRole };
 
 export function createNamespaceRepository(db: PgDb) {
 	return {
-		async create(namespaceParams: NamespaceRowInsert & { id: string }): Promise<NamespaceRow> {
-			const [createdNamespace] = await db.insert(namespace).values(namespaceParams).onConflictDoNothing().returning();
-
+		async create(namespaceParams: NamespaceRowInsert): Promise<NamespaceRow> {
+			const [createdNamespace] = await db
+				.insert(namespace)
+				.values({ ...namespaceParams, id: ulid() })
+				.onConflictDoUpdate({
+					target: [namespace.organizationId, namespace.name],
+					set: { status: "active" },
+					where: eq(namespace.status, "deleted"),
+				})
+				.returning();
 			if (!createdNamespace) {
 				throw new ConflictError(`Namespace with name "${namespaceParams.name}" already exists`);
 			}
@@ -24,7 +34,13 @@ export function createNamespaceRepository(db: PgDb) {
 		},
 
 		async createMember(memberParams: NamespaceMemberRowInsert & { id: string; namespaceId: string }): Promise<void> {
-			await db.insert(namespaceMember).values(memberParams);
+			await db
+				.insert(namespaceMember)
+				.values(memberParams)
+				.onConflictDoUpdate({
+					target: [namespaceMember.namespaceId, namespaceMember.userId],
+					set: { role: memberParams.role },
+				});
 		},
 
 		async getMember(namespaceId: string, userId: string): Promise<NamespaceMemberRow | null> {
@@ -68,6 +84,48 @@ export function createNamespaceRepository(db: PgDb) {
 
 		async softDelete(namespaceId: string): Promise<void> {
 			await db.update(namespace).set({ status: "deleted" }).where(eq(namespace.id, namespaceId));
+		},
+
+		async upsertMembers(namespaceId: string, members: NonEmptyArray<NamespaceMemberInput>): Promise<void> {
+			await db
+				.insert(namespaceMember)
+				.values(
+					members.map((m) => ({
+						id: ulid(),
+						namespaceId,
+						userId: m.userId,
+						role: m.role,
+					}))
+				)
+				.onConflictDoUpdate({
+					target: [namespaceMember.namespaceId, namespaceMember.userId],
+					set: { role: sql`excluded.role` },
+				});
+		},
+
+		async removeMember(namespaceId: string, userId: string): Promise<void> {
+			await db
+				.delete(namespaceMember)
+				.where(and(eq(namespaceMember.namespaceId, namespaceId), eq(namespaceMember.userId, userId)));
+		},
+
+		async listMembers(namespaceId: string): Promise<NamespaceMemberInfo[]> {
+			const rows = await db
+				.select({
+					userId: namespaceMember.userId,
+					name: user.name,
+					email: user.email,
+					role: namespaceMember.role,
+				})
+				.from(namespaceMember)
+				.innerJoin(user, eq(namespaceMember.userId, user.id))
+				.where(eq(namespaceMember.namespaceId, namespaceId));
+			return rows.map((row) => ({
+				userId: row.userId,
+				name: row.name ?? undefined,
+				email: row.email,
+				role: row.role,
+			}));
 		},
 
 		async countActiveByOrganizationForUpdate(organizationId: string): Promise<number> {

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
+import { useAuth } from "./auth/AuthProvider";
 import { NotFound } from "./components/common/NotFound";
 import { AppShell } from "./components/layout/AppShell";
 import { SettingsLayout } from "./components/layout/SettingsLayout";
@@ -56,7 +57,7 @@ export default function App() {
 				<Route path="/schedules" element={<SchedulesList />} />
 
 				<Route path="/settings" element={<SettingsLayout />}>
-					<Route index element={<Navigate to="api-keys" replace />} />
+					<Route index element={<SettingsRedirect />} />
 					<Route path="api-keys" element={<ApiKeys />} />
 					<Route path="organization" element={<OrganizationSettings />} />
 				</Route>
@@ -69,6 +70,12 @@ export default function App() {
 			</Route>
 		</Routes>
 	);
+}
+
+function SettingsRedirect() {
+	const { activeNamespace } = useAuth();
+	const target = activeNamespace?.role === "admin" ? "api-keys" : "organization";
+	return <Navigate to={target} replace />;
 }
 
 function OldRunRedirect() {

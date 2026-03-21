@@ -194,7 +194,7 @@ export const namespaceMember = pgTable(
 		id: text("id").primaryKey(),
 		namespaceId: text("namespace_id").notNull(),
 		userId: text("user_id").notNull(),
-		role: namespaceRoleEnum("role").notNull(),
+		role: namespaceRoleEnum("role").notNull().default("viewer"),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},

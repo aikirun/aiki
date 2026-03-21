@@ -1,15 +1,26 @@
-import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../auth/AuthProvider";
 
-const TABS = [
-	{ to: "api-keys", label: "API Keys" },
-	{ to: "organization", label: "Organization" },
-] as const;
-
 export function SettingsLayout() {
 	const { activeOrganization, activeNamespace } = useAuth();
+	const location = useLocation();
+	const navigate = useNavigate();
+
+	const isNamespaceAdmin = activeNamespace?.role === "admin";
+
+	const tabs = [
+		...(isNamespaceAdmin ? [{ to: "api-keys", label: "API Keys" }] : []),
+		{ to: "organization", label: "Organization" },
+	];
+
+	// Redirect away from api-keys if the user is no longer an admin (e.g. after org switch)
+	useEffect(() => {
+		if (!isNamespaceAdmin && location.pathname.includes("/settings/api-keys")) {
+			navigate("/settings/organization", { replace: true });
+		}
+	}, [isNamespaceAdmin, location.pathname, navigate]);
 
 	return (
 		<div style={{ maxWidth: 640, padding: "32px 0" }}>
@@ -48,7 +59,7 @@ export function SettingsLayout() {
 					marginBottom: 0,
 				}}
 			>
-				{TABS.map((tab) => (
+				{tabs.map((tab) => (
 					<TabLink key={tab.to} to={tab.to} label={tab.label} />
 				))}
 			</div>
