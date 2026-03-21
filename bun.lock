@@ -17,21 +17,21 @@
     },
     "examples": {
       "name": "@aikirun/examples",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "dependencies": {
         "dotenv": "^16.4.5",
       },
     },
     "lib": {
       "name": "@aikirun/lib",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
     },
     "sdk/client": {
       "name": "@aikirun/client",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.9.3",
@@ -41,7 +41,7 @@
     },
     "sdk/task": {
       "name": "@aikirun/task",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
@@ -50,7 +50,7 @@
     },
     "sdk/worker": {
       "name": "@aikirun/worker",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "dependencies": {
         "@aikirun/client": "workspace:*",
         "@aikirun/types": "workspace:*",
@@ -60,7 +60,7 @@
     },
     "sdk/workflow": {
       "name": "@aikirun/workflow",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@standard-schema/spec": "^1.1.0",
@@ -68,7 +68,7 @@
     },
     "server": {
       "name": "@aikirun/server",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "dependencies": {
         "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
@@ -91,11 +91,11 @@
     },
     "types": {
       "name": "@aikirun/types",
-      "version": "0.22.0",
+      "version": "0.23.0",
     },
     "web": {
       "name": "@aikirun/web",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.4.3",
@@ -859,7 +859,7 @@
 
     "semver": ["semver@7.7.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA=="],
 
-    "set-cookie-parser": ["set-cookie-parser@3.0.1", "", {}, "sha512-n7Z7dXZhJbwuAHhNzkTti6Aw9QDDjZtm3JTpTGATIdNzdQz5GuFs22w90BcvF4INfnrL5xrX3oGsuqO5Dx3A1Q=="],
+    "set-cookie-parser": ["set-cookie-parser@3.1.0", "", {}, "sha512-kjnC1DXBHcxaOaOXBHBeRtltsDG2nUiUni+jP92M9gYdW12rsmx92UsfpH7o5tDRs7I1ZZPSQJQGv3UaRfCiuw=="],
 
     "shebang-command": ["shebang-command@2.0.0", "", { "dependencies": { "shebang-regex": "^3.0.0" } }, "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA=="],
 

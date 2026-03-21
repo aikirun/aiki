@@ -2,6 +2,29 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.23.0
+
+### New Features
+
+- **Organization invite link flow** — Admins can invite users via email and share a copyable invite link. New `AcceptInvitation` page handles the full flow: unauthenticated users are redirected to sign-in/sign-up with the invite URL preserved, then returned to accept after authentication.
+- **Namespace RBAC** — Namespace member operations are now guarded by namespace-level roles instead of requiring org admin:
+  - **Admin**: full member management (add, remove, change roles)
+  - **Member**: read-only view of the member list
+  - **Viewer**: no access to the member panel
+  - Org owners/admins retain implicit namespace admin access
+- **Namespace soft delete** — Namespaces are soft-deleted instead of hard-deleted. Active sessions are cleared and associated API keys are revoked on deletion.
+- **Namespace membership management** — New APIs for managing namespace members: `setMembershipV1`, `removeMembershipV1`, `listMembersV1`, and `listForUserV1`.
+
+### Web UI
+
+- **Organization settings page** — New settings page with tabbed layout (Members / Namespaces) for managing org members, pending invitations, namespace members, and namespace lifecycle.
+- **Invite link UX** — Pending invitations show a "Copy Link" button for easy sharing. Invitation acceptance page displays org name, inviter email, and role.
+- **Role-aware settings** — API Keys tab is hidden for non-namespace-admins.
+
+### Improvements
+
+- **Organization role in auth context** — `OrganizationSessionRequestContext` now carries `organizationRole`, resolved during authorization rather than at each handler.
+
 ## 0.22.0
 
 ### New Features
