@@ -20,13 +20,7 @@ export async function runWithWorker(
 	workflows: WorkflowVersion<any, any, any, any>[],
 	callback: (client: Client<null>) => Promise<void>
 ): Promise<void> {
-	const aikiClient = client({
-		url: "http://localhost:9850",
-		redis: {
-			host: "localhost",
-			port: 6379,
-		},
-	});
+	const aikiClient = client({ url: process.env.AIKI_SERVER_URL ?? "http://localhost:9850" });
 
 	const workerA = worker({
 		name: "worker-A",
