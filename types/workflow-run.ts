@@ -51,10 +51,10 @@ export interface WorkflowReferenceOptions {
 
 export interface WorkflowDefinitionOptions {
 	retry?: RetryStrategy;
-	trigger?: TriggerStrategy;
 }
 
 export interface WorkflowStartOptions extends WorkflowDefinitionOptions {
+	trigger?: TriggerStrategy;
 	reference?: WorkflowReferenceOptions;
 	shard?: string;
 }
