@@ -19,9 +19,7 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"@orpc/client": "^1.9.3",
-		"ioredis": "^5.4.1",
-		"arktype": "^2.1.29"
+		"@orpc/client": "^1.9.3"
 	},
 	"publishConfig": {
 		"access": "public"

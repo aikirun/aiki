@@ -1,20 +1,34 @@
 import { getWorkerConsumerGroupName, getWorkflowStreamName } from "@aikirun/lib/address";
 import { distributeRoundRobin, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aikirun/lib/array";
 import { getRetryParams } from "@aikirun/lib/retry";
+import type { Logger } from "@aikirun/types/client";
 import type {
-	Client,
-	Logger,
-	RedisClient,
-	RedisStreamsSubscriberStrategy,
-	StrategyCallbacks,
+	CreateSubscriber,
+	Subscriber,
+	SubscriberContext,
 	SubscriberDelayParams,
-	SubscriberStrategyBuilder,
 	WorkflowRunBatch,
-} from "@aikirun/types/client";
-import { INTERNAL } from "@aikirun/types/symbols";
+} from "@aikirun/types/subscriber";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { type } from "arktype";
+import { Redis } from "ioredis";
+
+export interface RedisSubscriberParams {
+	host: string;
+	port: number;
+	password?: string;
+	db?: number;
+	maxRetriesPerRequest?: number;
+	retryDelayOnFailoverMs?: number;
+	connectTimeoutMs?: number;
+	// Aiki specific
+	intervalMs?: number;
+	maxRetryIntervalMs?: number;
+	atCapacityIntervalMs?: number;
+	blockTimeMs?: number;
+	claimMinIdleTimeMs?: number;
+}
 
 interface StreamMessageMeta {
 	stream: string;
@@ -75,26 +89,12 @@ const streamMessageDataSchema = type({
 
 const streamPendingMessagesSchema = type(["string", "string", "number", "number"]).array();
 
-export function createRedisStreamsStrategy(
-	client: Client,
-	strategy: RedisStreamsSubscriberStrategy,
-	workflows: WorkflowMeta[],
-	workerShards?: string[]
-): SubscriberStrategyBuilder {
-	const redis = client[INTERNAL].redis.getConnection();
-
-	const logger = client.logger.child({
-		"aiki.component": "redis-subscriber",
-	});
-
-	const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflows, workerShards);
-	const streams = Array.from(streamConsumerGroupMap.keys());
-
-	const intervalMs = strategy.intervalMs ?? 50;
-	const maxRetryIntervalMs = strategy.maxRetryIntervalMs ?? 30_000;
-	const atCapacityIntervalMs = strategy.atCapacityIntervalMs ?? 50;
-	const blockTimeMs = strategy.blockTimeMs ?? 1_000;
-	const claimMinIdleTimeMs = strategy.claimMinIdleTimeMs ?? 90_000;
+export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber {
+	const intervalMs = params.intervalMs ?? 50;
+	const maxRetryIntervalMs = params.maxRetryIntervalMs ?? 30_000;
+	const atCapacityIntervalMs = params.atCapacityIntervalMs ?? 50;
+	const blockTimeMs = params.blockTimeMs ?? 1_000;
+	const claimMinIdleTimeMs = params.claimMinIdleTimeMs ?? 90_000;
 
 	const getNextDelay = (params: SubscriberDelayParams) => {
 		switch (params.type) {
@@ -120,98 +120,116 @@ export function createRedisStreamsStrategy(
 		}
 	};
 
-	return {
-		async init(workerId: string, _callbacks: StrategyCallbacks) {
-			for (const [stream, consumerGroup] of streamConsumerGroupMap) {
-				try {
-					await redis.xgroup("CREATE", stream, consumerGroup, "0", "MKSTREAM");
-				} catch (error) {
-					if (!(error as Error).message?.includes("BUSYGROUP")) {
-						throw error;
-					}
+	return async (context: SubscriberContext): Promise<Subscriber> => {
+		const { workerId, workflows, shards, logger: parentLogger } = context;
+
+		const redis = new Redis({
+			host: params.host,
+			port: params.port,
+			password: params.password,
+			db: params.db,
+			maxRetriesPerRequest: params.maxRetriesPerRequest,
+			connectTimeout: params.connectTimeoutMs,
+		});
+
+		const logger = parentLogger.child({
+			"aiki.component": "redis-subscriber",
+		});
+
+		const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflows, shards);
+		const streams = Array.from(streamConsumerGroupMap.keys());
+
+		for (const [stream, consumerGroup] of streamConsumerGroupMap) {
+			try {
+				await redis.xgroup("CREATE", stream, consumerGroup, "0", "MKSTREAM");
+			} catch (error) {
+				if (!(error as Error).message?.includes("BUSYGROUP")) {
+					throw error;
 				}
 			}
+		}
 
-			const pendingMessageMetaByWorkflowRunId = new Map<WorkflowRunId, StreamMessageMeta>();
+		const pendingMessageMetaByWorkflowRunId = new Map<WorkflowRunId, StreamMessageMeta>();
 
-			return {
-				type: strategy.type,
-				getNextDelay,
-				getNextBatch: async (size: number): Promise<WorkflowRunBatch[]> => {
-					const messages = await fetchRedisStreamMessages(
-						redis,
-						logger.child({ "aiki.workerId": workerId }),
-						streams,
-						streamConsumerGroupMap,
-						workerId,
-						size,
-						blockTimeMs,
-						claimMinIdleTimeMs
-					);
+		return {
+			getNextDelay,
+			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
+				const messages = await fetchRedisStreamMessages(
+					redis,
+					logger.child({ "aiki.workerId": workerId }),
+					streams,
+					streamConsumerGroupMap,
+					workerId,
+					size,
+					blockTimeMs,
+					claimMinIdleTimeMs
+				);
 
-					const batches: WorkflowRunBatch[] = [];
-					for (const message of messages) {
-						pendingMessageMetaByWorkflowRunId.set(message.data.workflowRunId, message.meta);
-						batches.push({ data: message.data });
-					}
+				const batches: WorkflowRunBatch[] = [];
+				for (const message of messages) {
+					pendingMessageMetaByWorkflowRunId.set(message.data.workflowRunId, message.meta);
+					batches.push({ data: message.data });
+				}
 
-					return batches;
-				},
-				heartbeat: async (workflowRunId: WorkflowRunId): Promise<void> => {
-					const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
-					if (!meta) {
-						return;
-					}
-					try {
-						await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
-						logger.debug("Heartbeat sent", {
+				return batches;
+			},
+			async heartbeat(workflowRunId: WorkflowRunId): Promise<void> {
+				const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
+				if (!meta) {
+					return;
+				}
+				try {
+					await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
+					logger.debug("Heartbeat sent", {
+						"aiki.workerId": workerId,
+						"aiki.workflowRunId": workflowRunId,
+						"aiki.messageId": meta.messageId,
+					});
+				} catch (error) {
+					logger.warn("Heartbeat failed", {
+						"aiki.workerId": workerId,
+						"aiki.workflowRunId": workflowRunId,
+						"aiki.error": error instanceof Error ? error.message : String(error),
+					});
+				}
+			},
+			async acknowledge(workflowRunId: WorkflowRunId): Promise<void> {
+				const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
+				if (!meta) {
+					return;
+				}
+				try {
+					const result = await redis.xack(meta.stream, meta.consumerGroup, meta.messageId);
+
+					if (result === 0) {
+						logger.warn("Message already acknowledged", {
 							"aiki.workerId": workerId,
 							"aiki.workflowRunId": workflowRunId,
 							"aiki.messageId": meta.messageId,
 						});
-					} catch (error) {
-						logger.warn("Heartbeat failed", {
-							"aiki.workerId": workerId,
-							"aiki.workflowRunId": workflowRunId,
-							"aiki.error": error instanceof Error ? error.message : String(error),
-						});
-					}
-				},
-				acknowledge: async (workflowRunId: WorkflowRunId): Promise<void> => {
-					const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
-					if (!meta) {
-						return;
-					}
-					try {
-						const result = await redis.xack(meta.stream, meta.consumerGroup, meta.messageId);
-
-						if (result === 0) {
-							logger.warn("Message already acknowledged", {
-								"aiki.workerId": workerId,
-								"aiki.workflowRunId": workflowRunId,
-								"aiki.messageId": meta.messageId,
-							});
-						} else {
-							logger.debug("Message acknowledged", {
-								"aiki.workerId": workerId,
-								"aiki.workflowRunId": workflowRunId,
-								"aiki.messageId": meta.messageId,
-							});
-						}
-					} catch (error) {
-						logger.error("Failed to acknowledge message", {
+					} else {
+						logger.debug("Message acknowledged", {
 							"aiki.workerId": workerId,
 							"aiki.workflowRunId": workflowRunId,
 							"aiki.messageId": meta.messageId,
-							"aiki.error": error instanceof Error ? error.message : String(error),
 						});
-						throw error;
-					} finally {
-						pendingMessageMetaByWorkflowRunId.delete(workflowRunId);
 					}
-				},
-			};
-		},
+				} catch (error) {
+					logger.error("Failed to acknowledge message", {
+						"aiki.workerId": workerId,
+						"aiki.workflowRunId": workflowRunId,
+						"aiki.messageId": meta.messageId,
+						"aiki.error": error instanceof Error ? error.message : String(error),
+					});
+					throw error;
+				} finally {
+					pendingMessageMetaByWorkflowRunId.delete(workflowRunId);
+				}
+			},
+			async close(): Promise<void> {
+				redis.disconnect();
+			},
+		};
 	};
 }
 
@@ -239,7 +257,7 @@ function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shards?: stri
 // - attempt to claim stuck messages before fething newer ones
 // - instead of processing streams randomly, try to prioritise I/O bound streams over CPU hogs
 async function fetchRedisStreamMessages(
-	redis: RedisClient,
+	redis: Redis,
 	logger: Logger,
 	streams: string[],
 	streamConsumerGroupMap: Map<string, string>,
@@ -322,7 +340,7 @@ async function fetchRedisStreamMessages(
 }
 
 async function processRedisStreamMessages(
-	redis: RedisClient,
+	redis: Redis,
 	logger: Logger,
 	streamConsumerGroupMap: Map<string, string>,
 	streamsEntries: NonEmptyArray<unknown>
@@ -388,7 +406,7 @@ async function processRedisStreamMessages(
 }
 
 async function claimStuckRedisStreamMessages(
-	redis: RedisClient,
+	redis: Redis,
 	logger: Logger,
 	shuffledStreams: string[],
 	streamConsumerGroupMap: Map<string, string>,
@@ -473,7 +491,7 @@ async function claimStuckRedisStreamMessages(
 }
 
 async function findClaimableMessagesByStream(
-	redis: RedisClient,
+	redis: Redis,
 	logger: Logger,
 	shuffledStreams: string[],
 	streamConsumerGroupMap: Map<string, string>,

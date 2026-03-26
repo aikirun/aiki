@@ -38,7 +38,7 @@ export async function runWithWorker(
 
 	const shutdown = async () => {
 		await Promise.all([handleA.stop(), handleB.stop()]);
-		await aikiClient.close();
+
 		process.exit(0);
 	};
 
@@ -49,6 +49,5 @@ export async function runWithWorker(
 		await callback(aikiClient);
 	} finally {
 		await Promise.all([handleA.stop(), handleB.stop()]);
-		await aikiClient.close();
 	}
 }

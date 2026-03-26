@@ -64,6 +64,10 @@
 			"types": "./dist/state-transition.d.ts",
 			"import": "./dist/state-transition.js"
 		},
+		"./subscriber": {
+			"types": "./dist/subscriber.d.ts",
+			"import": "./dist/subscriber.js"
+		},
 		"./symbols": {
 			"types": "./dist/symbols.d.ts",
 			"import": "./dist/symbols.js"

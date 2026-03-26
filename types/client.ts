@@ -1,6 +1,5 @@
 import type { ScheduleApi } from "@aikirun/types/schedule-api";
-import type { WorkflowMeta } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { WorkflowRun } from "@aikirun/types/workflow-run";
 import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
 
 import { INTERNAL } from "./symbols";
@@ -8,7 +7,6 @@ import { INTERNAL } from "./symbols";
 export interface ClientParams<AppContext = unknown> {
 	url: string;
 	apiKey?: string;
-	redis?: RedisConfig;
 	logger?: Logger;
 	createContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
 }
@@ -16,16 +14,7 @@ export interface ClientParams<AppContext = unknown> {
 export interface Client<AppContext = unknown> {
 	api: ApiClient;
 	logger: Logger;
-	close: () => Promise<void>;
 	[INTERNAL]: {
-		subscriber: {
-			create: (
-				strategy: SubscriberStrategy,
-				workflows: WorkflowMeta[],
-				workerShards?: string[]
-			) => SubscriberStrategyBuilder;
-		};
-		redis: RedisConnection;
 		createContext?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
 	};
 }
@@ -42,74 +31,4 @@ export interface Logger {
 export interface ApiClient {
 	workflowRun: WorkflowRunApi;
 	schedule: ScheduleApi;
-}
-
-export interface RedisClient {
-	xclaim(...args: unknown[]): Promise<unknown>;
-	xack(stream: string, group: string, messageId: string): Promise<number>;
-	xgroup(...args: unknown[]): Promise<unknown>;
-	xreadgroup(...args: unknown[]): Promise<unknown>;
-	xpending(...args: unknown[]): Promise<unknown>;
-	quit(): Promise<unknown>;
-}
-
-export interface RedisConfig {
-	host: string;
-	port: number;
-	password?: string;
-	db?: number;
-	maxRetriesPerRequest?: number;
-	retryDelayOnFailoverMs?: number;
-	connectTimeoutMs?: number;
-}
-
-export interface RedisConnection {
-	getConnection: () => RedisClient;
-	closeConnection: () => Promise<void>;
-}
-
-export interface WorkflowRunBatch {
-	data: { workflowRunId: WorkflowRunId };
-}
-
-export type SubscriberDelayParams =
-	| { type: "polled"; foundWork: boolean }
-	| { type: "retry"; attemptNumber: number }
-	| { type: "heartbeat" }
-	| { type: "at_capacity" };
-
-export interface ResolvedSubscriberStrategy {
-	type: string;
-	getNextDelay: (context: SubscriberDelayParams) => number;
-	getNextBatch: (size: number) => Promise<WorkflowRunBatch[]>;
-	heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>;
-	acknowledge?: (workflowRunId: WorkflowRunId) => Promise<void>;
-}
-
-export interface RedisStreamsSubscriberStrategy {
-	type: "redis";
-	intervalMs?: number;
-	maxRetryIntervalMs?: number;
-	atCapacityIntervalMs?: number;
-	blockTimeMs?: number;
-	claimMinIdleTimeMs?: number;
-}
-
-export interface DbSubscriberStrategy {
-	type: "db";
-	intervalMs?: number;
-	maxRetryIntervalMs?: number;
-	atCapacityIntervalMs?: number;
-	claimMinIdleTimeMs?: number;
-}
-
-export type SubscriberStrategy = RedisStreamsSubscriberStrategy | DbSubscriberStrategy;
-
-export interface SubscriberStrategyBuilder {
-	init: (workerId: string, callbacks: StrategyCallbacks) => Promise<ResolvedSubscriberStrategy>;
-}
-
-export interface StrategyCallbacks {
-	onError?: (error: Error) => void;
-	onStop?: () => Promise<void>;
 }
