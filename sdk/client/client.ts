@@ -1,4 +1,3 @@
-import process from "node:process";
 import { ConsoleLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client, ClientParams } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
@@ -15,7 +14,7 @@ import { RPCLink } from "@orpc/client/fetch";
  * @template AppContext - Type of application context passed to workflows (default: null)
  * @param params - Client configuration parameters
  * @param params.url - HTTP URL of the Aiki server (e.g., "http://localhost:9850")
- * @param params.apiKey - API key for authentication. Falls back to AIKI_API_KEY env variable if not provided.
+ * @param params.apiKey - API key for authentication
  * @param params.createContext - Optional function to create context for each workflow run
  * @param params.logger - Optional custom logger (defaults to ConsoleLogger)
  * @returns Promise resolving to a configured Client instance
@@ -24,7 +23,7 @@ import { RPCLink } from "@orpc/client/fetch";
  * ```typescript
  * const aikiClient = client({
  *   url: "http://localhost:9850",
- *   apiKey: "yourApiKey", // or omit to use AIKI_API_KEY env variable
+ *   apiKey: "yourApiKey",
  *   createContext: (run) => ({
  *     traceId: generateTraceId(),
  *     userId: extractUserId(run),
@@ -53,10 +52,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 	constructor(private readonly params: ClientParams<AppContext>) {
 		this.logger = params.logger ?? new ConsoleLogger();
 
-		const apiKey = params.apiKey ?? process.env.AIKI_API_KEY;
-		if (!apiKey) {
-			throw new Error(`API key is required. Provide it via 'apiKey' param or AIKI_API_KEY env variable`);
-		}
+		const { apiKey } = params;
 
 		const rpcLink = new RPCLink({
 			url: `${params.url}/api`,

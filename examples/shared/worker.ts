@@ -19,7 +19,15 @@ export async function runWithWorker(
 	workflows: AnyWorkflowVersion[],
 	callback: (client: Client) => Promise<void>
 ): Promise<void> {
-	const aikiClient = client({ url: process.env.AIKI_SERVER_URL ?? "http://localhost:9850" });
+	const apiKey = process.env.AIKI_API_KEY;
+	if (!apiKey) {
+		throw new Error("AIKI_API_KEY environment variable is required");
+	}
+
+	const aikiClient = client({
+		url: process.env.AIKI_SERVER_URL ?? "http://localhost:9850",
+		apiKey,
+	});
 
 	const workerA = worker({
 		workflows,

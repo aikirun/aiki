@@ -40,9 +40,10 @@ const helloV1 = helloWorkflow.v("1.0.0", {
     },
 });
 
-// 3. Set up the client (set AIKI_API_KEY env variable or pass apiKey option inline)
+// 3. Set up the client
 const aikiClient = client({
     url: "http://localhost:9850",
+    apiKey: "your-api-key",
 });
 
 // 4. Create a worker (executes workflows)

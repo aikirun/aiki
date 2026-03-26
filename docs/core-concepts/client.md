@@ -7,9 +7,9 @@ The Aiki client connects to the server and lets you start workflows.
 ```typescript
 import { client } from "@aikirun/client";
 
-// Set AIKI_API_KEY env variable or pass apiKey option inline
 const aikiClient = client({
 	url: "http://localhost:9850",
+	apiKey: "your-api-key",
 });
 ```
 
@@ -17,10 +17,10 @@ const aikiClient = client({
 
 ### apiKey
 
-API key for authentication. Create one from the web UI. Can also be set via `AIKI_API_KEY` environment variable:
+API key for authentication. Create one from the web UI:
 
 ```typescript
-apiKey: "your-api-key"  // Or set AIKI_API_KEY env variable
+apiKey: "your-api-key"
 ```
 
 ### url
@@ -38,6 +38,7 @@ Optional function to create per-execution context for workflows. Called before e
 ```typescript
 const aikiClient = await client<AppContext>({
 	url: "http://localhost:9850",
+	apiKey: "your-api-key",
 	createContext: (run) => ({
 		traceId: crypto.randomUUID(),
 		workflowRunId: run.id,
@@ -54,6 +55,7 @@ Optional custom logger implementation. Defaults to console logging:
 ```typescript
 const aikiClient = client({
 	url: "http://localhost:9850",
+	apiKey: "your-api-key",
 	logger: myCustomLogger, // Must implement Logger interface
 });
 ```

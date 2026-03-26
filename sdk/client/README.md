@@ -14,9 +14,9 @@ npm install @aikirun/client
 import { client } from "@aikirun/client";
 import { orderWorkflowV1 } from "./workflows.ts";
 
-// Set AIKI_API_KEY env variable or pass apiKey option
 const aikiClient = client({
 	url: "http://localhost:9850",
+	apiKey: "your-api-key",
 });
 
 // Start a workflow

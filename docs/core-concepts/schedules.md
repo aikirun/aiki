@@ -11,6 +11,7 @@ import { dailyReportWorkflowV1 } from "./workflows";
 
 const aikiClient = client({
 	url: "http://localhost:9850",
+	apiKey: "your-api-key",
 });
 
 const dailyReport = schedule({

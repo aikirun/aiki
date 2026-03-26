@@ -131,9 +131,9 @@ import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 import { trialV1 } from "./workflow";
 
-// Connect to Aiki server (set AIKI_API_KEY env variable or pass apiKey option)
 const aikiClient = client({
   url: "http://localhost:9850",
+  apiKey: "your-api-key",
 });
 
 // Start a worker

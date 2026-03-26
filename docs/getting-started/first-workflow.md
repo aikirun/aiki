@@ -162,9 +162,9 @@ import process from "node:process";
 import { client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 
-// Set AIKI_API_KEY env variable or pass apiKey option inline
 const aikiClient = client({
 	url: "http://localhost:9850",
+	apiKey: "your-api-key",
 });
 
 const aikiWorker = worker({

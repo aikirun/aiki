@@ -7,7 +7,7 @@ import { INTERNAL } from "./symbols";
 
 export interface ClientParams<AppContext = null> {
 	url: string;
-	apiKey?: string;
+	apiKey: string;
 	logger?: Logger;
 	createContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
 }
