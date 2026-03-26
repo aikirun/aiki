@@ -12,6 +12,10 @@ import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 
 export interface DbSubscriberParams {
 	api: ApiClient;
+	options?: DbSubscriberOptions;
+}
+
+export interface DbSubscriberOptions {
 	intervalMs?: number;
 	maxRetryIntervalMs?: number;
 	atCapacityIntervalMs?: number;
@@ -19,11 +23,11 @@ export interface DbSubscriberParams {
 }
 
 export function dbSubscriber(params: DbSubscriberParams): CreateSubscriber {
-	const { api } = params;
-	const intervalMs = params.intervalMs ?? 1_000;
-	const maxRetryIntervalMs = params.maxRetryIntervalMs ?? 30_000;
-	const atCapacityIntervalMs = params.atCapacityIntervalMs ?? 500;
-	const claimMinIdleTimeMs = params.claimMinIdleTimeMs ?? 90_000;
+	const { api, options } = params;
+	const intervalMs = options?.intervalMs ?? 1_000;
+	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
+	const atCapacityIntervalMs = options?.atCapacityIntervalMs ?? 500;
+	const claimMinIdleTimeMs = options?.claimMinIdleTimeMs ?? 90_000;
 
 	const getNextDelay = (delayParams: SubscriberDelayParams) => {
 		switch (delayParams.type) {

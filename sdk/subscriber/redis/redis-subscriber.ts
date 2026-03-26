@@ -19,10 +19,13 @@ export interface RedisSubscriberParams {
 	port: number;
 	password?: string;
 	db?: number;
+	options?: RedisSubscriberOptions;
+}
+
+export interface RedisSubscriberOptions {
 	maxRetriesPerRequest?: number;
 	retryDelayOnFailoverMs?: number;
 	connectTimeoutMs?: number;
-	// Aiki specific
 	intervalMs?: number;
 	maxRetryIntervalMs?: number;
 	atCapacityIntervalMs?: number;
@@ -90,11 +93,12 @@ const streamMessageDataSchema = type({
 const streamPendingMessagesSchema = type(["string", "string", "number", "number"]).array();
 
 export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber {
-	const intervalMs = params.intervalMs ?? 50;
-	const maxRetryIntervalMs = params.maxRetryIntervalMs ?? 30_000;
-	const atCapacityIntervalMs = params.atCapacityIntervalMs ?? 50;
-	const blockTimeMs = params.blockTimeMs ?? 1_000;
-	const claimMinIdleTimeMs = params.claimMinIdleTimeMs ?? 90_000;
+	const { options } = params;
+	const intervalMs = options?.intervalMs ?? 50;
+	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
+	const atCapacityIntervalMs = options?.atCapacityIntervalMs ?? 50;
+	const blockTimeMs = options?.blockTimeMs ?? 1_000;
+	const claimMinIdleTimeMs = options?.claimMinIdleTimeMs ?? 90_000;
 
 	const getNextDelay = (params: SubscriberDelayParams) => {
 		switch (params.type) {
@@ -128,8 +132,8 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			port: params.port,
 			password: params.password,
 			db: params.db,
-			maxRetriesPerRequest: params.maxRetriesPerRequest,
-			connectTimeout: params.connectTimeoutMs,
+			maxRetriesPerRequest: options?.maxRetriesPerRequest,
+			connectTimeout: options?.connectTimeoutMs,
 		});
 
 		const logger = parentLogger.child({

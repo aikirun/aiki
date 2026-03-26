@@ -68,14 +68,18 @@ This means work stealing is safe. Re-executing a workflow doesn't cause duplicat
 Configure stream behavior in worker options:
 
 ```typescript
+import { redisSubscriber } from "@aikirun/subscriber-redis";
+
 const orderWorker = worker({
-	name: "order-worker",
 	workflows: [orderWorkflowV1],
-	subscriber: {
-		type: "redis",
-		claimMinIdleTimeMs: 90_000, // Claim messages idle > 90 seconds
-		blockTimeMs: 1000,           // Wait up to 1s for new messages
-	},
+	subscriber: redisSubscriber({
+		host: "localhost",
+		port: 6379,
+		options: {
+			claimMinIdleTimeMs: 90_000, // Claim messages idle > 90 seconds
+			blockTimeMs: 1000,           // Wait up to 1s for new messages
+		},
+	}),
 });
 ```
 
