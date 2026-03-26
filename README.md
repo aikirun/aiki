@@ -209,6 +209,8 @@ See the [Installation Guide](./docs/getting-started/installation.md) for detaile
 - [`@aikirun/task`](https://www.npmjs.com/package/@aikirun/task) — Task SDK
 - [`@aikirun/client`](https://www.npmjs.com/package/@aikirun/client) — Client SDK
 - [`@aikirun/worker`](https://www.npmjs.com/package/@aikirun/worker) — Worker SDK
+- [`@aikirun/endpoint`](https://www.npmjs.com/package/@aikirun/endpoint) — Endpoint SDK (serverless)
+- [`@aikirun/subscriber-redis`](https://www.npmjs.com/package/@aikirun/subscriber-redis) — Redis Streams subscriber (optional)
 
 ## License
 
