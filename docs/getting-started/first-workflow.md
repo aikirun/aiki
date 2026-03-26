@@ -177,7 +177,6 @@ const workerHandle = await aikiWorker.spawn(aikiClient);
 // Graceful shutdown
 process.on("SIGINT", async () => {
 	await workerHandle.stop();
-	await aikiClient.close();
 	process.exit(0);
 });
 ```

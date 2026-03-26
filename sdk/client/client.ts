@@ -39,9 +39,6 @@ import { ConsoleLogger } from "./logger/index";
  *   { type: "status", status: "completed" },
  *   { maxDurationMs: 60_000 }
  * );
- *
- * // Cleanup
- * await aikiClient.close();
  * ```
  */
 export function client<AppContext = null>(params: ClientParams<AppContext>): Client<AppContext> {

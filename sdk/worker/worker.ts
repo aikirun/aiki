@@ -36,7 +36,7 @@ import { ulid } from "ulidx";
  * @param params - Worker configuration parameters
  * @param params.name - Unique worker name for identification and monitoring
  * @param params.workflows - Array of workflow versions this worker can execute
- * @param params.subscriber - Message subscriber strategy (default: redis)
+ * @param params.subscriber - Optional subscriber factory for work discovery (default: DB polling)
  * @returns Worker definition, call spawn(client) to begin execution
  *
  * @example
@@ -53,7 +53,6 @@ import { ulid } from "ulidx";
  *
  * process.on("SIGINT", async () => {
  *   await handle.stop();
- *   await client.close();
  * });
  * ```
  */
@@ -243,7 +242,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 	private async poll(abortSignal: AbortSignal): Promise<void> {
 		if (!this.subscriber) {
-			throw new Error("Subscriber strategy not initialized");
+			throw new Error("Subscriber not initialized");
 		}
 
 		this.logger.info("Worker started", {
@@ -293,7 +292,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		if (!this.subscriber) {
 			return {
 				success: false,
-				error: new Error("Subscriber strategy not initialized"),
+				error: new Error("Subscriber not initialized"),
 			};
 		}
 
@@ -310,7 +309,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					const batch = await this.fallbackSubscriber.getNextBatch(size);
 					return { success: true, batch, subscriber: this.fallbackSubscriber };
 				} catch (fallbackError) {
-					this.logger.error("Fallback subscriber strategy for getting next workflow runs batch also failed", {
+					this.logger.error("Fallback subscriber also failed to get next workflow runs batch", {
 						"aiki.error": fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
 					});
 				}

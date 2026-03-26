@@ -17,7 +17,6 @@ import { orderWorkflowV1 } from "./workflows.ts";
 // Set AIKI_API_KEY env variable or pass apiKey option
 const aikiClient = client({
 	url: "http://localhost:9850",
-	redis: { host: "localhost", port: 6379 },
 });
 
 // Start a workflow
@@ -27,16 +26,12 @@ const handle = await orderWorkflowV1.start(aikiClient, {
 
 // Wait for completion
 const result = await handle.waitForStatus("completed");
-
-// Close when done
-await aikiClient.close();
 ```
 
 ## Features
 
 - **Server Connection** - Connect to the Aiki server via HTTP
 - **Workflow Management** - Start workflows with type-safe inputs
-- **Redis Integration** - Distributed state and message streaming
 - **Context Injection** - Pass application context to workflows
 - **Custom Logging** - Plug in your own logger
 

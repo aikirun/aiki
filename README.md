@@ -148,7 +148,6 @@ await trialV1.start(aikiClient, { userId: "user-123" });
 
 // Cleanup
 await workerHandle.stop();
-await aikiClient.close();
 ```
 <br>
 <p align="center">

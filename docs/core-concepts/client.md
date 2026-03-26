@@ -31,19 +31,6 @@ The URL of the Aiki server:
 url: "http://localhost:9850"; // Local development
 ```
 
-### redis (optional)
-
-Redis connection configuration. Only needed when using `{ type: "redis" }` subscriber strategy for lower-latency message delivery:
-
-```typescript
-redis: {
-  host: "localhost",
-  port: 6379,
-  password: "optional-password",  // Optional
-  db: 0                           // Optional, default: 0
-}
-```
-
 ### createContext
 
 Optional function to create per-execution context for workflows. Called before each workflow execution:
@@ -98,14 +85,6 @@ const handle = await workflowVersion
 ```
 
 See the [Reference IDs Guide](../guides/reference-ids.md) for more details.
-
-## Closing the Client
-
-Always close the client when done to release resources:
-
-```typescript
-await aikiClient.close();
-```
 
 ## Next Steps
 
