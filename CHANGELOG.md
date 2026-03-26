@@ -2,6 +2,91 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.24.0
+
+### New Features
+
+- **`@aikirun/endpoint` package** — Push-based workflow execution for serverless environments. Exposes a Web Standard `(Request) => Promise<Response>` handler that receives workflow runs via signed HTTP requests from the Aiki server. Works with Cloudflare Workers, AWS Lambda, Vercel, and any platform supporting the Fetch API.
+  ```typescript
+  import { endpoint } from "@aikirun/endpoint";
+
+  const handler = endpoint({
+    workflows: [myWorkflowV1],
+    client: aikiClient,
+    secret: process.env.AIKI_ENDPOINT_SECRET,
+  });
+  ```
+
+- **Pluggable subscribers** — Work discovery is now a pluggable concern. The client no longer bundles subscriber logic or manages Redis connections. Two subscriber packages are available:
+  - `@aikirun/subscriber-db` — DB polling (default, used automatically when no subscriber is specified)
+  - `@aikirun/subscriber-redis` — Redis Streams for lower-latency delivery
+
+  Custom subscribers can be implemented via the `CreateSubscriber` type from `@aikirun/types/subscriber`.
+
+### Improvements
+
+- **Worker fallback delay fix** — When the worker falls back from a failed primary subscriber to the DB subscriber, it now uses the fallback subscriber's delay config instead of the primary's.
+- **`@aikirun/lib` enforces sub-path imports** — Import from specific sub-paths (e.g., `@aikirun/lib/duration`) instead of the package root.
+- **`@aikirun/task` no longer depends on `@aikirun/workflow`** — Reduced coupling between packages.
+- **Type restructuring** — `Logger`, error classes (`TaskFailedError`, `NonDeterminismError`, `WorkflowRunRevisionConflictError`, etc.), and `ReplayManifest` moved to dedicated files in `@aikirun/types` for cleaner imports.
+
+### Breaking Changes
+
+- **`client()` no longer accepts `redis` config** — Redis is now configured at the subscriber level, not the client. The client is a lightweight HTTP-only connection.
+  ```typescript
+  // Before
+  const c = client({ url: "...", apiKey: "...", redis: { host: "localhost", port: 6379 } });
+
+  // After
+  const c = client({ url: "...", apiKey: "..." });
+  ```
+
+- **`client.close()` removed** — The client no longer manages long-lived connections. Remove any `await client.close()` calls.
+
+- **`apiKey` is now required** — No longer falls back to `process.env.AIKI_API_KEY`.
+
+- **`worker.name` removed** — Workers no longer require a `name` param. Worker identity is auto-generated via ULID.
+  ```typescript
+  // Before
+  const w = worker({ name: "order-worker", workflows: [...] });
+
+  // After
+  const w = worker({ workflows: [...] });
+  ```
+
+- **`subscriber` param on `worker()` changed** — No longer accepts `{ type: "redis" }` or `{ type: "db" }` strategy objects. Pass a `CreateSubscriber` factory function instead.
+  ```typescript
+  // Before
+  const w = worker({ workflows: [...], subscriber: { type: "redis" } });
+
+  // After
+  import { redisSubscriber } from "@aikirun/subscriber-redis";
+  const w = worker({ workflows: [...], subscriber: redisSubscriber({ host: "localhost", port: 6379 }) });
+  ```
+
+- **`opts` renamed to `options`** across all SDK packages — Applies to `worker()`, `workflow.v()`, `task()`, and `schedule()`.
+  ```typescript
+  // Before
+  worker({ workflows: [...], opts: { maxConcurrentWorkflowRuns: 10 } });
+  task({ name: "x", handler: fn, opts: { retry: { type: "fixed", maxAttempts: 3 } } });
+
+  // After
+  worker({ workflows: [...], options: { maxConcurrentWorkflowRuns: 10 } });
+  task({ name: "x", handler: fn, options: { retry: { type: "fixed", maxAttempts: 3 } } });
+  ```
+
+- **`trigger` moved from `WorkflowDefinitionOptions` to `WorkflowStartOptions`** — Trigger is a runtime/caller concern, not a definition concern.
+
+- **Re-exports removed from `@aikirun/client`** — Types like `Logger`, `RedisConfig`, `SubscriberStrategy`, `WorkflowRunBatch`, and `ConsoleLogger` are no longer exported from the client package. Import from their new locations:
+  - `Logger` → `@aikirun/types/logger`
+  - `Subscriber`, `CreateSubscriber` → `@aikirun/types/subscriber`
+  - Error classes → `@aikirun/types/workflow-run-error`, `@aikirun/types/task-error`
+
+### Documentation
+
+- Architecture docs reframed around pluggable subscriber abstraction instead of centering on Redis Streams
+- Diagrams updated to show both pull (workers) and push (endpoints) delivery models
+
 ## 0.23.1
 
 ### Improvements

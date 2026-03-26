@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/endpoint",
-	"version": "0.23.1",
+	"version": "0.24.0",
 	"description": "Push-based HTTP endpoint for Aiki - execute workflows from serverless environments",
 	"type": "module",
 	"main": "./dist/index.js",
