@@ -16,7 +16,7 @@ The server exposes an RPC API that the SDK client calls to:
 
 ### Work Distribution
 
-When a workflow run is ready for execution, the server makes it available for workers to pick up. By default, workers poll the server directly. When Redis is configured, the server also publishes messages to Redis Streams for lower-latency delivery. See [Redis Streams](./redis-streams.md) for details.
+When a workflow run is ready for execution, the server persists it as available for workers. Workers discover ready runs through their configured subscriber (DB polling by default). When Redis is configured on the server, it also publishes to Redis Streams, enabling workers using the Redis subscriber to receive work with lower latency. See [Subscribers](./subscribers.md) for details.
 
 ### Background Jobs
 
@@ -50,5 +50,5 @@ AIKI_SERVER_PORT=9850
 
 ## Next Steps
 
-- **[Redis Streams](./redis-streams.md)** - How work is distributed
+- **[Subscribers](./subscribers.md)** - How workers discover work
 - **[Overview](./overview.md)** - High-level architecture

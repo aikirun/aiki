@@ -179,24 +179,15 @@ await workerHandle.stop();
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Aiki Server                                    │
 │                    Orchestrates workflows, manages state                    │
-└─────────────────────────────────────┬───────────────────────────────────────┘
-                                      │
-                                      ▼
-                     ┌───────────────────────────────────┐
-                     │          Message Queue            │
-                     │     (Message distribution)        │
-                     └───────────────────────────────────┘
-                                      │
-          ┌───────────────────────────┼───────────────────────────┐
-          ▼                           ▼                           ▼
-   ┌─────────────┐             ┌─────────────┐             ┌─────────────┐
-   │  Worker A   │             │  Worker B   │             │  Worker C   │
-   │             │             │             │             │             │
-   │  Executes   │             │  Executes   │             │  Executes   │
-   │  workflows  │             │  workflows  │             │  workflows  │
-   │  in YOUR    │             │  in YOUR    │             │  in YOUR    │
-   │  environment│             │  environment│             │  environment│
-   └─────────────┘             └─────────────┘             └─────────────┘
+└─────────────────────┬─────────────────────────────────┬─────────────────────┘
+                      │                                 │
+                      │ Pull (Subscribers)              │ Push (HTTP)
+                      ▼                                 ▼
+        ┌──────────────────────────┐       ┌──────────────────────────┐
+        │  Workers                 │       │  Endpoints               │
+        │  Long-lived processes    │       │  Serverless functions    │
+        │  in your infrastructure  │       │  on any platform         │
+        └──────────────────────────┘       └──────────────────────────┘
 ```
 
 ## Documentation
@@ -208,7 +199,7 @@ Read the [docs](./docs/README.md)
 - **Runtime**: Node.js 18+ or Bun 1.0+
 - **ESM (ES Modules)** - This package uses ES modules (`import`/`export`)
 - **Database**: PostgreSQL 14+
-- **Message Queue** (optional): Redis 6.2+ for lower-latency message delivery
+- **Redis** (optional): Redis 6.2+ for lower-latency work discovery
 
 See the [Installation Guide](./docs/getting-started/installation.md) for detailed setup instructions including environment variable configuration.
 

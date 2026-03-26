@@ -19,32 +19,21 @@ Aiki follows a distributed architecture where workflow orchestration is separate
 │  │  Orchestration  │  │  Management     │  │  (Workflow Runs, Tasks,     │  │
 │  │                 │  │                 │  │   Results, State)           │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
-└─────────────────────────────────────┬───────────────────────────────────────┘
-                                      │
-                                      │ Message Queue
-                                      ▼
-                     ┌───────────────────────────────────┐
-                     │          Message Queue            │
-                     │  ┌─────────────────────────────┐  │
-                     │  │  Stream: workflow:orders    │  │
-                     │  │  Stream: workflow:users     │  │
-                     │  └─────────────────────────────┘  │
-                     └───────────────────────────────────┘
-                                      │
-                                      │
-                                      ▼
-          ┌─────────────────────────────────────────────────────────┐
-          │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
-          │  │   Worker A  │  │   Worker B  │  │   Worker C  │      │
-          │  │             │  │             │  │             │      │
-          │  │ Executes    │  │ Executes    │  │ Executes    │      │
-          │  │ Workflows   │  │ Workflows   │  │ Workflows   │      │
-          │  │ in YOUR     │  │ in YOUR     │  │ in YOUR     │      │
-          │  │ Environment │  │ Environment │  │ Environment │      │
-          │  └─────────────┘  └─────────────┘  └─────────────┘      │
-          │                                                         │
-          │                    Your Infrastructure                  │
-          └─────────────────────────────────────────────────────────┘
+└──────────────────────┬──────────────────────────────────┬─────────────────┘
+                       │                                  │
+                       │ Pull (Subscribers)                │ Push (HTTP)
+                       ▼                                  ▼
+┌──────────────────────────────────────┐  ┌──────────────────────────────────┐
+│  ┌──────────┐ ┌──────────┐ ┌──────┐ │  │  ┌──────────────────────────┐    │
+│  │ Worker A │ │ Worker B │ │ ...  │ │  │  │  Endpoint Handler        │    │
+│  │          │ │          │ │      │ │  │  │  (Serverless Function)    │    │
+│  │ Long-    │ │ Long-    │ │      │ │  │  │                          │    │
+│  │ lived    │ │ lived    │ │      │ │  │  │  Executes workflows      │    │
+│  │ process  │ │ process  │ │      │ │  │  │  per request             │    │
+│  └──────────┘ └──────────┘ └──────┘ │  │  └──────────────────────────┘    │
+│                                      │  │                                  │
+│         Your Infrastructure          │  │     Serverless Platform          │
+└──────────────────────────────────────┘  └──────────────────────────────────┘
 ```
 
 ## Key Components
@@ -59,17 +48,24 @@ retrieve results.
 The Aiki Server orchestrates workflows and manages state through three key functions: workflow orchestration manages the
 workflow lifecycle, task management tracks task execution, and the storage layer persists state and history.
 
-### 3. Message Queue
+### 3. Work Delivery
 
-The message queue provides high-performance message distribution using consumer groups for work distribution, message
-claiming for fault tolerance, and automatic load balancing (workers pull work when they have capacity).
+Aiki supports two models for delivering workflow runs to your code:
 
-**Available implementations**: Database polling (default) and Redis Streams (optional, lower latency). See [Redis Streams](./redis-streams.md) for details on the Redis option.
+- **Pull (Workers)** - Long-lived processes that discover ready work through pluggable [subscribers](./subscribers.md). Workers poll for work, execute workflows, and report results. Scale by running multiple instances.
+
+- **Push (Endpoints)** - The server pushes workflow runs via HTTP to a request handler you expose. Designed for serverless platforms (Cloudflare Workers, AWS Lambda, Vercel) where long-lived polling isn't possible.
+
+Both models use the same execution engine. A workflow behaves identically whether executed by a worker or an endpoint.
 
 ### 4. Workers
 
-Workers execute workflows in your infrastructure by receiving workflow runs from the message queue, executing workflow
+Workers execute workflows in your infrastructure by receiving workflow runs from their subscriber, executing workflow
 logic and tasks, reporting results to the server, and handling retries and failures.
+
+### 5. Endpoints
+
+Endpoints execute workflows in serverless environments. The server sends a signed HTTP request containing the workflow run ID. The endpoint handler verifies the signature, fetches the workflow run state, and executes it using the same engine as workers.
 
 ## Data Flow
 
@@ -77,36 +73,46 @@ logic and tasks, reporting results to the server, and handling retries and failu
 
 ```
 Application → SDK Client → Aiki Server → Storage
-                                    ↓
-                               Message Queue
 ```
 
 1. Application calls `workflowVersion.start()`
 2. SDK client sends request to server
 3. Server validates and creates workflow run
 4. Server stores run in database
-5. Server publishes message to message queue
+5. Server makes run available for delivery (via subscribers for workers, or HTTP push for endpoints)
 6. Returns result handle to client
 
-### 2. Workflow Execution
+### 2. Workflow Execution (Pull)
 
 ```
-Message Queue → Worker → Task Execution → Server
+Subscriber → Worker → Task Execution → Server
 ```
 
-1. Worker receives workflow run message from queue
+1. Worker discovers workflow run through its subscriber
 2. Worker loads workflow definition
 3. Worker executes workflow logic and tasks
 4. Worker reports results to server
 5. Server updates state in storage
 
-### 3. State Updates
+### 3. Workflow Execution (Push)
 
 ```
-Worker → Server → Storage → Subscribers
+Aiki Server → HTTP → Endpoint → Task Execution → Server
 ```
 
-1. Worker updates workflow run state via server
+1. Server sends signed HTTP request to endpoint with workflow run ID
+2. Endpoint verifies signature, fetches workflow run state
+3. Endpoint executes workflow logic and tasks
+4. Endpoint reports results to server
+5. Server updates state in storage
+
+### 4. State Updates
+
+```
+Worker/Endpoint → Server → Storage
+```
+
+1. Worker or endpoint updates workflow run state via server
 2. Server persists state to storage
 3. Server streams updates to subscribers (SSE for browsers, pub-sub for backend services)
 
@@ -114,4 +120,4 @@ Worker → Server → Storage → Subscribers
 
 - **[Server](./server.md)** - Server component details
 - **[Workers](./workers.md)** - Worker architecture deep dive
-- **[Redis Streams](./redis-streams.md)** - Message distribution specifics
+- **[Subscribers](./subscribers.md)** - Work discovery implementations

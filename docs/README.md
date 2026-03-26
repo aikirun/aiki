@@ -39,7 +39,7 @@ Deep dive into system design:
 
 - **[Overview](./architecture/overview.md)** - High-level architecture and design principles
 - **[Server](./architecture/server.md)** - Workflow orchestration and state management
-- **[Redis Streams](./architecture/redis-streams.md)** - Message distribution and fault tolerance
+- **[Subscribers](./architecture/subscribers.md)** - Work discovery and fault tolerance
 
 ## 🔗 Quick Links
 

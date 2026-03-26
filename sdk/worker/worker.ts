@@ -217,7 +217,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		const maxConcurrentWorkflowRuns = this.spawnOptions.maxConcurrentWorkflowRuns ?? 1;
 
-		let nextDelayMs = this.subscriber.getNextDelay({ type: "polled", foundWork: false });
+		let activeSubscriber: Subscriber = this.subscriber;
+		let nextDelayMs = activeSubscriber.getNextDelay({ type: "polled", foundWork: false });
 		let subscriberFailedAttempts = 0;
 
 		while (!abortSignal.aborted) {
@@ -225,14 +226,14 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 			const availableCapacity = maxConcurrentWorkflowRuns - this.activeWorkflowRunsById.size;
 			if (availableCapacity <= 0) {
-				nextDelayMs = this.subscriber.getNextDelay({ type: "at_capacity" });
+				nextDelayMs = activeSubscriber.getNextDelay({ type: "at_capacity" });
 				continue;
 			}
 
 			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, subscriberFailedAttempts);
 			if (!nextBatchResponse.success) {
 				subscriberFailedAttempts++;
-				nextDelayMs = this.subscriber.getNextDelay({
+				nextDelayMs = activeSubscriber.getNextDelay({
 					type: "retry",
 					attemptNumber: subscriberFailedAttempts,
 				});
@@ -240,14 +241,15 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			}
 
 			subscriberFailedAttempts = 0;
+			activeSubscriber = nextBatchResponse.subscriber;
 
 			if (!isNonEmptyArray(nextBatchResponse.batch)) {
-				nextDelayMs = this.subscriber.getNextDelay({ type: "polled", foundWork: false });
+				nextDelayMs = activeSubscriber.getNextDelay({ type: "polled", foundWork: false });
 				continue;
 			}
 
 			await this.enqueueWorkflowRunBatch(nextBatchResponse.batch, nextBatchResponse.subscriber, abortSignal);
-			nextDelayMs = this.subscriber.getNextDelay({ type: "polled", foundWork: true });
+			nextDelayMs = activeSubscriber.getNextDelay({ type: "polled", foundWork: true });
 		}
 	}
 
@@ -256,10 +258,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		subscriberFailedAttempts: number
 	): Promise<{ success: true; batch: WorkflowRunBatch[]; subscriber: Subscriber } | { success: false; error: Error }> {
 		if (!this.subscriber) {
-			return {
-				success: false,
-				error: new Error("Subscriber not initialized"),
-			};
+			throw new Error("Subscriber not initialized");
 		}
 
 		try {

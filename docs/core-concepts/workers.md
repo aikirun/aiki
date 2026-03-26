@@ -28,7 +28,7 @@ Worker definitions are static and reusable. The `worker()` function creates a de
 
 ## How Workers Operate
 
-When you call `spawn()`, the worker begins polling for ready workflow runs. When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
+When you call `spawn()`, the worker begins discovering ready workflow runs through its subscriber (DB polling by default). When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
 
 During execution, the worker sends periodic heartbeats to maintain its claim on the run. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the claim expires after a configurable idle time (default: 90 seconds). Other workers detect the orphaned work and claim it. The workflow then re-executes from its last checkpoint.
 
@@ -88,7 +88,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 
 ## Pluggable Subscribers
 
-Workers use DB polling by default. For lower-latency work discovery, install `@aikirun/subscriber-redis`:
+Workers use DB polling by default, which requires no additional setup beyond the Aiki server connection. For lower-latency work discovery, install `@aikirun/subscriber-redis`:
 
 ```bash
 npm install @aikirun/subscriber-redis
