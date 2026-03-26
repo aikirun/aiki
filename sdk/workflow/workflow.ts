@@ -3,7 +3,12 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
 import type { EventsDefinition } from "./run/event";
-import { type WorkflowVersion, WorkflowVersionImpl, type WorkflowVersionParams } from "./workflow-version";
+import {
+	type UnknownWorkflowVersion,
+	type WorkflowVersion,
+	WorkflowVersionImpl,
+	type WorkflowVersionParams,
+} from "./workflow-version";
 
 /**
  * Defines a durable workflow with versioning and multiple task execution.
@@ -74,15 +79,15 @@ export interface Workflow {
 	) => WorkflowVersion<Input, Output, AppContext, TEvents>;
 
 	[INTERNAL]: {
-		getAllVersions: () => WorkflowVersion<unknown, unknown, unknown>[];
-		getVersion: (versionId: WorkflowVersionId) => WorkflowVersion<unknown, unknown, unknown> | undefined;
+		getAllVersions: () => UnknownWorkflowVersion[];
+		getVersion: (versionId: WorkflowVersionId) => UnknownWorkflowVersion | undefined;
 	};
 }
 
 class WorkflowImpl implements Workflow {
 	public readonly name: WorkflowName;
 	public readonly [INTERNAL]: Workflow[typeof INTERNAL];
-	private workflowVersions = new Map<WorkflowVersionId, WorkflowVersion<unknown, unknown, unknown>>();
+	private workflowVersions = new Map<WorkflowVersionId, UnknownWorkflowVersion>();
 
 	constructor(params: WorkflowParams) {
 		this.name = params.name as WorkflowName;
@@ -101,19 +106,16 @@ class WorkflowImpl implements Workflow {
 		}
 
 		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
-		this.workflowVersions.set(
-			versionId as WorkflowVersionId,
-			workflowVersion as unknown as WorkflowVersion<unknown, unknown, unknown>
-		);
+		this.workflowVersions.set(versionId as WorkflowVersionId, workflowVersion as unknown as UnknownWorkflowVersion);
 
 		return workflowVersion;
 	}
 
-	private getAllVersions(): WorkflowVersion<unknown, unknown, unknown>[] {
+	private getAllVersions(): UnknownWorkflowVersion[] {
 		return Array.from(this.workflowVersions.values());
 	}
 
-	private getVersion(versionId: WorkflowVersionId): WorkflowVersion<unknown, unknown, unknown> | undefined {
+	private getVersion(versionId: WorkflowVersionId): UnknownWorkflowVersion | undefined {
 		return this.workflowVersions.get(versionId);
 	}
 }

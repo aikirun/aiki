@@ -7,6 +7,7 @@ COPY lib/package.json ./lib/
 COPY types/package.json ./types/
 COPY server/package.json ./server/
 COPY sdk/client/package.json ./sdk/client/
+COPY sdk/endpoint/package.json ./sdk/endpoint/
 COPY sdk/subscriber/db/package.json ./sdk/subscriber/db/
 COPY sdk/subscriber/redis/package.json ./sdk/subscriber/redis/
 COPY sdk/task/package.json ./sdk/task/

@@ -5,14 +5,14 @@ import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
 import type { Logger } from "./logger";
 import { INTERNAL } from "./symbols";
 
-export interface ClientParams<AppContext = unknown> {
+export interface ClientParams<AppContext = null> {
 	url: string;
 	apiKey?: string;
 	logger?: Logger;
 	createContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
 }
 
-export interface Client<AppContext = unknown> {
+export interface Client<AppContext = null> {
 	api: ApiClient;
 	logger: Logger;
 	[INTERNAL]: {

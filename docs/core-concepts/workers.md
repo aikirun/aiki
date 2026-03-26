@@ -15,7 +15,6 @@ const aikiClient = client({
 });
 
 const aikiWorker = worker({
-  name: "order-worker",
   workflows: [orderWorkflowV1, userWorkflowV1],
   opts: {
     maxConcurrentWorkflowRuns: 10,
@@ -42,8 +41,8 @@ Workers scale naturally. You can add capacity in several ways:
 **Run multiple instances** of the same worker to share load. Each gets a portion of the work automatically:
 
 ```typescript
-const worker1 = worker({ name: "worker-1", workflows: [orderWorkflowV1] });
-const worker2 = worker({ name: "worker-2", workflows: [orderWorkflowV1] });
+const worker1 = worker({ workflows: [orderWorkflowV1] });
+const worker2 = worker({ workflows: [orderWorkflowV1] });
 
 const handle1 = await worker1.spawn(aikiClient);
 const handle2 = await worker2.spawn(aikiClient);
@@ -99,7 +98,6 @@ npm install @aikirun/subscriber-redis
 import { redisSubscriber } from "@aikirun/subscriber-redis";
 
 const aikiWorker = worker({
-  name: "order-worker",
   workflows: [orderWorkflowV1],
   subscriber: redisSubscriber({ host: "localhost", port: 6379 }),
 });

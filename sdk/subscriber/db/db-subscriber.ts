@@ -50,11 +50,7 @@ export function dbSubscriber(params: DbSubscriberParams): CreateSubscriber {
 	};
 
 	return (context: SubscriberContext): Subscriber => {
-		const { workerId, workflows, shards, logger: parentLogger } = context;
-
-		const logger = parentLogger.child({
-			"aiki.component": "db-subscriber",
-		});
+		const { workerId, workflows, shards } = context;
 
 		const workflowFilters = !isNonEmptyArray(shards)
 			? workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId }))
@@ -76,22 +72,7 @@ export function dbSubscriber(params: DbSubscriberParams): CreateSubscriber {
 					data: { workflowRunId: run.id as WorkflowRunId },
 				}));
 			},
-			async heartbeat(workflowRunId: WorkflowRunId): Promise<void> {
-				try {
-					await api.workflowRun.heartbeatV1({ id: workflowRunId });
-					logger.debug("Heartbeat sent", {
-						"aiki.workerId": workerId,
-						"aiki.workflowRunId": workflowRunId,
-					});
-				} catch (error) {
-					logger.warn("Heartbeat failed", {
-						"aiki.workerId": workerId,
-						"aiki.workflowRunId": workflowRunId,
-						"aiki.error": error instanceof Error ? error.message : String(error),
-					});
-				}
-			},
-			async acknowledge(): Promise<void> {},
+			heartbeat: (workflowRunId: WorkflowRunId) => api.workflowRun.heartbeatV1({ id: workflowRunId }),
 		};
 	};
 }

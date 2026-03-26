@@ -5,27 +5,18 @@ import { dbSubscriber } from "@aikirun/subscriber-db";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
 import type { CreateSubscriber, Subscriber, SubscriberContext, WorkflowRunBatch } from "@aikirun/types/subscriber";
-import { INTERNAL } from "@aikirun/types/symbols";
-import type { WorkerId, WorkerName } from "@aikirun/types/worker";
+import type { WorkerId } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
 import {
-	NonDeterminismError,
-	WorkflowRunFailedError,
-	WorkflowRunNotExecutableError,
-	WorkflowRunRevisionConflictError,
-	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow-run-error";
-import {
-	createEventWaiters,
-	createReplayManifest,
-	createSleeper,
+	type AnyWorkflowVersion,
+	executeWorkflowRun,
+	getSystemWorkflows,
+	type WorkflowExecutionOptions,
 	type WorkflowRegistry,
 	type WorkflowVersion,
 	workflowRegistry,
-	workflowRunHandle,
 } from "@aikirun/workflow";
-import { getSystemWorkflows } from "sdk/workflow/system";
 import { ulid } from "ulidx";
 
 /**
@@ -35,7 +26,6 @@ import { ulid } from "ulidx";
  * execution, which returns a handle for controlling the running worker.
  *
  * @param params - Worker configuration parameters
- * @param params.name - Unique worker name for identification and monitoring
  * @param params.workflows - Array of workflow versions this worker can execute
  * @param params.subscriber - Optional subscriber factory for work discovery (default: DB polling)
  * @returns Worker definition, call spawn(client) to begin execution
@@ -43,7 +33,6 @@ import { ulid } from "ulidx";
  * @example
  * ```typescript
  * export const myWorker = worker({
- *   name: "order-worker",
  *   workflows: [orderWorkflowV1, paymentWorkflowV1],
  *   opts: {
  *     maxConcurrentWorkflowRuns: 10,
@@ -62,16 +51,14 @@ export function worker(params: WorkerParams): Worker {
 }
 
 export interface WorkerParams {
-	name: string;
-	// biome-ignore lint/suspicious/noExplicitAny: AppContext is contravariant
-	workflows: WorkflowVersion<any, any, any, any>[];
+	workflows: AnyWorkflowVersion[];
 	subscriber?: CreateSubscriber;
 	opts?: WorkerDefinitionOptions;
 }
 
 export interface WorkerDefinitionOptions {
 	maxConcurrentWorkflowRuns?: number;
-	workflowRun?: WorkflowRunOptions;
+	workflowRun?: WorkflowExecutionOptions;
 	gracefulShutdownTimeoutMs?: number;
 }
 
@@ -91,37 +78,18 @@ export interface WorkerSpawnOptions extends WorkerDefinitionOptions {
 	};
 }
 
-interface WorkflowRunOptions {
-	heartbeatIntervalMs?: number;
-	/**
-	 * Threshold for spinning vs persisting delays (default: 10ms).
-	 *
-	 * Delays <= threshold: In-memory wait (fast, no history, not durable)
-	 * Delays > threshold: Server state transition (history recorded, durable)
-	 *
-	 * Set to 0 to record all delays in transition history.
-	 */
-	spinThresholdMs?: number;
-}
-
 export interface Worker {
-	name: WorkerName;
 	with(): WorkerBuilder;
 	spawn: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
 }
 
 export interface WorkerHandle {
 	id: WorkerId;
-	name: WorkerName;
 	stop: () => Promise<void>;
 }
 
 class WorkerImpl implements Worker {
-	public readonly name: WorkerName;
-
-	constructor(private readonly params: WorkerParams) {
-		this.name = params.name as WorkerName;
-	}
+	constructor(private readonly params: WorkerParams) {}
 
 	public with(): WorkerBuilder {
 		const spawnOpts: WorkerSpawnOptions = this.params.opts ?? {};
@@ -150,8 +118,7 @@ interface ActiveWorkflowRun {
 
 class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	public readonly id: WorkerId;
-	public readonly name: WorkerName;
-	private readonly workflowRunOpts: Required<WorkflowRunOptions>;
+	private readonly workflowRunOpts: Required<WorkflowExecutionOptions>;
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
@@ -166,7 +133,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		private readonly spawnOpts: WorkerSpawnOptions
 	) {
 		this.id = ulid() as WorkerId;
-		this.name = params.name as WorkerName;
 		this.workflowRunOpts = {
 			heartbeatIntervalMs: this.spawnOpts.workflowRun?.heartbeatIntervalMs ?? 30_000,
 			spinThresholdMs: this.spawnOpts.workflowRun?.spinThresholdMs ?? 10,
@@ -177,7 +143,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.logger = client.logger.child({
 			"aiki.component": "worker",
 			"aiki.workerId": this.id,
-			"aiki.workerName": this.name,
 			...(reference && { "aiki.workerReferenceId": reference.id }),
 		});
 	}
@@ -335,8 +300,15 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			}
 
 			// TODO: maybe load multiple workflows in one request
-			const { run: workflowRun } = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
-			if (!workflowRun) {
+			let workflowRun: WorkflowRun | undefined;
+			try {
+				const response = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
+				workflowRun = response.run;
+			} catch (error) {
+				this.logger.warn("Failed to fetch workflow run", {
+					"aiki.workflowRunId": workflowRunId,
+					"aiki.error": error instanceof Error ? error.message : String(error),
+				});
 				if (subscriber.acknowledge) {
 					await subscriber.acknowledge(workflowRunId).catch(() => {});
 				}
@@ -378,90 +350,41 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		subscriber: Subscriber
 	): Promise<void> {
 		const logger = this.logger.child({
-			"aiki.component": "workflow-execution",
 			"aiki.workflowName": workflowRun.name,
 			"aiki.workflowVersionId": workflowRun.versionId,
 			"aiki.workflowRunId": workflowRun.id,
 		});
 
-		let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
-		let shouldAcknowledge = false;
+		const heartbeat = subscriber.heartbeat;
 
-		try {
-			const heartbeat = subscriber.heartbeat;
-			if (heartbeat) {
-				heartbeatInterval = setInterval(() => {
-					try {
-						heartbeat(workflowRun.id as WorkflowRunId);
-					} catch (error) {
-						logger.warn("Failed to send heartbeat", {
-							"aiki.error": error instanceof Error ? error.message : String(error),
-						});
-					}
-				}, this.workflowRunOpts.heartbeatIntervalMs);
-			}
+		const success = await executeWorkflowRun({
+			client: this.client,
+			workflowRun,
+			workflowVersion,
+			logger,
+			options: {
+				spinThresholdMs: this.workflowRunOpts.spinThresholdMs,
+				heartbeatIntervalMs: this.workflowRunOpts.heartbeatIntervalMs,
+			},
+			heartbeat: heartbeat ? () => heartbeat(workflowRun.id as WorkflowRunId) : undefined,
+		});
 
-			const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
-			const handle = await workflowRunHandle(this.client, workflowRun, eventsDefinition, logger);
-
-			const appContext = this.client[INTERNAL].createContext ? this.client[INTERNAL].createContext(workflowRun) : null;
-
-			await workflowVersion[INTERNAL].handler(
-				{
-					id: workflowRun.id as WorkflowRunId,
-					name: workflowRun.name as WorkflowName,
-					versionId: workflowRun.versionId as WorkflowVersionId,
-					options: workflowRun.options ?? {},
-					logger,
-					sleep: createSleeper(handle, logger),
-					events: createEventWaiters(handle, eventsDefinition, logger),
-					[INTERNAL]: {
-						handle,
-						replayManifest: createReplayManifest(workflowRun),
-						options: { spinThresholdMs: this.workflowRunOpts.spinThresholdMs },
-					},
-				},
-				workflowRun.input,
-				appContext instanceof Promise ? await appContext : appContext
-			);
-
-			shouldAcknowledge = true;
-		} catch (error) {
-			if (
-				error instanceof WorkflowRunNotExecutableError ||
-				error instanceof WorkflowRunSuspendedError ||
-				error instanceof WorkflowRunFailedError ||
-				error instanceof WorkflowRunRevisionConflictError ||
-				error instanceof NonDeterminismError
-			) {
-				shouldAcknowledge = true;
-			} else {
-				logger.error("Unexpected error during workflow execution", {
-					"aiki.error": error instanceof Error ? error.message : String(error),
-					"aiki.stack": error instanceof Error ? error.stack : undefined,
-				});
-				shouldAcknowledge = false;
-			}
-		} finally {
-			if (heartbeatInterval) clearInterval(heartbeatInterval);
-
-			if (subscriber.acknowledge) {
-				if (shouldAcknowledge) {
-					try {
-						await subscriber.acknowledge(workflowRun.id as WorkflowRunId);
-					} catch (error) {
-						logger.error("Failed to acknowledge message, it may be reprocessed", {
-							"aiki.errorType": "MESSAGE_ACK_FAILED",
-							"aiki.error": error instanceof Error ? error.message : String(error),
-						});
-					}
-				} else {
-					logger.debug("Message left in PEL for retry");
+		if (subscriber.acknowledge) {
+			if (success) {
+				try {
+					await subscriber.acknowledge(workflowRun.id as WorkflowRunId);
+				} catch (error) {
+					logger.error("Failed to acknowledge message, it may be reprocessed", {
+						"aiki.errorType": "MESSAGE_ACK_FAILED",
+						"aiki.error": error instanceof Error ? error.message : String(error),
+					});
 				}
+			} else {
+				logger.debug("Message left pending for retry");
 			}
-
-			this.activeWorkflowRunsById.delete(workflowRun.id);
 		}
+
+		this.activeWorkflowRunsById.delete(workflowRun.id);
 	}
 }
 
