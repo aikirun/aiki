@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/worker",
-	"version": "0.24.1",
+	"version": "0.24.2",
 	"description": "Worker SDK for Aiki - execute workflows and tasks with durable state management and automatic recovery",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -20,7 +20,6 @@
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
 		"@aikirun/client": "workspace:*",
-		"@aikirun/subscriber-db": "workspace:*",
 		"@aikirun/workflow": "workspace:*",
 		"ulidx": "^2.4.1"
 	},

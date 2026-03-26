@@ -2,7 +2,7 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
-## 0.24.1
+## 0.24.2
 
 ### Patch Changes
 

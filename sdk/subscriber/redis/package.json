@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/subscriber-redis",
-	"version": "0.24.1",
+	"version": "0.24.2",
 	"description": "Redis Streams subscriber for Aiki workers - high-performance work discovery via Redis Streams",
 	"type": "module",
 	"main": "./dist/index.js",
