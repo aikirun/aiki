@@ -17,7 +17,7 @@ const unreliableTask = task({
 		attempts = 0;
 		return { ok: true };
 	},
-	opts: {
+	options: {
 		retry: { type: "fixed", maxAttempts: 5, delayMs: 1_000 },
 	},
 });

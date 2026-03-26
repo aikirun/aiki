@@ -16,7 +16,7 @@ const aikiClient = client({
 
 const aikiWorker = worker({
   workflows: [orderWorkflowV1, userWorkflowV1],
-  opts: {
+  options: {
     maxConcurrentWorkflowRuns: 10,
   },
 });
@@ -77,7 +77,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 | `workflows` | Workflow versions this worker executes |
 | `subscriber` | Optional subscriber factory for work discovery (default: DB polling). Use `redisSubscriber()` from `@aikirun/subscriber-redis` for lower-latency delivery |
 
-**Options** are passed via `opts` param or `with()` builder:
+**Options** are passed via `options` param or `with()` builder:
 
 | Option | Default | Description |
 |--------|---------|-------------|

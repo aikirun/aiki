@@ -53,7 +53,7 @@ export type ScheduleDefinition = ScheduleParams & {
 };
 
 export function schedule(params: ScheduleParams): ScheduleDefinition {
-	async function activateWithOpts<Input, Output, AppContext, TEvents extends EventsDefinition>(
+	async function activateWithOptions<Input, Output, AppContext, TEvents extends EventsDefinition>(
 		client: Client<AppContext>,
 		workflow: WorkflowVersion<Input, Output, AppContext, TEvents>,
 		options: ScheduleActivateOptions,
@@ -102,11 +102,11 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 		};
 	}
 
-	function createBuilder(optsBuilder: ObjectBuilder<ScheduleActivateOptions>): ScheduleBuilder {
+	function createBuilder(optionsBuilder: ObjectBuilder<ScheduleActivateOptions>): ScheduleBuilder {
 		return {
-			opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
+			opt: (path, value) => createBuilder(optionsBuilder.with(path, value)),
 			async activate(client, workflow, ...args) {
-				return activateWithOpts(client, workflow, optsBuilder.build(), ...args);
+				return activateWithOptions(client, workflow, optionsBuilder.build(), ...args);
 			},
 		};
 	}
@@ -115,12 +115,12 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 		...params,
 
 		with(): ScheduleBuilder {
-			const optsOverrider = objectOverrider<ScheduleActivateOptions>({});
-			return createBuilder(optsOverrider());
+			const optionsOverrider = objectOverrider<ScheduleActivateOptions>({});
+			return createBuilder(optionsOverrider());
 		},
 
 		async activate(client, workflow, ...args) {
-			return activateWithOpts(client, workflow, {}, ...args);
+			return activateWithOptions(client, workflow, {}, ...args);
 		},
 	};
 }

@@ -24,7 +24,7 @@ const notifyRestaurant = task({
 		console.log(`Notifying restaurant about order ${input.orderId}`);
 		console.log(`Items: ${input.items.join(", ")}`);
 	},
-	opts: {
+	options: {
 		retry: {
 			type: "exponential",
 			maxAttempts: 3,

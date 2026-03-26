@@ -31,12 +31,12 @@ export async function runWithWorker(
 
 	const workerA = worker({
 		workflows,
-		opts: { maxConcurrentWorkflowRuns: 10 },
+		options: { maxConcurrentWorkflowRuns: 10 },
 	});
 
 	const workerB = worker({
 		workflows,
-		opts: { maxConcurrentWorkflowRuns: 10 },
+		options: { maxConcurrentWorkflowRuns: 10 },
 	});
 
 	const handleA = await workerA.spawn(aikiClient);

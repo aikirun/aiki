@@ -62,7 +62,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 ## Task Retry
 
-Configure automatic retries for failed tasks using the `opts.retry` property:
+Configure automatic retries for failed tasks using the `options.retry` property:
 
 ```typescript
 const processPayment = task({
@@ -70,7 +70,7 @@ const processPayment = task({
 	handler(input: { paymentId: string; amount: number }) {
 		return paymentService.charge(input.paymentId, input.amount);
 	},
-	opts: {
+	options: {
 		retry: {
 			type: "exponential",
 			maxAttempts: 3,

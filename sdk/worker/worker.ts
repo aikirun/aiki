@@ -34,7 +34,7 @@ import { ulid } from "ulidx";
  * ```typescript
  * export const myWorker = worker({
  *   workflows: [orderWorkflowV1, paymentWorkflowV1],
- *   opts: {
+ *   options: {
  *     maxConcurrentWorkflowRuns: 10,
  *   },
  * });
@@ -53,7 +53,7 @@ export function worker(params: WorkerParams): Worker {
 export interface WorkerParams {
 	workflows: AnyWorkflowVersion[];
 	subscriber?: CreateSubscriber;
-	opts?: WorkerDefinitionOptions;
+	options?: WorkerDefinitionOptions;
 }
 
 export interface WorkerDefinitionOptions {
@@ -92,20 +92,20 @@ class WorkerImpl implements Worker {
 	constructor(private readonly params: WorkerParams) {}
 
 	public with(): WorkerBuilder {
-		const spawnOpts: WorkerSpawnOptions = this.params.opts ?? {};
-		const spawnOptsOverrider = objectOverrider(spawnOpts);
-		return new WorkerBuilderImpl(this, spawnOptsOverrider());
+		const spawnOptions: WorkerSpawnOptions = this.params.options ?? {};
+		const spawnOptionsOverrider = objectOverrider(spawnOptions);
+		return new WorkerBuilderImpl(this, spawnOptionsOverrider());
 	}
 
 	public async spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
-		return this.spawnWithOpts(client, this.params.opts ?? {});
+		return this.spawnWithOptions(client, this.params.options ?? {});
 	}
 
-	public async spawnWithOpts<AppContext>(
+	public async spawnWithOptions<AppContext>(
 		client: Client<AppContext>,
-		spawnOpts: WorkerSpawnOptions
+		spawnOptions: WorkerSpawnOptions
 	): Promise<WorkerHandle> {
-		const handle = new WorkerHandleImpl(client, this.params, spawnOpts);
+		const handle = new WorkerHandleImpl(client, this.params, spawnOptions);
 		await handle._start();
 		return handle;
 	}
@@ -118,7 +118,7 @@ interface ActiveWorkflowRun {
 
 class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	public readonly id: WorkerId;
-	private readonly workflowRunOpts: Required<WorkflowExecutionOptions>;
+	private readonly workflowRunOptions: Required<WorkflowExecutionOptions>;
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
@@ -129,17 +129,17 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 	constructor(
 		private readonly client: Client<AppContext>,
-		private readonly params: Omit<WorkerParams, "opts">,
-		private readonly spawnOpts: WorkerSpawnOptions
+		private readonly params: Omit<WorkerParams, "options">,
+		private readonly spawnOptions: WorkerSpawnOptions
 	) {
 		this.id = ulid() as WorkerId;
-		this.workflowRunOpts = {
-			heartbeatIntervalMs: this.spawnOpts.workflowRun?.heartbeatIntervalMs ?? 30_000,
-			spinThresholdMs: this.spawnOpts.workflowRun?.spinThresholdMs ?? 10,
+		this.workflowRunOptions = {
+			heartbeatIntervalMs: this.spawnOptions.workflowRun?.heartbeatIntervalMs ?? 30_000,
+			spinThresholdMs: this.spawnOptions.workflowRun?.spinThresholdMs ?? 10,
 		};
 		this.registry = workflowRegistry().addMany(getSystemWorkflows(client.api)).addMany(this.params.workflows);
 
-		const reference = this.spawnOpts.reference;
+		const reference = this.spawnOptions.reference;
 		this.logger = client.logger.child({
 			"aiki.component": "worker",
 			"aiki.workerId": this.id,
@@ -151,7 +151,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const subscriberContext: SubscriberContext = {
 			workerId: this.id,
 			workflows: this.registry.getAll(),
-			shards: this.spawnOpts.shards,
+			shards: this.spawnOptions.shards,
 			logger: this.logger,
 		};
 
@@ -190,7 +190,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			return;
 		}
 
-		const timeoutMs = this.spawnOpts.gracefulShutdownTimeoutMs ?? 5_000;
+		const timeoutMs = this.spawnOptions.gracefulShutdownTimeoutMs ?? 5_000;
 		if (timeoutMs > 0) {
 			await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
 		}
@@ -215,7 +215,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			"aiki.registeredWorkflows": this.params.workflows.map((w) => `${w.name}:${w.versionId}`),
 		});
 
-		const maxConcurrentWorkflowRuns = this.spawnOpts.maxConcurrentWorkflowRuns ?? 1;
+		const maxConcurrentWorkflowRuns = this.spawnOptions.maxConcurrentWorkflowRuns ?? 1;
 
 		let nextDelayMs = this.subscriber.getNextDelay({ type: "polled", foundWork: false });
 		let subscriberFailedAttempts = 0;
@@ -363,8 +363,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			workflowVersion,
 			logger,
 			options: {
-				spinThresholdMs: this.workflowRunOpts.spinThresholdMs,
-				heartbeatIntervalMs: this.workflowRunOpts.heartbeatIntervalMs,
+				spinThresholdMs: this.workflowRunOptions.spinThresholdMs,
+				heartbeatIntervalMs: this.workflowRunOptions.heartbeatIntervalMs,
 			},
 			heartbeat: heartbeat ? () => heartbeat(workflowRun.id as WorkflowRunId) : undefined,
 		});
@@ -399,17 +399,17 @@ export interface WorkerBuilder {
 class WorkerBuilderImpl implements WorkerBuilder {
 	constructor(
 		private readonly worker: WorkerImpl,
-		private readonly spawnOptsBuilder: ObjectBuilder<WorkerSpawnOptions>
+		private readonly spawnOptionsBuilder: ObjectBuilder<WorkerSpawnOptions>
 	) {}
 
 	opt<Path extends PathFromObject<WorkerSpawnOptions>>(
 		path: Path,
 		value: TypeOfValueAtPath<WorkerSpawnOptions, Path>
 	): WorkerBuilder {
-		return new WorkerBuilderImpl(this.worker, this.spawnOptsBuilder.with(path, value));
+		return new WorkerBuilderImpl(this.worker, this.spawnOptionsBuilder.with(path, value));
 	}
 
 	spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
-		return this.worker.spawnWithOpts(client, this.spawnOptsBuilder.build());
+		return this.worker.spawnWithOptions(client, this.spawnOptionsBuilder.build());
 	}
 }

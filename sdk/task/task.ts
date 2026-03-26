@@ -53,7 +53,7 @@ import type { WorkflowRunContext, WorkflowRunHandle } from "./types";
  *   handler(input: { cardId: string; amount: number }) {
  *     return paymentService.charge(input.cardId, input.amount);
  *   },
- *   opts: {
+ *   options: {
  *     retry: {
  *       type: "fixed",
  *       maxAttempts: 3,
@@ -75,7 +75,7 @@ export function task<Input extends Serializable, Output extends Serializable>(
 export interface TaskParams<Input, Output> {
 	name: string;
 	handler: (input: Input) => Promise<Output>;
-	opts?: TaskDefinitionOptions;
+	options?: TaskDefinitionOptions;
 	schema?: RequireAtLeastOneProp<{
 		input?: StandardSchemaV1<Input>;
 		output?: StandardSchemaV1<Output>;
@@ -96,18 +96,18 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	public with(): TaskBuilder<Input, Output> {
-		const startOpts: TaskStartOptions = this.params.opts ?? {};
-		const startOptsOverrider = objectOverrider(startOpts);
-		return new TaskBuilderImpl(this, startOptsOverrider());
+		const startOptions: TaskStartOptions = this.params.options ?? {};
+		const startOptionsOverrider = objectOverrider(startOptions);
+		return new TaskBuilderImpl(this, startOptionsOverrider());
 	}
 
 	public async start(run: WorkflowRunContext, ...args: Input extends void ? [] : [Input]): Promise<Output> {
-		return this.startWithOpts(run, this.params.opts ?? {}, ...args);
+		return this.startWithOptions(run, this.params.options ?? {}, ...args);
 	}
 
-	public async startWithOpts(
+	public async startWithOptions(
 		run: WorkflowRunContext,
-		startOpts: TaskStartOptions,
+		startOptions: TaskStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
@@ -123,19 +123,19 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		if (replayManifest.hasUnconsumedEntries()) {
 			const existingTaskInfo = replayManifest.consumeNextTask(address);
 			if (existingTaskInfo) {
-				return this.getExistingTaskResult(run, handle, startOpts, input, existingTaskInfo);
+				return this.getExistingTaskResult(run, handle, startOptions, input, existingTaskInfo);
 			}
 
 			await this.throwNonDeterminismError(run, handle, inputHash, replayManifest.getUnconsumedEntries());
 		}
 
 		const attempts = 1;
-		const retryStrategy = startOpts.retry ?? { type: "never" };
+		const retryStrategy = startOptions.retry ?? { type: "never" };
 
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "create",
 			taskName: this.name,
-			options: startOpts,
+			options: startOptions,
 			taskState: { status: "running", attempts, input },
 		});
 
@@ -168,7 +168,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private async getExistingTaskResult(
 		run: WorkflowRunContext,
 		handle: WorkflowRunHandle,
-		startOpts: TaskStartOptions,
+		startOptions: TaskStartOptions,
 		input: Input,
 		existingTaskInfo: TaskInfo
 	) {
@@ -189,7 +189,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		existingTaskState.status satisfies "running" | "awaiting_retry";
 
 		const attempts = existingTaskState.attempts;
-		const retryStrategy = startOpts.retry ?? { type: "never" };
+		const retryStrategy = startOptions.retry ?? { type: "never" };
 		this.assertRetryAllowed(existingTaskInfo.id as TaskId, attempts, retryStrategy, run.logger);
 
 		run.logger.debug("Retrying task", {
@@ -199,7 +199,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			"aiki.taskStatus": existingTaskState.status,
 		});
 
-		return this.retryAndExecute(run, handle, input, existingTaskInfo.id, startOpts, retryStrategy, attempts);
+		return this.retryAndExecute(run, handle, input, existingTaskInfo.id, startOptions, retryStrategy, attempts);
 	}
 
 	private async throwNonDeterminismError(
@@ -227,7 +227,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		handle: WorkflowRunHandle,
 		input: Input,
 		taskId: string,
-		startOpts: TaskStartOptions,
+		startOptions: TaskStartOptions,
 		retryStrategy: RetryStrategy,
 		previousAttempts: number
 	): Promise<Output> {
@@ -236,7 +236,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "retry",
 			taskId,
-			options: startOpts,
+			options: startOptions,
 			taskState: { status: "running", attempts, input },
 		});
 
@@ -389,17 +389,17 @@ export interface TaskBuilder<Input, Output> {
 class TaskBuilderImpl<Input, Output> implements TaskBuilder<Input, Output> {
 	constructor(
 		private readonly task: TaskImpl<Input, Output>,
-		private readonly startOptsBuilder: ObjectBuilder<TaskStartOptions>
+		private readonly startOptionsBuilder: ObjectBuilder<TaskStartOptions>
 	) {}
 
 	opt<Path extends PathFromObject<TaskStartOptions>>(
 		path: Path,
 		value: TypeOfValueAtPath<TaskStartOptions, Path>
 	): TaskBuilder<Input, Output> {
-		return new TaskBuilderImpl(this.task, this.startOptsBuilder.with(path, value));
+		return new TaskBuilderImpl(this.task, this.startOptionsBuilder.with(path, value));
 	}
 
 	start(run: WorkflowRunContext, ...args: Input extends void ? [] : [Input]): Promise<Output> {
-		return this.task.startWithOpts(run, this.startOptsBuilder.build(), ...args);
+		return this.task.startWithOptions(run, this.startOptionsBuilder.build(), ...args);
 	}
 }

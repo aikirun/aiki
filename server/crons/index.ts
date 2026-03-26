@@ -27,12 +27,12 @@ export interface CronHandle {
 	shutdown(): void;
 }
 
-function initCron<Deps, Opts>(
+function initCron<Deps, Options>(
 	logger: Logger,
 	intervalMs: number,
-	fn: (context: CronContext, deps: Deps, opts?: Opts) => Promise<void>,
+	fn: (context: CronContext, deps: Deps, options?: Options) => Promise<void>,
 	deps: Deps,
-	opts?: Opts
+	options?: Options
 ): {
 	interval: ReturnType<typeof setInterval>;
 	abortController: AbortController;
@@ -51,7 +51,7 @@ function initCron<Deps, Opts>(
 
 		const context = createCronContext({ name, logger, signal });
 		const start = performance.now();
-		fn(context, deps, opts)
+		fn(context, deps, options)
 			.then(() => {
 				const durationMs = Math.round(performance.now() - start);
 				context.logger.debug({ durationMs }, `Cron ${name} completed`);

@@ -40,7 +40,7 @@ export interface WorkflowVersionParams<Input, Output, AppContext, TEvents extend
 		context: AppContext
 	) => Promise<Output>;
 	events?: TEvents;
-	opts?: WorkflowDefinitionOptions;
+	options?: WorkflowDefinitionOptions;
 	schema?: RequireAtLeastOneProp<{
 		input?: StandardSchemaV1<Input>;
 		output?: StandardSchemaV1<Output>;
@@ -105,21 +105,21 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 	}
 
 	public with(): WorkflowBuilder<Input, Output, AppContext, TEvents> {
-		const startOpts: WorkflowStartOptions = this.params.opts ?? {};
-		const startOptsOverrider = objectOverrider(startOpts);
-		return new WorkflowBuilderImpl(this, startOptsOverrider());
+		const startOptions: WorkflowStartOptions = this.params.options ?? {};
+		const startOptionsOverrider = objectOverrider(startOptions);
+		return new WorkflowBuilderImpl(this, startOptionsOverrider());
 	}
 
 	public async start(
 		client: Client<AppContext>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
-		return this.startWithOpts(client, this.params.opts ?? {}, ...args);
+		return this.startWithOptions(client, this.params.options ?? {}, ...args);
 	}
 
-	public async startWithOpts(
+	public async startWithOptions(
 		client: Client<AppContext>,
-		startOpts: WorkflowStartOptions,
+		startOptions: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		let input = args[0];
@@ -138,7 +138,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 			name: this.name,
 			versionId: this.versionId,
 			input,
-			options: startOpts,
+			options: startOptions,
 		});
 
 		client.logger.info("Created workflow", {
@@ -154,12 +154,12 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
-		return this.startAsChildWithOpts(parentRun, this.params.opts ?? {}, ...args);
+		return this.startAsChildWithOptions(parentRun, this.params.options ?? {}, ...args);
 	}
 
-	public async startAsChildWithOpts(
+	public async startAsChildWithOptions(
 		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
-		startOpts: WorkflowStartOptions,
+		startOptions: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
@@ -171,7 +171,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		const input = await this.parse(parentRunHandle, this.params.schema?.input, inputRaw, parentRun.logger);
 		const inputHash = await hashInput(input);
 
-		const referenceId = startOpts.reference?.id;
+		const referenceId = startOptions.reference?.id;
 		const address = getWorkflowRunAddress(this.name, this.versionId, referenceId ?? inputHash);
 		const replayManifest = parentRun[INTERNAL].replayManifest;
 
@@ -208,7 +208,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 			versionId: this.versionId,
 			input,
 			parentWorkflowRunId: parentRun.id,
-			options: shard === undefined ? startOpts : { ...startOpts, shard },
+			options: shard === undefined ? startOptions : { ...startOptions, shard },
 		});
 		const { run: newRun } = await client.api.workflowRun.getByIdV1({ id: newRunId });
 
@@ -291,7 +291,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 
 		handle[INTERNAL].assertExecutionAllowed();
 
-		const retryStrategy = this.params.opts?.retry ?? { type: "never" };
+		const retryStrategy = this.params.options?.retry ?? { type: "never" };
 		const state = handle.run.state;
 		if (state.status === "queued" && state.reason === "retry") {
 			await this.assertRetryAllowed(handle, retryStrategy, logger);
@@ -469,27 +469,27 @@ class WorkflowBuilderImpl<Input, Output, AppContext, TEvents extends EventsDefin
 {
 	constructor(
 		private readonly workflow: WorkflowVersionImpl<Input, Output, AppContext, TEvents>,
-		private readonly startOptsBuilder: ObjectBuilder<WorkflowStartOptions>
+		private readonly startOptionsBuilder: ObjectBuilder<WorkflowStartOptions>
 	) {}
 
 	opt<Path extends PathFromObject<WorkflowStartOptions>>(
 		path: Path,
 		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
 	): WorkflowBuilder<Input, Output, AppContext, TEvents> {
-		return new WorkflowBuilderImpl(this.workflow, this.startOptsBuilder.with(path, value));
+		return new WorkflowBuilderImpl(this.workflow, this.startOptionsBuilder.with(path, value));
 	}
 
 	start(
 		client: Client<AppContext>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
-		return this.workflow.startWithOpts(client, this.startOptsBuilder.build(), ...args);
+		return this.workflow.startWithOptions(client, this.startOptionsBuilder.build(), ...args);
 	}
 
 	startAsChild<ParentInput, ParentEvents extends EventsDefinition>(
 		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
-		return this.workflow.startAsChildWithOpts(parentRun, this.startOptsBuilder.build(), ...args);
+		return this.workflow.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);
 	}
 }

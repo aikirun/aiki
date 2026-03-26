@@ -9,7 +9,7 @@ Aiki provides automatic retry capabilities for both tasks and workflows. This gu
 No automatic retries. The task or workflow fails immediately on error.
 
 ```typescript
-opts: {
+options: {
 	retry: { type: "never" }
 }
 ```
@@ -24,7 +24,7 @@ opts: {
 Retries with a constant delay between attempts.
 
 ```typescript
-opts: {
+options: {
 	retry: {
 		type: "fixed",
 		maxAttempts: 3,
@@ -43,7 +43,7 @@ opts: {
 Retries with increasing delays (e.g., 1s, 2s, 4s, 8s...).
 
 ```typescript
-opts: {
+options: {
 	retry: {
 		type: "exponential",
 		maxAttempts: 5,
@@ -64,7 +64,7 @@ opts: {
 Exponential backoff with randomization to prevent thundering herd problems.
 
 ```typescript
-opts: {
+options: {
 	retry: {
 		type: "jittered",
 		maxAttempts: 5,
@@ -94,7 +94,7 @@ const sendNotification = task({
 	handler(input) {
 		return notificationService.send(input);
 	},
-	opts: {
+	options: {
 		retry: {
 			type: "exponential",
 			maxAttempts: 3,
@@ -117,7 +117,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	handler(run, input) {
 		// ...
 	},
-	opts: {
+	options: {
 		retry: {
 			type: "exponential",
 			maxAttempts: 3,
@@ -146,7 +146,7 @@ const chargeCard = task({
 			idempotencyKey: input.transactionId, // Prevents duplicate charges
 		});
 	},
-	opts: {
+	options: {
 		retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 },
 	},
 });

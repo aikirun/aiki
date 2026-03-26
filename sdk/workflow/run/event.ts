@@ -25,7 +25,7 @@ import type { WorkflowRunHandle } from "./handle";
  *
  * @template Data - Type of event data (must be JSON serializable)
  * @param params - Optional event configuration
- * @param opts.schema - Optional schema for runtime validation
+ * @param params.schema - Optional schema for runtime validation
  * @returns EventDefinition for use in workflows
  *
  * @example
@@ -245,12 +245,12 @@ function createEventSender<Data>(
 	logger: Logger,
 	options?: EventSendOptions
 ): EventSender<Data> {
-	const optsOverrider = objectOverrider(options ?? {});
+	const optionsOverrider = objectOverrider(options ?? {});
 
-	const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): EventSenderBuilder<Data> => ({
-		opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
+	const createBuilder = (optionsBuilder: ReturnType<typeof optionsOverrider>): EventSenderBuilder<Data> => ({
+		opt: (path, value) => createBuilder(optionsBuilder.with(path, value)),
 		send: (...args: Data extends void ? [] : [Data]) =>
-			createEventSender(api, workflowRunId, eventName, schema, logger, optsBuilder.build()).send(...args),
+			createEventSender(api, workflowRunId, eventName, schema, logger, optionsBuilder.build()).send(...args),
 	});
 
 	async function send(...args: Data extends void ? [] : [Data]): Promise<void> {
@@ -278,7 +278,7 @@ function createEventSender<Data>(
 	}
 
 	return {
-		with: () => createBuilder(optsOverrider()),
+		with: () => createBuilder(optionsOverrider()),
 		send,
 	};
 }
@@ -310,16 +310,16 @@ function createEventMulticaster<Data>(
 	schema: StandardSchemaV1<Data> | undefined,
 	options?: EventSendOptions
 ): EventMulticaster<Data> {
-	const optsOverrider = objectOverrider(options ?? {});
+	const optionsOverrider = objectOverrider(options ?? {});
 
-	const createBuilder = (optsBuilder: ReturnType<typeof optsOverrider>): EventMulticasterBuilder<Data> => ({
-		opt: (path, value) => createBuilder(optsBuilder.with(path, value)),
+	const createBuilder = (optionsBuilder: ReturnType<typeof optionsOverrider>): EventMulticasterBuilder<Data> => ({
+		opt: (path, value) => createBuilder(optionsBuilder.with(path, value)),
 		send: <AppContext>(
 			client: Client<AppContext>,
 			runId: string | string[],
 			...args: Data extends void ? [] : [Data]
 		) =>
-			createEventMulticaster(workflowName, workflowVersionId, eventName, schema, optsBuilder.build()).send(
+			createEventMulticaster(workflowName, workflowVersionId, eventName, schema, optionsBuilder.build()).send(
 				client,
 				runId,
 				...args
@@ -329,11 +329,13 @@ function createEventMulticaster<Data>(
 			referenceId: string | string[],
 			...args: Data extends void ? [] : [Data]
 		) =>
-			createEventMulticaster(workflowName, workflowVersionId, eventName, schema, optsBuilder.build()).sendByReferenceId(
-				client,
-				referenceId,
-				...args
-			),
+			createEventMulticaster(
+				workflowName,
+				workflowVersionId,
+				eventName,
+				schema,
+				optionsBuilder.build()
+			).sendByReferenceId(client, referenceId, ...args),
 	});
 
 	async function send<AppContext>(
@@ -425,7 +427,7 @@ function createEventMulticaster<Data>(
 	}
 
 	return {
-		with: () => createBuilder(optsOverrider()),
+		with: () => createBuilder(optionsOverrider()),
 		send,
 		sendByReferenceId,
 	};

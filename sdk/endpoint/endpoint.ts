@@ -26,7 +26,7 @@ export interface EndpointOptions {
 export function endpoint(params: EndpointParams): (request: Request) => Promise<Response> {
 	const { client, secret, options } = params;
 	const signatureMaxAgeMs = options?.signatureMaxAgeMs ?? 30_000;
-	const workflowRunOpts = {
+	const workflowRunOptions = {
 		heartbeatIntervalMs: options?.workflowRun?.heartbeatIntervalMs ?? 30_000,
 		spinThresholdMs: options?.workflowRun?.spinThresholdMs ?? 10,
 	};
@@ -94,8 +94,8 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 			workflowVersion,
 			logger: runLogger,
 			options: {
-				spinThresholdMs: workflowRunOpts.spinThresholdMs,
-				heartbeatIntervalMs: workflowRunOpts.heartbeatIntervalMs,
+				spinThresholdMs: workflowRunOptions.spinThresholdMs,
+				heartbeatIntervalMs: workflowRunOptions.heartbeatIntervalMs,
 			},
 			heartbeat: () => client.api.workflowRun.heartbeatV1({ id: workflowRun.id as WorkflowRunId }),
 		});
