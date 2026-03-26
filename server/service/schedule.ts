@@ -1,5 +1,6 @@
-import { hashInput, isNonEmptyArray, stableStringify } from "@aikirun/lib";
-import { sha256 } from "@aikirun/lib/crypto";
+import { isNonEmptyArray } from "@aikirun/lib/array";
+import { hashInput, sha256 } from "@aikirun/lib/crypto";
+import { stableStringify } from "@aikirun/lib/json";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type {
 	Schedule,

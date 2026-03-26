@@ -1,1 +1,1 @@
-export { createSerializableError } from "./serializable";
+export * from "./serializable";

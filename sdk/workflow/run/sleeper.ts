@@ -1,5 +1,6 @@
-import { type Duration, toMilliseconds } from "@aikirun/lib";
+import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/types/client";
+import type { Duration } from "@aikirun/types/duration";
 import type { SleepName, SleepResult } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";

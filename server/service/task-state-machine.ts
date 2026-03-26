@@ -1,4 +1,4 @@
-import { hashInput } from "@aikirun/lib";
+import { hashInput } from "@aikirun/lib/crypto";
 import type { TaskId, TaskInfo, TaskName, TaskState, TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type {

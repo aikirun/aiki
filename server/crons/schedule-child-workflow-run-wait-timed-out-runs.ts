@@ -1,5 +1,5 @@
-import { chunkLazy, isNonEmptyArray } from "@aikirun/lib";
 import type { NonEmptyArray } from "@aikirun/lib/array";
+import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
 import type {
 	TerminalWorkflowRunStatus,
 	WorkflowRunState,

@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib";
+import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { Repositories } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";

@@ -1,5 +1,5 @@
-import type { Duration } from "@aikirun/lib";
 import type { Logger } from "@aikirun/types/client";
+import type { Duration } from "@aikirun/types/duration";
 import type { ReplayManifest } from "@aikirun/types/replay-manifest";
 import type { SleepResult } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";

@@ -1,5 +1,8 @@
-import { hashInput, isNonEmptyArray, propsRequiredNonNull, toMilliseconds } from "@aikirun/lib";
 import { getTaskAddress, getWorkflowRunAddress } from "@aikirun/lib/address";
+import { isNonEmptyArray } from "@aikirun/lib/array";
+import { hashInput } from "@aikirun/lib/crypto";
+import { toMilliseconds } from "@aikirun/lib/duration";
+import { propsRequiredNonNull } from "@aikirun/lib/object";
 import type { EventReferenceOptions, EventWaitQueue } from "@aikirun/types/event";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { SleepQueue } from "@aikirun/types/sleep";

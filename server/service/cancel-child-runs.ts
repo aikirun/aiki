@@ -1,4 +1,5 @@
-import { hashInput, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
+import { hashInput } from "@aikirun/lib/crypto";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {

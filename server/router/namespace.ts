@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib";
+import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { ForbiddenError } from "server/errors";
 import {

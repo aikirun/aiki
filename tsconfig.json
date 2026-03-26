@@ -11,9 +11,7 @@
 
 		"baseUrl": ".",
 		"paths": {
-			"@aikirun/lib": ["./lib/index.ts"],
 			"@aikirun/lib/*": ["./lib/*/index.ts"],
-			"@aikirun/types": ["./types/index.ts"],
 			"@aikirun/types/*": ["./types/*.ts"],
 			"@aikirun/client": ["./sdk/client/index.ts"],
 			"@aikirun/subscriber-db": ["./sdk/subscriber/db/index.ts"],

@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib";
+import { isNonEmptyArray } from "@aikirun/lib/array";
 import type {
 	WorkflowGetStatsRequestV1,
 	WorkflowListRequestV1,

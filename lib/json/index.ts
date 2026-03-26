@@ -1,1 +1,1 @@
-export { stableStringify } from "./stable-stringify";
+export * from "./stable-stringify";

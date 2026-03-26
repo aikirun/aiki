@@ -1,5 +1,5 @@
-import { isNonEmptyArray } from "@aikirun/lib";
 import type { NonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
 import {

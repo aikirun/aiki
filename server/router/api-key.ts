@@ -1,4 +1,4 @@
-import { fireAndForget } from "@aikirun/lib";
+import { fireAndForget } from "@aikirun/lib/async";
 import type { NamespaceRole } from "@aikirun/types/namespace";
 
 import { namespaceAuthedImplementer } from "./implementer";

@@ -1,5 +1,6 @@
-import { type DurationObject, toMilliseconds } from "@aikirun/lib";
+import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Client, Logger } from "@aikirun/types/client";
+import type { DurationObject } from "@aikirun/types/duration";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
 	type ChildWorkflowRunWaitQueue,
