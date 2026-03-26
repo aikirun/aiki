@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/subscriber-db",
-	"version": "0.24.0",
+	"version": "0.24.1",
 	"private": true,
 	"description": "Internal DB polling subscriber for Aiki workers",
 	"type": "module",
