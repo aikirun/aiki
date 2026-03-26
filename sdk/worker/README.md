@@ -21,7 +21,6 @@ const aikiClient = client({
 });
 
 const aikiWorker = worker({
-	name: "order-worker",
 	workflows: [orderWorkflowV1],
 });
 

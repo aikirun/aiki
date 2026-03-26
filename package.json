@@ -3,17 +3,18 @@
 	"private": true,
 	"type": "module",
 	"workspaces": [
-		"types",
+		"examples",
 		"lib",
-		"sdk/workflow",
-		"sdk/task",
 		"sdk/client",
+		"sdk/endpoint",
 		"sdk/subscriber/db",
 		"sdk/subscriber/redis",
+		"sdk/task",
 		"sdk/worker",
+		"sdk/workflow",
 		"server",
-		"web",
-		"examples"
+		"types",
+		"web"
 	],
 	"scripts": {
 		"check": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
@@ -34,14 +35,14 @@
 		"clean": "rm -rf types/dist lib/dist server/dist sdk/*/dist",
 		"build:types": "bun run --cwd types build",
 		"build:lib": "bun run --cwd lib build",
-		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/task build && bun run --cwd sdk/client build && bun run --cwd sdk/subscriber/db build && bun run --cwd sdk/subscriber/redis build && bun run --cwd sdk/worker build",
+		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/task build && bun run --cwd sdk/client build && bun run --cwd sdk/subscriber/db build && bun run --cwd sdk/subscriber/redis build && bun run --cwd sdk/worker build && bun run --cwd sdk/endpoint build",
 		"build:server": "bun build server/index.ts --compile --outfile server/dist/aiki-server",
 		"docker:build": "docker compose build",
 		"docker:up": "docker compose up -d",
 		"docker:down": "docker compose down",
 		"docker:logs": "docker compose logs -f",
 		"release": "bun run build:types && bun run build:lib && bun run build:sdk && bun run release:publish && git tag v$(bun -e \"console.log(require('./types/package.json').version)\") && git push && git push --tags",
-		"release:publish": "for pkg in types sdk/workflow sdk/task sdk/client sdk/subscriber/redis sdk/worker; do (cd $pkg && bun publish --access public) || true; done",
+		"release:publish": "for pkg in types sdk/workflow sdk/task sdk/client sdk/subscriber/redis sdk/worker sdk/endpoint; do (cd $pkg && bun publish --access public) || true; done",
 		"prepare": "husky"
 	},
 	"lint-staged": {

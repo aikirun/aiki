@@ -138,7 +138,6 @@ const aikiClient = client({
 
 // Start a worker
 const myWorker = worker({
-  name: "trial-worker",
   workflows: [trialV1],
 });
 const workerHandle = await myWorker.spawn(aikiClient);

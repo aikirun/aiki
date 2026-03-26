@@ -1,0 +1,28 @@
+{
+	"name": "@aikirun/endpoint",
+	"version": "0.23.1",
+	"description": "Push-based HTTP endpoint for Aiki - execute workflows from serverless environments",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup"
+	},
+	"dependencies": {
+		"@aikirun/types": "workspace:*",
+		"@aikirun/workflow": "workspace:*"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"license": "Apache-2.0"
+}

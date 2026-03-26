@@ -133,7 +133,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 		});
 
 		const logger = parentLogger.child({
-			"aiki.component": "redis-subscriber",
+			"aiki.subscriber": "redis",
 		});
 
 		const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflows, shards);
@@ -178,20 +178,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 				if (!meta) {
 					return;
 				}
-				try {
-					await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
-					logger.debug("Heartbeat sent", {
-						"aiki.workerId": workerId,
-						"aiki.workflowRunId": workflowRunId,
-						"aiki.messageId": meta.messageId,
-					});
-				} catch (error) {
-					logger.warn("Heartbeat failed", {
-						"aiki.workerId": workerId,
-						"aiki.workflowRunId": workflowRunId,
-						"aiki.error": error instanceof Error ? error.message : String(error),
-					});
-				}
+				await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
 			},
 			async acknowledge(workflowRunId: WorkflowRunId): Promise<void> {
 				const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
@@ -205,20 +192,17 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 						logger.warn("Message already acknowledged", {
 							"aiki.workerId": workerId,
 							"aiki.workflowRunId": workflowRunId,
-							"aiki.messageId": meta.messageId,
 						});
 					} else {
 						logger.debug("Message acknowledged", {
 							"aiki.workerId": workerId,
 							"aiki.workflowRunId": workflowRunId,
-							"aiki.messageId": meta.messageId,
 						});
 					}
 				} catch (error) {
 					logger.error("Failed to acknowledge message", {
 						"aiki.workerId": workerId,
 						"aiki.workflowRunId": workflowRunId,
-						"aiki.messageId": meta.messageId,
 						"aiki.error": error instanceof Error ? error.message : String(error),
 					});
 					throw error;
@@ -374,7 +358,6 @@ async function processRedisStreamMessages(
 				if (messageData instanceof type.errors) {
 					logger.warn("Invalid message structure", {
 						"aiki.stream": stream,
-						"aiki.messageId": messageId,
 						"aiki.error": messageData.summary,
 					});
 					await redis.xack(stream, consumerGroup, messageId);

@@ -17,18 +17,16 @@ config({ path: join(__dirname, "../.env") });
  */
 export async function runWithWorker(
 	workflows: AnyWorkflowVersion[],
-	callback: (client: Client<null>) => Promise<void>
+	callback: (client: Client) => Promise<void>
 ): Promise<void> {
 	const aikiClient = client({ url: process.env.AIKI_SERVER_URL ?? "http://localhost:9850" });
 
 	const workerA = worker({
-		name: "worker-A",
 		workflows,
 		opts: { maxConcurrentWorkflowRuns: 10 },
 	});
 
 	const workerB = worker({
-		name: "worker-B",
 		workflows,
 		opts: { maxConcurrentWorkflowRuns: 10 },
 	});

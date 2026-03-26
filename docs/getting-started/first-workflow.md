@@ -168,7 +168,6 @@ const aikiClient = client({
 });
 
 const aikiWorker = worker({
-	name: "restaurant-worker",
 	workflows: [restaurantOrderV1, courierDeliveryV1],
 });
 
