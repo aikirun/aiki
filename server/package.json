@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/server",
-	"version": "0.24.2",
+	"version": "0.24.3",
 	"private": true,
 	"type": "module",
 	"main": "./index.ts",
@@ -14,7 +14,6 @@
 		"db:push": "drizzle-kit push --config infra/db/drizzle.config.ts"
 	},
 	"dependencies": {
-		"@aikirun/lib": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"@orpc/contract": "^1.9.3",
 		"@orpc/server": "^1.9.3",

@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/subscriber-redis",
-	"version": "0.24.2",
+	"version": "0.24.3",
 	"description": "Redis Streams subscriber for Aiki workers - high-performance work discovery via Redis Streams",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -19,7 +19,6 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"@aikirun/lib": "workspace:*",
 		"ioredis": "^5.4.1",
 		"arktype": "^2.1.29"
 	},

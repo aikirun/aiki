@@ -2,11 +2,11 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
-## 0.24.2
+## 0.24.1, 0.24.2 & 0.24.3
 
 ### Patch Changes
 
-- @aikirun/subscriber-db should not be listed as a depdency on npm. It's a private package.
+- @aikirun/lib and @aikirun/subscriber-db should not be listed as a depdencies on npm. They are private packages.
 
 ## 0.24.0
 
