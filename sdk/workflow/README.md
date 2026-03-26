@@ -35,7 +35,6 @@ import { client } from "@aikirun/client";
 // Set AIKI_API_KEY env variable or pass apiKey option
 const aikiClient = client({
 	url: "http://localhost:9850",
-	redis: { host: "localhost", port: 6379 },
 });
 
 const handle = await onboardingWorkflowV1.start(aikiClient, {

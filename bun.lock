@@ -35,6 +35,22 @@
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.9.3",
+      },
+    },
+    "sdk/subscriber/db": {
+      "name": "@aikirun/subscriber-db",
+      "version": "0.23.1",
+      "dependencies": {
+        "@aikirun/lib": "workspace:*",
+        "@aikirun/types": "workspace:*",
+      },
+    },
+    "sdk/subscriber/redis": {
+      "name": "@aikirun/subscriber-redis",
+      "version": "0.23.1",
+      "dependencies": {
+        "@aikirun/lib": "workspace:*",
+        "@aikirun/types": "workspace:*",
         "arktype": "^2.1.29",
         "ioredis": "^5.4.1",
       },
@@ -52,6 +68,7 @@
       "version": "0.23.1",
       "dependencies": {
         "@aikirun/client": "workspace:*",
+        "@aikirun/subscriber-db": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
         "ulidx": "^2.4.1",
@@ -125,6 +142,10 @@
     "@aikirun/lib": ["@aikirun/lib@workspace:lib"],
 
     "@aikirun/server": ["@aikirun/server@workspace:server"],
+
+    "@aikirun/subscriber-db": ["@aikirun/subscriber-db@workspace:sdk/subscriber/db"],
+
+    "@aikirun/subscriber-redis": ["@aikirun/subscriber-redis@workspace:sdk/subscriber/redis"],
 
     "@aikirun/task": ["@aikirun/task@workspace:sdk/task"],
 

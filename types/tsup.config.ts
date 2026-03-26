@@ -17,6 +17,7 @@ export default defineConfig({
 		serializable: "serializable.ts",
 		sleep: "sleep.ts",
 		"state-transition": "state-transition.ts",
+		subscriber: "subscriber.ts",
 		symbols: "symbols.ts",
 		task: "task.ts",
 		"task-error": "task-error.ts",

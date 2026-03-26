@@ -1,13 +1,9 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
-import type {
-	Client,
-	Logger,
-	ResolvedSubscriberStrategy,
-	SubscriberStrategy,
-	WorkflowRunBatch,
-} from "@aikirun/types/client";
+import { dbSubscriber } from "@aikirun/subscriber-db";
+import type { Client, Logger } from "@aikirun/types/client";
+import type { CreateSubscriber, Subscriber, SubscriberContext, WorkflowRunBatch } from "@aikirun/types/subscriber";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkerId, WorkerName } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -40,7 +36,7 @@ import { ulid } from "ulidx";
  * @param params - Worker configuration parameters
  * @param params.name - Unique worker name for identification and monitoring
  * @param params.workflows - Array of workflow versions this worker can execute
- * @param params.subscriber - Message subscriber strategy (default: redis)
+ * @param params.subscriber - Optional subscriber factory for work discovery (default: DB polling)
  * @returns Worker definition, call spawn(client) to begin execution
  *
  * @example
@@ -57,7 +53,6 @@ import { ulid } from "ulidx";
  *
  * process.on("SIGINT", async () => {
  *   await handle.stop();
- *   await client.close();
  * });
  * ```
  */
@@ -69,7 +64,7 @@ export interface WorkerParams {
 	name: string;
 	// biome-ignore lint/suspicious/noExplicitAny: AppContext is contravariant
 	workflows: WorkflowVersion<any, any, any, any>[];
-	subscriber?: SubscriberStrategy;
+	subscriber?: CreateSubscriber;
 	opts?: WorkerDefinitionOptions;
 }
 
@@ -159,8 +154,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
-	private subscriberStrategy: ResolvedSubscriberStrategy | undefined;
-	private fallbackSubscriberStrategy: ResolvedSubscriberStrategy | undefined;
+	private subscriber: Subscriber | undefined;
+	private fallbackSubscriber: Subscriber | undefined;
 	private pollPromise: Promise<void> | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 
@@ -187,30 +182,20 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	}
 
 	async _start(): Promise<void> {
-		const workflows = this.registry.getAll();
+		const subscriberContext: SubscriberContext = {
+			workerId: this.id,
+			workflows: this.registry.getAll(),
+			shards: this.spawnOpts.shards,
+			logger: this.logger,
+		};
 
-		const subscriberStrategyParams = this.params.subscriber ?? { type: "db" };
-		const subscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
-			subscriberStrategyParams,
-			workflows,
-			this.spawnOpts.shards
-		);
-		this.subscriberStrategy = await subscriberStrategyBuilder.init(this.id, {
-			onError: (error: Error) => this.handleSubscriberError(error),
-			onStop: () => this.stop(),
-		});
+		const createSubscriber = this.params.subscriber ?? dbSubscriber({ api: this.client.api });
+		const subscriber = createSubscriber(subscriberContext);
+		this.subscriber = subscriber instanceof Promise ? await subscriber : subscriber;
 
-		if (subscriberStrategyParams.type !== "db") {
-			const fallbackSubscriberStrategyBuilder = this.client[INTERNAL].subscriber.create(
-				{ type: "db" },
-				workflows,
-				this.spawnOpts.shards
-			);
-			this.fallbackSubscriberStrategy = await fallbackSubscriberStrategyBuilder.init(this.id, {
-				onError: (error: Error) => this.handleSubscriberError(error),
-				onStop: () => this.stop(),
-			});
-		}
+		const createFallbackSubscriber = dbSubscriber({ api: this.client.api });
+		const fallbackSubscriber = createFallbackSubscriber(subscriberContext);
+		this.fallbackSubscriber = fallbackSubscriber instanceof Promise ? await fallbackSubscriber : fallbackSubscriber;
 
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
@@ -230,6 +215,9 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.abortController?.abort();
 
 		await this.pollPromise;
+
+		await this.subscriber?.close?.();
+		await this.fallbackSubscriber?.close?.();
 
 		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
 		if (activeWorkflowRuns.length === 0) {
@@ -253,8 +241,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	}
 
 	private async poll(abortSignal: AbortSignal): Promise<void> {
-		if (!this.subscriberStrategy) {
-			throw new Error("Subscriber strategy not initialized");
+		if (!this.subscriber) {
+			throw new Error("Subscriber not initialized");
 		}
 
 		this.logger.info("Worker started", {
@@ -263,7 +251,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		const maxConcurrentWorkflowRuns = this.spawnOpts.maxConcurrentWorkflowRuns ?? 1;
 
-		let nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: false });
+		let nextDelayMs = this.subscriber.getNextDelay({ type: "polled", foundWork: false });
 		let subscriberFailedAttempts = 0;
 
 		while (!abortSignal.aborted) {
@@ -271,14 +259,14 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 			const availableCapacity = maxConcurrentWorkflowRuns - this.activeWorkflowRunsById.size;
 			if (availableCapacity <= 0) {
-				nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "at_capacity" });
+				nextDelayMs = this.subscriber.getNextDelay({ type: "at_capacity" });
 				continue;
 			}
 
 			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, subscriberFailedAttempts);
 			if (!nextBatchResponse.success) {
 				subscriberFailedAttempts++;
-				nextDelayMs = this.subscriberStrategy.getNextDelay({
+				nextDelayMs = this.subscriber.getNextDelay({
 					type: "retry",
 					attemptNumber: subscriberFailedAttempts,
 				});
@@ -288,43 +276,40 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			subscriberFailedAttempts = 0;
 
 			if (!isNonEmptyArray(nextBatchResponse.batch)) {
-				nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: false });
+				nextDelayMs = this.subscriber.getNextDelay({ type: "polled", foundWork: false });
 				continue;
 			}
 
 			await this.enqueueWorkflowRunBatch(nextBatchResponse.batch, nextBatchResponse.subscriber, abortSignal);
-			nextDelayMs = this.subscriberStrategy.getNextDelay({ type: "polled", foundWork: true });
+			nextDelayMs = this.subscriber.getNextDelay({ type: "polled", foundWork: true });
 		}
 	}
 
 	private async fetchNextWorkflowRunBatch(
 		size: number,
 		subscriberFailedAttempts: number
-	): Promise<
-		| { success: true; batch: WorkflowRunBatch[]; subscriber: ResolvedSubscriberStrategy }
-		| { success: false; error: Error }
-	> {
-		if (!this.subscriberStrategy) {
+	): Promise<{ success: true; batch: WorkflowRunBatch[]; subscriber: Subscriber } | { success: false; error: Error }> {
+		if (!this.subscriber) {
 			return {
 				success: false,
-				error: new Error("Subscriber strategy not initialized"),
+				error: new Error("Subscriber not initialized"),
 			};
 		}
 
 		try {
-			const batch = await this.subscriberStrategy.getNextBatch(size);
-			return { success: true, batch, subscriber: this.subscriberStrategy };
+			const batch = await this.subscriber.getNextBatch(size);
+			return { success: true, batch, subscriber: this.subscriber };
 		} catch (error) {
 			this.logger.error("Error getting next workflow runs batch", {
 				"aiki.error": error instanceof Error ? error.message : String(error),
 			});
 
-			if (this.fallbackSubscriberStrategy && subscriberFailedAttempts >= 2) {
+			if (this.fallbackSubscriber && subscriberFailedAttempts >= 2) {
 				try {
-					const batch = await this.fallbackSubscriberStrategy.getNextBatch(size);
-					return { success: true, batch, subscriber: this.fallbackSubscriberStrategy };
+					const batch = await this.fallbackSubscriber.getNextBatch(size);
+					return { success: true, batch, subscriber: this.fallbackSubscriber };
 				} catch (fallbackError) {
-					this.logger.error("Fallback subscriber strategy for getting next workflow runs batch also failed", {
+					this.logger.error("Fallback subscriber also failed to get next workflow runs batch", {
 						"aiki.error": fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
 					});
 				}
@@ -336,7 +321,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 	private async enqueueWorkflowRunBatch(
 		batch: NonEmptyArray<WorkflowRunBatch>,
-		subscriber: ResolvedSubscriberStrategy,
+		subscriber: Subscriber,
 		abortSignal: AbortSignal
 	): Promise<void> {
 		for (const { data } of batch) {
@@ -389,7 +374,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private async executeWorkflow(
 		workflowRun: WorkflowRun,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
-		subscriber: ResolvedSubscriberStrategy
+		subscriber: Subscriber
 	): Promise<void> {
 		const logger = this.logger.child({
 			"aiki.component": "workflow-execution",
@@ -418,9 +403,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
 			const handle = await workflowRunHandle(this.client, workflowRun, eventsDefinition, logger);
 
-			const appContext = this.client[INTERNAL].createContext
-				? await this.client[INTERNAL].createContext(workflowRun)
-				: null;
+			const appContext = this.client[INTERNAL].createContext ? this.client[INTERNAL].createContext(workflowRun) : null;
 
 			await workflowVersion[INTERNAL].handler(
 				{
@@ -438,7 +421,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					},
 				},
 				workflowRun.input,
-				appContext
+				appContext instanceof Promise ? await appContext : appContext
 			);
 
 			shouldAcknowledge = true;
@@ -478,13 +461,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 			this.activeWorkflowRunsById.delete(workflowRun.id);
 		}
-	}
-
-	private handleSubscriberError(error: Error): void {
-		this.logger.warn("Subscriber error", {
-			"aiki.error": error.message,
-			"aiki.stack": error.stack,
-		});
 	}
 }
 

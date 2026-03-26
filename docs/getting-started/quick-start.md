@@ -60,7 +60,6 @@ if (result.success) {
 
 // 7. Cleanup
 await workerHandle.stop();
-await aikiClient.close();
 ```
 
 ## Run Your Workflow

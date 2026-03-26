@@ -1,7 +1,7 @@
 {
-	"name": "@aikirun/worker",
+	"name": "@aikirun/subscriber-redis",
 	"version": "0.23.1",
-	"description": "Worker SDK for Aiki - execute workflows and tasks with durable state management and automatic recovery",
+	"description": "Redis Streams subscriber for Aiki workers - high-performance work discovery via Redis Streams",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -19,10 +19,9 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"@aikirun/client": "workspace:*",
-		"@aikirun/subscriber-db": "workspace:*",
-		"@aikirun/workflow": "workspace:*",
-		"ulidx": "^2.4.1"
+		"@aikirun/lib": "workspace:*",
+		"ioredis": "^5.4.1",
+		"arktype": "^2.1.29"
 	},
 	"publishConfig": {
 		"access": "public"

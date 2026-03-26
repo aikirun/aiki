@@ -29,11 +29,11 @@ Worker definitions are static and reusable. The `worker()` function creates a de
 
 ## How Workers Operate
 
-When you call `spawn()`, the worker subscribes to a stream for each registered workflow. When a workflow run is triggered, a message appears on the stream. The worker picks it up, looks up the workflow definition in its registry, and begins execution.
+When you call `spawn()`, the worker begins polling for ready workflow runs. When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
 
-During execution, the worker sends periodic heartbeats by refreshing its claim on the message. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the message remains unacknowledged. After a configurable idle time (default: 90 seconds), other workers detect the orphaned work and claim it. The workflow then re-executes from its last checkpoint.
+During execution, the worker sends periodic heartbeats to maintain its claim on the run. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the claim expires after a configurable idle time (default: 90 seconds). Other workers detect the orphaned work and claim it. The workflow then re-executes from its last checkpoint.
 
-When execution completes successfully or fails in an expected way, the worker acknowledges the message, marking it as processed.
+When execution completes successfully or fails in an expected way, the worker acknowledges the run, marking it as processed.
 
 ## Scaling
 
@@ -60,7 +60,6 @@ Always handle shutdown signals to let active workflows complete:
 ```typescript
 process.on("SIGTERM", async () => {
   await handle.stop();
-  await aikiClient.close();
   process.exit(0);
 });
 ```
@@ -77,7 +76,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 |-------|-------------|
 | `name` | Unique worker identifier |
 | `workflows` | Workflow versions this worker executes |
-| `subscriber` | Subscriber config (default: `{ type: "db" }`). Use `{ type: "redis" }` for lower-latency delivery |
+| `subscriber` | Optional subscriber factory for work discovery (default: DB polling). Use `redisSubscriber()` from `@aikirun/subscriber-redis` for lower-latency delivery |
 
 **Options** are passed via `opts` param or `with()` builder:
 
@@ -88,12 +87,25 @@ Worker configuration is split between **params** (identity) and **options** (tun
 | `workflowRun.heartbeatIntervalMs` | 30,000 | Heartbeat frequency (ms) |
 | `shards` | — | Shards to process |
 
-**Subscriber options** (within `subscriber`):
+## Pluggable Subscribers
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `claimMinIdleTimeMs` | 90,000 | Idle time before claiming stuck messages |
-| `blockTimeMs` | 1,000 | How long to wait for new messages |
+Workers use DB polling by default. For lower-latency work discovery, install `@aikirun/subscriber-redis`:
+
+```bash
+npm install @aikirun/subscriber-redis
+```
+
+```typescript
+import { redisSubscriber } from "@aikirun/subscriber-redis";
+
+const aikiWorker = worker({
+  name: "order-worker",
+  workflows: [orderWorkflowV1],
+  subscriber: redisSubscriber({ host: "localhost", port: 6379 }),
+});
+```
+
+You can also implement your own subscriber by providing a function that matches the `CreateSubscriber` type from `@aikirun/types/subscriber`.
 
 ## Next Steps
 

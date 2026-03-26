@@ -16,6 +16,8 @@
 			"@aikirun/types": ["./types/index.ts"],
 			"@aikirun/types/*": ["./types/*.ts"],
 			"@aikirun/client": ["./sdk/client/index.ts"],
+			"@aikirun/subscriber-db": ["./sdk/subscriber/db/index.ts"],
+			"@aikirun/subscriber-redis": ["./sdk/subscriber/redis/index.ts"],
 			"@aikirun/workflow": ["./sdk/workflow/index.ts"],
 			"@aikirun/task": ["./sdk/task/index.ts"],
 			"@aikirun/worker": ["./sdk/worker/index.ts"]
