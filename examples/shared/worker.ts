@@ -1,10 +1,10 @@
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import type { Client } from "@aikirun/client";
 import { client } from "@aikirun/client";
+import type { Client } from "@aikirun/types/client";
 import { worker } from "@aikirun/worker";
-import type { WorkflowVersion } from "@aikirun/workflow";
+import type { AnyWorkflowVersion } from "@aikirun/workflow";
 import { config } from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -16,8 +16,7 @@ config({ path: join(__dirname, "../.env") });
  * running on worker-A can have its children picked up by worker-B.
  */
 export async function runWithWorker(
-	// biome-ignore lint/suspicious/noExplicitAny: I want any workflow
-	workflows: WorkflowVersion<any, any, any, any>[],
+	workflows: AnyWorkflowVersion[],
 	callback: (client: Client<null>) => Promise<void>
 ): Promise<void> {
 	const aikiClient = client({ url: process.env.AIKI_SERVER_URL ?? "http://localhost:9850" });

@@ -6,12 +6,12 @@ import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import {
 	WorkflowRunFailedError,
-	type WorkflowRunId,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow-run";
+} from "@aikirun/types/workflow-run-error";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunHandle } from "./handle";

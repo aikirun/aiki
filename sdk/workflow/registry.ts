@@ -1,27 +1,25 @@
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
-import type { WorkflowVersion } from "./workflow-version";
+import type { UnknownWorkflowVersion } from "./workflow-version";
 
 export function workflowRegistry(): WorkflowRegistry {
 	return new WorkflowRegistryImpl();
 }
 
-type Workflow = WorkflowVersion<unknown, unknown, unknown>;
-
 export interface WorkflowRegistry {
-	add: (workflow: Workflow) => WorkflowRegistry;
-	addMany: (workflows: Workflow[]) => WorkflowRegistry;
-	remove: (workflow: Workflow) => WorkflowRegistry;
-	removeMany: (workflows: Workflow[]) => WorkflowRegistry;
+	add: (workflow: UnknownWorkflowVersion) => WorkflowRegistry;
+	addMany: (workflows: UnknownWorkflowVersion[]) => WorkflowRegistry;
+	remove: (workflow: UnknownWorkflowVersion) => WorkflowRegistry;
+	removeMany: (workflows: UnknownWorkflowVersion[]) => WorkflowRegistry;
 	removeAll: () => WorkflowRegistry;
-	getAll(): Workflow[];
-	get: (name: WorkflowName, versionId: WorkflowVersionId) => Workflow | undefined;
+	getAll(): UnknownWorkflowVersion[];
+	get: (name: WorkflowName, versionId: WorkflowVersionId) => UnknownWorkflowVersion | undefined;
 }
 
 class WorkflowRegistryImpl implements WorkflowRegistry {
-	private workflowsByName: Map<WorkflowName, Map<WorkflowVersionId, Workflow>> = new Map();
+	private workflowsByName: Map<WorkflowName, Map<WorkflowVersionId, UnknownWorkflowVersion>> = new Map();
 
-	public add(workflow: Workflow): WorkflowRegistry {
+	public add(workflow: UnknownWorkflowVersion): WorkflowRegistry {
 		const workflows = this.workflowsByName.get(workflow.name);
 		if (!workflows) {
 			this.workflowsByName.set(workflow.name, new Map([[workflow.versionId, workflow]]));
@@ -34,14 +32,14 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 		return this;
 	}
 
-	public addMany(workflows: Workflow[]): WorkflowRegistry {
+	public addMany(workflows: UnknownWorkflowVersion[]): WorkflowRegistry {
 		for (const workflow of workflows) {
 			this.add(workflow);
 		}
 		return this;
 	}
 
-	public remove(workflow: Workflow): WorkflowRegistry {
+	public remove(workflow: UnknownWorkflowVersion): WorkflowRegistry {
 		const workflowVersinos = this.workflowsByName.get(workflow.name);
 		if (workflowVersinos) {
 			workflowVersinos.delete(workflow.versionId);
@@ -49,7 +47,7 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 		return this;
 	}
 
-	public removeMany(workflows: Workflow[]): WorkflowRegistry {
+	public removeMany(workflows: UnknownWorkflowVersion[]): WorkflowRegistry {
 		for (const workflow of workflows) {
 			this.remove(workflow);
 		}
@@ -61,8 +59,8 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 		return this;
 	}
 
-	public getAll(): Workflow[] {
-		const workflows: Workflow[] = [];
+	public getAll(): UnknownWorkflowVersion[] {
+		const workflows: UnknownWorkflowVersion[] = [];
 		for (const workflowVersions of this.workflowsByName.values()) {
 			for (const workflow of workflowVersions.values()) {
 				workflows.push(workflow);
@@ -71,7 +69,7 @@ class WorkflowRegistryImpl implements WorkflowRegistry {
 		return workflows;
 	}
 
-	public get(name: WorkflowName, versionId: WorkflowVersionId): Workflow | undefined {
+	public get(name: WorkflowName, versionId: WorkflowVersionId): UnknownWorkflowVersion | undefined {
 		return this.workflowsByName.get(name)?.get(versionId);
 	}
 }

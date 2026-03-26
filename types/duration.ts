@@ -1,4 +1,4 @@
-import type { RequireAtLeastOneProp } from "./utils";
+import type { RequireAtLeastOneProp } from "./property";
 
 export interface DurationFields {
 	days?: number;

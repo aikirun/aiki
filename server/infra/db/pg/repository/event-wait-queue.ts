@@ -1,4 +1,4 @@
-import type { RequiredNonNullableProp } from "@aikirun/lib/object";
+import type { RequiredNonNullableProp } from "@aikirun/types/property";
 import { eq } from "drizzle-orm";
 
 import type { PgDb } from "../provider";

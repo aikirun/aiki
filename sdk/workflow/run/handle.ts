@@ -1,21 +1,20 @@
 import { type DurationObject, type RetryStrategy, toMilliseconds, withRetry } from "@aikirun/lib";
 import type { ApiClient, Client, Logger } from "@aikirun/types/client";
+import type { DistributiveOmit } from "@aikirun/types/property";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { TaskInfo } from "@aikirun/types/task";
-import type { DistributiveOmit } from "@aikirun/types/utils";
-import {
-	type TerminalWorkflowRunStatus,
-	type WorkflowRun,
-	type WorkflowRunId,
-	WorkflowRunNotExecutableError,
-	WorkflowRunRevisionConflictError,
-	type WorkflowRunState,
+import type {
+	TerminalWorkflowRunStatus,
+	WorkflowRun,
+	WorkflowRunId,
+	WorkflowRunState,
 } from "@aikirun/types/workflow-run";
 import type {
 	WorkflowRunStateRequest,
 	WorkflowRunTransitionStateResponseV1,
 	WorkflowRunTransitionTaskStateRequestV1,
 } from "@aikirun/types/workflow-run-api";
+import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from "@aikirun/types/workflow-run-error";
 
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 

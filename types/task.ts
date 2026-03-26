@@ -1,6 +1,6 @@
+import type { OptionalProp } from "./property";
 import type { RetryStrategy } from "./retry";
 import type { SerializableError } from "./serializable";
-import type { OptionalProp } from "./utils";
 
 export type TaskId = string & { _brand: "task_id" };
 
@@ -103,18 +103,4 @@ export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAt
 
 export interface TaskQueue {
 	tasks: TaskInfo[];
-}
-
-export class TaskFailedError extends Error {
-	public readonly taskId: TaskId;
-	public readonly attempts: number;
-	public readonly reason: string;
-
-	constructor(taskId: TaskId, attempts: number, reason: string) {
-		super(`Task ${taskId} failed after ${attempts} attempts. Reason: ${reason}`);
-		this.name = "TaskFailedError";
-		this.taskId = taskId;
-		this.attempts = attempts;
-		this.reason = reason;
-	}
 }

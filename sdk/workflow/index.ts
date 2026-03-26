@@ -13,12 +13,10 @@ export type {
 export { createEventSenders, createEventWaiters, event } from "./run/event";
 export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/handle";
 export { workflowRunHandle } from "./run/handle";
-export type { ReplayManifest } from "./run/replay-manifest";
 export { createReplayManifest } from "./run/replay-manifest";
 export { createSleeper } from "./run/sleeper";
 export type { ScheduleDefinition, ScheduleHandle, ScheduleParams } from "./schedule";
 export { schedule } from "./schedule";
 export type { Workflow, WorkflowParams } from "./workflow";
 export { workflow } from "./workflow";
-export type { WorkflowVersion, WorkflowVersionParams } from "./workflow-version";
-export { WorkflowVersionImpl } from "./workflow-version";
+export type { AnyWorkflowVersion, WorkflowVersion, WorkflowVersionParams } from "./workflow-version";

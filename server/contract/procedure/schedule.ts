@@ -1,4 +1,4 @@
-import type { Equal, ExpectTrue } from "@aikirun/lib";
+import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
 import type {
 	ScheduleActivateRequestV1,
 	ScheduleActivateResponseV1,

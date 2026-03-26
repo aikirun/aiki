@@ -32,6 +32,14 @@
 			"types": "./dist/organization.d.ts",
 			"import": "./dist/organization.js"
 		},
+		"./property": {
+			"types": "./dist/property.d.ts",
+			"import": "./dist/property.js"
+		},
+		"./replay-manifest": {
+			"types": "./dist/replay-manifest.d.ts",
+			"import": "./dist/replay-manifest.js"
+		},
 		"./retry": {
 			"types": "./dist/retry.d.ts",
 			"import": "./dist/retry.js"
@@ -64,13 +72,13 @@
 			"types": "./dist/task.d.ts",
 			"import": "./dist/task.js"
 		},
+		"./task-error": {
+			"types": "./dist/task-error.d.ts",
+			"import": "./dist/task-error.js"
+		},
 		"./trigger": {
 			"types": "./dist/trigger.d.ts",
 			"import": "./dist/trigger.js"
-		},
-		"./utils": {
-			"types": "./dist/utils.d.ts",
-			"import": "./dist/utils.js"
 		},
 		"./validator": {
 			"types": "./dist/validator.d.ts",
@@ -84,17 +92,21 @@
 			"types": "./dist/workflow.d.ts",
 			"import": "./dist/workflow.js"
 		},
-		"./workflow-run": {
-			"types": "./dist/workflow-run.d.ts",
-			"import": "./dist/workflow-run.js"
-		},
 		"./workflow-api": {
 			"types": "./dist/workflow-api.d.ts",
 			"import": "./dist/workflow-api.js"
 		},
+		"./workflow-run": {
+			"types": "./dist/workflow-run.d.ts",
+			"import": "./dist/workflow-run.js"
+		},
 		"./workflow-run-api": {
 			"types": "./dist/workflow-run-api.d.ts",
 			"import": "./dist/workflow-run-api.js"
+		},
+		"./workflow-run-error": {
+			"types": "./dist/workflow-run-error.d.ts",
+			"import": "./dist/workflow-run-error.js"
 		}
 	},
 	"files": [

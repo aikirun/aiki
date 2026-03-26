@@ -1,5 +1,6 @@
 import type { Duration } from "@aikirun/lib";
 import type { Logger } from "@aikirun/types/client";
+import type { ReplayManifest } from "@aikirun/types/replay-manifest";
 import type { SleepResult } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -7,9 +8,8 @@ import type { WorkflowRunId, WorkflowStartOptions } from "@aikirun/types/workflo
 
 import type { EventsDefinition, EventWaiters } from "./event";
 import type { WorkflowRunHandle } from "./handle";
-import type { ReplayManifest } from "./replay-manifest";
 
-export interface WorkflowRunContext<Input, AppContext, TEvents extends EventsDefinition> {
+export interface WorkflowRunContext<Input, AppContext, TEvents extends EventsDefinition = EventsDefinition> {
 	id: WorkflowRunId;
 	name: WorkflowName;
 	versionId: WorkflowVersionId;

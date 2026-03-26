@@ -1,38 +1,35 @@
 import { getWorkflowRunAddress } from "@aikirun/lib/address";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
-import {
-	type ObjectBuilder,
-	objectOverrider,
-	type PathFromObject,
-	type RequireAtLeastOneProp,
-	type TypeOfValueAtPath,
-} from "@aikirun/lib/object";
+import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { getRetryParams, type RetryStrategy } from "@aikirun/lib/retry";
 import type { Client, Logger } from "@aikirun/types/client";
+import type { RequireAtLeastOneProp } from "@aikirun/types/property";
+import type { ReplayManifest } from "@aikirun/types/replay-manifest";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { TaskFailedError } from "@aikirun/types/task";
+import { TaskFailedError } from "@aikirun/types/task-error";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import {
-	NonDeterminismError,
-	type WorkflowDefinitionOptions,
-	type WorkflowRun,
-	WorkflowRunFailedError,
-	type WorkflowRunId,
-	WorkflowRunRevisionConflictError,
-	type WorkflowRunStateFailed,
-	WorkflowRunSuspendedError,
-	type WorkflowStartOptions,
+import type {
+	WorkflowDefinitionOptions,
+	WorkflowRun,
+	WorkflowRunId,
+	WorkflowRunStateFailed,
+	WorkflowStartOptions,
 } from "@aikirun/types/workflow-run";
 import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/workflow-run-api";
+import {
+	NonDeterminismError,
+	WorkflowRunFailedError,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow-run-error";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunContext } from "./run/context";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
-import type { ReplayManifest } from "./run/replay-manifest";
 
 export interface WorkflowVersionParams<Input, Output, AppContext, TEvents extends EventsDefinition> {
 	handler: (
@@ -80,6 +77,11 @@ export interface WorkflowVersion<Input, Output, AppContext, TEvents extends Even
 		handler: (run: WorkflowRunContext<Input, AppContext, TEvents>, input: Input, context: AppContext) => Promise<void>;
 	};
 }
+
+// biome-ignore lint/suspicious/noExplicitAny: I want any workflow
+export type AnyWorkflowVersion = WorkflowVersion<any, any, any, any>;
+
+export type UnknownWorkflowVersion = WorkflowVersion<unknown, unknown, unknown>;
 
 export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends EventsDefinition>
 	implements WorkflowVersion<Input, Output, AppContext, TEvents>

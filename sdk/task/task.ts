@@ -2,30 +2,26 @@ import { getTaskAddress } from "@aikirun/lib/address";
 import { delay } from "@aikirun/lib/async";
 import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
-import {
-	type ObjectBuilder,
-	objectOverrider,
-	type PathFromObject,
-	type RequireAtLeastOneProp,
-	type TypeOfValueAtPath,
-} from "@aikirun/lib/object";
+import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Logger } from "@aikirun/types/client";
+import type { RequireAtLeastOneProp } from "@aikirun/types/property";
+import type { UnconsumedManifestEntries } from "@aikirun/types/replay-manifest";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskDefinitionOptions, TaskId, TaskInfo, TaskStartOptions } from "@aikirun/types/task";
-import { TaskFailedError, type TaskName } from "@aikirun/types/task";
+import type { TaskDefinitionOptions, TaskId, TaskInfo, TaskName, TaskStartOptions } from "@aikirun/types/task";
+import { TaskFailedError } from "@aikirun/types/task-error";
+import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import {
 	NonDeterminismError,
 	WorkflowRunFailedError,
-	type WorkflowRunId,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow-run";
-import type { ReplayManifest, WorkflowRunContext, WorkflowRunHandle } from "@aikirun/workflow";
+} from "@aikirun/types/workflow-run-error";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import type { EventsDefinition } from "sdk/workflow/run/event";
+
+import type { WorkflowRunContext, WorkflowRunHandle } from "./types";
 
 /**
  * Defines a durable task with deterministic execution and automatic retries.
@@ -89,10 +85,7 @@ export interface TaskParams<Input, Output> {
 export interface Task<Input, Output> {
 	name: TaskName;
 	with(): TaskBuilder<Input, Output>;
-	start: (
-		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
-		...args: Input extends void ? [] : [Input]
-	) => Promise<Output>;
+	start: (run: WorkflowRunContext, ...args: Input extends void ? [] : [Input]) => Promise<Output>;
 }
 
 class TaskImpl<Input, Output> implements Task<Input, Output> {
@@ -108,15 +101,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		return new TaskBuilderImpl(this, startOptsOverrider());
 	}
 
-	public async start(
-		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
-		...args: Input extends void ? [] : [Input]
-	): Promise<Output> {
+	public async start(run: WorkflowRunContext, ...args: Input extends void ? [] : [Input]): Promise<Output> {
 		return this.startWithOpts(run, this.params.opts ?? {}, ...args);
 	}
 
 	public async startWithOpts(
-		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
+		run: WorkflowRunContext,
 		startOpts: TaskStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<Output> {
@@ -136,7 +126,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				return this.getExistingTaskResult(run, handle, startOpts, input, existingTaskInfo);
 			}
 
-			await this.throwNonDeterminismError(run, handle, inputHash, replayManifest);
+			await this.throwNonDeterminismError(run, handle, inputHash, replayManifest.getUnconsumedEntries());
 		}
 
 		const attempts = 1;
@@ -177,8 +167,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async getExistingTaskResult(
-		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		run: WorkflowRunContext,
+		handle: WorkflowRunHandle,
 		startOpts: TaskStartOptions,
 		input: Input,
 		existingTaskInfo: TaskInfo
@@ -214,12 +204,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async throwNonDeterminismError(
-		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		run: WorkflowRunContext,
+		handle: WorkflowRunHandle,
 		inputHash: string,
-		manifest: ReplayManifest
+		unconsumedManifestEntries: UnconsumedManifestEntries
 	) {
-		const unconsumedManifestEntries = manifest.getUnconsumedEntries();
 		run.logger.error("Replay divergence", {
 			"aiki.taskName": this.name,
 			"aiki.inputHash": inputHash,
@@ -235,8 +224,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async retryAndExecute(
-		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		run: WorkflowRunContext,
+		handle: WorkflowRunHandle,
 		input: Input,
 		taskId: string,
 		startOpts: TaskStartOptions,
@@ -279,7 +268,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async tryExecuteTask(
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		handle: WorkflowRunHandle,
 		input: Input,
 		taskId: TaskId,
 		retryStrategy: RetryStrategy,
@@ -363,7 +352,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async parse<T>(
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
+		handle: WorkflowRunHandle,
 		schema: StandardSchemaV1<T> | undefined,
 		data: unknown,
 		logger: Logger
@@ -412,10 +401,7 @@ class TaskBuilderImpl<Input, Output> implements TaskBuilder<Input, Output> {
 		return new TaskBuilderImpl(this.task, this.startOptsBuilder.with(path, value));
 	}
 
-	start(
-		run: WorkflowRunContext<unknown, unknown, EventsDefinition>,
-		...args: Input extends void ? [] : [Input]
-	): Promise<Output> {
+	start(run: WorkflowRunContext, ...args: Input extends void ? [] : [Input]): Promise<Output> {
 		return this.task.startWithOpts(run, this.startOptsBuilder.build(), ...args);
 	}
 }

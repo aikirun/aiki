@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib";
+import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { and, eq, inArray } from "drizzle-orm";
 

@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib";
+import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
 import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/workflow-api";

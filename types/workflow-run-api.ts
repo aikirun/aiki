@@ -1,4 +1,5 @@
 import type { EventSendOptions } from "./event";
+import type { DistributiveOmit, OptionalProp } from "./property";
 import type { StateTransition } from "./state-transition";
 import type {
 	TaskInfo,
@@ -11,7 +12,6 @@ import type {
 	TransitionTaskStateToRunningCreate,
 	TransitionTaskStateToRunningRetry,
 } from "./task";
-import type { DistributiveOmit, OptionalProp } from "./utils";
 import type { WorkflowSource } from "./workflow";
 import type {
 	WorkflowRun,
