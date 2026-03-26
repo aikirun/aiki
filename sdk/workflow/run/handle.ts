@@ -1,7 +1,8 @@
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { withRetry } from "@aikirun/lib/retry";
-import type { ApiClient, Client, Logger } from "@aikirun/types/client";
+import type { ApiClient, Client } from "@aikirun/types/client";
 import type { DurationObject } from "@aikirun/types/duration";
+import type { Logger } from "@aikirun/types/logger";
 import type { DistributiveOmit } from "@aikirun/types/property";
 import type { RetryStrategy } from "@aikirun/types/retry";
 import { INTERNAL } from "@aikirun/types/symbols";

@@ -20,6 +20,10 @@
 			"types": "./dist/event.d.ts",
 			"import": "./dist/event.js"
 		},
+		"./logger": {
+			"types": "./dist/logger.d.ts",
+			"import": "./dist/logger.js"
+		},
 		"./namespace": {
 			"types": "./dist/namespace.d.ts",
 			"import": "./dist/namespace.js"

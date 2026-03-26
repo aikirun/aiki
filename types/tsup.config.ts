@@ -6,6 +6,7 @@ export default defineConfig({
 		client: "client.ts",
 		duration: "duration.ts",
 		event: "event.ts",
+		logger: "logger.ts",
 		namespace: "namespace.ts",
 		"namespace-api": "namespace-api.ts",
 		organization: "organization.ts",

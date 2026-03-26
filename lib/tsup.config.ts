@@ -9,6 +9,7 @@ export default defineConfig({
 		"duration/index": "duration/index.ts",
 		"error/index": "error/index.ts",
 		"json/index": "json/index.ts",
+		"logger/index": "logger/index.ts",
 		"object/index": "object/index.ts",
 		"polling/index": "polling/index.ts",
 		"retry/index": "retry/index.ts",

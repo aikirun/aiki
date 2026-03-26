@@ -1,7 +1,7 @@
 // biome-ignore-all lint/suspicious/noConsole: this is a console logger
-import type { Logger } from "@aikirun/types/client";
+import type { Logger } from "@aikirun/types/logger";
 
-export type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR";
+type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR";
 
 const colors = {
 	reset: "\x1b[0m",

@@ -1,10 +1,10 @@
 import process from "node:process";
-import type { ApiClient, Client, ClientParams, Logger } from "@aikirun/types/client";
+import { ConsoleLogger } from "@aikirun/lib/logger";
+import type { ApiClient, Client, ClientParams } from "@aikirun/types/client";
+import type { Logger } from "@aikirun/types/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-
-import { ConsoleLogger } from "./logger/index";
 
 /**
  * Creates an Aiki client for starting and managing workflows.

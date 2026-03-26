@@ -1,8 +1,9 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
-import type { ApiClient, Client, Logger } from "@aikirun/types/client";
+import type { ApiClient, Client } from "@aikirun/types/client";
 import type { EventName, EventSendOptions, EventWait, EventWaitOptions, EventWaitResult } from "@aikirun/types/event";
+import type { Logger } from "@aikirun/types/logger";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";

@@ -4,7 +4,7 @@ import { hashInput } from "@aikirun/lib/crypto";
 import { createSerializableError } from "@aikirun/lib/error";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import { getRetryParams } from "@aikirun/lib/retry";
-import type { Logger } from "@aikirun/types/client";
+import type { Logger } from "@aikirun/types/logger";
 import type { RequireAtLeastOneProp } from "@aikirun/types/property";
 import type { UnconsumedManifestEntries } from "@aikirun/types/replay-manifest";
 import type { RetryStrategy } from "@aikirun/types/retry";

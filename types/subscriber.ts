@@ -1,4 +1,4 @@
-import type { Logger } from "./client";
+import type { Logger } from "./logger";
 import type { WorkflowMeta } from "./workflow";
 import type { WorkflowRunId } from "./workflow-run";
 

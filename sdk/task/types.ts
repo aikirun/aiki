@@ -1,4 +1,4 @@
-import type { Logger } from "@aikirun/types/client";
+import type { Logger } from "@aikirun/types/logger";
 import type { DistributiveOmit } from "@aikirun/types/property";
 import type { ReplayManifest } from "@aikirun/types/replay-manifest";
 import { INTERNAL } from "@aikirun/types/symbols";

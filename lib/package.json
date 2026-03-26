@@ -33,6 +33,10 @@
 			"types": "./dist/json/index.d.ts",
 			"import": "./dist/json/index.js"
 		},
+		"./logger": {
+			"types": "./dist/logger/index.d.ts",
+			"import": "./dist/logger/index.js"
+		},
 		"./object": {
 			"types": "./dist/object/index.d.ts",
 			"import": "./dist/object/index.js"
