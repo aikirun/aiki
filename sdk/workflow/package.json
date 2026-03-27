@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/workflow",
-	"version": "0.24.3",
+	"version": "0.25.0",
 	"description": "Workflow and Task SDK for Aiki - define durable workflows and tasks with automatic retries, deterministic execution, and replay",
 	"type": "module",
 	"main": "./dist/index.js",

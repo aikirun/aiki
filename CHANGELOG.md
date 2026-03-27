@@ -2,6 +2,31 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.25.0
+
+### Breaking Changes
+
+- **`@aikirun/task` merged into `@aikirun/workflow`** — The `@aikirun/task` package has been removed. Import `task` from `@aikirun/workflow` instead:
+  ```typescript
+  // Before
+  import { task } from "@aikirun/task";
+  import { workflow } from "@aikirun/workflow";
+
+  // After
+  import { task, workflow } from "@aikirun/workflow";
+  ```
+
+  Update your install command:
+  ```bash
+  # Before
+  npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
+
+  # After
+  npm install @aikirun/workflow @aikirun/client @aikirun/worker
+  ```
+
+- **`@aikirun/worker` no longer depends on `@aikirun/client`** — The client is injected at runtime, not a compile-time dependency. No code changes needed — you already pass the client instance when spawning a worker.
+
 ## 0.24.1, 0.24.2 & 0.24.3
 
 ### Patch Changes
