@@ -10,19 +10,19 @@ import type {
 } from "@aikirun/types/subscriber";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 
-export interface DbSubscriberParams {
+export interface HttpSubscriberParams {
 	api: ApiClient;
-	options?: DbSubscriberOptions;
+	options?: HttpSubscriberOptions;
 }
 
-export interface DbSubscriberOptions {
+export interface HttpSubscriberOptions {
 	intervalMs?: number;
 	maxRetryIntervalMs?: number;
 	atCapacityIntervalMs?: number;
 	claimMinIdleTimeMs?: number;
 }
 
-export function dbSubscriber(params: DbSubscriberParams): CreateSubscriber {
+export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 	const { api, options } = params;
 	const intervalMs = options?.intervalMs ?? 1_000;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;

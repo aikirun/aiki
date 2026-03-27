@@ -1,7 +1,7 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
-import { dbSubscriber } from "@aikirun/subscriber-db";
+import { httpSubscriber } from "@aikirun/subscriber-http";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
 import type { CreateSubscriber, Subscriber, SubscriberContext, WorkflowRunBatch } from "@aikirun/types/subscriber";
@@ -155,11 +155,11 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			logger: this.logger,
 		};
 
-		const createSubscriber = this.params.subscriber ?? dbSubscriber({ api: this.client.api });
+		const createSubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
 		const subscriber = createSubscriber(subscriberContext);
 		this.subscriber = subscriber instanceof Promise ? await subscriber : subscriber;
 
-		const createFallbackSubscriber = dbSubscriber({ api: this.client.api });
+		const createFallbackSubscriber = httpSubscriber({ api: this.client.api });
 		const fallbackSubscriber = createFallbackSubscriber(subscriberContext);
 		this.fallbackSubscriber = fallbackSubscriber instanceof Promise ? await fallbackSubscriber : fallbackSubscriber;
 

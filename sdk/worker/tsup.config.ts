@@ -6,5 +6,5 @@ export default defineConfig({
 	dts: true,
 	clean: true,
 	outDir: "dist",
-	noExternal: ["@aikirun/lib", "@aikirun/subscriber-db"],
+	noExternal: ["@aikirun/lib", "@aikirun/subscriber-http"],
 });

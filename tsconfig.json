@@ -14,7 +14,7 @@
 			"@aikirun/client": ["./sdk/client/index.ts"],
 			"@aikirun/endpoint": ["./sdk/endpoint/index.ts"],
 			"@aikirun/lib/*": ["./lib/*/index.ts"],
-			"@aikirun/subscriber-db": ["./sdk/subscriber/db/index.ts"],
+			"@aikirun/subscriber-http": ["./sdk/subscriber/http/index.ts"],
 			"@aikirun/subscriber-redis": ["./sdk/subscriber/redis/index.ts"],
 			"@aikirun/types/*": ["./types/*.ts"],
 			"@aikirun/worker": ["./sdk/worker/index.ts"],

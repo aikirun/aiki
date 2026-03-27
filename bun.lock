@@ -45,8 +45,8 @@
         "@aikirun/workflow": "workspace:*",
       },
     },
-    "sdk/subscriber/db": {
-      "name": "@aikirun/subscriber-db",
+    "sdk/subscriber/http": {
+      "name": "@aikirun/subscriber-http",
       "version": "0.25.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
@@ -140,7 +140,7 @@
 
     "@aikirun/server": ["@aikirun/server@workspace:server"],
 
-    "@aikirun/subscriber-db": ["@aikirun/subscriber-db@workspace:sdk/subscriber/db"],
+    "@aikirun/subscriber-http": ["@aikirun/subscriber-http@workspace:sdk/subscriber/http"],
 
     "@aikirun/subscriber-redis": ["@aikirun/subscriber-redis@workspace:sdk/subscriber/redis"],
 
