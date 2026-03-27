@@ -49,8 +49,7 @@ For comprehensive documentation including scaling strategies, configuration opti
 ## Related Packages
 
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Connect to Aiki server
-- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows
-- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows and tasks
 
 ## License
 

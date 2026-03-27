@@ -17,9 +17,8 @@ Create a file called `my-first-workflow.ts`:
 
 ```typescript
 import { client } from "@aikirun/client";
-import { task } from "@aikirun/task";
 import { worker } from "@aikirun/worker";
-import { workflow } from "@aikirun/workflow";
+import { task, workflow } from "@aikirun/workflow";
 
 // 1. Define a task (unit of work)
 const greet = task({

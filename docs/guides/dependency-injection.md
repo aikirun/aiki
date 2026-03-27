@@ -11,7 +11,7 @@ Use this pattern for long-lived dependencies like database connections, API clie
 Wrap your task definition in a function that accepts dependencies:
 
 ```typescript
-import { task } from "@aikirun/task";
+import { task } from "@aikirun/workflow";
 
 interface EmailService {
 	send(to: string, subject: string, body: string): Promise<void>;

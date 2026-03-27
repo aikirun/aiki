@@ -1,8 +1,8 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { ApiClient } from "@aikirun/types/client";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow-run";
-import { task } from "sdk/task/task";
 
+import { task } from "../task";
 import { workflow } from "../workflow";
 
 export const createCancelChildRunsV1 = (api: ApiClient) => {

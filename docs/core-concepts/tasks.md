@@ -5,7 +5,7 @@ Tasks are the building blocks of workflows. Each task represents a single unit o
 ## Defining a Task
 
 ```typescript
-import { task } from "@aikirun/task";
+import { task } from "@aikirun/workflow";
 
 const sendEmail = task({
 	name: "send-email",

@@ -20,8 +20,7 @@ Aiki workflows are like a virtual thread of execution that can be suspended (int
 A workflow that activates a 14-day free trial and waits for the user to pay. If payment arrives early, it completes immediately. If the trial expires, the user is downgraded.
 
 ```typescript
-import { event, workflow } from "@aikirun/workflow";
-import { task } from "@aikirun/task";
+import { event, task, workflow } from "@aikirun/workflow";
 
 const activateTrial = task({ name: "activate-trial", async handler(userId: string) { /* ... */ } });
 const downgradeToFree = task({ name: "downgrade-to-free", async handler(userId: string) { /* ... */ } });
@@ -106,7 +105,7 @@ export const restaurantOrderV1 = workflow({ name: "restaurant-order" }).v("1.0.0
 
 Install the Aiki SDK:
 ```bash
-npm install @aikirun/workflow @aikirun/task @aikirun/client @aikirun/worker
+npm install @aikirun/workflow @aikirun/client @aikirun/worker
 ```
 
 Start Aiki (requires PostgreSQL — see [Installation Guide](./docs/getting-started/installation.md)):
@@ -205,8 +204,7 @@ See the [Installation Guide](./docs/getting-started/installation.md) for detaile
 
 ## Packages
 
-- [`@aikirun/workflow`](https://www.npmjs.com/package/@aikirun/workflow) — Workflow SDK
-- [`@aikirun/task`](https://www.npmjs.com/package/@aikirun/task) — Task SDK
+- [`@aikirun/workflow`](https://www.npmjs.com/package/@aikirun/workflow) — Workflow and Task SDK
 - [`@aikirun/client`](https://www.npmjs.com/package/@aikirun/client) — Client SDK
 - [`@aikirun/worker`](https://www.npmjs.com/package/@aikirun/worker) — Worker SDK
 - [`@aikirun/endpoint`](https://www.npmjs.com/package/@aikirun/endpoint) — Endpoint SDK (serverless)

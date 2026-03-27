@@ -55,7 +55,7 @@ This starts:
 In a separate terminal, navigate to your own application project (not the aiki directory) and install the SDK:
 
 ```bash
-npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
+npm install @aikirun/client @aikirun/worker @aikirun/workflow
 # or: bun add, pnpm add, yarn add
 ```
 
@@ -106,7 +106,7 @@ This starts:
 In a separate terminal, navigate to your own application project (not the aiki directory) and install the SDK:
 
 ```bash
-npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
+npm install @aikirun/client @aikirun/worker @aikirun/workflow
 # or: bun add, pnpm add, yarn add
 ```
 

@@ -16,7 +16,7 @@ This workflow spans hours or days and coordinates multiple humans—exactly what
 Each task is an independent unit of work that can be retried separately:
 
 ```typescript
-import { task } from "@aikirun/task";
+import { task } from "@aikirun/workflow";
 
 const notifyRestaurant = task({
 	name: "notify-restaurant",

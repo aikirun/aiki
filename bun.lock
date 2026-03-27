@@ -61,14 +61,6 @@
         "ioredis": "^5.4.1",
       },
     },
-    "sdk/task": {
-      "name": "@aikirun/task",
-      "version": "0.24.3",
-      "dependencies": {
-        "@aikirun/types": "workspace:*",
-        "@standard-schema/spec": "^1.1.0",
-      },
-    },
     "sdk/worker": {
       "name": "@aikirun/worker",
       "version": "0.24.3",
@@ -151,8 +143,6 @@
     "@aikirun/subscriber-db": ["@aikirun/subscriber-db@workspace:sdk/subscriber/db"],
 
     "@aikirun/subscriber-redis": ["@aikirun/subscriber-redis@workspace:sdk/subscriber/redis"],
-
-    "@aikirun/task": ["@aikirun/task@workspace:sdk/task"],
 
     "@aikirun/types": ["@aikirun/types@workspace:types"],
 

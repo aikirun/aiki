@@ -1,5 +1,4 @@
-import { task } from "@aikirun/task";
-import { workflow } from "@aikirun/workflow";
+import { task, workflow } from "@aikirun/workflow";
 
 /**
  * Demonstrates task retry. The task fails twice then succeeds on the 3rd attempt.

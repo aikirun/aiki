@@ -6,7 +6,7 @@
 
 - [README](https://github.com/aikirun/aiki/blob/main/README.md): Overview and quick start
 - [Workflows](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workflows.md): Define durable workflows with versioning, retries, and child workflows
-- [Tasks](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/tasks.md): Create idempotent task units with automatic retries
+- [Tasks](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/tasks.md): Define durable tasks with automatic retries
 - [Workers](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workers.md): Execute workflows with horizontal scaling
 - [Client](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/client.md): Connect to Aiki server and start workflows
 - [Events](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/events.md): Wait for external signals with typed events
@@ -25,7 +25,6 @@
 
 ## Packages
 
-- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow): Workflow SDK
-- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task): Task SDK
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow): Workflow and Task SDK
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client): Client SDK
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker): Worker SDK

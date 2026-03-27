@@ -1,6 +1,6 @@
 # @aikirun/workflow
 
-Workflow SDK for Aiki durable execution platform.
+Workflow and Task SDK for Aiki durable execution platform.
 
 ## Installation
 
@@ -11,15 +11,29 @@ npm install @aikirun/workflow
 ## Quick Start
 
 ```typescript
-import { workflow } from "@aikirun/workflow";
-import { sendEmail, createProfile } from "./tasks.ts";
+import { task, workflow } from "@aikirun/workflow";
+
+// Define tasks
+const sendEmail = task({
+	name: "send-email",
+	async handler(input: { email: string; message: string }) {
+		return emailService.send(input.email, input.message);
+	},
+});
+
+const createProfile = task({
+	name: "create-profile",
+	async handler(input: { email: string }) {
+		return profileService.create(input.email);
+	},
+});
 
 // Define a workflow
 export const onboardingWorkflow = workflow({ name: "user-onboarding" });
 
 export const onboardingWorkflowV1 = onboardingWorkflow.v("1.0.0", {
 	async handler(run, input: { email: string }) {
-		await sendEmail.start(run, { email: input.email });
+		await sendEmail.start(run, { email: input.email, message: "Welcome!" });
 		await run.sleep("welcome-delay", { days: 1 });
 		await createProfile.start(run, { email: input.email });
 		return { success: true };
@@ -63,6 +77,7 @@ await dailyReport.activate(aikiClient, onboardingWorkflowV1, { email: "daily@exa
 
 - **Durable Execution** - Workflows survive crashes and restarts
 - **Task Orchestration** - Coordinate multiple tasks
+- **Schema Validation** - Validate workflow & task input and output at runtime
 - **Durable Sleep** - Sleep without blocking workers
 - **Event Handling** - Wait for external events with timeouts
 - **Child Workflows** - Compose workflows together
@@ -72,11 +87,10 @@ await dailyReport.activate(aikiClient, onboardingWorkflowV1, { email: "daily@exa
 
 ## Documentation
 
-For comprehensive documentation including retry strategies, schema validation, child workflows, and best practices, see the [Workflows Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workflows.md).
+For comprehensive documentation including retry strategies, schema validation, child workflows, and best practices, see the [Workflows Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workflows.md) and [Tasks Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/tasks.md).
 
 ## Related Packages
 
-- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Start workflows
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute workflows
 

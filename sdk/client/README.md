@@ -41,8 +41,7 @@ For comprehensive documentation including configuration options and context inje
 
 ## Related Packages
 
-- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows
-- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Define tasks
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows and tasks
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute workflows
 
 ## License

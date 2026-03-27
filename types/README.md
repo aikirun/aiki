@@ -39,8 +39,7 @@ import type { TriggerStrategy } from "@aikirun/types/trigger";
 ## Related Packages
 
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client) - Client SDK
-- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Workflow SDK
-- [@aikirun/task](https://www.npmjs.com/package/@aikirun/task) - Task SDK
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Workflow and Task SDK
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Worker SDK
 
 ## Changelog
