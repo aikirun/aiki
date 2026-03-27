@@ -73,7 +73,6 @@
       "name": "@aikirun/worker",
       "version": "0.24.3",
       "dependencies": {
-        "@aikirun/client": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
         "ulidx": "^2.4.1",
