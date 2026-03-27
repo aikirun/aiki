@@ -75,7 +75,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 |-------|-------------|
 | `name` | Unique worker identifier |
 | `workflows` | Workflow versions this worker executes |
-| `subscriber` | Optional subscriber factory for work discovery (default: DB polling). Use `redisSubscriber()` from `@aikirun/subscriber-redis` for lower-latency delivery |
+| `subscriber` | Optional subscriber factory for work discovery (default: DB polling). Use `redisSubscriber()` from `@aikirun/redis` for lower-latency delivery |
 
 **Options** are passed via `options` param or `with()` builder:
 
@@ -88,14 +88,14 @@ Worker configuration is split between **params** (identity) and **options** (tun
 
 ## Pluggable Subscribers
 
-Workers use DB polling by default, which requires no additional setup beyond the Aiki server connection. For lower-latency work discovery, install `@aikirun/subscriber-redis`:
+Workers use DB polling by default, which requires no additional setup beyond the Aiki server connection. For lower-latency work discovery, install `@aikirun/redis`:
 
 ```bash
-npm install @aikirun/subscriber-redis
+npm install @aikirun/redis
 ```
 
 ```typescript
-import { redisSubscriber } from "@aikirun/subscriber-redis";
+import { redisSubscriber } from "@aikirun/redis";
 
 const aikiWorker = worker({
   workflows: [orderWorkflowV1],

@@ -31,7 +31,7 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
 
 ### Patch Changes
 
-- @aikirun/lib and @aikirun/subscriber-http should not be listed as a depdencies on npm. They are private packages.
+- @aikirun/lib and @aikirun/http should not be listed as a depdencies on npm. They are private packages.
 
 ## 0.24.0
 
@@ -49,8 +49,8 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
   ```
 
 - **Pluggable subscribers** — Work discovery is now a pluggable concern. The client no longer bundles subscriber logic or manages Redis connections. Two subscriber packages are available:
-  - `@aikirun/subscriber-http` — DB polling (default, used automatically when no subscriber is specified)
-  - `@aikirun/subscriber-redis` — Redis Streams for lower-latency delivery
+  - `@aikirun/http` — DB polling (default, used automatically when no subscriber is specified)
+  - `@aikirun/redis` — Redis Streams for lower-latency delivery
 
   Custom subscribers can be implemented via the `CreateSubscriber` type from `@aikirun/types/subscriber`.
 
@@ -91,7 +91,7 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
   const w = worker({ workflows: [...], subscriber: { type: "redis" } });
 
   // After
-  import { redisSubscriber } from "@aikirun/subscriber-redis";
+  import { redisSubscriber } from "@aikirun/redis";
   const w = worker({ workflows: [...], subscriber: redisSubscriber({ host: "localhost", port: 6379 }) });
   ```
 

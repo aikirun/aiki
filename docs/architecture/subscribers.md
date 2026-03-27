@@ -31,11 +31,11 @@ The DB subscriber calls the server's claim endpoint to atomically fetch and clai
 For lower-latency work discovery, install the Redis subscriber:
 
 ```bash
-npm install @aikirun/subscriber-redis
+npm install @aikirun/redis
 ```
 
 ```typescript
-import { redisSubscriber } from "@aikirun/subscriber-redis";
+import { redisSubscriber } from "@aikirun/redis";
 
 const aikiWorker = worker({
   workflows: [orderWorkflowV1],

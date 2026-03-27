@@ -45,15 +45,15 @@
         "@aikirun/workflow": "workspace:*",
       },
     },
-    "sdk/subscriber/http": {
-      "name": "@aikirun/subscriber-http",
+    "sdk/transport/http": {
+      "name": "@aikirun/http",
       "version": "0.25.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
     },
-    "sdk/subscriber/redis": {
-      "name": "@aikirun/subscriber-redis",
+    "sdk/transport/redis": {
+      "name": "@aikirun/redis",
       "version": "0.25.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
@@ -136,13 +136,13 @@
 
     "@aikirun/examples": ["@aikirun/examples@workspace:examples"],
 
+    "@aikirun/http": ["@aikirun/http@workspace:sdk/transport/http"],
+
     "@aikirun/lib": ["@aikirun/lib@workspace:lib"],
 
+    "@aikirun/redis": ["@aikirun/redis@workspace:sdk/transport/redis"],
+
     "@aikirun/server": ["@aikirun/server@workspace:server"],
-
-    "@aikirun/subscriber-http": ["@aikirun/subscriber-http@workspace:sdk/subscriber/http"],
-
-    "@aikirun/subscriber-redis": ["@aikirun/subscriber-redis@workspace:sdk/subscriber/redis"],
 
     "@aikirun/types": ["@aikirun/types@workspace:types"],
 

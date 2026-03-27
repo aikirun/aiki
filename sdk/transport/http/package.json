@@ -1,8 +1,8 @@
 {
-	"name": "@aikirun/subscriber-http",
+	"name": "@aikirun/http",
 	"version": "0.25.0",
 	"private": true,
-	"description": "Internal HTTP polling subscriber for Aiki workers",
+	"description": "Internal HTTP polling transport for Aiki workers",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

@@ -1,7 +1,7 @@
+import { httpSubscriber } from "@aikirun/http";
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { delay } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
-import { httpSubscriber } from "@aikirun/subscriber-http";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
 import type { CreateSubscriber, Subscriber, SubscriberContext, WorkflowRunBatch } from "@aikirun/types/subscriber";

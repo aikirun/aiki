@@ -40,7 +40,7 @@ process.on("SIGTERM", async () => {
 - **Heartbeat Monitoring** - Detect and recover stuck workflows
 - **Graceful Shutdown** - Complete active work before stopping
 - **Sharding** - Route workflows to specific workers
-- **Pluggable Subscribers** - Swap work discovery transport (DB polling default, Redis Streams via `@aikirun/subscriber-redis`, or bring your own)
+- **Pluggable Subscribers** - Swap work discovery transport (DB polling default, Redis Streams via `@aikirun/redis`, or bring your own)
 
 ## Documentation
 
