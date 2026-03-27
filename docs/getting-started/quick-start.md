@@ -6,7 +6,7 @@ Build your first workflow!
 
 Make sure you've completed the [Installation](./installation.md) steps:
 
-- PostgreSQL running
+- Database running (SQLite or PostgreSQL)
 - Aiki Server running
 - SDK packages installed
 - API key created via the Aiki Web UI

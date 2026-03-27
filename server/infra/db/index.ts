@@ -1,6 +1,13 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { createPgRepositories } from "./pg";
 import { createPgDatabaseConn, type PgDatabaseOptions } from "./pg/provider";
 import { betterAuthSchema as pgBetterAuthSchema } from "./pg/schema";
+import { createSqliteRepositories } from "./sqlite";
+import { createSqliteDatabase } from "./sqlite/provider";
+import { betterAuthSchema as sqliteBetterAuthSchema } from "./sqlite/schema";
 
 export type { Repositories } from "./types";
 export * from "./types";
@@ -18,10 +25,31 @@ export function createDatabase(options: DatabaseOptions) {
 				conn,
 				repos: createPgRepositories(conn),
 				betterAuthSchema: pgBetterAuthSchema,
+				close: undefined,
 			};
 		}
-		case "sqlite":
-			throw new Error("SQLite support not yet implemented");
+		case "sqlite": {
+			let tmpDir: string | undefined;
+			let resolvedOptions = options;
+			if (options.path === ":memory:") {
+				tmpDir = mkdtempSync(join(tmpdir(), "aiki-"));
+				resolvedOptions = { ...options, path: join(tmpDir, "aiki.db") };
+			}
+			const { raw, conn: reposConn, close: closeRepos } = createSqliteDatabase(resolvedOptions);
+			const { conn: authConn, close: closeAuth } = createSqliteDatabase(resolvedOptions);
+			return {
+				conn: authConn,
+				repos: createSqliteRepositories(reposConn, raw),
+				betterAuthSchema: sqliteBetterAuthSchema,
+				close: () => {
+					closeRepos();
+					closeAuth();
+					if (tmpDir) {
+						rmSync(tmpDir, { recursive: true, force: true });
+					}
+				},
+			};
+		}
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
 		default:
