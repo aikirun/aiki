@@ -2,6 +2,23 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.26.0
+
+### Breaking Changes
+
+- **`@aikirun/subscriber-redis` renamed to `@aikirun/redis`** — Shorter package name. Update your install and imports:
+  ```typescript
+  // Before
+  import { redisSubscriber } from "@aikirun/subscriber-redis";
+
+  // After
+  import { redisSubscriber } from "@aikirun/redis";
+  ```
+
+- **`@aikirun/subscriber-db` renamed to `@aikirun/http`** — Renamed to reflect what it actually does: poll the server's HTTP API. This is an internal package bundled with `@aikirun/worker` — no user code changes needed unless you imported it directly.
+
+- **Transport packages moved** — Internal directory restructure from `sdk/subscriber/` to `sdk/transport/`. No impact on published packages.
+
 ## 0.25.0
 
 ### Breaking Changes
@@ -31,7 +48,7 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
 
 ### Patch Changes
 
-- @aikirun/lib and @aikirun/http should not be listed as a depdencies on npm. They are private packages.
+- @aikirun/lib and @aikirun/subscriber-db should not be listed as a depdencies on npm. They are private packages.
 
 ## 0.24.0
 
@@ -49,8 +66,8 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
   ```
 
 - **Pluggable subscribers** — Work discovery is now a pluggable concern. The client no longer bundles subscriber logic or manages Redis connections. Two subscriber packages are available:
-  - `@aikirun/http` — DB polling (default, used automatically when no subscriber is specified)
-  - `@aikirun/redis` — Redis Streams for lower-latency delivery
+  - `@aikirun/subscriber-db` — DB polling (default, used automatically when no subscriber is specified)
+  - `@aikirun/subscriber-redis` — Redis Streams for lower-latency delivery
 
   Custom subscribers can be implemented via the `CreateSubscriber` type from `@aikirun/types/subscriber`.
 
@@ -91,7 +108,7 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
   const w = worker({ workflows: [...], subscriber: { type: "redis" } });
 
   // After
-  import { redisSubscriber } from "@aikirun/redis";
+  import { redisSubscriber } from "@aikirun/subscriber-redis";
   const w = worker({ workflows: [...], subscriber: redisSubscriber({ host: "localhost", port: 6379 }) });
   ```
 
