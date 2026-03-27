@@ -9,13 +9,14 @@ const providerDialects: Record<DatabaseConfig["provider"], DrizzleConfig["dialec
 };
 
 const provider = process.env.DATABASE_PROVIDER || "pg";
-const connectionString = process.env.DATABASE_URL;
 
 if (!isDatabaseProvider(provider)) {
 	throw new Error(`Unsupported DATABASE_PROVIDER: ${provider}. Supported: ${DATABASE_PROVIDERS.join(", ")}`);
 }
 
-if (!connectionString) {
+const connectionString = provider === "sqlite" ? (process.env.DATABASE_PATH ?? ":memory:") : process.env.DATABASE_URL;
+
+if (provider !== "sqlite" && !connectionString) {
 	throw new Error("DATABASE_URL environment variable is required");
 }
 
@@ -24,6 +25,6 @@ export default {
 	out: `./infra/db/${provider}/migration`,
 	dialect: providerDialects[provider],
 	dbCredentials: {
-		url: connectionString,
+		url: provider === "sqlite" ? `file:${connectionString}` : connectionString!,
 	},
 } satisfies DrizzleConfig;

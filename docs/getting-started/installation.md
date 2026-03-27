@@ -1,15 +1,86 @@
 # Installation
 
-This guide covers two ways to run Aiki:
+This guide covers three ways to run Aiki:
 
-- **Option A: Docker Compose** — Runs Aiki server and web UI in containers
-- **Option B: Direct with Bun** — Runs Aiki directly on your machine
+- **Option A: SQLite (simplest)** — No external database needed, runs entirely on your machine
+- **Option B: Docker Compose** — Runs Aiki server and web UI in containers with PostgreSQL
+- **Option C: Direct with Bun + PostgreSQL** — Runs Aiki directly on your machine with PostgreSQL
 
-Both options require PostgreSQL running externally. Redis is optional — it enables lower-latency message delivery but Aiki works without it.
+Redis is optional for all options — it enables lower-latency message delivery but Aiki works without it.
 
 ---
 
-## Option A: Using Docker Compose
+## Option A: SQLite (Simplest)
+
+The fastest way to get started — no PostgreSQL or Docker required. SQLite is ideal for development, testing, and single-node production deployments.
+
+### Prerequisites
+
+- Bun 1.0+
+
+### Step 1: Clone and Install
+
+```bash
+git clone https://github.com/aikirun/aiki.git
+cd aiki
+bun install
+```
+
+### Step 2: Configure Environment
+
+```bash
+cp server/.env.example server/.env
+```
+
+Edit `server/.env` to use SQLite:
+
+```bash
+DATABASE_PROVIDER=sqlite
+DATABASE_PATH=./data/aiki.db
+```
+
+Comment out or remove the `DATABASE_URL` line — it's not needed for SQLite.
+
+### Step 3: Push the Database Schema
+
+```bash
+cd server
+bunx drizzle-kit push --config infra/db/drizzle.config.ts
+cd ..
+```
+
+This creates the SQLite database file and all required tables.
+
+### Step 4: Start Aiki
+
+```bash
+# Terminal 1 - Start the server
+bun run server
+
+# Terminal 2 - Start the web UI
+bun run web
+```
+
+This starts:
+- **Aiki Server** on http://localhost:9850
+- **Aiki Web UI** on http://localhost:9851
+
+### Step 5: Install SDK Packages
+
+In a separate terminal, navigate to your own application project (not the aiki directory) and install the SDK:
+
+```bash
+npm install @aikirun/client @aikirun/worker @aikirun/workflow @aikirun/task
+# or: bun add, pnpm add, yarn add
+```
+
+You're ready! Continue to the [Quick Start](./quick-start.md) guide.
+
+> **Note:** SQLite uses a single database file and supports one writer at a time. This is fine for development and single-server production, but for multi-server deployments use PostgreSQL instead.
+
+---
+
+## Option B: Using Docker Compose
 
 ### Prerequisites
 
@@ -63,7 +134,7 @@ You're ready! Continue to the [Quick Start](./quick-start.md) guide.
 
 ---
 
-## Option B: Running Directly with Bun
+## Option C: Running Directly with Bun + PostgreSQL
 
 ### Prerequisites
 
@@ -120,10 +191,11 @@ You're ready! Continue to the [Quick Start](./quick-start.md) guide.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_PROVIDER` | No | `pg` | Database type: `pg` (PostgreSQL) |
-| `DATABASE_URL` | Yes | - | Connection string (e.g., `postgresql://user:password@host:port/database`) |
-| `DATABASE_MAX_CONNECTIONS` | No | `10` | Maximum database connections in pool |
-| `DATABASE_SSL` | No | `false` | Enable SSL for database connection |
+| `DATABASE_PROVIDER` | No | `pg` | Database type: `pg` (PostgreSQL) or `sqlite` |
+| `DATABASE_URL` | Yes (pg) | - | PostgreSQL connection string (e.g., `postgresql://user:password@host:port/database`) |
+| `DATABASE_PATH` | No (sqlite) | `:memory:` | Path to SQLite database file (e.g., `./data/aiki.db`) |
+| `DATABASE_MAX_CONNECTIONS` | No | `10` | Maximum database connections in pool (PostgreSQL only) |
+| `DATABASE_SSL` | No | `false` | Enable SSL for database connection (PostgreSQL only) |
 | `AIKI_SERVER_HOST` | No | `0.0.0.0` | Host address to bind the server to |
 | `AIKI_SERVER_PORT` | No | `9850` | Port for the Aiki server |
 | `AIKI_SERVER_BASE_URL` | Yes | - | Public URL of the Aiki server |

@@ -108,19 +108,20 @@ Install the Aiki SDK:
 npm install @aikirun/workflow @aikirun/client @aikirun/worker
 ```
 
-Start Aiki (requires PostgreSQL — see [Installation Guide](./docs/getting-started/installation.md)):
+Start Aiki (see [Installation Guide](./docs/getting-started/installation.md)):
 
 ```bash
 # First clone the repo
 git clone https://github.com/aikirun/aiki.git
 cd aiki
 
-# Configure your database connection, then start
+# Quickest start — uses SQLite, no external dependencies
+DATABASE_PROVIDER=sqlite bun run server
+
+# Or use PostgreSQL for production workloads
 docker-compose up
 
-# Or run directly with Bun
-bun run server  # Terminal 1 - start the server
-bun run web     # Terminal 2 - start the web UI
+bun run web  # Start the web UI
 ```
 
 The server runs on `http://localhost:9850` and the web UI on `http://localhost:9851`.
@@ -197,7 +198,7 @@ Read the [docs](./docs/README.md)
 
 - **Runtime**: Node.js 18+ or Bun 1.0+
 - **ESM (ES Modules)** - This package uses ES modules (`import`/`export`)
-- **Database**: PostgreSQL 14+
+- **Database**: SQLite (embedded, zero setup) or PostgreSQL 14+
 - **Redis** (optional): Redis 6.2+ for lower-latency work discovery
 
 See the [Installation Guide](./docs/getting-started/installation.md) for detailed setup instructions including environment variable configuration.

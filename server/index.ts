@@ -31,7 +31,7 @@ if (import.meta.main) {
 	const config = await loadConfig();
 	const logger = createLogger(config.logLevel, config.prettyLogs);
 
-	const { repos, conn, betterAuthSchema } = createDatabase(config.database);
+	const { repos, conn, betterAuthSchema, close } = createDatabase(config.database);
 
 	let redis: Redis | undefined;
 	let workflowRunPublisher: ReturnType<typeof createWorkflowRunPublisher> | undefined;
@@ -182,6 +182,7 @@ if (import.meta.main) {
 		if (redis) {
 			await redis.quit();
 		}
+		close?.();
 		process.exit(0);
 	};
 

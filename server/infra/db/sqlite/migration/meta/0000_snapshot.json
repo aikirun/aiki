@@ -1,0 +1,2055 @@
+{
+	"version": "6",
+	"dialect": "sqlite",
+	"id": "032cbeae-56bb-49e8-945c-22b302a15191",
+	"prevId": "00000000-0000-0000-0000-000000000000",
+	"tables": {
+		"child_workflow_run_wait_queue": {
+			"name": "child_workflow_run_wait_queue",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"parent_workflow_run_id": {
+					"name": "parent_workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"child_workflow_run_id": {
+					"name": "child_workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"child_workflow_run_status": {
+					"name": "child_workflow_run_status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"timed_out_at": {
+					"name": "timed_out_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"child_workflow_run_state_transition_id": {
+					"name": "child_workflow_run_state_transition_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"idx_child_workflow_run_wait_queue_parent_id": {
+					"name": "idx_child_workflow_run_wait_queue_parent_id",
+					"columns": ["parent_workflow_run_id", "id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_child_workflow_run_wait_queue_parent": {
+					"name": "fk_child_workflow_run_wait_queue_parent",
+					"tableFrom": "child_workflow_run_wait_queue",
+					"tableTo": "workflow_run",
+					"columnsFrom": ["parent_workflow_run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_child_workflow_run_wait_queue_child": {
+					"name": "fk_child_workflow_run_wait_queue_child",
+					"tableFrom": "child_workflow_run_wait_queue",
+					"tableTo": "workflow_run",
+					"columnsFrom": ["child_workflow_run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_child_workflow_run_wait_queue_state_transition": {
+					"name": "fk_child_workflow_run_wait_queue_state_transition",
+					"tableFrom": "child_workflow_run_wait_queue",
+					"tableTo": "state_transition",
+					"columnsFrom": ["child_workflow_run_state_transition_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {
+				"chk_child_workflow_run_wait_completed_invariants": {
+					"name": "chk_child_workflow_run_wait_completed_invariants",
+					"value": "\"child_workflow_run_wait_queue\".\"status\" != 'completed' OR (\"child_workflow_run_wait_queue\".\"completed_at\" IS NOT NULL AND \"child_workflow_run_wait_queue\".\"child_workflow_run_state_transition_id\" IS NOT NULL)"
+				},
+				"chk_child_workflow_run_wait_timeout_requires_timed_out_at": {
+					"name": "chk_child_workflow_run_wait_timeout_requires_timed_out_at",
+					"value": "\"child_workflow_run_wait_queue\".\"status\" != 'timeout' OR \"child_workflow_run_wait_queue\".\"timed_out_at\" IS NOT NULL"
+				}
+			}
+		},
+		"event_wait_queue": {
+			"name": "event_wait_queue",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_run_id": {
+					"name": "workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"reference_id": {
+					"name": "reference_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"data": {
+					"name": "data",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"timed_out_at": {
+					"name": "timed_out_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"uqidx_event_wait_queue_workflow_run_name_reference": {
+					"name": "uqidx_event_wait_queue_workflow_run_name_reference",
+					"columns": ["workflow_run_id", "name", "reference_id"],
+					"isUnique": true
+				},
+				"idx_event_wait_queue_workflow_run_id": {
+					"name": "idx_event_wait_queue_workflow_run_id",
+					"columns": ["workflow_run_id", "id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_event_wait_queue_workflow_run": {
+					"name": "fk_event_wait_queue_workflow_run",
+					"tableFrom": "event_wait_queue",
+					"tableTo": "workflow_run",
+					"columnsFrom": ["workflow_run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {
+				"chk_event_wait_queue_timeout_requires_timed_out_at": {
+					"name": "chk_event_wait_queue_timeout_requires_timed_out_at",
+					"value": "\"event_wait_queue\".\"status\" != 'timeout' OR \"event_wait_queue\".\"timed_out_at\" IS NOT NULL"
+				}
+			}
+		},
+		"schedule": {
+			"name": "schedule",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_id": {
+					"name": "workflow_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"type": {
+					"name": "type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"cron_expression": {
+					"name": "cron_expression",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"interval_ms": {
+					"name": "interval_ms",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"overlap_policy": {
+					"name": "overlap_policy",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"workflow_run_input": {
+					"name": "workflow_run_input",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"workflow_run_input_hash": {
+					"name": "workflow_run_input_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"definition_hash": {
+					"name": "definition_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"reference_id": {
+					"name": "reference_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"conflict_policy": {
+					"name": "conflict_policy",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"last_occurrence": {
+					"name": "last_occurrence",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"next_run_at": {
+					"name": "next_run_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"uqidx_schedule_namespace_definition": {
+					"name": "uqidx_schedule_namespace_definition",
+					"columns": ["namespace_id", "definition_hash"],
+					"isUnique": true
+				},
+				"uqidx_schedule_namespace_reference": {
+					"name": "uqidx_schedule_namespace_reference",
+					"columns": ["namespace_id", "reference_id"],
+					"isUnique": true
+				},
+				"idx_schedule_namespace_workflow": {
+					"name": "idx_schedule_namespace_workflow",
+					"columns": ["namespace_id", "workflow_id"],
+					"isUnique": false
+				},
+				"idx_schedule_status_next_run_at": {
+					"name": "idx_schedule_status_next_run_at",
+					"columns": ["status", "next_run_at"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_schedule_namespace_id": {
+					"name": "fk_schedule_namespace_id",
+					"tableFrom": "schedule",
+					"tableTo": "namespace",
+					"columnsFrom": ["namespace_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_schedule_workflow_id": {
+					"name": "fk_schedule_workflow_id",
+					"tableFrom": "schedule",
+					"tableTo": "workflow",
+					"columnsFrom": ["workflow_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"sleep_queue": {
+			"name": "sleep_queue",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_run_id": {
+					"name": "workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"awake_at": {
+					"name": "awake_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"cancelled_at": {
+					"name": "cancelled_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"uqidx_sleep_queue_one_active_per_run": {
+					"name": "uqidx_sleep_queue_one_active_per_run",
+					"columns": ["workflow_run_id"],
+					"isUnique": true,
+					"where": "\"sleep_queue\".\"status\" = 'sleeping'"
+				},
+				"idx_sleep_queue_workflow_run_id": {
+					"name": "idx_sleep_queue_workflow_run_id",
+					"columns": ["workflow_run_id", "id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_sleep_queue_workflow_run": {
+					"name": "fk_sleep_queue_workflow_run",
+					"tableFrom": "sleep_queue",
+					"tableTo": "workflow_run",
+					"columnsFrom": ["workflow_run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {
+				"chk_sleep_queue_completed_requires_completed_at": {
+					"name": "chk_sleep_queue_completed_requires_completed_at",
+					"value": "\"sleep_queue\".\"status\" != 'completed' OR \"sleep_queue\".\"completed_at\" IS NOT NULL"
+				},
+				"chk_sleep_queue_cancelled_requires_cancelled_at": {
+					"name": "chk_sleep_queue_cancelled_requires_cancelled_at",
+					"value": "\"sleep_queue\".\"status\" != 'cancelled' OR \"sleep_queue\".\"cancelled_at\" IS NOT NULL"
+				}
+			}
+		},
+		"state_transition": {
+			"name": "state_transition",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_run_id": {
+					"name": "workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"type": {
+					"name": "type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"task_id": {
+					"name": "task_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"attempt": {
+					"name": "attempt",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"state": {
+					"name": "state",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"idx_state_transition_workflow_run_id": {
+					"name": "idx_state_transition_workflow_run_id",
+					"columns": ["workflow_run_id", "id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_state_transition_workflow_run": {
+					"name": "fk_state_transition_workflow_run",
+					"tableFrom": "state_transition",
+					"tableTo": "workflow_run",
+					"columnsFrom": ["workflow_run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_state_transition_task": {
+					"name": "fk_state_transition_task",
+					"tableFrom": "state_transition",
+					"tableTo": "task",
+					"columnsFrom": ["task_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {
+				"chk_task_state_transition_requires_task_id": {
+					"name": "chk_task_state_transition_requires_task_id",
+					"value": "(\"state_transition\".\"type\" = 'task' AND \"state_transition\".\"task_id\" IS NOT NULL) OR (\"state_transition\".\"type\" = 'workflow_run' AND \"state_transition\".\"task_id\" IS NULL)"
+				},
+				"chk_state_transition_status_matches_type": {
+					"name": "chk_state_transition_status_matches_type",
+					"value": "(type = 'workflow_run' AND status IN ('scheduled', 'queued', 'running', 'paused', 'sleeping', 'awaiting_event', 'awaiting_retry', 'awaiting_child_workflow', 'cancelled', 'completed', 'failed')) OR (type = 'task' AND status IN ('running', 'awaiting_retry', 'completed', 'failed'))"
+				}
+			}
+		},
+		"task": {
+			"name": "task",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_run_id": {
+					"name": "workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"attempts": {
+					"name": "attempts",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"input": {
+					"name": "input",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"input_hash": {
+					"name": "input_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"options": {
+					"name": "options",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"latest_state_transition_id": {
+					"name": "latest_state_transition_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"next_attempt_at": {
+					"name": "next_attempt_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"idx_task_workflow_run_id": {
+					"name": "idx_task_workflow_run_id",
+					"columns": ["workflow_run_id", "id"],
+					"isUnique": false
+				},
+				"idx_task_workflow_run_status": {
+					"name": "idx_task_workflow_run_status",
+					"columns": ["workflow_run_id", "status"],
+					"isUnique": false
+				},
+				"idx_task_status_workflow_run_next_attempt_at": {
+					"name": "idx_task_status_workflow_run_next_attempt_at",
+					"columns": ["status", "workflow_run_id", "next_attempt_at"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_task_workflow_run": {
+					"name": "fk_task_workflow_run",
+					"tableFrom": "task",
+					"tableTo": "workflow_run",
+					"columnsFrom": ["workflow_run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"workflow": {
+			"name": "workflow",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"source": {
+					"name": "source",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'user'"
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"version_id": {
+					"name": "version_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"uqidx_workflow_namespace_source_name_version": {
+					"name": "uqidx_workflow_namespace_source_name_version",
+					"columns": ["namespace_id", "source", "name", "version_id"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"fk_workflow_namespace_id": {
+					"name": "fk_workflow_namespace_id",
+					"tableFrom": "workflow",
+					"tableTo": "namespace",
+					"columnsFrom": ["namespace_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"workflow_run": {
+			"name": "workflow_run",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_id": {
+					"name": "workflow_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"schedule_id": {
+					"name": "schedule_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"parent_workflow_run_id": {
+					"name": "parent_workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"revision": {
+					"name": "revision",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
+				"attempts": {
+					"name": "attempts",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
+				"input": {
+					"name": "input",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"input_hash": {
+					"name": "input_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"options": {
+					"name": "options",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"reference_id": {
+					"name": "reference_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"conflict_policy": {
+					"name": "conflict_policy",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"latest_state_transition_id": {
+					"name": "latest_state_transition_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"scheduled_at": {
+					"name": "scheduled_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"awake_at": {
+					"name": "awake_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"timeout_at": {
+					"name": "timeout_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"next_attempt_at": {
+					"name": "next_attempt_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"uqidx_workflow_run_workflow_reference": {
+					"name": "uqidx_workflow_run_workflow_reference",
+					"columns": ["workflow_id", "reference_id"],
+					"isUnique": true
+				},
+				"idx_workflow_run_namespace_id": {
+					"name": "idx_workflow_run_namespace_id",
+					"columns": ["namespace_id", "id"],
+					"isUnique": false
+				},
+				"idx_workflow_run_namespace_status_id": {
+					"name": "idx_workflow_run_namespace_status_id",
+					"columns": ["namespace_id", "status", "id"],
+					"isUnique": false
+				},
+				"idx_workflow_run_workflow_id": {
+					"name": "idx_workflow_run_workflow_id",
+					"columns": ["workflow_id", "id"],
+					"isUnique": false
+				},
+				"idx_workflow_run_workflow_status_id": {
+					"name": "idx_workflow_run_workflow_status_id",
+					"columns": ["workflow_id", "status", "id"],
+					"isUnique": false
+				},
+				"idx_workflow_run_schedule": {
+					"name": "idx_workflow_run_schedule",
+					"columns": ["schedule_id"],
+					"isUnique": false
+				},
+				"idx_workflow_run_parent_workflow_run_status": {
+					"name": "idx_workflow_run_parent_workflow_run_status",
+					"columns": ["parent_workflow_run_id", "status"],
+					"isUnique": false
+				},
+				"idx_workflow_run_status_scheduled_at": {
+					"name": "idx_workflow_run_status_scheduled_at",
+					"columns": ["status", "scheduled_at"],
+					"isUnique": false
+				},
+				"idx_workflow_run_status_awake_at": {
+					"name": "idx_workflow_run_status_awake_at",
+					"columns": ["status", "awake_at"],
+					"isUnique": false
+				},
+				"idx_workflow_run_status_timeout_at": {
+					"name": "idx_workflow_run_status_timeout_at",
+					"columns": ["status", "timeout_at"],
+					"isUnique": false
+				},
+				"idx_workflow_run_status_next_attempt_at": {
+					"name": "idx_workflow_run_status_next_attempt_at",
+					"columns": ["status", "next_attempt_at"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_workflow_run_namespace_id": {
+					"name": "fk_workflow_run_namespace_id",
+					"tableFrom": "workflow_run",
+					"tableTo": "namespace",
+					"columnsFrom": ["namespace_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_workflow_run_workflow_id": {
+					"name": "fk_workflow_run_workflow_id",
+					"tableFrom": "workflow_run",
+					"tableTo": "workflow",
+					"columnsFrom": ["workflow_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_workflow_run_schedule_id": {
+					"name": "fk_workflow_run_schedule_id",
+					"tableFrom": "workflow_run",
+					"tableTo": "schedule",
+					"columnsFrom": ["schedule_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_workflow_run_parent_workflow_run": {
+					"name": "fk_workflow_run_parent_workflow_run",
+					"tableFrom": "workflow_run",
+					"tableTo": "workflow_run",
+					"columnsFrom": ["parent_workflow_run_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"workflow_run_outbox": {
+			"name": "workflow_run_outbox",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_run_id": {
+					"name": "workflow_run_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_name": {
+					"name": "workflow_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"workflow_version_id": {
+					"name": "workflow_version_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"shard": {
+					"name": "shard",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+				}
+			},
+			"indexes": {
+				"uqidx_workflow_run_outbox_workflow_run_id": {
+					"name": "uqidx_workflow_run_outbox_workflow_run_id",
+					"columns": ["workflow_run_id"],
+					"isUnique": true
+				},
+				"idx_workflow_run_outbox_publish": {
+					"name": "idx_workflow_run_outbox_publish",
+					"columns": ["namespace_id", "status", "created_at", "workflow_name", "workflow_version_id", "shard"],
+					"isUnique": false
+				},
+				"idx_workflow_run_outbox_claim_stale": {
+					"name": "idx_workflow_run_outbox_claim_stale",
+					"columns": ["namespace_id", "status", "updated_at", "workflow_name", "workflow_version_id", "shard"],
+					"isUnique": false
+				},
+				"idx_workflow_run_outbox_status_created": {
+					"name": "idx_workflow_run_outbox_status_created",
+					"columns": ["status", "created_at"],
+					"isUnique": false
+				},
+				"idx_workflow_run_outbox_status_updated": {
+					"name": "idx_workflow_run_outbox_status_updated",
+					"columns": ["status", "updated_at"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"account": {
+			"name": "account",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"account_id": {
+					"name": "account_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"provider_id": {
+					"name": "provider_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"access_token": {
+					"name": "access_token",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"refresh_token": {
+					"name": "refresh_token",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"access_token_expires_at": {
+					"name": "access_token_expires_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"refresh_token_expires_at": {
+					"name": "refresh_token_expires_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"scope": {
+					"name": "scope",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"id_token": {
+					"name": "id_token",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"password": {
+					"name": "password",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uqidx_account_user_provider": {
+					"name": "uqidx_account_user_provider",
+					"columns": ["user_id", "provider_id"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"fk_account_user_id": {
+					"name": "fk_account_user_id",
+					"tableFrom": "account",
+					"tableTo": "user",
+					"columnsFrom": ["user_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"api_key": {
+			"name": "api_key",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"organization_id": {
+					"name": "organization_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_by_user_id": {
+					"name": "created_by_user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"key_hash": {
+					"name": "key_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"key_prefix": {
+					"name": "key_prefix",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'active'"
+				},
+				"expires_at": {
+					"name": "expires_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"revoked_at": {
+					"name": "revoked_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uq_api_key_key_hash": {
+					"name": "uq_api_key_key_hash",
+					"columns": ["key_hash"],
+					"isUnique": true
+				},
+				"uqidx_api_key_org_namespace_created_by_user_name": {
+					"name": "uqidx_api_key_org_namespace_created_by_user_name",
+					"columns": ["organization_id", "namespace_id", "created_by_user_id", "name"],
+					"isUnique": true
+				},
+				"idx_api_key_org_namespace_name": {
+					"name": "idx_api_key_org_namespace_name",
+					"columns": ["organization_id", "namespace_id", "name"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_api_key_namespace_id": {
+					"name": "fk_api_key_namespace_id",
+					"tableFrom": "api_key",
+					"tableTo": "namespace",
+					"columnsFrom": ["namespace_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"fk_api_key_organization_id": {
+					"name": "fk_api_key_organization_id",
+					"tableFrom": "api_key",
+					"tableTo": "organization",
+					"columnsFrom": ["organization_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"fk_api_key_created_by_user_id": {
+					"name": "fk_api_key_created_by_user_id",
+					"tableFrom": "api_key",
+					"tableTo": "user",
+					"columnsFrom": ["created_by_user_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"namespace": {
+			"name": "namespace",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"organization_id": {
+					"name": "organization_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'active'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uqidx_namespace_org_name": {
+					"name": "uqidx_namespace_org_name",
+					"columns": ["organization_id", "name"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"fk_namespace_org_id": {
+					"name": "fk_namespace_org_id",
+					"tableFrom": "namespace",
+					"tableTo": "organization",
+					"columnsFrom": ["organization_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"namespace_member": {
+			"name": "namespace_member",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"role": {
+					"name": "role",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uqidx_namespace_member_namespace_user": {
+					"name": "uqidx_namespace_member_namespace_user",
+					"columns": ["namespace_id", "user_id"],
+					"isUnique": true
+				},
+				"idx_namespace_member_user_id": {
+					"name": "idx_namespace_member_user_id",
+					"columns": ["user_id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_namespace_member_namespace_id": {
+					"name": "fk_namespace_member_namespace_id",
+					"tableFrom": "namespace_member",
+					"tableTo": "namespace",
+					"columnsFrom": ["namespace_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_namespace_member_user_id": {
+					"name": "fk_namespace_member_user_id",
+					"tableFrom": "namespace_member",
+					"tableTo": "user",
+					"columnsFrom": ["user_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"organization": {
+			"name": "organization",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"slug": {
+					"name": "slug",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"logo": {
+					"name": "logo",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"metadata": {
+					"name": "metadata",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"type": {
+					"name": "type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'active'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uq_organization_slug": {
+					"name": "uq_organization_slug",
+					"columns": ["slug"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"organization_invitation": {
+			"name": "organization_invitation",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"inviter_id": {
+					"name": "inviter_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"organization_id": {
+					"name": "organization_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"role": {
+					"name": "role",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"namespace_id": {
+					"name": "namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"expires_at": {
+					"name": "expires_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uqidx_org_invitation_pending_email_org_namespace": {
+					"name": "uqidx_org_invitation_pending_email_org_namespace",
+					"columns": ["email", "organization_id", "namespace_id"],
+					"isUnique": true,
+					"where": "\"organization_invitation\".\"status\" = 'pending'"
+				}
+			},
+			"foreignKeys": {
+				"fk_org_invitation_inviter_id": {
+					"name": "fk_org_invitation_inviter_id",
+					"tableFrom": "organization_invitation",
+					"tableTo": "user",
+					"columnsFrom": ["inviter_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_org_invitation_organization_id": {
+					"name": "fk_org_invitation_organization_id",
+					"tableFrom": "organization_invitation",
+					"tableTo": "organization",
+					"columnsFrom": ["organization_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"organization_member": {
+			"name": "organization_member",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"organization_id": {
+					"name": "organization_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"role": {
+					"name": "role",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uqidx_org_member_org_user": {
+					"name": "uqidx_org_member_org_user",
+					"columns": ["organization_id", "user_id"],
+					"isUnique": true
+				},
+				"idx_org_member_user_id": {
+					"name": "idx_org_member_user_id",
+					"columns": ["user_id"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"fk_org_member_user_id": {
+					"name": "fk_org_member_user_id",
+					"tableFrom": "organization_member",
+					"tableTo": "user",
+					"columnsFrom": ["user_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fk_org_member_org_id": {
+					"name": "fk_org_member_org_id",
+					"tableFrom": "organization_member",
+					"tableTo": "organization",
+					"columnsFrom": ["organization_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"session": {
+			"name": "session",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"token": {
+					"name": "token",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"expires_at": {
+					"name": "expires_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"ip_address": {
+					"name": "ip_address",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"user_agent": {
+					"name": "user_agent",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"active_organization_id": {
+					"name": "active_organization_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"active_namespace_id": {
+					"name": "active_namespace_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uq_session_token": {
+					"name": "uq_session_token",
+					"columns": ["token"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"fk_session_user_id": {
+					"name": "fk_session_user_id",
+					"tableFrom": "session",
+					"tableTo": "user",
+					"columnsFrom": ["user_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"user": {
+			"name": "user",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email_verified": {
+					"name": "email_verified",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": false
+				},
+				"image": {
+					"name": "image",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'active'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"uq_user_email": {
+					"name": "uq_user_email",
+					"columns": ["email"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"verification": {
+			"name": "verification",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"identifier": {
+					"name": "identifier",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"value": {
+					"name": "value",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"expires_at": {
+					"name": "expires_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		}
+	},
+	"views": {},
+	"enums": {},
+	"_meta": {
+		"schemas": {},
+		"tables": {},
+		"columns": {}
+	},
+	"internal": {
+		"indexes": {}
+	}
+}

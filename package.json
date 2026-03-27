@@ -58,5 +58,11 @@
 		"lint-staged": "^16.2.7",
 		"tsup": "^8.5.1",
 		"typescript": "^5.7.2"
+	},
+	"dependencies": {
+		"@aikirun/client": "^0.21.0",
+		"@aikirun/task": "^0.21.0",
+		"@aikirun/worker": "^0.21.0",
+		"@aikirun/workflow": "^0.21.0"
 	}
 }

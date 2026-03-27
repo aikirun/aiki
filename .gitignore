@@ -13,3 +13,8 @@ todo/
 **/dist/
 *.tsbuildinfo
 node_modules/
+
+*.db
+*.db-shm
+*.db-wal
+
