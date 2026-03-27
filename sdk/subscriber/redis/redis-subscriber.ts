@@ -136,7 +136,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			connectTimeout: options?.connectTimeoutMs,
 		});
 
-		const logger = parentLogger?.child({
+		const logger = parentLogger.child({
 			"aiki.subscriber": "redis",
 		});
 
@@ -160,13 +160,13 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
 				const messages = await fetchRedisStreamMessages(
 					redis,
+					logger.child({ "aiki.workerId": workerId }),
 					streams,
 					streamConsumerGroupMap,
 					workerId,
 					size,
 					blockTimeMs,
-					claimMinIdleTimeMs,
-					logger?.child({ "aiki.workerId": workerId })
+					claimMinIdleTimeMs
 				);
 
 				const batches: WorkflowRunBatch[] = [];
@@ -193,18 +193,18 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 					const result = await redis.xack(meta.stream, meta.consumerGroup, meta.messageId);
 
 					if (result === 0) {
-						logger?.warn("Message already acknowledged", {
+						logger.warn("Message already acknowledged", {
 							"aiki.workerId": workerId,
 							"aiki.workflowRunId": workflowRunId,
 						});
 					} else {
-						logger?.debug("Message acknowledged", {
+						logger.debug("Message acknowledged", {
 							"aiki.workerId": workerId,
 							"aiki.workflowRunId": workflowRunId,
 						});
 					}
 				} catch (error) {
-					logger?.error("Failed to acknowledge message", {
+					logger.error("Failed to acknowledge message", {
 						"aiki.workerId": workerId,
 						"aiki.workflowRunId": workflowRunId,
 						"aiki.error": error instanceof Error ? error.message : String(error),
@@ -246,13 +246,13 @@ function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shards?: stri
 // - instead of processing streams randomly, try to prioritise I/O bound streams over CPU hogs
 async function fetchRedisStreamMessages(
 	redis: Redis,
+	logger: Logger,
 	streams: string[],
 	streamConsumerGroupMap: Map<string, string>,
 	workerId: string,
 	size: number,
 	blockTimeMs: number,
-	claimMinIdleTimeMs: number,
-	logger?: Logger
+	claimMinIdleTimeMs: number
 ): Promise<StreamMessage[]> {
 	if (!isNonEmptyArray(streams)) {
 		return [];
@@ -297,7 +297,7 @@ async function fetchRedisStreamMessages(
 				streamEntries.push(result);
 			}
 		} catch (error) {
-			logger?.error("XREADGROUP failed", {
+			logger.error("XREADGROUP failed", {
 				"aiki.stream": stream,
 				"aiki.error": error instanceof Error ? error.message : String(error),
 			});
@@ -305,19 +305,19 @@ async function fetchRedisStreamMessages(
 	}
 
 	const workflowRuns = isNonEmptyArray(streamEntries)
-		? await processRedisStreamMessages(redis, streamConsumerGroupMap, streamEntries, logger)
+		? await processRedisStreamMessages(redis, logger, streamConsumerGroupMap, streamEntries)
 		: [];
 
 	const remainingCapacity = size - workflowRuns.length;
 	if (remainingCapacity > 0 && claimMinIdleTimeMs > 0) {
 		const claimedWorkflowRuns = await claimStuckRedisStreamMessages(
 			redis,
+			logger,
 			shuffledStreams,
 			streamConsumerGroupMap,
 			workerId,
 			remainingCapacity,
-			claimMinIdleTimeMs,
-			logger
+			claimMinIdleTimeMs
 		);
 		for (const workflowRun of claimedWorkflowRuns) {
 			workflowRuns.push(workflowRun);
@@ -329,17 +329,17 @@ async function fetchRedisStreamMessages(
 
 async function processRedisStreamMessages(
 	redis: Redis,
+	logger: Logger,
 	streamConsumerGroupMap: Map<string, string>,
-	streamsEntries: NonEmptyArray<unknown>,
-	logger?: Logger
+	streamsEntries: NonEmptyArray<unknown>
 ): Promise<StreamMessage[]> {
 	const workflowRuns: StreamMessage[] = [];
 	for (const streamEntriesRaw of streamsEntries) {
-		logger?.debug("Raw stream entries", { "aiki.entries": streamEntriesRaw });
+		logger.debug("Raw stream entries", { "aiki.entries": streamEntriesRaw });
 
 		const streamEntriesResult = streamEntriesSchema(streamEntriesRaw);
 		if (streamEntriesResult instanceof type.errors) {
-			logger?.error("Invalid stream entries format", {
+			logger.error("Invalid stream entries format", {
 				"aiki.error": streamEntriesResult.summary,
 			});
 			continue;
@@ -350,7 +350,7 @@ async function processRedisStreamMessages(
 
 			const consumerGroup = streamConsumerGroupMap.get(stream);
 			if (!consumerGroup) {
-				logger?.error("No consumer group found for stream", {
+				logger.error("No consumer group found for stream", {
 					"aiki.stream": stream,
 				});
 				continue;
@@ -360,7 +360,7 @@ async function processRedisStreamMessages(
 				const rawMessageData = rawStreamMessageFieldsToRecord(rawFields);
 				const messageData = streamMessageDataSchema(rawMessageData);
 				if (messageData instanceof type.errors) {
-					logger?.warn("Invalid message structure", {
+					logger.warn("Invalid message structure", {
 						"aiki.stream": stream,
 						"aiki.error": messageData.summary,
 					});
@@ -394,12 +394,12 @@ async function processRedisStreamMessages(
 
 async function claimStuckRedisStreamMessages(
 	redis: Redis,
+	logger: Logger,
 	shuffledStreams: string[],
 	streamConsumerGroupMap: Map<string, string>,
 	workerId: string,
 	maxClaim: number,
-	minIdleMs: number,
-	logger?: Logger
+	minIdleMs: number
 ): Promise<StreamMessage[]> {
 	if (maxClaim <= 0 || minIdleMs <= 0) {
 		return [];
@@ -407,12 +407,12 @@ async function claimStuckRedisStreamMessages(
 
 	const claimaibleMessagesByStream = await findClaimableMessagesByStream(
 		redis,
+		logger,
 		shuffledStreams,
 		streamConsumerGroupMap,
 		workerId,
 		maxClaim,
-		minIdleMs,
-		logger
+		minIdleMs
 	);
 	if (!claimaibleMessagesByStream.size) {
 		return [];
@@ -435,22 +435,22 @@ async function claimStuckRedisStreamMessages(
 			const errorMessage = error instanceof Error ? error.message : String(error);
 
 			if (errorMessage.includes("NOGROUP")) {
-				logger?.warn("Consumer group does not exist for stream, skipping claim operation", {
+				logger.warn("Consumer group does not exist for stream, skipping claim operation", {
 					"aiki.stream": stream,
 					"aiki.consumerGroup": consumerGroup,
 				});
 			} else if (errorMessage.includes("BUSYGROUP")) {
-				logger?.warn("Consumer group busy for stream, skipping claim operation", {
+				logger.warn("Consumer group busy for stream, skipping claim operation", {
 					"aiki.stream": stream,
 					"aiki.consumerGroup": consumerGroup,
 				});
 			} else if (errorMessage.includes("NOSCRIPT")) {
-				logger?.warn("Redis script not loaded for stream, skipping claim operation", {
+				logger.warn("Redis script not loaded for stream, skipping claim operation", {
 					"aiki.stream": stream,
 					"aiki.consumerGroup": consumerGroup,
 				});
 			} else {
-				logger?.error("Failed to claim messages from stream", {
+				logger.error("Failed to claim messages from stream", {
 					"aiki.stream": stream,
 					"aiki.consumerGroup": consumerGroup,
 					"aiki.messageIds": messageIds.length,
@@ -474,17 +474,17 @@ async function claimStuckRedisStreamMessages(
 	if (!isNonEmptyArray(claimedStreamEntries)) {
 		return [];
 	}
-	return processRedisStreamMessages(redis, streamConsumerGroupMap, [claimedStreamEntries], logger);
+	return processRedisStreamMessages(redis, logger, streamConsumerGroupMap, [claimedStreamEntries]);
 }
 
 async function findClaimableMessagesByStream(
 	redis: Redis,
+	logger: Logger,
 	shuffledStreams: string[],
 	streamConsumerGroupMap: Map<string, string>,
 	workerId: string,
 	maxClaim: number,
-	minIdleMs: number,
-	logger?: Logger
+	minIdleMs: number
 ): Promise<Map<string, string[]>> {
 	const claimSizePerStream = distributeRoundRobin(maxClaim, shuffledStreams.length);
 	const pendingPromises: Promise<{ stream: string; result: unknown }>[] = [];
@@ -523,7 +523,7 @@ async function findClaimableMessagesByStream(
 
 		const parsedResult = streamPendingMessagesSchema(result);
 		if (parsedResult instanceof type.errors) {
-			logger?.error("Invalid XPENDING response", {
+			logger.error("Invalid XPENDING response", {
 				"aiki.stream": stream,
 				"aiki.error": parsedResult.summary,
 			});

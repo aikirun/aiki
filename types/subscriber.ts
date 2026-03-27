@@ -24,7 +24,7 @@ export interface SubscriberContext {
 	workerId: string;
 	workflows: WorkflowMeta[];
 	shards?: string[];
-	logger?: Logger;
+	logger: Logger;
 }
 
 export type CreateSubscriber = (context: SubscriberContext) => Subscriber | Promise<Subscriber>;
