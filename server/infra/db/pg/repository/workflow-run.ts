@@ -350,14 +350,14 @@ export function createWorkflowRunRepository(db: PgDb) {
 		},
 
 		async bulkTransitionToQueued(
-			runs: NonEmptyArray<{ id: string; revision: number; stateTransitionId: string }>
+			runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>
 		): Promise<string[]> {
 			const orConditions = [];
 			const caseFragments = [];
 
-			for (const run of runs) {
-				orConditions.push(sql`(${workflowRun.id} = ${run.id} AND ${workflowRun.revision} = ${run.revision})`);
-				caseFragments.push(sql`WHEN ${run.id} THEN ${run.stateTransitionId}`);
+			for (const { filter, update } of runs) {
+				orConditions.push(sql`(${workflowRun.id} = ${filter.id} AND ${workflowRun.revision} = ${filter.revision})`);
+				caseFragments.push(sql`WHEN ${filter.id} THEN ${update.stateTransitionId}`);
 			}
 
 			const result = await db
@@ -376,15 +376,15 @@ export function createWorkflowRunRepository(db: PgDb) {
 
 		async bulkTransitionToScheduled(
 			fromStatus: WorkflowRunStatus,
-			runs: NonEmptyArray<{ id: string; revision: number; stateTransitionId: string }>,
+			runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
 			scheduledAt: Date
 		): Promise<string[]> {
 			const orConditions = [];
 			const stateTransitionCaseFragments = [];
 
-			for (const run of runs) {
-				orConditions.push(sql`(${workflowRun.id} = ${run.id} AND ${workflowRun.revision} = ${run.revision})`);
-				stateTransitionCaseFragments.push(sql`WHEN ${run.id} THEN ${run.stateTransitionId}`);
+			for (const { filter, update } of runs) {
+				orConditions.push(sql`(${workflowRun.id} = ${filter.id} AND ${workflowRun.revision} = ${filter.revision})`);
+				stateTransitionCaseFragments.push(sql`WHEN ${filter.id} THEN ${update.stateTransitionId}`);
 			}
 
 			const result = await db

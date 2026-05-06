@@ -45,7 +45,8 @@ async function processChunk(
 	const scheduledAt = new Date(now);
 
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
-	const workflowRunUpdates: { id: string; revision: number; stateTransitionId: string }[] = [];
+	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
+		[];
 
 	for (const run of runs) {
 		const stateTransitionId = ulid();
@@ -59,9 +60,13 @@ async function processChunk(
 			state,
 		});
 		workflowRunUpdates.push({
-			id: run.id,
-			revision: run.revision,
-			stateTransitionId,
+			filter: {
+				id: run.id,
+				revision: run.revision,
+			},
+			update: {
+				stateTransitionId,
+			},
 		});
 	}
 
