@@ -14,17 +14,19 @@ import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
 
-export interface QueueSleepElapsedRunsDeps {
-	repos: Pick<
-		Repositories,
-		"workflowRun" | "stateTransition" | "sleepQueue" | "workflow" | "workflowRunOutbox" | "transaction"
-	>;
+type Repos = Pick<
+	Repositories,
+	"workflowRun" | "stateTransition" | "sleepQueue" | "workflow" | "workflowRunOutbox" | "transaction"
+>;
+
+export interface ProcessImminentSleepElapsedRunsDeps {
+	repos: Repos;
 	workflowRunPublisher?: WorkflowRunPublisher;
 }
 
-export async function queueSleepElapsedWorkflowRuns(
+export async function processImminentSleepElapsedRuns(
 	context: CronContext,
-	{ repos, workflowRunPublisher }: QueueSleepElapsedRunsDeps,
+	{ repos, workflowRunPublisher }: ProcessImminentSleepElapsedRunsDeps,
 	options?: { limit?: number; chunkSize?: number }
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
@@ -33,6 +35,18 @@ export async function queueSleepElapsedWorkflowRuns(
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}
+
+	await queueSleepElapsedRuns(context, repos, workflowRunPublisher, runs, { chunkSize });
+}
+
+export async function queueSleepElapsedRuns(
+	context: CronContext,
+	repos: Repos,
+	workflowRunPublisher: WorkflowRunPublisher | undefined,
+	runs: NonEmptyArray<DueWorkflowRun>,
+	options?: { chunkSize?: number }
+) {
+	const { chunkSize = 50 } = options ?? {};
 
 	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId)));
 	if (!isNonEmptyArray(workflowIds)) {
@@ -52,7 +66,7 @@ export async function queueSleepElapsedWorkflowRuns(
 
 async function processChunk(
 	context: CronContext,
-	repos: QueueSleepElapsedRunsDeps["repos"],
+	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<DueWorkflowRun>,
 	workflowsById: Map<string, WorkflowRow>

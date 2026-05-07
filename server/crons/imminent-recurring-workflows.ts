@@ -26,30 +26,44 @@ import { publishRuns } from "./publish-ready-runs";
 
 export interface QueueRecurringWorkflowsDeps {
 	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "schedule" | "workflowRunOutbox" | "transaction">;
-	scheduleService: ScheduleService;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: WorkflowRunPublisher;
 }
 
-type DueSchedule = Schedule & {
+export interface ProcessImminentRecurringWorkflowsDeps extends QueueRecurringWorkflowsDeps {
+	scheduleService: ScheduleService;
+}
+
+export type DueSchedule = Schedule & {
 	workflowId: string;
 	namespaceId: NamespaceId;
 	workflowRunInputHash: string;
 };
 
-export async function queueRecurringWorkflows(context: CronContext, deps: QueueRecurringWorkflowsDeps) {
-	const now = Date.now();
-
-	const dueSchedules = await deps.scheduleService.getDueSchedules(now);
+export async function processImminentRecurringWorkflows(
+	context: CronContext,
+	deps: ProcessImminentRecurringWorkflowsDeps
+) {
+	const dueSchedules = await deps.scheduleService.getDueSchedules(Date.now());
 	if (!isNonEmptyArray(dueSchedules)) {
 		return;
 	}
+
+	await queueRecurringWorkflows(context, deps, dueSchedules);
+}
+
+export async function queueRecurringWorkflows(
+	context: CronContext,
+	deps: QueueRecurringWorkflowsDeps,
+	schedules: NonEmptyArray<DueSchedule>
+) {
+	const now = Date.now();
 
 	const allowSchedules: DueSchedule[] = [];
 	const skipSchedules: DueSchedule[] = [];
 	const cancelPreviousSchedules: DueSchedule[] = [];
 
-	for (const schedule of dueSchedules) {
+	for (const schedule of schedules) {
 		const overlapPolicy: ScheduleOverlapPolicy = schedule.spec.overlapPolicy ?? "skip";
 		if (overlapPolicy === "allow") {
 			allowSchedules.push(schedule);

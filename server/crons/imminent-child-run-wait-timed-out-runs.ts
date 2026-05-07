@@ -2,8 +2,8 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRunState, WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
+	ChildWorkflowRunWaitQueueRowInsert,
 	DueWorkflowRun,
-	EventWaitQueueRowInsert,
 	Repositories,
 	StateTransitionRowInsert,
 	WorkflowRow,
@@ -16,25 +16,39 @@ import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
 
-export interface QueueEventWaitTimedOutRunsDeps {
-	repos: Pick<
-		Repositories,
-		"workflowRun" | "stateTransition" | "eventWaitQueue" | "workflow" | "workflowRunOutbox" | "transaction"
-	>;
+type Repos = Pick<
+	Repositories,
+	"workflowRun" | "stateTransition" | "childWorkflowRunWaitQueue" | "workflow" | "workflowRunOutbox" | "transaction"
+>;
+
+export interface ProcessImminentChildRunWaitTimedOutRunsDeps {
+	repos: Repos;
 	workflowRunPublisher?: WorkflowRunPublisher;
 }
 
-export async function queueEventWaitTimedOutWorkflowRuns(
+export async function processImminentChildRunWaitTimedOutRuns(
 	context: CronContext,
-	{ repos, workflowRunPublisher }: QueueEventWaitTimedOutRunsDeps,
+	{ repos, workflowRunPublisher }: ProcessImminentChildRunWaitTimedOutRunsDeps,
 	options?: { limit?: number; chunkSize?: number }
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await repos.workflowRun.listEventWaitTimedOutRuns(limit);
+	const runs = await repos.workflowRun.listChildRunWaitTimedOutRuns(limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}
+
+	await queueChildRunWaitTimedOutRuns(context, repos, workflowRunPublisher, runs, { chunkSize });
+}
+
+export async function queueChildRunWaitTimedOutRuns(
+	context: CronContext,
+	repos: Repos,
+	workflowRunPublisher: WorkflowRunPublisher | undefined,
+	runs: NonEmptyArray<DueWorkflowRun>,
+	options?: { chunkSize?: number }
+) {
+	const { chunkSize = 50 } = options ?? {};
 
 	const stateTransitionIds: string[] = [];
 	const workflowIdSet = new Set<string>();
@@ -66,7 +80,7 @@ export async function queueEventWaitTimedOutWorkflowRuns(
 
 async function processChunk(
 	context: CronContext,
-	repos: QueueEventWaitTimedOutRunsDeps["repos"],
+	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<DueWorkflowRun>,
 	stateTransitionsById: Map<string, { id: string; state: unknown }>,
@@ -74,7 +88,7 @@ async function processChunk(
 ): Promise<void> {
 	const timedOutAt = new Date();
 
-	const eventWaitEntries: EventWaitQueueRowInsert[] = [];
+	const childRunWaitEntries: ChildWorkflowRunWaitQueueRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -91,20 +105,21 @@ async function processChunk(
 			continue;
 		}
 		const fromState = transition.state as WorkflowRunState;
-		if (fromState.status !== "awaiting_event") {
+		if (fromState.status !== "awaiting_child_workflow") {
 			continue;
 		}
 
-		eventWaitEntries.push({
+		childRunWaitEntries.push({
 			id: ulid(),
-			workflowRunId: run.id,
-			name: fromState.eventName,
+			parentWorkflowRunId: run.id,
+			childWorkflowRunId: fromState.childWorkflowRunId,
+			childWorkflowRunStatus: fromState.childWorkflowRunStatus,
 			status: "timeout",
 			timedOutAt,
 		});
 
 		const stateTransitionId = ulid();
-		const toState: WorkflowRunStateQueued = { status: "queued", reason: "event" };
+		const toState: WorkflowRunStateQueued = { status: "queued", reason: "child_workflow" };
 		stateTransitionEntries.push({
 			id: stateTransitionId,
 			workflowRunId: run.id,
@@ -122,7 +137,6 @@ async function processChunk(
 				stateTransitionId,
 			},
 		});
-
 		outboxEntries.push({
 			id: ulid(),
 			namespaceId: run.namespaceId,
@@ -135,7 +149,7 @@ async function processChunk(
 	}
 
 	if (
-		!isNonEmptyArray(eventWaitEntries) ||
+		!isNonEmptyArray(childRunWaitEntries) ||
 		!isNonEmptyArray(stateTransitionEntries) ||
 		!isNonEmptyArray(workflowRunUpdates)
 	) {
@@ -143,9 +157,12 @@ async function processChunk(
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
-		await txRepos.eventWaitQueue.insert(eventWaitEntries);
+		await txRepos.childWorkflowRunWaitQueue.insert(childRunWaitEntries);
 		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("awaiting_event", workflowRunUpdates);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
+			"awaiting_child_workflow",
+			workflowRunUpdates
+		);
 		const transitionedRunIdsSet = new Set(transitionedRunIds);
 		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
 		if (!isNonEmptyArray(outboxEntriesToInsert)) {

@@ -1,8 +1,9 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
-import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
+import type { WorkflowRunState, WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
 	DueWorkflowRun,
+	EventWaitQueueRowInsert,
 	Repositories,
 	StateTransitionRowInsert,
 	WorkflowRow,
@@ -15,36 +16,62 @@ import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
 
-export interface QueueRetryableRunsDeps {
-	repos: Pick<
-		Repositories,
-		"workflowRun" | "stateTransition" | "task" | "workflow" | "workflowRunOutbox" | "transaction"
-	>;
+type Repos = Pick<
+	Repositories,
+	"workflowRun" | "stateTransition" | "eventWaitQueue" | "workflow" | "workflowRunOutbox" | "transaction"
+>;
+
+export interface ProcessImminentEventWaitTimedOutRunsDeps {
+	repos: Repos;
 	workflowRunPublisher?: WorkflowRunPublisher;
 }
 
-export async function queueRetryableWorkflowRuns(
+export async function processImminentEventWaitTimedOutRuns(
 	context: CronContext,
-	{ repos, workflowRunPublisher }: QueueRetryableRunsDeps,
+	{ repos, workflowRunPublisher }: ProcessImminentEventWaitTimedOutRunsDeps,
 	options?: { limit?: number; chunkSize?: number }
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await repos.workflowRun.listRetryableRuns(limit);
+	const runs = await repos.workflowRun.listEventWaitTimedOutRuns(limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}
 
-	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId)));
-	if (!isNonEmptyArray(workflowIds)) {
+	await queueEventWaitTimedOutRuns(context, repos, workflowRunPublisher, runs, { chunkSize });
+}
+
+export async function queueEventWaitTimedOutRuns(
+	context: CronContext,
+	repos: Repos,
+	workflowRunPublisher: WorkflowRunPublisher | undefined,
+	runs: NonEmptyArray<DueWorkflowRun>,
+	options?: { chunkSize?: number }
+) {
+	const { chunkSize = 50 } = options ?? {};
+
+	const stateTransitionIds: string[] = [];
+	const workflowIdSet = new Set<string>();
+	for (const run of runs) {
+		stateTransitionIds.push(run.latestStateTransitionId);
+		workflowIdSet.add(run.workflowId);
+	}
+	const workflowIds = Array.from(workflowIdSet);
+
+	if (!isNonEmptyArray(stateTransitionIds) || !isNonEmptyArray(workflowIds)) {
 		return;
 	}
-	const workflows = await repos.workflow.getByIdsGlobal(context, workflowIds);
+
+	const [stateTransitions, workflows] = await Promise.all([
+		repos.stateTransition.getByIds(stateTransitionIds),
+		repos.workflow.getByIdsGlobal(context, workflowIds),
+	]);
+	const stateTransitionsById = new Map(stateTransitions.map((transition) => [transition.id, transition]));
 	const workflowsById = new Map(workflows.map((workflow) => [workflow.id, workflow]));
 
 	await runConcurrently(context, chunkLazy(runs, chunkSize), async (chunk, spanCtx) => {
 		try {
-			await processChunk(spanCtx, repos, workflowRunPublisher, chunk, workflowsById);
+			await processChunk(spanCtx, repos, workflowRunPublisher, chunk, stateTransitionsById, workflowsById);
 		} catch (error) {
 			spanCtx.logger.warn({ err: error, chunkSize: chunk.length }, "Failed to process chunk, will retry next tick");
 		}
@@ -53,13 +80,15 @@ export async function queueRetryableWorkflowRuns(
 
 async function processChunk(
 	context: CronContext,
-	repos: QueueRetryableRunsDeps["repos"],
+	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<DueWorkflowRun>,
+	stateTransitionsById: Map<string, { id: string; state: unknown }>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
-	const workflowRunIds = runs.map((run) => run.id);
+	const timedOutAt = new Date();
 
+	const eventWaitEntries: EventWaitQueueRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -71,15 +100,32 @@ async function processChunk(
 			continue;
 		}
 
+		const transition = stateTransitionsById.get(run.latestStateTransitionId);
+		if (!transition) {
+			continue;
+		}
+		const fromState = transition.state as WorkflowRunState;
+		if (fromState.status !== "awaiting_event") {
+			continue;
+		}
+
+		eventWaitEntries.push({
+			id: ulid(),
+			workflowRunId: run.id,
+			name: fromState.eventName,
+			status: "timeout",
+			timedOutAt,
+		});
+
 		const stateTransitionId = ulid();
-		const state: WorkflowRunStateQueued = { status: "queued", reason: "retry" };
+		const toState: WorkflowRunStateQueued = { status: "queued", reason: "event" };
 		stateTransitionEntries.push({
 			id: stateTransitionId,
 			workflowRunId: run.id,
 			type: "workflow_run",
 			status: "queued",
 			attempt: run.attempts,
-			state,
+			state: toState,
 		});
 		workflowRunUpdates.push({
 			filter: {
@@ -103,7 +149,7 @@ async function processChunk(
 	}
 
 	if (
-		!isNonEmptyArray(workflowRunIds) ||
+		!isNonEmptyArray(eventWaitEntries) ||
 		!isNonEmptyArray(stateTransitionEntries) ||
 		!isNonEmptyArray(workflowRunUpdates)
 	) {
@@ -111,9 +157,9 @@ async function processChunk(
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
-		await txRepos.task.deleteStaleByWorkflowRunIds(workflowRunIds);
+		await txRepos.eventWaitQueue.insert(eventWaitEntries);
 		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("awaiting_retry", workflowRunUpdates);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("awaiting_event", workflowRunUpdates);
 		const transitionedRunIdsSet = new Set(transitionedRunIds);
 		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
 		if (!isNonEmptyArray(outboxEntriesToInsert)) {
