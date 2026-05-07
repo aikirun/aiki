@@ -1,6 +1,6 @@
 import { httpSubscriber } from "@aikirun/http";
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
-import { delay } from "@aikirun/lib/async";
+import { delay, fireAndForget } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
@@ -126,6 +126,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private fallbackSubscriber: Subscriber | undefined;
 	private pollPromise: Promise<void> | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
+	private lastServerHeartbeatByRunId = new Map<string, number>();
 
 	constructor(
 		private readonly client: Client<AppContext>,
@@ -158,6 +159,9 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const createSubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
 		const subscriber = createSubscriber(subscriberContext);
 		this.subscriber = subscriber instanceof Promise ? await subscriber : subscriber;
+		if (this.subscriber.heartbeat) {
+			this.subscriber.heartbeat = this.withServerHeartbeatForwarding(this.subscriber.heartbeat);
+		}
 
 		const createFallbackSubscriber = httpSubscriber({ api: this.client.api });
 		const fallbackSubscriber = createFallbackSubscriber(subscriberContext);
@@ -173,6 +177,21 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				});
 			}
 		});
+	}
+
+	private withServerHeartbeatForwarding(heartbeat: (workflowRunId: WorkflowRunId) => Promise<void>) {
+		const serverHeartbeatIntervalMs = 30_000;
+
+		return async (workflowRunId: WorkflowRunId) => {
+			await heartbeat(workflowRunId);
+
+			const now = Date.now();
+			const lastServerHeartbeat = this.lastServerHeartbeatByRunId.get(workflowRunId) ?? 0;
+			if (now - lastServerHeartbeat >= serverHeartbeatIntervalMs) {
+				this.lastServerHeartbeatByRunId.set(workflowRunId, now);
+				await this.client.api.workflowRun.heartbeatV1({ id: workflowRunId });
+			}
+		};
 	}
 
 	public async stop(): Promise<void> {
@@ -204,6 +223,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 
 		this.activeWorkflowRunsById.clear();
+		this.lastServerHeartbeatByRunId.clear();
 	}
 
 	private async poll(abortSignal: AbortSignal): Promise<void> {
@@ -348,13 +368,15 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 		subscriber: Subscriber
 	): Promise<void> {
+		const workflowRunId = workflowRun.id as WorkflowRunId;
+
 		const logger = this.logger.child({
 			"aiki.workflowName": workflowRun.name,
 			"aiki.workflowVersionId": workflowRun.versionId,
-			"aiki.workflowRunId": workflowRun.id,
+			"aiki.workflowRunId": workflowRunId,
 		});
 
-		const heartbeat = subscriber.heartbeat;
+		const { heartbeat } = subscriber;
 
 		const success = await executeWorkflowRun({
 			client: this.client,
@@ -365,13 +387,21 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				spinThresholdMs: this.workflowRunOptions.spinThresholdMs,
 				heartbeatIntervalMs: this.workflowRunOptions.heartbeatIntervalMs,
 			},
-			heartbeat: heartbeat ? () => heartbeat(workflowRun.id as WorkflowRunId) : undefined,
+			heartbeat: heartbeat
+				? async () => {
+						fireAndForget(heartbeat(workflowRunId), (error) => {
+							logger.warn("Failed to send heartbeat", {
+								"aiki.error": error.message,
+							});
+						});
+					}
+				: undefined,
 		});
 
 		if (subscriber.acknowledge) {
 			if (success) {
 				try {
-					await subscriber.acknowledge(workflowRun.id as WorkflowRunId);
+					await subscriber.acknowledge(workflowRunId);
 				} catch (error) {
 					logger.error("Failed to acknowledge message, it may be reprocessed", {
 						"aiki.errorType": "MESSAGE_ACK_FAILED",
@@ -383,7 +413,10 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			}
 		}
 
-		this.activeWorkflowRunsById.delete(workflowRun.id);
+		this.activeWorkflowRunsById.delete(workflowRunId);
+		if (subscriber.heartbeat) {
+			this.lastServerHeartbeatByRunId.delete(workflowRunId);
+		}
 	}
 }
 
