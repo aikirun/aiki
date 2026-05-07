@@ -1,11 +1,12 @@
 import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
+import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import type { CronContext } from "server/middleware/context";
 import { createCronContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
-import type { ScheduleService } from "server/service/schedule";
 
+import { queueDueTimers } from "./due-timers";
 import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { processImminentRecurringWorkflows } from "./imminent-recurring-workflows";
@@ -19,8 +20,8 @@ import { republishStaleRuns } from "./republish-stale-runs";
 export interface InitCronsDeps {
 	repos: Repositories;
 	workflowRunPublisher?: WorkflowRunPublisher;
+	timerSortedSet?: TimerSortedSet;
 	childRunCanceller: ChildRunCanceller;
-	scheduleService: ScheduleService;
 }
 
 export interface CronHandle {
@@ -70,18 +71,6 @@ function initCron<Deps, Options>(
 
 export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 	const crons = [
-		...(deps.workflowRunPublisher
-			? [
-					initCron(logger, 1_000, publishReadyRuns, {
-						repos: deps.repos,
-						workflowRunPublisher: deps.workflowRunPublisher,
-					}),
-					initCron(logger, 1_000, republishStaleRuns, {
-						repos: deps.repos,
-						workflowRunPublisher: deps.workflowRunPublisher,
-					}),
-				]
-			: []),
 		initCron(logger, 1_000, processImminentScheduledRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
@@ -108,11 +97,36 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 		}),
 		initCron(logger, 1_000, processImminentRecurringWorkflows, {
 			repos: deps.repos,
-			scheduleService: deps.scheduleService,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
 		}),
 	];
+
+	if (deps.timerSortedSet) {
+		crons.push(
+			initCron(logger, 50, queueDueTimers, {
+				repos: deps.repos,
+				timerSortedSet: deps.timerSortedSet,
+				childRunCanceller: deps.childRunCanceller,
+				workflowRunPublisher: deps.workflowRunPublisher,
+			})
+		);
+	}
+
+	if (deps.workflowRunPublisher) {
+		crons.push(
+			...[
+				initCron(logger, 1_000, publishReadyRuns, {
+					repos: deps.repos,
+					workflowRunPublisher: deps.workflowRunPublisher,
+				}),
+				initCron(logger, 1_000, republishStaleRuns, {
+					repos: deps.repos,
+					workflowRunPublisher: deps.workflowRunPublisher,
+				}),
+			]
+		);
+	}
 
 	return {
 		shutdown() {
