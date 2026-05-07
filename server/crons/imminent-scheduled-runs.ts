@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
+import { chunkLazy, isNonEmptyArray, splitArray } from "@aikirun/lib/array";
 import type { WorkflowRunState, WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
 	DueWorkflowRun,
@@ -9,6 +9,7 @@ import type {
 	WorkflowRunOutboxRowInsert,
 } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
+import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
@@ -20,21 +21,51 @@ type Repos = Pick<Repositories, "workflowRun" | "workflow" | "stateTransition" |
 export interface ProcessImminentScheduledRunsDeps {
 	repos: Repos;
 	workflowRunPublisher?: WorkflowRunPublisher;
+	timerSortedSet?: TimerSortedSet;
 }
 
 export async function processImminentScheduledRuns(
 	context: CronContext,
-	{ repos, workflowRunPublisher }: ProcessImminentScheduledRunsDeps,
-	options?: { limit?: number; chunkSize?: number }
+	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentScheduledRunsDeps,
+	options?: { limit?: number; chunkSize?: number; imminenceThresholdMs?: number }
 ) {
-	const { limit = 100, chunkSize = 50 } = options ?? {};
+	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 1_000 } = options ?? {};
 
-	const runs = await repos.workflowRun.listDueScheduleRuns(context, limit);
+	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
+	const runs = await repos.workflowRun.listDueScheduleRuns(context, dueBefore, limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}
 
-	await queueScheduledRuns(context, repos, workflowRunPublisher, runs, { chunkSize });
+	const now = Date.now();
+	const { whenTrue: runsDueNow, whenFalse: runsDueSoon } = splitArray(runs, (run) => {
+		if (run.dueAt && run.dueAt.getTime() > now) {
+			return { meetsCondition: false, item: run };
+		}
+		return { meetsCondition: true, item: run };
+	});
+
+	if (isNonEmptyArray(runsDueNow)) {
+		await queueScheduledRuns(context, repos, workflowRunPublisher, runsDueNow, { chunkSize });
+	}
+
+	if (timerSortedSet && isNonEmptyArray(runsDueSoon)) {
+		const timers: Array<{ type: "scheduled"; id: string; dueAt: number }> = [];
+		for (const run of runsDueSoon) {
+			if (!run.dueAt) {
+				context.logger.warn({ runId: run.id }, "Missing dueAt for scheduled run, skipping promotion");
+				continue;
+			}
+			timers.push({
+				type: "scheduled",
+				id: run.id,
+				dueAt: run.dueAt.getTime(),
+			});
+		}
+		await runConcurrently(context, chunkLazy(timers, chunkSize), async (chunk) => {
+			await timerSortedSet.add(chunk);
+		});
+	}
 }
 
 export async function queueScheduledRuns(

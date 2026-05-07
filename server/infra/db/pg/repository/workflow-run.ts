@@ -19,10 +19,16 @@ type WorkflowRunRowUpdate = Partial<
 	>
 >;
 
-export type DueWorkflowRun = Pick<
-	WorkflowRunRow,
-	"id" | "namespaceId" | "workflowId" | "revision" | "attempts" | "options" | "latestStateTransitionId"
->;
+export interface DueWorkflowRun {
+	id: string;
+	namespaceId: string;
+	workflowId: string;
+	revision: number;
+	attempts: number;
+	options: unknown;
+	latestStateTransitionId: string;
+	dueAt?: Date | null;
+}
 
 export function createWorkflowRunRepository(db: PgDb) {
 	return {
@@ -288,7 +294,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.groupBy(workflowRun.status);
 		},
 
-		async listDueScheduleRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
+		async listDueScheduleRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -298,14 +304,15 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: workflowRun.scheduledAt,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "scheduled"), lte(workflowRun.scheduledAt, new Date())))
+				.where(and(eq(workflowRun.status, "scheduled"), lte(workflowRun.scheduledAt, before)))
 				.orderBy(workflowRun.scheduledAt, workflowRun.id)
 				.limit(limit);
 		},
 
-		async listSleepElapsedRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
+		async listSleepElapsedRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -315,14 +322,15 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: workflowRun.awakeAt,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "sleeping"), lte(workflowRun.awakeAt, new Date())))
+				.where(and(eq(workflowRun.status, "sleeping"), lte(workflowRun.awakeAt, before)))
 				.orderBy(workflowRun.awakeAt, workflowRun.id)
 				.limit(limit);
 		},
 
-		async listRetryableRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
+		async listRetryableRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -332,14 +340,15 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: workflowRun.nextAttemptAt,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "awaiting_retry"), lte(workflowRun.nextAttemptAt, new Date())))
+				.where(and(eq(workflowRun.status, "awaiting_retry"), lte(workflowRun.nextAttemptAt, before)))
 				.orderBy(workflowRun.nextAttemptAt, workflowRun.id)
 				.limit(limit);
 		},
 
-		async listEventWaitTimedOutRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
+		async listEventWaitTimedOutRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -349,14 +358,15 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: workflowRun.timeoutAt,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "awaiting_event"), lte(workflowRun.timeoutAt, new Date())))
+				.where(and(eq(workflowRun.status, "awaiting_event"), lte(workflowRun.timeoutAt, before)))
 				.orderBy(workflowRun.timeoutAt, workflowRun.id)
 				.limit(limit);
 		},
 
-		async listChildRunWaitTimedOutRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
+		async listChildRunWaitTimedOutRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -366,9 +376,10 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: workflowRun.timeoutAt,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "awaiting_child_workflow"), lte(workflowRun.timeoutAt, new Date())))
+				.where(and(eq(workflowRun.status, "awaiting_child_workflow"), lte(workflowRun.timeoutAt, before)))
 				.orderBy(workflowRun.timeoutAt, workflowRun.id)
 				.limit(limit);
 		},

@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { and, eq, inArray, lte, min } from "drizzle-orm";
+import type { CronContext } from "server/middleware/context";
 
 import type { PgDb } from "../provider";
 import { task } from "../schema";
@@ -34,15 +35,17 @@ export function createTaskRepository(db: PgDb) {
 			return db.select().from(task).where(eq(task.workflowRunId, workflowRunId)).orderBy(task.id).limit(10_000);
 		},
 
-		async listRetryableTaskWorkflowRunIds(limit = 100): Promise<string[]> {
-			const rows = await db
-				.select({ workflowRunId: task.workflowRunId })
+		async listRetryableTaskWorkflowRuns(_context: CronContext, before: Date, limit = 100) {
+			return db
+				.select({
+					workflowRunId: task.workflowRunId,
+					dueAt: min(task.nextAttemptAt),
+				})
 				.from(task)
-				.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, new Date())))
+				.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, before)))
 				.groupBy(task.workflowRunId)
 				.orderBy(min(task.nextAttemptAt))
 				.limit(limit);
-			return rows.map((row) => row.workflowRunId);
 		},
 
 		async deleteStaleByWorkflowRunIds(workflowRunIds: string | NonEmptyArray<string>): Promise<void> {

@@ -74,31 +74,38 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 		initCron(logger, 1_000, processImminentScheduledRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
 		initCron(logger, 1_000, processImminentSleepElapsedRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
 		initCron(logger, 1_000, processImminentRetryableRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
 		initCron(logger, 1_000, processImminentRetryableTaskRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
 		initCron(logger, 1_000, processImminentEventWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
 		initCron(logger, 1_000, processImminentChildRunWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
 		initCron(logger, 1_000, processImminentRecurringWorkflows, {
 			repos: deps.repos,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
 	];
 
