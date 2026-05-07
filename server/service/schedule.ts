@@ -106,16 +106,6 @@ export interface ScheduleServiceDeps {
 export function createScheduleService(deps: ScheduleServiceDeps) {
 	const { repos } = deps;
 
-	async function getDueSchedules(now: number) {
-		const rows = await repos.schedule.listDueSchedules(new Date(now));
-		return rows.map(({ schedule, workflow }) => ({
-			...scheduleRowToDomain(schedule, workflow),
-			workflowId: schedule.workflowId,
-			namespaceId: schedule.namespaceId as NamespaceId,
-			workflowRunInputHash: schedule.workflowRunInputHash,
-		}));
-	}
-
 	async function updateSchedule(
 		namespaceId: NamespaceId,
 		id: string,
@@ -303,7 +293,6 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 	}
 
 	return {
-		getDueSchedules: getDueSchedules,
 		updateSchedule: updateSchedule,
 		activateSchedule: activateSchedule,
 		getScheduleById: getScheduleById,

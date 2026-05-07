@@ -7,7 +7,8 @@ import { initCrons } from "./crons";
 import { UnauthorizedError } from "./errors";
 import { createDatabase } from "./infra/db";
 import { createLogger } from "./infra/logger";
-import { createWorkflowRunPublisher } from "./infra/messaging/redis-publisher";
+import { createWorkflowRunPublisher, type WorkflowRunPublisher } from "./infra/messaging/redis-publisher";
+import { createTimerSortedSet, type TimerSortedSet } from "./infra/messaging/redis-timer-sorted-set";
 import { createAuthorizer } from "./middleware/authorization";
 import {
 	createNamespaceRequestContext,
@@ -34,7 +35,8 @@ if (import.meta.main) {
 	const { repos, conn, betterAuthSchema } = createDatabase(config.database);
 
 	let redis: Redis | undefined;
-	let workflowRunPublisher: ReturnType<typeof createWorkflowRunPublisher> | undefined;
+	let timerSortedSet: TimerSortedSet | undefined;
+	let workflowRunPublisher: WorkflowRunPublisher | undefined;
 
 	if (config.redis) {
 		redis = new Redis({
@@ -45,6 +47,7 @@ if (import.meta.main) {
 		redis.on("error", (err: Error) => {
 			logger.error({ err }, "Redis connection error");
 		});
+		timerSortedSet = createTimerSortedSet(redis, "timers");
 		workflowRunPublisher = createWorkflowRunPublisher(redis);
 	}
 
@@ -83,8 +86,8 @@ if (import.meta.main) {
 	const crons = initCrons(logger, {
 		repos,
 		workflowRunPublisher,
+		timerSortedSet,
 		childRunCanceller,
-		scheduleService,
 	});
 
 	const organizationAuthedRouter = createOrganizationAuthedRouter(namespaceService);

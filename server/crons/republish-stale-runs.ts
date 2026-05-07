@@ -15,7 +15,7 @@ export async function republishStaleRuns(
 ) {
 	const { claimMinIdleTimeMs = 30_000, limit = 50 } = options ?? {};
 
-	const staleEntries = await deps.repos.workflowRunOutbox.listStalePublished(claimMinIdleTimeMs, limit);
+	const staleEntries = await deps.repos.workflowRunOutbox.listStalePublished(context, claimMinIdleTimeMs, limit);
 	const staleEntryIds = staleEntries.map((entry) => entry.id);
 	if (!isNonEmptyArray(staleEntryIds)) {
 		return;

@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import { chunkLazy, isNonEmptyArray, splitArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
 import {
@@ -16,40 +16,87 @@ import type {
 	WorkflowRunRowInsert,
 } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
+import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
+import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
-import type { ScheduleService } from "server/service/schedule";
-import { getDueOccurrences, getNextOccurrence, getReferenceId } from "server/service/schedule";
+import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "server/service/schedule";
 import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
 
-export interface QueueRecurringWorkflowsDeps {
+export interface ProcessImminentRecurringWorkflowsDeps {
 	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "schedule" | "workflowRunOutbox" | "transaction">;
-	scheduleService: ScheduleService;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: WorkflowRunPublisher;
+	timerSortedSet?: TimerSortedSet;
 }
 
-type DueSchedule = Schedule & {
+export type DueSchedule = Schedule & {
 	workflowId: string;
 	namespaceId: NamespaceId;
 	workflowRunInputHash: string;
 };
 
-export async function queueRecurringWorkflows(context: CronContext, deps: QueueRecurringWorkflowsDeps) {
-	const now = Date.now();
+export async function processImminentRecurringWorkflows(
+	context: CronContext,
+	deps: ProcessImminentRecurringWorkflowsDeps,
+	options?: { imminenceThresholdMs?: number; chunkSize?: number }
+) {
+	const { imminenceThresholdMs = 1_000, chunkSize = 50 } = options ?? {};
 
-	const dueSchedules = await deps.scheduleService.getDueSchedules(now);
-	if (!isNonEmptyArray(dueSchedules)) {
+	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
+	const rows = await deps.repos.schedule.listDueSchedules(context, dueBefore);
+	const schedules: DueSchedule[] = rows.map(({ schedule, workflow }) => ({
+		...scheduleRowToDomain(schedule, workflow),
+		workflowId: schedule.workflowId,
+		namespaceId: schedule.namespaceId as NamespaceId,
+		workflowRunInputHash: schedule.workflowRunInputHash,
+	}));
+	if (!isNonEmptyArray(schedules)) {
 		return;
 	}
+
+	const now = Date.now();
+	const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = splitArray(schedules, (schedule) => {
+		if (schedule.nextRunAt > now) {
+			return { meetsCondition: false, item: schedule };
+		}
+		return { meetsCondition: true, item: schedule };
+	});
+
+	if (isNonEmptyArray(schedulesDueNow)) {
+		await queueRecurringWorkflows(context, deps, schedulesDueNow);
+	}
+
+	const { timerSortedSet } = deps;
+	if (timerSortedSet && isNonEmptyArray(schedulesDueSoon)) {
+		const timers: Array<{ type: "recurring"; id: string; dueAt: number }> = [];
+		for (const schedule of schedulesDueSoon) {
+			timers.push({
+				type: "recurring",
+				id: schedule.id,
+				dueAt: schedule.nextRunAt,
+			});
+		}
+		await runConcurrently(context, chunkLazy(timers, chunkSize), async (chunk) => {
+			await timerSortedSet.add(chunk);
+		});
+	}
+}
+
+export async function queueRecurringWorkflows(
+	context: CronContext,
+	deps: ProcessImminentRecurringWorkflowsDeps,
+	schedules: NonEmptyArray<DueSchedule>
+) {
+	const now = Date.now();
 
 	const allowSchedules: DueSchedule[] = [];
 	const skipSchedules: DueSchedule[] = [];
 	const cancelPreviousSchedules: DueSchedule[] = [];
 
-	for (const schedule of dueSchedules) {
+	for (const schedule of schedules) {
 		const overlapPolicy: ScheduleOverlapPolicy = schedule.spec.overlapPolicy ?? "skip";
 		if (overlapPolicy === "allow") {
 			allowSchedules.push(schedule);
@@ -82,7 +129,7 @@ export async function queueRecurringWorkflows(context: CronContext, deps: QueueR
 
 async function processOverlapAllowSchedules(
 	context: CronContext,
-	repos: QueueRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
 	workflowRunPublisher?: WorkflowRunPublisher
@@ -169,7 +216,7 @@ async function processOverlapAllowSchedules(
 
 async function processOverlapSkipSchedules(
 	context: CronContext,
-	repos: QueueRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
 	workflowRunPublisher?: WorkflowRunPublisher
@@ -260,7 +307,7 @@ async function processOverlapSkipSchedules(
 
 async function processOverlapCancelPreviousSchedules(
 	context: CronContext,
-	deps: QueueRecurringWorkflowsDeps,
+	deps: ProcessImminentRecurringWorkflowsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number
 ) {
@@ -397,7 +444,7 @@ async function processOverlapCancelPreviousSchedules(
 }
 
 async function fetchActiveRunsBySchedule(
-	repos: QueueRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>
 ) {
 	const workflowAndReferenceIdPairs: { workflowId: string; referenceId: string }[] = [];

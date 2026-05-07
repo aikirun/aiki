@@ -1,26 +1,27 @@
 import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
+import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import type { CronContext } from "server/middleware/context";
 import { createCronContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
-import type { ScheduleService } from "server/service/schedule";
 
+import { queueDueTimers } from "./due-timers";
+import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
+import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
+import { processImminentRecurringWorkflows } from "./imminent-recurring-workflows";
+import { processImminentRetryableRuns } from "./imminent-retryable-runs";
+import { processImminentRetryableTaskRuns } from "./imminent-retryable-task-runs";
+import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
+import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { publishReadyRuns } from "./publish-ready-runs";
-import { queueChildRunWaitTimedOutWorkflowRuns } from "./queue-child-workflow-run-wait-timed-out-runs";
-import { queueEventWaitTimedOutWorkflowRuns } from "./queue-event-wait-timed-out-runs";
-import { queueRecurringWorkflows } from "./queue-recurring-workflows";
-import { queueRetryableWorkflowRuns } from "./queue-retryable-runs";
-import { queueWorkflowRunsWithRetryableTask } from "./queue-retryable-task-runs";
-import { queueScheduledWorkflowRuns } from "./queue-scheduled-runs";
-import { queueSleepElapsedWorkflowRuns } from "./queue-sleep-elapsed-runs";
 import { republishStaleRuns } from "./republish-stale-runs";
 
 export interface InitCronsDeps {
 	repos: Repositories;
 	workflowRunPublisher?: WorkflowRunPublisher;
+	timerSortedSet?: TimerSortedSet;
 	childRunCanceller: ChildRunCanceller;
-	scheduleService: ScheduleService;
 }
 
 export interface CronHandle {
@@ -70,49 +71,69 @@ function initCron<Deps, Options>(
 
 export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 	const crons = [
-		...(deps.workflowRunPublisher
-			? [
-					initCron(logger, 1_000, publishReadyRuns, {
-						repos: deps.repos,
-						workflowRunPublisher: deps.workflowRunPublisher,
-					}),
-					initCron(logger, 1_000, republishStaleRuns, {
-						repos: deps.repos,
-						workflowRunPublisher: deps.workflowRunPublisher,
-					}),
-				]
-			: []),
-		initCron(logger, 1_000, queueScheduledWorkflowRuns, {
+		initCron(logger, 1_000, processImminentScheduledRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 1_000, queueSleepElapsedWorkflowRuns, {
+		initCron(logger, 1_000, processImminentSleepElapsedRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 1_000, queueRetryableWorkflowRuns, {
+		initCron(logger, 1_000, processImminentRetryableRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 1_000, queueWorkflowRunsWithRetryableTask, {
+		initCron(logger, 1_000, processImminentRetryableTaskRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 1_000, queueEventWaitTimedOutWorkflowRuns, {
+		initCron(logger, 1_000, processImminentEventWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 1_000, queueChildRunWaitTimedOutWorkflowRuns, {
+		initCron(logger, 1_000, processImminentChildRunWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 1_000, queueRecurringWorkflows, {
+		initCron(logger, 1_000, processImminentRecurringWorkflows, {
 			repos: deps.repos,
-			scheduleService: deps.scheduleService,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			timerSortedSet: deps.timerSortedSet,
 		}),
 	];
+
+	if (deps.timerSortedSet) {
+		crons.push(
+			initCron(logger, 50, queueDueTimers, {
+				repos: deps.repos,
+				timerSortedSet: deps.timerSortedSet,
+				childRunCanceller: deps.childRunCanceller,
+				workflowRunPublisher: deps.workflowRunPublisher,
+			})
+		);
+	}
+
+	if (deps.workflowRunPublisher) {
+		crons.push(
+			...[
+				initCron(logger, 1_000, publishReadyRuns, {
+					repos: deps.repos,
+					workflowRunPublisher: deps.workflowRunPublisher,
+				}),
+				initCron(logger, 1_000, republishStaleRuns, {
+					repos: deps.repos,
+					workflowRunPublisher: deps.workflowRunPublisher,
+				}),
+			]
+		);
+	}
 
 	return {
 		shutdown() {

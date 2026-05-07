@@ -1,4 +1,5 @@
-import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/array";
+import { chunkLazy, isNonEmptyArray, splitArray } from "@aikirun/lib/array";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
 	DueWorkflowRun,
@@ -8,31 +9,85 @@ import type {
 	WorkflowRunOutboxRowInsert,
 } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
+import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
 
-export interface QueueSleepElapsedRunsDeps {
-	repos: Pick<
-		Repositories,
-		"workflowRun" | "stateTransition" | "sleepQueue" | "workflow" | "workflowRunOutbox" | "transaction"
-	>;
+type Repos = Pick<
+	Repositories,
+	"task" | "workflowRun" | "stateTransition" | "workflow" | "workflowRunOutbox" | "transaction"
+>;
+
+export interface ProcessImminentRetryableTaskRunsDeps {
+	repos: Repos;
 	workflowRunPublisher?: WorkflowRunPublisher;
+	timerSortedSet?: TimerSortedSet;
 }
 
-export async function queueSleepElapsedWorkflowRuns(
+export async function processImminentRetryableTaskRuns(
 	context: CronContext,
-	{ repos, workflowRunPublisher }: QueueSleepElapsedRunsDeps,
-	options?: { limit?: number; chunkSize?: number }
+	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentRetryableTaskRunsDeps,
+	options?: { limit?: number; chunkSize?: number; imminenceThresholdMs?: number }
 ) {
-	const { limit = 100, chunkSize = 50 } = options ?? {};
+	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 1_000 } = options ?? {};
 
-	const runs = await repos.workflowRun.listSleepElapsedRuns(limit);
-	if (!isNonEmptyArray(runs)) {
+	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
+	const retryableTasks = await repos.task.listRetryableTaskWorkflowRuns(context, dueBefore, limit);
+	if (!isNonEmptyArray(retryableTasks)) {
 		return;
 	}
+
+	const now = Date.now();
+	const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } = splitArray(retryableTasks, (task) => {
+		if (task.dueAt && new Date(task.dueAt).getTime() > now) {
+			return { meetsCondition: false, item: task };
+		}
+		return { meetsCondition: true, item: task };
+	});
+
+	if (isNonEmptyArray(tasksDueNow)) {
+		const workflowRunIds = tasksDueNow.map((task) => task.workflowRunId);
+		if (isNonEmptyArray(workflowRunIds)) {
+			const runs = await repos.workflowRun.listByIdsAndStatus(context, workflowRunIds, "running");
+			if (isNonEmptyArray(runs)) {
+				await queueRetryableTaskRuns(context, repos, workflowRunPublisher, runs, { chunkSize });
+			}
+		}
+	}
+
+	if (timerSortedSet && isNonEmptyArray(tasksDueSoon)) {
+		const timers: Array<{ type: "task_retry"; id: string; dueAt: number }> = [];
+		for (const task of tasksDueSoon) {
+			if (!task.dueAt) {
+				context.logger.warn(
+					{ workflowRunId: task.workflowRunId },
+					"Missing dueAt for retryable task run, skipping promotion"
+				);
+				continue;
+			}
+			timers.push({
+				type: "task_retry",
+				id: task.workflowRunId,
+				dueAt: new Date(task.dueAt).getTime(),
+			});
+		}
+		await runConcurrently(context, chunkLazy(timers, chunkSize), async (chunk) => {
+			await timerSortedSet.add(chunk);
+		});
+	}
+}
+
+export async function queueRetryableTaskRuns(
+	context: CronContext,
+	repos: Repos,
+	workflowRunPublisher: WorkflowRunPublisher | undefined,
+	runs: NonEmptyArray<DueWorkflowRun>,
+	options?: { chunkSize?: number }
+) {
+	const { chunkSize = 50 } = options ?? {};
 
 	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId)));
 	if (!isNonEmptyArray(workflowIds)) {
@@ -52,15 +107,11 @@ export async function queueSleepElapsedWorkflowRuns(
 
 async function processChunk(
 	context: CronContext,
-	repos: QueueSleepElapsedRunsDeps["repos"],
+	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<DueWorkflowRun>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
-	const completedAt = new Date();
-
-	const workflowRunIds = runs.map((run) => run.id);
-
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -73,7 +124,7 @@ async function processChunk(
 		}
 
 		const stateTransitionId = ulid();
-		const state: WorkflowRunStateQueued = { status: "queued", reason: "awake" };
+		const state: WorkflowRunStateQueued = { status: "queued", reason: "task_retry" };
 		stateTransitionEntries.push({
 			id: stateTransitionId,
 			workflowRunId: run.id,
@@ -91,6 +142,7 @@ async function processChunk(
 				stateTransitionId,
 			},
 		});
+
 		outboxEntries.push({
 			id: ulid(),
 			namespaceId: run.namespaceId,
@@ -102,18 +154,13 @@ async function processChunk(
 		});
 	}
 
-	if (
-		!isNonEmptyArray(workflowRunIds) ||
-		!isNonEmptyArray(stateTransitionEntries) ||
-		!isNonEmptyArray(workflowRunUpdates)
-	) {
+	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(workflowRunUpdates)) {
 		return;
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
-		await txRepos.sleepQueue.bulkCompleteByWorkflowRunIds(workflowRunIds, completedAt);
 		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("sleeping", workflowRunUpdates);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("running", workflowRunUpdates);
 		const transitionedRunIdsSet = new Set(transitionedRunIds);
 		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
 		if (!isNonEmptyArray(outboxEntriesToInsert)) {

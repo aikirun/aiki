@@ -1,6 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, count, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
+import type { CronContext } from "server/middleware/context";
 
 import type { PgDb } from "../provider";
 import { schedule, workflow } from "../schema";
@@ -137,7 +138,18 @@ export function createScheduleRepository(db: PgDb) {
 			return { rows, total: countResult[0]?.count ?? 0 };
 		},
 
-		async listDueSchedules(before: Date, limit = 100) {
+		async listActiveByIds(_context: CronContext, ids: NonEmptyArray<string>) {
+			return db
+				.select({
+					schedule: getTableColumns(schedule),
+					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
+				})
+				.from(schedule)
+				.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
+				.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
+		},
+
+		async listDueSchedules(_context: CronContext, before: Date, limit = 100) {
 			return db
 				.select({
 					schedule: getTableColumns(schedule),

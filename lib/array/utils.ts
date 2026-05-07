@@ -31,6 +31,28 @@ export function* chunkLazy<T>(items: T[], size: number): Generator<NonEmptyArray
 	}
 }
 
+export const splitArray = <Item, WhenTrue = Item, WhenFalse = Item>(
+	items: Item[],
+	condition: (item: Item) => { meetsCondition: true; item: WhenTrue } | { meetsCondition: false; item: WhenFalse }
+): { whenTrue: WhenTrue[]; whenFalse: WhenFalse[] } => {
+	const itemsThatMeetCondition: WhenTrue[] = [];
+	const itemsThatDoNotMeetCondition: WhenFalse[] = [];
+
+	for (const item of items) {
+		const result = condition(item);
+		if (result.meetsCondition) {
+			itemsThatMeetCondition.push(result.item);
+		} else {
+			itemsThatDoNotMeetCondition.push(result.item);
+		}
+	}
+
+	return {
+		whenTrue: itemsThatMeetCondition,
+		whenFalse: itemsThatDoNotMeetCondition,
+	};
+};
+
 /**
  * Shuffles an array using Fisher-Yates algorithm for better randomness
  * @param array The array to shuffle

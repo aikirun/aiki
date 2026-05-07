@@ -11,7 +11,7 @@ export interface PublishReadyRunsDeps {
 export async function publishReadyRuns(context: CronContext, deps: PublishReadyRunsDeps, options?: { limit?: number }) {
 	const { limit = 100 } = options ?? {};
 
-	const pendingEntries = await deps.repos.workflowRunOutbox.listPending(limit);
+	const pendingEntries = await deps.repos.workflowRunOutbox.listPending(context, limit);
 	if (!isNonEmptyArray(pendingEntries)) {
 		return;
 	}
