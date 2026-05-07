@@ -46,7 +46,7 @@ const workflowRunStateTransitionValidator: Record<
 
 	running: (() => {
 		const allowedDestinations: WorkflowRunStatus[] = [
-			"scheduled",
+			"queued",
 			"running",
 			"paused",
 			"sleeping",
@@ -61,8 +61,8 @@ const workflowRunStateTransitionValidator: Record<
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
-			if (to.status === "scheduled" && to.reason !== "task_retry") {
-				return { allowed: false, reason: "Only task retry run allowed" };
+			if (to.status === "queued" && to.reason !== "task_retry") {
+				return { allowed: false, reason: "Only task_retry run allowed" };
 			}
 			return { allowed: true };
 		};
@@ -82,20 +82,23 @@ const workflowRunStateTransitionValidator: Record<
 	})(),
 
 	sleeping: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "queued", "cancelled"];
 		return (to) => {
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
-			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "awake" && to.reason !== "awake_early") {
-				return { allowed: false, reason: "Only new or awake run allowed" };
+			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "awake_early") {
+				return { allowed: false, reason: "Only new or awake_early run allowed" };
+			}
+			if (to.status === "queued" && to.reason !== "awake") {
+				return { allowed: false, reason: "Only awake run allowed" };
 			}
 			return { allowed: true };
 		};
 	})(),
 
 	awaiting_event: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "queued", "cancelled"];
 		return (to) => {
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
@@ -103,31 +106,40 @@ const workflowRunStateTransitionValidator: Record<
 			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "event") {
 				return { allowed: false, reason: "Only new or event received run allowed" };
 			}
+			if (to.status === "queued" && to.reason !== "event") {
+				return { allowed: false, reason: "Only event received run allowed" };
+			}
 			return { allowed: true };
 		};
 	})(),
 
 	awaiting_retry: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "queued", "cancelled"];
 		return (to) => {
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
-			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "retry") {
-				return { allowed: false, reason: "Only new or retry run allowed" };
+			if (to.status === "scheduled" && to.reason !== "new") {
+				return { allowed: false, reason: "Only new run allowed" };
+			}
+			if (to.status === "queued" && to.reason !== "retry") {
+				return { allowed: false, reason: "Only retry run allowed" };
 			}
 			return { allowed: true };
 		};
 	})(),
 
 	awaiting_child_workflow: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "queued", "cancelled"];
 		return (to) => {
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
 			if (to.status === "scheduled" && to.reason !== "new" && to.reason !== "child_workflow") {
 				return { allowed: false, reason: "Only new or child workflow triggered run allowed" };
+			}
+			if (to.status === "queued" && to.reason !== "child_workflow") {
+				return { allowed: false, reason: "Only child workflow triggered run allowed" };
 			}
 			return { allowed: true };
 		};
