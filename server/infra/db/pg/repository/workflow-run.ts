@@ -18,6 +18,11 @@ type WorkflowRunRowUpdate = Partial<
 	>
 >;
 
+export type DueWorkflowRun = Pick<
+	WorkflowRunRow,
+	"id" | "namespaceId" | "workflowId" | "revision" | "attempts" | "options" | "latestStateTransitionId"
+>;
+
 export function createWorkflowRunRepository(db: PgDb) {
 	return {
 		async insert(input: WorkflowRunRowInsert | NonEmptyArray<WorkflowRunRowInsert>): Promise<void> {
@@ -108,8 +113,12 @@ export function createWorkflowRunRepository(db: PgDb) {
 			return db
 				.select({
 					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
 					revision: workflowRun.revision,
 					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
 				})
 				.from(workflowRun)
 				.where(and(inArray(workflowRun.id, ids), eq(workflowRun.status, status)));
@@ -278,7 +287,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.groupBy(workflowRun.status);
 		},
 
-		async listDueScheduleRuns(limit = 100) {
+		async listDueScheduleRuns(limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -295,12 +304,16 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async listSleepElapsedRuns(limit = 100) {
+		async listSleepElapsedRuns(limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
 					revision: workflowRun.revision,
 					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
 				})
 				.from(workflowRun)
 				.where(and(eq(workflowRun.status, "sleeping"), lte(workflowRun.awakeAt, new Date())))
@@ -308,12 +321,16 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async listRetryableRuns(limit = 100) {
+		async listRetryableRuns(limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
 					revision: workflowRun.revision,
 					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
 				})
 				.from(workflowRun)
 				.where(and(eq(workflowRun.status, "awaiting_retry"), lte(workflowRun.nextAttemptAt, new Date())))
@@ -321,12 +338,15 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async listEventWaitTimedOutRuns(limit = 100) {
+		async listEventWaitTimedOutRuns(limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
 					revision: workflowRun.revision,
 					attempts: workflowRun.attempts,
+					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
 				})
 				.from(workflowRun)
@@ -335,12 +355,15 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async listChildRunWaitTimedOutRuns(limit = 100) {
+		async listChildRunWaitTimedOutRuns(limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
 					revision: workflowRun.revision,
 					attempts: workflowRun.attempts,
+					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
 				})
 				.from(workflowRun)
@@ -350,6 +373,13 @@ export function createWorkflowRunRepository(db: PgDb) {
 		},
 
 		async bulkTransitionToQueued(
+			fromStatus:
+				| "scheduled"
+				| "sleeping"
+				| "awaiting_retry"
+				| "awaiting_event"
+				| "awaiting_child_workflow"
+				| "running",
 			runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>
 		): Promise<string[]> {
 			const orConditions = [];
@@ -366,37 +396,10 @@ export function createWorkflowRunRepository(db: PgDb) {
 					status: "queued",
 					revision: sql`${workflowRun.revision} + 1`,
 					scheduledAt: null,
-					latestStateTransitionId: sql`CASE ${workflowRun.id} ${sql.join(caseFragments, sql` `)} END`,
-				})
-				.where(and(eq(workflowRun.status, "scheduled"), or(...orConditions)))
-				.returning({ id: workflowRun.id });
-
-			return result.map((row) => row.id);
-		},
-
-		async bulkTransitionToScheduled(
-			fromStatus: WorkflowRunStatus,
-			runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
-			scheduledAt: Date
-		): Promise<string[]> {
-			const orConditions = [];
-			const stateTransitionCaseFragments = [];
-
-			for (const { filter, update } of runs) {
-				orConditions.push(sql`(${workflowRun.id} = ${filter.id} AND ${workflowRun.revision} = ${filter.revision})`);
-				stateTransitionCaseFragments.push(sql`WHEN ${filter.id} THEN ${update.stateTransitionId}`);
-			}
-
-			const result = await db
-				.update(workflowRun)
-				.set({
-					status: "scheduled",
-					revision: sql`${workflowRun.revision} + 1`,
-					scheduledAt,
 					awakeAt: null,
 					timeoutAt: null,
 					nextAttemptAt: null,
-					latestStateTransitionId: sql`CASE ${workflowRun.id} ${sql.join(stateTransitionCaseFragments, sql` `)} END`,
+					latestStateTransitionId: sql`CASE ${workflowRun.id} ${sql.join(caseFragments, sql` `)} END`,
 				})
 				.where(and(eq(workflowRun.status, fromStatus), or(...orConditions)))
 				.returning({ id: workflowRun.id });

@@ -38,7 +38,7 @@ function groupIntoAttempts(transitions: StateTransition[]): Attempt[] {
 		const isNewAttempt =
 			i > 0 &&
 			t.type === "workflow_run" &&
-			t.state.status === "scheduled" &&
+			(t.state.status === "scheduled" || t.state.status === "queued") &&
 			(t.state.reason === "new" || t.state.reason === "retry");
 
 		if (isNewAttempt) {
@@ -214,7 +214,7 @@ function TimelineItem({
 		const isRunning = status === "running";
 
 		let reason: string | undefined;
-		if (transition.state.status === "scheduled") {
+		if (transition.state.status === "scheduled" || transition.state.status === "queued") {
 			reason = transition.state.reason;
 		}
 
@@ -236,7 +236,10 @@ function TimelineItem({
 					child <ChildWorkflowLink id={childId}>{shortId(childId)}</ChildWorkflowLink>
 				</span>
 			);
-		} else if (transition.state.status === "scheduled" && lookups?.scheduledContext) {
+		} else if (
+			(transition.state.status === "scheduled" || transition.state.status === "queued") &&
+			lookups?.scheduledContext
+		) {
 			const ctx = lookups.scheduledContext.get(globalIndex);
 			if (ctx) {
 				inlineContext = <ScheduledContextInfo ctx={ctx} color={color} />;

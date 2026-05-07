@@ -3,6 +3,7 @@ import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRunState, WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
 	DueWorkflowRun,
+	EventWaitQueueRowInsert,
 	Repositories,
 	StateTransitionRowInsert,
 	WorkflowRow,
@@ -15,19 +16,22 @@ import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
 
-export interface QueueScheduledRunsDeps {
-	repos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition" | "workflowRunOutbox" | "transaction">;
+export interface QueueEventWaitTimedOutRunsDeps {
+	repos: Pick<
+		Repositories,
+		"workflowRun" | "stateTransition" | "eventWaitQueue" | "workflow" | "workflowRunOutbox" | "transaction"
+	>;
 	workflowRunPublisher?: WorkflowRunPublisher;
 }
 
-export async function queueScheduledWorkflowRuns(
+export async function queueEventWaitTimedOutWorkflowRuns(
 	context: CronContext,
-	{ repos, workflowRunPublisher }: QueueScheduledRunsDeps,
+	{ repos, workflowRunPublisher }: QueueEventWaitTimedOutRunsDeps,
 	options?: { limit?: number; chunkSize?: number }
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await repos.workflowRun.listDueScheduleRuns(limit);
+	const runs = await repos.workflowRun.listEventWaitTimedOutRuns(limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}
@@ -39,6 +43,7 @@ export async function queueScheduledWorkflowRuns(
 		workflowIdSet.add(run.workflowId);
 	}
 	const workflowIds = Array.from(workflowIdSet);
+
 	if (!isNonEmptyArray(stateTransitionIds) || !isNonEmptyArray(workflowIds)) {
 		return;
 	}
@@ -61,12 +66,15 @@ export async function queueScheduledWorkflowRuns(
 
 async function processChunk(
 	context: CronContext,
-	repos: QueueScheduledRunsDeps["repos"],
+	repos: QueueEventWaitTimedOutRunsDeps["repos"],
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<DueWorkflowRun>,
 	stateTransitionsById: Map<string, { id: string; state: unknown }>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
+	const timedOutAt = new Date();
+
+	const eventWaitEntries: EventWaitQueueRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -83,12 +91,20 @@ async function processChunk(
 			continue;
 		}
 		const fromState = transition.state as WorkflowRunState;
-		if (fromState.status !== "scheduled") {
+		if (fromState.status !== "awaiting_event") {
 			continue;
 		}
 
+		eventWaitEntries.push({
+			id: ulid(),
+			workflowRunId: run.id,
+			name: fromState.eventName,
+			status: "timeout",
+			timedOutAt,
+		});
+
 		const stateTransitionId = ulid();
-		const toState: WorkflowRunStateQueued = { status: "queued", reason: fromState.reason };
+		const toState: WorkflowRunStateQueued = { status: "queued", reason: "event" };
 		stateTransitionEntries.push({
 			id: stateTransitionId,
 			workflowRunId: run.id,
@@ -106,6 +122,7 @@ async function processChunk(
 				stateTransitionId,
 			},
 		});
+
 		outboxEntries.push({
 			id: ulid(),
 			namespaceId: run.namespaceId,
@@ -117,13 +134,18 @@ async function processChunk(
 		});
 	}
 
-	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(workflowRunUpdates)) {
+	if (
+		!isNonEmptyArray(eventWaitEntries) ||
+		!isNonEmptyArray(stateTransitionEntries) ||
+		!isNonEmptyArray(workflowRunUpdates)
+	) {
 		return;
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
+		await txRepos.eventWaitQueue.insert(eventWaitEntries);
 		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("scheduled", workflowRunUpdates);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("awaiting_event", workflowRunUpdates);
 		const transitionedRunIdsSet = new Set(transitionedRunIds);
 		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
 		if (!isNonEmptyArray(outboxEntriesToInsert)) {

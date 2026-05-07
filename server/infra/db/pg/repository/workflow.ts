@@ -3,6 +3,7 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
 import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/workflow-api";
 import { and, count, eq, inArray, like, max, or, sql } from "drizzle-orm";
+import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 import type { PgDb } from "../provider";
@@ -29,7 +30,7 @@ export function createWorkflowRepository(db: PgDb) {
 				.where(and(eq(workflow.namespaceId, namespaceId), inArray(workflow.id, ids)));
 		},
 
-		async getByIdsGlobal(ids: NonEmptyArray<string>): Promise<WorkflowRow[]> {
+		async getByIdsGlobal(_context: CronContext, ids: NonEmptyArray<string>): Promise<WorkflowRow[]> {
 			return db.select().from(workflow).where(inArray(workflow.id, ids));
 		},
 

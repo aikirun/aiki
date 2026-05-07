@@ -179,7 +179,7 @@ export function buildTransitionsWithMetadata(transitions: StateTransition[]): Tr
 
 		if (
 			transition.type === "workflow_run" &&
-			transition.state.status === "scheduled" &&
+			(transition.state.status === "scheduled" || transition.state.status === "queued") &&
 			(transition.state.reason === "new" || transition.state.reason === "retry")
 		) {
 			currentAttempt++;
