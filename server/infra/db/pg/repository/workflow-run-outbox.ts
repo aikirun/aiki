@@ -2,6 +2,7 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import type { CronContext } from "server/middleware/context";
 
 import type { PgDb } from "../provider";
 import { workflowRunOutbox } from "../schema";
@@ -15,7 +16,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			await db.insert(workflowRunOutbox).values(rows);
 		},
 
-		async listPending(limit = 100): Promise<WorkflowRunOutboxRow[]> {
+		async listPending(_context: CronContext, limit = 100): Promise<WorkflowRunOutboxRow[]> {
 			return db
 				.select()
 				.from(workflowRunOutbox)
@@ -38,7 +39,11 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 				.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, ids)));
 		},
 
-		async listStalePublished(claimMinIdleTimeMs: number, limit: number): Promise<WorkflowRunOutboxRow[]> {
+		async listStalePublished(
+			_context: CronContext,
+			claimMinIdleTimeMs: number,
+			limit: number
+		): Promise<WorkflowRunOutboxRow[]> {
 			const now = Date.now();
 			const staleThreshold = new Date(now - claimMinIdleTimeMs);
 

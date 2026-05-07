@@ -4,6 +4,7 @@ import type { TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow-run";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
+import type { CronContext } from "server/middleware/context";
 
 import { toWorkflowRunState } from "./state-transition";
 import type { PgDb } from "../provider";
@@ -109,7 +110,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 			return row as Omit<typeof row, "state"> & { state: WorkflowRunState };
 		},
 
-		async listByIdsAndStatus(ids: NonEmptyArray<string>, status: WorkflowRunStatus) {
+		async listByIdsAndStatus(_context: CronContext, ids: NonEmptyArray<string>, status: WorkflowRunStatus) {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -287,7 +288,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.groupBy(workflowRun.status);
 		},
 
-		async listDueScheduleRuns(limit = 100): Promise<DueWorkflowRun[]> {
+		async listDueScheduleRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -304,7 +305,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async listSleepElapsedRuns(limit = 100): Promise<DueWorkflowRun[]> {
+		async listSleepElapsedRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -321,7 +322,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async listRetryableRuns(limit = 100): Promise<DueWorkflowRun[]> {
+		async listRetryableRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -338,7 +339,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async listEventWaitTimedOutRuns(limit = 100): Promise<DueWorkflowRun[]> {
+		async listEventWaitTimedOutRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -355,7 +356,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async listChildRunWaitTimedOutRuns(limit = 100): Promise<DueWorkflowRun[]> {
+		async listChildRunWaitTimedOutRuns(_context: CronContext, limit = 100): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,

@@ -32,7 +32,7 @@ export async function processImminentRetryableRuns(
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await repos.workflowRun.listRetryableRuns(limit);
+	const runs = await repos.workflowRun.listRetryableRuns(context, limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}

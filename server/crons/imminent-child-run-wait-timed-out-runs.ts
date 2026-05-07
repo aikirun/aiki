@@ -33,7 +33,7 @@ export async function processImminentChildRunWaitTimedOutRuns(
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await repos.workflowRun.listChildRunWaitTimedOutRuns(limit);
+	const runs = await repos.workflowRun.listChildRunWaitTimedOutRuns(context, limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}

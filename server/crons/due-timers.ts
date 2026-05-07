@@ -50,7 +50,7 @@ export async function queueDueTimers(context: CronContext, deps: QueueDueTimersD
 			promises.push(queueRecurringWorkflows(context, deps, schedules));
 		} else {
 			const runStatus = timerTypeToWorkflowRunStatus[timerType];
-			const runs = await deps.repos.workflowRun.listByIdsAndStatus(ids, runStatus);
+			const runs = await deps.repos.workflowRun.listByIdsAndStatus(context, ids, runStatus);
 			if (!isNonEmptyArray(runs)) {
 				continue;
 			}

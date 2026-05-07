@@ -33,7 +33,7 @@ export async function processImminentEventWaitTimedOutRuns(
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await repos.workflowRun.listEventWaitTimedOutRuns(limit);
+	const runs = await repos.workflowRun.listEventWaitTimedOutRuns(context, limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}

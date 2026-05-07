@@ -31,7 +31,7 @@ export async function processImminentSleepElapsedRuns(
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await repos.workflowRun.listSleepElapsedRuns(limit);
+	const runs = await repos.workflowRun.listSleepElapsedRuns(context, limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}

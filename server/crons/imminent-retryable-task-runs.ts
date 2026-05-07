@@ -37,7 +37,7 @@ export async function processImminentRetryableTaskRuns(
 		return;
 	}
 
-	const runs = await repos.workflowRun.listByIdsAndStatus(workflowRunIds, "running");
+	const runs = await repos.workflowRun.listByIdsAndStatus(context, workflowRunIds, "running");
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}

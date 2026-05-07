@@ -18,20 +18,15 @@ import type {
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
-import type { ScheduleService } from "server/service/schedule";
-import { getDueOccurrences, getNextOccurrence, getReferenceId } from "server/service/schedule";
+import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "server/service/schedule";
 import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
 
-export interface QueueRecurringWorkflowsDeps {
+export interface ProcessImminentRecurringWorkflowsDeps {
 	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "schedule" | "workflowRunOutbox" | "transaction">;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: WorkflowRunPublisher;
-}
-
-export interface ProcessImminentRecurringWorkflowsDeps extends QueueRecurringWorkflowsDeps {
-	scheduleService: ScheduleService;
 }
 
 export type DueSchedule = Schedule & {
@@ -44,7 +39,13 @@ export async function processImminentRecurringWorkflows(
 	context: CronContext,
 	deps: ProcessImminentRecurringWorkflowsDeps
 ) {
-	const dueSchedules = await deps.scheduleService.getDueSchedules(Date.now());
+	const rows = await deps.repos.schedule.listDueSchedules(context, new Date());
+	const dueSchedules: DueSchedule[] = rows.map(({ schedule, workflow }) => ({
+		...scheduleRowToDomain(schedule, workflow),
+		workflowId: schedule.workflowId,
+		namespaceId: schedule.namespaceId as NamespaceId,
+		workflowRunInputHash: schedule.workflowRunInputHash,
+	}));
 	if (!isNonEmptyArray(dueSchedules)) {
 		return;
 	}
@@ -54,7 +55,7 @@ export async function processImminentRecurringWorkflows(
 
 export async function queueRecurringWorkflows(
 	context: CronContext,
-	deps: QueueRecurringWorkflowsDeps,
+	deps: ProcessImminentRecurringWorkflowsDeps,
 	schedules: NonEmptyArray<DueSchedule>
 ) {
 	const now = Date.now();
@@ -96,7 +97,7 @@ export async function queueRecurringWorkflows(
 
 async function processOverlapAllowSchedules(
 	context: CronContext,
-	repos: QueueRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
 	workflowRunPublisher?: WorkflowRunPublisher
@@ -183,7 +184,7 @@ async function processOverlapAllowSchedules(
 
 async function processOverlapSkipSchedules(
 	context: CronContext,
-	repos: QueueRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
 	workflowRunPublisher?: WorkflowRunPublisher
@@ -274,7 +275,7 @@ async function processOverlapSkipSchedules(
 
 async function processOverlapCancelPreviousSchedules(
 	context: CronContext,
-	deps: QueueRecurringWorkflowsDeps,
+	deps: ProcessImminentRecurringWorkflowsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number
 ) {
@@ -411,7 +412,7 @@ async function processOverlapCancelPreviousSchedules(
 }
 
 async function fetchActiveRunsBySchedule(
-	repos: QueueRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>
 ) {
 	const workflowAndReferenceIdPairs: { workflowId: string; referenceId: string }[] = [];

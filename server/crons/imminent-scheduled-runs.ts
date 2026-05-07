@@ -29,7 +29,7 @@ export async function processImminentScheduledRuns(
 ) {
 	const { limit = 100, chunkSize = 50 } = options ?? {};
 
-	const runs = await repos.workflowRun.listDueScheduleRuns(limit);
+	const runs = await repos.workflowRun.listDueScheduleRuns(context, limit);
 	if (!isNonEmptyArray(runs)) {
 		return;
 	}

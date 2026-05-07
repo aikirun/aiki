@@ -149,7 +149,7 @@ export function createScheduleRepository(db: PgDb) {
 				.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
 		},
 
-		async listDueSchedules(before: Date, limit = 100) {
+		async listDueSchedules(_context: CronContext, before: Date, limit = 100) {
 			return db
 				.select({
 					schedule: getTableColumns(schedule),
