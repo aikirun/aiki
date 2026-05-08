@@ -9,7 +9,7 @@ import type {
 	WorkflowRunOutboxRowInsert,
 } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
-import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
+import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
@@ -32,7 +32,7 @@ export async function processImminentRetryableTaskRuns(
 	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentRetryableTaskRunsDeps,
 	options?: { limit?: number; chunkSize?: number; imminenceThresholdMs?: number }
 ) {
-	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 1_000 } = options ?? {};
+	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
 	const retryableTasks = await repos.task.listRetryableTaskWorkflowRuns(context, dueBefore, limit);
@@ -59,7 +59,7 @@ export async function processImminentRetryableTaskRuns(
 	}
 
 	if (timerSortedSet && isNonEmptyArray(tasksDueSoon)) {
-		const timers: Array<{ type: "task_retry"; id: string; dueAt: number }> = [];
+		const timers: TimerEntry[] = [];
 		for (const task of tasksDueSoon) {
 			if (!task.dueAt) {
 				context.logger.warn(
@@ -71,7 +71,7 @@ export async function processImminentRetryableTaskRuns(
 			timers.push({
 				type: "task_retry",
 				id: task.workflowRunId,
-				dueAt: new Date(task.dueAt).getTime(),
+				dueAt: task.dueAt.getTime(),
 			});
 		}
 		await runConcurrently(context, chunkLazy(timers, chunkSize), async (chunk) => {

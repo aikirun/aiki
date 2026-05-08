@@ -1,10 +1,12 @@
-import { groupBy, isNonEmptyArray } from "@aikirun/lib/array";
+import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import type { Repositories } from "server/infra/db/types";
+import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { TimerSortedSet, TimerType } from "server/infra/messaging/redis-timer-sorted-set";
 import type { CronContext } from "server/middleware/context";
+import { createCronContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
 import { scheduleRowToDomain } from "server/service/schedule";
 
@@ -16,21 +18,102 @@ import { queueRetryableTaskRuns } from "./imminent-retryable-task-runs";
 import { queueScheduledRuns } from "./imminent-scheduled-runs";
 import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 
-export interface QueueDueTimersDeps {
+export interface DueTimersConsumerDeps {
 	repos: Repositories;
 	timerSortedSet: TimerSortedSet;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: WorkflowRunPublisher;
 }
 
-export async function queueDueTimers(context: CronContext, deps: QueueDueTimersDeps, options?: { limit?: number }) {
-	const { limit = 100 } = options ?? {};
+export interface DueTimersConsumerOptions {
+	limit?: number;
+	overshootMs?: number;
+}
 
-	const dueTimers = await deps.timerSortedSet.popDue(Date.now(), limit);
-	if (dueTimers.length === 0) {
-		return;
+export interface DueTimersConsumerHandle {
+	stop(): void;
+}
+
+export function spawnDueTimersConsumer(
+	logger: Logger,
+	deps: DueTimersConsumerDeps,
+	options?: DueTimersConsumerOptions
+): DueTimersConsumerHandle {
+	const abortController = new AbortController();
+	const { signal: abortSignal } = abortController;
+
+	const promise = dueTimersConsumerLoop(logger, deps, abortSignal, options);
+	promise.catch((error) => {
+		if (!abortSignal.aborted) {
+			logger.error({ err: error }, "Due timers consumer crashed unexpectedly");
+		}
+	});
+
+	return {
+		stop() {
+			abortController.abort();
+		},
+	};
+}
+
+async function dueTimersConsumerLoop(
+	logger: Logger,
+	deps: DueTimersConsumerDeps,
+	abortSignal: AbortSignal,
+	options?: DueTimersConsumerOptions
+): Promise<void> {
+	const { limit = 100, overshootMs = 30 } = options ?? {};
+
+	// Peek on startup to discover any entries left over from a previous consumer's lifecycle.
+	let nextTimerDueAt = await deps.timerSortedSet.peek();
+
+	while (!abortSignal.aborted) {
+		let signal = 0;
+
+		if (nextTimerDueAt === null) {
+			signal = await deps.timerSortedSet.waitForSignal(0);
+		} else {
+			const waitMs = nextTimerDueAt - Date.now() + overshootMs;
+			if (waitMs > 0) {
+				signal = await deps.timerSortedSet.waitForSignal(waitMs / 1000);
+			}
+		}
+
+		if (abortSignal.aborted) {
+			break;
+		}
+
+		if (signal > Date.now()) {
+			if (nextTimerDueAt === null || signal < nextTimerDueAt) {
+				nextTimerDueAt = signal;
+			}
+			continue;
+		}
+
+		const context = createCronContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
+
+		try {
+			let hasDueTimers = true;
+			while (hasDueTimers && !abortSignal.aborted) {
+				const dueTimers = await deps.timerSortedSet.popDue(limit);
+				if (isNonEmptyArray(dueTimers)) {
+					await processDueTimers(context, deps, dueTimers);
+				}
+				hasDueTimers = dueTimers.length >= limit;
+			}
+		} catch (error) {
+			context.logger.error({ err: error }, "Failed to process due timers batch");
+		}
+
+		nextTimerDueAt = await deps.timerSortedSet.peek();
 	}
+}
 
+async function processDueTimers(
+	context: CronContext,
+	deps: DueTimersConsumerDeps,
+	dueTimers: NonEmptyArray<{ type: TimerType; id: string }>
+): Promise<void> {
 	const timersByType = groupBy(dueTimers, (timer) => [timer.type, timer.id]);
 
 	const promises: Promise<void>[] = [];
