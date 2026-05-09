@@ -183,6 +183,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 					return;
 				}
 				await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
+				logger.debug("Heartbeat sent");
 			},
 			async acknowledge(workflowRunId: WorkflowRunId): Promise<void> {
 				const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);

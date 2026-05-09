@@ -1,3 +1,4 @@
+import { fireAndForget } from "@aikirun/lib/async";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -24,6 +25,7 @@ export interface ExecuteWorkflowParams<AppContext> {
 	logger: Logger;
 	options: Required<WorkflowExecutionOptions>;
 	heartbeat?: () => Promise<void>;
+	abortSignal?: AbortSignal;
 }
 
 export interface WorkflowExecutionOptions {
@@ -40,22 +42,29 @@ export interface WorkflowExecutionOptions {
 }
 
 export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowParams<AppContext>): Promise<boolean> {
-	const { client, workflowRun, workflowVersion, logger, options, heartbeat } = params;
+	const { client, workflowRun, workflowVersion, logger, options, heartbeat, abortSignal } = params;
 
 	let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
 
 	try {
 		if (heartbeat) {
-			heartbeatInterval = setInterval(async () => {
-				try {
-					await heartbeat();
-					logger.debug("Heartbeat sent");
-				} catch (error) {
-					logger.warn("Failed to send heartbeat", {
-						"aiki.error": error instanceof Error ? error.message : String(error),
-					});
-				}
+			heartbeatInterval = setInterval(() => {
+				fireAndForget(heartbeat(), (error) => {
+					if (!abortSignal?.aborted) {
+						logger.warn("Failed to send heartbeat", {
+							"aiki.error": error.message,
+						});
+					}
+				});
 			}, options.heartbeatIntervalMs);
+
+			abortSignal?.addEventListener(
+				"abort",
+				() => {
+					clearInterval(heartbeatInterval);
+				},
+				{ once: true }
+			);
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;

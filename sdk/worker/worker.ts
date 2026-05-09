@@ -1,6 +1,6 @@
 import { httpSubscriber } from "@aikirun/http";
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
-import { delay, fireAndForget } from "@aikirun/lib/async";
+import { delay } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
@@ -252,7 +252,11 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				continue;
 			}
 
-			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, subscriberFailedAttempts);
+			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(
+				availableCapacity,
+				subscriberFailedAttempts,
+				abortSignal
+			);
 			if (!nextBatchResponse.success) {
 				subscriberFailedAttempts++;
 				nextDelayMs = activeSubscriber.getNextDelay({
@@ -277,7 +281,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 	private async fetchNextWorkflowRunBatch(
 		size: number,
-		subscriberFailedAttempts: number
+		subscriberFailedAttempts: number,
+		abortSignal: AbortSignal
 	): Promise<{ success: true; batch: WorkflowRunBatch[]; subscriber: Subscriber } | { success: false; error: Error }> {
 		if (!this.subscriber) {
 			throw new Error("Subscriber not initialized");
@@ -287,6 +292,10 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			const batch = await this.subscriber.getNextBatch(size);
 			return { success: true, batch, subscriber: this.subscriber };
 		} catch (error) {
+			if (abortSignal.aborted) {
+				return { success: false, error: error as Error };
+			}
+
 			this.logger.error("Error getting next workflow runs batch", {
 				"aiki.error": error instanceof Error ? error.message : String(error),
 			});
@@ -356,7 +365,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				break;
 			}
 
-			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber);
+			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber, abortSignal);
 
 			this.activeWorkflowRunsById.set(workflowRun.id, {
 				run: workflowRun,
@@ -368,7 +377,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private async executeWorkflow(
 		workflowRun: WorkflowRun,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
-		subscriber: Subscriber
+		subscriber: Subscriber,
+		abortSignal: AbortSignal
 	): Promise<void> {
 		const workflowRunId = workflowRun.id as WorkflowRunId;
 
@@ -389,26 +399,21 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				spinThresholdMs: this.workflowRunOptions.spinThresholdMs,
 				heartbeatIntervalMs: this.workflowRunOptions.heartbeatIntervalMs,
 			},
-			heartbeat: heartbeat
-				? async () => {
-						fireAndForget(heartbeat(workflowRunId), (error) => {
-							logger.warn("Failed to send heartbeat", {
-								"aiki.error": error.message,
-							});
-						});
-					}
-				: undefined,
+			heartbeat: heartbeat ? () => heartbeat(workflowRunId) : undefined,
+			abortSignal,
 		});
 
-		if (subscriber.acknowledge) {
+		if (!abortSignal.aborted && subscriber.acknowledge) {
 			if (success) {
 				try {
 					await subscriber.acknowledge(workflowRunId);
 				} catch (error) {
-					logger.error("Failed to acknowledge message, it may be reprocessed", {
-						"aiki.errorType": "MESSAGE_ACK_FAILED",
-						"aiki.error": error instanceof Error ? error.message : String(error),
-					});
+					if (!abortSignal.aborted) {
+						logger.error("Failed to acknowledge message, it may be reprocessed", {
+							"aiki.errorType": "MESSAGE_ACK_FAILED",
+							"aiki.error": error instanceof Error ? error.message : String(error),
+						});
+					}
 				}
 			} else {
 				logger.debug("Message left pending for retry");
