@@ -45,6 +45,7 @@ export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowPara
 	const { client, workflowRun, workflowVersion, logger, options, heartbeat, abortSignal } = params;
 
 	let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
+	let onAbort: (() => void) | undefined;
 
 	try {
 		if (heartbeat) {
@@ -58,13 +59,10 @@ export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowPara
 				});
 			}, options.heartbeatIntervalMs);
 
-			abortSignal?.addEventListener(
-				"abort",
-				() => {
-					clearInterval(heartbeatInterval);
-				},
-				{ once: true }
-			);
+			if (abortSignal) {
+				onAbort = () => clearInterval(heartbeatInterval);
+				abortSignal.addEventListener("abort", onAbort, { once: true });
+			}
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
@@ -111,6 +109,9 @@ export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowPara
 	} finally {
 		if (heartbeatInterval) {
 			clearInterval(heartbeatInterval);
+		}
+		if (onAbort) {
+			abortSignal?.removeEventListener("abort", onAbort);
 		}
 	}
 }
