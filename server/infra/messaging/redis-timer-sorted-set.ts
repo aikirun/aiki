@@ -102,8 +102,8 @@ export function createTimerSortedSet(redis: Redis, key: string) {
 			await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minDueAt, ...args);
 		},
 
-		async popDue(limit: number): Promise<DueTimer[]> {
-			const maxScore = Date.now() * PRIORITY_LEVELS + (PRIORITY_LEVELS - 1);
+		async popDue(before: number, limit: number): Promise<DueTimer[]> {
+			const maxScore = before * PRIORITY_LEVELS + (PRIORITY_LEVELS - 1);
 
 			const members = (await redis.eval(POP_DUE_TIMERS_SCRIPT, 1, key, maxScore, limit)) as string[];
 			if (members.length === 0) {

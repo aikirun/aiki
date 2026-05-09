@@ -42,10 +42,9 @@ export function spawnDueTimersConsumer(
 	const abortController = new AbortController();
 	const { signal: abortSignal } = abortController;
 
-	const promise = dueTimersConsumerLoop(logger, deps, abortSignal, options);
-	promise.catch((error) => {
+	dueTimersConsumerLoop(logger, deps, abortSignal, options).catch((error) => {
 		if (!abortSignal.aborted) {
-			logger.error({ err: error }, "Due timers consumer crashed unexpectedly");
+			logger.error({ error }, "Due timers consumer crashed unexpectedly");
 		}
 	});
 
@@ -95,14 +94,14 @@ async function dueTimersConsumerLoop(
 		try {
 			let hasDueTimers = true;
 			while (hasDueTimers && !abortSignal.aborted) {
-				const dueTimers = await deps.timerSortedSet.popDue(limit);
+				const dueTimers = await deps.timerSortedSet.popDue(Date.now(), limit);
 				if (isNonEmptyArray(dueTimers)) {
 					await processDueTimers(context, deps, dueTimers);
 				}
 				hasDueTimers = dueTimers.length >= limit;
 			}
 		} catch (error) {
-			context.logger.error({ err: error }, "Failed to process due timers batch");
+			context.logger.error({ error }, "Failed to process due timers batch");
 		}
 
 		nextTimerDueAt = await deps.timerSortedSet.peek();
