@@ -18,14 +18,14 @@ export function createWorkflowRunPublisher(redis: Redis) {
 			}
 
 			try {
-				const pipeline = redis.pipeline();
+				const redisPipeline = redis.pipeline();
 
 				for (const run of runs) {
 					const streamName = getWorkflowStreamName(run.name, run.versionId, run.shard);
-					pipeline.xadd(streamName, "*", "version", "1", "type", "workflow_run_ready", "workflowRunId", run.id);
+					redisPipeline.xadd(streamName, "*", "version", "1", "type", "workflow_run_ready", "workflowRunId", run.id);
 				}
 
-				const results = await pipeline.exec();
+				const results = await redisPipeline.exec();
 				context.logger.debug({ results }, "Messages sent");
 			} catch (error) {
 				context.logger.error(
