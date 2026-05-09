@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { chunkLazy, isNonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { isNonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { streamChunks } from "@aikirun/lib/async";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
 import {
@@ -17,7 +18,6 @@ import type {
 } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
-import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "server/service/schedule";
@@ -41,47 +41,47 @@ export type DueSchedule = Schedule & {
 export async function processImminentRecurringWorkflows(
 	context: CronContext,
 	deps: ProcessImminentRecurringWorkflowsDeps,
-	options?: { imminenceThresholdMs?: number; chunkSize?: number }
+	options?: { limit?: number; imminenceThresholdMs?: number }
 ) {
-	const { imminenceThresholdMs = 2_000, chunkSize = 50 } = options ?? {};
+	const { limit = 100, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
-	const rows = await deps.repos.schedule.listDueSchedules(context, dueBefore);
-	const schedules: DueSchedule[] = rows.map(({ schedule, workflow }) => ({
-		...scheduleRowToDomain(schedule, workflow),
-		workflowId: schedule.workflowId,
-		namespaceId: schedule.namespaceId as NamespaceId,
-		workflowRunInputHash: schedule.workflowRunInputHash,
-	}));
-	if (!isNonEmptyArray(schedules)) {
-		return;
-	}
+	const next = () => deps.repos.schedule.listDueSchedules(context, dueBefore, limit);
 
-	const now = Date.now();
-	const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = splitArray(schedules, (schedule) => {
-		if (schedule.nextRunAt > now) {
-			return { meetsCondition: false, item: schedule };
-		}
-		return { meetsCondition: true, item: schedule };
-	});
+	for await (const rows of streamChunks(next, (chunk) => chunk.length < limit)) {
+		const schedules: DueSchedule[] = rows.map(({ schedule, workflow }) => ({
+			...scheduleRowToDomain(schedule, workflow),
+			workflowId: schedule.workflowId,
+			namespaceId: schedule.namespaceId as NamespaceId,
+			workflowRunInputHash: schedule.workflowRunInputHash,
+		}));
 
-	if (isNonEmptyArray(schedulesDueNow)) {
-		await queueRecurringWorkflows(context, deps, schedulesDueNow);
-	}
-
-	const { timerSortedSet } = deps;
-	if (timerSortedSet && isNonEmptyArray(schedulesDueSoon)) {
-		const timers: TimerEntry[] = [];
-		for (const schedule of schedulesDueSoon) {
-			timers.push({
-				type: "recurring",
-				id: schedule.id,
-				dueAt: schedule.nextRunAt,
-			});
-		}
-		await runConcurrently(context, chunkLazy(timers, chunkSize), async (chunk) => {
-			await timerSortedSet.add(chunk);
+		const now = Date.now();
+		const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = splitArray(schedules, (schedule) => {
+			if (schedule.nextRunAt > now) {
+				return { meetsCondition: false, item: schedule };
+			}
+			return { meetsCondition: true, item: schedule };
 		});
+
+		if (isNonEmptyArray(schedulesDueNow)) {
+			await queueRecurringWorkflows(context, deps, schedulesDueNow);
+		}
+
+		const { timerSortedSet } = deps;
+		if (timerSortedSet && isNonEmptyArray(schedulesDueSoon)) {
+			const timers: TimerEntry[] = [];
+			for (const schedule of schedulesDueSoon) {
+				timers.push({
+					type: "recurring",
+					id: schedule.id,
+					dueAt: schedule.nextRunAt,
+				});
+			}
+			if (isNonEmptyArray(timers)) {
+				await timerSortedSet.add(timers);
+			}
+		}
 	}
 }
 

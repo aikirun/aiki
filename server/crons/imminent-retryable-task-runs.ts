@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { chunkLazy, isNonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { streamChunks } from "@aikirun/lib/async";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
 	DueWorkflowRun,
@@ -35,48 +36,45 @@ export async function processImminentRetryableTaskRuns(
 	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
-	const retryableTasks = await repos.task.listRetryableTaskWorkflowRuns(context, dueBefore, limit);
-	if (!isNonEmptyArray(retryableTasks)) {
-		return;
-	}
+	const next = () => repos.task.listRetryableTaskWorkflowRuns(context, dueBefore, limit);
 
-	const now = Date.now();
-	const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } = splitArray(retryableTasks, (task) => {
-		if (task.dueAt && new Date(task.dueAt).getTime() > now) {
-			return { meetsCondition: false, item: task };
-		}
-		return { meetsCondition: true, item: task };
-	});
+	for await (const retryableTasks of streamChunks(next, (chunk) => chunk.length < limit)) {
+		const now = Date.now();
+		const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } = splitArray(retryableTasks, (task) => {
+			if (task.dueAt && new Date(task.dueAt).getTime() > now) {
+				return { meetsCondition: false, item: task };
+			}
+			return { meetsCondition: true, item: task };
+		});
 
-	if (isNonEmptyArray(tasksDueNow)) {
-		const workflowRunIds = tasksDueNow.map((task) => task.workflowRunId);
-		if (isNonEmptyArray(workflowRunIds)) {
+		if (isNonEmptyArray(tasksDueNow)) {
+			const workflowRunIds = tasksDueNow.map((task) => task.workflowRunId) as NonEmptyArray<string>;
 			const runs = await repos.workflowRun.listByIdsAndStatus(context, workflowRunIds, "running");
 			if (isNonEmptyArray(runs)) {
 				await queueRetryableTaskRuns(context, repos, workflowRunPublisher, runs, { chunkSize });
 			}
 		}
-	}
 
-	if (timerSortedSet && isNonEmptyArray(tasksDueSoon)) {
-		const timers: TimerEntry[] = [];
-		for (const task of tasksDueSoon) {
-			if (!task.dueAt) {
-				context.logger.warn(
-					{ workflowRunId: task.workflowRunId },
-					"Missing dueAt for retryable task run, skipping promotion"
-				);
-				continue;
+		if (timerSortedSet && isNonEmptyArray(tasksDueSoon)) {
+			const timers: TimerEntry[] = [];
+			for (const task of tasksDueSoon) {
+				if (!task.dueAt) {
+					context.logger.warn(
+						{ workflowRunId: task.workflowRunId },
+						"Missing dueAt for retryable task run, skipping promotion"
+					);
+					continue;
+				}
+				timers.push({
+					type: "task_retry",
+					id: task.workflowRunId,
+					dueAt: task.dueAt.getTime(),
+				});
 			}
-			timers.push({
-				type: "task_retry",
-				id: task.workflowRunId,
-				dueAt: task.dueAt.getTime(),
-			});
+			if (isNonEmptyArray(timers)) {
+				await timerSortedSet.add(timers);
+			}
 		}
-		await runConcurrently(context, chunkLazy(timers, chunkSize), async (chunk) => {
-			await timerSortedSet.add(chunk);
-		});
 	}
 }
 

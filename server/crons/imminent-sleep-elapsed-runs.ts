@@ -1,4 +1,5 @@
 import { chunkLazy, isNonEmptyArray, type NonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { streamChunks } from "@aikirun/lib/async";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
 	DueWorkflowRun,
@@ -34,39 +35,38 @@ export async function processImminentSleepElapsedRuns(
 	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
-	const runs = await repos.workflowRun.listSleepElapsedRuns(context, dueBefore, limit);
-	if (!isNonEmptyArray(runs)) {
-		return;
-	}
+	const next = () => repos.workflowRun.listSleepElapsedRuns(context, dueBefore, limit);
 
-	const now = Date.now();
-	const { whenTrue: runsDueNow, whenFalse: runsDueSoon } = splitArray(runs, (run) => {
-		if (run.dueAt && run.dueAt.getTime() > now) {
-			return { meetsCondition: false, item: run };
-		}
-		return { meetsCondition: true, item: run };
-	});
-
-	if (isNonEmptyArray(runsDueNow)) {
-		await queueSleepElapsedRuns(context, repos, workflowRunPublisher, runsDueNow, { chunkSize });
-	}
-
-	if (timerSortedSet && isNonEmptyArray(runsDueSoon)) {
-		const timers: TimerEntry[] = [];
-		for (const run of runsDueSoon) {
-			if (!run.dueAt) {
-				context.logger.warn({ runId: run.id }, "Missing dueAt for sleep-elapsed run, skipping promotion");
-				continue;
+	for await (const runs of streamChunks(next, (chunk) => chunk.length < limit)) {
+		const now = Date.now();
+		const { whenTrue: runsDueNow, whenFalse: runsDueSoon } = splitArray(runs, (run) => {
+			if (run.dueAt && run.dueAt.getTime() > now) {
+				return { meetsCondition: false, item: run };
 			}
-			timers.push({
-				type: "sleep",
-				id: run.id,
-				dueAt: run.dueAt.getTime(),
-			});
-		}
-		await runConcurrently(context, chunkLazy(timers, chunkSize), async (chunk) => {
-			await timerSortedSet.add(chunk);
+			return { meetsCondition: true, item: run };
 		});
+
+		if (isNonEmptyArray(runsDueNow)) {
+			await queueSleepElapsedRuns(context, repos, workflowRunPublisher, runsDueNow, { chunkSize });
+		}
+
+		if (timerSortedSet && isNonEmptyArray(runsDueSoon)) {
+			const timers: TimerEntry[] = [];
+			for (const run of runsDueSoon) {
+				if (!run.dueAt) {
+					context.logger.warn({ runId: run.id }, "Missing dueAt for sleep-elapsed run, skipping promotion");
+					continue;
+				}
+				timers.push({
+					type: "sleep",
+					id: run.id,
+					dueAt: run.dueAt.getTime(),
+				});
+			}
+			if (isNonEmptyArray(timers)) {
+				await timerSortedSet.add(timers);
+			}
+		}
 	}
 }
 

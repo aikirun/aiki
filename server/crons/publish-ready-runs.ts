@@ -1,4 +1,5 @@
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/array";
+import { streamChunks } from "@aikirun/lib/async";
 import type { Repositories, WorkflowRunOutboxRowInsert } from "server/infra/db/types";
 import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";
@@ -11,12 +12,11 @@ export interface PublishReadyRunsDeps {
 export async function publishReadyRuns(context: CronContext, deps: PublishReadyRunsDeps, options?: { limit?: number }) {
 	const { limit = 100 } = options ?? {};
 
-	const pendingEntries = await deps.repos.workflowRunOutbox.listPending(context, limit);
-	if (!isNonEmptyArray(pendingEntries)) {
-		return;
-	}
+	const next = () => deps.repos.workflowRunOutbox.listPending(context, limit);
 
-	await publishRuns(context, deps.repos, deps.workflowRunPublisher, pendingEntries);
+	for await (const pendingEntries of streamChunks(next, (chunk) => chunk.length < limit)) {
+		await publishRuns(context, deps.repos, deps.workflowRunPublisher, pendingEntries);
+	}
 }
 
 export async function publishRuns(

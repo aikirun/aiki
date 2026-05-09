@@ -1,4 +1,5 @@
 import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
+import { streamChunks } from "@aikirun/lib/async";
 import { withRetry } from "@aikirun/lib/retry";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
@@ -110,17 +111,14 @@ async function dueTimersConsumerLoop(
 
 		const context = createCronContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
 
-		let hasDueTimers = true;
-		while (hasDueTimers && !abortSignal.aborted) {
-			const dueTimers = await deps.timerSortedSet.popDue(Date.now(), limit);
-			if (isNonEmptyArray(dueTimers)) {
-				try {
-					await processDueTimers(context, deps, dueTimers);
-				} catch (error) {
-					context.logger.error({ error }, "Failed to process due timers batch");
-				}
+		const next = () => deps.timerSortedSet.popDue(Date.now(), limit);
+
+		for await (const dueTimers of streamChunks(next, (chunk) => chunk.length < limit)) {
+			try {
+				await processDueTimers(context, deps, dueTimers);
+			} catch (error) {
+				context.logger.error({ error }, "Failed to process due timers batch");
 			}
-			hasDueTimers = dueTimers.length >= limit;
 		}
 
 		nextTimerDueAt = await deps.timerSortedSet.peek();
