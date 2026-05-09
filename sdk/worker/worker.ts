@@ -199,10 +199,10 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		this.abortController?.abort();
 
-		await this.subscriberLoopPromise;
-
 		await this.subscriber?.close?.();
 		await this.fallbackSubscriber?.close?.();
+
+		await this.subscriberLoopPromise;
 
 		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
 		if (activeWorkflowRuns.length === 0) {
