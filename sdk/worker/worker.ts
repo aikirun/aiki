@@ -214,9 +214,9 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
 		}
 
-		const stillActive = Array.from(this.activeWorkflowRunsById.values());
-		if (stillActive.length > 0) {
-			const ids = stillActive.map((w) => w.run.id).join(", ");
+		const stillActiveRuns = Array.from(this.activeWorkflowRunsById.values());
+		if (stillActiveRuns.length > 0) {
+			const ids = stillActiveRuns.map((w) => w.run.id).join(", ");
 			this.logger.warn("Worker shutdown with active workflows", {
 				"aiki.activeWorkflowRunIds": ids,
 			});
@@ -242,7 +242,9 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		let subscriberFailedAttempts = 0;
 
 		while (!abortSignal.aborted) {
-			await delay(nextDelayMs, { abortSignal });
+			if (nextDelayMs > 0) {
+				await delay(nextDelayMs, { abortSignal });
+			}
 
 			const availableCapacity = maxConcurrentWorkflowRuns - this.activeWorkflowRunsById.size;
 			if (availableCapacity <= 0) {
