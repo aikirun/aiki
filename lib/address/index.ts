@@ -30,7 +30,7 @@ export function getWorkflowRunAddress(name: string, versionId: string, reference
  * @returns Redis stream name
  */
 export function getWorkflowStreamName(name: string, versionId: string, shard?: string): string {
-	return shard ? `workflow:${name}:${versionId}:${shard}` : `workflow:${name}:${versionId}`;
+	return shard ? `aiki:workflow:${name}:${versionId}:${shard}` : `aiki:workflow:${name}:${versionId}`;
 }
 
 /**

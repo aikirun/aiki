@@ -47,7 +47,7 @@ if (import.meta.main) {
 		redis.on("error", (err: Error) => {
 			logger.error({ err }, "Redis connection error");
 		});
-		timerSortedSet = createTimerSortedSet(redis, "timers");
+		timerSortedSet = createTimerSortedSet(redis, "aiki:timers");
 		workflowRunPublisher = createWorkflowRunPublisher(redis);
 	}
 
