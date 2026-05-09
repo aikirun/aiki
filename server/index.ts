@@ -181,7 +181,7 @@ if (import.meta.main) {
 	});
 
 	const shutdown = async () => {
-		crons.shutdown();
+		await crons.shutdown();
 		if (redis) {
 			await redis.quit();
 		}

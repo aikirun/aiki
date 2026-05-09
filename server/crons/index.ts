@@ -25,7 +25,7 @@ export interface InitCronsDeps {
 }
 
 export interface CronHandle {
-	shutdown(): void;
+	shutdown(): Promise<void>;
 }
 
 function initCron<Deps, Options>(
@@ -133,12 +133,12 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 	}
 
 	return {
-		shutdown() {
+		async shutdown() {
 			for (const { abortController, interval } of crons) {
 				abortController.abort();
 				clearInterval(interval);
 			}
-			dueTimersConsumer?.stop();
+			await dueTimersConsumer?.stop();
 		},
 	};
 }
