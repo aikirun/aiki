@@ -390,39 +390,41 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		const { heartbeat } = subscriber;
 
-		const success = await executeWorkflowRun({
-			client: this.client,
-			workflowRun,
-			workflowVersion,
-			logger,
-			options: {
-				spinThresholdMs: this.workflowRunOptions.spinThresholdMs,
-				heartbeatIntervalMs: this.workflowRunOptions.heartbeatIntervalMs,
-			},
-			heartbeat: heartbeat ? () => heartbeat(workflowRunId) : undefined,
-			abortSignal,
-		});
+		try {
+			const success = await executeWorkflowRun({
+				client: this.client,
+				workflowRun,
+				workflowVersion,
+				logger,
+				options: {
+					spinThresholdMs: this.workflowRunOptions.spinThresholdMs,
+					heartbeatIntervalMs: this.workflowRunOptions.heartbeatIntervalMs,
+				},
+				heartbeat: heartbeat ? () => heartbeat(workflowRunId) : undefined,
+				abortSignal,
+			});
 
-		if (!abortSignal.aborted && subscriber.acknowledge) {
-			if (success) {
-				try {
-					await subscriber.acknowledge(workflowRunId);
-				} catch (error) {
-					if (!abortSignal.aborted) {
-						logger.error("Failed to acknowledge message, it may be reprocessed", {
-							"aiki.errorType": "MESSAGE_ACK_FAILED",
-							"aiki.error": error instanceof Error ? error.message : String(error),
-						});
+			if (!abortSignal.aborted && subscriber.acknowledge) {
+				if (success) {
+					try {
+						await subscriber.acknowledge(workflowRunId);
+					} catch (error) {
+						if (!abortSignal.aborted) {
+							logger.error("Failed to acknowledge message, it may be reprocessed", {
+								"aiki.errorType": "MESSAGE_ACK_FAILED",
+								"aiki.error": error instanceof Error ? error.message : String(error),
+							});
+						}
 					}
+				} else {
+					logger.debug("Message left pending for retry");
 				}
-			} else {
-				logger.debug("Message left pending for retry");
 			}
-		}
-
-		this.activeWorkflowRunsById.delete(workflowRunId);
-		if (subscriber.heartbeat) {
-			this.lastServerHeartbeatByRunId.delete(workflowRunId);
+		} finally {
+			this.activeWorkflowRunsById.delete(workflowRunId);
+			if (subscriber.heartbeat) {
+				this.lastServerHeartbeatByRunId.delete(workflowRunId);
+			}
 		}
 	}
 }
