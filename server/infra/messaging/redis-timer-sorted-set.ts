@@ -25,6 +25,11 @@ export interface DueTimer {
 	id: string;
 }
 
+export interface TimerSignalWaiter {
+	wait(timeoutSeconds: number): Promise<number>;
+	close(): Promise<void>;
+}
+
 function computeScore(timestampMs: number, priority: number = DEFAULT_PRIORITY): number {
 	return timestampMs * PRIORITY_LEVELS + priority;
 }
@@ -122,25 +127,40 @@ export function createTimerSortedSet(redis: Redis, key: string) {
 			return Math.floor(score / PRIORITY_LEVELS);
 		},
 
-		/**
-		 * Blocks on the signal list, then drains any remaining signals.
-		 * Returns the minimum signal observed (combining BRPOP value with drained values).
-		 * Returns 0 if BRPOP timed out — drained values are discarded in that case since
-		 * peek-after-pop will rediscover them.
-		 */
-		async waitForSignal(timeoutSeconds: number): Promise<number> {
-			const result = await redis.brpop(signalKey, timeoutSeconds);
-			if (result === null) {
-				await redis.del(signalKey);
-				return 0;
-			}
+		createSignalWaiter(): TimerSignalWaiter {
+			const redisDuplicate = redis.duplicate();
+			let closed = false;
 
-			const signal = Number(result[1]);
-			const minSignal = (await redis.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
-			if (minSignal === null) {
-				return signal;
-			}
-			return Math.min(signal, minSignal);
+			return {
+				/**
+				 * Blocks on the signal list, then drains any remaining signals.
+				 * Returns the minimum signal observed (combining BRPOP value with drained values).
+				 * Returns 0 if BRPOP timed out — drained values are discarded in that case since
+				 * peek-after-pop will rediscover them.
+				 */
+				async wait(timeoutSeconds: number): Promise<number> {
+					const result = await redisDuplicate.brpop(signalKey, timeoutSeconds);
+					if (result === null) {
+						await redis.del(signalKey);
+						return 0;
+					}
+
+					const signal = Number(result[1]);
+					const minSignal = (await redis.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
+					if (minSignal === null) {
+						return signal;
+					}
+					return Math.min(signal, minSignal);
+				},
+
+				async close(): Promise<void> {
+					if (closed) {
+						return;
+					}
+					closed = true;
+					redisDuplicate.disconnect();
+				},
+			};
 		},
 	};
 }

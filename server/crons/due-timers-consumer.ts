@@ -1,10 +1,11 @@
 import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
+import { withRetry } from "@aikirun/lib/retry";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
-import type { TimerSortedSet, TimerType } from "server/infra/messaging/redis-timer-sorted-set";
+import type { TimerSignalWaiter, TimerSortedSet, TimerType } from "server/infra/messaging/redis-timer-sorted-set";
 import type { CronContext } from "server/middleware/context";
 import { createCronContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
@@ -31,7 +32,7 @@ export interface DueTimersConsumerOptions {
 }
 
 export interface DueTimersConsumerHandle {
-	stop(): void;
+	stop(): Promise<void>;
 }
 
 export function spawnDueTimersConsumer(
@@ -42,15 +43,32 @@ export function spawnDueTimersConsumer(
 	const abortController = new AbortController();
 	const { signal: abortSignal } = abortController;
 
-	dueTimersConsumerLoop(logger, deps, abortSignal, options).catch((error) => {
-		if (!abortSignal.aborted) {
-			logger.error({ error }, "Due timers consumer crashed unexpectedly");
-		}
-	});
+	let timerSignalWaiter: TimerSignalWaiter | undefined;
+
+	withRetry(
+		async () => {
+			timerSignalWaiter = deps.timerSortedSet.createSignalWaiter();
+			try {
+				await dueTimersConsumerLoop(logger, deps, timerSignalWaiter, abortSignal, options);
+			} finally {
+				await timerSignalWaiter.close();
+				timerSignalWaiter = undefined;
+			}
+		},
+		{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
+		{ abortSignal }
+	)
+		.run()
+		.catch((error) => {
+			if (!abortSignal.aborted) {
+				logger.error({ error }, "Due timers consumer crashed unexpectedly");
+			}
+		});
 
 	return {
-		stop() {
+		async stop() {
 			abortController.abort();
+			await timerSignalWaiter?.close();
 		},
 	};
 }
@@ -58,6 +76,7 @@ export function spawnDueTimersConsumer(
 async function dueTimersConsumerLoop(
 	logger: Logger,
 	deps: DueTimersConsumerDeps,
+	timerSignalWaiter: TimerSignalWaiter,
 	abortSignal: AbortSignal,
 	options?: DueTimersConsumerOptions
 ): Promise<void> {
@@ -70,11 +89,11 @@ async function dueTimersConsumerLoop(
 		let signal = 0;
 
 		if (nextTimerDueAt === null) {
-			signal = await deps.timerSortedSet.waitForSignal(0);
+			signal = await timerSignalWaiter.wait(0);
 		} else {
 			const waitMs = nextTimerDueAt - Date.now() + overshootMs;
 			if (waitMs > 0) {
-				signal = await deps.timerSortedSet.waitForSignal(waitMs / 1000);
+				signal = await timerSignalWaiter.wait(waitMs / 1000);
 			}
 		}
 
@@ -91,17 +110,17 @@ async function dueTimersConsumerLoop(
 
 		const context = createCronContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
 
-		try {
-			let hasDueTimers = true;
-			while (hasDueTimers && !abortSignal.aborted) {
-				const dueTimers = await deps.timerSortedSet.popDue(Date.now(), limit);
-				if (isNonEmptyArray(dueTimers)) {
+		let hasDueTimers = true;
+		while (hasDueTimers && !abortSignal.aborted) {
+			const dueTimers = await deps.timerSortedSet.popDue(Date.now(), limit);
+			if (isNonEmptyArray(dueTimers)) {
+				try {
 					await processDueTimers(context, deps, dueTimers);
+				} catch (error) {
+					context.logger.error({ error }, "Failed to process due timers batch");
 				}
-				hasDueTimers = dueTimers.length >= limit;
 			}
-		} catch (error) {
-			context.logger.error({ error }, "Failed to process due timers batch");
+			hasDueTimers = dueTimers.length >= limit;
 		}
 
 		nextTimerDueAt = await deps.timerSortedSet.peek();
