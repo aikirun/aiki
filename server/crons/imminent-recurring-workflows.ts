@@ -16,7 +16,7 @@ import type {
 	WorkflowRunRowInsert,
 } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
-import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
+import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
@@ -43,7 +43,7 @@ export async function processImminentRecurringWorkflows(
 	deps: ProcessImminentRecurringWorkflowsDeps,
 	options?: { imminenceThresholdMs?: number; chunkSize?: number }
 ) {
-	const { imminenceThresholdMs = 1_000, chunkSize = 50 } = options ?? {};
+	const { imminenceThresholdMs = 2_000, chunkSize = 50 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
 	const rows = await deps.repos.schedule.listDueSchedules(context, dueBefore);
@@ -71,7 +71,7 @@ export async function processImminentRecurringWorkflows(
 
 	const { timerSortedSet } = deps;
 	if (timerSortedSet && isNonEmptyArray(schedulesDueSoon)) {
-		const timers: Array<{ type: "recurring"; id: string; dueAt: number }> = [];
+		const timers: TimerEntry[] = [];
 		for (const schedule of schedulesDueSoon) {
 			timers.push({
 				type: "recurring",

@@ -8,7 +8,7 @@ import type {
 	WorkflowRunOutboxRowInsert,
 } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
-import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
+import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
@@ -31,7 +31,7 @@ export async function processImminentSleepElapsedRuns(
 	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentSleepElapsedRunsDeps,
 	options?: { limit?: number; chunkSize?: number; imminenceThresholdMs?: number }
 ) {
-	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 1_000 } = options ?? {};
+	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
 	const runs = await repos.workflowRun.listSleepElapsedRuns(context, dueBefore, limit);
@@ -52,7 +52,7 @@ export async function processImminentSleepElapsedRuns(
 	}
 
 	if (timerSortedSet && isNonEmptyArray(runsDueSoon)) {
-		const timers: Array<{ type: "sleep"; id: string; dueAt: number }> = [];
+		const timers: TimerEntry[] = [];
 		for (const run of runsDueSoon) {
 			if (!run.dueAt) {
 				context.logger.warn({ runId: run.id }, "Missing dueAt for sleep-elapsed run, skipping promotion");

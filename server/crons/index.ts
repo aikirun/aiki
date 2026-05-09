@@ -6,7 +6,7 @@ import type { CronContext } from "server/middleware/context";
 import { createCronContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
 
-import { queueDueTimers } from "./due-timers";
+import { type DueTimersConsumerHandle, spawnDueTimersConsumer } from "./due-timers-consumer";
 import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { processImminentRecurringWorkflows } from "./imminent-recurring-workflows";
@@ -109,29 +109,26 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 		}),
 	];
 
+	let dueTimersConsumer: DueTimersConsumerHandle | undefined;
 	if (deps.timerSortedSet) {
-		crons.push(
-			initCron(logger, 50, queueDueTimers, {
-				repos: deps.repos,
-				timerSortedSet: deps.timerSortedSet,
-				childRunCanceller: deps.childRunCanceller,
-				workflowRunPublisher: deps.workflowRunPublisher,
-			})
-		);
+		dueTimersConsumer = spawnDueTimersConsumer(logger, {
+			repos: deps.repos,
+			timerSortedSet: deps.timerSortedSet,
+			childRunCanceller: deps.childRunCanceller,
+			workflowRunPublisher: deps.workflowRunPublisher,
+		});
 	}
 
 	if (deps.workflowRunPublisher) {
 		crons.push(
-			...[
-				initCron(logger, 1_000, publishReadyRuns, {
-					repos: deps.repos,
-					workflowRunPublisher: deps.workflowRunPublisher,
-				}),
-				initCron(logger, 1_000, republishStaleRuns, {
-					repos: deps.repos,
-					workflowRunPublisher: deps.workflowRunPublisher,
-				}),
-			]
+			initCron(logger, 1_000, publishReadyRuns, {
+				repos: deps.repos,
+				workflowRunPublisher: deps.workflowRunPublisher,
+			}),
+			initCron(logger, 1_000, republishStaleRuns, {
+				repos: deps.repos,
+				workflowRunPublisher: deps.workflowRunPublisher,
+			})
 		);
 	}
 
@@ -141,6 +138,7 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 				abortController.abort();
 				clearInterval(interval);
 			}
+			dueTimersConsumer?.stop();
 		},
 	};
 }
