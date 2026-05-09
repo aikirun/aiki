@@ -31,8 +31,8 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 
 	const getNextDelay = (delayParams: SubscriberDelayParams) => {
 		switch (delayParams.type) {
-			case "polled":
-			case "heartbeat":
+			case "found_work":
+			case "no_work":
 				return intervalMs;
 			case "at_capacity":
 				return atCapacityIntervalMs;

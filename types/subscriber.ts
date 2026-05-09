@@ -7,9 +7,9 @@ export interface WorkflowRunBatch {
 }
 
 export type SubscriberDelayParams =
-	| { type: "polled"; foundWork: boolean }
+	| { type: "found_work" }
+	| { type: "no_work" }
 	| { type: "retry"; attemptNumber: number }
-	| { type: "heartbeat" }
 	| { type: "at_capacity" };
 
 export interface Subscriber {

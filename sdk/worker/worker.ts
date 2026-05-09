@@ -124,7 +124,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private abortController: AbortController | undefined;
 	private subscriber: Subscriber | undefined;
 	private fallbackSubscriber: Subscriber | undefined;
-	private pollPromise: Promise<void> | undefined;
+	private subscriberLoopPromise: Promise<void> | undefined;
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 	private lastServerHeartbeatByRunId = new Map<string, number>();
 
@@ -170,7 +170,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
 
-		this.pollPromise = this.poll(abortSignal).catch((error) => {
+		this.subscriberLoopPromise = this.subscriberLoop(abortSignal).catch((error) => {
 			if (!abortSignal.aborted) {
 				this.logger.error("Unexpected error", {
 					"aiki.error": error.message,
@@ -199,7 +199,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		this.abortController?.abort();
 
-		await this.pollPromise;
+		await this.subscriberLoopPromise;
 
 		await this.subscriber?.close?.();
 		await this.fallbackSubscriber?.close?.();
@@ -226,7 +226,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.lastServerHeartbeatByRunId.clear();
 	}
 
-	private async poll(abortSignal: AbortSignal): Promise<void> {
+	private async subscriberLoop(abortSignal: AbortSignal): Promise<void> {
 		if (!this.subscriber) {
 			throw new Error("Subscriber not initialized");
 		}
@@ -238,7 +238,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const maxConcurrentWorkflowRuns = this.spawnOptions.maxConcurrentWorkflowRuns ?? 1;
 
 		let activeSubscriber: Subscriber = this.subscriber;
-		let nextDelayMs = activeSubscriber.getNextDelay({ type: "polled", foundWork: false });
+		let nextDelayMs = activeSubscriber.getNextDelay({ type: "no_work" });
 		let subscriberFailedAttempts = 0;
 
 		while (!abortSignal.aborted) {
@@ -266,12 +266,12 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			activeSubscriber = nextBatchResponse.subscriber;
 
 			if (!isNonEmptyArray(nextBatchResponse.batch)) {
-				nextDelayMs = activeSubscriber.getNextDelay({ type: "polled", foundWork: false });
+				nextDelayMs = activeSubscriber.getNextDelay({ type: "no_work" });
 				continue;
 			}
 
 			await this.enqueueWorkflowRunBatch(nextBatchResponse.batch, nextBatchResponse.subscriber, abortSignal);
-			nextDelayMs = activeSubscriber.getNextDelay({ type: "polled", foundWork: true });
+			nextDelayMs = activeSubscriber.getNextDelay({ type: "found_work" });
 		}
 	}
 

@@ -102,8 +102,8 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 
 	const getNextDelay = (params: SubscriberDelayParams) => {
 		switch (params.type) {
-			case "polled":
-			case "heartbeat":
+			case "found_work":
+			case "no_work":
 				return intervalMs;
 			case "retry": {
 				const retryParams = getRetryParams(params.attemptNumber, {
