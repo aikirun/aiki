@@ -4,10 +4,17 @@ import type { Repositories } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";
 
+import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
+
 export interface RepublishStaleRuns {
 	repos: Pick<Repositories, "workflowRunOutbox">;
 	workflowRunPublisher: WorkflowRunPublisher;
 }
+
+const advanceOutboxCursor = createTimerStreamCursorAdvancer<{ id: string; updatedAt: Date }>({
+	getDueAt: (entry) => entry.updatedAt,
+	getId: (entry) => entry.id,
+});
 
 export async function republishStaleRuns(
 	context: CronContext,
@@ -16,9 +23,13 @@ export async function republishStaleRuns(
 ) {
 	const { claimMinIdleTimeMs = 90_000, limit = 50 } = options ?? {};
 
-	const next = () => deps.repos.workflowRunOutbox.listStalePublished(context, claimMinIdleTimeMs, limit);
-
-	for await (const staleEntries of streamChunks(next, (chunk) => chunk.length < limit)) {
+	for await (const staleEntries of streamChunks(
+		(cursor) => deps.repos.workflowRunOutbox.listStalePublished(context, claimMinIdleTimeMs, limit, cursor),
+		{
+			advanceCursor: advanceOutboxCursor,
+			until: (chunk) => chunk.length < limit,
+		}
+	)) {
 		context.logger.info({ count: staleEntries.length }, "Republishing stale published outbox entries");
 
 		await deps.workflowRunPublisher.publishReadyRuns(

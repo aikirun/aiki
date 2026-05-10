@@ -2,8 +2,10 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import type { TimerStreamCursor } from "server/crons/lib/timer-stream";
 import type { CronContext } from "server/middleware/context";
 
+import { timerStreamCursorFilter } from "./lib/timer-stream";
 import type { PgDb } from "../provider";
 import { workflowRunOutbox } from "../schema";
 
@@ -16,12 +18,17 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			await db.insert(workflowRunOutbox).values(rows);
 		},
 
-		async listPending(_context: CronContext, limit = 100): Promise<WorkflowRunOutboxRow[]> {
+		async listPending(_context: CronContext, limit = 100, cursor?: TimerStreamCursor): Promise<WorkflowRunOutboxRow[]> {
 			return db
 				.select()
 				.from(workflowRunOutbox)
-				.where(eq(workflowRunOutbox.status, "pending"))
-				.orderBy(workflowRunOutbox.createdAt)
+				.where(
+					and(
+						eq(workflowRunOutbox.status, "pending"),
+						timerStreamCursorFilter(workflowRunOutbox.createdAt, workflowRunOutbox.id, cursor)
+					)
+				)
+				.orderBy(workflowRunOutbox.createdAt, workflowRunOutbox.id)
 				.limit(limit);
 		},
 
@@ -42,7 +49,8 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 		async listStalePublished(
 			_context: CronContext,
 			claimMinIdleTimeMs: number,
-			limit: number
+			limit: number,
+			cursor?: TimerStreamCursor
 		): Promise<WorkflowRunOutboxRow[]> {
 			const now = Date.now();
 			const staleThreshold = new Date(now - claimMinIdleTimeMs);
@@ -50,8 +58,14 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			return db
 				.select()
 				.from(workflowRunOutbox)
-				.where(and(eq(workflowRunOutbox.status, "published"), lt(workflowRunOutbox.updatedAt, staleThreshold)))
-				.orderBy(workflowRunOutbox.updatedAt)
+				.where(
+					and(
+						eq(workflowRunOutbox.status, "published"),
+						lt(workflowRunOutbox.updatedAt, staleThreshold),
+						timerStreamCursorFilter(workflowRunOutbox.updatedAt, workflowRunOutbox.id, cursor)
+					)
+				)
+				.orderBy(workflowRunOutbox.updatedAt, workflowRunOutbox.id)
 				.limit(limit);
 		},
 

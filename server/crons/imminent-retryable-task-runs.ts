@@ -1,9 +1,9 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { chunkLazy, isNonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
+import type { WorkflowRunMeta } from "server/infra/db/pg/repository/workflow-run";
 import type {
-	DueWorkflowRun,
 	Repositories,
 	StateTransitionRowInsert,
 	WorkflowRow,
@@ -15,6 +15,7 @@ import { runConcurrently } from "server/lib/concurrency";
 import type { CronContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
+import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
 import { publishRuns } from "./publish-ready-runs";
 
 type Repos = Pick<
@@ -28,6 +29,11 @@ export interface ProcessImminentRetryableTaskRunsDeps {
 	timerSortedSet?: TimerSortedSet;
 }
 
+const advanceTaskCursor = createTimerStreamCursorAdvancer<{ workflowRunId: string; dueAt: Date }>({
+	getDueAt: (entry) => entry.dueAt,
+	getId: (entry) => entry.workflowRunId,
+});
+
 export async function processImminentRetryableTaskRuns(
 	context: CronContext,
 	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentRetryableTaskRunsDeps,
@@ -36,41 +42,30 @@ export async function processImminentRetryableTaskRuns(
 	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
-	const next = () => repos.task.listRetryableTaskWorkflowRuns(context, dueBefore, limit);
 
-	for await (const retryableTasks of streamChunks(next, (chunk) => chunk.length < limit)) {
-		const now = Date.now();
-		const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } = splitArray(retryableTasks, (task) => {
-			if (task.dueAt && new Date(task.dueAt).getTime() > now) {
-				return { meetsCondition: false, item: task };
-			}
-			return { meetsCondition: true, item: task };
-		});
-
+	const now = Date.now();
+	for await (const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } of streamChunks(
+		(cursor) => repos.task.listRetryableTaskWorkflowRuns(context, dueBefore, limit, cursor),
+		{
+			advanceCursor: advanceTaskCursor,
+			until: (chunk) => chunk.length < limit,
+			partition: (task: { dueAt: Date }) => task.dueAt.getTime() <= now,
+		}
+	)) {
 		if (isNonEmptyArray(tasksDueNow)) {
-			const workflowRunIds = tasksDueNow.map((task) => task.workflowRunId) as NonEmptyArray<string>;
-			const runs = await repos.workflowRun.listByIdsAndStatus(context, workflowRunIds, "running");
+			const runIds = tasksDueNow.map((task) => task.workflowRunId) as NonEmptyArray<string>;
+			const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds, "running");
 			if (isNonEmptyArray(runs)) {
 				await queueRetryableTaskRuns(context, repos, workflowRunPublisher, runs, { chunkSize });
 			}
 		}
 
 		if (timerSortedSet && isNonEmptyArray(tasksDueSoon)) {
-			const timers: TimerEntry[] = [];
-			for (const task of tasksDueSoon) {
-				if (!task.dueAt) {
-					context.logger.warn(
-						{ workflowRunId: task.workflowRunId },
-						"Missing dueAt for retryable task run, skipping promotion"
-					);
-					continue;
-				}
-				timers.push({
-					type: "task_retry",
-					id: task.workflowRunId,
-					dueAt: task.dueAt.getTime(),
-				});
-			}
+			const timers: TimerEntry[] = tasksDueSoon.map((task) => ({
+				type: "task_retry",
+				id: task.workflowRunId,
+				dueAt: task.dueAt.getTime(),
+			}));
 			if (isNonEmptyArray(timers)) {
 				await timerSortedSet.add(timers);
 			}
@@ -82,7 +77,7 @@ export async function queueRetryableTaskRuns(
 	context: CronContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
-	runs: NonEmptyArray<DueWorkflowRun>,
+	runs: NonEmptyArray<WorkflowRunMeta>,
 	options?: { chunkSize?: number }
 ) {
 	const { chunkSize = 50 } = options ?? {};
@@ -107,7 +102,7 @@ async function processChunk(
 	context: CronContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
-	runs: NonEmptyArray<DueWorkflowRun>,
+	runs: NonEmptyArray<WorkflowRunMeta>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];

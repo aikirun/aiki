@@ -106,7 +106,7 @@ async function dueTimersConsumerLoop(
 
 		const next = () => deps.timerSortedSet.popDue(Date.now(), limit);
 
-		for await (const dueTimers of streamChunks(next, (chunk) => chunk.length < limit)) {
+		for await (const dueTimers of streamChunks(next, { until: (chunk) => chunk.length < limit })) {
 			try {
 				await processDueTimers(context, deps, dueTimers);
 			} catch (error) {

@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { isNonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { isNonEmptyArray, partitionArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
@@ -23,6 +23,7 @@ import type { CancelledParentRun, ChildRunCanceller } from "server/service/cance
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "server/service/schedule";
 import { ulid } from "ulidx";
 
+import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
 import { publishRuns } from "./publish-ready-runs";
 
 export interface ProcessImminentRecurringWorkflowsDeps {
@@ -38,6 +39,11 @@ export type DueSchedule = Schedule & {
 	workflowRunInputHash: string;
 };
 
+const advanceScheduleCursor = createTimerStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: Date } }>({
+	getDueAt: (row) => row.schedule.nextRunAt,
+	getId: (row) => row.schedule.id,
+});
+
 export async function processImminentRecurringWorkflows(
 	context: CronContext,
 	deps: ProcessImminentRecurringWorkflowsDeps,
@@ -46,9 +52,14 @@ export async function processImminentRecurringWorkflows(
 	const { limit = 100, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
-	const next = () => deps.repos.schedule.listDueSchedules(context, dueBefore, limit);
 
-	for await (const rows of streamChunks(next, (chunk) => chunk.length < limit)) {
+	for await (const rows of streamChunks(
+		(cursor) => deps.repos.schedule.listDueSchedules(context, dueBefore, limit, cursor),
+		{
+			advanceCursor: advanceScheduleCursor,
+			until: (chunk) => chunk.length < limit,
+		}
+	)) {
 		const schedules: DueSchedule[] = rows.map(({ schedule, workflow }) => ({
 			...scheduleRowToDomain(schedule, workflow),
 			workflowId: schedule.workflowId,
@@ -57,7 +68,7 @@ export async function processImminentRecurringWorkflows(
 		}));
 
 		const now = Date.now();
-		const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = splitArray(schedules, (schedule) => {
+		const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = partitionArray(schedules, (schedule) => {
 			if (schedule.nextRunAt > now) {
 				return { meetsCondition: false, item: schedule };
 			}

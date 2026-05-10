@@ -4,17 +4,28 @@ import type { Repositories, WorkflowRunOutboxRowInsert } from "server/infra/db/t
 import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "server/infra/messaging/redis-publisher";
 import type { CronContext } from "server/middleware/context";
 
+import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
+
 export interface PublishReadyRunsDeps {
 	repos: Pick<Repositories, "workflowRunOutbox">;
 	workflowRunPublisher: WorkflowRunPublisher;
 }
 
+const advanceOutboxCursor = createTimerStreamCursorAdvancer<{ id: string; createdAt: Date }>({
+	getDueAt: (entry) => entry.createdAt,
+	getId: (entry) => entry.id,
+});
+
 export async function publishReadyRuns(context: CronContext, deps: PublishReadyRunsDeps, options?: { limit?: number }) {
 	const { limit = 100 } = options ?? {};
 
-	const next = () => deps.repos.workflowRunOutbox.listPending(context, limit);
-
-	for await (const pendingEntries of streamChunks(next, (chunk) => chunk.length < limit)) {
+	for await (const pendingEntries of streamChunks(
+		(cursor) => deps.repos.workflowRunOutbox.listPending(context, limit, cursor),
+		{
+			advanceCursor: advanceOutboxCursor,
+			until: (chunk) => chunk.length < limit,
+		}
+	)) {
 		await publishRuns(context, deps.repos, deps.workflowRunPublisher, pendingEntries);
 	}
 }

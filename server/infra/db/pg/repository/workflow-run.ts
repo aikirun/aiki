@@ -4,8 +4,10 @@ import type { TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow-run";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
+import type { TimerStreamCursor } from "server/crons/lib/timer-stream";
 import type { CronContext } from "server/middleware/context";
 
+import { timerStreamCursorFilter } from "./lib/timer-stream";
 import { toWorkflowRunState } from "./state-transition";
 import type { PgDb } from "../provider";
 import { stateTransition, task, workflow, workflowRun } from "../schema";
@@ -19,7 +21,7 @@ type WorkflowRunRowUpdate = Partial<
 	>
 >;
 
-export interface DueWorkflowRun {
+export interface WorkflowRunMeta {
 	id: string;
 	namespaceId: string;
 	workflowId: string;
@@ -27,7 +29,10 @@ export interface DueWorkflowRun {
 	attempts: number;
 	options: unknown;
 	latestStateTransitionId: string;
-	dueAt?: Date | null;
+}
+
+export interface DueWorkflowRun extends WorkflowRunMeta {
+	dueAt: Date;
 }
 
 export function createWorkflowRunRepository(db: PgDb) {
@@ -294,7 +299,12 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.groupBy(workflowRun.status);
 		},
 
-		async listDueScheduleRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
+		async listDueScheduleRuns(
+			_context: CronContext,
+			before: Date,
+			limit = 100,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -304,15 +314,26 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: workflowRun.scheduledAt,
+					dueAt: sql<Date>`${workflowRun.scheduledAt}`,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "scheduled"), lte(workflowRun.scheduledAt, before)))
+				.where(
+					and(
+						eq(workflowRun.status, "scheduled"),
+						lte(workflowRun.scheduledAt, before),
+						timerStreamCursorFilter(workflowRun.scheduledAt, workflowRun.id, cursor)
+					)
+				)
 				.orderBy(workflowRun.scheduledAt, workflowRun.id)
 				.limit(limit);
 		},
 
-		async listSleepElapsedRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
+		async listSleepElapsedRuns(
+			_context: CronContext,
+			before: Date,
+			limit = 100,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -322,15 +343,26 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: workflowRun.awakeAt,
+					dueAt: sql<Date>`${workflowRun.awakeAt}`,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "sleeping"), lte(workflowRun.awakeAt, before)))
+				.where(
+					and(
+						eq(workflowRun.status, "sleeping"),
+						lte(workflowRun.awakeAt, before),
+						timerStreamCursorFilter(workflowRun.awakeAt, workflowRun.id, cursor)
+					)
+				)
 				.orderBy(workflowRun.awakeAt, workflowRun.id)
 				.limit(limit);
 		},
 
-		async listRetryableRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
+		async listRetryableRuns(
+			_context: CronContext,
+			before: Date,
+			limit = 100,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -340,15 +372,26 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: workflowRun.nextAttemptAt,
+					dueAt: sql<Date>`${workflowRun.nextAttemptAt}`,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "awaiting_retry"), lte(workflowRun.nextAttemptAt, before)))
+				.where(
+					and(
+						eq(workflowRun.status, "awaiting_retry"),
+						lte(workflowRun.nextAttemptAt, before),
+						timerStreamCursorFilter(workflowRun.nextAttemptAt, workflowRun.id, cursor)
+					)
+				)
 				.orderBy(workflowRun.nextAttemptAt, workflowRun.id)
 				.limit(limit);
 		},
 
-		async listEventWaitTimedOutRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
+		async listEventWaitTimedOutRuns(
+			_context: CronContext,
+			before: Date,
+			limit = 100,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -358,15 +401,26 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: workflowRun.timeoutAt,
+					dueAt: sql<Date>`${workflowRun.timeoutAt}`,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "awaiting_event"), lte(workflowRun.timeoutAt, before)))
+				.where(
+					and(
+						eq(workflowRun.status, "awaiting_event"),
+						lte(workflowRun.timeoutAt, before),
+						timerStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
+					)
+				)
 				.orderBy(workflowRun.timeoutAt, workflowRun.id)
 				.limit(limit);
 		},
 
-		async listChildRunWaitTimedOutRuns(_context: CronContext, before: Date, limit = 100): Promise<DueWorkflowRun[]> {
+		async listChildRunWaitTimedOutRuns(
+			_context: CronContext,
+			before: Date,
+			limit = 100,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -376,10 +430,16 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: workflowRun.timeoutAt,
+					dueAt: sql<Date>`${workflowRun.timeoutAt}`,
 				})
 				.from(workflowRun)
-				.where(and(eq(workflowRun.status, "awaiting_child_workflow"), lte(workflowRun.timeoutAt, before)))
+				.where(
+					and(
+						eq(workflowRun.status, "awaiting_child_workflow"),
+						lte(workflowRun.timeoutAt, before),
+						timerStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
+					)
+				)
 				.orderBy(workflowRun.timeoutAt, workflowRun.id)
 				.limit(limit);
 		},
