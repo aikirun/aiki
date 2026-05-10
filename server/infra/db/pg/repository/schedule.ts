@@ -1,8 +1,10 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, count, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
+import type { TimerStreamCursor } from "server/crons/lib/timer-stream";
 import type { CronContext } from "server/middleware/context";
 
+import { timerStreamCursorFilter } from "./lib/timer-stream";
 import type { PgDb } from "../provider";
 import { schedule, workflow } from "../schema";
 
@@ -149,15 +151,24 @@ export function createScheduleRepository(db: PgDb) {
 				.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
 		},
 
-		async listDueSchedules(_context: CronContext, before: Date, limit = 100) {
+		async listDueSchedules(_context: CronContext, before: Date, limit = 100, cursor?: TimerStreamCursor) {
 			return db
 				.select({
-					schedule: getTableColumns(schedule),
+					schedule: {
+						...getTableColumns(schedule),
+						nextRunAt: sql<Date>`${schedule.nextRunAt}`,
+					},
 					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
 				})
 				.from(schedule)
 				.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
-				.where(and(eq(schedule.status, "active"), lte(schedule.nextRunAt, before)))
+				.where(
+					and(
+						eq(schedule.status, "active"),
+						lte(schedule.nextRunAt, before),
+						timerStreamCursorFilter(schedule.nextRunAt, schedule.id, cursor)
+					)
+				)
 				.orderBy(schedule.nextRunAt, schedule.id)
 				.limit(limit);
 		},
