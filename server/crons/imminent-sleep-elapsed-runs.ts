@@ -30,9 +30,9 @@ export interface ProcessImminentSleepElapsedRunsDeps {
 export async function processImminentSleepElapsedRuns(
 	context: CronContext,
 	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentSleepElapsedRunsDeps,
-	options?: { limit?: number; chunkSize?: number; imminenceThresholdMs?: number }
+	options?: { limit?: number; imminenceThresholdMs?: number }
 ) {
-	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 2_000 } = options ?? {};
+	const { limit = 100, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
 
@@ -41,7 +41,7 @@ export async function processImminentSleepElapsedRuns(
 		(chunk) => chunk.length < limit
 	)) {
 		if (isNonEmptyArray(runsDueNow)) {
-			await queueSleepElapsedRuns(context, repos, workflowRunPublisher, runsDueNow, { chunkSize });
+			await queueSleepElapsedRuns(context, repos, workflowRunPublisher, runsDueNow);
 		}
 
 		if (timerSortedSet && isNonEmptyArray(runsDueSoon)) {
@@ -64,7 +64,7 @@ export async function queueSleepElapsedRuns(
 	runs: NonEmptyArray<WorkflowRunMeta>,
 	options?: { chunkSize?: number }
 ) {
-	const { chunkSize = 50 } = options ?? {};
+	const { chunkSize = runs.length } = options ?? {};
 
 	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId)));
 	if (!isNonEmptyArray(workflowIds)) {

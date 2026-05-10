@@ -37,9 +37,9 @@ const advanceTaskCursor = createTimerStreamCursorAdvancer<{ workflowRunId: strin
 export async function processImminentRetryableTaskRuns(
 	context: CronContext,
 	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentRetryableTaskRunsDeps,
-	options?: { limit?: number; chunkSize?: number; imminenceThresholdMs?: number }
+	options?: { limit?: number; imminenceThresholdMs?: number }
 ) {
-	const { limit = 100, chunkSize = 50, imminenceThresholdMs = 2_000 } = options ?? {};
+	const { limit = 100, imminenceThresholdMs = 2_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
 
@@ -56,7 +56,7 @@ export async function processImminentRetryableTaskRuns(
 			const runIds = tasksDueNow.map((task) => task.workflowRunId) as NonEmptyArray<string>;
 			const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds, "running");
 			if (isNonEmptyArray(runs)) {
-				await queueRetryableTaskRuns(context, repos, workflowRunPublisher, runs, { chunkSize });
+				await queueRetryableTaskRuns(context, repos, workflowRunPublisher, runs);
 			}
 		}
 
@@ -80,7 +80,7 @@ export async function queueRetryableTaskRuns(
 	runs: NonEmptyArray<WorkflowRunMeta>,
 	options?: { chunkSize?: number }
 ) {
-	const { chunkSize = 50 } = options ?? {};
+	const { chunkSize = runs.length } = options ?? {};
 
 	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId)));
 	if (!isNonEmptyArray(workflowIds)) {
