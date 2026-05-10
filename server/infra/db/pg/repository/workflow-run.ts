@@ -302,7 +302,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		async listDueScheduleRuns(
 			_context: CronContext,
 			before: Date,
-			limit = 100,
+			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
 			return db
@@ -331,7 +331,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		async listSleepElapsedRuns(
 			_context: CronContext,
 			before: Date,
-			limit = 100,
+			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
 			return db
@@ -360,7 +360,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		async listRetryableRuns(
 			_context: CronContext,
 			before: Date,
-			limit = 100,
+			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
 			return db
@@ -389,7 +389,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		async listEventWaitTimedOutRuns(
 			_context: CronContext,
 			before: Date,
-			limit = 100,
+			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
 			return db
@@ -418,7 +418,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		async listChildRunWaitTimedOutRuns(
 			_context: CronContext,
 			before: Date,
-			limit = 100,
+			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
 			return db

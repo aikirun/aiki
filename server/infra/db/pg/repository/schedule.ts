@@ -151,7 +151,7 @@ export function createScheduleRepository(db: PgDb) {
 				.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
 		},
 
-		async listDueSchedules(_context: CronContext, before: Date, limit = 100, cursor?: TimerStreamCursor) {
+		async listDueSchedules(_context: CronContext, before: Date, limit: number, cursor?: TimerStreamCursor) {
 			return db
 				.select({
 					schedule: {

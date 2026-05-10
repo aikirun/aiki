@@ -74,7 +74,7 @@ async function dueTimersConsumerLoop(
 	abortSignal: AbortSignal,
 	options?: DueTimersConsumerOptions
 ): Promise<void> {
-	const { limit = 100, overshootMs = 30 } = options ?? {};
+	const { limit = 1_000, overshootMs = 30 } = options ?? {};
 
 	// Peek on startup to discover any entries left over from a previous consumer's lifecycle.
 	let nextTimerDueAt = await deps.timerSortedSet.peek();
@@ -87,7 +87,7 @@ async function dueTimersConsumerLoop(
 		} else {
 			const waitMs = nextTimerDueAt - Date.now() + overshootMs;
 			if (waitMs > 0) {
-				signal = await timerSignalWaiter.wait(waitMs / 1000);
+				signal = await timerSignalWaiter.wait(waitMs / 1_000);
 			}
 		}
 

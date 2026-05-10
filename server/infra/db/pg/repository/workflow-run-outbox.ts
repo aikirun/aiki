@@ -18,7 +18,11 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			await db.insert(workflowRunOutbox).values(rows);
 		},
 
-		async listPending(_context: CronContext, limit = 100, cursor?: TimerStreamCursor): Promise<WorkflowRunOutboxRow[]> {
+		async listPending(
+			_context: CronContext,
+			limit: number,
+			cursor?: TimerStreamCursor
+		): Promise<WorkflowRunOutboxRow[]> {
 			return db
 				.select()
 				.from(workflowRunOutbox)

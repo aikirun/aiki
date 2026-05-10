@@ -17,7 +17,7 @@ const advanceOutboxCursor = createTimerStreamCursorAdvancer<{ id: string; create
 });
 
 export async function publishReadyRuns(context: CronContext, deps: PublishReadyRunsDeps, options?: { limit?: number }) {
-	const { limit = 100 } = options ?? {};
+	const { limit = 1_000 } = options ?? {};
 
 	for await (const pendingEntries of streamChunks(
 		(cursor) => deps.repos.workflowRunOutbox.listPending(context, limit, cursor),
