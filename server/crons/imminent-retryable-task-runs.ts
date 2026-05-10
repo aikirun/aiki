@@ -2,8 +2,8 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { chunkLazy, isNonEmptyArray, partitionArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
+import type { WorkflowRunMeta } from "server/infra/db/pg/repository/workflow-run";
 import type {
-	DueWorkflowRun,
 	Repositories,
 	StateTransitionRowInsert,
 	WorkflowRow,
@@ -82,7 +82,7 @@ export async function queueRetryableTaskRuns(
 	context: CronContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
-	runs: NonEmptyArray<DueWorkflowRun>,
+	runs: NonEmptyArray<WorkflowRunMeta>,
 	options?: { chunkSize?: number }
 ) {
 	const { chunkSize = 50 } = options ?? {};
@@ -107,7 +107,7 @@ async function processChunk(
 	context: CronContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
-	runs: NonEmptyArray<DueWorkflowRun>,
+	runs: NonEmptyArray<WorkflowRunMeta>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];

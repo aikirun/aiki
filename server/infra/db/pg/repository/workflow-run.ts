@@ -19,7 +19,7 @@ type WorkflowRunRowUpdate = Partial<
 	>
 >;
 
-export interface DueWorkflowRun {
+export interface WorkflowRunMeta {
 	id: string;
 	namespaceId: string;
 	workflowId: string;
@@ -27,7 +27,10 @@ export interface DueWorkflowRun {
 	attempts: number;
 	options: unknown;
 	latestStateTransitionId: string;
-	dueAt?: Date | null;
+}
+
+export interface DueWorkflowRun extends WorkflowRunMeta {
+	dueAt: Date | null;
 }
 
 export function createWorkflowRunRepository(db: PgDb) {
