@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { isNonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { isNonEmptyArray, partitionArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
@@ -57,7 +57,7 @@ export async function processImminentRecurringWorkflows(
 		}));
 
 		const now = Date.now();
-		const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = splitArray(schedules, (schedule) => {
+		const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = partitionArray(schedules, (schedule) => {
 			if (schedule.nextRunAt > now) {
 				return { meetsCondition: false, item: schedule };
 			}

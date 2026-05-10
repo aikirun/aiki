@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { chunkLazy, isNonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { chunkLazy, isNonEmptyArray, partitionArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
@@ -40,7 +40,7 @@ export async function processImminentRetryableTaskRuns(
 
 	for await (const retryableTasks of streamChunks(next, (chunk) => chunk.length < limit)) {
 		const now = Date.now();
-		const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } = splitArray(retryableTasks, (task) => {
+		const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } = partitionArray(retryableTasks, (task) => {
 			if (task.dueAt && new Date(task.dueAt).getTime() > now) {
 				return { meetsCondition: false, item: task };
 			}

@@ -31,7 +31,7 @@ export function* chunkLazy<T>(items: T[], size: number): Generator<NonEmptyArray
 	}
 }
 
-export const splitArray = <Item, WhenTrue = Item, WhenFalse = Item>(
+export const partitionArray = <Item, WhenTrue = Item, WhenFalse = Item>(
 	items: Item[],
 	condition: (item: Item) => { meetsCondition: true; item: WhenTrue } | { meetsCondition: false; item: WhenFalse }
 ): { whenTrue: WhenTrue[]; whenFalse: WhenFalse[] } => {

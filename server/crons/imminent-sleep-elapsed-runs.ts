@@ -1,4 +1,4 @@
-import { chunkLazy, isNonEmptyArray, type NonEmptyArray, splitArray } from "@aikirun/lib/array";
+import { chunkLazy, isNonEmptyArray, type NonEmptyArray, partitionArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type {
@@ -39,7 +39,7 @@ export async function processImminentSleepElapsedRuns(
 
 	for await (const runs of streamChunks(next, (chunk) => chunk.length < limit)) {
 		const now = Date.now();
-		const { whenTrue: runsDueNow, whenFalse: runsDueSoon } = splitArray(runs, (run) => {
+		const { whenTrue: runsDueNow, whenFalse: runsDueSoon } = partitionArray(runs, (run) => {
 			if (run.dueAt && run.dueAt.getTime() > now) {
 				return { meetsCondition: false, item: run };
 			}
