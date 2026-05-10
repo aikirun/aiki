@@ -9,7 +9,7 @@ import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@ai
 import type { WorkflowRunHandle } from "./handle";
 
 const MAX_SLEEP_YEARS = 10;
-const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1000;
+const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1_000;
 
 export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknown>, logger: Logger) {
 	const nextIndexBySleepName: Record<SleepName, number> = {};

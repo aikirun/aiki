@@ -61,7 +61,7 @@ type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
  *     retry: {
  *       type: "fixed",
  *       maxAttempts: 3,
- *       delayMs: 1000,
+ *       delayMs: 1_000,
  *     },
  *   },
  * });

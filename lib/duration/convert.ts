@@ -1,6 +1,6 @@
 import type { Duration, DurationFields } from "@aikirun/types/duration";
 
-const MS_PER_SECOND = 1000;
+const MS_PER_SECOND = 1_000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
@@ -17,13 +17,13 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
  *
  * @example
  * // Using milliseconds
- * toMilliseconds(5000) // => 5000
+ * toMilliseconds(5_000) // => 5_000
  *
  * @example
  * // Using duration object
- * toMilliseconds({ seconds: 5 }) // => 5000
- * toMilliseconds({ minutes: 1, seconds: 30 }) // => 90000
- * toMilliseconds({ days: 1, hours: 2 }) // => 93600000
+ * toMilliseconds({ seconds: 5 }) // => 5_000
+ * toMilliseconds({ minutes: 1, seconds: 30 }) // => 90_000
+ * toMilliseconds({ days: 1, hours: 2 }) // => 93_600_000
  */
 export function toMilliseconds(duration: Duration): number {
 	if (typeof duration === "number") {

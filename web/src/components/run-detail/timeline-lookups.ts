@@ -24,10 +24,10 @@ export interface TimelineLookups {
 export type ScheduledContext = NonNullable<ReturnType<TimelineLookups["scheduledContext"]["get"]>>;
 
 export function formatDuration(ms: number): string {
-	if (ms < 1000) return `${ms}ms`;
-	if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-	if (ms < 3600000) return `${Math.round(ms / 60000)}m`;
-	return `${(ms / 3600000).toFixed(1)}h`;
+	if (ms < 1_000) return `${ms}ms`;
+	if (ms < 60_000) return `${(ms / 1_000).toFixed(1)}s`;
+	if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`;
+	return `${(ms / 3_600_000).toFixed(1)}h`;
 }
 
 export function buildTimelineLookups(

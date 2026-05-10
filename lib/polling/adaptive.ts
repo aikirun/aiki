@@ -9,7 +9,7 @@ export interface AdaptivePollingConfig {
 
 	/**
 	 * Maximum polling interval when idle (ms)
-	 * @default 5000
+	 * @default 5_000
 	 */
 	maxPollIntervalMs?: number;
 
