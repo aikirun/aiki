@@ -128,7 +128,7 @@ export const schedule = pgTable(
 		uniqueIndex("uqidx_schedule_namespace_reference").on(table.namespaceId, table.referenceId),
 		index("idx_schedule_namespace_workflow").on(table.namespaceId, table.workflowId),
 		// TODO: how to prevent certain namespaces from starving others
-		index("idx_schedule_status_next_run_at").on(table.status, table.nextRunAt),
+		index("idx_schedule_status_next_run_at_id").on(table.status, table.nextRunAt, table.id),
 	]
 );
 
@@ -196,10 +196,10 @@ export const workflowRun = pgTable(
 
 		// TODO: will adding an index on input hash make conflict resolution faster?
 
-		index("idx_workflow_run_status_scheduled_at").on(table.status, table.scheduledAt),
-		index("idx_workflow_run_status_awake_at").on(table.status, table.awakeAt),
-		index("idx_workflow_run_status_timeout_at").on(table.status, table.timeoutAt),
-		index("idx_workflow_run_status_next_attempt_at").on(table.status, table.nextAttemptAt),
+		index("idx_workflow_run_status_scheduled_at_id").on(table.status, table.scheduledAt, table.id),
+		index("idx_workflow_run_status_awake_at_id").on(table.status, table.awakeAt, table.id),
+		index("idx_workflow_run_status_timeout_at_id").on(table.status, table.timeoutAt, table.id),
+		index("idx_workflow_run_status_next_attempt_at_id").on(table.status, table.nextAttemptAt, table.id),
 	]
 );
 
@@ -231,7 +231,7 @@ export const task = pgTable(
 		}),
 		index("idx_task_workflow_run_id").on(table.workflowRunId, table.id),
 		index("idx_task_workflow_run_status").on(table.workflowRunId, table.status),
-		index("idx_task_status_workflow_run_next_attempt_at").on(table.status, table.workflowRunId, table.nextAttemptAt),
+		index("idx_task_status_next_attempt_at_workflow_run").on(table.status, table.nextAttemptAt, table.workflowRunId),
 	]
 );
 
@@ -418,8 +418,8 @@ export const workflowRunOutbox = pgTable(
 			table.workflowVersionId,
 			table.shard
 		),
-		index("idx_workflow_run_outbox_status_created").on(table.status, table.createdAt),
-		index("idx_workflow_run_outbox_status_updated").on(table.status, table.updatedAt),
+		index("idx_workflow_run_outbox_status_created_id").on(table.status, table.createdAt, table.id),
+		index("idx_workflow_run_outbox_status_updated_id").on(table.status, table.updatedAt, table.id),
 	]
 );
 
