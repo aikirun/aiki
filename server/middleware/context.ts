@@ -12,7 +12,7 @@ import type {
 } from "./authorization";
 
 export interface ContextBase {
-	type: "request" | "cron";
+	type: "request" | "daemon";
 	traceId: string;
 	spanId: string;
 	logger: Logger;
@@ -74,12 +74,12 @@ export type AuthedRequestContext = OrganizationRequestContext | NamespaceRequest
 
 export type RequestContext = PublicRequestContext | AuthedRequestContext;
 
-export interface CronContext extends ContextBase {
-	type: "cron";
+export interface DaemonContext extends ContextBase {
+	type: "daemon";
 	name: string;
 }
 
-export type Context = RequestContext | CronContext;
+export type Context = RequestContext | DaemonContext;
 
 export function createPublicRequestContext(params: { request: Request; logger: Logger }): PublicRequestContext {
 	const { request, logger } = params;
@@ -190,15 +190,15 @@ export async function createNamespaceRequestContext(params: {
 	}
 }
 
-export function createCronContext(params: { name: string; logger: Logger; signal?: AbortSignal }): CronContext {
+export function createDaemonContext(params: { name: string; logger: Logger; signal?: AbortSignal }): DaemonContext {
 	const { name, logger, signal } = params;
 	const traceId = ulid();
 	const spanId = ulid();
 	return {
-		type: "cron",
+		type: "daemon",
 		traceId,
 		spanId,
-		logger: logger.child({ cronName: name, traceId, spanId }),
+		logger: logger.child({ daemonName: name, traceId, spanId }),
 		name,
 		signal,
 	};

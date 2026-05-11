@@ -1,8 +1,8 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, count, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
-import type { TimerStreamCursor } from "server/crons/lib/timer-stream";
-import type { CronContext } from "server/middleware/context";
+import type { TimerStreamCursor } from "server/daemons/lib/timer-stream";
+import type { DaemonContext } from "server/middleware/context";
 
 import { timerStreamCursorFilter } from "./lib/timer-stream";
 import type { PgDb } from "../provider";
@@ -140,7 +140,7 @@ export function createScheduleRepository(db: PgDb) {
 			return { rows, total: countResult[0]?.count ?? 0 };
 		},
 
-		async listActiveByIds(_context: CronContext, ids: NonEmptyArray<string>) {
+		async listActiveByIds(_context: DaemonContext, ids: NonEmptyArray<string>) {
 			return db
 				.select({
 					schedule: getTableColumns(schedule),
@@ -151,7 +151,7 @@ export function createScheduleRepository(db: PgDb) {
 				.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
 		},
 
-		async listDueSchedules(_context: CronContext, before: Date, limit: number, cursor?: TimerStreamCursor) {
+		async listDueSchedules(_context: DaemonContext, before: Date, limit: number, cursor?: TimerStreamCursor) {
 			return db
 				.select({
 					schedule: {

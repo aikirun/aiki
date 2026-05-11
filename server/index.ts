@@ -3,7 +3,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { Redis } from "ioredis";
 
 import { loadConfig } from "./config/index";
-import { initCrons } from "./crons";
+import { initDaemons } from "./daemons";
 import { UnauthorizedError } from "./errors";
 import { createDatabase } from "./infra/db";
 import { createLogger } from "./infra/logger";
@@ -83,7 +83,7 @@ if (import.meta.main) {
 	const scheduleService = createScheduleService({ repos });
 	const workflowRunOutboxService = createWorkflowRunOutboxService({ repos });
 
-	const crons = initCrons(logger, {
+	const daemons = initDaemons(logger, {
 		repos,
 		workflowRunPublisher,
 		timerSortedSet,
@@ -181,7 +181,7 @@ if (import.meta.main) {
 	});
 
 	const shutdown = async () => {
-		await crons.shutdown();
+		await daemons.shutdown();
 		if (redis) {
 			await redis.quit();
 		}

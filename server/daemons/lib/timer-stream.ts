@@ -46,12 +46,13 @@ export async function* streamTimers<Item extends Timer>(
 	next: (cursor: TimerStreamCursor | undefined) => Item[] | Promise<Item[]>,
 	until?: (chunk: NonEmptyArray<Item>) => boolean
 ): AsyncGenerator<{ dueNow: Item[]; dueSoon: Item[] }> {
-	const now = Date.now();
+	let now = Date.now();
 	for await (const { whenTrue, whenFalse } of streamChunks(next, {
 		advanceCursor: advanceTimerStreamCursor,
 		until,
 		partition: (timer: Item) => timer.dueAt.getTime() <= now,
 	})) {
 		yield { dueNow: whenTrue, dueSoon: whenFalse };
+		now = Date.now();
 	}
 }

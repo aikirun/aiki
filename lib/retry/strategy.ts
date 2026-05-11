@@ -5,6 +5,7 @@ import { delay } from "../async/delay";
 export type WithRetryOptions<Result, Abortable extends boolean> = {
 	shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>;
 	shouldNotRetryOnError?: (error: unknown) => Promise<boolean>;
+	onError?: (error: unknown) => void | Promise<void>;
 } & (Abortable extends true ? { abortSignal: AbortSignal } : { abortSignal?: never });
 
 type CompletedResult<Result> = {
@@ -63,7 +64,13 @@ export function withRetry<Args, Result>(
 						};
 					}
 				} catch (err) {
-					if (options?.shouldNotRetryOnError !== undefined && (await options.shouldNotRetryOnError(err))) {
+					if (options?.onError) {
+						const onErrorResult = options.onError(err);
+						if (onErrorResult instanceof Promise) {
+							await onErrorResult;
+						}
+					}
+					if (options?.shouldNotRetryOnError && (await options.shouldNotRetryOnError(err))) {
 						throw err;
 					}
 				}

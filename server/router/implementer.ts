@@ -27,7 +27,7 @@ const baseOrganizationAuthedImplementer = implement(organizationAuthedContract).
 const baseNamespaceAuthedImplementer = implement(namespaceAuthedContract).$context<NamespaceRequestContext>();
 
 function handleError<T extends ContextBase>(context: T, error: unknown) {
-	if (context.type === "cron") {
+	if (context.type === "daemon") {
 		throw error;
 	}
 

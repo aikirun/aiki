@@ -7,8 +7,8 @@ import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { TimerSignalWaiter, TimerSortedSet, TimerType } from "server/infra/messaging/redis-timer-sorted-set";
-import type { CronContext } from "server/middleware/context";
-import { createCronContext } from "server/middleware/context";
+import type { DaemonContext } from "server/middleware/context";
+import { createDaemonContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
 import { scheduleRowToDomain } from "server/service/schedule";
 
@@ -102,7 +102,7 @@ async function dueTimersConsumerLoop(
 			continue;
 		}
 
-		const context = createCronContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
+		const context = createDaemonContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
 
 		const next = () => deps.timerSortedSet.popDue(Date.now(), limit);
 
@@ -119,7 +119,7 @@ async function dueTimersConsumerLoop(
 }
 
 async function processDueTimers(
-	context: CronContext,
+	context: DaemonContext,
 	deps: DueTimersConsumerDeps,
 	dueTimers: NonEmptyArray<{ type: TimerType; id: string }>
 ): Promise<void> {
