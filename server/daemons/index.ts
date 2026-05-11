@@ -49,7 +49,10 @@ function initDaemon<Deps, Options>(
 				await fn(context, deps, options);
 				const durationMs = Math.round(performance.now() - start);
 				context.logger.debug({ durationMs }, `Daemon ${name} completed`);
-				await delay(Math.max(0, intervalMs - durationMs), { abortSignal: signal });
+				const delayMs = intervalMs - durationMs;
+				if (delayMs > 0) {
+					await delay(delayMs, { abortSignal: signal });
+				}
 			}
 		},
 		{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
