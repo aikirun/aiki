@@ -1,3 +1,5 @@
+import { delay } from "@aikirun/lib/async";
+import { withRetry } from "@aikirun/lib/retry";
 import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
@@ -34,39 +36,30 @@ function initCron<Deps, Options>(
 	fn: (context: CronContext, deps: Deps, options?: Options) => Promise<void>,
 	deps: Deps,
 	options?: Options
-): {
-	interval: ReturnType<typeof setInterval>;
-	abortController: AbortController;
-} {
+) {
 	const name = fn.name;
 	const abortController = new AbortController();
 	const { signal } = abortController;
 
-	let running = false;
-
-	const interval = setInterval(() => {
-		if (signal.aborted || running) {
-			return;
-		}
-		running = true;
-
-		const context = createCronContext({ name, logger, signal });
-		const start = performance.now();
-		fn(context, deps, options)
-			.then(() => {
+	const promise = withRetry(
+		async () => {
+			while (!signal.aborted) {
+				const context = createCronContext({ name, logger, signal });
+				const start = performance.now();
+				await fn(context, deps, options);
 				const durationMs = Math.round(performance.now() - start);
 				context.logger.debug({ durationMs }, `Cron ${name} completed`);
-			})
-			.catch((err) => {
-				const durationMs = Math.round(performance.now() - start);
-				context.logger.error({ err, durationMs }, `Cron ${name} failed`);
-			})
-			.finally(() => {
-				running = false;
-			});
-	}, intervalMs);
+				await delay(Math.max(0, intervalMs - durationMs), { abortSignal: signal });
+			}
+		},
+		{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
+		{
+			abortSignal: signal,
+			onError: (err) => logger.error({ err }, `Cron ${name} failed`),
+		}
+	).run();
 
-	return { interval, abortController };
+	return { abortController, promise };
 }
 
 export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
@@ -134,10 +127,12 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 
 	return {
 		async shutdown() {
-			for (const { abortController, interval } of crons) {
+			const cronPromises: Promise<unknown>[] = [];
+			for (const { abortController, promise } of crons) {
 				abortController.abort();
-				clearInterval(interval);
+				cronPromises.push(promise);
 			}
+			await Promise.all(cronPromises);
 			await dueTimersConsumer?.stop();
 		},
 	};
