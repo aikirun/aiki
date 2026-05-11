@@ -43,7 +43,7 @@ export async function processImminentRetryableTaskRuns(
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
 
-	const now = Date.now();
+	let now = Date.now();
 	for await (const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } of streamChunks(
 		(cursor) => repos.task.listRetryableTaskWorkflowRuns(context, dueBefore, limit, cursor),
 		{
@@ -70,6 +70,8 @@ export async function processImminentRetryableTaskRuns(
 				await timerSortedSet.add(timers);
 			}
 		}
+
+		now = Date.now();
 	}
 }
 
