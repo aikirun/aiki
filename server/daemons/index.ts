@@ -4,8 +4,8 @@ import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
-import type { CronContext } from "server/middleware/context";
-import { createCronContext } from "server/middleware/context";
+import type { DaemonContext } from "server/middleware/context";
+import { createDaemonContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
 
 import { type DueTimersConsumerHandle, spawnDueTimersConsumer } from "./due-timers-consumer";
@@ -19,21 +19,21 @@ import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { publishReadyRuns } from "./publish-ready-runs";
 import { republishStaleRuns } from "./republish-stale-runs";
 
-export interface InitCronsDeps {
+export interface InitDaemonsDeps {
 	repos: Repositories;
 	workflowRunPublisher?: WorkflowRunPublisher;
 	timerSortedSet?: TimerSortedSet;
 	childRunCanceller: ChildRunCanceller;
 }
 
-export interface CronHandle {
+export interface DaemonHandle {
 	shutdown(): Promise<void>;
 }
 
-function initCron<Deps, Options>(
+function initDaemon<Deps, Options>(
 	logger: Logger,
 	intervalMs: number,
-	fn: (context: CronContext, deps: Deps, options?: Options) => Promise<void>,
+	fn: (context: DaemonContext, deps: Deps, options?: Options) => Promise<void>,
 	deps: Deps,
 	options?: Options
 ) {
@@ -44,11 +44,11 @@ function initCron<Deps, Options>(
 	const promise = withRetry(
 		async () => {
 			while (!signal.aborted) {
-				const context = createCronContext({ name, logger, signal });
+				const context = createDaemonContext({ name, logger, signal });
 				const start = performance.now();
 				await fn(context, deps, options);
 				const durationMs = Math.round(performance.now() - start);
-				context.logger.debug({ durationMs }, `Cron ${name} completed`);
+				context.logger.debug({ durationMs }, `Daemon ${name} completed`);
 				await delay(Math.max(0, intervalMs - durationMs), { abortSignal: signal });
 			}
 		},
@@ -59,7 +59,7 @@ function initCron<Deps, Options>(
 				if (signal.aborted) {
 					return;
 				}
-				logger.error({ err }, `Cron ${name} failed`);
+				logger.error({ err }, `Daemon ${name} failed`);
 			},
 		}
 	).run();
@@ -67,39 +67,39 @@ function initCron<Deps, Options>(
 	return { abortController, promise };
 }
 
-export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
-	const crons = [
-		initCron(logger, 2_000, processImminentScheduledRuns, {
+export function initDaemons(logger: Logger, deps: InitDaemonsDeps): DaemonHandle {
+	const daemons = [
+		initDaemon(logger, 2_000, processImminentScheduledRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 2_000, processImminentSleepElapsedRuns, {
+		initDaemon(logger, 2_000, processImminentSleepElapsedRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 2_000, processImminentRetryableRuns, {
+		initDaemon(logger, 2_000, processImminentRetryableRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 2_000, processImminentRetryableTaskRuns, {
+		initDaemon(logger, 2_000, processImminentRetryableTaskRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 2_000, processImminentEventWaitTimedOutRuns, {
+		initDaemon(logger, 2_000, processImminentEventWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 2_000, processImminentChildRunWaitTimedOutRuns, {
+		initDaemon(logger, 2_000, processImminentChildRunWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initCron(logger, 2_000, processImminentRecurringWorkflows, {
+		initDaemon(logger, 2_000, processImminentRecurringWorkflows, {
 			repos: deps.repos,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
@@ -118,12 +118,12 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 	}
 
 	if (deps.workflowRunPublisher) {
-		crons.push(
-			initCron(logger, 1_000, publishReadyRuns, {
+		daemons.push(
+			initDaemon(logger, 1_000, publishReadyRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			}),
-			initCron(logger, 1_000, republishStaleRuns, {
+			initDaemon(logger, 1_000, republishStaleRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			})
@@ -132,12 +132,12 @@ export function initCrons(logger: Logger, deps: InitCronsDeps): CronHandle {
 
 	return {
 		async shutdown() {
-			const cronPromises: Promise<unknown>[] = [];
-			for (const { abortController, promise } of crons) {
+			const daemonPromises: Promise<unknown>[] = [];
+			for (const { abortController, promise } of daemons) {
 				abortController.abort();
-				cronPromises.push(promise);
+				daemonPromises.push(promise);
 			}
-			await Promise.all(cronPromises);
+			await Promise.all(daemonPromises);
 			await dueTimersConsumer?.stop();
 		},
 	};

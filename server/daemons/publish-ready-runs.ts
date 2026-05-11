@@ -2,7 +2,7 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { Repositories, WorkflowRunOutboxRowInsert } from "server/infra/db/types";
 import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "server/infra/messaging/redis-publisher";
-import type { CronContext } from "server/middleware/context";
+import type { DaemonContext } from "server/middleware/context";
 
 import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
 
@@ -16,7 +16,11 @@ const advanceOutboxCursor = createTimerStreamCursorAdvancer<{ id: string; create
 	getId: (entry) => entry.id,
 });
 
-export async function publishReadyRuns(context: CronContext, deps: PublishReadyRunsDeps, options?: { limit?: number }) {
+export async function publishReadyRuns(
+	context: DaemonContext,
+	deps: PublishReadyRunsDeps,
+	options?: { limit?: number }
+) {
 	const { limit = 1_000 } = options ?? {};
 
 	for await (const pendingEntries of streamChunks(
@@ -31,7 +35,7 @@ export async function publishReadyRuns(context: CronContext, deps: PublishReadyR
 }
 
 export async function publishRuns(
-	context: CronContext,
+	context: DaemonContext,
 	repos: Pick<Repositories, "workflowRunOutbox">,
 	workflowRunPublisher: WorkflowRunPublisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsert>

@@ -1,7 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { and, eq, inArray, lte, min, sql } from "drizzle-orm";
-import type { TimerStreamCursor } from "server/crons/lib/timer-stream";
-import type { CronContext } from "server/middleware/context";
+import type { TimerStreamCursor } from "server/daemons/lib/timer-stream";
+import type { DaemonContext } from "server/middleware/context";
 
 import { timerStreamCursorFilter } from "./lib/timer-stream";
 import type { PgDb } from "../provider";
@@ -38,7 +38,7 @@ export function createTaskRepository(db: PgDb) {
 		},
 
 		async listRetryableTaskWorkflowRuns(
-			_context: CronContext,
+			_context: DaemonContext,
 			before: Date,
 			limit: number,
 			cursor?: TimerStreamCursor

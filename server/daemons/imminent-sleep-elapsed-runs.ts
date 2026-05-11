@@ -10,7 +10,7 @@ import type {
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import { runConcurrently } from "server/lib/concurrency";
-import type { CronContext } from "server/middleware/context";
+import type { DaemonContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 import { streamTimers } from "./lib/timer-stream";
@@ -28,7 +28,7 @@ export interface ProcessImminentSleepElapsedRunsDeps {
 }
 
 export async function processImminentSleepElapsedRuns(
-	context: CronContext,
+	context: DaemonContext,
 	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentSleepElapsedRunsDeps,
 	options?: { limit?: number; imminenceThresholdMs?: number }
 ) {
@@ -58,7 +58,7 @@ export async function processImminentSleepElapsedRuns(
 }
 
 export async function queueSleepElapsedRuns(
-	context: CronContext,
+	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<WorkflowRunMeta>,
@@ -83,7 +83,7 @@ export async function queueSleepElapsedRuns(
 }
 
 async function processChunk(
-	context: CronContext,
+	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<WorkflowRunMeta>,

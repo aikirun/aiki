@@ -18,7 +18,7 @@ import type {
 } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
-import type { CronContext } from "server/middleware/context";
+import type { DaemonContext } from "server/middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "server/service/schedule";
 import { ulid } from "ulidx";
@@ -45,7 +45,7 @@ const advanceScheduleCursor = createTimerStreamCursorAdvancer<{ schedule: { id: 
 });
 
 export async function processImminentRecurringWorkflows(
-	context: CronContext,
+	context: DaemonContext,
 	deps: ProcessImminentRecurringWorkflowsDeps,
 	options?: { limit?: number; imminenceThresholdMs?: number }
 ) {
@@ -97,7 +97,7 @@ export async function processImminentRecurringWorkflows(
 }
 
 export async function queueRecurringWorkflows(
-	context: CronContext,
+	context: DaemonContext,
 	deps: ProcessImminentRecurringWorkflowsDeps,
 	schedules: NonEmptyArray<DueSchedule>
 ) {
@@ -139,7 +139,7 @@ export async function queueRecurringWorkflows(
 }
 
 async function processOverlapAllowSchedules(
-	context: CronContext,
+	context: DaemonContext,
 	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
@@ -226,7 +226,7 @@ async function processOverlapAllowSchedules(
 }
 
 async function processOverlapSkipSchedules(
-	context: CronContext,
+	context: DaemonContext,
 	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
@@ -317,7 +317,7 @@ async function processOverlapSkipSchedules(
 }
 
 async function processOverlapCancelPreviousSchedules(
-	context: CronContext,
+	context: DaemonContext,
 	deps: ProcessImminentRecurringWorkflowsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number

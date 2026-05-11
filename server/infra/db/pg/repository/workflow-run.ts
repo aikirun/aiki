@@ -4,8 +4,8 @@ import type { TaskStatus } from "@aikirun/types/task";
 import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow-run";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
-import type { TimerStreamCursor } from "server/crons/lib/timer-stream";
-import type { CronContext } from "server/middleware/context";
+import type { TimerStreamCursor } from "server/daemons/lib/timer-stream";
+import type { DaemonContext } from "server/middleware/context";
 
 import { timerStreamCursorFilter } from "./lib/timer-stream";
 import { toWorkflowRunState } from "./state-transition";
@@ -121,7 +121,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 			return row as Omit<typeof row, "state"> & { state: WorkflowRunState };
 		},
 
-		async listByIdsAndStatus(_context: CronContext, ids: NonEmptyArray<string>, status: WorkflowRunStatus) {
+		async listByIdsAndStatus(_context: DaemonContext, ids: NonEmptyArray<string>, status: WorkflowRunStatus) {
 			return db
 				.select({
 					id: workflowRun.id,
@@ -300,7 +300,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		},
 
 		async listDueScheduleRuns(
-			_context: CronContext,
+			_context: DaemonContext,
 			before: Date,
 			limit: number,
 			cursor?: TimerStreamCursor
@@ -329,7 +329,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		},
 
 		async listSleepElapsedRuns(
-			_context: CronContext,
+			_context: DaemonContext,
 			before: Date,
 			limit: number,
 			cursor?: TimerStreamCursor
@@ -358,7 +358,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		},
 
 		async listRetryableRuns(
-			_context: CronContext,
+			_context: DaemonContext,
 			before: Date,
 			limit: number,
 			cursor?: TimerStreamCursor
@@ -387,7 +387,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		},
 
 		async listEventWaitTimedOutRuns(
-			_context: CronContext,
+			_context: DaemonContext,
 			before: Date,
 			limit: number,
 			cursor?: TimerStreamCursor
@@ -416,7 +416,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 		},
 
 		async listChildRunWaitTimedOutRuns(
-			_context: CronContext,
+			_context: DaemonContext,
 			before: Date,
 			limit: number,
 			cursor?: TimerStreamCursor

@@ -2,7 +2,7 @@ import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "lib/dist/array";
 import type { Repositories } from "server/infra/db/types";
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
-import type { CronContext } from "server/middleware/context";
+import type { DaemonContext } from "server/middleware/context";
 
 import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
 
@@ -17,7 +17,7 @@ const advanceOutboxCursor = createTimerStreamCursorAdvancer<{ id: string; update
 });
 
 export async function republishStaleRuns(
-	context: CronContext,
+	context: DaemonContext,
 	deps: RepublishStaleRuns,
 	options?: { claimMinIdleTimeMs?: number; limit?: number }
 ) {

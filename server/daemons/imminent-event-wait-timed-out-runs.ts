@@ -3,6 +3,7 @@ import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRunState, WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type { WorkflowRunMeta } from "server/infra/db/pg/repository/workflow-run";
 import type {
+	EventWaitQueueRowInsert,
 	Repositories,
 	StateTransitionRowInsert,
 	WorkflowRow,
@@ -11,23 +12,26 @@ import type {
 import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
 import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
 import { runConcurrently } from "server/lib/concurrency";
-import type { CronContext } from "server/middleware/context";
+import type { DaemonContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
 import { streamTimers } from "./lib/timer-stream";
 import { publishRuns } from "./publish-ready-runs";
 
-type Repos = Pick<Repositories, "workflowRun" | "workflow" | "stateTransition" | "workflowRunOutbox" | "transaction">;
+type Repos = Pick<
+	Repositories,
+	"workflowRun" | "stateTransition" | "eventWaitQueue" | "workflow" | "workflowRunOutbox" | "transaction"
+>;
 
-export interface ProcessImminentScheduledRunsDeps {
+export interface ProcessImminentEventWaitTimedOutRunsDeps {
 	repos: Repos;
 	workflowRunPublisher?: WorkflowRunPublisher;
 	timerSortedSet?: TimerSortedSet;
 }
 
-export async function processImminentScheduledRuns(
-	context: CronContext,
-	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentScheduledRunsDeps,
+export async function processImminentEventWaitTimedOutRuns(
+	context: DaemonContext,
+	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentEventWaitTimedOutRunsDeps,
 	options?: { limit?: number; imminenceThresholdMs?: number }
 ) {
 	const { limit = 1_000, imminenceThresholdMs = 5_000 } = options ?? {};
@@ -35,16 +39,16 @@ export async function processImminentScheduledRuns(
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
-		(cursor) => repos.workflowRun.listDueScheduleRuns(context, dueBefore, limit, cursor),
+		(cursor) => repos.workflowRun.listEventWaitTimedOutRuns(context, dueBefore, limit, cursor),
 		(chunk) => chunk.length < limit
 	)) {
 		if (isNonEmptyArray(runsDueNow)) {
-			await queueScheduledRuns(context, repos, workflowRunPublisher, runsDueNow);
+			await queueEventWaitTimedOutRuns(context, repos, workflowRunPublisher, runsDueNow);
 		}
 
 		if (timerSortedSet && isNonEmptyArray(runsDueSoon)) {
 			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
-				type: "scheduled",
+				type: "event_wait_timeout",
 				id: run.id,
 				dueAt: run.dueAt.getTime(),
 			}));
@@ -55,8 +59,8 @@ export async function processImminentScheduledRuns(
 	}
 }
 
-export async function queueScheduledRuns(
-	context: CronContext,
+export async function queueEventWaitTimedOutRuns(
+	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<WorkflowRunMeta>,
@@ -93,13 +97,16 @@ export async function queueScheduledRuns(
 }
 
 async function processChunk(
-	context: CronContext,
+	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
 	runs: NonEmptyArray<WorkflowRunMeta>,
 	stateTransitionsById: Map<string, { id: string; state: unknown }>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
+	const timedOutAt = new Date();
+
+	const eventWaitEntries: EventWaitQueueRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -116,12 +123,20 @@ async function processChunk(
 			continue;
 		}
 		const fromState = transition.state as WorkflowRunState;
-		if (fromState.status !== "scheduled") {
+		if (fromState.status !== "awaiting_event") {
 			continue;
 		}
 
+		eventWaitEntries.push({
+			id: ulid(),
+			workflowRunId: run.id,
+			name: fromState.eventName,
+			status: "timeout",
+			timedOutAt,
+		});
+
 		const stateTransitionId = ulid();
-		const toState: WorkflowRunStateQueued = { status: "queued", reason: fromState.reason };
+		const toState: WorkflowRunStateQueued = { status: "queued", reason: "event" };
 		stateTransitionEntries.push({
 			id: stateTransitionId,
 			workflowRunId: run.id,
@@ -139,6 +154,7 @@ async function processChunk(
 				stateTransitionId,
 			},
 		});
+
 		outboxEntries.push({
 			id: ulid(),
 			namespaceId: run.namespaceId,
@@ -150,13 +166,18 @@ async function processChunk(
 		});
 	}
 
-	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(workflowRunUpdates)) {
+	if (
+		!isNonEmptyArray(eventWaitEntries) ||
+		!isNonEmptyArray(stateTransitionEntries) ||
+		!isNonEmptyArray(workflowRunUpdates)
+	) {
 		return;
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
+		await txRepos.eventWaitQueue.insert(eventWaitEntries);
 		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("scheduled", workflowRunUpdates);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("awaiting_event", workflowRunUpdates);
 		const transitionedRunIdsSet = new Set(transitionedRunIds);
 		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
 		if (!isNonEmptyArray(outboxEntriesToInsert)) {
