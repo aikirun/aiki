@@ -30,7 +30,7 @@ export async function processImminentScheduledRuns(
 	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentScheduledRunsDeps,
 	options?: { limit?: number; imminenceThresholdMs?: number }
 ) {
-	const { limit = 1_000, imminenceThresholdMs = 2_000 } = options ?? {};
+	const { limit = 1_000, imminenceThresholdMs = 5_000 } = options ?? {};
 
 	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
 
