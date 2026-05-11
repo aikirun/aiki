@@ -55,7 +55,12 @@ function initCron<Deps, Options>(
 		{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
 		{
 			abortSignal: signal,
-			onError: (err) => logger.error({ err }, `Cron ${name} failed`),
+			onError: (err) => {
+				if (signal.aborted) {
+					return;
+				}
+				logger.error({ err }, `Cron ${name} failed`);
+			},
 		}
 	).run();
 
