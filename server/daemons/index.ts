@@ -67,37 +67,37 @@ function initDaemon<Deps, Options>(
 
 export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 	const daemons = [
-		initDaemon(logger, 2_000, processImminentScheduledRuns, {
+		initDaemon(logger, 1_000, processImminentScheduledRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initDaemon(logger, 2_000, processImminentSleepElapsedRuns, {
+		initDaemon(logger, 1_000, processImminentSleepElapsedRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initDaemon(logger, 2_000, processImminentRetryableRuns, {
+		initDaemon(logger, 1_000, processImminentRetryableRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initDaemon(logger, 2_000, processImminentRetryableTaskRuns, {
+		initDaemon(logger, 1_000, processImminentRetryableTaskRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initDaemon(logger, 2_000, processImminentEventWaitTimedOutRuns, {
+		initDaemon(logger, 1_000, processImminentEventWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initDaemon(logger, 2_000, processImminentChildRunWaitTimedOutRuns, {
+		initDaemon(logger, 1_000, processImminentChildRunWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerSortedSet: deps.timerSortedSet,
 		}),
-		initDaemon(logger, 2_000, processImminentRecurringWorkflows, {
+		initDaemon(logger, 1_000, processImminentRecurringWorkflows, {
 			repos: deps.repos,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
