@@ -129,6 +129,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private pendingWorkflowRunIds = new Set<string>();
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 	private lastServerHeartbeatByRunId = new Map<string, number>();
+	private stopPromise: Promise<void> | undefined;
 
 	constructor(
 		private readonly client: Client<AppContext>,
@@ -187,7 +188,14 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		});
 	}
 
-	public async stop(): Promise<void> {
+	public stop(): Promise<void> {
+		if (!this.stopPromise) {
+			this.stopPromise = this._stop();
+		}
+		return this.stopPromise;
+	}
+
+	private async _stop(): Promise<void> {
 		this.logger.info("Worker stopping");
 
 		this.abortController?.abort();

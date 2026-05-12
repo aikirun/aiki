@@ -181,12 +181,18 @@ if (import.meta.main) {
 		fetch: async (request) => withCorsHeaders(request, new Response("Not Found", { status: 404 })),
 	});
 
-	const shutdown = async () => {
-		await daemons.shutdown();
-		if (redis) {
-			await redis.quit();
+	let shutdownPromise: Promise<void> | undefined;
+	const shutdown = () => {
+		if (!shutdownPromise) {
+			shutdownPromise = (async () => {
+				await daemons.shutdown();
+				if (redis) {
+					await redis.quit();
+				}
+				process.exit(0);
+			})();
 		}
-		process.exit(0);
+		return shutdownPromise;
 	};
 
 	process.on("SIGTERM", shutdown);

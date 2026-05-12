@@ -96,6 +96,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 		});
 
 		const queueNames = getWorkflowQueueNames(workflows, shards);
+		let closed = false;
 
 		return {
 			getNextDelay,
@@ -127,6 +128,10 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 				return batch;
 			},
 			async close(): Promise<void> {
+				if (closed) {
+					return;
+				}
+				closed = true;
 				redis.disconnect();
 			},
 		};
