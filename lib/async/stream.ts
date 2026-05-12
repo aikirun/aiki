@@ -7,22 +7,25 @@ export interface StreamChunksOptions<Item, Cursor> {
 	until?: (chunk: NonEmptyArray<Item>) => boolean;
 }
 
-export interface StreamChunkPartitionsOptions<Item, Cursor> extends StreamChunksOptions<Item, Cursor> {
-	partition: (item: Item) => boolean;
+export interface StreamChunkPartitionsOptions<Item, Cursor, ItemWhenTrue = Item, ItemWhenFalse = Item>
+	extends StreamChunksOptions<Item, Cursor> {
+	partition: (
+		item: Item
+	) => { meetsCondition: true; item: ItemWhenTrue } | { meetsCondition: false; item: ItemWhenFalse };
 }
 
 export function streamChunks<Item, Cursor>(
 	next: (cursor?: Cursor) => Item[] | Promise<Item[]>,
 	options: StreamChunksOptions<Item, Cursor>
 ): AsyncGenerator<NonEmptyArray<Item>>;
-export function streamChunks<Item, Cursor>(
+export function streamChunks<Item, Cursor, ItemWhenTrue = Item, ItemWhenFalse = Item>(
 	next: (cursor?: Cursor) => Item[] | Promise<Item[]>,
-	options: StreamChunkPartitionsOptions<Item, Cursor>
-): AsyncGenerator<{ whenTrue: Item[]; whenFalse: Item[] }>;
-export async function* streamChunks<Item, Cursor>(
+	options: StreamChunkPartitionsOptions<Item, Cursor, ItemWhenTrue, ItemWhenFalse>
+): AsyncGenerator<{ whenTrue: ItemWhenTrue[]; whenFalse: ItemWhenFalse[] }>;
+export async function* streamChunks<Item, Cursor, ItemWhenTrue = Item, ItemWhenFalse = Item>(
 	next: (cursor?: Cursor) => Item[] | Promise<Item[]>,
-	options: OptionalProp<StreamChunkPartitionsOptions<Item, Cursor>, "partition">
-): AsyncGenerator<NonEmptyArray<Item> | { whenTrue: Item[]; whenFalse: Item[] }> {
+	options: OptionalProp<StreamChunkPartitionsOptions<Item, Cursor, ItemWhenTrue, ItemWhenFalse>, "partition">
+): AsyncGenerator<NonEmptyArray<Item> | { whenTrue: ItemWhenTrue[]; whenFalse: ItemWhenFalse[] }> {
 	let cursor: Cursor | undefined;
 	const { advanceCursor, until, partition } = options;
 
@@ -34,13 +37,18 @@ export async function* streamChunks<Item, Cursor>(
 		}
 
 		if (partition) {
-			const whenTrue: Item[] = [];
-			const whenFalse: Item[] = [];
+			const whenTrue: ItemWhenTrue[] = [];
+			const whenFalse: ItemWhenFalse[] = [];
 			for (const item of chunk) {
 				if (advanceCursor) {
 					cursor = advanceCursor(cursor, item);
 				}
-				(partition(item) ? whenTrue : whenFalse).push(item);
+				const partitionResult = partition(item);
+				if (partitionResult.meetsCondition) {
+					whenTrue.push(partitionResult.item);
+				} else {
+					whenFalse.push(partitionResult.item);
+				}
 			}
 			yield { whenTrue, whenFalse };
 		} else {

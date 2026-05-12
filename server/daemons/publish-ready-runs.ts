@@ -1,18 +1,18 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { Repositories, WorkflowRunOutboxRowInsert } from "server/infra/db/types";
-import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "server/infra/messaging/redis-publisher";
+import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "server/infra/messaging/types";
 import type { DaemonContext } from "server/middleware/context";
 
-import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
+import { createRankStreamCursorAdvancer } from "./lib/rank-stream";
 
 export interface PublishReadyRunsDeps {
 	repos: Pick<Repositories, "workflowRunOutbox">;
 	workflowRunPublisher: WorkflowRunPublisher;
 }
 
-const advanceOutboxCursor = createTimerStreamCursorAdvancer<{ id: string; createdAt: Date }>({
-	getDueAt: (entry) => entry.createdAt,
+const advanceRankStreamCursor = createRankStreamCursorAdvancer<{ id: string; rank: number }>({
+	getRank: (entry) => entry.rank,
 	getId: (entry) => entry.id,
 });
 
@@ -26,7 +26,7 @@ export async function publishReadyRuns(
 	for await (const pendingEntries of streamChunks(
 		(cursor) => deps.repos.workflowRunOutbox.listPending(context, limit, cursor),
 		{
-			advanceCursor: advanceOutboxCursor,
+			advanceCursor: advanceRankStreamCursor,
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
@@ -48,6 +48,7 @@ export async function publishRuns(
 			id: entry.workflowRunId,
 			name: entry.workflowName,
 			versionId: entry.workflowVersionId,
+			rank: entry.rank,
 			shard: entry.shard ?? undefined,
 		});
 	}

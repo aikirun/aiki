@@ -67,20 +67,3 @@ export function shuffleArray<T>(array: readonly T[]): T[] {
 	}
 	return shuffledArray;
 }
-
-/**
- * Distributes a total size across an array of items using round-robin distribution
- * @param totalSize The total size to distribute
- * @param itemCount The number of items to distribute across
- * @returns Array of sizes for each item
- */
-export function distributeRoundRobin(totalSize: number, itemCount: number): number[] {
-	if (itemCount <= 0) return [];
-
-	const distribution = Array(itemCount).fill(0);
-	for (let i = 0; i < totalSize; i++) {
-		// biome-ignore lint/style/noNonNullAssertion: index exists
-		distribution[i % itemCount]!++;
-	}
-	return distribution;
-}

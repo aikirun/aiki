@@ -9,9 +9,9 @@ import type {
 	WorkflowRow,
 	WorkflowRunOutboxRowInsert,
 } from "server/infra/db/types";
-import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
-import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
+import type { TimerEntry, TimerSortedSet, WorkflowRunPublisher } from "server/infra/messaging/types";
 import { runConcurrently } from "server/lib/concurrency";
+import { computeRank, type Ranked } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
@@ -49,14 +49,30 @@ export async function processImminentRetryableTaskRuns(
 		{
 			advanceCursor: advanceTaskCursor,
 			until: (chunk) => chunk.length < limit,
-			partition: (task: { dueAt: Date }) => task.dueAt.getTime() <= now,
+			partition: (task: { workflowRunId: string; dueAt: Date }) => ({
+				meetsCondition: task.dueAt.getTime() <= now,
+				item: task,
+			}),
 		}
 	)) {
 		if (isNonEmptyArray(tasksDueNow)) {
-			const runIds = tasksDueNow.map((task) => task.workflowRunId) as NonEmptyArray<string>;
-			const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds, "running");
-			if (isNonEmptyArray(runs)) {
-				await queueRetryableTaskRuns(context, repos, workflowRunPublisher, runs);
+			const runIds: string[] = [];
+			const rankByRunId = new Map<string, number>();
+			for (const { workflowRunId, dueAt } of tasksDueNow) {
+				runIds.push(workflowRunId);
+				rankByRunId.set(workflowRunId, computeRank(dueAt.getTime()));
+			}
+
+			const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds as NonEmptyArray<string>, "running");
+			const rankedRuns: Ranked<WorkflowRunMeta>[] = [];
+			for (const run of runs) {
+				const rank = rankByRunId.get(run.id);
+				if (rank !== undefined) {
+					rankedRuns.push({ ...run, rank });
+				}
+			}
+			if (isNonEmptyArray(rankedRuns)) {
+				await queueRetryableTaskRuns(context, repos, workflowRunPublisher, rankedRuns);
 			}
 		}
 
@@ -65,6 +81,7 @@ export async function processImminentRetryableTaskRuns(
 				type: "task_retry",
 				id: task.workflowRunId,
 				dueAt: task.dueAt.getTime(),
+				rank: computeRank(task.dueAt.getTime()),
 			}));
 			if (isNonEmptyArray(timers)) {
 				await timerSortedSet.add(timers);
@@ -79,7 +96,7 @@ export async function queueRetryableTaskRuns(
 	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
-	runs: NonEmptyArray<WorkflowRunMeta>,
+	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	options?: { chunkSize?: number }
 ) {
 	const { chunkSize = runs.length } = options ?? {};
@@ -104,7 +121,7 @@ async function processChunk(
 	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
-	runs: NonEmptyArray<WorkflowRunMeta>,
+	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -145,6 +162,7 @@ async function processChunk(
 			workflowName: workflow.name,
 			workflowVersionId: workflow.versionId,
 			shard: (run.options as WorkflowStartOptions | null)?.shard,
+			rank: run.rank,
 			status: "pending",
 		});
 	}

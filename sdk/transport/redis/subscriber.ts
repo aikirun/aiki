@@ -1,7 +1,5 @@
-import { getWorkerConsumerGroupName, getWorkflowStreamName } from "@aikirun/lib/address";
-import { distributeRoundRobin, isNonEmptyArray, type NonEmptyArray, shuffleArray } from "@aikirun/lib/array";
+import { isNonEmptyArray, shuffleArray } from "@aikirun/lib/array";
 import { getRetryParams } from "@aikirun/lib/retry";
-import type { Logger } from "@aikirun/types/logger";
 import type {
 	CreateSubscriber,
 	Subscriber,
@@ -11,7 +9,6 @@ import type {
 } from "@aikirun/types/subscriber";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
-import { type } from "arktype";
 import { Redis } from "ioredis";
 
 export interface RedisSubscriberParams {
@@ -26,90 +23,55 @@ export interface RedisSubscriberOptions {
 	maxRetriesPerRequest?: number;
 	retryDelayOnFailoverMs?: number;
 	connectTimeoutMs?: number;
-	intervalMs?: number;
 	maxRetryIntervalMs?: number;
-	atCapacityIntervalMs?: number;
-	blockTimeMs?: number;
-	claimMinIdleTimeMs?: number;
-}
-
-interface StreamMessageMeta {
-	stream: string;
-	messageId: string;
-	consumerGroup: string;
-}
-
-interface StreamMessage {
-	data: { workflowRunId: WorkflowRunId };
-	meta: StreamMessageMeta;
 }
 
 /**
- * Redis stream entries structure returned by XREADGROUP command:
- * [
- *   [
- *     "stream-1",
- *     [
- *       [
- *         "message-1",
- *         [
- *   	       "version", 1,
- *           "type", "workflow_run_ready",
- *           "workflowRunId", "1a0dd834-e0a7-4170-b357-a9ce2564900c"
- *         ]
- *       ],
- *       [
- *         "message-2",
- *         [
- *           "version", 1,
- *           "type", "workflow_run_ready",
- *           "workflowRunId", "0bd81dd8-0bbb-4703-9455-afb199979acd"
- *         ]
- *       ]
- *     ]
- *   ]
- * ]
+ * Pop items from multiple sorted sets in round-robin fashion.
+ * KEYS: sorted set keys to pop from
+ * ARGV[1]: total capacity to fill
+ * Returns: flat array of workflowRunIds
  */
-const streamEntriesSchema = type(["string", type(["string", "unknown[]"]).array()]).array();
+const ROUND_ROBIN_ZPOPMIN_SCRIPT = `
+local capacity = tonumber(ARGV[1])
+local results = {}
+local keyCount = #KEYS
+local emptyKeys = {}
+local emptyKeyCount = 0
 
-const rawStreamMessageFieldsToRecord = (rawFields: unknown[]): Record<string, unknown> => {
-	const data: Record<string, unknown> = {};
-	for (let i = 0; i < rawFields.length; i += 2) {
-		if (i + 1 < rawFields.length) {
-			const key = rawFields[i];
-			if (typeof key === "string") {
-				data[key] = rawFields[i + 1];
-			}
-		}
-	}
-	return data;
-};
+while #results < capacity and emptyKeyCount < keyCount do
+  for i = 1, keyCount do
+    if #results >= capacity then
+      break
+    end
+    if not emptyKeys[i] then
+      local item = redis.call('ZPOPMIN', KEYS[i])
+      if #item == 0 then
+        emptyKeys[i] = true
+        emptyKeyCount = emptyKeyCount + 1
+      else
+        results[#results + 1] = item[1]
+      end
+    end
+  end
+end
 
-const streamMessageDataSchema = type({
-	type: "'workflow_run_ready'",
-	workflowRunId: "string > 0",
-});
-
-const streamPendingMessagesSchema = type(["string", "string", "number", "number"]).array();
+return results
+`;
 
 export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber {
 	const { options } = params;
-	const intervalMs = options?.intervalMs ?? 50;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
-	const atCapacityIntervalMs = options?.atCapacityIntervalMs ?? 50;
-	const blockTimeMs = options?.blockTimeMs ?? 1_000;
-	const claimMinIdleTimeMs = options?.claimMinIdleTimeMs ?? 90_000;
 
-	const getNextDelay = (params: SubscriberDelayParams) => {
-		switch (params.type) {
-			case "found_work":
+	const getNextDelay = (delayParams: SubscriberDelayParams) => {
+		switch (delayParams.type) {
 			case "no_work":
-				return intervalMs;
+				return 0;
 			case "retry": {
-				const retryParams = getRetryParams(params.attemptNumber, {
+				const retryParams = getRetryParams(delayParams.attemptNumber, {
 					type: "jittered",
 					maxAttempts: Number.POSITIVE_INFINITY,
-					baseDelayMs: intervalMs,
+					baseDelayMs: 1_000,
 					maxDelayMs: maxRetryIntervalMs,
 				});
 				if (!retryParams.retriesLeft) {
@@ -117,15 +79,13 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 				}
 				return retryParams.delayMs;
 			}
-			case "at_capacity":
-				return atCapacityIntervalMs;
 			default:
-				return params satisfies never;
+				return delayParams satisfies never;
 		}
 	};
 
-	return async (context: SubscriberContext): Promise<Subscriber> => {
-		const { workerId, workflows, shards, logger: parentLogger } = context;
+	return (context: SubscriberContext): Subscriber => {
+		const { workflows, shards } = context;
 
 		const redis = new Redis({
 			host: params.host,
@@ -136,84 +96,36 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			connectTimeout: options?.connectTimeoutMs,
 		});
 
-		const logger = parentLogger.child({
-			"aiki.subscriber": "redis",
-		});
-
-		const streamConsumerGroupMap = getRedisStreamConsumerGroupMap(workflows, shards);
-		const streams = Array.from(streamConsumerGroupMap.keys());
-
-		for (const [stream, consumerGroup] of streamConsumerGroupMap) {
-			try {
-				await redis.xgroup("CREATE", stream, consumerGroup, "0", "MKSTREAM");
-			} catch (error) {
-				if (!(error as Error).message?.includes("BUSYGROUP")) {
-					throw error;
-				}
-			}
-		}
-
-		const pendingMessageMetaByWorkflowRunId = new Map<WorkflowRunId, StreamMessageMeta>();
+		const queueNames = getWorkflowQueueNames(workflows, shards);
 
 		return {
 			getNextDelay,
 			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
-				const messages = await fetchRedisStreamMessages(
-					redis,
-					logger.child({ "aiki.workerId": workerId }),
-					streams,
-					streamConsumerGroupMap,
-					workerId,
-					size,
-					blockTimeMs,
-					claimMinIdleTimeMs
-				);
-
-				const batches: WorkflowRunBatch[] = [];
-				for (const message of messages) {
-					pendingMessageMetaByWorkflowRunId.set(message.data.workflowRunId, message.meta);
-					batches.push({ data: message.data });
+				const shuffledQueueNames = shuffleArray(queueNames);
+				const firstItem = (await redis.bzpopmin(...shuffledQueueNames, 0)) as
+					| [key: string, member: WorkflowRunId, score: string]
+					| null;
+				if (firstItem === null) {
+					return [];
 				}
 
-				return batches;
-			},
-			async heartbeat(workflowRunId: WorkflowRunId): Promise<void> {
-				const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
-				if (!meta) {
-					return;
-				}
-				await redis.xclaim(meta.stream, meta.consumerGroup, workerId, 0, meta.messageId, "JUSTID");
-				logger.debug("Heartbeat sent");
-			},
-			async acknowledge(workflowRunId: WorkflowRunId): Promise<void> {
-				const meta = pendingMessageMetaByWorkflowRunId.get(workflowRunId);
-				if (!meta) {
-					return;
-				}
-				try {
-					const result = await redis.xack(meta.stream, meta.consumerGroup, meta.messageId);
+				const batch: WorkflowRunBatch[] = [{ data: { workflowRunId: firstItem[1] } }];
 
-					if (result === 0) {
-						logger.warn("Message already acknowledged", {
-							"aiki.workerId": workerId,
-							"aiki.workflowRunId": workflowRunId,
-						});
-					} else {
-						logger.debug("Message acknowledged", {
-							"aiki.workerId": workerId,
-							"aiki.workflowRunId": workflowRunId,
-						});
+				const remainingCapacity = size - 1;
+				if (remainingCapacity > 0) {
+					const workflowRunIds = (await redis.eval(
+						ROUND_ROBIN_ZPOPMIN_SCRIPT,
+						queueNames.length,
+						...queueNames,
+						remainingCapacity
+					)) as WorkflowRunId[];
+
+					for (const workflowRunId of workflowRunIds) {
+						batch.push({ data: { workflowRunId: workflowRunId } });
 					}
-				} catch (error) {
-					logger.error("Failed to acknowledge message", {
-						"aiki.workerId": workerId,
-						"aiki.workflowRunId": workflowRunId,
-						"aiki.error": error instanceof Error ? error.message : String(error),
-					});
-					throw error;
-				} finally {
-					pendingMessageMetaByWorkflowRunId.delete(workflowRunId);
 				}
+
+				return batch;
 			},
 			async close(): Promise<void> {
 				redis.disconnect();
@@ -222,327 +134,16 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 	};
 }
 
-function getRedisStreamConsumerGroupMap(workflows: WorkflowMeta[], shards?: string[]): Map<string, string> {
-	if (!shards || !isNonEmptyArray(shards)) {
-		return new Map(
-			workflows.map((workflow) => [
-				getWorkflowStreamName(workflow.name, workflow.versionId),
-				getWorkerConsumerGroupName(workflow.name, workflow.versionId),
-			])
-		);
+function getWorkflowQueueNames(workflows: WorkflowMeta[], shards?: string[]): string[] {
+	if (!isNonEmptyArray(shards)) {
+		return workflows.map((workflow) => getWorkflowQueueName(workflow.name, workflow.versionId));
 	}
 
-	return new Map(
-		workflows.flatMap((workflow) =>
-			shards.map((shard) => [
-				getWorkflowStreamName(workflow.name, workflow.versionId, shard),
-				getWorkerConsumerGroupName(workflow.name, workflow.versionId, shard),
-			])
-		)
+	return workflows.flatMap((workflow) =>
+		shards.map((shard) => getWorkflowQueueName(workflow.name, workflow.versionId, shard))
 	);
 }
 
-// TODO:
-// - attempt to claim stuck messages before fething newer ones
-// - instead of processing streams randomly, try to prioritise I/O bound streams over CPU hogs
-async function fetchRedisStreamMessages(
-	redis: Redis,
-	logger: Logger,
-	streams: string[],
-	streamConsumerGroupMap: Map<string, string>,
-	workerId: string,
-	size: number,
-	blockTimeMs: number,
-	claimMinIdleTimeMs: number
-): Promise<StreamMessage[]> {
-	if (!isNonEmptyArray(streams)) {
-		return [];
-	}
-
-	const perStreamBlockTimeMs = Math.max(50, Math.floor(blockTimeMs / streams.length));
-
-	const batchSizePerStream = distributeRoundRobin(size, streams.length);
-	const shuffledStreams = shuffleArray(streams);
-
-	const streamEntries: unknown[] = [];
-	for (let i = 0; i < shuffledStreams.length; i++) {
-		const stream = shuffledStreams[i];
-		if (!stream) {
-			continue;
-		}
-
-		const streamBatchSize = batchSizePerStream[i];
-		if (!streamBatchSize || streamBatchSize === 0) {
-			continue;
-		}
-
-		const consumerGroup = streamConsumerGroupMap.get(stream);
-		if (!consumerGroup) {
-			continue;
-		}
-
-		try {
-			const result = await redis.xreadgroup(
-				"GROUP",
-				consumerGroup,
-				workerId,
-				"COUNT",
-				streamBatchSize,
-				"BLOCK",
-				perStreamBlockTimeMs,
-				"STREAMS",
-				stream,
-				">"
-			);
-			if (result) {
-				streamEntries.push(result);
-			}
-		} catch (error) {
-			logger.error("XREADGROUP failed", {
-				"aiki.stream": stream,
-				"aiki.error": error instanceof Error ? error.message : String(error),
-			});
-		}
-	}
-
-	const workflowRuns = isNonEmptyArray(streamEntries)
-		? await processRedisStreamMessages(redis, logger, streamConsumerGroupMap, streamEntries)
-		: [];
-
-	const remainingCapacity = size - workflowRuns.length;
-	if (remainingCapacity > 0 && claimMinIdleTimeMs > 0) {
-		const claimedWorkflowRuns = await claimStuckRedisStreamMessages(
-			redis,
-			logger,
-			shuffledStreams,
-			streamConsumerGroupMap,
-			workerId,
-			remainingCapacity,
-			claimMinIdleTimeMs
-		);
-		for (const workflowRun of claimedWorkflowRuns) {
-			workflowRuns.push(workflowRun);
-		}
-	}
-
-	return workflowRuns;
-}
-
-async function processRedisStreamMessages(
-	redis: Redis,
-	logger: Logger,
-	streamConsumerGroupMap: Map<string, string>,
-	streamsEntries: NonEmptyArray<unknown>
-): Promise<StreamMessage[]> {
-	const workflowRuns: StreamMessage[] = [];
-	for (const streamEntriesRaw of streamsEntries) {
-		logger.debug("Raw stream entries", { "aiki.entries": streamEntriesRaw });
-
-		const streamEntriesResult = streamEntriesSchema(streamEntriesRaw);
-		if (streamEntriesResult instanceof type.errors) {
-			logger.error("Invalid stream entries format", {
-				"aiki.error": streamEntriesResult.summary,
-			});
-			continue;
-		}
-
-		for (const streamEntry of streamEntriesResult) {
-			const [stream, messages] = streamEntry;
-
-			const consumerGroup = streamConsumerGroupMap.get(stream);
-			if (!consumerGroup) {
-				logger.error("No consumer group found for stream", {
-					"aiki.stream": stream,
-				});
-				continue;
-			}
-
-			for (const [messageId, rawFields] of messages) {
-				const rawMessageData = rawStreamMessageFieldsToRecord(rawFields);
-				const messageData = streamMessageDataSchema(rawMessageData);
-				if (messageData instanceof type.errors) {
-					logger.warn("Invalid message structure", {
-						"aiki.stream": stream,
-						"aiki.error": messageData.summary,
-					});
-					await redis.xack(stream, consumerGroup, messageId);
-					continue;
-				}
-
-				switch (messageData.type) {
-					case "workflow_run_ready": {
-						const workflowRunId = messageData.workflowRunId as WorkflowRunId;
-						workflowRuns.push({
-							data: { workflowRunId },
-							meta: {
-								stream,
-								messageId,
-								consumerGroup,
-							},
-						});
-						break;
-					}
-					default:
-						messageData.type satisfies never;
-						continue;
-				}
-			}
-		}
-	}
-
-	return workflowRuns;
-}
-
-async function claimStuckRedisStreamMessages(
-	redis: Redis,
-	logger: Logger,
-	shuffledStreams: string[],
-	streamConsumerGroupMap: Map<string, string>,
-	workerId: string,
-	maxClaim: number,
-	minIdleMs: number
-): Promise<StreamMessage[]> {
-	if (maxClaim <= 0 || minIdleMs <= 0) {
-		return [];
-	}
-
-	const claimaibleMessagesByStream = await findClaimableMessagesByStream(
-		redis,
-		logger,
-		shuffledStreams,
-		streamConsumerGroupMap,
-		workerId,
-		maxClaim,
-		minIdleMs
-	);
-	if (!claimaibleMessagesByStream.size) {
-		return [];
-	}
-
-	const claimPromises = Array.from(claimaibleMessagesByStream.entries()).map(async ([stream, messageIds]) => {
-		if (!messageIds.length) {
-			return null;
-		}
-
-		const consumerGroup = streamConsumerGroupMap.get(stream);
-		if (!consumerGroup) {
-			return null;
-		}
-
-		try {
-			const claimedMessages = await redis.xclaim(stream, consumerGroup, workerId, minIdleMs, ...messageIds);
-			return { stream, claimedMessages };
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-
-			if (errorMessage.includes("NOGROUP")) {
-				logger.warn("Consumer group does not exist for stream, skipping claim operation", {
-					"aiki.stream": stream,
-					"aiki.consumerGroup": consumerGroup,
-				});
-			} else if (errorMessage.includes("BUSYGROUP")) {
-				logger.warn("Consumer group busy for stream, skipping claim operation", {
-					"aiki.stream": stream,
-					"aiki.consumerGroup": consumerGroup,
-				});
-			} else if (errorMessage.includes("NOSCRIPT")) {
-				logger.warn("Redis script not loaded for stream, skipping claim operation", {
-					"aiki.stream": stream,
-					"aiki.consumerGroup": consumerGroup,
-				});
-			} else {
-				logger.error("Failed to claim messages from stream", {
-					"aiki.stream": stream,
-					"aiki.consumerGroup": consumerGroup,
-					"aiki.messageIds": messageIds.length,
-					"aiki.error": errorMessage,
-				});
-			}
-			return null;
-		}
-	});
-
-	const claimResults = await Promise.allSettled(claimPromises);
-
-	const claimedStreamEntries: [string, unknown][] = [];
-	for (const result of claimResults) {
-		if (result.status === "fulfilled" && result.value !== null) {
-			const { stream, claimedMessages } = result.value;
-			claimedStreamEntries.push([stream, claimedMessages]);
-		}
-	}
-
-	if (!isNonEmptyArray(claimedStreamEntries)) {
-		return [];
-	}
-	return processRedisStreamMessages(redis, logger, streamConsumerGroupMap, [claimedStreamEntries]);
-}
-
-async function findClaimableMessagesByStream(
-	redis: Redis,
-	logger: Logger,
-	shuffledStreams: string[],
-	streamConsumerGroupMap: Map<string, string>,
-	workerId: string,
-	maxClaim: number,
-	minIdleMs: number
-): Promise<Map<string, string[]>> {
-	const claimSizePerStream = distributeRoundRobin(maxClaim, shuffledStreams.length);
-	const pendingPromises: Promise<{ stream: string; result: unknown }>[] = [];
-	for (let i = 0; i < shuffledStreams.length; i++) {
-		const stream = shuffledStreams[i];
-		if (!stream) {
-			continue;
-		}
-
-		const claimSize = claimSizePerStream[i];
-		if (!claimSize || claimSize === 0) {
-			continue;
-		}
-
-		const consumerGroup = streamConsumerGroupMap.get(stream);
-		if (!consumerGroup) {
-			continue;
-		}
-
-		const readPromise = redis
-			.xpending(stream, consumerGroup, "IDLE", minIdleMs, "-", "+", claimSize)
-			.then((result) => ({ stream, result }));
-		pendingPromises.push(readPromise);
-	}
-
-	const pendingResults = await Promise.allSettled(pendingPromises);
-
-	const claimableMessagesByStream = new Map<string, string[]>();
-
-	for (const pendingResult of pendingResults) {
-		if (pendingResult.status !== "fulfilled") {
-			continue;
-		}
-
-		const { stream, result } = pendingResult.value;
-
-		const parsedResult = streamPendingMessagesSchema(result);
-		if (parsedResult instanceof type.errors) {
-			logger.error("Invalid XPENDING response", {
-				"aiki.stream": stream,
-				"aiki.error": parsedResult.summary,
-			});
-			continue;
-		}
-
-		const claimableStreamMessages = claimableMessagesByStream.get(stream) ?? [];
-
-		for (const [messageId, consumerName, _idleTimeMs, _deliveryCount] of parsedResult) {
-			if (consumerName !== workerId) {
-				claimableStreamMessages.push(messageId);
-			}
-		}
-
-		if (claimableStreamMessages.length) {
-			claimableMessagesByStream.set(stream, claimableStreamMessages);
-		}
-	}
-
-	return claimableMessagesByStream;
+function getWorkflowQueueName(name: string, versionId: string, shard?: string): string {
+	return shard ? `aiki:workflow:${name}:${versionId}:${shard}` : `aiki:workflow:${name}:${versionId}`;
 }

@@ -1,6 +1,6 @@
 import { httpSubscriber } from "@aikirun/http";
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
-import { delay } from "@aikirun/lib/async";
+import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
@@ -65,8 +65,8 @@ export interface WorkerDefinitionOptions {
 export interface WorkerSpawnOptions extends WorkerDefinitionOptions {
 	/**
 	 * Optional array of shards this worker should process.
-	 * When provided, the worker will only subscribe to sharded streams.
-	 * When omitted, the worker subscribes to default streams.
+	 * When provided, the worker will only subscribe to registered workflows within that shard.
+	 * When omitted, the worker subscribes to unsharded registered workflows.
 	 */
 	shards?: string[];
 	/**
@@ -125,6 +125,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private subscriber: Subscriber | undefined;
 	private fallbackSubscriber: Subscriber | undefined;
 	private subscriberLoopPromise: Promise<void> | undefined;
+	private availableCapacityLatch = createBinaryLatch();
+	private pendingWorkflowRunIds = new Set<string>();
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 	private lastServerHeartbeatByRunId = new Map<string, number>();
 
@@ -149,9 +151,14 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	}
 
 	async _start(): Promise<void> {
+		const workflows = this.registry.getAll();
+		if (!isNonEmptyArray(workflows)) {
+			throw new Error("No workflow registered");
+		}
+
 		const subscriberContext: SubscriberContext = {
 			workerId: this.id,
-			workflows: this.registry.getAll(),
+			workflows,
 			shards: this.spawnOptions.shards,
 			logger: this.logger,
 		};
@@ -159,13 +166,14 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		const createSubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
 		const subscriber = createSubscriber(subscriberContext);
 		this.subscriber = subscriber instanceof Promise ? await subscriber : subscriber;
-		if (this.subscriber.heartbeat) {
-			this.subscriber.heartbeat = this.withServerHeartbeatForwarding(this.subscriber.heartbeat);
-		}
+		this.subscriber.heartbeat = this.withServerHeartbeatForwarding(this.subscriber.heartbeat?.bind(this.subscriber));
 
 		const createFallbackSubscriber = httpSubscriber({ api: this.client.api });
 		const fallbackSubscriber = createFallbackSubscriber(subscriberContext);
 		this.fallbackSubscriber = fallbackSubscriber instanceof Promise ? await fallbackSubscriber : fallbackSubscriber;
+		this.fallbackSubscriber.heartbeat = this.withServerHeartbeatForwarding(
+			this.fallbackSubscriber.heartbeat?.bind(this.fallbackSubscriber)
+		);
 
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
@@ -179,11 +187,45 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		});
 	}
 
-	private withServerHeartbeatForwarding(heartbeat: (workflowRunId: WorkflowRunId) => Promise<void>) {
+	public async stop(): Promise<void> {
+		this.logger.info("Worker stopping");
+
+		this.abortController?.abort();
+		this.availableCapacityLatch.signal();
+
+		await this.subscriber?.close?.();
+		await this.fallbackSubscriber?.close?.();
+
+		await this.subscriberLoopPromise;
+
+		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
+		if (activeWorkflowRuns.length > 0) {
+			const timeoutMs = this.spawnOptions.gracefulShutdownTimeoutMs ?? 5_000;
+			if (timeoutMs > 0) {
+				await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
+			}
+
+			const stillActiveRuns = Array.from(this.activeWorkflowRunsById.values());
+			if (stillActiveRuns.length > 0) {
+				const ids = stillActiveRuns.map((w) => w.run.id).join(", ");
+				this.logger.warn("Worker shutdown with active workflows", {
+					"aiki.activeWorkflowRunIds": ids,
+				});
+			}
+		}
+
+		this.pendingWorkflowRunIds.clear();
+		this.activeWorkflowRunsById.clear();
+		this.lastServerHeartbeatByRunId.clear();
+	}
+
+	private withServerHeartbeatForwarding(heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>) {
 		const serverHeartbeatIntervalMs = 30_000;
 
 		return async (workflowRunId: WorkflowRunId) => {
-			await heartbeat(workflowRunId);
+			if (heartbeat) {
+				await heartbeat(workflowRunId);
+			}
 
 			const now = Date.now();
 			const lastServerHeartbeat = this.lastServerHeartbeatByRunId.get(workflowRunId) ?? 0;
@@ -192,38 +234,6 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				await this.client.api.workflowRun.heartbeatV1({ id: workflowRunId });
 			}
 		};
-	}
-
-	public async stop(): Promise<void> {
-		this.logger.info("Worker stopping");
-
-		this.abortController?.abort();
-
-		await this.subscriber?.close?.();
-		await this.fallbackSubscriber?.close?.();
-
-		await this.subscriberLoopPromise;
-
-		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
-		if (activeWorkflowRuns.length === 0) {
-			return;
-		}
-
-		const timeoutMs = this.spawnOptions.gracefulShutdownTimeoutMs ?? 5_000;
-		if (timeoutMs > 0) {
-			await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
-		}
-
-		const stillActiveRuns = Array.from(this.activeWorkflowRunsById.values());
-		if (stillActiveRuns.length > 0) {
-			const ids = stillActiveRuns.map((w) => w.run.id).join(", ");
-			this.logger.warn("Worker shutdown with active workflows", {
-				"aiki.activeWorkflowRunIds": ids,
-			});
-		}
-
-		this.activeWorkflowRunsById.clear();
-		this.lastServerHeartbeatByRunId.clear();
 	}
 
 	private async subscriberLoop(abortSignal: AbortSignal): Promise<void> {
@@ -246,9 +256,10 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				await delay(nextDelayMs, { abortSignal });
 			}
 
-			const availableCapacity = maxConcurrentWorkflowRuns - this.activeWorkflowRunsById.size;
+			const availableCapacity =
+				maxConcurrentWorkflowRuns - this.pendingWorkflowRunIds.size - this.activeWorkflowRunsById.size;
 			if (availableCapacity <= 0) {
-				nextDelayMs = activeSubscriber.getNextDelay({ type: "at_capacity" });
+				await this.availableCapacityLatch.wait();
 				continue;
 			}
 
@@ -269,13 +280,22 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			subscriberFailedAttempts = 0;
 			activeSubscriber = nextBatchResponse.subscriber;
 
-			if (!isNonEmptyArray(nextBatchResponse.batch)) {
+			const workflowRunIdsToEnqueue: WorkflowRunId[] = [];
+			for (const { data } of nextBatchResponse.batch) {
+				const { workflowRunId } = data;
+				if (!this.pendingWorkflowRunIds.has(workflowRunId) && !this.activeWorkflowRunsById.has(workflowRunId)) {
+					this.pendingWorkflowRunIds.add(workflowRunId);
+					workflowRunIdsToEnqueue.push(workflowRunId);
+				}
+			}
+
+			if (!isNonEmptyArray(workflowRunIdsToEnqueue)) {
 				nextDelayMs = activeSubscriber.getNextDelay({ type: "no_work" });
 				continue;
 			}
 
-			await this.enqueueWorkflowRunBatch(nextBatchResponse.batch, nextBatchResponse.subscriber, abortSignal);
-			nextDelayMs = activeSubscriber.getNextDelay({ type: "found_work" });
+			this.enqueueWorkflowRunBatch(workflowRunIdsToEnqueue, activeSubscriber, abortSignal);
+			nextDelayMs = 0;
 		}
 	}
 
@@ -315,63 +335,67 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 	}
 
-	private async enqueueWorkflowRunBatch(
-		batch: NonEmptyArray<WorkflowRunBatch>,
+	private enqueueWorkflowRunBatch(
+		workflowRunIds: NonEmptyArray<WorkflowRunId>,
 		subscriber: Subscriber,
 		abortSignal: AbortSignal
-	): Promise<void> {
-		for (const { data } of batch) {
-			const { workflowRunId } = data;
-			if (this.activeWorkflowRunsById.has(workflowRunId)) {
-				this.logger.info("Workflow already running", {
-					"aiki.workflowRunId": workflowRunId,
-				});
-				continue;
-			}
+	): void {
+		const enqueue = async () => {
+			for (const workflowRunId of workflowRunIds) {
+				if (abortSignal.aborted) {
+					return;
+				}
 
-			// TODO: maybe load multiple workflows in one request
-			let workflowRun: WorkflowRun | undefined;
-			try {
-				const response = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
-				workflowRun = response.run;
-			} catch (error) {
-				this.logger.warn("Failed to fetch workflow run", {
-					"aiki.workflowRunId": workflowRunId,
+				// TODO: maybe load multiple workflows in one request
+				let workflowRun: WorkflowRun | undefined;
+				try {
+					const response = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
+					workflowRun = response.run;
+				} catch (error) {
+					this.logger.warn("Failed to fetch workflow run", {
+						"aiki.workflowRunId": workflowRunId,
+						"aiki.error": error instanceof Error ? error.message : String(error),
+					});
+					this.pendingWorkflowRunIds.delete(workflowRunId);
+					this.availableCapacityLatch.signal();
+					continue;
+				}
+
+				if (abortSignal.aborted) {
+					return;
+				}
+
+				const workflowVersion = this.registry.get(
+					workflowRun.name as WorkflowName,
+					workflowRun.versionId as WorkflowVersionId
+				);
+				if (!workflowVersion) {
+					this.logger.warn("Workflow version not found", {
+						"aiki.workflowName": workflowRun.name,
+						"aiki.workflowVersionId": workflowRun.versionId,
+						"aiki.workflowRunId": workflowRun.id,
+					});
+					this.pendingWorkflowRunIds.delete(workflowRunId);
+					this.availableCapacityLatch.signal();
+					continue;
+				}
+
+				this.pendingWorkflowRunIds.delete(workflowRunId);
+				const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber, abortSignal);
+				this.activeWorkflowRunsById.set(workflowRun.id, {
+					run: workflowRun,
+					executionPromise: workflowExecutionPromise,
+				});
+			}
+		};
+
+		enqueue().catch((error) => {
+			if (!abortSignal.aborted) {
+				this.logger.error("Error enqueuing workflow run batch", {
 					"aiki.error": error instanceof Error ? error.message : String(error),
 				});
-				if (subscriber.acknowledge) {
-					await subscriber.acknowledge(workflowRunId).catch(() => {});
-				}
-				continue;
 			}
-
-			const workflowVersion = this.registry.get(
-				workflowRun.name as WorkflowName,
-				workflowRun.versionId as WorkflowVersionId
-			);
-			if (!workflowVersion) {
-				this.logger.warn("Workflow version not found", {
-					"aiki.workflowName": workflowRun.name,
-					"aiki.workflowVersionId": workflowRun.versionId,
-					"aiki.workflowRunId": workflowRun.id,
-				});
-				if (subscriber.acknowledge) {
-					await subscriber.acknowledge(workflowRunId).catch(() => {});
-				}
-				continue;
-			}
-
-			if (abortSignal.aborted) {
-				break;
-			}
-
-			const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber, abortSignal);
-
-			this.activeWorkflowRunsById.set(workflowRun.id, {
-				run: workflowRun,
-				executionPromise: workflowExecutionPromise,
-			});
-		}
+		});
 	}
 
 	private async executeWorkflow(
@@ -417,14 +441,13 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 						}
 					}
 				} else {
-					logger.debug("Message left pending for retry");
+					logger.debug("Message not acknowledged");
 				}
 			}
 		} finally {
 			this.activeWorkflowRunsById.delete(workflowRunId);
-			if (subscriber.heartbeat) {
-				this.lastServerHeartbeatByRunId.delete(workflowRunId);
-			}
+			this.lastServerHeartbeatByRunId.delete(workflowRunId);
+			this.availableCapacityLatch.signal();
 		}
 	}
 }

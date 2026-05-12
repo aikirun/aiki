@@ -1,7 +1,7 @@
 {
 	"name": "@aikirun/redis",
 	"version": "0.26.0",
-	"description": "Redis transport for Aiki - high-performance work discovery via Redis Streams",
+	"description": "Redis transport for Aiki - high-performance work discovery via Redis Sorted Sets",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -19,8 +19,7 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"ioredis": "^5.4.1",
-		"arktype": "^2.1.29"
+		"ioredis": "^5.4.1"
 	},
 	"publishConfig": {
 		"access": "public"

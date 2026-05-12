@@ -16,8 +16,8 @@ import type {
 	WorkflowRunOutboxRowInsert,
 	WorkflowRunRowInsert,
 } from "server/infra/db/types";
-import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
-import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
+import type { TimerEntry, TimerSortedSet, WorkflowRunPublisher } from "server/infra/messaging/types";
+import { computeRank } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "server/service/schedule";
@@ -87,6 +87,7 @@ export async function processImminentRecurringWorkflows(
 					type: "recurring",
 					id: schedule.id,
 					dueAt: schedule.nextRunAt,
+					rank: computeRank(schedule.nextRunAt),
 				});
 			}
 			if (isNonEmptyArray(timers)) {
@@ -187,6 +188,7 @@ async function processOverlapAllowSchedules(
 				workflowRunId: runId,
 				workflowName: schedule.workflowName,
 				workflowVersionId: schedule.workflowVersionId,
+				rank: computeRank(occurrence),
 				shard: null,
 				status: "pending",
 			});
@@ -284,6 +286,7 @@ async function processOverlapSkipSchedules(
 			workflowRunId: runId,
 			workflowName: schedule.workflowName,
 			workflowVersionId: schedule.workflowVersionId,
+			rank: computeRank(occurrence),
 			shard: null,
 			status: "pending",
 		});
@@ -378,6 +381,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowRunId: runId,
 			workflowName: schedule.workflowName,
 			workflowVersionId: schedule.workflowVersionId,
+			rank: computeRank(occurrence),
 			shard: null,
 			status: "pending",
 		});

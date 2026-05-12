@@ -1,48 +1,18 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { Redis } from "ioredis";
 
-const PRIORITY_LEVELS = 10;
-const DEFAULT_PRIORITY = PRIORITY_LEVELS - 1;
-
-export type TimerType =
-	| "scheduled"
-	| "sleep"
-	| "retry"
-	| "task_retry"
-	| "event_wait_timeout"
-	| "child_wait_timeout"
-	| "recurring";
-
-export interface TimerEntry {
-	type: TimerType;
-	id: string;
-	dueAt: number;
-	priority?: number;
-}
-
-export interface DueTimer {
-	type: TimerType;
-	id: string;
-}
-
-export interface TimerSignalWaiter {
-	wait(timeoutSeconds: number): Promise<number>;
-	close(): Promise<void>;
-}
-
-function computeScore(timestampMs: number, priority: number = DEFAULT_PRIORITY): number {
-	return timestampMs * PRIORITY_LEVELS + priority;
-}
+import type { DueTimer, TimerEntry, TimerSignalWaiter, TimerSortedSet, TimerType } from "../types";
 
 function encodeMember(type: TimerType, id: string): string {
 	return `${type}:${id}`;
 }
 
-function decodeMember(member: string): DueTimer {
+function decodeMember(member: string, rank: number): DueTimer {
 	const colonIndex = member.indexOf(":");
 	return {
 		type: member.substring(0, colonIndex) as TimerType,
 		id: member.substring(colonIndex + 1),
+		rank,
 	};
 }
 
@@ -64,9 +34,13 @@ return 1
  * Atomically pops all entries with scores <= the given max score.
  */
 const POP_DUE_TIMERS_SCRIPT = `
-local due = redis.call('ZRANGEBYSCORE', KEYS[1], 0, ARGV[1], 'LIMIT', 0, ARGV[2])
+local due = redis.call('ZRANGEBYSCORE', KEYS[1], 0, ARGV[1], 'WITHSCORES', 'LIMIT', 0, ARGV[2])
 if #due > 0 then
-  redis.call('ZREM', KEYS[1], unpack(due))
+  local members = {}
+  for i = 1, #due, 2 do
+    members[#members + 1] = due[i]
+  end
+  redis.call('ZREM', KEYS[1], unpack(members))
 end
 return due
 `;
@@ -88,7 +62,7 @@ end
 return minSignal
 `;
 
-export function createTimerSortedSet(redis: Redis, key: string) {
+export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
 	const signalKey = `${key}:signal`;
 
 	return {
@@ -99,32 +73,34 @@ export function createTimerSortedSet(redis: Redis, key: string) {
 				if (timer.dueAt < minDueAt) {
 					minDueAt = timer.dueAt;
 				}
-				const score = computeScore(timer.dueAt, timer.priority);
 				const member = encodeMember(timer.type, timer.id);
-				args.push(score, member);
+				args.push(timer.rank, member);
 			}
 
 			await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minDueAt, ...args);
 		},
 
-		async popDue(before: number, limit: number): Promise<DueTimer[]> {
-			const maxScore = before * PRIORITY_LEVELS + (PRIORITY_LEVELS - 1);
-
-			const members = (await redis.eval(POP_DUE_TIMERS_SCRIPT, 1, key, maxScore, limit)) as string[];
-			if (members.length === 0) {
+		async popDue(maxRank: number, limit: number): Promise<DueTimer[]> {
+			const pairs = (await redis.eval(POP_DUE_TIMERS_SCRIPT, 1, key, maxRank, limit)) as string[];
+			if (pairs.length === 0) {
 				return [];
 			}
 
-			return members.map(decodeMember);
+			const result: DueTimer[] = [];
+			for (let i = 0; i + 1 < pairs.length; i += 2) {
+				const member = pairs[i] as string;
+				const rank = Number(pairs[i + 1]);
+				result.push(decodeMember(member, rank));
+			}
+			return result;
 		},
 
-		async peek(): Promise<number | null> {
+		async nextRank(): Promise<number | null> {
 			const result = await redis.zrangebyscore(key, "-inf", "+inf", "WITHSCORES", "LIMIT", 0, 1);
 			if (result.length < 2) {
 				return null;
 			}
-			const score = Number(result[1]);
-			return Math.floor(score / PRIORITY_LEVELS);
+			return Number(result[1]);
 		},
 
 		createSignalWaiter(): TimerSignalWaiter {
@@ -164,5 +140,3 @@ export function createTimerSortedSet(redis: Redis, key: string) {
 		},
 	};
 }
-
-export type TimerSortedSet = ReturnType<typeof createTimerSortedSet>;
