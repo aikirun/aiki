@@ -53,23 +53,25 @@ export function spawnDueTimersConsumer(
 
 	const timerSignalWaiter = deps.timerSortedSet.createSignalWaiter();
 
-	withRetry(
+	const promise = withRetry(
 		() => dueTimersConsumerLoop(logger, deps, timerSignalWaiter, abortSignal, options),
 		{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
-		{ abortSignal }
-	)
-		.run()
-		.catch((error) => {
-			if (!abortSignal.aborted) {
+		{
+			abortSignal,
+			onError: (error) => {
+				if (abortSignal.aborted) {
+					return;
+				}
 				logger.error({ error }, "Due timers consumer crashed unexpectedly");
-			}
-		})
-		.finally(() => timerSignalWaiter.close());
+			},
+		}
+	).run();
 
 	return {
 		async stop() {
 			abortController.abort();
 			await timerSignalWaiter.close();
+			await promise;
 		},
 	};
 }
