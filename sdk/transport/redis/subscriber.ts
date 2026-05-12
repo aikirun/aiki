@@ -20,8 +20,6 @@ export interface RedisSubscriberParams {
 }
 
 export interface RedisSubscriberOptions {
-	maxRetriesPerRequest?: number;
-	retryDelayOnFailoverMs?: number;
 	connectTimeoutMs?: number;
 	maxRetryIntervalMs?: number;
 }
@@ -92,7 +90,8 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			port: params.port,
 			password: params.password,
 			db: params.db,
-			maxRetriesPerRequest: options?.maxRetriesPerRequest,
+			maxRetriesPerRequest: 0,
+			enableOfflineQueue: false,
 			connectTimeout: options?.connectTimeoutMs,
 		});
 
