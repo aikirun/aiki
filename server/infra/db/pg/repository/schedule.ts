@@ -52,28 +52,23 @@ export function createScheduleRepository(db: PgDb) {
 		async bulkUpdateOccurrence(
 			entries: NonEmptyArray<{ id: string; lastOccurrence?: Date; nextRunAt: Date }>
 		): Promise<void> {
-			const ids: string[] = [];
-			const nextRunAtCaseFragments = [];
-			const lastOccurrenceCaseFragments = [];
-
-			for (const entry of entries) {
-				ids.push(entry.id);
-				nextRunAtCaseFragments.push(sql`WHEN ${entry.id} THEN ${entry.nextRunAt.toISOString()}::timestamptz`);
-				if (entry.lastOccurrence) {
-					lastOccurrenceCaseFragments.push(
-						sql`WHEN ${entry.id} THEN ${entry.lastOccurrence.toISOString()}::timestamptz`
-					);
+			const valueRows = entries.map((entry, index) => {
+				const lastOccurrenceIso = entry.lastOccurrence ? entry.lastOccurrence.toISOString() : null;
+				const nextRunAtIso = entry.nextRunAt.toISOString();
+				if (index === 0) {
+					return sql`(${entry.id}::text, ${nextRunAtIso}::timestamptz, ${lastOccurrenceIso}::timestamptz)`;
 				}
-			}
+				return sql`(${entry.id}, ${nextRunAtIso}, ${lastOccurrenceIso})`;
+			});
 
-			const updates: Record<string, unknown> = {
-				nextRunAt: sql`CASE ${schedule.id} ${sql.join(nextRunAtCaseFragments, sql` `)} END`,
-			};
-			if (lastOccurrenceCaseFragments.length > 0) {
-				updates.lastOccurrence = sql`CASE ${schedule.id} ${sql.join(lastOccurrenceCaseFragments, sql` `)} ELSE ${schedule.lastOccurrence} END`;
-			}
-
-			await db.update(schedule).set(updates).where(inArray(schedule.id, ids));
+			await db
+				.update(schedule)
+				.set({
+					nextRunAt: sql`v.next_run_at`,
+					lastOccurrence: sql`COALESCE(v.last_occurrence, ${schedule.lastOccurrence})`,
+				})
+				.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, next_run_at, last_occurrence)`)
+				.where(sql`${schedule.id} = v.id`);
 		},
 
 		async getByReferenceId(namespaceId: NamespaceId, referenceId: string): Promise<ScheduleRow | null> {

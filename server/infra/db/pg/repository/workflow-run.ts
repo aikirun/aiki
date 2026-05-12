@@ -454,13 +454,12 @@ export function createWorkflowRunRepository(db: PgDb) {
 				| "running",
 			runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>
 		): Promise<string[]> {
-			const orConditions = [];
-			const caseFragments = [];
-
-			for (const { filter, update } of runs) {
-				orConditions.push(sql`(${workflowRun.id} = ${filter.id} AND ${workflowRun.revision} = ${filter.revision})`);
-				caseFragments.push(sql`WHEN ${filter.id} THEN ${update.stateTransitionId}`);
-			}
+			const valueRows = runs.map(({ filter, update }, index) => {
+				if (index === 0) {
+					return sql`(${filter.id}::text, ${filter.revision}::integer, ${update.stateTransitionId}::text)`;
+				}
+				return sql`(${filter.id}, ${filter.revision}, ${update.stateTransitionId})`;
+			});
 
 			const result = await db
 				.update(workflowRun)
@@ -471,9 +470,16 @@ export function createWorkflowRunRepository(db: PgDb) {
 					awakeAt: null,
 					timeoutAt: null,
 					nextAttemptAt: null,
-					latestStateTransitionId: sql`CASE ${workflowRun.id} ${sql.join(caseFragments, sql` `)} END`,
+					latestStateTransitionId: sql`v.state_transition_id`,
 				})
-				.where(and(eq(workflowRun.status, fromStatus), or(...orConditions)))
+				.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, revision, state_transition_id)`)
+				.where(
+					and(
+						eq(workflowRun.status, fromStatus),
+						sql`${workflowRun.id} = v.id`,
+						sql`${workflowRun.revision} = v.revision`
+					)
+				)
 				.returning({ id: workflowRun.id });
 
 			return result.map((row) => row.id);
@@ -499,20 +505,20 @@ export function createWorkflowRunRepository(db: PgDb) {
 		async bulkSetLatestStateTransitionId(
 			runs: NonEmptyArray<{ id: string; stateTransitionId: string }>
 		): Promise<void> {
-			const ids: string[] = [];
-			const caseFragments = [];
-
-			for (const run of runs) {
-				ids.push(run.id);
-				caseFragments.push(sql`WHEN ${run.id} THEN ${run.stateTransitionId}`);
-			}
+			const valueRows = runs.map((run, index) => {
+				if (index === 0) {
+					return sql`(${run.id}::text, ${run.stateTransitionId}::text)`;
+				}
+				return sql`(${run.id}, ${run.stateTransitionId})`;
+			});
 
 			await db
 				.update(workflowRun)
 				.set({
-					latestStateTransitionId: sql`CASE ${workflowRun.id} ${sql.join(caseFragments, sql` `)} END`,
+					latestStateTransitionId: sql`v.state_transition_id`,
 				})
-				.where(inArray(workflowRun.id, ids));
+				.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, state_transition_id)`)
+				.where(sql`${workflowRun.id} = v.id`);
 		},
 
 		async getRunCount(scheduleId: string): Promise<number> {
