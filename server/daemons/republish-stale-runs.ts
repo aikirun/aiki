@@ -1,7 +1,7 @@
+import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
-import type { NonEmptyArray } from "lib/dist/array";
 import type { Repositories } from "server/infra/db/types";
-import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
+import type { WorkflowRunPublisher } from "server/infra/messaging/types";
 import type { DaemonContext } from "server/middleware/context";
 
 import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
@@ -38,6 +38,7 @@ export async function republishStaleRuns(
 				id: entry.workflowRunId,
 				name: entry.workflowName,
 				versionId: entry.workflowVersionId,
+				rank: entry.rank,
 				shard: entry.shard ?? undefined,
 			}))
 		);

@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import { computeRank, type Ranked } from "server/lib/rank";
 
 interface Timer {
 	dueAt: Date;
@@ -44,13 +45,20 @@ const advanceTimerStreamCursor = createTimerStreamCursorAdvancer<Timer>({
 
 export async function* streamTimers<Item extends Timer>(
 	next: (cursor: TimerStreamCursor | undefined) => Item[] | Promise<Item[]>,
-	until?: (chunk: NonEmptyArray<Item>) => boolean
-): AsyncGenerator<{ dueNow: Item[]; dueSoon: Item[] }> {
+	options?: {
+		until?: (chunk: NonEmptyArray<Item>) => boolean;
+	}
+): AsyncGenerator<{ dueNow: Ranked<Item>[]; dueSoon: Ranked<Item>[] }> {
 	let now = Date.now();
-	for await (const { whenTrue, whenFalse } of streamChunks(next, {
+
+	for await (const { whenTrue, whenFalse } of streamChunks<Item, TimerStreamCursor, Ranked<Item>, Ranked<Item>>(next, {
 		advanceCursor: advanceTimerStreamCursor,
-		until,
-		partition: (timer: Item) => timer.dueAt.getTime() <= now,
+		until: options?.until,
+		partition: (timer) => {
+			const dueAtMs = timer.dueAt.getTime();
+			const rank = computeRank(dueAtMs);
+			return { meetsCondition: dueAtMs <= now, item: { ...timer, rank } };
+		},
 	})) {
 		yield { dueNow: whenTrue, dueSoon: whenFalse };
 		now = Date.now();

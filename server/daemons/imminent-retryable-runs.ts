@@ -8,9 +8,9 @@ import type {
 	WorkflowRow,
 	WorkflowRunOutboxRowInsert,
 } from "server/infra/db/types";
-import type { WorkflowRunPublisher } from "server/infra/messaging/redis-publisher";
-import type { TimerEntry, TimerSortedSet } from "server/infra/messaging/redis-timer-sorted-set";
+import type { TimerEntry, TimerSortedSet, WorkflowRunPublisher } from "server/infra/messaging/types";
 import { runConcurrently } from "server/lib/concurrency";
+import type { Ranked } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
 import { ulid } from "ulidx";
 
@@ -39,7 +39,7 @@ export async function processImminentRetryableRuns(
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
 		(cursor) => repos.workflowRun.listRetryableRuns(context, dueBefore, limit, cursor),
-		(chunk) => chunk.length < limit
+		{ until: (chunk) => chunk.length < limit }
 	)) {
 		if (isNonEmptyArray(runsDueNow)) {
 			await queueRetryableRuns(context, repos, workflowRunPublisher, runsDueNow);
@@ -50,6 +50,7 @@ export async function processImminentRetryableRuns(
 				type: "retry",
 				id: run.id,
 				dueAt: run.dueAt.getTime(),
+				rank: run.rank,
 			}));
 			if (isNonEmptyArray(timers)) {
 				await timerSortedSet.add(timers);
@@ -62,7 +63,7 @@ export async function queueRetryableRuns(
 	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
-	runs: NonEmptyArray<WorkflowRunMeta>,
+	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	options?: { chunkSize?: number }
 ) {
 	const { chunkSize = runs.length } = options ?? {};
@@ -87,7 +88,7 @@ async function processChunk(
 	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: WorkflowRunPublisher | undefined,
-	runs: NonEmptyArray<WorkflowRunMeta>,
+	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
 	const workflowRunIds = runs.map((run) => run.id);
@@ -131,6 +132,7 @@ async function processChunk(
 			workflowVersionId: workflow.versionId,
 			shard: (run.options as WorkflowStartOptions | null)?.shard,
 			status: "pending",
+			rank: run.rank,
 		});
 	}
 

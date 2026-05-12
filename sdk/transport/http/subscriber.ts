@@ -18,7 +18,6 @@ export interface HttpSubscriberParams {
 export interface HttpSubscriberOptions {
 	intervalMs?: number;
 	maxRetryIntervalMs?: number;
-	atCapacityIntervalMs?: number;
 	claimMinIdleTimeMs?: number;
 }
 
@@ -26,16 +25,12 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 	const { api, options } = params;
 	const intervalMs = options?.intervalMs ?? 1_000;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
-	const atCapacityIntervalMs = options?.atCapacityIntervalMs ?? 500;
 	const claimMinIdleTimeMs = options?.claimMinIdleTimeMs ?? 90_000;
 
 	const getNextDelay = (delayParams: SubscriberDelayParams) => {
 		switch (delayParams.type) {
-			case "found_work":
 			case "no_work":
 				return intervalMs;
-			case "at_capacity":
-				return atCapacityIntervalMs;
 			case "retry": {
 				const retryParams = getRetryParams(delayParams.attemptNumber, {
 					type: "jittered",
@@ -76,7 +71,6 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 					data: { workflowRunId: run.id as WorkflowRunId },
 				}));
 			},
-			heartbeat: (workflowRunId: WorkflowRunId) => api.workflowRun.heartbeatV1({ id: workflowRunId }),
 		};
 	};
 }

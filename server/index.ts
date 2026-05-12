@@ -7,8 +7,9 @@ import { initDaemons } from "./daemons";
 import { UnauthorizedError } from "./errors";
 import { createDatabase } from "./infra/db";
 import { createLogger } from "./infra/logger";
-import { createWorkflowRunPublisher, type WorkflowRunPublisher } from "./infra/messaging/redis-publisher";
-import { createTimerSortedSet, type TimerSortedSet } from "./infra/messaging/redis-timer-sorted-set";
+import { createWorkflowRunPublisher } from "./infra/messaging/redis/publisher";
+import { createTimerSortedSet } from "./infra/messaging/redis/timer-sorted-set";
+import type { TimerSortedSet, WorkflowRunPublisher } from "./infra/messaging/types";
 import { createAuthorizer } from "./middleware/authorization";
 import {
 	createNamespaceRequestContext,

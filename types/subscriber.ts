@@ -1,3 +1,5 @@
+import type { NonEmptyArray } from "@aikirun/lib/array";
+
 import type { Logger } from "./logger";
 import type { WorkflowMeta } from "./workflow";
 import type { WorkflowRunId } from "./workflow-run";
@@ -6,11 +8,7 @@ export interface WorkflowRunBatch {
 	data: { workflowRunId: WorkflowRunId };
 }
 
-export type SubscriberDelayParams =
-	| { type: "found_work" }
-	| { type: "no_work" }
-	| { type: "retry"; attemptNumber: number }
-	| { type: "at_capacity" };
+export type SubscriberDelayParams = { type: "no_work" } | { type: "retry"; attemptNumber: number };
 
 export interface Subscriber {
 	getNextDelay: (context: SubscriberDelayParams) => number;
@@ -22,7 +20,7 @@ export interface Subscriber {
 
 export interface SubscriberContext {
 	workerId: string;
-	workflows: WorkflowMeta[];
+	workflows: NonEmptyArray<WorkflowMeta>;
 	shards?: string[];
 	logger: Logger;
 }

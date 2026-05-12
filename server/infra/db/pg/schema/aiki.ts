@@ -20,6 +20,7 @@ import {
 import { relations, sql } from "drizzle-orm";
 import {
 	check,
+	doublePrecision,
 	foreignKey,
 	index,
 	integer,
@@ -394,6 +395,7 @@ export const workflowRunOutbox = pgTable(
 		workflowName: text("workflow_name").notNull(),
 		workflowVersionId: text("workflow_version_id").notNull(),
 		shard: text("shard"),
+		rank: doublePrecision("rank").notNull(),
 
 		status: workflowRunOutboxStatusEnum("status").notNull(),
 
@@ -405,7 +407,7 @@ export const workflowRunOutbox = pgTable(
 		index("idx_workflow_run_outbox_publish").on(
 			table.namespaceId,
 			table.status,
-			table.createdAt,
+			table.rank,
 			table.workflowName,
 			table.workflowVersionId,
 			table.shard
@@ -418,7 +420,7 @@ export const workflowRunOutbox = pgTable(
 			table.workflowVersionId,
 			table.shard
 		),
-		index("idx_workflow_run_outbox_status_created_id").on(table.status, table.createdAt, table.id),
+		index("idx_workflow_run_outbox_status_rank_id").on(table.status, table.rank, table.id),
 		index("idx_workflow_run_outbox_status_updated_id").on(table.status, table.updatedAt, table.id),
 	]
 );
