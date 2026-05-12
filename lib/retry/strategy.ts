@@ -82,7 +82,7 @@ export function withRetry<Args, Result>(
 					};
 				}
 
-				await delay(retryParams.delayMs, { abortSignal: options?.abortSignal });
+				await delay(retryParams.delayMs, { abortSignal: options?.abortSignal }).catch(() => {});
 			}
 		},
 	};
