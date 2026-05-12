@@ -48,7 +48,7 @@ export function createTaskRepository(db: PgDb) {
 			return db
 				.select({
 					workflowRunId: task.workflowRunId,
-					dueAt: sql<Date>`${dueAtExpr}`,
+					dueAt: sql<Date>`${dueAtExpr}`.mapWith(task.nextAttemptAt),
 				})
 				.from(task)
 				.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, before)))

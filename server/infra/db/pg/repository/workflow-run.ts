@@ -314,7 +314,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.scheduledAt}`,
+					dueAt: sql<Date>`${workflowRun.scheduledAt}`.mapWith(workflowRun.scheduledAt),
 				})
 				.from(workflowRun)
 				.where(
@@ -343,7 +343,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.awakeAt}`,
+					dueAt: sql<Date>`${workflowRun.awakeAt}`.mapWith(workflowRun.awakeAt),
 				})
 				.from(workflowRun)
 				.where(
@@ -372,7 +372,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.nextAttemptAt}`,
+					dueAt: sql<Date>`${workflowRun.nextAttemptAt}`.mapWith(workflowRun.nextAttemptAt),
 				})
 				.from(workflowRun)
 				.where(
@@ -401,7 +401,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.timeoutAt}`,
+					dueAt: sql<Date>`${workflowRun.timeoutAt}`.mapWith(workflowRun.timeoutAt),
 				})
 				.from(workflowRun)
 				.where(
@@ -430,7 +430,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.timeoutAt}`,
+					dueAt: sql<Date>`${workflowRun.timeoutAt}`.mapWith(workflowRun.timeoutAt),
 				})
 				.from(workflowRun)
 				.where(

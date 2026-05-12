@@ -156,7 +156,7 @@ export function createScheduleRepository(db: PgDb) {
 				.select({
 					schedule: {
 						...getTableColumns(schedule),
-						nextRunAt: sql<Date>`${schedule.nextRunAt}`,
+						nextRunAt: sql<Date>`${schedule.nextRunAt}`.mapWith(schedule.nextRunAt),
 					},
 					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
 				})
