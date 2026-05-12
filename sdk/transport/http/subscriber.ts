@@ -1,4 +1,3 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { ApiClient } from "@aikirun/types/client";
 import type {
@@ -51,18 +50,13 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 	return (context: SubscriberContext): Subscriber => {
 		const { workerId, workflows, shards } = context;
 
-		const workflowFilters = !isNonEmptyArray(shards)
-			? workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId }))
-			: workflows.flatMap((workflow) =>
-					shards.map((shard) => ({ name: workflow.name, versionId: workflow.versionId, shard }) as const)
-				);
-
 		return {
 			getNextDelay,
 			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
 				const response = await api.workflowRun.claimReadyV1({
 					workerId,
-					workflows: workflowFilters,
+					workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
+					shards,
 					limit: size,
 					claimMinIdleTimeMs,
 				});

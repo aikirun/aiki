@@ -293,7 +293,8 @@ export interface WorkflowRunCancelByIdsResponseV1 {
 
 export interface WorkflowRunClaimReadyRequestV1 {
 	workerId: string;
-	workflows: Array<{ name: string; versionId: string; shard?: string }>;
+	workflows: Array<{ name: string; versionId: string }>;
+	shards?: string[];
 	limit: number;
 	claimMinIdleTimeMs: number;
 }

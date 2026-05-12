@@ -1,7 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
-import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import type { RankStreamCursor } from "server/daemons/lib/rank-stream";
 import type { TimerStreamCursor } from "server/daemons/lib/timer-stream";
 import type { DaemonContext } from "server/middleware/context";
@@ -13,6 +13,27 @@ import { workflowRunOutbox } from "../schema";
 
 export type WorkflowRunOutboxRow = typeof workflowRunOutbox.$inferSelect;
 export type WorkflowRunOutboxRowInsert = typeof workflowRunOutbox.$inferInsert;
+
+interface ClaimFilter {
+	workflows: NonEmptyArray<{ name: string; versionId: string }>;
+	shards?: string[];
+}
+
+function buildClaimFilterPredicate(filters: ClaimFilter) {
+	const workflowsPredicate = or(
+		...filters.workflows.map((workflow) =>
+			and(
+				eq(workflowRunOutbox.workflowName, workflow.name),
+				eq(workflowRunOutbox.workflowVersionId, workflow.versionId)
+			)
+		)
+	);
+	const shardsPredicate = isNonEmptyArray(filters.shards)
+		? inArray(workflowRunOutbox.shard, filters.shards)
+		: isNull(workflowRunOutbox.shard);
+
+	return and(workflowsPredicate, shardsPredicate);
+}
 
 export function createWorkflowRunOutboxRepository(db: PgDb) {
 	return {
@@ -81,27 +102,9 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 				.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
 		},
 
-		async claimStalePublished(
-			namespaceId: string,
-			filters: NonEmptyArray<{ name: string; versionId: string; shard?: string }>,
-			claimMinIdleTimeMs: number,
-			limit: number
-		) {
+		async claimStalePublished(namespaceId: string, filters: ClaimFilter, claimMinIdleTimeMs: number, limit: number) {
 			const now = Date.now();
 			const staleThreshold = new Date(now - claimMinIdleTimeMs);
-
-			const workflowsFilter = filters.map((filter) =>
-				filter.shard !== undefined
-					? and(
-							eq(workflowRunOutbox.workflowName, filter.name),
-							eq(workflowRunOutbox.workflowVersionId, filter.versionId),
-							eq(workflowRunOutbox.shard, filter.shard)
-						)
-					: and(
-							eq(workflowRunOutbox.workflowName, filter.name),
-							eq(workflowRunOutbox.workflowVersionId, filter.versionId)
-						)
-			);
 
 			const staleEntries = await db
 				.select({ id: workflowRunOutbox.id })
@@ -111,7 +114,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 						eq(workflowRunOutbox.namespaceId, namespaceId),
 						eq(workflowRunOutbox.status, "published"),
 						lt(workflowRunOutbox.updatedAt, staleThreshold),
-						workflowsFilter.length === 1 ? workflowsFilter[0] : sql`(${sql.join(workflowsFilter, sql` OR `)})`
+						buildClaimFilterPredicate(filters)
 					)
 				)
 				.orderBy(workflowRunOutbox.updatedAt)
@@ -135,24 +138,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
 		},
 
-		async claimPending(
-			namespaceId: string,
-			filters: NonEmptyArray<{ name: string; versionId: string; shard?: string }>,
-			limit: number
-		) {
-			const workflowsFilter = filters.map((filter) =>
-				filter.shard !== undefined
-					? and(
-							eq(workflowRunOutbox.workflowName, filter.name),
-							eq(workflowRunOutbox.workflowVersionId, filter.versionId),
-							eq(workflowRunOutbox.shard, filter.shard)
-						)
-					: and(
-							eq(workflowRunOutbox.workflowName, filter.name),
-							eq(workflowRunOutbox.workflowVersionId, filter.versionId)
-						)
-			);
-
+		async claimPending(namespaceId: string, filters: ClaimFilter, limit: number) {
 			const pendingEntries = await db
 				.select({ id: workflowRunOutbox.id })
 				.from(workflowRunOutbox)
@@ -160,7 +146,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 					and(
 						eq(workflowRunOutbox.namespaceId, namespaceId),
 						eq(workflowRunOutbox.status, "pending"),
-						workflowsFilter.length === 1 ? workflowsFilter[0] : sql`(${sql.join(workflowsFilter, sql` OR `)})`
+						buildClaimFilterPredicate(filters)
 					)
 				)
 				.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)

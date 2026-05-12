@@ -19,7 +19,7 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 
 		return repos.workflowRunOutbox.claimStalePublished(
 			context.namespaceId,
-			workflows,
+			{ workflows, shards: request.shards },
 			request.claimMinIdleTimeMs,
 			request.limit
 		);
@@ -27,14 +27,18 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 
 	async function claimPending(
 		context: NamespaceRequestContext,
-		request: Pick<WorkflowRunClaimReadyRequestV1, "workflows" | "limit">
+		request: Pick<WorkflowRunClaimReadyRequestV1, "workflows" | "shards" | "limit">
 	) {
 		const workflows = request.workflows;
 		if (!isNonEmptyArray(workflows)) {
 			return [];
 		}
 
-		return repos.workflowRunOutbox.claimPending(context.namespaceId, workflows, request.limit);
+		return repos.workflowRunOutbox.claimPending(
+			context.namespaceId,
+			{ workflows, shards: request.shards },
+			request.limit
+		);
 	}
 
 	async function claimReady(context: NamespaceRequestContext, request: WorkflowRunClaimReadyRequestV1) {
@@ -44,6 +48,7 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 			remainingSlots > 0
 				? await claimPending(context, {
 						workflows: request.workflows,
+						shards: request.shards,
 						limit: remainingSlots,
 					})
 				: [];

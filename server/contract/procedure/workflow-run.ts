@@ -338,10 +338,10 @@ const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRu
 			workflows: type({
 				name: "string > 0",
 				versionId: "string > 0",
-				"shard?": "string > 0 | undefined",
 			})
 				.array()
 				.atLeastLength(1),
+			"shards?": type("string > 0").array().or("undefined"),
 			limit: "number.integer > 0",
 			claimMinIdleTimeMs: "number.integer > 0",
 		})
