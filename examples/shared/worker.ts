@@ -44,7 +44,6 @@ export async function runWithWorker(
 
 	const shutdown = async () => {
 		await Promise.all([handleA.stop(), handleB.stop()]);
-
 		process.exit(0);
 	};
 
