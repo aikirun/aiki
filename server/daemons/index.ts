@@ -25,10 +25,6 @@ export interface InitDaemonsDeps {
 	childRunCanceller: ChildRunCanceller;
 }
 
-export interface DaemonHandle {
-	shutdown(): Promise<void>;
-}
-
 function initDaemon<Deps, Options>(
 	logger: Logger,
 	intervalMs: number,
@@ -47,7 +43,7 @@ function initDaemon<Deps, Options>(
 				const start = performance.now();
 				await fn(context, deps, options);
 				const durationMs = Math.round(performance.now() - start);
-				context.logger.debug({ durationMs }, `Daemon ${name} completed`);
+				context.logger.debug({ durationMs }, "Completed");
 				const delayMs = intervalMs - durationMs;
 				if (delayMs > 0) {
 					await delay(delayMs, { abortSignal: signal });
@@ -69,7 +65,7 @@ function initDaemon<Deps, Options>(
 	return { abortController, promise };
 }
 
-export function initDaemons(logger: Logger, deps: InitDaemonsDeps): DaemonHandle {
+export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 	const daemons = [
 		initDaemon(logger, 2_000, processImminentScheduledRuns, {
 			repos: deps.repos,
@@ -109,16 +105,6 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps): DaemonHandle
 		}),
 	];
 
-	let dueTimersConsumer: DueTimersConsumerHandle | undefined;
-	if (deps.timerSortedSet) {
-		dueTimersConsumer = spawnDueTimersConsumer(logger, {
-			repos: deps.repos,
-			timerSortedSet: deps.timerSortedSet,
-			childRunCanceller: deps.childRunCanceller,
-			workflowRunPublisher: deps.workflowRunPublisher,
-		});
-	}
-
 	if (deps.workflowRunPublisher) {
 		daemons.push(
 			initDaemon(logger, 1_000, publishReadyRuns, {
@@ -130,6 +116,16 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps): DaemonHandle
 				workflowRunPublisher: deps.workflowRunPublisher,
 			})
 		);
+	}
+
+	let dueTimersConsumer: DueTimersConsumerHandle | undefined;
+	if (deps.timerSortedSet) {
+		dueTimersConsumer = spawnDueTimersConsumer(logger, {
+			repos: deps.repos,
+			timerSortedSet: deps.timerSortedSet,
+			childRunCanceller: deps.childRunCanceller,
+			workflowRunPublisher: deps.workflowRunPublisher,
+		});
 	}
 
 	return {
