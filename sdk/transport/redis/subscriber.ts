@@ -95,6 +95,8 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			connectTimeout: options?.connectTimeoutMs,
 		});
 
+		redis.on("error", () => {});
+
 		const queueNames = getWorkflowQueueNames(workflows, shards);
 		let closed = false;
 
