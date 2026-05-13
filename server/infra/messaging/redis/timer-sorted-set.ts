@@ -95,7 +95,7 @@ export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet 
 			return result;
 		},
 
-		async nextRank(): Promise<number | null> {
+		async peekNextRank(): Promise<number | null> {
 			const result = await redis.zrangebyscore(key, "-inf", "+inf", "WITHSCORES", "LIMIT", 0, 1);
 			if (result.length < 2) {
 				return null;

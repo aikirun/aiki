@@ -30,6 +30,6 @@ export interface TimerSignalWaiter {
 export interface TimerSortedSet {
 	add(timers: NonEmptyArray<TimerEntry>): Promise<void>;
 	popDue(maxRank: number, limit: number): Promise<DueTimer[]>;
-	nextRank(): Promise<number | null>;
+	peekNextRank(): Promise<number | null>;
 	createSignalWaiter(): TimerSignalWaiter;
 }

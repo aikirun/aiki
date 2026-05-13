@@ -86,7 +86,7 @@ async function dueTimersConsumerLoop(
 	const { limit = 1_000, overshootMs = 30 } = options ?? {};
 
 	// Peek on startup to discover any entries left over from a previous consumer's lifecycle.
-	let nextTimerRank = await deps.timerSortedSet.nextRank();
+	let nextTimerRank = await deps.timerSortedSet.peekNextRank();
 	let nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
 
 	while (!abortSignal.aborted) {
@@ -124,7 +124,7 @@ async function dueTimersConsumerLoop(
 			}
 		}
 
-		nextTimerRank = await deps.timerSortedSet.nextRank();
+		nextTimerRank = await deps.timerSortedSet.peekNextRank();
 		nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
 	}
 }
