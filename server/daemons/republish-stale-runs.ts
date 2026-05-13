@@ -32,16 +32,16 @@ export async function republishStaleRuns(
 	)) {
 		context.logger.info({ count: staleEntries.length }, "Republishing stale published outbox entries");
 
-		await deps.workflowRunPublisher.publishReadyRuns(
-			context,
-			staleEntries.map((entry) => ({
-				id: entry.workflowRunId,
-				name: entry.workflowName,
-				versionId: entry.workflowVersionId,
-				rank: entry.rank,
-				shard: entry.shard ?? undefined,
-			})) as NonEmptyArray<WorkflowRunReadyMessage>
-		);
+		const messages = staleEntries.map((entry) => ({
+			id: entry.workflowRunId,
+			name: entry.workflowName,
+			versionId: entry.workflowVersionId,
+			rank: entry.rank,
+			shard: entry.shard ?? undefined,
+		})) as NonEmptyArray<WorkflowRunReadyMessage>;
+
+		await deps.workflowRunPublisher.publishReadyRuns(messages);
+		context.logger.debug({ count: messages.length }, "Published ready workflow runs");
 
 		const staleEntryIds = staleEntries.map((entry) => entry.id) as NonEmptyArray<string>;
 		await deps.repos.workflowRunOutbox.markAsRepublished(staleEntryIds);
