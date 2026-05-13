@@ -181,9 +181,9 @@ Work stealing is safe. Re-executing a workflow doesn't cause duplicate side effe
 
 **Choosing `claimMinIdleTimeMs`**: Set this higher than the heartbeat interval. Workers refresh their claim every heartbeat, so a run only becomes "idle" when a worker stops heartbeating (crashes or hangs). The default of 90 seconds with 30-second heartbeats gives plenty of margin.
 
-### Fallback Subscriber
+### Backup Subscriber
 
-Workers automatically create a fallback DB subscriber alongside the primary subscriber. If the primary subscriber fails repeatedly (2+ consecutive errors), the worker switches to the DB fallback to maintain availability. This ensures workflow execution continues even if an external dependency like Redis goes down.
+Workers automatically create a backup http subscriber alongside the primary subscriber. If the primary subscriber fails, the worker switches to the backup to maintain availability. This ensures workflow execution continues even if an external dependency like Redis goes down.
 
 ## Next Steps
 

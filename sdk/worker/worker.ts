@@ -4,7 +4,7 @@ import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
-import type { CreateSubscriber, Subscriber, SubscriberContext, WorkflowRunBatch } from "@aikirun/types/subscriber";
+import type { CreateSubscriber, Subscriber, WorkflowRunBatch } from "@aikirun/types/subscriber";
 import type { WorkerId } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
@@ -123,11 +123,11 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
 	private primarySubscriber: Subscriber | undefined;
-	private fallbackSubscriber: Subscriber | undefined;
+	private backupSubscriber: Subscriber | undefined;
 	private subscriberLoopPromise: Promise<void> | undefined;
 	private primarySubscriberFailedAttempts = 0;
 	private primarySubscriberNextAttemptAt = 0;
-	private fallbackSubscriberFailedAttempts = 0;
+	private backupSubscriberFailedAttempts = 0;
 	private availableCapacityLatch = createBinaryLatch();
 	private pendingWorkflowRunIds = new Set<string>();
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
@@ -160,26 +160,29 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			throw new Error("No workflow registered");
 		}
 
-		const subscriberContext: SubscriberContext = {
+		const createSubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
+		const primarySubscriber = createSubscriber({
 			workerId: this.id,
 			workflows,
 			shards: this.spawnOptions.shards,
-			logger: this.logger,
-		};
-
-		const createSubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
-		const primarySubscriber = createSubscriber(subscriberContext);
+			logger: this.logger.child({ "aiki.subscriber": "primary" }),
+		});
 		this.primarySubscriber = primarySubscriber instanceof Promise ? await primarySubscriber : primarySubscriber;
 		this.primarySubscriber.heartbeat = this.withServerHeartbeatForwarding(
 			this.primarySubscriber.heartbeat?.bind(this.primarySubscriber)
 		);
 
 		if (!this.params.subscriber) {
-			const createFallbackSubscriber = httpSubscriber({ api: this.client.api });
-			const fallbackSubscriber = createFallbackSubscriber(subscriberContext);
-			this.fallbackSubscriber = fallbackSubscriber instanceof Promise ? await fallbackSubscriber : fallbackSubscriber;
-			this.fallbackSubscriber.heartbeat = this.withServerHeartbeatForwarding(
-				this.fallbackSubscriber.heartbeat?.bind(this.fallbackSubscriber)
+			const createBackupSubscriber = httpSubscriber({ api: this.client.api });
+			const backupSubscriber = createBackupSubscriber({
+				workerId: this.id,
+				workflows,
+				shards: this.spawnOptions.shards,
+				logger: this.logger.child({ "aiki.subscriber": "backup" }),
+			});
+			this.backupSubscriber = backupSubscriber instanceof Promise ? await backupSubscriber : backupSubscriber;
+			this.backupSubscriber.heartbeat = this.withServerHeartbeatForwarding(
+				this.backupSubscriber.heartbeat?.bind(this.backupSubscriber)
 			);
 		}
 
@@ -208,7 +211,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.abortController?.abort();
 		this.availableCapacityLatch.signal();
 
-		await Promise.all([this.primarySubscriber?.close?.(), this.fallbackSubscriber?.close?.()]);
+		await Promise.all([this.primarySubscriber?.close?.(), this.backupSubscriber?.close?.()]);
 
 		await this.subscriberLoopPromise;
 
@@ -317,11 +320,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		if (Date.now() >= this.primarySubscriberNextAttemptAt) {
 			try {
 				const batch = await this.primarySubscriber.getNextBatch(size, { abortSignal });
-				if (this.primarySubscriberFailedAttempts > 0) {
-					this.logger.info("Primary subscriber recovered");
-				}
 				this.primarySubscriberFailedAttempts = 0;
-				this.fallbackSubscriberFailedAttempts = 0;
+				this.backupSubscriberFailedAttempts = 0;
 				this.primarySubscriberNextAttemptAt = 0;
 				return { success: true, batch, activeSubscriber: this.primarySubscriber };
 			} catch (error) {
@@ -329,11 +329,10 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 					return { success: false, retryDelayMs: 0 };
 				}
 
-				if (this.primarySubscriberFailedAttempts === 0) {
-					this.logger.error("Primary subscriber failed", {
-						"aiki.error": error instanceof Error ? error.message : String(error),
-					});
-				}
+				this.logger.error("Subscriber failed", {
+					"aiki.subscriber": "primary",
+					"aiki.error": error instanceof Error ? error.message : String(error),
+				});
 
 				this.primarySubscriberFailedAttempts++;
 				const retryDelayMs = this.primarySubscriber.getNextDelay({
@@ -344,7 +343,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			}
 		}
 
-		if (!this.fallbackSubscriber) {
+		if (!this.backupSubscriber) {
 			return {
 				success: false,
 				retryDelayMs: this.primarySubscriberNextAttemptAt - Date.now(),
@@ -352,30 +351,26 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 
 		try {
-			const batch = await this.fallbackSubscriber.getNextBatch(size, { abortSignal });
-			if (this.fallbackSubscriberFailedAttempts > 0) {
-				this.logger.info("Fallback subscriber recovered");
-			}
-			this.fallbackSubscriberFailedAttempts = 0;
-			return { success: true, batch, activeSubscriber: this.fallbackSubscriber };
+			const batch = await this.backupSubscriber.getNextBatch(size, { abortSignal });
+			this.backupSubscriberFailedAttempts = 0;
+			return { success: true, batch, activeSubscriber: this.backupSubscriber };
 		} catch (error) {
 			if (abortSignal.aborted) {
 				return { success: false, retryDelayMs: 0 };
 			}
 
-			if (this.fallbackSubscriberFailedAttempts === 0) {
-				this.logger.error("Fallback subscriber failed", {
-					"aiki.error": error instanceof Error ? error.message : String(error),
-				});
-			}
+			this.logger.error("Subscriber failed", {
+				"aiki.subscriber": "backup",
+				"aiki.error": error instanceof Error ? error.message : String(error),
+			});
 
-			this.fallbackSubscriberFailedAttempts++;
+			this.backupSubscriberFailedAttempts++;
 
 			return {
 				success: false,
-				retryDelayMs: this.fallbackSubscriber.getNextDelay({
+				retryDelayMs: this.backupSubscriber.getNextDelay({
 					type: "retry",
-					attemptNumber: this.fallbackSubscriberFailedAttempts,
+					attemptNumber: this.backupSubscriberFailedAttempts,
 				}),
 			};
 		}

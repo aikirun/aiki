@@ -59,17 +59,19 @@ return results
 
 export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber {
 	const { options } = params;
+	const intervalMs = 1_000;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
+	const connectTimeoutMs = options?.connectTimeoutMs ?? 5_000;
 
 	const getNextDelay = (delayParams: SubscriberDelayParams) => {
 		switch (delayParams.type) {
 			case "no_work":
-				return 0;
+				return intervalMs;
 			case "retry": {
 				const retryParams = getRetryParams(delayParams.attemptNumber, {
 					type: "jittered",
 					maxAttempts: Number.POSITIVE_INFINITY,
-					baseDelayMs: 1_000,
+					baseDelayMs: intervalMs,
 					maxDelayMs: maxRetryIntervalMs,
 				});
 				if (!retryParams.retriesLeft) {
@@ -83,7 +85,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 	};
 
 	return (context: SubscriberContext): Subscriber => {
-		const { workflows, shards } = context;
+		const { workflows, shards, logger } = context;
 
 		const redis = new Redis({
 			host: params.host,
@@ -92,17 +94,52 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			db: params.db,
 			maxRetriesPerRequest: 0,
 			enableOfflineQueue: false,
-			connectTimeout: options?.connectTimeoutMs,
+			connectTimeout: connectTimeoutMs,
 		});
 
+		type State =
+			| { status: "disconnected" }
+			| { status: "awaiting_ready"; readyWatchdog: ReturnType<typeof setTimeout> }
+			| { status: "connected" }
+			| { status: "closed" };
+
+		let currentState: State = { status: "disconnected" };
+
+		const transitionTo = (nextStatus: State["status"]) => {
+			if (currentState.status === "closed") {
+				return;
+			}
+			if (currentState.status === "awaiting_ready") {
+				clearTimeout(currentState.readyWatchdog);
+			}
+			if (nextStatus === "awaiting_ready") {
+				currentState = { status: "awaiting_ready", readyWatchdog: setTimeout(onReadyCheckTimeout, connectTimeoutMs) };
+			} else {
+				currentState = { status: nextStatus };
+			}
+			if (nextStatus === "closed") {
+				redis.disconnect();
+			}
+		};
+
+		const onReadyCheckTimeout = () => {
+			logger.warn("Redis ready check timed out, forcing reconnect");
+			redis.disconnect(true);
+		};
+
 		redis.on("error", () => {});
+		redis.on("connect", () => transitionTo("awaiting_ready"));
+		redis.on("ready", () => {
+			logger.info("Redis connection established");
+			transitionTo("connected");
+		});
+		redis.on("close", () => transitionTo("disconnected"));
 
 		const queueNames = getWorkflowQueueNames(workflows, shards);
-		let closed = false;
 
 		return {
 			getNextDelay,
-			async getNextBatch(size: number, _options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunBatch[]> {
+			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
 				const shuffledQueueNames = shuffleArray(queueNames);
 				const firstItem = (await redis.bzpopmin(...shuffledQueueNames, 0)) as
 					| [key: string, member: WorkflowRunId, score: string]
@@ -130,11 +167,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 				return batch;
 			},
 			async close(): Promise<void> {
-				if (closed) {
-					return;
-				}
-				closed = true;
-				redis.disconnect();
+				transitionTo("closed");
 			},
 		};
 	};
