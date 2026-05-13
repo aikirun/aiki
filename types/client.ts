@@ -20,7 +20,18 @@ export interface Client<AppContext = null> {
 	};
 }
 
+/**
+ * Wraps each method of an API contract with an additional `{ signal }` option,
+ * reflecting orpc's runtime client behaviour. Lets callers cancel in-flight
+ * requests without polluting the wire contract types.
+ */
+type WithClientOptions<T> = {
+	[K in keyof T]: T[K] extends (input: infer I) => Promise<infer O>
+		? (input: I, options?: { signal?: AbortSignal }) => Promise<O>
+		: T[K];
+};
+
 export interface ApiClient {
-	workflowRun: WorkflowRunApi;
-	schedule: ScheduleApi;
+	workflowRun: WithClientOptions<WorkflowRunApi>;
+	schedule: WithClientOptions<ScheduleApi>;
 }

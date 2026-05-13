@@ -95,12 +95,14 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			connectTimeout: options?.connectTimeoutMs,
 		});
 
+		redis.on("error", () => {});
+
 		const queueNames = getWorkflowQueueNames(workflows, shards);
 		let closed = false;
 
 		return {
 			getNextDelay,
-			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
+			async getNextBatch(size: number, _options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunBatch[]> {
 				const shuffledQueueNames = shuffleArray(queueNames);
 				const firstItem = (await redis.bzpopmin(...shuffledQueueNames, 0)) as
 					| [key: string, member: WorkflowRunId, score: string]

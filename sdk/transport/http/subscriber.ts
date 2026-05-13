@@ -52,14 +52,17 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 
 		return {
 			getNextDelay,
-			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
-				const response = await api.workflowRun.claimReadyV1({
-					workerId,
-					workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
-					shards,
-					limit: size,
-					claimMinIdleTimeMs,
-				});
+			async getNextBatch(size: number, options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunBatch[]> {
+				const response = await api.workflowRun.claimReadyV1(
+					{
+						workerId,
+						workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
+						shards,
+						limit: size,
+						claimMinIdleTimeMs,
+					},
+					{ signal: options?.abortSignal }
+				);
 
 				return response.runs.map((run) => ({
 					data: { workflowRunId: run.id as WorkflowRunId },
