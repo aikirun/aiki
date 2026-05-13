@@ -1,7 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { Repositories } from "server/infra/db/types";
-import type { WorkflowRunPublisher } from "server/infra/messaging/types";
+import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "server/infra/messaging/types";
 import type { DaemonContext } from "server/middleware/context";
 
 import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
@@ -40,7 +40,7 @@ export async function republishStaleRuns(
 				versionId: entry.workflowVersionId,
 				rank: entry.rank,
 				shard: entry.shard ?? undefined,
-			}))
+			})) as NonEmptyArray<WorkflowRunReadyMessage>
 		);
 
 		const staleEntryIds = staleEntries.map((entry) => entry.id) as NonEmptyArray<string>;

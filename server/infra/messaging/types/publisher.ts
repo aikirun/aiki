@@ -1,3 +1,4 @@
+import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { Context } from "server/middleware/context";
 
 export interface WorkflowRunReadyMessage {
@@ -9,5 +10,5 @@ export interface WorkflowRunReadyMessage {
 }
 
 export interface WorkflowRunPublisher {
-	publishReadyRuns(context: Context, runs: WorkflowRunReadyMessage[]): Promise<void>;
+	publishReadyRuns(context: Context, runs: NonEmptyArray<WorkflowRunReadyMessage>): Promise<void>;
 }

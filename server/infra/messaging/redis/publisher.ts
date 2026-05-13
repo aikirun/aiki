@@ -1,4 +1,3 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { Redis } from "ioredis";
 import type { Context } from "server/middleware/context";
 
@@ -11,10 +10,6 @@ function getWorkflowQueueName(name: string, versionId: string, shard?: string): 
 export function createWorkflowRunPublisher(redis: Redis): WorkflowRunPublisher {
 	return {
 		async publishReadyRuns(context: Context, runs: WorkflowRunReadyMessage[]): Promise<void> {
-			if (!isNonEmptyArray(runs)) {
-				return;
-			}
-
 			try {
 				const redisPipeline = redis.pipeline();
 

@@ -53,6 +53,6 @@ export async function publishRuns(
 		});
 	}
 
-	await workflowRunPublisher.publishReadyRuns(context, messages);
+	await workflowRunPublisher.publishReadyRuns(context, messages as NonEmptyArray<WorkflowRunReadyMessage>);
 	await repos.workflowRunOutbox.markPublished(entryIds as NonEmptyArray<string>);
 }
