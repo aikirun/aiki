@@ -334,7 +334,6 @@ const cancelByIdsV1: ContractProcedure<WorkflowRunCancelByIdsRequestV1, Workflow
 const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRunClaimReadyResponseV1> = oc
 	.input(
 		type({
-			workerId: "string > 0",
 			workflows: type({
 				name: "string > 0",
 				versionId: "string > 0",

@@ -48,14 +48,13 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 	};
 
 	return (context: SubscriberContext): Subscriber => {
-		const { workerId, workflows, shards } = context;
+		const { workflows, shards } = context;
 
 		return {
 			getNextDelay,
 			async getNextBatch(size: number, options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
 				const response = await api.workflowRun.claimReadyV1(
 					{
-						workerId,
 						workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
 						shards,
 						limit: size,
