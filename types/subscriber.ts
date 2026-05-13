@@ -4,7 +4,7 @@ import type { Logger } from "./logger";
 import type { WorkflowMeta } from "./workflow";
 import type { WorkflowRunId } from "./workflow-run";
 
-export interface WorkflowRunBatch {
+export interface WorkflowRunMessage {
 	data: { workflowRunId: WorkflowRunId };
 }
 
@@ -12,7 +12,7 @@ export type SubscriberDelayParams = { type: "no_work" } | { type: "retry"; attem
 
 export interface Subscriber {
 	getNextDelay: (context: SubscriberDelayParams) => number;
-	getNextBatch: (size: number, options?: { abortSignal?: AbortSignal }) => Promise<WorkflowRunBatch[]>;
+	getNextBatch: (size: number, options?: { abortSignal?: AbortSignal }) => Promise<WorkflowRunMessage[]>;
 	heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>;
 	acknowledge?: (workflowRunId: WorkflowRunId) => Promise<void>;
 	close?: () => Promise<void>;

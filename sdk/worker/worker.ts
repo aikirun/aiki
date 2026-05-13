@@ -4,7 +4,7 @@ import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
-import type { CreateSubscriber, Subscriber, WorkflowRunBatch } from "@aikirun/types/subscriber";
+import type { CreateSubscriber, Subscriber, WorkflowRunMessage } from "@aikirun/types/subscriber";
 import type { WorkerId } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
@@ -310,7 +310,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		size: number,
 		abortSignal: AbortSignal
 	): Promise<
-		| { success: true; batch: WorkflowRunBatch[]; activeSubscriber: Subscriber }
+		| { success: true; batch: WorkflowRunMessage[]; activeSubscriber: Subscriber }
 		| { success: false; retryDelayMs: number }
 	> {
 		if (!this.primarySubscriber) {

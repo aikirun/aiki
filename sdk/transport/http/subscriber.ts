@@ -5,7 +5,7 @@ import type {
 	Subscriber,
 	SubscriberContext,
 	SubscriberDelayParams,
-	WorkflowRunBatch,
+	WorkflowRunMessage,
 } from "@aikirun/types/subscriber";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 
@@ -52,7 +52,7 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 
 		return {
 			getNextDelay,
-			async getNextBatch(size: number, options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunBatch[]> {
+			async getNextBatch(size: number, options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
 				const response = await api.workflowRun.claimReadyV1(
 					{
 						workerId,

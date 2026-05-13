@@ -5,7 +5,7 @@ import type {
 	Subscriber,
 	SubscriberContext,
 	SubscriberDelayParams,
-	WorkflowRunBatch,
+	WorkflowRunMessage,
 } from "@aikirun/types/subscriber";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
@@ -139,7 +139,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 
 		return {
 			getNextDelay,
-			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
+			async getNextBatch(size: number): Promise<WorkflowRunMessage[]> {
 				const shuffledQueueNames = shuffleArray(queueNames);
 				const firstItem = (await redis.bzpopmin(...shuffledQueueNames, 0)) as
 					| [key: string, member: WorkflowRunId, score: string]
@@ -148,7 +148,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 					return [];
 				}
 
-				const batch: WorkflowRunBatch[] = [{ data: { workflowRunId: firstItem[1] } }];
+				const batch: WorkflowRunMessage[] = [{ data: { workflowRunId: firstItem[1] } }];
 
 				const remainingCapacity = size - 1;
 				if (remainingCapacity > 0) {
