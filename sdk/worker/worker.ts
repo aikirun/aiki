@@ -122,9 +122,12 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
 	private abortController: AbortController | undefined;
-	private subscriber: Subscriber | undefined;
+	private primarySubscriber: Subscriber | undefined;
 	private fallbackSubscriber: Subscriber | undefined;
 	private subscriberLoopPromise: Promise<void> | undefined;
+	private primarySubscriberFailedAttempts = 0;
+	private primarySubscriberNextAttemptAt = 0;
+	private fallbackSubscriberFailedAttempts = 0;
 	private availableCapacityLatch = createBinaryLatch();
 	private pendingWorkflowRunIds = new Set<string>();
 	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
@@ -165,16 +168,20 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		};
 
 		const createSubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
-		const subscriber = createSubscriber(subscriberContext);
-		this.subscriber = subscriber instanceof Promise ? await subscriber : subscriber;
-		this.subscriber.heartbeat = this.withServerHeartbeatForwarding(this.subscriber.heartbeat?.bind(this.subscriber));
-
-		const createFallbackSubscriber = httpSubscriber({ api: this.client.api });
-		const fallbackSubscriber = createFallbackSubscriber(subscriberContext);
-		this.fallbackSubscriber = fallbackSubscriber instanceof Promise ? await fallbackSubscriber : fallbackSubscriber;
-		this.fallbackSubscriber.heartbeat = this.withServerHeartbeatForwarding(
-			this.fallbackSubscriber.heartbeat?.bind(this.fallbackSubscriber)
+		const primarySubscriber = createSubscriber(subscriberContext);
+		this.primarySubscriber = primarySubscriber instanceof Promise ? await primarySubscriber : primarySubscriber;
+		this.primarySubscriber.heartbeat = this.withServerHeartbeatForwarding(
+			this.primarySubscriber.heartbeat?.bind(this.primarySubscriber)
 		);
+
+		if (!this.params.subscriber) {
+			const createFallbackSubscriber = httpSubscriber({ api: this.client.api });
+			const fallbackSubscriber = createFallbackSubscriber(subscriberContext);
+			this.fallbackSubscriber = fallbackSubscriber instanceof Promise ? await fallbackSubscriber : fallbackSubscriber;
+			this.fallbackSubscriber.heartbeat = this.withServerHeartbeatForwarding(
+				this.fallbackSubscriber.heartbeat?.bind(this.fallbackSubscriber)
+			);
+		}
 
 		this.abortController = new AbortController();
 		const abortSignal = this.abortController.signal;
@@ -201,8 +208,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		this.abortController?.abort();
 		this.availableCapacityLatch.signal();
 
-		await this.subscriber?.close?.();
-		await this.fallbackSubscriber?.close?.();
+		await Promise.all([this.primarySubscriber?.close?.(), this.fallbackSubscriber?.close?.()]);
 
 		await this.subscriberLoopPromise;
 
@@ -245,7 +251,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	}
 
 	private async subscriberLoop(abortSignal: AbortSignal): Promise<void> {
-		if (!this.subscriber) {
+		if (!this.primarySubscriber) {
 			throw new Error("Subscriber not initialized");
 		}
 
@@ -255,9 +261,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		const maxConcurrentWorkflowRuns = this.spawnOptions.maxConcurrentWorkflowRuns ?? 1;
 
-		let activeSubscriber: Subscriber = this.subscriber;
+		let activeSubscriber: Subscriber = this.primarySubscriber;
 		let nextDelayMs = activeSubscriber.getNextDelay({ type: "no_work" });
-		let subscriberFailedAttempts = 0;
 
 		while (!abortSignal.aborted) {
 			if (nextDelayMs > 0) {
@@ -271,22 +276,13 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				continue;
 			}
 
-			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(
-				availableCapacity,
-				subscriberFailedAttempts,
-				abortSignal
-			);
+			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, abortSignal);
 			if (!nextBatchResponse.success) {
-				subscriberFailedAttempts++;
-				nextDelayMs = activeSubscriber.getNextDelay({
-					type: "retry",
-					attemptNumber: subscriberFailedAttempts,
-				});
+				nextDelayMs = nextBatchResponse.retryDelayMs;
 				continue;
 			}
 
-			subscriberFailedAttempts = 0;
-			activeSubscriber = nextBatchResponse.subscriber;
+			activeSubscriber = nextBatchResponse.activeSubscriber;
 
 			const workflowRunIdsToEnqueue: WorkflowRunId[] = [];
 			for (const { data } of nextBatchResponse.batch) {
@@ -309,37 +305,79 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 	private async fetchNextWorkflowRunBatch(
 		size: number,
-		subscriberFailedAttempts: number,
 		abortSignal: AbortSignal
-	): Promise<{ success: true; batch: WorkflowRunBatch[]; subscriber: Subscriber } | { success: false; error: Error }> {
-		if (!this.subscriber) {
+	): Promise<
+		| { success: true; batch: WorkflowRunBatch[]; activeSubscriber: Subscriber }
+		| { success: false; retryDelayMs: number }
+	> {
+		if (!this.primarySubscriber) {
 			throw new Error("Subscriber not initialized");
 		}
 
-		try {
-			const batch = await this.subscriber.getNextBatch(size);
-			return { success: true, batch, subscriber: this.subscriber };
-		} catch (error) {
-			if (abortSignal.aborted) {
-				return { success: false, error: error as Error };
-			}
+		if (Date.now() >= this.primarySubscriberNextAttemptAt) {
+			try {
+				const batch = await this.primarySubscriber.getNextBatch(size);
+				if (this.primarySubscriberFailedAttempts > 0) {
+					this.logger.info("Primary subscriber recovered");
+				}
+				this.primarySubscriberFailedAttempts = 0;
+				this.fallbackSubscriberFailedAttempts = 0;
+				this.primarySubscriberNextAttemptAt = 0;
+				return { success: true, batch, activeSubscriber: this.primarySubscriber };
+			} catch (error) {
+				if (abortSignal.aborted) {
+					return { success: false, retryDelayMs: 0 };
+				}
 
-			this.logger.error("Error getting next workflow runs batch", {
-				"aiki.error": error instanceof Error ? error.message : String(error),
-			});
-
-			if (this.fallbackSubscriber && subscriberFailedAttempts >= 2) {
-				try {
-					const batch = await this.fallbackSubscriber.getNextBatch(size);
-					return { success: true, batch, subscriber: this.fallbackSubscriber };
-				} catch (fallbackError) {
-					this.logger.error("Fallback subscriber also failed to get next workflow runs batch", {
-						"aiki.error": fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+				if (this.primarySubscriberFailedAttempts === 0) {
+					this.logger.error("Primary subscriber failed", {
+						"aiki.error": error instanceof Error ? error.message : String(error),
 					});
 				}
+
+				this.primarySubscriberFailedAttempts++;
+				const retryDelayMs = this.primarySubscriber.getNextDelay({
+					type: "retry",
+					attemptNumber: this.primarySubscriberFailedAttempts,
+				});
+				this.primarySubscriberNextAttemptAt = Date.now() + retryDelayMs;
+			}
+		}
+
+		if (!this.fallbackSubscriber) {
+			return {
+				success: false,
+				retryDelayMs: this.primarySubscriberNextAttemptAt - Date.now(),
+			};
+		}
+
+		try {
+			const batch = await this.fallbackSubscriber.getNextBatch(size);
+			if (this.fallbackSubscriberFailedAttempts > 0) {
+				this.logger.info("Fallback subscriber recovered");
+			}
+			this.fallbackSubscriberFailedAttempts = 0;
+			return { success: true, batch, activeSubscriber: this.fallbackSubscriber };
+		} catch (error) {
+			if (abortSignal.aborted) {
+				return { success: false, retryDelayMs: 0 };
 			}
 
-			return { success: false, error: error as Error };
+			if (this.fallbackSubscriberFailedAttempts === 0) {
+				this.logger.error("Fallback subscriber failed", {
+					"aiki.error": error instanceof Error ? error.message : String(error),
+				});
+			}
+
+			this.fallbackSubscriberFailedAttempts++;
+
+			return {
+				success: false,
+				retryDelayMs: this.fallbackSubscriber.getNextDelay({
+					type: "retry",
+					attemptNumber: this.fallbackSubscriberFailedAttempts,
+				}),
+			};
 		}
 	}
 
