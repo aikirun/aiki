@@ -316,7 +316,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		if (Date.now() >= this.primarySubscriberNextAttemptAt) {
 			try {
-				const batch = await this.primarySubscriber.getNextBatch(size);
+				const batch = await this.primarySubscriber.getNextBatch(size, { abortSignal });
 				if (this.primarySubscriberFailedAttempts > 0) {
 					this.logger.info("Primary subscriber recovered");
 				}
@@ -352,7 +352,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 
 		try {
-			const batch = await this.fallbackSubscriber.getNextBatch(size);
+			const batch = await this.fallbackSubscriber.getNextBatch(size, { abortSignal });
 			if (this.fallbackSubscriberFailedAttempts > 0) {
 				this.logger.info("Fallback subscriber recovered");
 			}

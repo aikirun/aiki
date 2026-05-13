@@ -102,7 +102,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 
 		return {
 			getNextDelay,
-			async getNextBatch(size: number): Promise<WorkflowRunBatch[]> {
+			async getNextBatch(size: number, _options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunBatch[]> {
 				const shuffledQueueNames = shuffleArray(queueNames);
 				const firstItem = (await redis.bzpopmin(...shuffledQueueNames, 0)) as
 					| [key: string, member: WorkflowRunId, score: string]
