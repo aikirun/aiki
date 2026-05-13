@@ -179,7 +179,7 @@ async function processOverlapAllowSchedules(
 				workflowRunId: runId,
 				type: "workflow_run",
 				status: "queued",
-				attempt: 0,
+				attempt: 1,
 				state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 			});
 			outboxEntries.push({
@@ -277,7 +277,7 @@ async function processOverlapSkipSchedules(
 			workflowRunId: runId,
 			type: "workflow_run",
 			status: "queued",
-			attempt: 0,
+			attempt: 1,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
 		outboxEntries.push({
@@ -372,7 +372,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowRunId: runId,
 			type: "workflow_run",
 			status: "queued",
-			attempt: 0,
+			attempt: 1,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
 		newOutboxEntries.push({

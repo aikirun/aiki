@@ -27,32 +27,19 @@ interface Attempt {
 
 function groupIntoAttempts(transitions: StateTransition[]): Attempt[] {
 	const attempts: Attempt[] = [];
-	let current: StateTransition[] = [];
-	let currentOffset = 0;
 
 	for (let i = 0; i < transitions.length; i++) {
 		const t = transitions[i];
-		// A new attempt starts only on actual retries — "new" (initial) or "retry" (workflow retry).
-		// Other scheduled reasons (awake, event, child_workflow, resume, etc.) are continuations
-		// within the same attempt, not new attempts.
-		const isNewAttempt =
-			i > 0 &&
-			t.type === "workflow_run" &&
-			(t.state.status === "scheduled" || t.state.status === "queued") &&
-			(t.state.reason === "new" || t.state.reason === "retry");
+		const last = attempts[attempts.length - 1];
+		// Only workflow_run transitions delimit attempt groups; task transitions
+		// carry the task's own retry count and belong to whichever workflow attempt is open.
+		const startsNewAttempt = !last || (t.type === "workflow_run" && t.attempt !== last.number);
 
-		if (isNewAttempt) {
-			if (current.length > 0) {
-				attempts.push({ number: attempts.length + 1, transitions: current, indexOffset: currentOffset });
-			}
-			currentOffset = i;
-			current = [];
+		if (startsNewAttempt) {
+			attempts.push({ number: t.attempt, transitions: [t], indexOffset: i });
+		} else {
+			last.transitions.push(t);
 		}
-		current.push(t);
-	}
-
-	if (current.length > 0) {
-		attempts.push({ number: attempts.length + 1, transitions: current, indexOffset: currentOffset });
 	}
 
 	return attempts;
@@ -70,7 +57,7 @@ export function TimelineTab({ transitions, isLoading, lookups }: TimelineTabProp
 	}
 
 	const attempts = groupIntoAttempts(transitions);
-	const latestAttemptNumber = attempts.length;
+	const latestAttemptNumber = attempts[attempts.length - 1]?.number ?? 0;
 
 	return (
 		<div>
