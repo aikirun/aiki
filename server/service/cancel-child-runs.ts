@@ -114,7 +114,7 @@ export function createChildRunCanceller() {
 					workflowRunId: childrenCancellationRunId,
 					type: "workflow_run",
 					status: "scheduled",
-					attempt: 0,
+					attempt: 1,
 					state: {
 						status: "scheduled",
 						scheduledAt: now,

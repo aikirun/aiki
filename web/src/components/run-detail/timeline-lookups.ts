@@ -154,38 +154,3 @@ export function buildTimelineLookups(
 
 	return { childWorkflowById, taskById, scheduledContext };
 }
-
-export interface TransitionWithMetadata {
-	transition: StateTransition;
-	index: number;
-	dateStr: string;
-	dateChanged: boolean;
-	attemptChanged: boolean;
-	attemptNumber: number;
-}
-
-export function buildTransitionsWithMetadata(transitions: StateTransition[]): TransitionWithMetadata[] {
-	let lastDate = "";
-	let currentAttempt = 1;
-
-	return transitions.map((transition, index) => {
-		const date = new Date(transition.createdAt);
-		const dateStr = date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-
-		const dateChanged = dateStr !== lastDate;
-		lastDate = dateStr;
-
-		let attemptChanged = false;
-
-		if (
-			transition.type === "workflow_run" &&
-			(transition.state.status === "scheduled" || transition.state.status === "queued") &&
-			(transition.state.reason === "new" || transition.state.reason === "retry")
-		) {
-			currentAttempt++;
-			attemptChanged = true;
-		}
-
-		return { transition, index, dateStr, dateChanged, attemptChanged, attemptNumber: currentAttempt };
-	});
-}

@@ -278,6 +278,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 						id: row.id,
 						type: row.type,
 						createdAt: row.createdAt.getTime(),
+						attempt: row.attempt,
 						taskId: row.taskId,
 						taskState: row.state as TaskState,
 					};
@@ -286,6 +287,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					id: row.id,
 					type: row.type satisfies "workflow_run",
 					createdAt: row.createdAt.getTime(),
+					attempt: row.attempt,
 					state: row.state as WorkflowRunState,
 				};
 			}),
@@ -666,7 +668,7 @@ async function createWorkflowRunInTx(
 		workflowRunId: runId,
 		type: "workflow_run",
 		status: "scheduled",
-		attempt: 0,
+		attempt: 1,
 		state,
 	});
 

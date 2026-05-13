@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_run" ALTER COLUMN "attempts" SET DEFAULT 1;

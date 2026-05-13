@@ -8,6 +8,7 @@ export interface StateTransitionBase {
 	id: string;
 	createdAt: number;
 	type: StateTransitionType;
+	attempt: number;
 }
 
 export interface WorkflowRunStateTransition extends StateTransitionBase {
