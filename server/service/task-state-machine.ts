@@ -15,6 +15,7 @@ const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
 	awaiting_retry: ["running"],
 	completed: [],
 	failed: [],
+	discarded: [],
 };
 
 export function assertIsValidTaskStateTransition(

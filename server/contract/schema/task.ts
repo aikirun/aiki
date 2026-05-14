@@ -32,7 +32,7 @@ export const taskStateAwaitingRetryRequestSchema = type({
 	nextAttemptInMs: "number.integer > 0",
 });
 
-export const taskStateSchema = type({
+const nonDiscardedTaskStateSchema = type({
 	status: "'running'",
 	attempts: "number.integer > 0",
 	input: "unknown",
@@ -54,10 +54,15 @@ export const taskStateSchema = type({
 		error: serializedErrorSchema,
 	});
 
+export const taskStateSchema = nonDiscardedTaskStateSchema.or({
+	status: "'discarded'",
+	attempts: "number.integer > 0",
+});
+
 export const taskInfoSchema = type({
 	id: "string > 0",
 	name: "string > 0",
-	state: taskStateSchema,
+	state: nonDiscardedTaskStateSchema,
 	inputHash: "string > 0",
 });
 

@@ -270,6 +270,7 @@ function TaskOutput({ task, color }: { task: TaskInfo; color: string }) {
 	} else if (state.status === "running") {
 		text = state.input !== undefined ? JSON.stringify(state.input, null, 2) : "Executing…";
 	} else {
+		state.status satisfies "awaiting_retry";
 		text = `Error: ${state.error.message}\nRetrying…`;
 	}
 

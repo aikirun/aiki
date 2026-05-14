@@ -43,6 +43,13 @@
 			"when": 1778696316804,
 			"tag": "0005_real_cassandra_nova",
 			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1778759461140,
+			"tag": "0006_smooth_mattie_franklin",
+			"breakpoints": true
 		}
 	]
 }

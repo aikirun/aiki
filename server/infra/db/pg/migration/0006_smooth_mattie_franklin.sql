@@ -1,0 +1,1 @@
+ALTER TYPE "public"."task_status" ADD VALUE 'discarded';

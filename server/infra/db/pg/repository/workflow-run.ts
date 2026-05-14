@@ -273,7 +273,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 			for (const row of rows) {
 				let taskCounts = result.get(row.workflowRunId);
 				if (!taskCounts) {
-					taskCounts = { completed: 0, running: 0, failed: 0, awaiting_retry: 0 };
+					taskCounts = { completed: 0, running: 0, failed: 0, awaiting_retry: 0, discarded: 0 };
 					result.set(row.workflowRunId, taskCounts);
 				}
 				taskCounts[row.status] = row.count;
@@ -452,7 +452,8 @@ export function createWorkflowRunRepository(db: PgDb) {
 				| "awaiting_event"
 				| "awaiting_child_workflow"
 				| "running",
-			runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>
+			runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
+			options?: { incrementAttempts?: boolean }
 		): Promise<string[]> {
 			const valueRows = runs.map(({ filter, update }, index) => {
 				if (index === 0) {
@@ -466,6 +467,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.set({
 					status: "queued",
 					revision: sql`${workflowRun.revision} + 1`,
+					attempts: options?.incrementAttempts ? sql`${workflowRun.attempts} + 1` : workflowRun.attempts,
 					scheduledAt: null,
 					awakeAt: null,
 					timeoutAt: null,

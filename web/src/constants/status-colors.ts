@@ -21,6 +21,7 @@ export const TASK_STATUS_COLORS: Record<TaskStatus, { tint: string; text: string
 	awaiting_retry: { tint: "#FB923C", text: "var(--accent-orange)" },
 	completed: { tint: "#34D399", text: "var(--accent-green)" },
 	failed: { tint: "#F87171", text: "var(--accent-red)" },
+	discarded: { tint: "#6B7280", text: "var(--accent-gray)" },
 };
 
 export const TASK_STATUS_GLYPHS: Record<TaskStatus, string> = {
@@ -28,6 +29,7 @@ export const TASK_STATUS_GLYPHS: Record<TaskStatus, string> = {
 	awaiting_retry: "↺",
 	completed: "✓",
 	failed: "✕",
+	discarded: "⊘",
 };
 
 export const SCHEDULE_STATUS_COLORS: Record<ScheduleStatus, string> = {

@@ -12,6 +12,7 @@ import type { TimerEntry, TimerSortedSet, WorkflowRunPublisher } from "server/in
 import { runConcurrently } from "server/lib/concurrency";
 import type { Ranked } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
+import { discardStaleTasks } from "server/service/discard-stale-tasks";
 import { ulid } from "ulidx";
 
 import { streamTimers } from "./lib/timer-stream";
@@ -91,8 +92,6 @@ async function processChunk(
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
-	const workflowRunIds = runs.map((run) => run.id);
-
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -111,7 +110,7 @@ async function processChunk(
 			workflowRunId: run.id,
 			type: "workflow_run",
 			status: "queued",
-			attempt: run.attempts,
+			attempt: run.attempts + 1,
 			state,
 		});
 		workflowRunUpdates.push({
@@ -136,18 +135,21 @@ async function processChunk(
 		});
 	}
 
-	if (
-		!isNonEmptyArray(workflowRunIds) ||
-		!isNonEmptyArray(stateTransitionEntries) ||
-		!isNonEmptyArray(workflowRunUpdates)
-	) {
+	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(workflowRunUpdates)) {
 		return;
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
-		await txRepos.task.deleteStaleByWorkflowRunIds(workflowRunIds);
 		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("awaiting_retry", workflowRunUpdates);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("awaiting_retry", workflowRunUpdates, {
+			incrementAttempts: true,
+		});
+		if (!isNonEmptyArray(transitionedRunIds)) {
+			return [];
+		}
+
+		await discardStaleTasks(transitionedRunIds, txRepos);
+
 		const transitionedRunIdsSet = new Set(transitionedRunIds);
 		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
 		if (!isNonEmptyArray(outboxEntriesToInsert)) {

@@ -8,7 +8,7 @@ export type TaskName = string & { _brand: "task_name" };
 
 export type TaskAddress = string & { _brand: "task_address" };
 
-export const TASK_STATUSES = ["running", "awaiting_retry", "completed", "failed"] as const;
+export const TASK_STATUSES = ["running", "awaiting_retry", "completed", "failed", "discarded"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export interface TaskDefinitionOptions {
@@ -19,43 +19,45 @@ export interface TaskStartOptions extends TaskDefinitionOptions {}
 
 interface TaskStateBase {
 	status: TaskStatus;
+	attempts: number;
 }
 
 export interface TaskStateRunning<Input> extends TaskStateBase {
 	status: "running";
-	attempts: number;
 	input: Input;
 }
 
 export interface TaskStateAwaitingRetry extends TaskStateBase {
 	status: "awaiting_retry";
-	attempts: number;
 	error: SerializableError;
 	nextAttemptAt: number;
 }
 
 export interface TaskStateCompleted<Output> extends TaskStateBase {
 	status: "completed";
-	attempts: number;
 	output: Output;
 }
 
 export interface TaskStateFailed extends TaskStateBase {
 	status: "failed";
-	attempts: number;
 	error: SerializableError;
+}
+
+export interface TaskStateDiscarded extends TaskStateBase {
+	status: "discarded";
 }
 
 export type TaskState<Input = unknown, Output = unknown> =
 	| TaskStateRunning<Input>
 	| TaskStateAwaitingRetry
 	| TaskStateCompleted<Output>
-	| TaskStateFailed;
+	| TaskStateFailed
+	| TaskStateDiscarded;
 
 export interface TaskInfo {
 	id: string;
 	name: string;
-	state: TaskState;
+	state: Exclude<TaskState, TaskStateDiscarded>;
 	inputHash: string;
 }
 

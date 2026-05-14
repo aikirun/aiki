@@ -18,6 +18,7 @@ import { InvalidWorkflowRunStateTransitionError, NotFoundError, WorkflowRunRevis
 import type { Repositories } from "server/infra/db/types";
 import type { NamespaceRequestContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
+import { discardStaleTasks } from "server/service/discard-stale-tasks";
 import { ulid } from "ulidx";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
@@ -259,7 +260,7 @@ async function transitionStateInTx(
 	}
 
 	if (toState.status === "scheduled" && toState.reason === "retry") {
-		await txRepos.task.deleteStaleByWorkflowRunIds(runId);
+		await discardStaleTasks(runId, txRepos);
 	}
 
 	if (toState.status === "awaiting_child_workflow") {
