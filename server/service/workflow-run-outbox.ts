@@ -11,7 +11,25 @@ export interface WorkflowRunOutboxServiceDeps {
 export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDeps) {
 	const { repos } = deps;
 
-	async function claimStalePublished(context: NamespaceRequestContext, request: WorkflowRunClaimReadyRequestV1) {
+	async function stealStaleClaimed(context: NamespaceRequestContext, request: WorkflowRunClaimReadyRequestV1) {
+		const workflows = request.workflows;
+		if (!isNonEmptyArray(workflows)) {
+			return [];
+		}
+
+		return repos.workflowRunOutbox.stealStaleClaimed(
+			context.namespaceId,
+			{ workflows, shards: request.shards },
+			request.claimMinIdleTimeMs,
+			request.limit
+		);
+	}
+
+	async function claimStalePublished(
+		context: NamespaceRequestContext,
+		request: Omit<WorkflowRunClaimReadyRequestV1, "limit">,
+		limit: number
+	) {
 		const workflows = request.workflows;
 		if (!isNonEmptyArray(workflows)) {
 			return [];
@@ -21,7 +39,7 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 			context.namespaceId,
 			{ workflows, shards: request.shards },
 			request.claimMinIdleTimeMs,
-			request.limit
+			limit
 		);
 	}
 
@@ -42,8 +60,12 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 	}
 
 	async function claimReady(context: NamespaceRequestContext, request: WorkflowRunClaimReadyRequestV1) {
-		const staleEntries = await claimStalePublished(context, request);
-		const remainingSlots = request.limit - staleEntries.length;
+		const stolenEntries = await stealStaleClaimed(context, request);
+		let remainingSlots = request.limit - stolenEntries.length;
+
+		const stalePublishedEntries = remainingSlots > 0 ? await claimStalePublished(context, request, remainingSlots) : [];
+		remainingSlots -= stalePublishedEntries.length;
+
 		const pendingEntries =
 			remainingSlots > 0
 				? await claimPending(context, {
@@ -54,7 +76,10 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 				: [];
 
 		const runs: Array<{ id: string }> = [];
-		for (const entry of staleEntries) {
+		for (const entry of stolenEntries) {
+			runs.push({ id: entry.workflowRunId });
+		}
+		for (const entry of stalePublishedEntries) {
 			runs.push({ id: entry.workflowRunId });
 		}
 		for (const entry of pendingEntries) {

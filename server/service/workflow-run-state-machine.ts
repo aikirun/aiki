@@ -256,6 +256,8 @@ async function transitionStateInTx(
 	}
 
 	if (toState.status === "running") {
+		await txRepos.workflowRunOutbox.markClaimed(namespaceId, runId);
+	} else if (toState.status !== "queued") {
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
 	}
 
