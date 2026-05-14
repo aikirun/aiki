@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import { and, eq, inArray, lte, min, sql } from "drizzle-orm";
+import type { TaskStatus } from "@aikirun/types/task";
+import { and, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 import type { TimerStreamCursor } from "server/daemons/lib/timer-stream";
 import type { DaemonContext } from "server/middleware/context";
 
@@ -34,7 +35,12 @@ export function createTaskRepository(db: PgDb) {
 
 		async listByWorkflowRunId(workflowRunId: string): Promise<TaskRow[]> {
 			// TODO: explore loading in chunks
-			return db.select().from(task).where(eq(task.workflowRunId, workflowRunId)).orderBy(task.id).limit(10_000);
+			return db
+				.select()
+				.from(task)
+				.where(and(eq(task.workflowRunId, workflowRunId), ne(task.status, "discarded")))
+				.orderBy(task.id)
+				.limit(10_000);
 		},
 
 		async listRetryableTaskWorkflowRuns(
@@ -58,12 +64,39 @@ export function createTaskRepository(db: PgDb) {
 				.limit(limit);
 		},
 
-		async deleteStaleByWorkflowRunIds(workflowRunIds: string | NonEmptyArray<string>): Promise<void> {
+		async listByWorkflowRunIdsAndStatuses(
+			workflowRunIds: string | NonEmptyArray<string>,
+			statuses: TaskStatus[]
+		): Promise<Array<Pick<TaskRow, "id" | "workflowRunId" | "attempts">>> {
 			const runIdsFilter =
 				typeof workflowRunIds === "string"
 					? eq(task.workflowRunId, workflowRunIds)
 					: inArray(task.workflowRunId, workflowRunIds);
-			await db.delete(task).where(and(runIdsFilter, inArray(task.status, ["running", "awaiting_retry", "failed"])));
+			return db
+				.select({ id: task.id, workflowRunId: task.workflowRunId, attempts: task.attempts })
+				.from(task)
+				.where(and(runIdsFilter, inArray(task.status, statuses)));
+		},
+
+		async bulkDiscard(
+			tasks: NonEmptyArray<{ filter: { id: string }; update: { latestStateTransitionId: string } }>
+		): Promise<void> {
+			const valueRows = tasks.map(({ filter, update }, index) => {
+				if (index === 0) {
+					return sql`(${filter.id}::text, ${update.latestStateTransitionId}::text)`;
+				}
+				return sql`(${filter.id}, ${update.latestStateTransitionId})`;
+			});
+
+			await db
+				.update(task)
+				.set({
+					status: "discarded",
+					nextAttemptAt: null,
+					latestStateTransitionId: sql`v.state_transition_id`,
+				})
+				.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, state_transition_id)`)
+				.where(sql`${task.id} = v.id`);
 		},
 	};
 }

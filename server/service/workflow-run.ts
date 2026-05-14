@@ -6,7 +6,7 @@ import { propsRequiredNonNull } from "@aikirun/lib/object";
 import type { EventReferenceOptions, EventWaitQueue } from "@aikirun/types/event";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { SleepQueue } from "@aikirun/types/sleep";
-import type { TaskInfo, TaskQueue, TaskState, TaskStatus } from "@aikirun/types/task";
+import type { TaskInfo, TaskQueue, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/task";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ChildWorkflowRunInfo,
@@ -683,6 +683,9 @@ function buildTaskQueuesByAddressRecord(
 ): Record<string, TaskQueue> {
 	const taskQueuesByAddress: Record<string, TaskQueue> = {};
 	for (const task of tasks) {
+		if (task.status === "discarded") {
+			continue;
+		}
 		const address = getTaskAddress(task.name, task.inputHash);
 		const transition = taskTransitionsById.get(task.latestStateTransitionId);
 		if (!transition) {
@@ -691,7 +694,7 @@ function buildTaskQueuesByAddressRecord(
 		const taskInfo: TaskInfo = {
 			id: task.id,
 			name: task.name,
-			state: transition.state as TaskState,
+			state: transition.state as Exclude<TaskState, TaskStateDiscarded>,
 			inputHash: task.inputHash,
 		};
 		const taskQueue = taskQueuesByAddress[address];

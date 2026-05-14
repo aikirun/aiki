@@ -113,6 +113,7 @@ const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListRespons
 					running: "number.integer >= 0",
 					failed: "number.integer >= 0",
 					awaiting_retry: "number.integer >= 0",
+					discarded: "number.integer >= 0",
 				}).or("undefined"),
 			}).array(),
 			total: "number.integer >= 0",
