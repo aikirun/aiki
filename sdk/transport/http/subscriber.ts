@@ -22,7 +22,7 @@ export interface HttpSubscriberOptions {
 
 export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 	const { api, options } = params;
-	const intervalMs = options?.intervalMs ?? 1_000;
+	const intervalMs = options?.intervalMs ?? 5_000;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
 	const claimMinIdleTimeMs = options?.claimMinIdleTimeMs ?? 90_000;
 
