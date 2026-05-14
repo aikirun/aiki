@@ -8,5 +8,4 @@ CREATE INDEX "idx_workflow_run_outbox_pending" ON "workflow_run_outbox" USING bt
 CREATE INDEX "idx_workflow_run_outbox_published" ON "workflow_run_outbox" USING btree ("namespace_id","status","workflow_name","workflow_version_id","shard","published_at","rank","id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_outbox_claimed" ON "workflow_run_outbox" USING btree ("namespace_id","status","workflow_name","workflow_version_id","shard","claimed_at","rank","id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_run_outbox_status_published_id" ON "workflow_run_outbox" USING btree ("status","published_at","id");--> statement-breakpoint
-CREATE INDEX "idx_workflow_run_outbox_status_claimed_id" ON "workflow_run_outbox" USING btree ("status","claimed_at","id");--> statement-breakpoint
-ALTER TABLE "workflow_run_outbox" ADD CONSTRAINT "chk_workflow_run_outbox_claimed_requires_claimed_at" CHECK ("workflow_run_outbox"."status" != 'claimed' OR "workflow_run_outbox"."claimed_at" IS NOT NULL);
+CREATE INDEX "idx_workflow_run_outbox_status_claimed_id" ON "workflow_run_outbox" USING btree ("status","claimed_at","id");

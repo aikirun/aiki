@@ -1,6 +1,6 @@
 {
-	"id": "d9a279c3-43ca-43a3-b884-f3b28d9ea7b3",
-	"prevId": "2dcea1d6-7762-4931-ad9d-b301266adced",
+	"id": "45ed82e0-5169-4c7d-8910-ad133114f76d",
+	"prevId": "d9a279c3-43ca-43a3-b884-f3b28d9ea7b3",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
@@ -1774,7 +1774,12 @@
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"policies": {},
-			"checkConstraints": {},
+			"checkConstraints": {
+				"chk_workflow_run_outbox_claimed_requires_claimed_at": {
+					"name": "chk_workflow_run_outbox_claimed_requires_claimed_at",
+					"value": "\"workflow_run_outbox\".\"status\" != 'claimed' OR \"workflow_run_outbox\".\"claimed_at\" IS NOT NULL"
+				}
+			},
 			"isRLSEnabled": false
 		},
 		"public.account": {
