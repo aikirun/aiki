@@ -50,6 +50,13 @@
 			"when": 1778759461140,
 			"tag": "0006_smooth_mattie_franklin",
 			"breakpoints": true
+		},
+		{
+			"idx": 7,
+			"version": "7",
+			"when": 1778777052019,
+			"tag": "0007_demonic_firestar",
+			"breakpoints": true
 		}
 	]
 }
