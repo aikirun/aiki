@@ -292,10 +292,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const retryStrategy = this.params.options?.retry ?? { type: "never" };
-		const state = handle.run.state;
-		if (state.status === "queued" && state.reason === "retry") {
-			await this.assertRetryAllowed(handle, retryStrategy, logger);
-		}
 
 		logger.info("Starting workflow");
 		await handle[INTERNAL].transitionState({ status: "running" });
@@ -364,29 +360,6 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 				// If the workflow failed
 				throw new WorkflowRunSuspendedError(run.id);
 			}
-		}
-	}
-
-	private async assertRetryAllowed(
-		handle: WorkflowRunHandle<Input, unknown, AppContext, TEvents>,
-		retryStrategy: RetryStrategy,
-		logger: Logger
-	): Promise<void> {
-		const { id, attempts } = handle.run;
-
-		const retryParams = getRetryParams(attempts, retryStrategy);
-
-		if (!retryParams.retriesLeft) {
-			logger.error("Workflow retry not allowed", { "aiki.attempts": attempts });
-
-			const error = new WorkflowRunFailedError(id as WorkflowRunId, attempts);
-			await handle[INTERNAL].transitionState({
-				status: "failed",
-				cause: "self",
-				error: createSerializableError(error),
-			});
-
-			throw error;
 		}
 	}
 
