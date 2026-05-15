@@ -13,6 +13,7 @@ import { workflowRunOutbox } from "../schema";
 
 export type WorkflowRunOutboxRow = typeof workflowRunOutbox.$inferSelect;
 export type WorkflowRunOutboxRowInsert = typeof workflowRunOutbox.$inferInsert;
+export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & { status: "published"; publishedAt: Date };
 export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "claimed"; claimedAt: Date };
 
 interface ClaimFilter {
@@ -110,11 +111,11 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			claimMinIdleTimeMs: number,
 			limit: number,
 			cursor?: TimerStreamCursor
-		): Promise<WorkflowRunOutboxRow[]> {
+		): Promise<WorkflowRunOutboxRowPublished[]> {
 			const now = Date.now();
 			const staleThreshold = new Date(now - claimMinIdleTimeMs);
 
-			return db
+			const rows = await db
 				.select()
 				.from(workflowRunOutbox)
 				.where(
@@ -126,6 +127,8 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 				)
 				.orderBy(workflowRunOutbox.publishedAt, workflowRunOutbox.id)
 				.limit(limit);
+
+			return rows as WorkflowRunOutboxRowPublished[];
 		},
 
 		async listStaleClaimed(
@@ -195,39 +198,29 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
 		},
 
-		async claimStalePublished(namespaceId: string, filters: ClaimFilter, claimMinIdleTimeMs: number, limit: number) {
-			const now = Date.now();
-			const staleThreshold = new Date(now - claimMinIdleTimeMs);
-
-			const staleEntries = await db
+		async claimPublished(namespaceId: string, filters: ClaimFilter, limit: number) {
+			const entries = await db
 				.select({ id: workflowRunOutbox.id })
 				.from(workflowRunOutbox)
 				.where(
 					and(
 						eq(workflowRunOutbox.namespaceId, namespaceId),
 						eq(workflowRunOutbox.status, "published"),
-						lt(workflowRunOutbox.publishedAt, staleThreshold),
 						buildClaimFilterPredicate(filters)
 					)
 				)
-				.orderBy(workflowRunOutbox.publishedAt, workflowRunOutbox.rank, workflowRunOutbox.id)
+				.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
 				.limit(limit);
 
-			const staleEntryIds = staleEntries.map(({ id }) => id);
-			if (!isNonEmptyArray(staleEntryIds)) {
+			const entryIds = entries.map(({ id }) => id);
+			if (!isNonEmptyArray(entryIds)) {
 				return [];
 			}
 
 			return db
 				.update(workflowRunOutbox)
-				.set({ status: "claimed", claimedAt: new Date(now) })
-				.where(
-					and(
-						eq(workflowRunOutbox.status, "published"),
-						inArray(workflowRunOutbox.id, staleEntryIds),
-						lt(workflowRunOutbox.publishedAt, staleThreshold)
-					)
-				)
+				.set({ status: "claimed", claimedAt: new Date() })
+				.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, entryIds)))
 				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
 		},
 

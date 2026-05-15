@@ -399,14 +399,15 @@ export const workflowRunOutbox = pgTable(
 
 		status: workflowRunOutboxStatusEnum("status").notNull(),
 
+		publishedAt: timestamp("published_at", { withTimezone: true }),
+		claimedAt: timestamp("claimed_at", { withTimezone: true }),
+
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-		publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
-		claimedAt: timestamp("claimed_at", { withTimezone: true }),
 	},
 	(table) => [
 		uniqueIndex("uqidx_workflow_run_outbox_workflow_run_id").on(table.workflowRunId),
-		index("idx_workflow_run_outbox_pending").on(
+		index("idx_workflow_run_outbox_status_workflow_rank_id").on(
 			table.namespaceId,
 			table.status,
 			table.workflowName,
@@ -415,17 +416,7 @@ export const workflowRunOutbox = pgTable(
 			table.rank,
 			table.id
 		),
-		index("idx_workflow_run_outbox_published").on(
-			table.namespaceId,
-			table.status,
-			table.workflowName,
-			table.workflowVersionId,
-			table.shard,
-			table.publishedAt,
-			table.rank,
-			table.id
-		),
-		index("idx_workflow_run_outbox_claimed").on(
+		index("idx_workflow_run_outbox_status_workflow_claimed_rank_id").on(
 			table.namespaceId,
 			table.status,
 			table.workflowName,
@@ -438,6 +429,10 @@ export const workflowRunOutbox = pgTable(
 		index("idx_workflow_run_outbox_status_rank_id").on(table.status, table.rank, table.id),
 		index("idx_workflow_run_outbox_status_published_id").on(table.status, table.publishedAt, table.id),
 		index("idx_workflow_run_outbox_status_claimed_id").on(table.status, table.claimedAt, table.id),
+		check(
+			"chk_workflow_run_outbox_published_requires_published_at",
+			sql`${table.status} != 'published' OR ${table.publishedAt} IS NOT NULL`
+		),
 		check(
 			"chk_workflow_run_outbox_claimed_requires_claimed_at",
 			sql`${table.status} != 'claimed' OR ${table.claimedAt} IS NOT NULL`
