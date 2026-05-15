@@ -4,16 +4,16 @@ import { task, workflow } from "@aikirun/workflow";
  * Demonstrates task retry. The task fails twice then succeeds on the 3rd attempt.
  */
 
-let attempts = 0;
+let tasAttempts = 0;
 
 const unreliableTask = task({
 	name: "unreliable-task",
 	async handler() {
-		attempts++;
-		if (attempts <= 2) {
-			throw new Error(`Failed (attempt ${attempts})`);
+		tasAttempts++;
+		if (tasAttempts <= 2) {
+			throw new Error(`Failed (attempt ${tasAttempts})`);
 		}
-		attempts = 0;
+		tasAttempts = 0;
 		return { ok: true };
 	},
 	options: {
@@ -21,8 +21,17 @@ const unreliableTask = task({
 	},
 });
 
+let workflowAttempts = 0;
+
 export const retryUntilSuccessV1 = workflow({ name: "retry-until-success" }).v("1.0.0", {
 	async handler(run) {
-		return unreliableTask.start(run);
+		workflowAttempts++;
+		if (workflowAttempts <= 1) {
+			throw new Error(`Workflow (attempt ${workflowAttempts})`);
+		}
+		await unreliableTask.start(run);
+	},
+	options: {
+		retry: { type: "exponential", maxAttempts: Number.MAX_SAFE_INTEGER, baseDelayMs: 500 },
 	},
 });

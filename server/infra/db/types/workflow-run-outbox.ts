@@ -3,4 +3,5 @@ export type {
 	WorkflowRunOutboxRow,
 	WorkflowRunOutboxRowClaimed,
 	WorkflowRunOutboxRowInsert,
+	WorkflowRunOutboxRowPublished,
 } from "../pg/repository/workflow-run-outbox";

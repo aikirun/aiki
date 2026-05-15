@@ -25,9 +25,9 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 		);
 	}
 
-	async function claimStalePublished(
+	async function claimPublished(
 		context: NamespaceRequestContext,
-		request: Omit<WorkflowRunClaimReadyRequestV1, "limit">,
+		request: Pick<WorkflowRunClaimReadyRequestV1, "workflows" | "shards">,
 		limit: number
 	) {
 		const workflows = request.workflows;
@@ -35,12 +35,7 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 			return [];
 		}
 
-		return repos.workflowRunOutbox.claimStalePublished(
-			context.namespaceId,
-			{ workflows, shards: request.shards },
-			request.claimMinIdleTimeMs,
-			limit
-		);
+		return repos.workflowRunOutbox.claimPublished(context.namespaceId, { workflows, shards: request.shards }, limit);
 	}
 
 	async function claimPending(
@@ -63,8 +58,8 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 		const stolenEntries = await stealStaleClaimed(context, request);
 		let remainingSlots = request.limit - stolenEntries.length;
 
-		const stalePublishedEntries = remainingSlots > 0 ? await claimStalePublished(context, request, remainingSlots) : [];
-		remainingSlots -= stalePublishedEntries.length;
+		const publishedEntries = remainingSlots > 0 ? await claimPublished(context, request, remainingSlots) : [];
+		remainingSlots -= publishedEntries.length;
 
 		const pendingEntries =
 			remainingSlots > 0
@@ -79,7 +74,7 @@ export function createWorkflowRunOutboxService(deps: WorkflowRunOutboxServiceDep
 		for (const entry of stolenEntries) {
 			runs.push({ id: entry.workflowRunId });
 		}
-		for (const entry of stalePublishedEntries) {
+		for (const entry of publishedEntries) {
 			runs.push({ id: entry.workflowRunId });
 		}
 		for (const entry of pendingEntries) {
