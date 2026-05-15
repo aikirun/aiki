@@ -2,6 +2,91 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.27.0
+
+### New Features
+
+- **Redis subscriber on per-workflow sorted sets** — `@aikirun/redis` no longer uses Redis Streams with per-workflow consumer groups. The server now publishes ready runs by `ZADD`-ing into one sorted set per workflow (per-shard when shards are in use); workers block on `BZPOPMIN` across the sorted sets they're registered for. No consumer-group bookkeeping, no polling, and a run becomes visible to a worker as soon as the publishing transaction commits.
+
+- **Primary/backup subscriber** — When you configure a custom subscriber (e.g., `@aikirun/redis`), the worker also spawns the HTTP subscriber as a backup. If the primary's `getNextBatch` fails, the worker drains from the backup while a scheduled retry to the primary runs in the background. Automatic when you pass a non-HTTP subscriber; no code changes needed.
+
+- **Discarded task status** — When a workflow run transitions back to `scheduled` with reason `retry`, every task from the prior attempt that is still in `running`, `awaiting_retry`, or `failed` is moved to a new terminal status, `discarded`. Discarded entries appear in the state-transition log (carrying the attempt number they belonged to) but are excluded from `TaskInfo.state`, so a run's "current tasks" only shows tasks for the live attempt.
+
+- **Attempt counter on every state transition** — `StateTransitionBase` now carries `attempt: number`. Workflow-run and task transitions both record the workflow attempt they belong to, which the web UI uses directly to group the timeline.
+
+- **Per-call request cancellation** — `ApiClient` methods now accept `{ signal?: AbortSignal }` as a second argument. In-flight HTTP requests can be cancelled — the worker uses this so a shutdown abort can interrupt a long-running `claimReadyV1` poll.
+
+- **Outbox `claimed` status** — The `workflow_run_outbox` table now has a third status, `claimed`, in addition to `pending` and `published`. Combined with a `claimed_at` timestamp refreshed by worker heartbeats, this lets the server distinguish in-flight runs from abandoned ones: `republishStaleRuns` returns claims whose `claimed_at` exceeds `claimMinIdleTimeMs` to the `published` pool so another worker can pick them up. Schema migration applied automatically.
+
+- **Server heartbeat forwarding from custom subscribers** — When the worker uses a non-HTTP subscriber, it still calls `workflowRun.heartbeatV1` on the server every 30 s per active run. Without this, the server-side outbox heartbeat is never refreshed and `republishStaleRuns` would prematurely steal the claim. Automatic, no configuration required.
+
+- **`db:migrate:debug` script** — Alternative migrate entry-point (`bun db:migrate:debug`) that runs each migration file in its own transaction. Works around `drizzle-kit migrate` wrapping all pending migrations in a single transaction, which Postgres rejects when one migration adds an enum value (`ALTER TYPE … ADD VALUE`) that a later migration references. Same journal format as `drizzle-kit migrate`, so the two paths are interchangeable.
+
+### Breaking Changes
+
+- **`WorkflowRunBatch` renamed to `WorkflowRunMessage`** in `@aikirun/types/subscriber`. Update custom subscriber implementations:
+  ```typescript
+  // Before
+  import type { WorkflowRunBatch } from "@aikirun/types/subscriber";
+
+  // After
+  import type { WorkflowRunMessage } from "@aikirun/types/subscriber";
+  ```
+
+- **`SubscriberDelayParams` simplified** — Removed `polled`, `at_capacity`, and `heartbeat` variants; only `no_work` and `retry` remain. Capacity backpressure is now handled inside the worker (via a binary latch on free slots) rather than by asking the subscriber for an at-capacity delay. Update custom subscribers:
+  ```typescript
+  // Before
+  case "polled": return delayParams.foundWork ? 0 : intervalMs;
+  case "at_capacity": return atCapacityIntervalMs;
+  case "heartbeat": return intervalMs;
+
+  // After
+  case "no_work": return intervalMs;
+  ```
+
+- **`Subscriber.getNextBatch` signature** — Now accepts `(size, options?: { abortSignal?: AbortSignal })`. Implementations should honour the signal so a worker shutdown can promptly interrupt a blocking call (e.g., `BZPOPMIN`).
+
+- **`SubscriberContext.workflows` is now `NonEmptyArray<WorkflowMeta>`** — The worker refuses to start with zero registered workflows, so subscribers can rely on at least one entry.
+
+- **`WorkflowRunClaimReadyRequestV1` shape changed** — Removed `workerId` (was unused) and removed per-workflow `shard`; added top-level optional `shards?: string[]`. Shards are a worker-level filter applied to all of its workflows, not a per-workflow attribute, so the old shape forced custom clients to build the Cartesian product themselves. Affects callers of the contract directly.
+
+- **`@aikirun/lib/address` module removed** — `getWorkerConsumerGroupName` and `getWorkflowStreamName` are no longer needed since the Redis subscriber dropped streams + consumer groups. Remove imports if you used them.
+
+- **`splitArray` renamed to `partitionArray`** in `@aikirun/lib/array` with a richer signature that lets each branch carry a different element type:
+  ```typescript
+  // Before
+  const [matches, rest] = splitArray(items, (item) => predicate(item));
+
+  // After
+  const { whenTrue, whenFalse } = partitionArray(items, (item) =>
+    predicate(item) ? { meetsCondition: true, item } : { meetsCondition: false, item }
+  );
+  ```
+
+- **`distributeRoundRobin` removed** from `@aikirun/lib/array` — Round-robin distribution across workflow sorted sets is now done inside a Redis Lua script (`ROUND_ROBIN_ZPOPMIN_SCRIPT`), so the JS helper is dead code.
+
+### Improvements
+
+- **Sub-second timer dispatch via Redis** — Each timer type (sleep elapsed, retry, task retry, scheduled, event/child wait timeout, recurring) has a daemon that scans the DB on a 1 s tick for entries due within `imminenceThresholdMs` (default 3 s). Entries already due are queued and published immediately; the rest go into a single Redis sorted set keyed by `dueAt`-encoded rank. A separate consumer daemon blocks on a signal list paired with the sorted set: when a new entry is added, its `dueAt` is `LPUSH`-ed onto the list, the consumer's `BRPOP` returns, and it pops everything due. Long-tail timers still live in Postgres and only enter the sorted set when they become imminent.
+
+- **Daemons replace `setInterval` crons** — The server's background workers (renamed from `crons/` to `daemons/` internally) now run as a loop with a dynamically computed delay: the next tick fires `intervalMs - durationMs` after the current one finishes, so a slow tick can't overlap with the next one. Replaces the previous `setInterval`-based scheduling that could fire concurrent invocations of the same job under load.
+
+- **Worker shutdown** — `stop()` is now idempotent. It closes subscribers before awaiting the subscriber loop, so blocking calls (e.g., `BZPOPMIN`) unblock by way of the connection closing rather than by polling for the abort signal — the worker no longer hangs at shutdown.
+
+- **Redis keys namespaced under `aiki:`** — All Aiki Redis keys (workflow sorted sets, timer sorted set, signal list) are prefixed so they can't collide with user keys in shared Redis instances.
+
+- **Timer dispatch skips intermediate `scheduled` state** — Due workflow runs now transition directly from `sleeping`/`awaiting_*` to `queued` and are added to the outbox in one step, removing one round-trip of state transition for every timer-driven dispatch.
+
+- **`claimReadyV1` query plan** — The previous query joined the outbox against a derived table built from large `OR` + `CASE WHEN` branches, which the planner's cost grew non-linearly with the number of registered workflows. Replaced with regular joins so plan time scales linearly.
+
+- **`assertRetryAllowed` precheck removed from SDK** — The server is the sole authority on whether a retry is permitted. The SDK no longer rechecks the retry strategy before starting execution; the server's state-machine refusal is what enforces it.
+
+### Web UI
+
+- **Timeline attempt grouping** — Attempt groups are now derived from the `attempt` field on each transition rather than inferred from `scheduled` reason flags. Task transitions are attributed to the workflow attempt that was open when they happened.
+- **Discarded task rendering** — Discarded tasks have their own colour and glyph in tables and timelines.
+- **Reason shown for `queued` state** — Previously only the `scheduled` status displayed its `reason`; `queued` now does too, since runs can land in `queued` directly when their timer was already due.
+
 ## 0.26.0
 
 ### Breaking Changes
