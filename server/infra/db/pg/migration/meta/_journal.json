@@ -64,6 +64,13 @@
 			"when": 1778779232167,
 			"tag": "0008_yellow_zombie",
 			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "7",
+			"when": 1778811698518,
+			"tag": "0009_oval_gateway",
+			"breakpoints": true
 		}
 	]
 }
