@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
 	entry: {
 		"api-key-api": "api-key-api.ts",
+		array: "array.ts",
 		client: "client.ts",
 		duration: "duration.ts",
 		event: "event.ts",

@@ -8,6 +8,10 @@
 			"types": "./dist/api-key-api.d.ts",
 			"import": "./dist/api-key-api.js"
 		},
+		"./array": {
+			"types": "./dist/array.d.ts",
+			"import": "./dist/array.js"
+		},
 		"./client": {
 			"types": "./dist/client.d.ts",
 			"import": "./dist/client.js"
