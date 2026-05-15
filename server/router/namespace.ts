@@ -28,7 +28,7 @@ export function createNamespaceRouter(namespaceService: NamespaceService) {
 
 	const deleteV1 = os.deleteV1.handler(async ({ input, context }) => {
 		assertIsOrganizationManager(context);
-		await namespaceService.softDeleteNamespaceId(context, input.id as NamespaceId);
+		await namespaceService.softDeleteNamespaceById(context, input.id as NamespaceId);
 	});
 
 	const listForUserV1 = os.listForUserV1.handler(async ({ input, context }) => {

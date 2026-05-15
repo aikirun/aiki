@@ -107,7 +107,7 @@ export function createNamespaceService(
 			return repos.namespace.listMembers(namespaceId);
 		},
 
-		async softDeleteNamespaceId(
+		async softDeleteNamespaceById(
 			context: OrganizationManagerSessionRequestContext,
 			namespaceId: NamespaceId
 		): Promise<void> {
