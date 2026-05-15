@@ -11,6 +11,7 @@
 		"db:generate": "drizzle-kit generate --config infra/db/drizzle.config.ts",
 		"db:generate:custom": "drizzle-kit generate --config infra/db/drizzle.config.ts --custom",
 		"db:migrate": "drizzle-kit migrate --config infra/db/drizzle.config.ts",
+		"db:migrate:debug": "bun run infra/db/migrate.ts",
 		"db:push": "drizzle-kit push --config infra/db/drizzle.config.ts"
 	},
 	"dependencies": {
