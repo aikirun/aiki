@@ -51,6 +51,24 @@ end
 return results
 `;
 
+/**
+ * Builds a Redis-backed subscriber that workers use to pull ready workflow
+ * runs from sorted-set queues.
+ *
+ * The factory takes connection params (rather than a pre-constructed ioredis
+ * client) for two reasons:
+ *
+ * 1. The subscriber requires specific ioredis settings — `maxRetriesPerRequest: 0`
+ *    and `enableOfflineQueue: false` — so that connection failures surface to
+ *    the worker's retry/backoff loop instead of being silently absorbed. These
+ *    settings can only be applied at construction time, so the factory owns
+ *    client creation to guarantee them.
+ *
+ * 2. Each spawned worker gets its own connection. The subscriber uses
+ *    `BZPOPMIN`, a blocking command that ties up the underlying connection
+ *    while it waits, so connections cannot be shared across concurrent
+ *    workers.
+ */
 export function redisSubscriber(params: RedisConnectionParams, options?: RedisSubscriberOptions): CreateSubscriber {
 	const intervalMs = 1_000;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
