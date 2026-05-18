@@ -1,14 +1,14 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import type { Publisher, WorkflowRunReadyMessage } from "@aikirun/types/publisher";
 import type { Repositories, WorkflowRunOutboxRowInsert } from "server/infra/db/types";
-import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "server/infra/messaging/types";
 import type { DaemonContext } from "server/middleware/context";
 
 import { createRankStreamCursorAdvancer } from "./lib/rank-stream";
 
 export interface PublishReadyRunsDeps {
 	repos: Pick<Repositories, "workflowRunOutbox">;
-	workflowRunPublisher: WorkflowRunPublisher;
+	workflowRunPublisher: Publisher;
 }
 
 const advanceRankStreamCursor = createRankStreamCursorAdvancer<{ id: string; rank: number }>({
@@ -37,7 +37,7 @@ export async function publishReadyRuns(
 export async function publishRuns(
 	context: DaemonContext,
 	repos: Pick<Repositories, "workflowRunOutbox">,
-	workflowRunPublisher: WorkflowRunPublisher,
+	workflowRunPublisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsert>
 ): Promise<void> {
 	const entryIds: string[] = [];

@@ -52,7 +52,7 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 
 		return {
 			getNextDelay,
-			async getNextBatch(size: number, options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
+			async getReadyRuns(size: number, options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
 				const response = await api.workflowRun.claimReadyV1(
 					{
 						workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),

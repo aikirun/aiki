@@ -160,8 +160,8 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			throw new Error("No workflow registered");
 		}
 
-		const createSubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
-		const primarySubscriber = createSubscriber({
+		const createPrimarySubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
+		const primarySubscriber = createPrimarySubscriber({
 			workerId: this.id,
 			workflows,
 			shards: this.spawnOptions.shards,
@@ -319,7 +319,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 		if (Date.now() >= this.primarySubscriberNextAttemptAt) {
 			try {
-				const batch = await this.primarySubscriber.getNextBatch(size, { abortSignal });
+				const batch = await this.primarySubscriber.getReadyRuns(size, { abortSignal });
 				this.primarySubscriberFailedAttempts = 0;
 				this.backupSubscriberFailedAttempts = 0;
 				this.primarySubscriberNextAttemptAt = 0;
@@ -351,7 +351,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 
 		try {
-			const batch = await this.backupSubscriber.getNextBatch(size, { abortSignal });
+			const batch = await this.backupSubscriber.getReadyRuns(size, { abortSignal });
 			this.backupSubscriberFailedAttempts = 0;
 			return { success: true, batch, activeSubscriber: this.backupSubscriber };
 		} catch (error) {

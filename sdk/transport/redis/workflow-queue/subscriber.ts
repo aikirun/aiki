@@ -11,16 +11,10 @@ import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { Redis } from "ioredis";
 
-export interface RedisSubscriberParams {
-	host: string;
-	port: number;
-	password?: string;
-	db?: number;
-	options?: RedisSubscriberOptions;
-}
+import { getWorkflowQueueName } from "./keys";
+import { attachConnectionSupervisor, type RedisConnectionParams } from "../connection";
 
 export interface RedisSubscriberOptions {
-	connectTimeoutMs?: number;
 	maxRetryIntervalMs?: number;
 }
 
@@ -57,11 +51,9 @@ end
 return results
 `;
 
-export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber {
-	const { options } = params;
+export function redisSubscriber(params: RedisConnectionParams, options?: RedisSubscriberOptions): CreateSubscriber {
 	const intervalMs = 1_000;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
-	const connectTimeoutMs = options?.connectTimeoutMs ?? 5_000;
 
 	const getNextDelay = (delayParams: SubscriberDelayParams) => {
 		switch (delayParams.type) {
@@ -85,6 +77,7 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 	};
 
 	return (context: SubscriberContext): Subscriber => {
+		const connectTimeoutMs = params?.connectTimeoutMs ?? 5_000;
 		const { workflows, shards, logger } = context;
 
 		const redis = new Redis({
@@ -96,50 +89,14 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 			enableOfflineQueue: false,
 			connectTimeout: connectTimeoutMs,
 		});
-
-		type State =
-			| { status: "disconnected" }
-			| { status: "awaiting_ready"; readyWatchdog: ReturnType<typeof setTimeout> }
-			| { status: "connected" }
-			| { status: "closed" };
-
-		let currentState: State = { status: "disconnected" };
-
-		const transitionTo = (nextStatus: State["status"]) => {
-			if (currentState.status === "closed") {
-				return;
-			}
-			if (currentState.status === "awaiting_ready") {
-				clearTimeout(currentState.readyWatchdog);
-			}
-			if (nextStatus === "awaiting_ready") {
-				currentState = { status: "awaiting_ready", readyWatchdog: setTimeout(onReadyCheckTimeout, connectTimeoutMs) };
-			} else {
-				currentState = { status: nextStatus };
-			}
-			if (nextStatus === "closed") {
-				redis.disconnect();
-			}
-		};
-
-		const onReadyCheckTimeout = () => {
-			logger.warn("Redis ready check timed out, forcing reconnect");
-			redis.disconnect(true);
-		};
-
-		redis.on("error", () => {});
-		redis.on("connect", () => transitionTo("awaiting_ready"));
-		redis.on("ready", () => {
-			logger.info("Redis connection established");
-			transitionTo("connected");
-		});
-		redis.on("close", () => transitionTo("disconnected"));
+		redis.on("ready", () => logger.info("Redis connection established"));
+		const connectionSupervisor = attachConnectionSupervisor(redis, { connectTimeoutMs, logger });
 
 		const queueNames = getWorkflowQueueNames(workflows, shards);
 
 		return {
 			getNextDelay,
-			async getNextBatch(size: number): Promise<WorkflowRunMessage[]> {
+			async getReadyRuns(size: number): Promise<WorkflowRunMessage[]> {
 				const shuffledQueueNames = shuffleArray(queueNames);
 				const firstItem = (await redis.bzpopmin(...shuffledQueueNames, 0)) as
 					| [key: string, member: WorkflowRunId, score: string]
@@ -167,7 +124,8 @@ export function redisSubscriber(params: RedisSubscriberParams): CreateSubscriber
 				return batch;
 			},
 			async close(): Promise<void> {
-				transitionTo("closed");
+				connectionSupervisor.detach();
+				redis.disconnect();
 			},
 		};
 	};
@@ -181,8 +139,4 @@ function getWorkflowQueueNames(workflows: WorkflowMeta[], shards?: string[]): st
 	return workflows.flatMap((workflow) =>
 		shards.map((shard) => getWorkflowQueueName(workflow.name, workflow.versionId, shard))
 	);
-}
-
-function getWorkflowQueueName(name: string, versionId: string, shard?: string): string {
-	return shard ? `aiki:workflow:${name}:${versionId}:${shard}` : `aiki:workflow:${name}:${versionId}`;
 }

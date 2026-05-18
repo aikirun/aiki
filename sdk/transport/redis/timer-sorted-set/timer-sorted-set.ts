@@ -1,7 +1,15 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/types/array";
+import type {
+	DueTimer,
+	TimerEntry,
+	TimerSignalWaiter,
+	TimerSignalWaiterContext,
+	TimerSortedSet,
+	TimerType,
+} from "@aikirun/types/timer";
 import type { Redis } from "ioredis";
 
-import type { DueTimer, TimerEntry, TimerSignalWaiter, TimerSortedSet, TimerType } from "../types";
+import { attachConnectionSupervisor } from "../connection";
 
 function encodeMember(type: TimerType, id: string): string {
 	return `${type}:${id}`;
@@ -62,7 +70,7 @@ end
 return minSignal
 `;
 
-export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
+export function redisTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
 	const signalKey = `${key}:signal`;
 
 	return {
@@ -103,8 +111,9 @@ export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet 
 			return Number(result[1]);
 		},
 
-		createSignalWaiter(): TimerSignalWaiter {
+		createSignalWaiter(context: TimerSignalWaiterContext): TimerSignalWaiter {
 			const redisDuplicate = redis.duplicate();
+			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger: context.logger });
 			let closed = false;
 
 			return {
@@ -134,6 +143,7 @@ export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet 
 						return;
 					}
 					closed = true;
+					connectionSupervisor.detach();
 					redisDuplicate.disconnect();
 				},
 			};

@@ -1,4 +1,5 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "./array";
+import type { Logger } from "./logger";
 
 export type TimerType =
 	| "scheduled"
@@ -27,9 +28,14 @@ export interface TimerSignalWaiter {
 	close(): Promise<void>;
 }
 
+export interface TimerSignalWaiterContext {
+	logger: Logger;
+}
+
 export interface TimerSortedSet {
 	add(timers: NonEmptyArray<TimerEntry>): Promise<void>;
 	popDue(maxRank: number, limit: number): Promise<DueTimer[]>;
 	peekNextRank(): Promise<number | null>;
-	createSignalWaiter(): TimerSignalWaiter;
+	createSignalWaiter(context: TimerSignalWaiterContext): TimerSignalWaiter;
+	close?(): Promise<void>;
 }

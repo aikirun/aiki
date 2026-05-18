@@ -1,14 +1,14 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import type { Publisher, WorkflowRunReadyMessage } from "@aikirun/types/publisher";
 import type { Repositories, WorkflowRunOutboxRow } from "server/infra/db/types";
-import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "server/infra/messaging/types";
 import type { DaemonContext } from "server/middleware/context";
 
 import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
 
 export interface RepublishStaleRuns {
 	repos: Pick<Repositories, "workflowRunOutbox">;
-	workflowRunPublisher: WorkflowRunPublisher;
+	workflowRunPublisher: Publisher;
 }
 
 const advanceClaimedCursor = createTimerStreamCursorAdvancer<{ id: string; claimedAt: Date }>({
@@ -57,7 +57,7 @@ export async function republishStaleRuns(
 
 async function republishRuns(
 	context: DaemonContext,
-	workflowRunPublisher: WorkflowRunPublisher,
+	workflowRunPublisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRow>
 ): Promise<void> {
 	const messages = entries.map((entry) => ({

@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { sha256Sync } from "@aikirun/lib/crypto";
+import type { Cache } from "@aikirun/types/cache";
 import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
-import type { Redis } from "ioredis";
 import { UnauthorizedError } from "server/errors";
 import type { ApiKeyRepository, ApiKeyRowInsert, Repositories } from "server/infra/db/types";
 import type { NamespaceSessionRequestContext } from "server/middleware/context";
@@ -13,9 +13,8 @@ const PLATFORM = "aiki";
 const PREFIX_LENGTH = 8;
 const SECRET_LENGTH = 32;
 const CACHE_TTL_SECONDS = 4 * 60 * 60;
-const CACHE_KEY_PREFIX = `${PLATFORM}:api_key:`;
 
-interface CachedKeyInfo {
+export interface CachedApiKeyInfo {
 	organizationId: OrganizationId;
 	namespaceId: NamespaceId;
 	expiresAt: number | null;
@@ -46,16 +45,12 @@ function isValidKeyFormat(key: string): boolean {
 	return platform === PLATFORM && prefix.length === PREFIX_LENGTH && secret.length > 0;
 }
 
-function getCacheKey(keyHash: string): string {
-	return `${CACHE_KEY_PREFIX}${keyHash}`;
-}
-
 export interface ApiKeyServiceDeps {
 	repos: Pick<Repositories, "apiKey" | "organization" | "namespace">;
-	redis?: Redis;
+	cache?: Cache<CachedApiKeyInfo>;
 }
 
-export function createApiKeyService({ repos, redis }: ApiKeyServiceDeps) {
+export function createApiKeyService({ repos, cache }: ApiKeyServiceDeps) {
 	return {
 		async resolveNamespaceRole(context: NamespaceSessionRequestContext): Promise<NamespaceRole> {
 			const organizationRole = await repos.organization.getMemberRole(context.organizationId, context.userId);
@@ -96,11 +91,9 @@ export function createApiKeyService({ repos, redis }: ApiKeyServiceDeps) {
 
 			const keyHash = sha256Sync(key);
 
-			if (redis) {
-				const cacheKey = getCacheKey(keyHash);
-				const cached = await redis.get(cacheKey);
-				if (cached) {
-					const cachedKeyInfo: CachedKeyInfo = JSON.parse(cached);
+			if (cache) {
+				const cachedKeyInfo = await cache.get(keyHash);
+				if (cachedKeyInfo) {
 					if (cachedKeyInfo.expiresAt && cachedKeyInfo.expiresAt <= Date.now()) {
 						return null;
 					}
@@ -120,14 +113,16 @@ export function createApiKeyService({ repos, redis }: ApiKeyServiceDeps) {
 				return null;
 			}
 
-			if (redis) {
-				const cacheKey = getCacheKey(keyHash);
-				const cachedKeyInfo: CachedKeyInfo = {
-					organizationId: keyInfo.organizationId as OrganizationId,
-					namespaceId: keyInfo.namespaceId as NamespaceId,
-					expiresAt: keyInfo.expiresAt,
-				};
-				await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(cachedKeyInfo));
+			if (cache) {
+				await cache.set(
+					keyHash,
+					{
+						organizationId: keyInfo.organizationId as OrganizationId,
+						namespaceId: keyInfo.namespaceId as NamespaceId,
+						expiresAt: keyInfo.expiresAt,
+					},
+					{ ttlSeconds: CACHE_TTL_SECONDS }
+				);
 			}
 
 			return {
@@ -149,14 +144,8 @@ export function createApiKeyService({ repos, redis }: ApiKeyServiceDeps) {
 		},
 
 		async invalidateCacheByHashes(keyHashes: string | NonEmptyArray<string>): Promise<void> {
-			if (redis) {
-				if (Array.isArray(keyHashes)) {
-					const cacheKeys = keyHashes.map(getCacheKey);
-					await redis.del(...cacheKeys);
-				} else {
-					const cacheKey = getCacheKey(keyHashes);
-					await redis.del(cacheKey);
-				}
+			if (cache) {
+				await cache.invalidate(keyHashes);
 			}
 		},
 	};

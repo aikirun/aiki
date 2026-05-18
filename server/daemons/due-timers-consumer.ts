@@ -2,17 +2,12 @@ import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array
 import { streamChunks } from "@aikirun/lib/async";
 import { withRetry } from "@aikirun/lib/retry";
 import type { NamespaceId } from "@aikirun/types/namespace";
+import type { Publisher } from "@aikirun/types/publisher";
+import type { DueTimer, TimerSignalWaiter, TimerSortedSet, TimerType } from "@aikirun/types/timer";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
 import type { WorkflowRunMeta } from "server/infra/db/pg/repository/workflow-run";
 import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
-import type {
-	DueTimer,
-	TimerSignalWaiter,
-	TimerSortedSet,
-	TimerType,
-	WorkflowRunPublisher,
-} from "server/infra/messaging/types";
 import { computeRank, type Ranked, rankDueAtMs } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
 import { createDaemonContext } from "server/middleware/context";
@@ -31,7 +26,7 @@ export interface DueTimersConsumerDeps {
 	repos: Repositories;
 	timerSortedSet: TimerSortedSet;
 	childRunCanceller: ChildRunCanceller;
-	workflowRunPublisher?: WorkflowRunPublisher;
+	workflowRunPublisher?: Publisher;
 }
 
 export interface DueTimersConsumerOptions {
@@ -51,7 +46,7 @@ export function spawnDueTimersConsumer(
 	const abortController = new AbortController();
 	const { signal: abortSignal } = abortController;
 
-	const timerSignalWaiter = deps.timerSortedSet.createSignalWaiter();
+	const timerSignalWaiter = deps.timerSortedSet.createSignalWaiter({ logger });
 
 	const promise = withRetry(
 		() => dueTimersConsumerLoop(logger, deps, timerSignalWaiter, abortSignal, options),

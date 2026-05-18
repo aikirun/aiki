@@ -4,6 +4,7 @@ export default defineConfig({
 	entry: {
 		"api-key-api": "api-key-api.ts",
 		array: "array.ts",
+		cache: "cache.ts",
 		client: "client.ts",
 		duration: "duration.ts",
 		event: "event.ts",
@@ -12,6 +13,7 @@ export default defineConfig({
 		"namespace-api": "namespace-api.ts",
 		organization: "organization.ts",
 		property: "property.ts",
+		publisher: "publisher.ts",
 		"replay-manifest": "replay-manifest.ts",
 		retry: "retry.ts",
 		schedule: "schedule.ts",
@@ -23,6 +25,7 @@ export default defineConfig({
 		symbols: "symbols.ts",
 		task: "task.ts",
 		"task-error": "task-error.ts",
+		timer: "timer.ts",
 		trigger: "trigger.ts",
 		validator: "validator.ts",
 		worker: "worker.ts",

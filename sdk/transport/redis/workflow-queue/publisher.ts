@@ -1,12 +1,9 @@
+import type { Publisher, WorkflowRunReadyMessage } from "@aikirun/types/publisher";
 import type { Redis } from "ioredis";
 
-import type { WorkflowRunPublisher, WorkflowRunReadyMessage } from "../types";
+import { getWorkflowQueueName } from "./keys";
 
-function getWorkflowQueueName(name: string, versionId: string, shard?: string): string {
-	return shard ? `aiki:workflow:${name}:${versionId}:${shard}` : `aiki:workflow:${name}:${versionId}`;
-}
-
-export function createWorkflowRunPublisher(redis: Redis): WorkflowRunPublisher {
+export function redisPublisher(redis: Redis): Publisher {
 	return {
 		async publishReadyRuns(runs: WorkflowRunReadyMessage[]): Promise<void> {
 			const redisPipeline = redis.pipeline();

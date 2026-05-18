@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "./array";
 
 export interface WorkflowRunReadyMessage {
 	id: string;
@@ -8,6 +8,6 @@ export interface WorkflowRunReadyMessage {
 	shard?: string;
 }
 
-export interface WorkflowRunPublisher {
+export interface Publisher {
 	publishReadyRuns(runs: NonEmptyArray<WorkflowRunReadyMessage>): Promise<void>;
 }
