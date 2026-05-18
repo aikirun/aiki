@@ -112,8 +112,14 @@ export function redisTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
 		},
 
 		createSignalWaiter(context: TimerSignalWaiterContext): TimerSignalWaiter {
-			const redisDuplicate = redis.duplicate();
-			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger: context.logger });
+			const redisDuplicate = redis.duplicate({
+				maxRetriesPerRequest: 0,
+				enableOfflineQueue: false,
+			});
+			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, {
+				connectTimeoutMs: redis.options.connectTimeout,
+				logger: context.logger,
+			});
 			let closed = false;
 
 			return {
