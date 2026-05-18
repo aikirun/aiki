@@ -108,7 +108,7 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 			connectTimeout: connectTimeoutMs,
 		});
 		redis.on("ready", () => logger.info("Redis connection established"));
-		const connectionSupervisor = attachConnectionSupervisor(redis, { connectTimeoutMs, logger });
+		const connectionSupervisor = attachConnectionSupervisor(redis, { logger });
 
 		const queueNames = getWorkflowQueueNames(workflows, shards);
 

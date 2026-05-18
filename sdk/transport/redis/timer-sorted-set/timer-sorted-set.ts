@@ -116,10 +116,7 @@ export function redisTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
 				maxRetriesPerRequest: 0,
 				enableOfflineQueue: false,
 			});
-			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, {
-				connectTimeoutMs: redis.options.connectTimeout,
-				logger: context.logger,
-			});
+			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger: context.logger });
 			let closed = false;
 
 			return {
