@@ -11,7 +11,7 @@ import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import { Redis } from "ioredis";
 
-import { getWorkflowQueueName } from "./keys";
+import { getWorkflowQueueName } from "./key";
 import { attachConnectionSupervisor, type RedisConnectionParams } from "../connection";
 
 export interface RedisSubscriberOptions {

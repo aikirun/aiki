@@ -1,3 +1,3 @@
 export * from "./cache";
+export * from "./queue";
 export * from "./timer-sorted-set";
-export * from "./workflow-run-queue";

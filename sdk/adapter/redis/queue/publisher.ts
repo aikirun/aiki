@@ -2,7 +2,7 @@ import type { NonEmptyArray } from "@aikirun/types/array";
 import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/publisher";
 import type { Redis } from "ioredis";
 
-import { getWorkflowQueueName } from "./keys";
+import { getWorkflowQueueName } from "./key";
 
 export function redisPublisher(redis: Redis): Publisher {
 	return {
