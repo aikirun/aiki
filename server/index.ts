@@ -19,7 +19,7 @@ import {
 	type OrganizationRequestContext,
 } from "./middleware/context";
 import { createNamespaceAuthedRouter, createOrganizationAuthedRouter } from "./router/index";
-import { type CachedApiKeyInfo, createApiKeyService } from "./service/api-key";
+import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 import { createAuthService } from "./service/auth";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 import { createNamespaceService } from "./service/namespace";
@@ -38,7 +38,7 @@ if (import.meta.main) {
 
 	let redis: Redis | undefined;
 
-	let apiKeyCache: Cache<CachedApiKeyInfo> | undefined;
+	let apiKeyCache: Cache<ApiKeyAuthorizationInfo> | undefined;
 	let timerSortedSet: TimerSortedSet | undefined;
 	let workflowRunPublisher: Publisher | undefined;
 

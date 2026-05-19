@@ -14,7 +14,7 @@ const PREFIX_LENGTH = 8;
 const SECRET_LENGTH = 32;
 const CACHE_TTL_SECONDS = 4 * 60 * 60;
 
-export interface CachedApiKeyInfo {
+export interface ApiKeyAuthorizationInfo {
 	organizationId: OrganizationId;
 	namespaceId: NamespaceId;
 	expiresAt: number | null;
@@ -47,7 +47,7 @@ function isValidKeyFormat(key: string): boolean {
 
 export interface ApiKeyServiceDeps {
 	repos: Pick<Repositories, "apiKey" | "organization" | "namespace">;
-	cache?: Cache<CachedApiKeyInfo>;
+	cache?: Cache<ApiKeyAuthorizationInfo>;
 }
 
 export function createApiKeyService({ repos, cache }: ApiKeyServiceDeps) {
