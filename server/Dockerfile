@@ -19,6 +19,7 @@ RUN bun install --frozen-lockfile
 
 COPY lib/ ./lib/
 COPY types/ ./types/
+COPY sdk/adapter/redis/ ./sdk/adapter/redis/
 COPY server/ ./server/
 COPY tsconfig.json ./
 
