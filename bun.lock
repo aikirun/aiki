@@ -29,6 +29,21 @@
         "@aikirun/types": "workspace:*",
       },
     },
+    "sdk/adapter/http": {
+      "name": "@aikirun/http",
+      "version": "0.27.0",
+      "dependencies": {
+        "@aikirun/types": "workspace:*",
+      },
+    },
+    "sdk/adapter/redis": {
+      "name": "@aikirun/redis",
+      "version": "0.27.0",
+      "dependencies": {
+        "@aikirun/types": "workspace:*",
+        "ioredis": "^5.4.1",
+      },
+    },
     "sdk/client": {
       "name": "@aikirun/client",
       "version": "0.27.0",
@@ -43,21 +58,6 @@
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
-      },
-    },
-    "sdk/transport/http": {
-      "name": "@aikirun/http",
-      "version": "0.27.0",
-      "dependencies": {
-        "@aikirun/types": "workspace:*",
-      },
-    },
-    "sdk/transport/redis": {
-      "name": "@aikirun/redis",
-      "version": "0.27.0",
-      "dependencies": {
-        "@aikirun/types": "workspace:*",
-        "ioredis": "^5.4.1",
       },
     },
     "sdk/worker": {
@@ -136,11 +136,11 @@
 
     "@aikirun/examples": ["@aikirun/examples@workspace:examples"],
 
-    "@aikirun/http": ["@aikirun/http@workspace:sdk/transport/http"],
+    "@aikirun/http": ["@aikirun/http@workspace:sdk/adapter/http"],
 
     "@aikirun/lib": ["@aikirun/lib@workspace:lib"],
 
-    "@aikirun/redis": ["@aikirun/redis@workspace:sdk/transport/redis"],
+    "@aikirun/redis": ["@aikirun/redis@workspace:sdk/adapter/redis"],
 
     "@aikirun/server": ["@aikirun/server@workspace:server"],
 

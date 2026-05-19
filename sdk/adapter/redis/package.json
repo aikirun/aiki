@@ -1,8 +1,7 @@
 {
-	"name": "@aikirun/http",
+	"name": "@aikirun/redis",
 	"version": "0.27.0",
-	"private": true,
-	"description": "Internal HTTP polling transport for Aiki workers",
+	"description": "Redis adapter for Aiki - publisher, subscriber, cache, and timer scheduling backed by Redis",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -19,7 +18,11 @@
 		"build": "tsup"
 	},
 	"dependencies": {
-		"@aikirun/types": "workspace:*"
+		"@aikirun/types": "workspace:*",
+		"ioredis": "^5.4.1"
+	},
+	"publishConfig": {
+		"access": "public"
 	},
 	"license": "Apache-2.0"
 }

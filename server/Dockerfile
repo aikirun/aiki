@@ -8,8 +8,8 @@ COPY types/package.json ./types/
 COPY server/package.json ./server/
 COPY sdk/client/package.json ./sdk/client/
 COPY sdk/endpoint/package.json ./sdk/endpoint/
-COPY sdk/transport/http/package.json ./sdk/transport/http/
-COPY sdk/transport/redis/package.json ./sdk/transport/redis/
+COPY sdk/adapter/http/package.json ./sdk/adapter/http/
+COPY sdk/adapter/redis/package.json ./sdk/adapter/redis/
 COPY sdk/worker/package.json ./sdk/worker/
 COPY sdk/workflow/package.json ./sdk/workflow/
 COPY web/package.json ./web/

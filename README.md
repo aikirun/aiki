@@ -208,7 +208,7 @@ See the [Installation Guide](./docs/getting-started/installation.md) for detaile
 - [`@aikirun/client`](https://www.npmjs.com/package/@aikirun/client) — Client SDK
 - [`@aikirun/worker`](https://www.npmjs.com/package/@aikirun/worker) — Worker SDK
 - [`@aikirun/endpoint`](https://www.npmjs.com/package/@aikirun/endpoint) — Endpoint SDK (serverless)
-- [`@aikirun/redis`](https://www.npmjs.com/package/@aikirun/redis) — Redis transport (optional)
+- [`@aikirun/redis`](https://www.npmjs.com/package/@aikirun/redis) — Redis adapter (optional)
 
 ## License
 
