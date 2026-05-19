@@ -1,3 +1,4 @@
+import type { NonEmptyArray } from "@aikirun/types/array";
 import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/publisher";
 import type { Redis } from "ioredis";
 
@@ -5,7 +6,7 @@ import { getWorkflowQueueName } from "./keys";
 
 export function redisPublisher(redis: Redis): Publisher {
 	return {
-		async publishReadyRuns(runs: ReadyWorkflowRun[]): Promise<void> {
+		async publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<void> {
 			const redisPipeline = redis.pipeline();
 
 			const argsByQueueName = new Map<string, (string | number)[]>();
