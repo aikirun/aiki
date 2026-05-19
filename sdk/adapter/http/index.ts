@@ -1,2 +1,2 @@
-export type { HttpSubscriberOptions, HttpSubscriberParams } from "./subscriber";
-export { httpSubscriber } from "./subscriber";
+export type { HttpSubscriberOptions, HttpSubscriberParams } from "./workflow-run-queue/subscriber";
+export { httpSubscriber } from "./workflow-run-queue/subscriber";
