@@ -2,6 +2,7 @@
 	"compilerOptions": {
 		"baseUrl": "..",
 		"paths": {
+			"@aikirun/lib/*": ["./lib/*/index.ts"],
 			"@aikirun/types": ["./types/index.ts"],
 			"@aikirun/types/*": ["./types/*.ts"]
 		},

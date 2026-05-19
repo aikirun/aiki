@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/types/array";
+import type { NonEmptyArray } from "@aikirun/lib/array";
 import type {
 	DueTimer,
 	TimerEntry,

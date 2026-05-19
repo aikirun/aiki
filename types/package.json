@@ -8,10 +8,6 @@
 			"types": "./dist/api-key-api.d.ts",
 			"import": "./dist/api-key-api.js"
 		},
-		"./array": {
-			"types": "./dist/array.d.ts",
-			"import": "./dist/array.js"
-		},
 		"./cache": {
 			"types": "./dist/cache.d.ts",
 			"import": "./dist/cache.js"
@@ -43,10 +39,6 @@
 		"./organization": {
 			"types": "./dist/organization.d.ts",
 			"import": "./dist/organization.js"
-		},
-		"./property": {
-			"types": "./dist/property.d.ts",
-			"import": "./dist/property.js"
 		},
 		"./publisher": {
 			"types": "./dist/publisher.d.ts",

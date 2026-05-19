@@ -1,4 +1,9 @@
-import type { SerializableError } from "@aikirun/types/serializable";
+export interface SerializableError {
+	message: string;
+	name: string;
+	stack?: string;
+	cause?: SerializableError;
+}
 
 export function createSerializableError(error: unknown): SerializableError {
 	return error instanceof Error

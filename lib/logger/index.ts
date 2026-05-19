@@ -1,1 +1,2 @@
-export { ConsoleLogger } from "./console-logger";
+export * from "./console-logger";
+export * from "./types";

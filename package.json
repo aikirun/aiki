@@ -31,7 +31,7 @@
 		"web": "bun run --cwd web dev",
 		"changeset": "changeset",
 		"bump": "changeset version && find . -path ./node_modules -prune -o -path ./CHANGELOG.md -prune -o -name CHANGELOG.md -print -exec rm {} + && rm bun.lock && bun install && bun run lint:fix",
-		"clean": "rm -rf types/dist lib/dist server/dist sdk/*/dist",
+		"clean": "rm -rf lib/dist types/dist server/dist sdk/*/dist sdk/adapter/*/dist",
 		"build:types": "bun run --cwd types build",
 		"build:lib": "bun run --cwd lib build",
 		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/client build && bun run --cwd sdk/adapter/http build && bun run --cwd sdk/adapter/redis build && bun run --cwd sdk/worker build && bun run --cwd sdk/endpoint build",
@@ -40,7 +40,7 @@
 		"docker:up": "docker compose up -d",
 		"docker:down": "docker compose down",
 		"docker:logs": "docker compose logs -f",
-		"release": "bun run build:types && bun run build:lib && bun run build:sdk && bun run release:publish && git tag v$(bun -e \"console.log(require('./types/package.json').version)\") && git push && git push --tags",
+		"release": "bun run build:lib && bun run build:types && bun run build:sdk && bun run release:publish && git tag v$(bun -e \"console.log(require('./types/package.json').version)\") && git push && git push --tags",
 		"release:publish": "for pkg in types sdk/workflow sdk/client sdk/adapter/redis sdk/worker sdk/endpoint; do (cd $pkg && bun publish --access public) || true; done",
 		"prepare": "husky"
 	},

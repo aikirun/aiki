@@ -3,7 +3,6 @@ import { defineConfig } from "tsup";
 export default defineConfig({
 	entry: {
 		"api-key-api": "api-key-api.ts",
-		array: "array.ts",
 		cache: "cache.ts",
 		client: "client.ts",
 		duration: "duration.ts",
@@ -12,7 +11,6 @@ export default defineConfig({
 		namespace: "namespace.ts",
 		"namespace-api": "namespace-api.ts",
 		organization: "organization.ts",
-		property: "property.ts",
 		publisher: "publisher.ts",
 		"replay-manifest": "replay-manifest.ts",
 		retry: "retry.ts",
@@ -39,4 +37,5 @@ export default defineConfig({
 	dts: true,
 	clean: true,
 	outDir: "dist",
+	noExternal: ["@aikirun/lib"],
 });

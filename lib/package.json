@@ -25,10 +25,6 @@
 			"types": "./dist/duration/index.d.ts",
 			"import": "./dist/duration/index.js"
 		},
-		"./error": {
-			"types": "./dist/error/index.d.ts",
-			"import": "./dist/error/index.js"
-		},
 		"./json": {
 			"types": "./dist/json/index.d.ts",
 			"import": "./dist/json/index.js"
@@ -49,6 +45,10 @@
 			"types": "./dist/retry/index.d.ts",
 			"import": "./dist/retry/index.js"
 		},
+		"./serializable": {
+			"types": "./dist/serializable/index.d.ts",
+			"import": "./dist/serializable/index.js"
+		},
 		"./testing/expect": {
 			"types": "./dist/testing/expect/index.d.ts",
 			"import": "./dist/testing/expect/index.js"
@@ -59,9 +59,6 @@
 	],
 	"scripts": {
 		"build": "tsup"
-	},
-	"dependencies": {
-		"@aikirun/types": "workspace:*"
 	},
 	"license": "Apache-2.0"
 }

@@ -1,4 +1,5 @@
-import type { OptionalProp } from "./property";
+import type { OptionalProp } from "@aikirun/lib/object";
+
 import type { RetryStrategy } from "./retry";
 import type { SerializableError } from "./serializable";
 

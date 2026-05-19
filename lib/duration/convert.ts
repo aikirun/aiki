@@ -1,4 +1,18 @@
-import type { Duration, DurationFields } from "@aikirun/types/duration";
+import type { RequireAtLeastOneProp } from "../object";
+
+interface DurationFields {
+	days?: number;
+	hours?: number;
+	minutes?: number;
+	seconds?: number;
+	milliseconds?: number;
+}
+
+export type DurationObject = RequireAtLeastOneProp<DurationFields>;
+
+type DurationMs = number;
+
+export type Duration = DurationMs | DurationObject;
 
 const MS_PER_SECOND = 1_000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;

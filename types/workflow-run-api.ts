@@ -1,5 +1,6 @@
+import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
+
 import type { EventSendOptions } from "./event";
-import type { DistributiveOmit, OptionalProp } from "./property";
 import type { StateTransition } from "./state-transition";
 import type {
 	TaskInfo,

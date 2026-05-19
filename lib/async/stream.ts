@@ -1,6 +1,5 @@
-import type { OptionalProp } from "@aikirun/types/property";
-
 import { isNonEmptyArray, type NonEmptyArray } from "../array";
+import type { OptionalProp } from "../object";
 
 export interface StreamChunksOptions<Item, Cursor> {
 	advanceCursor?: (current: Cursor | undefined, item: Item) => Cursor;

@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "./array";
+import type { NonEmptyArray } from "@aikirun/lib/array";
 
 export interface ReadyWorkflowRun {
 	id: string;

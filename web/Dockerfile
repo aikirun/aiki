@@ -17,6 +17,7 @@ COPY examples/package.json ./examples/
 
 RUN bun install --frozen-lockfile
 
+COPY lib/ ./lib/
 COPY types/ ./types/
 COPY web/ ./web/
 COPY tsconfig.json ./

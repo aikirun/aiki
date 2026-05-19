@@ -1,41 +1,53 @@
-// biome-ignore-all lint/correctness/noUnusedVariables: the unused types are tests
-import type { RequireAtLeastOneProp } from "@aikirun/types/property";
-
 import type { NonEmptyArray } from "../array";
 import type { Equal, ExpectTrue } from "../testing/expect/types";
 
 export type EmptyRecord = Record<PropertyKey, never>;
 
-export type NonArrayObject<T> = T extends object ? (T extends ReadonlyArray<unknown> ? never : T) : never;
-//#region <NonArrayObject Tests>
-type TestNonArrayObjectPlainObject = ExpectTrue<Equal<NonArrayObject<EmptyRecord>, EmptyRecord>>;
-type TestNonArrayObjectFunction = ExpectTrue<Equal<NonArrayObject<() => unknown>, () => unknown>>;
-type TestNonArrayObjectArray = ExpectTrue<Equal<NonArrayObject<[]>, never>>;
-type TestNonArrayReadonlyArray = ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>;
-//#endregion
+export type DistributiveOmit<T, K extends keyof T> = T extends T ? Omit<T, K> : never;
 
-//#region <RequireAtLeastOneProp Tests>
-type TestRequireAtLeastOnePropProducesUnion = ExpectTrue<
-	Equal<
-		RequireAtLeastOneProp<{ a?: string; b?: number; c?: boolean }, "a" | "b">,
-		{ a: string; b?: number; c?: boolean } | { a?: string; b: number; c?: boolean }
-	>
->;
-type TestRequireAtLeastOneDefaultIsUnionOfAllProps = ExpectTrue<
-	Equal<
-		RequireAtLeastOneProp<{ a?: string; b?: number; c?: boolean }>,
-		| { a: string; b?: number; c?: boolean }
-		| { a?: string; b: number; c?: boolean }
-		| { a?: string; b?: number; c: boolean }
-	>
->;
-type TestRequireAtLeastOnePropPreservesPreviouslyRequiredProp = ExpectTrue<
-	Equal<
-		RequireAtLeastOneProp<{ a: string; b?: number; c?: boolean }, "a" | "b">,
-		{ a: string; b?: number; c?: boolean } | { a: string; b: number; c?: boolean }
-	>
->;
-//#endregion
+export type OptionalProp<T, K extends keyof T> = Omit<T, K> & { [Key in K]?: T[Key] };
+
+export type NonArrayObject<T> = T extends object ? (T extends ReadonlyArray<unknown> ? never : T) : never;
+declare const _nonArrayObjectTypeTests: [
+	ExpectTrue<Equal<NonArrayObject<EmptyRecord>, EmptyRecord>>,
+	ExpectTrue<Equal<NonArrayObject<() => unknown>, () => unknown>>,
+	ExpectTrue<Equal<NonArrayObject<[]>, never>>,
+	ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>,
+];
+
+export type RequiredProp<T, K extends keyof T> = T & {
+	[Key in K]-?: Exclude<T[K], undefined>;
+};
+
+export type RequiredNonNullableProp<T, K extends keyof T> = T & {
+	[Key in K]-?: NonNullable<T[K]>;
+};
+
+export type RequireAtLeastOneProp<T, Keys extends keyof T = keyof T> = {
+	[K in Keys]-?: Required<Pick<T, K>> & Omit<T, K>;
+}[Keys];
+declare const _requireAtLeastOnePropTypeTests: [
+	ExpectTrue<
+		Equal<
+			RequireAtLeastOneProp<{ a?: string; b?: number; c?: boolean }, "a" | "b">,
+			{ a: string; b?: number; c?: boolean } | { a?: string; b: number; c?: boolean }
+		>
+	>,
+	ExpectTrue<
+		Equal<
+			RequireAtLeastOneProp<{ a?: string; b?: number; c?: boolean }>,
+			| { a: string; b?: number; c?: boolean }
+			| { a?: string; b: number; c?: boolean }
+			| { a?: string; b?: number; c: boolean }
+		>
+	>,
+	ExpectTrue<
+		Equal<
+			RequireAtLeastOneProp<{ a: string; b?: number; c?: boolean }, "a" | "b">,
+			{ a: string; b?: number; c?: boolean } | { a: string; b: number; c?: boolean }
+		>
+	>,
+];
 
 type IsSubtype<SubT, SuperT> = SubT extends SuperT ? true : false;
 
