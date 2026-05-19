@@ -10,7 +10,14 @@ import type { UnconsumedManifestEntries } from "@aikirun/types/replay-manifest";
 import type { RetryStrategy } from "@aikirun/types/retry";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { TaskDefinitionOptions, TaskId, TaskInfo, TaskName, TaskStartOptions } from "@aikirun/types/task";
+import type {
+	TaskAddress,
+	TaskDefinitionOptions,
+	TaskId,
+	TaskInfo,
+	TaskName,
+	TaskStartOptions,
+} from "@aikirun/types/task";
 import { TaskFailedError } from "@aikirun/types/task-error";
 import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import {
@@ -120,7 +127,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const inputRaw = args[0];
 		const input = await this.parse(handle, this.params.schema?.input, inputRaw, run.logger);
 		const inputHash = await hashInput(input);
-		const address = getTaskAddress(this.name, inputHash);
+		const address = getTaskAddress(this.name, inputHash) as TaskAddress;
 
 		const replayManifest = run[INTERNAL].replayManifest;
 

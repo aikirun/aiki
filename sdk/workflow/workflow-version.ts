@@ -15,6 +15,7 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	WorkflowDefinitionOptions,
 	WorkflowRun,
+	WorkflowRunAddress,
 	WorkflowRunId,
 	WorkflowRunStateFailed,
 	WorkflowStartOptions,
@@ -172,7 +173,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		const inputHash = await hashInput(input);
 
 		const referenceId = startOptions.reference?.id;
-		const address = getWorkflowRunAddress(this.name, this.versionId, referenceId ?? inputHash);
+		const address = getWorkflowRunAddress(this.name, this.versionId, referenceId ?? inputHash) as WorkflowRunAddress;
 		const replayManifest = parentRun[INTERNAL].replayManifest;
 
 		if (replayManifest.hasUnconsumedEntries()) {
