@@ -37,5 +37,4 @@ export interface TimerSortedSet {
 	popDue(maxRank: number, limit: number): Promise<DueTimer[]>;
 	peekNextRank(): Promise<number | null>;
 	createSignalWaiter(context: TimerSignalWaiterContext): TimerSignalWaiter;
-	close?(): Promise<void>;
 }

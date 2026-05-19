@@ -189,7 +189,7 @@ if (import.meta.main) {
 	const shutdown = () => {
 		if (!shutdownPromise) {
 			shutdownPromise = (async () => {
-				await Promise.all([daemons.shutdown(), timerSortedSet?.close?.(), redis?.quit()]);
+				await Promise.all([daemons.shutdown(), redis?.quit()]);
 				process.exit(0);
 			})();
 		}
