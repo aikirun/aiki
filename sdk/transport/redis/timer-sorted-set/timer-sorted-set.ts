@@ -129,12 +129,12 @@ export function redisTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
 				async wait(timeoutSeconds: number): Promise<number> {
 					const result = await redisDuplicate.brpop(signalKey, timeoutSeconds);
 					if (result === null) {
-						await redis.del(signalKey);
+						await redisDuplicate.del(signalKey);
 						return 0;
 					}
 
 					const signal = Number(result[1]);
-					const minSignal = (await redis.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
+					const minSignal = (await redisDuplicate.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
 					if (minSignal === null) {
 						return signal;
 					}
