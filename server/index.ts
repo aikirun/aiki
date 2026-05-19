@@ -189,7 +189,10 @@ if (import.meta.main) {
 	const shutdown = () => {
 		if (!shutdownPromise) {
 			shutdownPromise = (async () => {
-				await Promise.all([daemons.shutdown(), redis?.quit()]);
+				await daemons.shutdown();
+				if (redis) {
+					await redis.quit();
+				}
 				process.exit(0);
 			})();
 		}
