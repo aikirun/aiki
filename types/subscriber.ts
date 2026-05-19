@@ -4,7 +4,7 @@ import type { WorkflowMeta } from "./workflow";
 import type { WorkflowRunId } from "./workflow-run";
 
 export interface WorkflowRunMessage {
-	data: { workflowRunId: WorkflowRunId };
+	data: { id: WorkflowRunId };
 }
 
 export type SubscriberDelayParams = { type: "no_work" } | { type: "retry"; attemptNumber: number };

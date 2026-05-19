@@ -123,7 +123,7 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 					return [];
 				}
 
-				const batch: WorkflowRunMessage[] = [{ data: { workflowRunId: firstItem[1] } }];
+				const batch: WorkflowRunMessage[] = [{ data: { id: firstItem[1] } }];
 
 				const remainingCapacity = size - 1;
 				if (remainingCapacity > 0) {
@@ -135,7 +135,7 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 					)) as WorkflowRunId[];
 
 					for (const workflowRunId of workflowRunIds) {
-						batch.push({ data: { workflowRunId: workflowRunId } });
+						batch.push({ data: { id: workflowRunId } });
 					}
 				}
 

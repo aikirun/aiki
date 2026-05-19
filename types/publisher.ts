@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "./array";
 
-export interface WorkflowRunReadyMessage {
+export interface ReadyWorkflowRun {
 	id: string;
 	name: string;
 	versionId: string;
@@ -9,5 +9,5 @@ export interface WorkflowRunReadyMessage {
 }
 
 export interface Publisher {
-	publishReadyRuns(runs: NonEmptyArray<WorkflowRunReadyMessage>): Promise<void>;
+	publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<void>;
 }

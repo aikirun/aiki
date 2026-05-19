@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
-import type { Publisher, WorkflowRunReadyMessage } from "@aikirun/types/publisher";
+import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/publisher";
 import type { Repositories, WorkflowRunOutboxRowInsert } from "server/infra/db/types";
 import type { DaemonContext } from "server/middleware/context";
 
@@ -41,10 +41,10 @@ export async function publishRuns(
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsert>
 ): Promise<void> {
 	const entryIds: string[] = [];
-	const messages: WorkflowRunReadyMessage[] = [];
+	const runs: ReadyWorkflowRun[] = [];
 	for (const entry of entries) {
 		entryIds.push(entry.id);
-		messages.push({
+		runs.push({
 			id: entry.workflowRunId,
 			name: entry.workflowName,
 			versionId: entry.workflowVersionId,
@@ -53,8 +53,8 @@ export async function publishRuns(
 		});
 	}
 
-	await workflowRunPublisher.publishReadyRuns(messages as NonEmptyArray<WorkflowRunReadyMessage>);
-	context.logger.debug({ count: messages.length }, "Published ready workflow runs");
+	await workflowRunPublisher.publishReadyRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
+	context.logger.debug({ count: runs.length }, "Published ready workflow runs");
 
 	await repos.workflowRunOutbox.markPublished(entryIds as NonEmptyArray<string>);
 }

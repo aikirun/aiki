@@ -289,7 +289,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 
 			const workflowRunIdsToEnqueue: WorkflowRunId[] = [];
 			for (const { data } of nextBatchResponse.batch) {
-				const { workflowRunId } = data;
+				const { id: workflowRunId } = data;
 				if (!this.pendingWorkflowRunIds.has(workflowRunId) && !this.activeWorkflowRunsById.has(workflowRunId)) {
 					this.pendingWorkflowRunIds.add(workflowRunId);
 					workflowRunIdsToEnqueue.push(workflowRunId);

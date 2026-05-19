@@ -64,7 +64,7 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 				);
 
 				return response.runs.map((run) => ({
-					data: { workflowRunId: run.id as WorkflowRunId },
+					data: { id: run.id as WorkflowRunId },
 				}));
 			},
 		};
