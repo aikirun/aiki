@@ -95,7 +95,7 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 	};
 
 	return (context: SubscriberContext): Subscriber => {
-		const connectTimeoutMs = params?.connectTimeoutMs ?? 5_000;
+		const connectTimeoutMs = params.connectTimeoutMs ?? 5_000;
 		const { workflows, shards, logger } = context;
 
 		const redis = new Redis({

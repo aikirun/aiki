@@ -21,6 +21,7 @@ interface RedisConnectionSupervisorOptions {
  */
 export function attachConnectionSupervisor(redis: Redis, options?: RedisConnectionSupervisorOptions) {
 	const logger = options?.logger;
+	const connectTimeoutMs = redis.options.connectTimeout ?? 5_000;
 
 	type State =
 		| { status: "disconnected" }
@@ -45,7 +46,7 @@ export function attachConnectionSupervisor(redis: Redis, options?: RedisConnecti
 		if (nextStatus === "awaiting_ready") {
 			currentState = {
 				status: "awaiting_ready",
-				supervisor: setTimeout(onReadyHandshakeStalled, redis.options.connectTimeout),
+				supervisor: setTimeout(onReadyHandshakeStalled, connectTimeoutMs),
 			};
 		} else {
 			currentState = { status: nextStatus };
