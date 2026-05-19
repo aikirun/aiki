@@ -1,8 +1,9 @@
 import { delay } from "@aikirun/lib/async";
 import { withRetry } from "@aikirun/lib/retry";
+import type { Publisher } from "@aikirun/types/publisher";
+import type { TimerSortedSet } from "@aikirun/types/timer";
 import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
-import type { TimerSortedSet, WorkflowRunPublisher } from "server/infra/messaging/types";
 import type { DaemonContext } from "server/middleware/context";
 import { createDaemonContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
@@ -20,7 +21,7 @@ import { republishStaleRuns } from "./republish-stale-runs";
 
 export interface InitDaemonsDeps {
 	repos: Repositories;
-	workflowRunPublisher?: WorkflowRunPublisher;
+	workflowRunPublisher?: Publisher;
 	timerSortedSet?: TimerSortedSet;
 	childRunCanceller: ChildRunCanceller;
 }

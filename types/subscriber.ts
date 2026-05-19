@@ -4,14 +4,14 @@ import type { WorkflowMeta } from "./workflow";
 import type { WorkflowRunId } from "./workflow-run";
 
 export interface WorkflowRunMessage {
-	data: { workflowRunId: WorkflowRunId };
+	data: { id: WorkflowRunId };
 }
 
 export type SubscriberDelayParams = { type: "no_work" } | { type: "retry"; attemptNumber: number };
 
 export interface Subscriber {
 	getNextDelay: (context: SubscriberDelayParams) => number;
-	getNextBatch: (size: number, options?: { abortSignal?: AbortSignal }) => Promise<WorkflowRunMessage[]>;
+	getReadyRuns: (size: number, options?: { abortSignal?: AbortSignal }) => Promise<WorkflowRunMessage[]>;
 	heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>;
 	acknowledge?: (workflowRunId: WorkflowRunId) => Promise<void>;
 	close?: () => Promise<void>;

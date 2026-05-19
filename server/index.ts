@@ -1,4 +1,8 @@
 import process from "node:process";
+import { redisCache, redisPublisher, redisTimerSortedSet } from "@aikirun/redis";
+import type { Cache } from "@aikirun/types/cache";
+import type { Publisher } from "@aikirun/types/publisher";
+import type { TimerSortedSet } from "@aikirun/types/timer";
 import { RPCHandler } from "@orpc/server/fetch";
 import { Redis } from "ioredis";
 
@@ -7,9 +11,6 @@ import { initDaemons } from "./daemons";
 import { UnauthorizedError } from "./errors";
 import { createDatabase } from "./infra/db";
 import { createLogger } from "./infra/logger";
-import { createWorkflowRunPublisher } from "./infra/messaging/redis/publisher";
-import { createTimerSortedSet } from "./infra/messaging/redis/timer-sorted-set";
-import type { TimerSortedSet, WorkflowRunPublisher } from "./infra/messaging/types";
 import { createAuthorizer } from "./middleware/authorization";
 import {
 	createNamespaceRequestContext,
@@ -18,7 +19,7 @@ import {
 	type OrganizationRequestContext,
 } from "./middleware/context";
 import { createNamespaceAuthedRouter, createOrganizationAuthedRouter } from "./router/index";
-import { createApiKeyService } from "./service/api-key";
+import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 import { createAuthService } from "./service/auth";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 import { createNamespaceService } from "./service/namespace";
@@ -36,8 +37,10 @@ if (import.meta.main) {
 	const { repos, conn, betterAuthSchema } = createDatabase(config.database);
 
 	let redis: Redis | undefined;
+
+	let apiKeyCache: Cache<ApiKeyAuthorizationInfo> | undefined;
 	let timerSortedSet: TimerSortedSet | undefined;
-	let workflowRunPublisher: WorkflowRunPublisher | undefined;
+	let workflowRunPublisher: Publisher | undefined;
 
 	if (config.redis) {
 		redis = new Redis({
@@ -48,11 +51,12 @@ if (import.meta.main) {
 		redis.on("error", (err: Error) => {
 			logger.error({ err }, "Redis connection error");
 		});
-		timerSortedSet = createTimerSortedSet(redis, "aiki:timers");
-		workflowRunPublisher = createWorkflowRunPublisher(redis);
+		apiKeyCache = redisCache(redis, { keyPrefix: "aiki:api_key:" });
+		timerSortedSet = redisTimerSortedSet(redis, "aiki:timers");
+		workflowRunPublisher = redisPublisher(redis);
 	}
 
-	const apiKeyService = createApiKeyService({ repos, redis });
+	const apiKeyService = createApiKeyService({ repos, cache: apiKeyCache });
 	const authService = createAuthService({
 		conn,
 		provider: config.database.provider,

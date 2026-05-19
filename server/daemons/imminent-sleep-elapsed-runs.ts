@@ -1,4 +1,6 @@
 import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
+import type { Publisher } from "@aikirun/types/publisher";
+import type { TimerEntry, TimerSortedSet } from "@aikirun/types/timer";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type { WorkflowRunMeta } from "server/infra/db/pg/repository/workflow-run";
 import type {
@@ -7,7 +9,6 @@ import type {
 	WorkflowRow,
 	WorkflowRunOutboxRowInsert,
 } from "server/infra/db/types";
-import type { TimerEntry, TimerSortedSet, WorkflowRunPublisher } from "server/infra/messaging/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { Ranked } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
@@ -23,7 +24,7 @@ type Repos = Pick<
 
 export interface ProcessImminentSleepElapsedRunsDeps {
 	repos: Repos;
-	workflowRunPublisher?: WorkflowRunPublisher;
+	workflowRunPublisher?: Publisher;
 	timerSortedSet?: TimerSortedSet;
 }
 
@@ -61,7 +62,7 @@ export async function processImminentSleepElapsedRuns(
 export async function queueSleepElapsedRuns(
 	context: DaemonContext,
 	repos: Repos,
-	workflowRunPublisher: WorkflowRunPublisher | undefined,
+	workflowRunPublisher: Publisher | undefined,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	options?: { chunkSize?: number }
 ) {
@@ -86,7 +87,7 @@ export async function queueSleepElapsedRuns(
 async function processChunk(
 	context: DaemonContext,
 	repos: Repos,
-	workflowRunPublisher: WorkflowRunPublisher | undefined,
+	workflowRunPublisher: Publisher | undefined,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {

@@ -2,7 +2,9 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray, partitionArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { NamespaceId } from "@aikirun/types/namespace";
+import type { Publisher } from "@aikirun/types/publisher";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
+import type { TimerEntry, TimerSortedSet } from "@aikirun/types/timer";
 import {
 	NON_TERMINAL_WORKFLOW_RUN_STATUSES,
 	type WorkflowRunId,
@@ -16,7 +18,6 @@ import type {
 	WorkflowRunOutboxRowInsert,
 	WorkflowRunRowInsert,
 } from "server/infra/db/types";
-import type { TimerEntry, TimerSortedSet, WorkflowRunPublisher } from "server/infra/messaging/types";
 import { computeRank } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "server/service/cancel-child-runs";
@@ -29,7 +30,7 @@ import { publishRuns } from "./publish-ready-runs";
 export interface ProcessImminentRecurringWorkflowsDeps {
 	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "schedule" | "workflowRunOutbox" | "transaction">;
 	childRunCanceller: ChildRunCanceller;
-	workflowRunPublisher?: WorkflowRunPublisher;
+	workflowRunPublisher?: Publisher;
 	timerSortedSet?: TimerSortedSet;
 }
 
@@ -144,7 +145,7 @@ async function processOverlapAllowSchedules(
 	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
-	workflowRunPublisher?: WorkflowRunPublisher
+	workflowRunPublisher?: Publisher
 ) {
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -232,7 +233,7 @@ async function processOverlapSkipSchedules(
 	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
-	workflowRunPublisher?: WorkflowRunPublisher
+	workflowRunPublisher?: Publisher
 ) {
 	const { scheduleIdsWithActiveRuns } = await fetchActiveRunsBySchedule(repos, schedules);
 

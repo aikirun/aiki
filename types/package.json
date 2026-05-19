@@ -12,6 +12,10 @@
 			"types": "./dist/array.d.ts",
 			"import": "./dist/array.js"
 		},
+		"./cache": {
+			"types": "./dist/cache.d.ts",
+			"import": "./dist/cache.js"
+		},
 		"./client": {
 			"types": "./dist/client.d.ts",
 			"import": "./dist/client.js"
@@ -43,6 +47,10 @@
 		"./property": {
 			"types": "./dist/property.d.ts",
 			"import": "./dist/property.js"
+		},
+		"./publisher": {
+			"types": "./dist/publisher.d.ts",
+			"import": "./dist/publisher.js"
 		},
 		"./replay-manifest": {
 			"types": "./dist/replay-manifest.d.ts",
@@ -87,6 +95,10 @@
 		"./task-error": {
 			"types": "./dist/task-error.d.ts",
 			"import": "./dist/task-error.js"
+		},
+		"./timer": {
+			"types": "./dist/timer.d.ts",
+			"import": "./dist/timer.js"
 		},
 		"./trigger": {
 			"types": "./dist/trigger.d.ts",

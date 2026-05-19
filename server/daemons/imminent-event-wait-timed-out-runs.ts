@@ -1,5 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
+import type { Publisher } from "@aikirun/types/publisher";
+import type { TimerEntry, TimerSortedSet } from "@aikirun/types/timer";
 import type { WorkflowRunState, WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow-run";
 import type { WorkflowRunMeta } from "server/infra/db/pg/repository/workflow-run";
 import type {
@@ -9,7 +11,6 @@ import type {
 	WorkflowRow,
 	WorkflowRunOutboxRowInsert,
 } from "server/infra/db/types";
-import type { TimerEntry, TimerSortedSet, WorkflowRunPublisher } from "server/infra/messaging/types";
 import { runConcurrently } from "server/lib/concurrency";
 import type { Ranked } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
@@ -25,7 +26,7 @@ type Repos = Pick<
 
 export interface ProcessImminentEventWaitTimedOutRunsDeps {
 	repos: Repos;
-	workflowRunPublisher?: WorkflowRunPublisher;
+	workflowRunPublisher?: Publisher;
 	timerSortedSet?: TimerSortedSet;
 }
 
@@ -63,7 +64,7 @@ export async function processImminentEventWaitTimedOutRuns(
 export async function queueEventWaitTimedOutRuns(
 	context: DaemonContext,
 	repos: Repos,
-	workflowRunPublisher: WorkflowRunPublisher | undefined,
+	workflowRunPublisher: Publisher | undefined,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	options?: { chunkSize?: number }
 ) {
@@ -100,7 +101,7 @@ export async function queueEventWaitTimedOutRuns(
 async function processChunk(
 	context: DaemonContext,
 	repos: Repos,
-	workflowRunPublisher: WorkflowRunPublisher | undefined,
+	workflowRunPublisher: Publisher | undefined,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	stateTransitionsById: Map<string, { id: string; state: unknown }>,
 	workflowsById: Map<string, WorkflowRow>

@@ -1,7 +1,15 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/types/array";
+import type {
+	DueTimer,
+	TimerEntry,
+	TimerSignalWaiter,
+	TimerSignalWaiterContext,
+	TimerSortedSet,
+	TimerType,
+} from "@aikirun/types/timer";
 import type { Redis } from "ioredis";
 
-import type { DueTimer, TimerEntry, TimerSignalWaiter, TimerSortedSet, TimerType } from "../types";
+import { attachConnectionSupervisor } from "../connection";
 
 function encodeMember(type: TimerType, id: string): string {
 	return `${type}:${id}`;
@@ -62,7 +70,7 @@ end
 return minSignal
 `;
 
-export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
+export function redisTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
 	const signalKey = `${key}:signal`;
 
 	return {
@@ -103,8 +111,12 @@ export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet 
 			return Number(result[1]);
 		},
 
-		createSignalWaiter(): TimerSignalWaiter {
-			const redisDuplicate = redis.duplicate();
+		createSignalWaiter(context: TimerSignalWaiterContext): TimerSignalWaiter {
+			const redisDuplicate = redis.duplicate({
+				maxRetriesPerRequest: 0,
+				enableOfflineQueue: false,
+			});
+			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger: context.logger });
 			let closed = false;
 
 			return {
@@ -117,12 +129,12 @@ export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet 
 				async wait(timeoutSeconds: number): Promise<number> {
 					const result = await redisDuplicate.brpop(signalKey, timeoutSeconds);
 					if (result === null) {
-						await redis.del(signalKey);
+						await redisDuplicate.del(signalKey);
 						return 0;
 					}
 
 					const signal = Number(result[1]);
-					const minSignal = (await redis.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
+					const minSignal = (await redisDuplicate.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
 					if (minSignal === null) {
 						return signal;
 					}
@@ -134,6 +146,7 @@ export function createTimerSortedSet(redis: Redis, key: string): TimerSortedSet 
 						return;
 					}
 					closed = true;
+					connectionSupervisor.detach();
 					redisDuplicate.disconnect();
 				},
 			};
