@@ -25,4 +25,4 @@ export interface SubscriberContext {
 	logger: Logger;
 }
 
-export type CreateSubscriber = (context: SubscriberContext) => Subscriber | Promise<Subscriber>;
+export type CreateSubscriber = (context: SubscriberContext) => Subscriber;
