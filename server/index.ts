@@ -24,6 +24,7 @@ if (import.meta.main) {
 
 	const aiki = server({
 		db: config.database,
+		cache: redis && redisCache(redis),
 		logger,
 		handler: {
 			auth: {
@@ -31,7 +32,6 @@ if (import.meta.main) {
 				baseURL: config.baseURL,
 				trustedOrigins: config.corsOrigins,
 			},
-			...(redis && { cache: redisCache(redis) }),
 		},
 		runtime: {
 			...(redis && {

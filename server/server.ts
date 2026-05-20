@@ -37,7 +37,6 @@ export interface ServerHandlerAuth {
 
 export interface ServerHandlerParams {
 	auth: ServerHandlerAuth;
-	cache?: CreateCache;
 }
 
 export interface ServerRuntimeOptions {
@@ -52,6 +51,7 @@ export interface ServerRuntimeParams {
 
 export interface ServerParams {
 	db: DatabaseConfig;
+	cache?: CreateCache;
 	logger?: Logger;
 	handler: ServerHandlerParams;
 	runtime?: ServerRuntimeParams;
@@ -78,7 +78,7 @@ export function server(params: ServerParams): Server {
 	const createHandler = () => {
 		const apiKeyService = createApiKeyService({
 			repos,
-			cache: params.handler.cache?.<ApiKeyAuthorizationInfo>({
+			cache: params.cache?.<ApiKeyAuthorizationInfo>({
 				logger: logger.child({ "aiki.component": "cache.apiKeyAuth" }),
 				keyPrefix: "api_key:",
 			}),
