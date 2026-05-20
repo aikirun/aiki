@@ -1,15 +1,15 @@
-import type { Cache, CacheSetOptions } from "@aikirun/types/infra/cache";
+import type { CacheContext, CacheSetOptions, CreateCache } from "@aikirun/types/infra/cache";
 import type { Redis } from "ioredis";
 
 export interface RedisCacheOptions {
 	keyPrefix?: string;
 }
 
-export function redisCache<V>(redis: Redis, options?: RedisCacheOptions): Cache<V> {
+export function redisCache<V>(redis: Redis, options?: RedisCacheOptions): CreateCache<V> {
 	const keyPrefix = options?.keyPrefix ?? "";
 	const getCacheKey = (key: string) => `${keyPrefix}${key}`;
 
-	return {
+	return (_context: CacheContext) => ({
 		async get(key: string): Promise<V | null> {
 			const cached = await redis.get(getCacheKey(key));
 			if (!cached) {
@@ -35,5 +35,5 @@ export function redisCache<V>(redis: Redis, options?: RedisCacheOptions): Cache<
 				await redis.del(getCacheKey(keys));
 			}
 		},
-	};
+	});
 }

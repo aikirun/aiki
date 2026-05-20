@@ -46,7 +46,7 @@ export function spawnDueTimersConsumer(
 	const abortController = new AbortController();
 	const { signal: abortSignal } = abortController;
 
-	const timerSignalWaiter = deps.timerSortedSet.createSignalWaiter({ logger });
+	const timerSignalWaiter = deps.timerSortedSet.createSignalWaiter();
 
 	const promise = withRetry(
 		() => dueTimersConsumerLoop(logger, deps, timerSignalWaiter, abortSignal, options),
