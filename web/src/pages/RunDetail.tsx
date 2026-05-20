@@ -1,5 +1,5 @@
-import type { ChildWorkflowRunInfo } from "@aikirun/types/workflow-run";
-import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { ChildWorkflowRunInfo } from "@aikirun/types/workflow/run";
+import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";

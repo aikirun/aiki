@@ -1,4 +1,4 @@
-import type { WorkflowRun } from "@aikirun/types/workflow-run";
+import type { WorkflowRun } from "@aikirun/types/workflow/run";
 
 import { CopyButton } from "../common/CopyButton";
 

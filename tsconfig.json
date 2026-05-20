@@ -16,7 +16,7 @@
 			"@aikirun/lib/*": ["./lib/*/index.ts"],
 			"@aikirun/http": ["./sdk/adapter/http/index.ts"],
 			"@aikirun/redis": ["./sdk/adapter/redis/index.ts"],
-			"@aikirun/types/*": ["./types/*.ts"],
+			"@aikirun/types/*": ["./types/*.ts", "./types/*/index.ts"],
 			"@aikirun/worker": ["./sdk/worker/index.ts"],
 			"@aikirun/workflow": ["./sdk/workflow/index.ts"]
 		},

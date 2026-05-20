@@ -4,7 +4,7 @@
 		"paths": {
 			"@aikirun/lib/*": ["./lib/*/index.ts"],
 			"@aikirun/types": ["./types/index.ts"],
-			"@aikirun/types/*": ["./types/*.ts"]
+			"@aikirun/types/*": ["./types/*.ts", "./types/*/index.ts"]
 		},
 		"target": "ES2022",
 		"useDefineForClassFields": true,

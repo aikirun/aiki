@@ -1,8 +1,8 @@
-import type { ApiKeyApi } from "@aikirun/types/api-key-api";
-import type { NamespaceApi } from "@aikirun/types/namespace-api";
-import type { ScheduleApi } from "@aikirun/types/schedule-api";
-import type { WorkflowApi } from "@aikirun/types/workflow-api";
-import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
+import type { ApiKeyApi } from "@aikirun/types/api/api-key";
+import type { NamespaceApi } from "@aikirun/types/api/namespace";
+import type { ScheduleApi } from "@aikirun/types/api/schedule";
+import type { WorkflowApi } from "@aikirun/types/api/workflow";
+import type { WorkflowRunApi } from "@aikirun/types/api/workflow-run";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 

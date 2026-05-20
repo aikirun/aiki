@@ -1,5 +1,5 @@
 import type { UnconsumedManifestEntries } from "./replay-manifest";
-import type { WorkflowRunId, WorkflowRunStatus } from "./workflow-run";
+import type { WorkflowRunId, WorkflowRunStatus } from "./run";
 
 export class WorkflowRunNotExecutableError extends Error {
 	public readonly id: WorkflowRunId;

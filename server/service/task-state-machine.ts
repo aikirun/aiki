@@ -1,10 +1,10 @@
 import { hashInput } from "@aikirun/lib/crypto";
-import type { TaskId, TaskInfo, TaskName, TaskState, TaskStatus } from "@aikirun/types/task";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
 import type {
 	TransitionTaskStateToRunning,
 	WorkflowRunTransitionTaskStateRequestV1,
-} from "@aikirun/types/workflow-run-api";
+} from "@aikirun/types/api/workflow-run";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { TaskId, TaskInfo, TaskName, TaskState, TaskStatus } from "@aikirun/types/workflow/task";
 import { InvalidTaskStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "server/errors";
 import type { Repositories } from "server/infra/db/types";
 import type { NamespaceRequestContext } from "server/middleware/context";

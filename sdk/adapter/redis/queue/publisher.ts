@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/publisher";
+import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 import type { Redis } from "ioredis";
 
 import { getWorkflowQueueName } from "./key";

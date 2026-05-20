@@ -6,7 +6,7 @@ import type {
 	TimerSignalWaiterContext,
 	TimerSortedSet,
 	TimerType,
-} from "@aikirun/types/timer";
+} from "@aikirun/types/infra/timer";
 import type { Redis } from "ioredis";
 
 import { attachConnectionSupervisor } from "../connection";

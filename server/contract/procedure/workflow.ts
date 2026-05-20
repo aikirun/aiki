@@ -7,7 +7,7 @@ import type {
 	WorkflowListResponseV1,
 	WorkflowListVersionsRequestV1,
 	WorkflowListVersionsResponseV1,
-} from "@aikirun/types/workflow-api";
+} from "@aikirun/types/api/workflow";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 

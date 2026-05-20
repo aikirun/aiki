@@ -1,5 +1,5 @@
-import type { TaskAddress, TaskInfo } from "./task";
-import type { ChildWorkflowRunInfo, WorkflowRunAddress } from "./workflow-run";
+import type { ChildWorkflowRunInfo, WorkflowRunAddress } from "./run";
+import type { TaskAddress, TaskInfo } from "../task";
 
 export interface ReplayManifest {
 	consumeNextTask(address: TaskAddress): TaskInfo | undefined;

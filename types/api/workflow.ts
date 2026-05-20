@@ -1,5 +1,5 @@
-import type { WorkflowSource } from "./workflow";
-import type { WorkflowRunStatus } from "./workflow-run";
+import type { WorkflowSource } from "../workflow";
+import type { WorkflowRunStatus } from "../workflow/run";
 
 export interface WorkflowApi {
 	listV1: (_: WorkflowListRequestV1) => Promise<WorkflowListResponseV1>;

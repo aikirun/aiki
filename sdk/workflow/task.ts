@@ -11,10 +11,16 @@ import {
 import { getRetryParams } from "@aikirun/lib/retry";
 import { createSerializableError } from "@aikirun/lib/serializable";
 import type { Logger } from "@aikirun/types/logger";
-import type { UnconsumedManifestEntries } from "@aikirun/types/replay-manifest";
 import type { RetryStrategy } from "@aikirun/types/retry";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
+import type { UnconsumedManifestEntries, WorkflowRunId } from "@aikirun/types/workflow/run";
+import {
+	NonDeterminismError,
+	WorkflowRunFailedError,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
 import type {
 	TaskAddress,
 	TaskDefinitionOptions,
@@ -22,15 +28,8 @@ import type {
 	TaskInfo,
 	TaskName,
 	TaskStartOptions,
-} from "@aikirun/types/task";
-import { TaskFailedError } from "@aikirun/types/task-error";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
-import {
-	NonDeterminismError,
-	WorkflowRunFailedError,
-	WorkflowRunRevisionConflictError,
-	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow-run-error";
+} from "@aikirun/types/workflow/task";
+import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunContext } from "./run/context";

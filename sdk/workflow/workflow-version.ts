@@ -9,29 +9,29 @@ import {
 } from "@aikirun/lib/object";
 import { getRetryParams } from "@aikirun/lib/retry";
 import { createSerializableError } from "@aikirun/lib/serializable";
+import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/api/workflow-run";
 import type { Client } from "@aikirun/types/client";
 import type { Logger } from "@aikirun/types/logger";
-import type { ReplayManifest } from "@aikirun/types/replay-manifest";
 import type { RetryStrategy } from "@aikirun/types/retry";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { TaskFailedError } from "@aikirun/types/task-error";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
+	ReplayManifest,
 	WorkflowDefinitionOptions,
 	WorkflowRun,
 	WorkflowRunAddress,
 	WorkflowRunId,
 	WorkflowRunStateFailed,
 	WorkflowStartOptions,
-} from "@aikirun/types/workflow-run";
-import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/workflow-run-api";
+} from "@aikirun/types/workflow/run";
 import {
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow-run-error";
+} from "@aikirun/types/workflow/run";
+import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunContext } from "./run/context";

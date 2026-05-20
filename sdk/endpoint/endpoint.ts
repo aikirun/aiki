@@ -1,6 +1,6 @@
 import type { Client } from "@aikirun/types/client";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
 	type AnyWorkflowVersion,
 	executeWorkflowRun,

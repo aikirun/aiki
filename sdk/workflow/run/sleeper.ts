@@ -1,10 +1,9 @@
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Duration } from "@aikirun/types/duration";
 import type { Logger } from "@aikirun/types/logger";
-import type { SleepName, SleepResult } from "@aikirun/types/sleep";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
-import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run-error";
+import type { SleepName, SleepResult, WorkflowRunId } from "@aikirun/types/workflow/run";
+import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
 import type { WorkflowRunHandle } from "./handle";
 

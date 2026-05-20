@@ -1,7 +1,13 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: Manifest boundaries are tracked, hence, we never exceed array boundaries */
-import type { ReplayManifest, UnconsumedManifestEntries } from "@aikirun/types/replay-manifest";
-import type { TaskAddress, TaskInfo } from "@aikirun/types/task";
-import type { ChildWorkflowRunInfo, WorkflowRun, WorkflowRunAddress } from "@aikirun/types/workflow-run";
+
+import type {
+	ChildWorkflowRunInfo,
+	ReplayManifest,
+	UnconsumedManifestEntries,
+	WorkflowRun,
+	WorkflowRunAddress,
+} from "@aikirun/types/workflow/run";
+import type { TaskAddress, TaskInfo } from "@aikirun/types/workflow/task";
 
 export function createReplayManifest(run: WorkflowRun): ReplayManifest {
 	const { taskQueues, childWorkflowRunQueues } = run;

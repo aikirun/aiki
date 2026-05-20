@@ -1,5 +1,5 @@
+import type { ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
-import type { ScheduleListRequestV1 } from "@aikirun/types/schedule-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";

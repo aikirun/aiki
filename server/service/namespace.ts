@@ -1,7 +1,7 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { fireAndForget } from "@aikirun/lib/async";
+import type { NamespaceInfo, NamespaceMemberInfo, NamespaceMemberInput } from "@aikirun/types/api/namespace";
 import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";
-import type { NamespaceInfo, NamespaceMemberInfo, NamespaceMemberInput } from "@aikirun/types/namespace-api";
 import { ForbiddenError, ValidationError } from "server/errors";
 import type { NamespaceRow, Repositories } from "server/infra/db/types";
 import {

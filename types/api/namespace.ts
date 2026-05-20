@@ -1,4 +1,4 @@
-import type { NamespaceRole } from "./namespace";
+import type { NamespaceRole } from "../namespace";
 
 export interface NamespaceApi {
 	createV1: (_: NamespaceCreateRequestV1) => Promise<NamespaceCreateResponseV1>;

@@ -1,4 +1,4 @@
-import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type { CSSProperties } from "react";
 
 import { StatusChips } from "./StatusChips";

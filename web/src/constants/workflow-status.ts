@@ -1,4 +1,4 @@
-import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 
 import { WORKFLOW_RUN_STATUS_COLORS } from "./status-colors";
 

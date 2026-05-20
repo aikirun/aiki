@@ -1,4 +1,4 @@
-import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
+import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 

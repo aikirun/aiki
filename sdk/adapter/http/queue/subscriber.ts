@@ -6,8 +6,8 @@ import type {
 	SubscriberContext,
 	SubscriberDelayParams,
 	WorkflowRunMessage,
-} from "@aikirun/types/subscriber";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
+} from "@aikirun/types/infra/queue";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
 export interface HttpSubscriberParams {
 	api: ApiClient;

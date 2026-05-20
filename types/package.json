@@ -4,13 +4,25 @@
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"type": "module",
 	"exports": {
-		"./api-key-api": {
-			"types": "./dist/api-key-api.d.ts",
-			"import": "./dist/api-key-api.js"
+		"./api/api-key": {
+			"types": "./dist/api/api-key.d.ts",
+			"import": "./dist/api/api-key.js"
 		},
-		"./cache": {
-			"types": "./dist/cache.d.ts",
-			"import": "./dist/cache.js"
+		"./api/namespace": {
+			"types": "./dist/api/namespace.d.ts",
+			"import": "./dist/api/namespace.js"
+		},
+		"./api/schedule": {
+			"types": "./dist/api/schedule.d.ts",
+			"import": "./dist/api/schedule.js"
+		},
+		"./api/workflow": {
+			"types": "./dist/api/workflow.d.ts",
+			"import": "./dist/api/workflow.js"
+		},
+		"./api/workflow-run": {
+			"types": "./dist/api/workflow-run.d.ts",
+			"import": "./dist/api/workflow-run.js"
 		},
 		"./client": {
 			"types": "./dist/client.d.ts",
@@ -20,9 +32,17 @@
 			"types": "./dist/duration.d.ts",
 			"import": "./dist/duration.js"
 		},
-		"./event": {
-			"types": "./dist/event.d.ts",
-			"import": "./dist/event.js"
+		"./infra/cache": {
+			"types": "./dist/infra/cache.d.ts",
+			"import": "./dist/infra/cache.js"
+		},
+		"./infra/queue": {
+			"types": "./dist/infra/queue/index.d.ts",
+			"import": "./dist/infra/queue/index.js"
+		},
+		"./infra/timer": {
+			"types": "./dist/infra/timer.d.ts",
+			"import": "./dist/infra/timer.js"
 		},
 		"./logger": {
 			"types": "./dist/logger.d.ts",
@@ -32,21 +52,9 @@
 			"types": "./dist/namespace.d.ts",
 			"import": "./dist/namespace.js"
 		},
-		"./namespace-api": {
-			"types": "./dist/namespace-api.d.ts",
-			"import": "./dist/namespace-api.js"
-		},
 		"./organization": {
 			"types": "./dist/organization.d.ts",
 			"import": "./dist/organization.js"
-		},
-		"./publisher": {
-			"types": "./dist/publisher.d.ts",
-			"import": "./dist/publisher.js"
-		},
-		"./replay-manifest": {
-			"types": "./dist/replay-manifest.d.ts",
-			"import": "./dist/replay-manifest.js"
 		},
 		"./retry": {
 			"types": "./dist/retry.d.ts",
@@ -56,45 +64,13 @@
 			"types": "./dist/schedule.d.ts",
 			"import": "./dist/schedule.js"
 		},
-		"./schedule-api": {
-			"types": "./dist/schedule-api.d.ts",
-			"import": "./dist/schedule-api.js"
-		},
 		"./serializable": {
 			"types": "./dist/serializable.d.ts",
 			"import": "./dist/serializable.js"
 		},
-		"./sleep": {
-			"types": "./dist/sleep.d.ts",
-			"import": "./dist/sleep.js"
-		},
-		"./state-transition": {
-			"types": "./dist/state-transition.d.ts",
-			"import": "./dist/state-transition.js"
-		},
-		"./subscriber": {
-			"types": "./dist/subscriber.d.ts",
-			"import": "./dist/subscriber.js"
-		},
 		"./symbols": {
 			"types": "./dist/symbols.d.ts",
 			"import": "./dist/symbols.js"
-		},
-		"./task": {
-			"types": "./dist/task.d.ts",
-			"import": "./dist/task.js"
-		},
-		"./task-error": {
-			"types": "./dist/task-error.d.ts",
-			"import": "./dist/task-error.js"
-		},
-		"./timer": {
-			"types": "./dist/timer.d.ts",
-			"import": "./dist/timer.js"
-		},
-		"./trigger": {
-			"types": "./dist/trigger.d.ts",
-			"import": "./dist/trigger.js"
 		},
 		"./validator": {
 			"types": "./dist/validator.d.ts",
@@ -105,24 +81,20 @@
 			"import": "./dist/worker.js"
 		},
 		"./workflow": {
-			"types": "./dist/workflow.d.ts",
-			"import": "./dist/workflow.js"
+			"types": "./dist/workflow/index.d.ts",
+			"import": "./dist/workflow/index.js"
 		},
-		"./workflow-api": {
-			"types": "./dist/workflow-api.d.ts",
-			"import": "./dist/workflow-api.js"
+		"./workflow/state-transition": {
+			"types": "./dist/workflow/state-transition.d.ts",
+			"import": "./dist/workflow/state-transition.js"
 		},
-		"./workflow-run": {
-			"types": "./dist/workflow-run.d.ts",
-			"import": "./dist/workflow-run.js"
+		"./workflow/task": {
+			"types": "./dist/workflow/task/index.d.ts",
+			"import": "./dist/workflow/task/index.js"
 		},
-		"./workflow-run-api": {
-			"types": "./dist/workflow-run-api.d.ts",
-			"import": "./dist/workflow-run-api.js"
-		},
-		"./workflow-run-error": {
-			"types": "./dist/workflow-run-error.d.ts",
-			"import": "./dist/workflow-run-error.js"
+		"./workflow/run": {
+			"types": "./dist/workflow/run/index.d.ts",
+			"import": "./dist/workflow/run/index.js"
 		}
 	},
 	"files": [

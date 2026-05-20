@@ -1,4 +1,4 @@
-import type { Cache, CacheSetOptions } from "@aikirun/types/cache";
+import type { Cache, CacheSetOptions } from "@aikirun/types/infra/cache";
 import type { Redis } from "ioredis";
 
 export interface RedisCacheOptions {

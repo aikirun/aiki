@@ -2,18 +2,24 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { ApiClient, Client } from "@aikirun/types/client";
-import type { EventName, EventSendOptions, EventWait, EventWaitOptions, EventWaitResult } from "@aikirun/types/event";
 import type { Logger } from "@aikirun/types/logger";
 import type { Serializable } from "@aikirun/types/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
+import type {
+	EventName,
+	EventSendOptions,
+	EventWait,
+	EventWaitOptions,
+	EventWaitResult,
+	WorkflowRunId,
+} from "@aikirun/types/workflow/run";
 import {
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow-run-error";
+} from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunHandle } from "./handle";

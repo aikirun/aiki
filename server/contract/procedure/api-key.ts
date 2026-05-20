@@ -5,14 +5,14 @@ import type {
 	ApiKeyCreateResponseV1,
 	ApiKeyListResponseV1,
 	ApiKeyRevokeRequestV1,
-} from "@aikirun/types/api-key-api";
+} from "@aikirun/types/api/api-key";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 import { apiKeyInfoSchema } from "../schema/api-key";
 
-export type { ApiKeyApi, ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api-key-api";
+export type { ApiKeyApi, ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api/api-key";
 
 const createV1: ContractProcedure<ApiKeyCreateRequestV1, ApiKeyCreateResponseV1> = oc
 	.input(type({ name: "string > 0", "expiresAt?": "number > 0 | undefined" }))

@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import type { TaskStateDiscarded } from "@aikirun/types/task";
+import type { TaskStateDiscarded } from "@aikirun/types/workflow/task";
 import type { Repositories, StateTransitionRowInsert } from "server/infra/db/types";
 import { ulid } from "ulidx";
 

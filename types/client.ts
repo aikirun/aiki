@@ -1,9 +1,8 @@
-import type { ScheduleApi } from "@aikirun/types/schedule-api";
-import type { WorkflowRun } from "@aikirun/types/workflow-run";
-import type { WorkflowRunApi } from "@aikirun/types/workflow-run-api";
-
+import type { ScheduleApi } from "./api/schedule";
+import type { WorkflowRunApi } from "./api/workflow-run";
 import type { Logger } from "./logger";
 import { INTERNAL } from "./symbols";
+import type { WorkflowRun } from "./workflow/run";
 
 export interface ClientParams<AppContext = null> {
 	url: string;

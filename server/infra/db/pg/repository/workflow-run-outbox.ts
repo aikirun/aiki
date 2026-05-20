@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray } from "@aikirun/lib/array";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import type { RankStreamCursor } from "server/daemons/lib/rank-stream";
 import type { TimerStreamCursor } from "server/daemons/lib/timer-stream";

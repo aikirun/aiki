@@ -12,7 +12,7 @@ import type {
 	ScheduleListResponseV1,
 	SchedulePauseRequestV1,
 	ScheduleResumeRequestV1,
-} from "@aikirun/types/schedule-api";
+} from "@aikirun/types/api/schedule";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 

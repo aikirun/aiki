@@ -1,4 +1,4 @@
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { runConcurrently } from "server/lib/concurrency";
 import type { TaskStateMachineService } from "server/service/task-state-machine";
 import type { WorkflowRunService } from "server/service/workflow-run";

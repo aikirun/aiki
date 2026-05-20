@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@aikirun/types/task";
+import type { TaskStatus } from "@aikirun/types/workflow/task";
 
 import { TASK_STATUS_COLORS } from "../../constants/status-colors";
 

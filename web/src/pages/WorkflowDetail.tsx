@@ -1,4 +1,4 @@
-import type { WorkflowFilter } from "@aikirun/types/workflow-run-api";
+import type { WorkflowFilter } from "@aikirun/types/api/workflow-run";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 

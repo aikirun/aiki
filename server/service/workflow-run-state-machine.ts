@@ -1,5 +1,10 @@
 import { propsRequiredNonNull } from "@aikirun/lib/object";
 import type {
+	WorkflowRunStateRequest,
+	WorkflowRunTransitionStateRequestV1,
+	WorkflowRunTransitionStateResponseV1,
+} from "@aikirun/types/api/workflow-run";
+import type {
 	TerminalWorkflowRunStatus,
 	WorkflowRunId,
 	WorkflowRunState,
@@ -7,13 +12,8 @@ import type {
 	WorkflowRunStateScheduled,
 	WorkflowRunStatus,
 	WorkflowStartOptions,
-} from "@aikirun/types/workflow-run";
-import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow-run";
-import type {
-	WorkflowRunStateRequest,
-	WorkflowRunTransitionStateRequestV1,
-	WorkflowRunTransitionStateResponseV1,
-} from "@aikirun/types/workflow-run-api";
+} from "@aikirun/types/workflow/run";
+import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { InvalidWorkflowRunStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "server/errors";
 import type { Repositories } from "server/infra/db/types";
 import type { NamespaceRequestContext } from "server/middleware/context";

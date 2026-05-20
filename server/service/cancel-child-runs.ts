@@ -7,7 +7,7 @@ import {
 	type WorkflowRunId,
 	type WorkflowRunStateScheduled,
 	type WorkflowStartOptions,
-} from "@aikirun/types/workflow-run";
+} from "@aikirun/types/workflow/run";
 import type {
 	Repositories,
 	StateTransitionRowInsert,

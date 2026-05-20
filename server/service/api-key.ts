@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { sha256Sync } from "@aikirun/lib/crypto";
-import type { Cache } from "@aikirun/types/cache";
+import type { Cache } from "@aikirun/types/infra/cache";
 import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { UnauthorizedError } from "server/errors";

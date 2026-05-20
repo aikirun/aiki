@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 
-import type { Logger } from "./logger";
+import type { Logger } from "../logger";
 
 export type TimerType =
 	| "scheduled"

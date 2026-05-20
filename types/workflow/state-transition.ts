@@ -1,5 +1,5 @@
+import type { WorkflowRunState } from "./run";
 import type { TaskState } from "./task";
-import type { WorkflowRunState } from "./workflow-run";
 
 export const STATE_TRANSITION_TYPES = ["workflow_run", "task"] as const;
 export type StateTransitionType = (typeof STATE_TRANSITION_TYPES)[number];

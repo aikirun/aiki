@@ -1,19 +1,6 @@
 import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
 
-import type { EventSendOptions } from "./event";
-import type { StateTransition } from "./state-transition";
-import type {
-	TaskInfo,
-	TaskStateCompleted,
-	TaskStateFailed,
-	TaskStatus,
-	TransitionTaskStateToAwaitingRetry,
-	TransitionTaskStateToCompleted,
-	TransitionTaskStateToFailed,
-	TransitionTaskStateToRunningCreate,
-	TransitionTaskStateToRunningRetry,
-} from "./task";
-import type { WorkflowSource } from "./workflow";
+import type { WorkflowSource } from "../workflow";
 import type {
 	WorkflowRun,
 	WorkflowRunState,
@@ -27,7 +14,20 @@ import type {
 	WorkflowRunStateSleeping,
 	WorkflowRunStatus,
 	WorkflowStartOptions,
-} from "./workflow-run";
+} from "../workflow/run";
+import type { EventSendOptions } from "../workflow/run/event";
+import type { StateTransition } from "../workflow/state-transition";
+import type {
+	TaskInfo,
+	TaskStateCompleted,
+	TaskStateFailed,
+	TaskStatus,
+	TransitionTaskStateToAwaitingRetry,
+	TransitionTaskStateToCompleted,
+	TransitionTaskStateToFailed,
+	TransitionTaskStateToRunningCreate,
+	TransitionTaskStateToRunningRetry,
+} from "../workflow/task";
 
 export interface WorkflowRunApi {
 	listV1: (_: WorkflowRunListRequestV1) => Promise<WorkflowRunListResponseV1>;

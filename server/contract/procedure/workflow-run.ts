@@ -30,7 +30,7 @@ import type {
 	WorkflowRunTransitionStateResponseV1,
 	WorkflowRunTransitionTaskStateRequestV1,
 	WorkflowRunTransitionTaskStateResponseV1,
-} from "@aikirun/types/workflow-run-api";
+} from "@aikirun/types/api/workflow-run";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 

@@ -1,8 +1,8 @@
 import process from "node:process";
 import { redisCache, redisPublisher, redisTimerSortedSet } from "@aikirun/redis";
-import type { Cache } from "@aikirun/types/cache";
-import type { Publisher } from "@aikirun/types/publisher";
-import type { TimerSortedSet } from "@aikirun/types/timer";
+import type { Cache } from "@aikirun/types/infra/cache";
+import type { Publisher } from "@aikirun/types/infra/queue";
+import type { TimerSortedSet } from "@aikirun/types/infra/timer";
 import { RPCHandler } from "@orpc/server/fetch";
 import { Redis } from "ioredis";
 

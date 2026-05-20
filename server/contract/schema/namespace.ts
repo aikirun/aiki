@@ -1,6 +1,6 @@
 import { type } from "arktype";
 
-export type { NamespaceApi, NamespaceInfo } from "@aikirun/types/namespace-api";
+export type { NamespaceApi, NamespaceInfo } from "@aikirun/types/api/namespace";
 
 export const namespaceRoleSchema = type("'admin' | 'member' | 'viewer'");
 

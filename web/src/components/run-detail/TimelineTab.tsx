@@ -1,4 +1,4 @@
-import type { StateTransition } from "@aikirun/types/state-transition";
+import type { StateTransition } from "@aikirun/types/workflow/state-transition";
 import { Link } from "react-router-dom";
 
 import type { ScheduledContext, TimelineLookups } from "./timeline-lookups";

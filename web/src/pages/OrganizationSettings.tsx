@@ -1,5 +1,5 @@
+import type { NamespaceMemberInfo } from "@aikirun/types/api/namespace";
 import type { NamespaceRole } from "@aikirun/types/namespace";
-import type { NamespaceMemberInfo } from "@aikirun/types/namespace-api";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 

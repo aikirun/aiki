@@ -8,8 +8,9 @@ import {
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRun,
-} from "@aikirun/types/workflow-run";
-import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow-run-error";
+	WorkflowRunRevisionConflictError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
 
 import type { WorkflowRunContext } from "./context";
 import type { EventsDefinition } from "./event";

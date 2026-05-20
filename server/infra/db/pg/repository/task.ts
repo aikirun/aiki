@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import type { TaskStatus } from "@aikirun/types/task";
+import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 import type { TimerStreamCursor } from "server/daemons/lib/timer-stream";
 import type { DaemonContext } from "server/middleware/context";

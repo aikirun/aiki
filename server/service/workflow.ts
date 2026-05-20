@@ -3,8 +3,8 @@ import type {
 	WorkflowGetStatsRequestV1,
 	WorkflowListRequestV1,
 	WorkflowListVersionsRequestV1,
-} from "@aikirun/types/workflow-api";
-import type { WorkflowRunStatus } from "@aikirun/types/workflow-run";
+} from "@aikirun/types/api/workflow";
+import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type { Repositories } from "server/infra/db/types";
 import type { NamespaceRequestContext } from "server/middleware/context";
 import { decodeTime } from "ulidx";

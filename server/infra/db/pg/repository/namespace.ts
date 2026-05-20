@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NamespaceMemberInfo, NamespaceMemberInput } from "@aikirun/types/api/namespace";
 import type { NamespaceRole } from "@aikirun/types/namespace";
-import type { NamespaceMemberInfo, NamespaceMemberInput } from "@aikirun/types/namespace-api";
 import { and, eq, sql } from "drizzle-orm";
 import { ConflictError } from "server/errors";
 import { ulid } from "ulidx";

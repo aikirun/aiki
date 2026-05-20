@@ -1,4 +1,4 @@
-import type { ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api-key-api";
+import type { ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api/api-key";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 

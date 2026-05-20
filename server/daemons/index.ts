@@ -1,7 +1,7 @@
 import { delay } from "@aikirun/lib/async";
 import { withRetry } from "@aikirun/lib/retry";
-import type { Publisher } from "@aikirun/types/publisher";
-import type { TimerSortedSet } from "@aikirun/types/timer";
+import type { Publisher } from "@aikirun/types/infra/queue";
+import type { TimerSortedSet } from "@aikirun/types/infra/timer";
 import type { Repositories } from "server/infra/db/types";
 import type { Logger } from "server/infra/logger";
 import type { DaemonContext } from "server/middleware/context";

@@ -6,9 +6,9 @@ import type {
 	SubscriberContext,
 	SubscriberDelayParams,
 	WorkflowRunMessage,
-} from "@aikirun/types/subscriber";
+} from "@aikirun/types/infra/queue";
 import type { WorkflowMeta } from "@aikirun/types/workflow";
-import type { WorkflowRunId } from "@aikirun/types/workflow-run";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { Redis } from "ioredis";
 
 import { getWorkflowQueueName } from "./key";

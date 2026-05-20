@@ -11,14 +11,14 @@ import type {
 	NamespaceListResponseV1,
 	NamespaceRemoveMembershipRequestV1,
 	NamespaceSetMembershipRequestV1,
-} from "@aikirun/types/namespace-api";
+} from "@aikirun/types/api/namespace";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 import { namespaceInfoSchema, namespaceMemberInfoSchema, namespaceRoleSchema } from "../schema/namespace";
 
-export type { NamespaceApi, NamespaceInfo } from "@aikirun/types/namespace-api";
+export type { NamespaceApi, NamespaceInfo } from "@aikirun/types/api/namespace";
 
 const createV1: ContractProcedure<NamespaceCreateRequestV1, NamespaceCreateResponseV1> = oc
 	.input(type({ name: "string > 0" }))

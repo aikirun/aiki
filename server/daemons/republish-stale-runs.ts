@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
-import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/publisher";
+import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 import type { Repositories, WorkflowRunOutboxRow } from "server/infra/db/types";
 import type { DaemonContext } from "server/middleware/context";
 
