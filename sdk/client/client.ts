@@ -15,7 +15,7 @@ import { RPCLink } from "@orpc/client/fetch";
  * @param params - Client configuration parameters
  * @param params.url - HTTP URL of the Aiki server (e.g., "http://localhost:9850")
  * @param params.apiKey - API key for authentication
- * @param params.createContext - Optional function to create context for each workflow run
+ * @param params.appContext - Optional function to create context for each workflow run
  * @param params.logger - Optional custom logger (defaults to ConsoleLogger)
  * @returns Promise resolving to a configured Client instance
  *
@@ -24,7 +24,7 @@ import { RPCLink } from "@orpc/client/fetch";
  * const aikiClient = client({
  *   url: "http://localhost:9850",
  *   apiKey: "yourApiKey",
- *   createContext: (run) => ({
+ *   appContext: (run) => ({
  *     traceId: generateTraceId(),
  *     userId: extractUserId(run),
  *   }),
@@ -69,7 +69,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 		});
 
 		this[INTERNAL] = {
-			createContext: this.params.createContext,
+			appContext: this.params.appContext,
 		};
 	}
 }

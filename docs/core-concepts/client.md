@@ -31,7 +31,7 @@ The URL of the Aiki server:
 url: "http://localhost:9850"; // Local development
 ```
 
-### createContext
+### appContext
 
 Optional function to create per-execution context for workflows. Called before each workflow execution:
 
@@ -39,14 +39,14 @@ Optional function to create per-execution context for workflows. Called before e
 const aikiClient = await client<AppContext>({
 	url: "http://localhost:9850",
 	apiKey: "your-api-key",
-	createContext: (run) => ({
+	appContext: (run) => ({
 		traceId: crypto.randomUUID(),
 		workflowRunId: run.id,
 	}),
 });
 ```
 
-See the [Dependency Injection Guide](../guides/dependency-injection.md) for more on `createContext` vs higher-order functions.
+See the [Dependency Injection Guide](../guides/dependency-injection.md) for more on `appContext` vs higher-order functions.
 
 ### logger
 

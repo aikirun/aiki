@@ -9,14 +9,14 @@ export interface ClientParams<AppContext = null> {
 	url: string;
 	apiKey: string;
 	logger?: Logger;
-	createContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
+	appContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
 }
 
 export interface Client<AppContext = null> {
 	api: ApiClient;
 	logger: Logger;
 	[INTERNAL]: {
-		createContext?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
+		appContext?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
 	};
 }
 

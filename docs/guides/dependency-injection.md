@@ -66,7 +66,7 @@ export const orderWorkflowV1 = createOrderWorkflow(db);
 
 ## AppContext (Per-Execution Context)
 
-Use `AppContext` for data that should be unique per workflow execution, like trace IDs or request metadata. The `createContext` function is called before each workflow execution.
+Use `AppContext` for data that should be unique per workflow execution, like trace IDs or request metadata. The `appContext` function is called before each workflow execution.
 
 ```typescript
 import { workflow } from "@aikirun/workflow";
@@ -95,7 +95,7 @@ const auditWorkflowV1 = auditWorkflow.v("1.0.0", {
 // Client is typed with AppContext
 const aikiClient = await client<AppContext>({
 	url: "http://localhost:9850",
-	createContext: (run) => ({
+	appContext: (run) => ({
 		traceId: crypto.randomUUID(),
 		workflowRunId: run.id,
 	}),
