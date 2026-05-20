@@ -10,7 +10,7 @@ export interface AuthOptions {
 	betterAuthSchema: BetterAuthSchema;
 	baseURL: string;
 	secret: string;
-	corsOrigins: string[];
+	trustedOrigins: string[];
 }
 
 export function createAuthService(options: AuthOptions) {
@@ -19,7 +19,7 @@ export function createAuthService(options: AuthOptions) {
 		baseURL: options.baseURL,
 		basePath: "/auth",
 		secret: options.secret,
-		trustedOrigins: options.corsOrigins,
+		trustedOrigins: options.trustedOrigins,
 		advanced: {
 			defaultCookieAttributes: {
 				sameSite: "none",
