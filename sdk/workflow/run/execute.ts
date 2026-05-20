@@ -1,6 +1,6 @@
 import { fireAndForget } from "@aikirun/lib/async";
+import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
-import type { Logger } from "@aikirun/types/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";

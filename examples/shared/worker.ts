@@ -1,8 +1,7 @@
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { client } from "@aikirun/client";
-import type { Client } from "@aikirun/types/client";
+import { type Client, client } from "@aikirun/client";
 import { worker } from "@aikirun/worker";
 import type { AnyWorkflowVersion } from "@aikirun/workflow";
 import { config } from "dotenv";

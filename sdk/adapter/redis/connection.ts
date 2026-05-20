@@ -1,4 +1,4 @@
-import type { Logger } from "@aikirun/types/logger";
+import type { Logger } from "@aikirun/lib/logger";
 import type { Redis } from "ioredis";
 
 export interface RedisConnectionParams {

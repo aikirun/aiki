@@ -1,10 +1,10 @@
 import { httpSubscriber } from "@aikirun/http";
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { createBinaryLatch, delay } from "@aikirun/lib/async";
+import type { Logger } from "@aikirun/lib/logger";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { CreateSubscriber, Subscriber, WorkflowRunMessage } from "@aikirun/types/infra/queue";
-import type { Logger } from "@aikirun/types/logger";
 import type { WorkerId } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";

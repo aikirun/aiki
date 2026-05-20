@@ -1,3 +1,40 @@
+export type { Duration, DurationObject } from "@aikirun/lib/duration";
+export type {
+	ExponentialRetryStrategy,
+	FixedRetryStrategy,
+	JitteredRetryStrategy,
+	NeverRetryStrategy,
+	RetryStrategy,
+} from "@aikirun/lib/retry";
+export type { Serializable, SerializableError } from "@aikirun/lib/serializable";
+export type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
+export { SchemaValidationError } from "@aikirun/types/validator";
+export type {
+	EventName,
+	EventReferenceOptions,
+	EventSendOptions,
+	EventWait,
+	EventWaitOptions,
+	EventWaitQueue,
+	EventWaitResult,
+	ReplayManifest,
+	TriggerStrategy,
+	UnconsumedManifestEntries,
+	WorkflowRun,
+	WorkflowRunId,
+	WorkflowRunState,
+	WorkflowRunStatus,
+} from "@aikirun/types/workflow/run";
+export {
+	NonDeterminismError,
+	WorkflowRunFailedError,
+	WorkflowRunNotExecutableError,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
+export type { TaskId, TaskInfo, TaskName, TaskState, TaskStatus } from "@aikirun/types/workflow/task";
+export { TaskFailedError } from "@aikirun/types/workflow/task";
+
 export type { WorkflowRegistry } from "./registry";
 export { workflowRegistry } from "./registry";
 export type { WorkflowRunContext } from "./run/context";

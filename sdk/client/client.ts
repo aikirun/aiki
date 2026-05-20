@@ -1,6 +1,6 @@
+import type { Logger } from "@aikirun/lib/logger";
 import { ConsoleLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client, ClientParams } from "@aikirun/types/client";
-import type { Logger } from "@aikirun/types/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";

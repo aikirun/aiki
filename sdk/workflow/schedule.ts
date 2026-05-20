@@ -1,7 +1,7 @@
+import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
-import type { DurationObject } from "@aikirun/types/duration";
 import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, ScheduleSpec } from "@aikirun/types/schedule";
 
 import type { EventsDefinition } from "./run/event";

@@ -1,7 +1,6 @@
 import type { OptionalProp } from "@aikirun/lib/object";
-
-import type { RetryStrategy } from "../../retry";
-import type { SerializableError } from "../../serializable";
+import type { RetryStrategy } from "@aikirun/lib/retry";
+import type { SerializableError } from "@aikirun/lib/serializable";
 
 export type TaskId = string & { _brand: "task_id" };
 

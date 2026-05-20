@@ -1,4 +1,4 @@
-import type { DurationObject } from "../../duration";
+import type { DurationObject } from "@aikirun/lib/duration";
 
 export type EventName = string & { _brand: "event_name" };
 

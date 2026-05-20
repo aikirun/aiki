@@ -28,10 +28,6 @@
 			"types": "./dist/client.d.ts",
 			"import": "./dist/client.js"
 		},
-		"./duration": {
-			"types": "./dist/duration.d.ts",
-			"import": "./dist/duration.js"
-		},
 		"./infra/cache": {
 			"types": "./dist/infra/cache.d.ts",
 			"import": "./dist/infra/cache.js"
@@ -44,10 +40,6 @@
 			"types": "./dist/infra/timer.d.ts",
 			"import": "./dist/infra/timer.js"
 		},
-		"./logger": {
-			"types": "./dist/logger.d.ts",
-			"import": "./dist/logger.js"
-		},
 		"./namespace": {
 			"types": "./dist/namespace.d.ts",
 			"import": "./dist/namespace.js"
@@ -56,17 +48,9 @@
 			"types": "./dist/organization.d.ts",
 			"import": "./dist/organization.js"
 		},
-		"./retry": {
-			"types": "./dist/retry.d.ts",
-			"import": "./dist/retry.js"
-		},
 		"./schedule": {
 			"types": "./dist/schedule.d.ts",
 			"import": "./dist/schedule.js"
-		},
-		"./serializable": {
-			"types": "./dist/serializable.d.ts",
-			"import": "./dist/serializable.js"
 		},
 		"./symbols": {
 			"types": "./dist/symbols.d.ts",

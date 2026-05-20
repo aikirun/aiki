@@ -1,8 +1,9 @@
+import type { RetryStrategy } from "@aikirun/lib/retry";
+import type { SerializableError } from "@aikirun/lib/serializable";
+
 import type { EventWaitQueue } from "./event";
 import type { SleepQueue } from "./sleep";
 import type { TriggerStrategy } from "./trigger";
-import type { RetryStrategy } from "../../retry";
-import type { SerializableError } from "../../serializable";
 import type { TaskQueue } from "../task";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };

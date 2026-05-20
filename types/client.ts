@@ -1,6 +1,7 @@
+import type { Logger } from "@aikirun/lib/logger";
+
 import type { ScheduleApi } from "./api/schedule";
 import type { WorkflowRunApi } from "./api/workflow-run";
-import type { Logger } from "./logger";
 import { INTERNAL } from "./symbols";
 import type { WorkflowRun } from "./workflow/run";
 
