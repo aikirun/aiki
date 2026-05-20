@@ -1,11 +1,11 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
-import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
+import type { CreatePublisher, PublisherContext, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 import type { Redis } from "ioredis";
 
 import { getWorkflowQueueName } from "./key";
 
-export function redisPublisher(redis: Redis): Publisher {
-	return {
+export function redisPublisher(redis: Redis): CreatePublisher {
+	return (_context: PublisherContext) => ({
 		async publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<void> {
 			const redisPipeline = redis.pipeline();
 
@@ -26,5 +26,5 @@ export function redisPublisher(redis: Redis): Publisher {
 
 			await redisPipeline.exec();
 		},
-	};
+	});
 }

@@ -1,10 +1,9 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import type {
+	CreateTimerSortedSet,
 	DueTimer,
 	TimerEntry,
 	TimerSignalWaiter,
-	TimerSignalWaiterContext,
-	TimerSortedSet,
 	TimerType,
 } from "@aikirun/types/infra/timer";
 import type { Redis } from "ioredis";
@@ -70,10 +69,10 @@ end
 return minSignal
 `;
 
-export function redisTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
+export function redisTimerSortedSet(redis: Redis, key: string): CreateTimerSortedSet {
 	const signalKey = `${key}:signal`;
 
-	return {
+	return ({ logger }) => ({
 		async add(timers: NonEmptyArray<TimerEntry>): Promise<void> {
 			let minDueAt = timers[0].dueAt;
 			const args: (string | number)[] = [];
@@ -111,12 +110,12 @@ export function redisTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
 			return Number(result[1]);
 		},
 
-		createSignalWaiter(context: TimerSignalWaiterContext): TimerSignalWaiter {
+		createSignalWaiter(): TimerSignalWaiter {
 			const redisDuplicate = redis.duplicate({
 				maxRetriesPerRequest: 0,
 				enableOfflineQueue: false,
 			});
-			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger: context.logger });
+			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger });
 			let closed = false;
 
 			return {
@@ -151,5 +150,5 @@ export function redisTimerSortedSet(redis: Redis, key: string): TimerSortedSet {
 				},
 			};
 		},
-	};
+	});
 }

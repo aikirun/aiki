@@ -28,13 +28,15 @@ export interface TimerSignalWaiter {
 	close(): Promise<void>;
 }
 
-export interface TimerSignalWaiterContext {
-	logger: Logger;
-}
-
 export interface TimerSortedSet {
 	add(timers: NonEmptyArray<TimerEntry>): Promise<void>;
 	popDue(maxRank: number, limit: number): Promise<DueTimer[]>;
 	peekNextRank(): Promise<number | null>;
-	createSignalWaiter(context: TimerSignalWaiterContext): TimerSignalWaiter;
+	createSignalWaiter(): TimerSignalWaiter;
 }
+
+export interface TimerSortedSetContext {
+	logger: Logger;
+}
+
+export type CreateTimerSortedSet = (context: TimerSortedSetContext) => TimerSortedSet | Promise<TimerSortedSet>;

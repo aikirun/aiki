@@ -51,9 +51,23 @@ if (import.meta.main) {
 		redis.on("error", (err: Error) => {
 			logger.error({ err }, "Redis connection error");
 		});
-		apiKeyCache = redisCache(redis, { keyPrefix: "aiki:api_key:" });
-		timerSortedSet = redisTimerSortedSet(redis, "aiki:timers");
-		workflowRunPublisher = redisPublisher(redis);
+
+		const createApiKeyCache = redisCache<ApiKeyAuthorizationInfo>(redis, { keyPrefix: "aiki:api_key:" });
+		const apiKeyCacheValue = createApiKeyCache({ logger: logger.child({ "aiki.component": "api-key-cache" }) });
+		apiKeyCache = apiKeyCacheValue instanceof Promise ? await apiKeyCacheValue : apiKeyCacheValue;
+
+		const createTimerSortedSet = redisTimerSortedSet(redis, "aiki:timers");
+		const timerSortedSetValue = createTimerSortedSet({
+			logger: logger.child({ "aiki.component": "timer-sorted-set" }),
+		});
+		timerSortedSet = timerSortedSetValue instanceof Promise ? await timerSortedSetValue : timerSortedSetValue;
+
+		const createWorkflowRunPublisher = redisPublisher(redis);
+		const workflowRunPublisherValue = createWorkflowRunPublisher({
+			logger: logger.child({ "aiki.component": "workflow-run-publisher" }),
+		});
+		workflowRunPublisher =
+			workflowRunPublisherValue instanceof Promise ? await workflowRunPublisherValue : workflowRunPublisherValue;
 	}
 
 	const apiKeyService = createApiKeyService({ repos, cache: apiKeyCache });
