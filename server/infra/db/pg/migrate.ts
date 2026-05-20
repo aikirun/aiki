@@ -1,11 +1,11 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Logger } from "@aikirun/lib/logger";
 import { sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import type { PgDatabaseConfig } from "server/config/schema";
 
 import { createPgDatabaseConn, type PgDatabaseOptions } from "./provider";
-import type { Logger } from "../../logger";
 
 const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), "migration");
 
@@ -32,7 +32,7 @@ export async function migratePg(options: PgDatabaseOptions | PgDatabaseConfig, l
 				continue;
 			}
 
-			logger.info({ hash: migration.hash.slice(0, 12) }, "applying migration");
+			logger.info("applying migration", { hash: migration.hash.slice(0, 12) });
 
 			await db.transaction(async (tx) => {
 				for (const statement of migration.sql) {

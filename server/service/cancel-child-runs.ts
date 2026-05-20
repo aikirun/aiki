@@ -1,5 +1,6 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { hashInput } from "@aikirun/lib/crypto";
+import type { Logger } from "@aikirun/lib/logger";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
@@ -14,7 +15,6 @@ import type {
 	WorkflowRowInsert,
 	WorkflowRunRowInsert,
 } from "server/infra/db/types";
-import type { Logger } from "server/infra/logger";
 import { ulid } from "ulidx";
 
 export interface CancelledParentRun {
@@ -48,7 +48,7 @@ export function createChildRunCanceller() {
 				return;
 			}
 
-			logger.info({ parentRunIds: parentRunIdsHavingChildren }, "Scheduling cancel-child-runs workflows");
+			logger.info("Scheduling cancel-child-runs workflows", { parentRunIds: parentRunIdsHavingChildren });
 
 			const workflowEntries: WorkflowRowInsert[] = [];
 			const inputHashPromises: Array<Promise<string>> = [];

@@ -225,7 +225,7 @@ async function transitionStateInTx(
 	const now = Date.now();
 	let toState = convertDurationsToTimestamps(request.state, now);
 
-	context.logger.info({ runId, state: toState, attempts: run.attempts }, "Workflow state transition");
+	context.logger.info("Workflow state transition", { runId, state: toState, attempts: run.attempts });
 
 	if (fromState.status === "sleeping" && toState.status === "scheduled") {
 		await finalizeSleep(runId, fromState.sleepName, toState, now, txRepos);
@@ -355,10 +355,11 @@ async function childWorkflowRunWaitNotNeeded(
 			childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
 		});
 
-		context.logger.info(
-			{ runId, childRunId, childRunStatus: childRun.status },
-			"Child already at status, scheduling immediately"
-		);
+		context.logger.info("Child already at status, scheduling immediately", {
+			runId,
+			childRunId,
+			childRunStatus: childRun.status,
+		});
 
 		return true;
 	}
@@ -441,10 +442,11 @@ async function notifyParentOfStateChangeIfNecessary(
 		parentRunState.childWorkflowRunId === childRun.id &&
 		parentRunState.childWorkflowRunStatus === childRun.status
 	) {
-		context.logger.info(
-			{ parentRunId: parentRun.id, childRunId: childRun.id, status: childRun.status },
-			"Notifying parent of child state change"
-		);
+		context.logger.info("Notifying parent of child state change", {
+			parentRunId: parentRun.id,
+			childRunId: childRun.id,
+			status: childRun.status,
+		});
 
 		await txRepos.childWorkflowRunWaitQueue.insert({
 			id: ulid(),

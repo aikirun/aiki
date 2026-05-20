@@ -81,7 +81,7 @@ export async function queueRetryableRuns(
 		try {
 			await processChunk(spanCtx, repos, workflowRunPublisher, chunk, workflowsById);
 		} catch (error) {
-			spanCtx.logger.warn({ error, chunkSize: chunk.length }, "Failed to process chunk, will retry next tick");
+			spanCtx.logger.warn("Failed to process chunk, will retry next tick", { error, chunkSize: chunk.length });
 		}
 	});
 }

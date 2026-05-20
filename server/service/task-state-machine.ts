@@ -120,7 +120,7 @@ async function transitionStateInTx(
 			state: taskState,
 		});
 
-		context.logger.info({ runId, taskId, taskState }, "Created new task");
+		context.logger.info("Created new task", { runId, taskId, taskState });
 
 		return { id: taskId, name: taskName, state: taskState, inputHash };
 	}
@@ -176,7 +176,7 @@ async function transitionStateInTx(
 		nextAttemptAt: taskState.status === "awaiting_retry" ? new Date(taskState.nextAttemptAt) : null,
 	});
 
-	context.logger.info({ runId, taskId, taskState }, "Transitioning task state");
+	context.logger.info("Transitioning task state", { runId, taskId, taskState });
 
 	return { id: taskId, name: taskName, state: taskState, inputHash };
 }

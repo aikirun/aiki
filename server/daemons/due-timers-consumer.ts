@@ -1,5 +1,6 @@
 import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import type { Logger } from "@aikirun/lib/logger";
 import { withRetry } from "@aikirun/lib/retry";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { DueTimer, TimerSignalWaiter, TimerSortedSet, TimerType } from "@aikirun/types/infra/timer";
@@ -7,7 +8,6 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type { WorkflowRunMeta } from "server/infra/db/pg/repository/workflow-run";
 import type { Repositories } from "server/infra/db/types";
-import type { Logger } from "server/infra/logger";
 import { computeRank, type Ranked, rankDueAtMs } from "server/lib/rank";
 import type { DaemonContext } from "server/middleware/context";
 import { createDaemonContext } from "server/middleware/context";
@@ -57,7 +57,7 @@ export function spawnDueTimersConsumer(
 				if (abortSignal.aborted) {
 					return;
 				}
-				logger.error({ error }, "Due timers consumer crashed unexpectedly");
+				logger.error("Due timers consumer crashed unexpectedly", { error });
 			},
 		}
 	).run();
@@ -115,7 +115,7 @@ async function dueTimersConsumerLoop(
 			try {
 				await processDueTimers(context, deps, dueTimers);
 			} catch (error) {
-				context.logger.error({ error }, "Failed to process due timers batch");
+				context.logger.error("Failed to process due timers batch", { error });
 			}
 		}
 

@@ -54,7 +54,7 @@ export async function publishRuns(
 	}
 
 	await workflowRunPublisher.publishReadyRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
-	context.logger.debug({ count: runs.length }, "Published ready workflow runs");
+	context.logger.debug("Published ready workflow runs", { count: runs.length });
 
 	await repos.workflowRunOutbox.markPublished(entryIds as NonEmptyArray<string>);
 }
