@@ -15,4 +15,4 @@ export interface CacheContext {
 	logger: Logger;
 }
 
-export type CreateCache<V> = (context: CacheContext) => Cache<V> | Promise<Cache<V>>;
+export type CreateCache<V> = (context: CacheContext) => Cache<V>;
