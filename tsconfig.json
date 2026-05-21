@@ -16,6 +16,8 @@
 			"@aikirun/lib/*": ["./lib/*/index.ts"],
 			"@aikirun/http": ["./sdk/adapter/http/index.ts"],
 			"@aikirun/redis": ["./sdk/adapter/redis/index.ts"],
+			"@aikirun/server": ["./sdk/server/index.ts"],
+			"@aikirun/server/*": ["./sdk/server/*.ts", "./sdk/server/*/index.ts"],
 			"@aikirun/types/*": ["./types/*.ts", "./types/*/index.ts"],
 			"@aikirun/worker": ["./sdk/worker/index.ts"],
 			"@aikirun/workflow": ["./sdk/workflow/index.ts"]
@@ -30,6 +32,6 @@
 
 		"types": ["bun-types", "@types/node"]
 	},
-	"include": ["lib/**/*", "types/**/*", "sdk/**/*", "server/**/*", "scripts/**/*", "examples/**/*"],
+	"include": ["lib/**/*", "types/**/*", "sdk/**/*", "app/server/**/*", "examples/**/*"],
 	"exclude": ["node_modules", "**/dist"]
 }

@@ -1,0 +1,60 @@
+import type { NonEmptyArray } from "@aikirun/lib/array";
+import { streamChunks } from "@aikirun/lib/async";
+import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
+
+import { createRankStreamCursorAdvancer } from "./lib/rank-stream";
+import type { Repositories, WorkflowRunOutboxRowInsert } from "../infra/db/types";
+import type { DaemonContext } from "../middleware/context";
+
+export interface PublishReadyRunsDeps {
+	repos: Pick<Repositories, "workflowRunOutbox">;
+	workflowRunPublisher: Publisher;
+}
+
+const advanceRankStreamCursor = createRankStreamCursorAdvancer<{ id: string; rank: number }>({
+	getRank: (entry) => entry.rank,
+	getId: (entry) => entry.id,
+});
+
+export async function publishReadyRuns(
+	context: DaemonContext,
+	deps: PublishReadyRunsDeps,
+	options?: { limit?: number }
+) {
+	const { limit = 1_000 } = options ?? {};
+
+	for await (const pendingEntries of streamChunks(
+		(cursor) => deps.repos.workflowRunOutbox.listPending(context, limit, cursor),
+		{
+			advanceCursor: advanceRankStreamCursor,
+			until: (chunk) => chunk.length < limit,
+		}
+	)) {
+		await publishRuns(context, deps.repos, deps.workflowRunPublisher, pendingEntries);
+	}
+}
+
+export async function publishRuns(
+	context: DaemonContext,
+	repos: Pick<Repositories, "workflowRunOutbox">,
+	workflowRunPublisher: Publisher,
+	entries: NonEmptyArray<WorkflowRunOutboxRowInsert>
+): Promise<void> {
+	const entryIds: string[] = [];
+	const runs: ReadyWorkflowRun[] = [];
+	for (const entry of entries) {
+		entryIds.push(entry.id);
+		runs.push({
+			id: entry.workflowRunId,
+			name: entry.workflowName,
+			versionId: entry.workflowVersionId,
+			rank: entry.rank,
+			shard: entry.shard ?? undefined,
+		});
+	}
+
+	await workflowRunPublisher.publishReadyRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
+	context.logger.debug("Published ready workflow runs", { count: runs.length });
+
+	await repos.workflowRunOutbox.markPublished(entryIds as NonEmptyArray<string>);
+}

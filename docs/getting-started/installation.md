@@ -82,10 +82,10 @@ bun install
 ### Step 2: Configure Environment
 
 ```bash
-cp server/.env.example server/.env
+cp app/server/.env.example app/server/.env
 ```
 
-Edit `server/.env` with your PostgreSQL connection details (and optionally Redis).
+Edit `app/server/.env` with your PostgreSQL connection details (and optionally Redis).
 
 ### Step 3: Start Aiki
 

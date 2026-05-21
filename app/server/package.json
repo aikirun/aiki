@@ -1,0 +1,29 @@
+{
+	"name": "@aikirun/app-server",
+	"version": "0.27.0",
+	"private": true,
+	"type": "module",
+	"main": "./index.ts",
+	"scripts": {
+		"start": "bun run index.ts",
+		"start:watch": "bun --watch run index.ts",
+		"db:generate": "drizzle-kit generate --config ../../sdk/server/infra/db/drizzle.config.ts",
+		"db:generate:custom": "drizzle-kit generate --config ../../sdk/server/infra/db/drizzle.config.ts --custom",
+		"db:migrate": "bun run migrate.ts"
+	},
+	"dependencies": {
+		"@aikirun/lib": "workspace:*",
+		"@aikirun/redis": "workspace:*",
+		"@aikirun/server": "workspace:*",
+		"@aikirun/types": "workspace:*",
+		"arktype": "^2.1.29",
+		"dotenv": "^16.4.5",
+		"ioredis": "^5.4.1",
+		"pino": "^9.6.0",
+		"pino-pretty": "^13.0.0"
+	},
+	"devDependencies": {
+		"drizzle-kit": "^0.31.8"
+	},
+	"license": "Apache-2.0"
+}

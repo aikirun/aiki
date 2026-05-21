@@ -5,7 +5,7 @@
 
 .claude
 
-server/.env
+app/server/.env
 examples/.env
 
 todo/

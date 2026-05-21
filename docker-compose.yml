@@ -2,9 +2,10 @@ services:
   server:
     build:
       context: .
-      dockerfile: server/Dockerfile
+      dockerfile: app/server/Dockerfile
       args:
         AIKI_SERVER_PORT: ${AIKI_SERVER_PORT:-9850}
+    image: aikirun/server
     container_name: aiki-server
     ports:
       - "${AIKI_SERVER_PORT:-9850}:${AIKI_SERVER_PORT:-9850}"
@@ -29,9 +30,10 @@ services:
   web:
     build:
       context: .
-      dockerfile: web/Dockerfile
+      dockerfile: app/web/Dockerfile
       args:
         VITE_AIKI_SERVER_URL: ${VITE_AIKI_SERVER_URL:-http://localhost:9850}
+    image: aikirun/web
     container_name: aiki-web
     ports:
       - "${AIKI_WEB_PORT:-9851}:9851"
