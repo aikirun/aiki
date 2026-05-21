@@ -2,6 +2,7 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import type { Logger } from "@aikirun/lib/logger";
 
 export interface ReadyWorkflowRun {
+	namespaceId: string;
 	id: string;
 	name: string;
 	versionId: string;

@@ -45,6 +45,7 @@ export async function publishRuns(
 	for (const entry of entries) {
 		entryIds.push(entry.id);
 		runs.push({
+			namespaceId: entry.namespaceId,
 			id: entry.workflowRunId,
 			name: entry.workflowName,
 			versionId: entry.workflowVersionId,

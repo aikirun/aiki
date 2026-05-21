@@ -61,6 +61,7 @@ async function republishRuns(
 	entries: NonEmptyArray<WorkflowRunOutboxRow>
 ): Promise<void> {
 	const runs = entries.map((entry) => ({
+		namespaceId: entry.namespaceId,
 		id: entry.workflowRunId,
 		name: entry.workflowName,
 		versionId: entry.workflowVersionId,
