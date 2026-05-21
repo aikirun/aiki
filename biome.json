@@ -59,7 +59,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["web/**/*.tsx", "web/**/*.ts", "docs/**/*.html"],
+			"includes": ["app/web/**/*.tsx", "app/web/**/*.ts", "docs/**/*.html"],
 			"linter": {
 				"rules": {
 					"a11y": {

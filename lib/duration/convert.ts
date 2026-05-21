@@ -1,6 +1,6 @@
 import type { RequireAtLeastOneProp } from "../object";
 
-interface DurationFields {
+export interface DurationFields {
 	days?: number;
 	hours?: number;
 	minutes?: number;

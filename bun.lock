@@ -15,6 +15,48 @@
         "typescript": "^5.7.2",
       },
     },
+    "app/server": {
+      "name": "@aikirun/app-server",
+      "version": "0.27.0",
+      "dependencies": {
+        "@aikirun/lib": "workspace:*",
+        "@aikirun/redis": "workspace:*",
+        "@aikirun/server": "workspace:*",
+        "@aikirun/types": "workspace:*",
+        "arktype": "^2.1.29",
+        "dotenv": "^16.4.5",
+        "ioredis": "^5.4.1",
+        "pino": "^9.6.0",
+        "pino-pretty": "^13.0.0",
+      },
+      "devDependencies": {
+        "drizzle-kit": "^0.31.8",
+      },
+    },
+    "app/web": {
+      "name": "@aikirun/app-web",
+      "version": "0.27.0",
+      "dependencies": {
+        "@aikirun/types": "workspace:*",
+        "@orpc/client": "^1.4.3",
+        "@tanstack/react-query": "^5.62.16",
+        "better-auth": "^1.4.14",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-router-dom": "^7.1.1",
+      },
+      "devDependencies": {
+        "@types/react": "^18.3.18",
+        "@types/react-dom": "^18.3.5",
+        "@vitejs/plugin-react": "^4.3.4",
+        "autoprefixer": "^10.4.20",
+        "postcss": "^8.4.49",
+        "tailwindcss": "^3.4.17",
+        "typescript": "~5.7.2",
+        "vite": "^6.0.7",
+        "vite-tsconfig-paths": "^6.1.1",
+      },
+    },
     "examples": {
       "name": "@aikirun/examples",
       "version": "0.27.0",
@@ -57,6 +99,25 @@
         "@aikirun/workflow": "workspace:*",
       },
     },
+    "sdk/server": {
+      "name": "@aikirun/server",
+      "version": "0.27.0",
+      "dependencies": {
+        "@aikirun/lib": "workspace:*",
+        "@aikirun/types": "workspace:*",
+        "@orpc/contract": "^1.9.3",
+        "@orpc/server": "^1.9.3",
+        "arktype": "^2.1.29",
+        "better-auth": "^1.4.14",
+        "cron-parser": "^5.4.0",
+        "drizzle-orm": "^0.45.1",
+        "postgres": "^3.4.8",
+        "ulidx": "^2.4.1",
+      },
+      "devDependencies": {
+        "drizzle-kit": "^0.31.8",
+      },
+    },
     "sdk/worker": {
       "name": "@aikirun/worker",
       "version": "0.27.0",
@@ -74,59 +135,16 @@
         "@standard-schema/spec": "^1.1.0",
       },
     },
-    "server": {
-      "name": "@aikirun/server",
-      "version": "0.27.0",
-      "dependencies": {
-        "@aikirun/redis": "workspace:*",
-        "@aikirun/types": "workspace:*",
-        "@orpc/contract": "^1.9.3",
-        "@orpc/server": "^1.9.3",
-        "arktype": "^2.1.29",
-        "better-auth": "^1.4.14",
-        "cron-parser": "^5.4.0",
-        "dotenv": "^16.4.5",
-        "drizzle-orm": "^0.45.1",
-        "ioredis": "^5.4.1",
-        "pino": "^9.6.0",
-        "pino-pretty": "^13.0.0",
-        "postgres": "^3.4.8",
-        "ulidx": "^2.4.1",
-      },
-      "devDependencies": {
-        "drizzle-kit": "^0.31.8",
-      },
-    },
     "types": {
       "name": "@aikirun/types",
       "version": "0.27.0",
     },
-    "web": {
-      "name": "@aikirun/web",
-      "version": "0.27.0",
-      "dependencies": {
-        "@aikirun/types": "workspace:*",
-        "@orpc/client": "^1.4.3",
-        "@tanstack/react-query": "^5.62.16",
-        "better-auth": "^1.4.14",
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1",
-        "react-router-dom": "^7.1.1",
-      },
-      "devDependencies": {
-        "@types/react": "^18.3.18",
-        "@types/react-dom": "^18.3.5",
-        "@vitejs/plugin-react": "^4.3.4",
-        "autoprefixer": "^10.4.20",
-        "postcss": "^8.4.49",
-        "tailwindcss": "^3.4.17",
-        "typescript": "~5.7.2",
-        "vite": "^6.0.7",
-        "vite-tsconfig-paths": "^6.1.1",
-      },
-    },
   },
   "packages": {
+    "@aikirun/app-server": ["@aikirun/app-server@workspace:app/server"],
+
+    "@aikirun/app-web": ["@aikirun/app-web@workspace:app/web"],
+
     "@aikirun/client": ["@aikirun/client@workspace:sdk/client"],
 
     "@aikirun/endpoint": ["@aikirun/endpoint@workspace:sdk/endpoint"],
@@ -139,11 +157,9 @@
 
     "@aikirun/redis": ["@aikirun/redis@workspace:sdk/adapter/redis"],
 
-    "@aikirun/server": ["@aikirun/server@workspace:server"],
+    "@aikirun/server": ["@aikirun/server@workspace:sdk/server"],
 
     "@aikirun/types": ["@aikirun/types@workspace:types"],
-
-    "@aikirun/web": ["@aikirun/web@workspace:web"],
 
     "@aikirun/worker": ["@aikirun/worker@workspace:sdk/worker"],
 
@@ -961,7 +977,7 @@
 
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
-    "@aikirun/web/typescript": ["typescript@5.7.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw=="],
+    "@aikirun/app-web/typescript": ["typescript@5.7.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw=="],
 
     "@babel/core/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
