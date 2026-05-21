@@ -39,4 +39,4 @@ export interface TimerSortedSetContext {
 	logger: Logger;
 }
 
-export type CreateTimerSortedSet = (context: TimerSortedSetContext) => TimerSortedSet | Promise<TimerSortedSet>;
+export type CreateTimerSortedSet = (context: TimerSortedSetContext) => TimerSortedSet;

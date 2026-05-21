@@ -161,26 +161,24 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 
 		const createPrimarySubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
-		const primarySubscriber = createPrimarySubscriber({
+		this.primarySubscriber = createPrimarySubscriber({
 			workerId: this.id,
 			workflows,
 			shards: this.spawnOptions.shards,
 			logger: this.logger.child({ "aiki.subscriber": "primary" }),
 		});
-		this.primarySubscriber = primarySubscriber instanceof Promise ? await primarySubscriber : primarySubscriber;
 		this.primarySubscriber.heartbeat = this.withServerHeartbeatForwarding(
 			this.primarySubscriber.heartbeat?.bind(this.primarySubscriber)
 		);
 
 		if (!this.params.subscriber) {
 			const createBackupSubscriber = httpSubscriber({ api: this.client.api });
-			const backupSubscriber = createBackupSubscriber({
+			this.backupSubscriber = createBackupSubscriber({
 				workerId: this.id,
 				workflows,
 				shards: this.spawnOptions.shards,
 				logger: this.logger.child({ "aiki.subscriber": "backup" }),
 			});
-			this.backupSubscriber = backupSubscriber instanceof Promise ? await backupSubscriber : backupSubscriber;
 			this.backupSubscriber.heartbeat = this.withServerHeartbeatForwarding(
 				this.backupSubscriber.heartbeat?.bind(this.backupSubscriber)
 			);

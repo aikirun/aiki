@@ -426,7 +426,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				const runningStateTransitionId = monotonic();
 				const finalStateTransitionId = monotonic();
 
-				context.logger.info({ runId, taskId, state: request.state }, "Setting task state (new task)");
+				context.logger.info("Setting task state (new task)", { runId, taskId, state: request.state });
 
 				const runningState: TaskState = {
 					status: "running",
@@ -477,10 +477,11 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				throw new NotFoundError(`Task not found: ${request.taskId}`);
 			}
 
-			context.logger.info(
-				{ runId, taskId: request.taskId, state: request.state },
-				"Setting task state (existing task)"
-			);
+			context.logger.info("Setting task state (existing task)", {
+				runId,
+				taskId: request.taskId,
+				state: request.state,
+			});
 
 			const attempts = existingTaskRow.attempts;
 
@@ -627,7 +628,7 @@ async function createWorkflowRunInTx(
 				}
 			}
 
-			context.logger.info({ runId: existingRun.id, referenceId }, "Returning existing run from reference ID");
+			context.logger.info("Returning existing run from reference ID", { runId: existingRun.id, referenceId });
 			return existingRun.id as WorkflowRunId;
 		}
 	}
@@ -673,7 +674,7 @@ async function createWorkflowRunInTx(
 		state,
 	});
 
-	context.logger.info({ workflowName: name, versionId, runId, referenceId, options }, "Created workflow run");
+	context.logger.info("Created workflow run", { workflowName: name, versionId, runId, referenceId, options });
 
 	return runId;
 }

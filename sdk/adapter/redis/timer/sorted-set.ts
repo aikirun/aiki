@@ -4,6 +4,7 @@ import type {
 	DueTimer,
 	TimerEntry,
 	TimerSignalWaiter,
+	TimerSortedSet,
 	TimerType,
 } from "@aikirun/types/infra/timer";
 import type { Redis } from "ioredis";
@@ -72,7 +73,7 @@ return minSignal
 export function redisTimerSortedSet(redis: Redis, key: string): CreateTimerSortedSet {
 	const signalKey = `${key}:signal`;
 
-	return ({ logger }) => ({
+	return ({ logger }): TimerSortedSet => ({
 		async add(timers: NonEmptyArray<TimerEntry>): Promise<void> {
 			let minDueAt = timers[0].dueAt;
 			const args: (string | number)[] = [];

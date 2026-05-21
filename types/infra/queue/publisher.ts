@@ -17,4 +17,4 @@ export interface PublisherContext {
 	logger: Logger;
 }
 
-export type CreatePublisher = (context: PublisherContext) => Publisher | Promise<Publisher>;
+export type CreatePublisher = (context: PublisherContext) => Publisher;

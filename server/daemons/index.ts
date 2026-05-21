@@ -1,9 +1,9 @@
 import { delay } from "@aikirun/lib/async";
+import type { Logger } from "@aikirun/lib/logger";
 import { withRetry } from "@aikirun/lib/retry";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerSortedSet } from "@aikirun/types/infra/timer";
 import type { Repositories } from "server/infra/db/types";
-import type { Logger } from "server/infra/logger";
 import type { DaemonContext } from "server/middleware/context";
 import { createDaemonContext } from "server/middleware/context";
 import type { ChildRunCanceller } from "server/service/cancel-child-runs";
@@ -44,7 +44,7 @@ function initDaemon<Deps, Options>(
 				const start = performance.now();
 				await fn(context, deps, options);
 				const durationMs = Math.round(performance.now() - start);
-				context.logger.debug({ durationMs }, "Completed");
+				context.logger.debug("Completed", { durationMs });
 				const delayMs = intervalMs - durationMs;
 				if (delayMs > 0) {
 					await delay(delayMs, { abortSignal: signal });
@@ -58,7 +58,7 @@ function initDaemon<Deps, Options>(
 				if (signal.aborted) {
 					return;
 				}
-				logger.error({ err }, `Daemon ${name} failed`);
+				logger.error(`Daemon ${name} failed`, { err });
 			},
 		}
 	).run();

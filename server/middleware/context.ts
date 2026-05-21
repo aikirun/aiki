@@ -1,7 +1,7 @@
+import type { Logger } from "@aikirun/lib/logger";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import type { OrganizationRole } from "server/infra/db/constants/organization";
-import type { Logger } from "server/infra/logger";
 import { ulid } from "ulidx";
 
 import type {

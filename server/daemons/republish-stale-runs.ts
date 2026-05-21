@@ -35,7 +35,7 @@ export async function republishStaleRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		context.logger.info({ count: staleEntries.length }, "Releasing stale outbox claims");
+		context.logger.info("Releasing stale outbox claims", { count: staleEntries.length });
 		await republishRuns(context, deps.workflowRunPublisher, staleEntries);
 		const staleEntryIds = staleEntries.map((entry) => entry.id) as NonEmptyArray<string>;
 		await deps.repos.workflowRunOutbox.releaseStaleClaim(staleEntryIds);
@@ -48,7 +48,7 @@ export async function republishStaleRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		context.logger.info({ count: staleEntries.length }, "Republishing stale published outbox entries");
+		context.logger.info("Republishing stale published outbox entries", { count: staleEntries.length });
 		await republishRuns(context, deps.workflowRunPublisher, staleEntries);
 		const staleEntryIds = staleEntries.map((entry) => entry.id) as NonEmptyArray<string>;
 		await deps.repos.workflowRunOutbox.markRepublished(staleEntryIds);
@@ -69,5 +69,5 @@ async function republishRuns(
 	})) as NonEmptyArray<ReadyWorkflowRun>;
 
 	await workflowRunPublisher.publishReadyRuns(runs);
-	context.logger.debug({ count: runs.length }, "Published ready workflow runs");
+	context.logger.debug("Published ready workflow runs", { count: runs.length });
 }

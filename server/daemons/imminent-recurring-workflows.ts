@@ -135,7 +135,7 @@ export async function queueRecurringWorkflows(
 
 	for (const result of results) {
 		if (result.status === "rejected") {
-			context.logger.warn({ err: result.reason }, "Failed to process recurring schedules batch, will retry next tick");
+			context.logger.warn("Failed to process recurring schedules batch, will retry next tick", { err: result.reason });
 		}
 	}
 }
