@@ -15,7 +15,6 @@
 		"build": "tsup"
 	},
 	"dependencies": {
-		"@aikirun/lib": "workspace:*",
 		"@aikirun/server": "workspace:*",
 		"cac": "^6.7.14",
 		"dotenv": "^16.4.5",
@@ -23,6 +22,7 @@
 		"postgres": "^3.4.8"
 	},
 	"devDependencies": {
+		"@aikirun/lib": "workspace:*",
 		"drizzle-kit": "^0.31.8"
 	},
 	"publishConfig": {

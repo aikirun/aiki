@@ -21,6 +21,9 @@
 		"@aikirun/types": "workspace:*",
 		"ioredis": "^5.4.1"
 	},
+	"devDependencies": {
+		"@aikirun/lib": "workspace:*"
+	},
 	"publishConfig": {
 		"access": "public"
 	},

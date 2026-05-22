@@ -6,5 +6,8 @@
 	"dependencies": {
 		"dotenv": "^16.4.5"
 	},
+	"devDependencies": {
+		"@aikirun/lib": "workspace:*"
+	},
 	"license": "Apache-2.0"
 }

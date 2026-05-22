@@ -21,6 +21,9 @@
 		"@aikirun/types": "workspace:*",
 		"@orpc/client": "^1.9.3"
 	},
+	"devDependencies": {
+		"@aikirun/lib": "workspace:*"
+	},
 	"publishConfig": {
 		"access": "public"
 	},

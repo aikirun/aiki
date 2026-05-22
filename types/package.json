@@ -87,6 +87,9 @@
 	"scripts": {
 		"build": "tsup"
 	},
+	"devDependencies": {
+		"@aikirun/lib": "workspace:*"
+	},
 	"publishConfig": {
 		"access": "public"
 	},
