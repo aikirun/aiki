@@ -11,13 +11,10 @@
 			"import": "./dist/index.js"
 		},
 		"./config": {
-			"types": "./dist/config.d.ts",
-			"import": "./dist/config.js"
+			"types": "./dist/config/index.d.ts",
+			"import": "./dist/config/index.js"
 		},
-		"./infra/db/pg/migrate": {
-			"types": "./dist/infra/db/pg/migrate.d.ts",
-			"import": "./dist/infra/db/pg/migrate.js"
-		}
+		"./package.json": "./package.json"
 	},
 	"files": [
 		"dist"
