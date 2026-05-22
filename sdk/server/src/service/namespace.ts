@@ -6,7 +6,8 @@ import { ulid } from "ulidx";
 
 import type { ApiKeyService } from "./api-key";
 import { ForbiddenError, ValidationError } from "../errors";
-import type { NamespaceRow, Repositories } from "../infra/db/types";
+import type { Repositories } from "../infra/db/types";
+import type { NamespaceRow } from "../infra/db/types/namespace";
 import {
 	isOrganizationManager,
 	type OrganizationManagerSessionRequestContext,

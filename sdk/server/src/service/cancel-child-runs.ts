@@ -11,12 +11,10 @@ import {
 } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import type {
-	Repositories,
-	StateTransitionRowInsert,
-	WorkflowRowInsert,
-	WorkflowRunRowInsert,
-} from "../infra/db/types";
+import type { Repositories } from "../infra/db/types";
+import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRowInsert } from "../infra/db/types/workflow";
+import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 
 export interface CancelledParentRun {
 	namespaceId: NamespaceId;

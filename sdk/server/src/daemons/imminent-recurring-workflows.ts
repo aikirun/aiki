@@ -15,12 +15,10 @@ import {
 import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
-import type {
-	Repositories,
-	StateTransitionRowInsert,
-	WorkflowRunOutboxRowInsert,
-	WorkflowRunRowInsert,
-} from "../infra/db/types";
+import type { Repositories } from "../infra/db/types";
+import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
+import type { WorkflowRunOutboxRowInsert } from "../infra/db/types/workflow-run-outbox";
 import { computeRank } from "../lib/rank";
 import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";

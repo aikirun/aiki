@@ -3,7 +3,8 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { TaskStateDiscarded } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import type { Repositories, StateTransitionRowInsert } from "../infra/db/types";
+import type { Repositories } from "../infra/db/types";
+import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 
 export async function discardStaleTasks(
 	workflowRunIds: string | NonEmptyArray<string>,

@@ -5,9 +5,6 @@ import { createPgDatabaseConn } from "./pg/provider";
 import { betterAuthSchema as pgBetterAuthSchema } from "./pg/schema";
 import { type DatabaseConfig, databaseConfigSchema } from "../../config";
 
-export type { Repositories } from "./types";
-export * from "./types";
-
 export function createDatabase(params: DatabaseConfig) {
 	const validationResult = databaseConfigSchema(params);
 	if (validationResult instanceof type.errors) {

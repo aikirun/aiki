@@ -7,7 +7,8 @@ import type { OrganizationId } from "@aikirun/types/organization";
 import { ulid } from "ulidx";
 
 import { UnauthorizedError } from "../errors";
-import type { ApiKeyRepository, ApiKeyRowInsert, Repositories } from "../infra/db/types";
+import type { Repositories } from "../infra/db/types";
+import type { ApiKeyRepository, ApiKeyRowInsert } from "../infra/db/types/api-key";
 import type { NamespaceSessionRequestContext } from "../middleware/context";
 
 const PLATFORM = "aiki";

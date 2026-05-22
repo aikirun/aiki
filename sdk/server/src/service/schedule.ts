@@ -15,7 +15,8 @@ import CronExpressionParser from "cron-parser";
 import { ulid } from "ulidx";
 
 import { NotFoundError, ScheduleConflictError } from "../errors";
-import type { Repositories, ScheduleRow } from "../infra/db/types";
+import type { Repositories } from "../infra/db/types";
+import type { ScheduleRow } from "../infra/db/types/schedule";
 import type { Context } from "../middleware/context";
 
 export function getReferenceId(scheduleId: string, occurrence: number) {

@@ -6,13 +6,11 @@ import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/type
 import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
-import type {
-	Repositories,
-	StateTransitionRowInsert,
-	WorkflowRow,
-	WorkflowRunOutboxRowInsert,
-} from "../infra/db/types";
+import type { Repositories } from "../infra/db/types";
+import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRow } from "../infra/db/types/workflow";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
+import type { WorkflowRunOutboxRowInsert } from "../infra/db/types/workflow-run-outbox";
 import { runConcurrently } from "../lib/concurrency";
 import type { Ranked } from "../lib/rank";
 import { streamTimers } from "../lib/timer-stream";

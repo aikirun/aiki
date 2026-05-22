@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
 
 import type { DatabaseProvider } from "../config";
-import type { BetterAuthSchema } from "../infra/db/types";
+import type { BetterAuthSchema } from "../infra/db/types/better-auth";
 
 export interface AuthOptions {
 	conn: Parameters<typeof drizzleAdapter>[0];
