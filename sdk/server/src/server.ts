@@ -29,14 +29,14 @@ import { createWorkflowRunService } from "./service/workflow-run";
 import { createWorkflowRunOutboxService } from "./service/workflow-run-outbox";
 import { createWorkflowRunStateMachineService } from "./service/workflow-run-state-machine";
 
-export interface ServerHandlerAuth {
+export interface ServerHandlerAuthParams {
 	secret: string;
 	baseURL: string;
 	trustedOrigins: string[];
 }
 
 export interface ServerHandlerParams {
-	auth: ServerHandlerAuth;
+	auth: ServerHandlerAuthParams;
 }
 
 export interface ServerRuntimeOptions {

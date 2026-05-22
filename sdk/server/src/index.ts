@@ -2,7 +2,7 @@ export type { Logger } from "@aikirun/lib/logger";
 
 export type {
 	Server,
-	ServerHandlerAuth,
+	ServerHandlerAuthParams,
 	ServerHandlerParams,
 	ServerParams,
 	ServerRuntimeHandle,
