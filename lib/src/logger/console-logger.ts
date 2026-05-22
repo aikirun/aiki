@@ -25,16 +25,16 @@ const logLevelConfig: Record<LogLevel, { level: number; color: string }> = {
 
 interface ConsoleLoggerOptions {
 	level?: LogLevel;
-	context?: Record<string, unknown>;
+	bindings?: Record<string, unknown>;
 }
 
 export class ConsoleLogger implements Logger {
 	private readonly level: number;
-	private readonly context: Record<string, unknown>;
+	private readonly bindings: Record<string, unknown>;
 
 	constructor(options: ConsoleLoggerOptions = {}) {
 		this.level = logLevelConfig[options.level ?? "INFO"].level;
-		this.context = options.context ?? {};
+		this.bindings = options.bindings ?? {};
 	}
 
 	trace(message: string, metadata?: Record<string, unknown>): void {
@@ -70,13 +70,13 @@ export class ConsoleLogger implements Logger {
 	child(bindings: Record<string, unknown>): Logger {
 		return new ConsoleLogger({
 			level: Object.entries(logLevelConfig).find(([, v]) => v.level === this.level)?.[0] as LogLevel,
-			context: { ...this.context, ...bindings },
+			bindings: { ...this.bindings, ...bindings },
 		});
 	}
 
 	private format(level: LogLevel, message: string, metadata?: Record<string, unknown>): string {
 		const timestamp = new Date().toISOString();
-		const mergedContext = { ...this.context, ...metadata };
+		const mergedMetadata = { ...this.bindings, ...metadata };
 		const levelColor = logLevelConfig[level].color ?? colors.reset;
 
 		const timestampStr = `${colors.dim}${timestamp}${colors.reset}`;
@@ -85,8 +85,8 @@ export class ConsoleLogger implements Logger {
 
 		let output = `${timestampStr} ${levelStr} ${messageStr}`;
 
-		if (Object.keys(mergedContext).length > 0) {
-			const entries = Object.entries(mergedContext)
+		if (Object.keys(mergedMetadata).length > 0) {
+			const entries = Object.entries(mergedMetadata)
 				.map(([key, value]) => {
 					const valueStr = typeof value === "object" ? JSON.stringify(value) : String(value);
 					return `${colors.magenta}${key}:${colors.reset} ${valueStr}`;
