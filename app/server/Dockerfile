@@ -12,6 +12,7 @@ COPY sdk/adapter/redis/package.json ./sdk/adapter/redis/
 COPY sdk/server/package.json ./sdk/server/
 COPY sdk/worker/package.json ./sdk/worker/
 COPY sdk/workflow/package.json ./sdk/workflow/
+COPY cli/package.json ./cli/
 COPY app/server/package.json ./app/server/
 COPY app/web/package.json ./app/web/
 COPY examples/package.json ./examples/
