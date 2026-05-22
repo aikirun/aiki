@@ -1,7 +1,7 @@
 import { and, gt, or, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
-import type { RankStreamCursor } from "../../../../../daemons/lib/rank-stream";
+import type { RankStreamCursor } from "../../../../../lib/rank-stream";
 
 export function rankStreamCursorFilter(
 	rankCol: PgColumn,

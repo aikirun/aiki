@@ -7,7 +7,7 @@ import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
 import { timerStreamCursorFilter } from "./lib/timer-stream";
 import { toWorkflowRunState } from "./state-transition";
-import type { TimerStreamCursor } from "../../../../daemons/lib/timer-stream";
+import type { TimerStreamCursor } from "../../../../lib/timer-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { stateTransition, task, workflow, workflowRun } from "../schema";

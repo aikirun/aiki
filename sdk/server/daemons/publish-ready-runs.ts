@@ -2,8 +2,8 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 
-import { createRankStreamCursorAdvancer } from "./lib/rank-stream";
 import type { Repositories, WorkflowRunOutboxRowInsert } from "../infra/db/types";
+import { createRankStreamCursorAdvancer } from "../lib/rank-stream";
 import type { DaemonContext } from "../middleware/context";
 
 export interface PublishReadyRunsDeps {

@@ -6,7 +6,6 @@ import type { TimerEntry, TimerSortedSet } from "@aikirun/types/infra/timer";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
 import { publishRuns } from "./publish-ready-runs";
 import type { WorkflowRunMeta } from "../infra/db/pg/repository/workflow-run";
 import type {
@@ -17,6 +16,7 @@ import type {
 } from "../infra/db/types";
 import { runConcurrently } from "../lib/concurrency";
 import { computeRank, type Ranked } from "../lib/rank";
+import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 
 type Repos = Pick<

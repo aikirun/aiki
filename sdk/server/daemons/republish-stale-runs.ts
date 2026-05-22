@@ -2,8 +2,8 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 
-import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
 import type { Repositories, WorkflowRunOutboxRow } from "../infra/db/types";
+import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 
 export interface RepublishStaleRuns {

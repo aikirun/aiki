@@ -14,7 +14,6 @@ import {
 } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import { createTimerStreamCursorAdvancer } from "./lib/timer-stream";
 import { publishRuns } from "./publish-ready-runs";
 import type {
 	Repositories,
@@ -23,6 +22,7 @@ import type {
 	WorkflowRunRowInsert,
 } from "../infra/db/types";
 import { computeRank } from "../lib/rank";
+import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "../service/cancel-child-runs";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "../service/schedule";

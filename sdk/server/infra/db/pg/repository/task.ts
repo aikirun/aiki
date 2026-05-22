@@ -3,7 +3,7 @@ import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 
 import { timerStreamCursorFilter } from "./lib/timer-stream";
-import type { TimerStreamCursor } from "../../../../daemons/lib/timer-stream";
+import type { TimerStreamCursor } from "../../../../lib/timer-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { task } from "../schema";

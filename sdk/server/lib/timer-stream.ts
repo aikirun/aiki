@@ -1,7 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 
-import { computeRank, type Ranked } from "../../lib/rank";
+import { computeRank, type Ranked } from "../lib/rank";
 
 interface Timer {
 	dueAt: Date;

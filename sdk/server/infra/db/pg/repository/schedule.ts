@@ -3,7 +3,7 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, count, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
 
 import { timerStreamCursorFilter } from "./lib/timer-stream";
-import type { TimerStreamCursor } from "../../../../daemons/lib/timer-stream";
+import type { TimerStreamCursor } from "../../../../lib/timer-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { schedule, workflow } from "../schema";

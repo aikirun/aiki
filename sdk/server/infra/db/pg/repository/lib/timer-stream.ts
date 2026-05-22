@@ -1,7 +1,7 @@
 import { and, gt, or, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
-import type { TimerStreamCursor } from "../../../../../daemons/lib/timer-stream";
+import type { TimerStreamCursor } from "../../../../../lib/timer-stream";
 
 export function timerStreamCursorFilter(
 	dueAtCol: PgColumn | SQL,
