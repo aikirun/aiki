@@ -1,0 +1,32 @@
+{
+	"name": "@aikirun/cli",
+	"version": "0.27.0",
+	"description": "Aiki CLI — manage Aiki server migrations.",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"aiki": "./dist/index.js"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup"
+	},
+	"dependencies": {
+		"@aikirun/lib": "workspace:*",
+		"@aikirun/server": "workspace:*",
+		"cac": "^6.7.14",
+		"dotenv": "^16.4.5",
+		"drizzle-orm": "^0.45.1",
+		"postgres": "^3.4.8"
+	},
+	"devDependencies": {
+		"drizzle-kit": "^0.31.8"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"license": "Apache-2.0"
+}

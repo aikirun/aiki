@@ -1,30 +1,18 @@
-import "dotenv/config";
 import type { Config as DrizzleConfig } from "drizzle-kit";
 
-import { DATABASE_PROVIDERS, type DatabaseConfig, isDatabaseProvider } from "../../config";
+import { type DatabaseProvider, loadDatabaseConfig } from "../../config";
 
-const providerDialects: Record<DatabaseConfig["provider"], DrizzleConfig["dialect"]> = {
+const providerDialects: Record<DatabaseProvider, DrizzleConfig["dialect"]> = {
 	pg: "postgresql",
 	sqlite: "sqlite",
 	mysql: "mysql",
 };
 
-const provider = process.env.DATABASE_PROVIDER || "pg";
-const connectionString = process.env.DATABASE_URL;
-
-if (!isDatabaseProvider(provider)) {
-	throw new Error(`Unsupported DATABASE_PROVIDER: ${provider}. Supported: ${DATABASE_PROVIDERS.join(", ")}`);
-}
-
-if (!connectionString) {
-	throw new Error("DATABASE_URL environment variable is required");
-}
+const dbConfig = loadDatabaseConfig();
 
 export default {
-	schema: `./infra/db/${provider}/schema/*.ts`,
-	out: `./infra/db/${provider}/migration`,
-	dialect: providerDialects[provider],
-	dbCredentials: {
-		url: connectionString,
-	},
+	schema: `./infra/db/${dbConfig.provider}/schema/*.ts`,
+	out: `./infra/db/${dbConfig.provider}/migration`,
+	dialect: providerDialects[dbConfig.provider],
+	dbCredentials: dbConfig.provider === "sqlite" ? { url: dbConfig.path } : { url: dbConfig.url, ssl: dbConfig.ssl },
 } satisfies DrizzleConfig;

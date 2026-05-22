@@ -7,9 +7,10 @@
 	"scripts": {
 		"start": "bun run index.ts",
 		"start:watch": "bun --watch run index.ts",
-		"db:generate": "drizzle-kit generate --config ../../sdk/server/infra/db/drizzle.config.ts",
-		"db:generate:custom": "drizzle-kit generate --config ../../sdk/server/infra/db/drizzle.config.ts --custom",
-		"db:migrate": "bun run migrate.ts"
+		"build": "bun build index.ts --compile --outfile dist/aiki-server",
+		"db:migrate": "aiki migrate apply --env-file ./.env",
+		"db:generate": "aiki migrate generate --env-file ./.env",
+		"db:generate:custom": "aiki migrate generate --custom --env-file ./.env"
 	},
 	"dependencies": {
 		"@aikirun/lib": "workspace:*",
@@ -23,7 +24,7 @@
 		"pino-pretty": "^13.0.0"
 	},
 	"devDependencies": {
-		"drizzle-kit": "^0.31.8"
+		"@aikirun/cli": "workspace:*"
 	},
 	"license": "Apache-2.0"
 }
