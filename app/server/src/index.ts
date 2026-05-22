@@ -3,7 +3,7 @@ import { redisCache, redisPublisher, redisTimerSortedSet } from "@aikirun/redis"
 import { server } from "@aikirun/server";
 import { Redis } from "ioredis";
 
-import { loadConfig } from "./config";
+import { loadConfig } from "./config/loader";
 import { createCorsHelpers } from "./cors";
 import { createLogger } from "./logger";
 
