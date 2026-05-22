@@ -2,18 +2,12 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import * as schema from "./schema";
+import type { PgDatabaseConfig } from "../../../config/";
 
-export interface PgDatabaseOptions {
-	provider: "pg";
-	url: string;
-	maxConnections?: number;
-	ssl?: boolean;
-}
-
-export function createPgDatabaseConn(options: PgDatabaseOptions) {
-	const client = postgres(options.url, {
-		max: options.maxConnections ?? 10,
-		ssl: options.ssl ? "require" : undefined,
+export function createPgDatabaseConn(params: PgDatabaseConfig) {
+	const client = postgres(params.url, {
+		max: params.maxConnections,
+		ssl: params.ssl,
 	});
 
 	return drizzle(client, { schema });

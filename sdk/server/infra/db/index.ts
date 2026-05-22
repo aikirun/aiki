@@ -1,19 +1,22 @@
+import { type } from "arktype";
+
 import { createPgRepositories } from "./pg";
-import { createPgDatabaseConn, type PgDatabaseOptions } from "./pg/provider";
+import { createPgDatabaseConn } from "./pg/provider";
 import { betterAuthSchema as pgBetterAuthSchema } from "./pg/schema";
+import { type DatabaseConfig, databaseConfigSchema } from "../../config";
 
 export type { Repositories } from "./types";
 export * from "./types";
 
-export type DatabaseOptions =
-	| PgDatabaseOptions
-	| { provider: "mysql"; url: string; maxConnections?: number; ssl?: boolean }
-	| { provider: "sqlite"; path: string };
+export function createDatabase(params: DatabaseConfig) {
+	const validationResult = databaseConfigSchema(params);
+	if (validationResult instanceof type.errors) {
+		throw new Error(`Invalid database config: ${validationResult.summary}`);
+	}
 
-export function createDatabase(options: DatabaseOptions) {
-	switch (options.provider) {
+	switch (params.provider) {
 		case "pg": {
-			const conn = createPgDatabaseConn(options);
+			const conn = createPgDatabaseConn(params);
 			return {
 				conn,
 				repos: createPgRepositories(conn),
@@ -25,6 +28,6 @@ export function createDatabase(options: DatabaseOptions) {
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
 		default:
-			return options satisfies never;
+			return params satisfies never;
 	}
 }
