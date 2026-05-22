@@ -1,6 +1,5 @@
+import { type DatabaseProvider, loadDatabaseConfig } from "@aikirun/server/config";
 import type { Config as DrizzleConfig } from "drizzle-kit";
-
-import { type DatabaseProvider, loadDatabaseConfig } from "../../config";
 
 const providerDialects: Record<DatabaseProvider, DrizzleConfig["dialect"]> = {
 	pg: "postgresql",

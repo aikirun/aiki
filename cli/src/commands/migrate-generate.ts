@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { loadDatabaseConfig } from "@aikirun/server/config";
+import { fileURLToPath } from "node:url";
+import { type DatabaseProvider, loadDatabaseConfig } from "@aikirun/server/config";
 
 import { loadEnv } from "../lib/env";
 import { resolveServerRoot } from "../lib/resolve-server";
@@ -13,10 +14,12 @@ interface MigrateGenerateOptions {
 
 export async function migrateGenerate(options: MigrateGenerateOptions): Promise<void> {
 	loadEnv(options.envFile);
-	loadDatabaseConfig();
+	const dbConfig = loadDatabaseConfig();
 
 	const serverRoot = resolveServerRoot();
-	const configPath = resolveDrizzleConfigPath(serverRoot);
+	ensureWorkspaceMode(serverRoot, dbConfig.provider);
+
+	const configPath = resolveDrizzleConfigPath();
 	const args = ["drizzle-kit", "generate", "--config", configPath];
 	if (options.custom) {
 		args.push("--custom");
@@ -25,14 +28,26 @@ export async function migrateGenerate(options: MigrateGenerateOptions): Promise<
 	await spawnDrizzle(args, serverRoot);
 }
 
-function resolveDrizzleConfigPath(serverRoot: string): string {
-	const configPath = path.join(serverRoot, "infra", "db", "drizzle.config.ts");
-	if (!fs.existsSync(configPath)) {
+function ensureWorkspaceMode(serverRoot: string, provider: DatabaseProvider): void {
+	const schemaDir = path.join(serverRoot, "infra", "db", provider, "schema");
+	if (!fs.existsSync(schemaDir)) {
 		throw new Error(
 			"aiki migrate generate is only supported inside the Aiki monorepo. Schema generation is a maintainer operation; end users do not need it."
 		);
 	}
-	return configPath;
+}
+
+function resolveDrizzleConfigPath(): string {
+	// Source mode runs from cli/src/commands/, compiled mode runs from cli/dist/.
+	// Walk up until we hit the first package.json — in both layouts that's the cli package root.
+	let dir = path.dirname(fileURLToPath(import.meta.url));
+	while (dir !== path.dirname(dir)) {
+		if (fs.existsSync(path.join(dir, "package.json"))) {
+			return path.join(dir, "drizzle.config.ts");
+		}
+		dir = path.dirname(dir);
+	}
+	throw new Error("Could not locate @aikirun/cli root for drizzle.config.ts");
 }
 
 function spawnDrizzle(args: string[], cwd: string): Promise<void> {

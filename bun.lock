@@ -64,7 +64,6 @@
         "aiki": "./dist/index.js",
       },
       "dependencies": {
-        "@aikirun/lib": "workspace:*",
         "@aikirun/server": "workspace:*",
         "cac": "^6.7.14",
         "dotenv": "^16.4.5",
@@ -72,6 +71,7 @@
         "postgres": "^3.4.8",
       },
       "devDependencies": {
+        "@aikirun/lib": "workspace:*",
         "drizzle-kit": "^0.31.8",
       },
     },
@@ -80,6 +80,9 @@
       "version": "0.27.0",
       "dependencies": {
         "dotenv": "^16.4.5",
+      },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
       },
     },
     "lib": {
@@ -92,6 +95,9 @@
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+      },
     },
     "sdk/adapter/redis": {
       "name": "@aikirun/redis",
@@ -99,6 +105,9 @@
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "ioredis": "^5.4.1",
+      },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
       },
     },
     "sdk/client": {
@@ -108,6 +117,9 @@
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.9.3",
       },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+      },
     },
     "sdk/endpoint": {
       "name": "@aikirun/endpoint",
@@ -116,12 +128,14 @@
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
       },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+      },
     },
     "sdk/server": {
       "name": "@aikirun/server",
       "version": "0.27.0",
       "dependencies": {
-        "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@orpc/contract": "^1.9.3",
         "@orpc/server": "^1.9.3",
@@ -133,7 +147,7 @@
         "ulidx": "^2.4.1",
       },
       "devDependencies": {
-        "drizzle-kit": "^0.31.8",
+        "@aikirun/lib": "workspace:*",
       },
     },
     "sdk/worker": {
@@ -144,6 +158,9 @@
         "@aikirun/workflow": "workspace:*",
         "ulidx": "^2.4.1",
       },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+      },
     },
     "sdk/workflow": {
       "name": "@aikirun/workflow",
@@ -152,10 +169,16 @@
         "@aikirun/types": "workspace:*",
         "@standard-schema/spec": "^1.1.0",
       },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+      },
     },
     "types": {
       "name": "@aikirun/types",
       "version": "0.27.0",
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+      },
     },
   },
   "packages": {
