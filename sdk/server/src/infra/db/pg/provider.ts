@@ -1,7 +1,8 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import * as schema from "./schema";
+import * as aikiSchema from "./schema/aiki";
+import * as authSchema from "./schema/auth";
 import type { PgDatabaseConfig } from "../../../config/";
 
 export function createPgDatabaseConn(params: PgDatabaseConfig) {
@@ -10,7 +11,7 @@ export function createPgDatabaseConn(params: PgDatabaseConfig) {
 		ssl: params.ssl,
 	});
 
-	return drizzle(client, { schema });
+	return drizzle(client, { schema: { ...aikiSchema, ...authSchema } });
 }
 
 export type PgDatabaseConn = ReturnType<typeof createPgDatabaseConn>;

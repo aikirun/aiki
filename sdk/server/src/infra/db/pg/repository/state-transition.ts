@@ -5,7 +5,7 @@ import type { TaskState } from "@aikirun/types/workflow/task";
 import { and, count, eq, gt, inArray, sql } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { stateTransition, workflowRun } from "../schema";
+import { stateTransition, workflowRun } from "../schema/aiki";
 
 type _StateTransitionRow = typeof stateTransition.$inferSelect;
 export type StateTransitionRow = Omit<_StateTransitionRow, "state"> & {

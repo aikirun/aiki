@@ -2,7 +2,7 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, eq } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { apiKey } from "../schema";
+import { apiKey } from "../schema/auth";
 
 export type ApiKeyRow = typeof apiKey.$inferSelect;
 export type ApiKeyRowInsert = typeof apiKey.$inferInsert;

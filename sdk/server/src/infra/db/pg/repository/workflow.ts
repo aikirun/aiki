@@ -7,7 +7,7 @@ import { ulid } from "ulidx";
 
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
-import { workflow, workflowRun } from "../schema";
+import { workflow, workflowRun } from "../schema/aiki";
 
 export type WorkflowRow = typeof workflow.$inferSelect;
 export type WorkflowRowInsert = Omit<typeof workflow.$inferInsert, "id">;

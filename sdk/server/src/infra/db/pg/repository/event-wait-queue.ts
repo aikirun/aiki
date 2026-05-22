@@ -2,7 +2,7 @@ import type { RequiredNonNullableProp } from "@aikirun/lib/object";
 import { eq } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { eventWaitQueue } from "../schema";
+import { eventWaitQueue } from "../schema/aiki";
 
 export type EventWaitQueueRow = typeof eventWaitQueue.$inferSelect;
 export type EventWaitQueueRowInsert = typeof eventWaitQueue.$inferInsert;

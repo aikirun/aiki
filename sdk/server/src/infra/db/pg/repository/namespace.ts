@@ -6,7 +6,7 @@ import { ulid } from "ulidx";
 
 import { ConflictError } from "../../../../errors";
 import type { PgDb } from "../provider";
-import { namespace, namespaceMember, user } from "../schema";
+import { namespace, namespaceMember, user } from "../schema/auth";
 
 export type NamespaceRow = typeof namespace.$inferSelect;
 export type NamespaceRowInsert = Pick<typeof namespace.$inferInsert, "name" | "organizationId">;

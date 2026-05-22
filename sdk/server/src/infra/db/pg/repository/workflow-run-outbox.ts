@@ -9,7 +9,7 @@ import type { RankStreamCursor } from "../../../../lib/rank-stream";
 import type { TimerStreamCursor } from "../../../../lib/timer-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
-import { workflowRunOutbox } from "../schema";
+import { workflowRunOutbox } from "../schema/aiki";
 
 export type WorkflowRunOutboxRow = typeof workflowRunOutbox.$inferSelect;
 export type WorkflowRunOutboxRowInsert = typeof workflowRunOutbox.$inferInsert;

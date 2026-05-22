@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { organizationMember } from "../schema";
+import { organizationMember } from "../schema/auth";
 
 export function createOrganizationRepository(db: PgDb) {
 	return {

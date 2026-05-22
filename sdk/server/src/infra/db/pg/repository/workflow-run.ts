@@ -10,7 +10,7 @@ import { toWorkflowRunState } from "./state-transition";
 import type { TimerStreamCursor } from "../../../../lib/timer-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
-import { stateTransition, task, workflow, workflowRun } from "../schema";
+import { stateTransition, task, workflow, workflowRun } from "../schema/aiki";
 
 export type WorkflowRunRow = typeof workflowRun.$inferSelect;
 export type WorkflowRunRowInsert = typeof workflowRun.$inferInsert;

@@ -2,7 +2,7 @@ import { type } from "arktype";
 
 import { createPgRepositories } from "./pg";
 import { createPgDatabaseConn } from "./pg/provider";
-import { betterAuthSchema as pgBetterAuthSchema } from "./pg/schema";
+import { betterAuthSchema as pgBetterAuthSchema } from "./pg/schema/better-auth";
 import { type DatabaseConfig, databaseConfigSchema } from "../../config";
 
 export function createDatabase(params: DatabaseConfig) {

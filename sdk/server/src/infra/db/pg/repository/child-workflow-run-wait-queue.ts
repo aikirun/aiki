@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { childWorkflowRunWaitQueue } from "../schema";
+import { childWorkflowRunWaitQueue } from "../schema/aiki";
 
 export type ChildWorkflowRunWaitQueueRow = typeof childWorkflowRunWaitQueue.$inferSelect;
 export type ChildWorkflowRunWaitQueueRowInsert = typeof childWorkflowRunWaitQueue.$inferInsert;

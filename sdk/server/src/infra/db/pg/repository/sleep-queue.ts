@@ -3,7 +3,7 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { sleepQueue } from "../schema";
+import { sleepQueue } from "../schema/aiki";
 
 export type SleepQueueRow = typeof sleepQueue.$inferSelect;
 type SleepQueueRowInsert = typeof sleepQueue.$inferInsert;
