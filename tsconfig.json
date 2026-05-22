@@ -11,16 +11,16 @@
 
 		"baseUrl": ".",
 		"paths": {
-			"@aikirun/client": ["./sdk/client/index.ts"],
-			"@aikirun/endpoint": ["./sdk/endpoint/index.ts"],
-			"@aikirun/lib/*": ["./lib/*/index.ts"],
-			"@aikirun/http": ["./sdk/adapter/http/index.ts"],
-			"@aikirun/redis": ["./sdk/adapter/redis/index.ts"],
-			"@aikirun/server": ["./sdk/server/index.ts"],
-			"@aikirun/server/*": ["./sdk/server/*.ts", "./sdk/server/*/index.ts"],
-			"@aikirun/types/*": ["./types/*.ts", "./types/*/index.ts"],
-			"@aikirun/worker": ["./sdk/worker/index.ts"],
-			"@aikirun/workflow": ["./sdk/workflow/index.ts"]
+			"@aikirun/client": ["./sdk/client/src/index.ts"],
+			"@aikirun/endpoint": ["./sdk/endpoint/src/index.ts"],
+			"@aikirun/lib/*": ["./lib/src/*/index.ts"],
+			"@aikirun/http": ["./sdk/adapter/http/src/index.ts"],
+			"@aikirun/redis": ["./sdk/adapter/redis/src/index.ts"],
+			"@aikirun/server": ["./sdk/server/src/index.ts"],
+			"@aikirun/server/*": ["./sdk/server/src/*.ts", "./sdk/server/src/*/index.ts"],
+			"@aikirun/types/*": ["./types/src/*.ts", "./types/src/*/index.ts"],
+			"@aikirun/worker": ["./sdk/worker/src/index.ts"],
+			"@aikirun/workflow": ["./sdk/workflow/src/index.ts"]
 		},
 
 		"esModuleInterop": true,

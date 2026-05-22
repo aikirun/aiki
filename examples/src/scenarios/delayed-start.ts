@@ -1,6 +1,5 @@
-import { notify } from "examples/workflows/notify";
-
 import { runWithWorker } from "../shared/worker";
+import { notify } from "../workflows/notify";
 
 await runWithWorker([notify], async (client) => {
 	const startedAt = Date.now();
