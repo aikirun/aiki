@@ -3,4 +3,3 @@ export type {
 	StateTransitionRow,
 	StateTransitionRowInsert,
 } from "../pg/repository/state-transition";
-export { toTaskState, toWorkflowRunState } from "../pg/repository/state-transition";
