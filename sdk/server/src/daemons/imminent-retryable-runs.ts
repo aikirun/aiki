@@ -6,13 +6,13 @@ import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/type
 import { ulid } from "ulidx";
 
 import { publishRuns } from "./publish-ready-runs";
-import type { WorkflowRunMeta } from "../infra/db/pg/repository/workflow-run";
 import type {
 	Repositories,
 	StateTransitionRowInsert,
 	WorkflowRow,
 	WorkflowRunOutboxRowInsert,
 } from "../infra/db/types";
+import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import { runConcurrently } from "../lib/concurrency";
 import type { Ranked } from "../lib/rank";
 import { streamTimers } from "../lib/timer-stream";

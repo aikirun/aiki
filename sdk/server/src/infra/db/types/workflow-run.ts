@@ -1,5 +1,6 @@
 export type {
 	DueWorkflowRun,
+	WorkflowRunMeta,
 	WorkflowRunRepository,
 	WorkflowRunRow,
 	WorkflowRunRowInsert,
