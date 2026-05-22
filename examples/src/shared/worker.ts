@@ -7,7 +7,7 @@ import type { AnyWorkflowVersion } from "@aikirun/workflow";
 import { config } from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: join(__dirname, "../.env") });
+config({ path: join(__dirname, "../../.env") });
 
 /**
  * Spawns two workers with the given workflows, runs the callback, then shuts down.

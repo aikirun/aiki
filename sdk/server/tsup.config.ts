@@ -2,12 +2,12 @@ import { cp, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { defineConfig } from "tsup";
 
-import { DATABASE_PROVIDERS } from "./config";
+import { DATABASE_PROVIDERS } from "./src/config";
 
 export default defineConfig({
 	entry: {
-		index: "index.ts",
-		"config/index": "config/index.ts",
+		index: "src/index.ts",
+		"config/index": "src/config/index.ts",
 	},
 	format: ["esm"],
 	dts: true,
@@ -16,7 +16,7 @@ export default defineConfig({
 	noExternal: ["@aikirun/lib"],
 	async onSuccess() {
 		for (const provider of DATABASE_PROVIDERS) {
-			const sourceDir = path.join("infra", "db", provider, "migration");
+			const sourceDir = path.join("src", "infra", "db", provider, "migration");
 			const targetDir = path.join("dist", "infra", "db", provider, "migration");
 			try {
 				await readdir(sourceDir);

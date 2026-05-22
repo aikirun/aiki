@@ -3,11 +3,11 @@
 	"version": "0.27.0",
 	"private": true,
 	"type": "module",
-	"main": "./index.ts",
+	"main": "./src/index.ts",
 	"scripts": {
-		"start": "bun run index.ts",
-		"start:watch": "bun --watch run index.ts",
-		"build": "bun build index.ts --compile --outfile dist/aiki-server",
+		"start": "bun run src/index.ts",
+		"start:watch": "bun --watch run src/index.ts",
+		"build": "bun build src/index.ts --compile --outfile dist/aiki-server",
 		"db:migrate": "aiki migrate apply --env-file ./.env",
 		"db:generate": "aiki migrate generate --env-file ./.env",
 		"db:generate:custom": "aiki migrate generate --custom --env-file ./.env"

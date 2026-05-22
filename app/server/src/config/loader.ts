@@ -11,7 +11,7 @@ import { type Config, configSchema } from "./schema";
 export async function loadConfig(): Promise<Config> {
 	const __filename = fileURLToPath(import.meta.url);
 	const __dirname = dirname(__filename);
-	const envPath = join(__dirname, "../.env");
+	const envPath = join(__dirname, "../../.env");
 
 	config({ path: envPath });
 

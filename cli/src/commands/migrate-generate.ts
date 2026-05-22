@@ -29,7 +29,7 @@ export async function migrateGenerate(options: MigrateGenerateOptions): Promise<
 }
 
 function ensureWorkspaceMode(serverRoot: string, provider: DatabaseProvider): void {
-	const schemaDir = path.join(serverRoot, "infra", "db", provider, "schema");
+	const schemaDir = path.join(serverRoot, "src", "infra", "db", provider, "schema");
 	if (!fs.existsSync(schemaDir)) {
 		throw new Error(
 			"aiki migrate generate is only supported inside the Aiki monorepo. Schema generation is a maintainer operation; end users do not need it."
