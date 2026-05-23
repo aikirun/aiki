@@ -6,8 +6,8 @@ import type { DatabaseProvider } from "../config";
 import type { BetterAuthSchema } from "../infra/db/types/better-auth";
 
 export interface AuthOptions {
-	conn: Parameters<typeof drizzleAdapter>[0];
-	provider: DatabaseProvider;
+	dbConn: Parameters<typeof drizzleAdapter>[0];
+	dbProvider: DatabaseProvider;
 	betterAuthSchema: BetterAuthSchema;
 	baseURL: string;
 	secret: string;
@@ -16,7 +16,7 @@ export interface AuthOptions {
 
 export function createAuthService(options: AuthOptions) {
 	return betterAuth({
-		database: drizzleAdapter(options.conn, { provider: options.provider, schema: options.betterAuthSchema }),
+		database: drizzleAdapter(options.dbConn, { provider: options.dbProvider, schema: options.betterAuthSchema }),
 		baseURL: options.baseURL,
 		basePath: "/auth",
 		secret: options.secret,

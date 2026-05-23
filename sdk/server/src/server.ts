@@ -71,7 +71,7 @@ export interface Server {
 
 export function server(params: ServerParams): Server {
 	const logger: Logger = params.logger ?? new ConsoleLogger();
-	const { repos, conn, betterAuthSchema } = createDatabase(params.db);
+	const { repos, conn: dbConn, betterAuthSchema } = createDatabase(params.db);
 
 	const childRunCanceller = createChildRunCanceller();
 
@@ -84,8 +84,8 @@ export function server(params: ServerParams): Server {
 			}),
 		});
 		const authService = createAuthService({
-			conn,
-			provider: params.db.provider,
+			dbConn,
+			dbProvider: params.db.provider,
 			betterAuthSchema,
 			baseURL: params.handler.auth.baseURL,
 			secret: params.handler.auth.secret,
