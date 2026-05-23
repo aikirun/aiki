@@ -80,18 +80,13 @@ export async function processImminentRecurringWorkflows(
 
 		const { timerSortedSet } = deps;
 		if (timerSortedSet && isNonEmptyArray(schedulesDueSoon)) {
-			const timers: TimerEntry[] = [];
-			for (const schedule of schedulesDueSoon) {
-				timers.push({
-					type: "recurring",
-					id: schedule.id,
-					dueAt: schedule.nextRunAt,
-					rank: computeRank(schedule.nextRunAt),
-				});
-			}
-			if (isNonEmptyArray(timers)) {
-				await timerSortedSet.add(timers);
-			}
+			const timers: TimerEntry[] = schedulesDueSoon.map((schedule) => ({
+				type: "recurring",
+				id: schedule.id,
+				dueAt: schedule.nextRunAt,
+				rank: computeRank(schedule.nextRunAt),
+			}));
+			await timerSortedSet.add(timers as NonEmptyArray<TimerEntry>);
 		}
 	}
 }

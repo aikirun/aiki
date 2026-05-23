@@ -50,9 +50,7 @@ export async function processImminentSleepElapsedRuns(
 				dueAt: run.dueAt.getTime(),
 				rank: run.rank,
 			}));
-			if (isNonEmptyArray(timers)) {
-				await timerSortedSet.add(timers);
-			}
+			await timerSortedSet.add(timers as NonEmptyArray<TimerEntry>);
 		}
 	}
 }
@@ -66,10 +64,7 @@ export async function queueSleepElapsedRuns(
 ) {
 	const { chunkSize = runs.length } = options ?? {};
 
-	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId)));
-	if (!isNonEmptyArray(workflowIds)) {
-		return;
-	}
+	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId))) as NonEmptyArray<string>;
 	const workflows = await repos.workflow.getByIdsGlobal(context, workflowIds);
 	const workflowsById = new Map(workflows.map((workflow) => [workflow.id, workflow]));
 
@@ -91,7 +86,7 @@ async function processChunk(
 ): Promise<void> {
 	const completedAt = new Date();
 
-	const workflowRunIds = runs.map((run) => run.id);
+	const workflowRunIds = runs.map((run) => run.id) as NonEmptyArray<string>;
 
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
@@ -135,11 +130,7 @@ async function processChunk(
 		});
 	}
 
-	if (
-		!isNonEmptyArray(workflowRunIds) ||
-		!isNonEmptyArray(stateTransitionEntries) ||
-		!isNonEmptyArray(workflowRunUpdates)
-	) {
+	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(workflowRunUpdates)) {
 		return;
 	}
 

@@ -52,9 +52,7 @@ export async function processImminentRetryableRuns(
 				dueAt: run.dueAt.getTime(),
 				rank: run.rank,
 			}));
-			if (isNonEmptyArray(timers)) {
-				await timerSortedSet.add(timers);
-			}
+			await timerSortedSet.add(timers as NonEmptyArray<TimerEntry>);
 		}
 	}
 }
@@ -68,10 +66,7 @@ export async function queueRetryableRuns(
 ) {
 	const { chunkSize = runs.length } = options ?? {};
 
-	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId)));
-	if (!isNonEmptyArray(workflowIds)) {
-		return;
-	}
+	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId))) as NonEmptyArray<string>;
 	const workflows = await repos.workflow.getByIdsGlobal(context, workflowIds);
 	const workflowsById = new Map(workflows.map((workflow) => [workflow.id, workflow]));
 

@@ -52,9 +52,7 @@ export async function processImminentChildRunWaitTimedOutRuns(
 				dueAt: run.dueAt.getTime(),
 				rank: run.rank,
 			}));
-			if (isNonEmptyArray(timers)) {
-				await timerSortedSet.add(timers);
-			}
+			await timerSortedSet.add(timers as NonEmptyArray<TimerEntry>);
 		}
 	}
 }
@@ -74,14 +72,10 @@ export async function queueChildRunWaitTimedOutRuns(
 		stateTransitionIds.push(run.latestStateTransitionId);
 		workflowIdSet.add(run.workflowId);
 	}
-	const workflowIds = Array.from(workflowIdSet);
-
-	if (!isNonEmptyArray(stateTransitionIds) || !isNonEmptyArray(workflowIds)) {
-		return;
-	}
+	const workflowIds = Array.from(workflowIdSet) as NonEmptyArray<string>;
 
 	const [stateTransitions, workflows] = await Promise.all([
-		repos.stateTransition.getByIds(stateTransitionIds),
+		repos.stateTransition.getByIds(stateTransitionIds as NonEmptyArray<string>),
 		repos.workflow.getByIdsGlobal(context, workflowIds),
 	]);
 	const stateTransitionsById = new Map(stateTransitions.map((transition) => [transition.id, transition]));
