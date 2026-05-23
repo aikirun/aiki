@@ -6,6 +6,7 @@
 .claude
 
 app/server/.env
+app/server/.env.prod
 examples/.env
 
 todo/
