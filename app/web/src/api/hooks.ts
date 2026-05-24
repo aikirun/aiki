@@ -7,12 +7,12 @@ import type {
 import type { WorkflowRunListRequestV1, WorkflowRunListTransitionsRequestV1 } from "@aikirun/types/api/workflow-run";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import { client } from "./client";
+import { namespaceAuthedClient, organizationAuthedClient } from "./client";
 
 export function useWorkflows(params: WorkflowListRequestV1 = { source: "user" }) {
 	return useQuery({
 		queryKey: ["workflows", params],
-		queryFn: () => client.workflow.listV1(params),
+		queryFn: () => namespaceAuthedClient.workflow.listV1(params),
 		placeholderData: keepPreviousData,
 	});
 }
@@ -23,7 +23,7 @@ export function useWorkflowVersions(
 ) {
 	return useQuery({
 		queryKey: ["workflow-versions", name, params],
-		queryFn: () => client.workflow.listVersionsV1({ name, ...params }),
+		queryFn: () => namespaceAuthedClient.workflow.listVersionsV1({ name, ...params }),
 		enabled: !!name,
 	});
 }
@@ -31,14 +31,14 @@ export function useWorkflowVersions(
 export function useWorkflowStats(params: WorkflowGetStatsRequestV1 = undefined) {
 	return useQuery({
 		queryKey: ["workflow-stats", params],
-		queryFn: () => client.workflow.getStatsV1(params),
+		queryFn: () => namespaceAuthedClient.workflow.getStatsV1(params),
 	});
 }
 
 export function useWorkflowRuns(params: WorkflowRunListRequestV1 = {}) {
 	return useQuery({
 		queryKey: ["workflow-runs", params],
-		queryFn: () => client.workflowRun.listV1(params),
+		queryFn: () => namespaceAuthedClient.workflowRun.listV1(params),
 		placeholderData: keepPreviousData,
 	});
 }
@@ -49,12 +49,14 @@ export function useWorkflowRun(
 		refetchInterval?:
 			| number
 			| false
-			| ((query: { state: { data?: Awaited<ReturnType<typeof client.workflowRun.getByIdV1>> } }) => number | false);
+			| ((query: {
+					state: { data?: Awaited<ReturnType<typeof namespaceAuthedClient.workflowRun.getByIdV1>> };
+			  }) => number | false);
 	}
 ) {
 	return useQuery({
 		queryKey: ["workflow-run", id],
-		queryFn: () => client.workflowRun.getByIdV1({ id }),
+		queryFn: () => namespaceAuthedClient.workflowRun.getByIdV1({ id }),
 		enabled: !!id,
 		refetchInterval: options?.refetchInterval,
 	});
@@ -67,7 +69,7 @@ export function useWorkflowRunTransitions(
 ) {
 	return useQuery({
 		queryKey: ["workflow-run-transitions", id, params],
-		queryFn: () => client.workflowRun.listTransitionsV1({ id, ...params }),
+		queryFn: () => namespaceAuthedClient.workflowRun.listTransitionsV1({ id, ...params }),
 		enabled: !!id,
 		refetchInterval: options?.refetchInterval,
 	});
@@ -76,14 +78,14 @@ export function useWorkflowRunTransitions(
 export function useSchedules(params: ScheduleListRequestV1 = {}) {
 	return useQuery({
 		queryKey: ["schedules", params],
-		queryFn: () => client.schedule.listV1(params),
+		queryFn: () => namespaceAuthedClient.schedule.listV1(params),
 		placeholderData: keepPreviousData,
 	});
 }
 
-export function useApiKeys() {
+export function useApiKeys(namespaceId: string) {
 	return useQuery({
-		queryKey: ["api-keys"],
-		queryFn: () => client.apiKey.listV1(),
+		queryKey: ["api-keys", namespaceId],
+		queryFn: () => organizationAuthedClient.apiKey.listV1({ namespaceId }),
 	});
 }

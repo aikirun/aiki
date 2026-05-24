@@ -2,7 +2,8 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type DatabaseProvider, loadDatabaseConfig } from "@aikirun/server/config";
+import { loadDatabaseConfig } from "@aikirun/server/config";
+import type { DatabaseProvider } from "@aikirun/types/infra/db";
 
 import { loadEnv } from "../lib/env";
 import { resolveServerRoot } from "../lib/resolve-server";

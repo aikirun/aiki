@@ -2,16 +2,26 @@ import { isNonEmptyArray } from "@aikirun/lib/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
 import { organizationAuthedImplementer } from "./implementer";
-import { ForbiddenError } from "../errors";
+import { ForbiddenError, NotFoundError } from "../../errors";
 import {
 	isOrganizationManager,
 	type OrganizationManagerSessionRequestContext,
 	type OrganizationSessionRequestContext,
-} from "../middleware/context";
+} from "../organization-context";
 import type { NamespaceService } from "../service/namespace";
 
 export function createNamespaceRouter(namespaceService: NamespaceService) {
 	const os = organizationAuthedImplementer.namespace;
+
+	async function assertNamespaceBelongsToOrganization(
+		context: OrganizationSessionRequestContext,
+		namespaceId: NamespaceId
+	): Promise<void> {
+		const exists = await namespaceService.namespaceExists(context, namespaceId);
+		if (!exists) {
+			throw new NotFoundError("Namespace not found");
+		}
+	}
 
 	const createV1 = os.createV1.handler(async ({ input, context }) => {
 		assertIsOrganizationManager(context);
@@ -28,7 +38,9 @@ export function createNamespaceRouter(namespaceService: NamespaceService) {
 
 	const deleteV1 = os.deleteV1.handler(async ({ input, context }) => {
 		assertIsOrganizationManager(context);
-		await namespaceService.softDeleteNamespaceById(context, input.id as NamespaceId);
+		const namespaceId = input.id as NamespaceId;
+		await assertNamespaceBelongsToOrganization(context, namespaceId);
+		await namespaceService.softDeleteNamespaceById(context, namespaceId);
 	});
 
 	const listForUserV1 = os.listForUserV1.handler(async ({ input, context }) => {
@@ -41,27 +53,33 @@ export function createNamespaceRouter(namespaceService: NamespaceService) {
 		if (!isNonEmptyArray(input.members)) {
 			return;
 		}
-		const namespaceRole = await namespaceService.resolveRole(context, input.id as NamespaceId);
+		const namespaceId = input.id as NamespaceId;
+		await assertNamespaceBelongsToOrganization(context, namespaceId);
+		const namespaceRole = await namespaceService.resolveRole(context, namespaceId);
 		if (namespaceRole !== "admin") {
 			throw new ForbiddenError("Requires namespace admin role");
 		}
-		await namespaceService.setMembership(context, input.id as NamespaceId, input.members);
+		await namespaceService.setMembership(context, namespaceId, input.members);
 	});
 
 	const removeMembershipV1 = os.removeMembershipV1.handler(async ({ input, context }) => {
-		const namespaceRole = await namespaceService.resolveRole(context, input.id as NamespaceId);
+		const namespaceId = input.id as NamespaceId;
+		await assertNamespaceBelongsToOrganization(context, namespaceId);
+		const namespaceRole = await namespaceService.resolveRole(context, namespaceId);
 		if (namespaceRole !== "admin") {
 			throw new ForbiddenError("Requires namespace admin role");
 		}
-		await namespaceService.removeMembership(context, input.id as NamespaceId, input.userId);
+		await namespaceService.removeMembership(context, namespaceId, input.userId);
 	});
 
 	const listMembersV1 = os.listMembersV1.handler(async ({ input, context }) => {
-		const namespaceRole = await namespaceService.resolveRole(context, input.id as NamespaceId);
+		const namespaceId = input.id as NamespaceId;
+		await assertNamespaceBelongsToOrganization(context, namespaceId);
+		const namespaceRole = await namespaceService.resolveRole(context, namespaceId);
 		if (namespaceRole !== "admin" && namespaceRole !== "member") {
 			throw new ForbiddenError("Requires namespace admin/member role");
 		}
-		const members = await namespaceService.listMembers(context, input.id as NamespaceId);
+		const members = await namespaceService.listMembers(context, namespaceId);
 		return { members };
 	});
 

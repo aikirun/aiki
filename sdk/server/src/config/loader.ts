@@ -1,8 +1,9 @@
 import process from "node:process";
 import { omitUndefined } from "@aikirun/lib/object";
+import { DATABASE_PROVIDERS, isDatabaseProvider } from "@aikirun/types/infra/db";
 import { type } from "arktype";
 
-import { DATABASE_PROVIDERS, type DatabaseConfig, databaseConfigSchema, isDatabaseProvider } from "./schema";
+import { type DatabaseConfig, databaseConfigSchema } from "./schema";
 
 export function loadDatabaseConfig(): DatabaseConfig {
 	const loadEnv = () => {

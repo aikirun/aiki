@@ -1,4 +1,5 @@
-import { type DatabaseProvider, loadDatabaseConfig } from "@aikirun/server/config";
+import { loadDatabaseConfig } from "@aikirun/server/config";
+import type { DatabaseProvider } from "@aikirun/types/infra/db";
 import type { Config as DrizzleConfig } from "drizzle-kit";
 
 const providerDialects: Record<DatabaseProvider, DrizzleConfig["dialect"]> = {

@@ -11,6 +11,7 @@ export interface ApiKeyInfo {
 }
 
 export interface ApiKeyCreateRequestV1 {
+	namespaceId: string;
 	name: string;
 	expiresAt?: number;
 }
@@ -20,16 +21,21 @@ export interface ApiKeyCreateResponseV1 {
 	info: ApiKeyInfo;
 }
 
+export interface ApiKeyListRequestV1 {
+	namespaceId: string;
+}
+
 export interface ApiKeyListResponseV1 {
 	keyInfos: ApiKeyInfo[];
 }
 
 export interface ApiKeyRevokeRequestV1 {
 	id: string;
+	namespaceId: string;
 }
 
 export interface ApiKeyApi {
 	createV1: (_: ApiKeyCreateRequestV1) => Promise<ApiKeyCreateResponseV1>;
-	listV1: () => Promise<ApiKeyListResponseV1>;
+	listV1: (_: ApiKeyListRequestV1) => Promise<ApiKeyListResponseV1>;
 	revokeV1: (_: ApiKeyRevokeRequestV1) => Promise<void>;
 }

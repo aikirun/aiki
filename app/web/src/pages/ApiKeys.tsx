@@ -2,7 +2,7 @@ import type { ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api/api-key";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import { client } from "../api/client";
+import { organizationAuthedClient } from "../api/client";
 import { useApiKeys } from "../api/hooks";
 import { useAuth } from "../auth/AuthProvider";
 import { RelativeTime } from "../components/common/RelativeTime";
@@ -23,8 +23,9 @@ const STATUS_LABELS: Record<ApiKeyStatus, string> = {
 };
 
 export function ApiKeys() {
-	const { data, isLoading } = useApiKeys();
 	const { activeNamespace } = useAuth();
+	const namespaceId = activeNamespace?.id ?? "";
+	const { data, isLoading } = useApiKeys(namespaceId);
 	const [state, setState] = useState<PageState>({ mode: "idle" });
 
 	const canManageKeys = activeNamespace?.role === "admin";
@@ -73,7 +74,13 @@ export function ApiKeys() {
 				</div>
 
 				{/* Inline create form */}
-				{showCreateForm && <CreateKeyInline onCreated={handleKeyCreated} onCancel={() => setState({ mode: "idle" })} />}
+				{showCreateForm && (
+					<CreateKeyInline
+						namespaceId={namespaceId}
+						onCreated={handleKeyCreated}
+						onCancel={() => setState({ mode: "idle" })}
+					/>
+				)}
 
 				{/* Inline key reveal */}
 				{revealedKey && <KeyRevealInline apiKey={revealedKey} onDismiss={() => setState({ mode: "idle" })} />}
@@ -107,7 +114,7 @@ export function ApiKeys() {
 				) : (
 					<div className="space-y-2">
 						{data.keyInfos.map((apiKey) => (
-							<ApiKeyRow key={apiKey.id} apiKey={apiKey} canManage={canManageKeys} />
+							<ApiKeyRow key={apiKey.id} apiKey={apiKey} namespaceId={namespaceId} canManage={canManageKeys} />
 						))}
 					</div>
 				)}
@@ -154,7 +161,15 @@ const aikiClient = client({
 	);
 }
 
-function CreateKeyInline({ onCreated, onCancel }: { onCreated: (key: string) => void; onCancel: () => void }) {
+function CreateKeyInline({
+	namespaceId,
+	onCreated,
+	onCancel,
+}: {
+	namespaceId: string;
+	onCreated: (key: string) => void;
+	onCancel: () => void;
+}) {
 	const queryClient = useQueryClient();
 	const [name, setName] = useState("");
 	const [isCreating, setIsCreating] = useState(false);
@@ -173,7 +188,7 @@ function CreateKeyInline({ onCreated, onCancel }: { onCreated: (key: string) => 
 		setError(null);
 
 		try {
-			const result = await client.apiKey.createV1({ name: name.trim() });
+			const result = await organizationAuthedClient.apiKey.createV1({ namespaceId, name: name.trim() });
 			queryClient.invalidateQueries({ queryKey: ["api-keys"] });
 			onCreated(result.key);
 		} catch (err) {
@@ -349,7 +364,15 @@ function KeyRevealInline({ apiKey, onDismiss }: { apiKey: string; onDismiss: () 
 	);
 }
 
-function ApiKeyRow({ apiKey, canManage }: { apiKey: ApiKeyInfo; canManage: boolean }) {
+function ApiKeyRow({
+	apiKey,
+	namespaceId,
+	canManage,
+}: {
+	apiKey: ApiKeyInfo;
+	namespaceId: string;
+	canManage: boolean;
+}) {
 	const queryClient = useQueryClient();
 	const [isRevoking, setIsRevoking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -360,7 +383,7 @@ function ApiKeyRow({ apiKey, canManage }: { apiKey: ApiKeyInfo; canManage: boole
 		setIsRevoking(true);
 		setError(null);
 		try {
-			await client.apiKey.revokeV1({ id: apiKey.id });
+			await organizationAuthedClient.apiKey.revokeV1({ id: apiKey.id, namespaceId });
 			queryClient.invalidateQueries({ queryKey: ["api-keys"] });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to revoke key");

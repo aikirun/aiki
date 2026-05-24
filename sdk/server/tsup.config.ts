@@ -1,8 +1,7 @@
 import { cp, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
+import { DATABASE_PROVIDERS } from "@aikirun/types/infra/db";
 import { defineConfig } from "tsup";
-
-import { DATABASE_PROVIDERS } from "./src/config";
 
 export default defineConfig({
 	entry: {

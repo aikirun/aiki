@@ -1,43 +1,25 @@
 import { delay } from "@aikirun/lib/async";
 import { ConsoleLogger, type Logger } from "@aikirun/lib/logger";
+import type { Iam } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
+import type { Database } from "@aikirun/types/infra/db";
 import type { CreatePublisher } from "@aikirun/types/infra/queue";
 import type { CreateTimerSortedSet } from "@aikirun/types/infra/timer";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ulid } from "ulidx";
 
-import type { DatabaseConfig } from "./config";
 import { initDaemons } from "./daemons";
 import { UnauthorizedError } from "./errors";
-import { createDatabase } from "./infra/db";
-import { createAuthorizer } from "./middleware/authorization";
-import {
-	createNamespaceRequestContext,
-	createOrganizationRequestContext,
-	type NamespaceRequestContext,
-	type OrganizationRequestContext,
-} from "./middleware/context";
-import { createNamespaceAuthedRouter, createOrganizationAuthedRouter } from "./router/index";
-import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
-import { createAuthService } from "./service/auth";
+import { createRepos } from "./infra/db/repo";
+import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
+import { createNamespaceAuthedRouter } from "./router/index";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
-import { createNamespaceService } from "./service/namespace";
 import { createScheduleService } from "./service/schedule";
 import { createTaskStateMachineService } from "./service/task-state-machine";
 import { createWorkflowService } from "./service/workflow";
 import { createWorkflowRunService } from "./service/workflow-run";
 import { createWorkflowRunOutboxService } from "./service/workflow-run-outbox";
 import { createWorkflowRunStateMachineService } from "./service/workflow-run-state-machine";
-
-export interface ServerHandlerAuthParams {
-	secret: string;
-	baseURL: string;
-	trustedOrigins: string[];
-}
-
-export interface ServerHandlerParams {
-	auth: ServerHandlerAuthParams;
-}
 
 export interface ServerRuntimeOptions {
 	gracefulShutdownTimeoutMs?: number;
@@ -50,10 +32,10 @@ export interface ServerRuntimeParams {
 }
 
 export interface ServerParams {
-	db: DatabaseConfig;
+	db: Database;
+	iam: Iam;
 	cache?: CreateCache;
 	logger?: Logger;
-	handler: ServerHandlerParams;
 	runtime?: ServerRuntimeParams;
 }
 
@@ -71,34 +53,13 @@ export interface Server {
 
 export function server(params: ServerParams): Server {
 	const logger: Logger = params.logger ?? new ConsoleLogger();
-	const { repos, conn: dbConn, betterAuthSchema } = createDatabase(params.db);
+	const repos = createRepos(params.db);
 
 	const childRunCanceller = createChildRunCanceller();
 
 	const createHandler = () => {
-		const apiKeyService = createApiKeyService({
-			repos,
-			cache: params.cache?.<ApiKeyAuthorizationInfo>({
-				logger: logger.child({ "aiki.component": "cache.apiKeyAuth" }),
-				keyPrefix: "api_key:",
-			}),
-		});
-		const authService = createAuthService({
-			dbConn,
-			dbProvider: params.db.provider,
-			betterAuthSchema,
-			baseURL: params.handler.auth.baseURL,
-			secret: params.handler.auth.secret,
-			trustedOrigins: params.handler.auth.trustedOrigins,
-		});
-
-		const { authorizeByApiKey, authorizeByOrganizationSession, authorizeByNamespaceSession } = createAuthorizer(
-			apiKeyService,
-			authService,
-			repos.organization
-		);
-
-		const namespaceService = createNamespaceService(repos, apiKeyService);
+		const apiAuthorizer = params.iam.api?.({ logger });
+		const dashboardIam = params.iam.dashboard?.({ logger });
 
 		const workflowRunStateMachineService = createWorkflowRunStateMachineService({
 			repos,
@@ -114,9 +75,7 @@ export function server(params: ServerParams): Server {
 		const scheduleService = createScheduleService({ repos });
 		const workflowRunOutboxService = createWorkflowRunOutboxService({ repos });
 
-		const organizationAuthedRouter = createOrganizationAuthedRouter(namespaceService);
 		const namespaceAuthedRouter = createNamespaceAuthedRouter({
-			apiKeyService,
 			workflowRunService,
 			workflowRunStateMachineService,
 			taskStateMachineService,
@@ -125,16 +84,19 @@ export function server(params: ServerParams): Server {
 			workflowRunOutboxService,
 		});
 
-		const organizationAuthedHandler = new RPCHandler(organizationAuthedRouter, {});
 		const namespaceAuthedHandler = new RPCHandler(namespaceAuthedRouter, {});
 
 		return async (request: Request): Promise<Response> => {
 			const pathname = new URL(request.url).pathname;
 
 			if (pathname.startsWith("/api/")) {
+				if (!apiAuthorizer) {
+					return new Response("Not Found", { status: 404 });
+				}
+
 				let context: NamespaceRequestContext;
 				try {
-					context = await createNamespaceRequestContext({ request, logger, authorizer: authorizeByApiKey });
+					context = await createNamespaceRequestContext({ request, logger, authorizer: apiAuthorizer });
 				} catch (error) {
 					if (error instanceof UnauthorizedError) {
 						return new Response(error.message, { status: 401 });
@@ -147,44 +109,18 @@ export function server(params: ServerParams): Server {
 				return result.response ?? new Response("Not Found", { status: 404 });
 			}
 
-			if (pathname.startsWith("/web/namespace/")) {
-				let context: OrganizationRequestContext;
-				try {
-					context = await createOrganizationRequestContext({
-						request,
-						logger,
-						authorizer: authorizeByOrganizationSession,
-					});
-				} catch (error) {
-					if (error instanceof UnauthorizedError) {
-						return new Response(error.message, { status: 401 });
-					}
-					logger.error("Unhandled error", { error });
-					return new Response("Internal Server Error", { status: 500 });
+			if (pathname.startsWith("/dashboard/")) {
+				if (!dashboardIam) {
+					return new Response("Not Found", { status: 404 });
 				}
-
-				const result = await organizationAuthedHandler.handle(request, { context, prefix: "/web" });
-				return result.response ?? new Response("Not Found", { status: 404 });
-			}
-
-			if (pathname.startsWith("/web/")) {
-				let context: NamespaceRequestContext;
-				try {
-					context = await createNamespaceRequestContext({ request, logger, authorizer: authorizeByNamespaceSession });
-				} catch (error) {
-					if (error instanceof UnauthorizedError) {
-						return new Response(error.message, { status: 401 });
-					}
-					logger.error("Unhandled error", { error });
-					return new Response("Internal Server Error", { status: 500 });
-				}
-
-				const result = await namespaceAuthedHandler.handle(request, { context, prefix: "/web" });
-				return result.response ?? new Response("Not Found", { status: 404 });
+				return dashboardIam.organization(request);
 			}
 
 			if (pathname.startsWith("/auth/")) {
-				return await authService.handler(request);
+				if (!dashboardIam) {
+					return new Response("Not Found", { status: 404 });
+				}
+				return dashboardIam.authenticator(request);
 			}
 
 			if (pathname === "/health") {

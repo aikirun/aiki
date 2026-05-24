@@ -28,9 +28,21 @@
 			"types": "./dist/client.d.ts",
 			"import": "./dist/client.js"
 		},
+		"./context": {
+			"types": "./dist/context.d.ts",
+			"import": "./dist/context.js"
+		},
+		"./iam": {
+			"types": "./dist/iam.d.ts",
+			"import": "./dist/iam.js"
+		},
 		"./infra/cache": {
 			"types": "./dist/infra/cache.d.ts",
 			"import": "./dist/infra/cache.js"
+		},
+		"./infra/db": {
+			"types": "./dist/infra/db.d.ts",
+			"import": "./dist/infra/db.js"
 		},
 		"./infra/queue": {
 			"types": "./dist/infra/queue/index.d.ts",

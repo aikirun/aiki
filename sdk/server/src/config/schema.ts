@@ -1,19 +1,8 @@
 import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
+import type { DATABASE_PROVIDERS } from "@aikirun/types/infra/db";
 import { type } from "arktype";
 
 const coerceBool = type("'true' | 'false' | '1' | '0'").pipe((v) => v === "true" || v === "1");
-
-export const DATABASE_PROVIDERS = ["pg", "sqlite", "mysql"] as const;
-export type DatabaseProvider = (typeof DATABASE_PROVIDERS)[number];
-
-export function isDatabaseProvider(provider: string): provider is DatabaseProvider {
-	for (const dbProvider of DATABASE_PROVIDERS) {
-		if (provider === dbProvider) {
-			return true;
-		}
-	}
-	return false;
-}
 
 export const pgDatabaseConfigSchema = type({
 	provider: "'pg'",

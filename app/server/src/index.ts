@@ -1,6 +1,6 @@
 import process from "node:process";
 import { redisCache, redisPublisher, redisTimerSortedSet } from "@aikirun/redis";
-import { server } from "@aikirun/server";
+import { database, iam, server } from "@aikirun/server";
 import { Redis } from "ioredis";
 
 import { loadConfig } from "./config/loader";
@@ -23,17 +23,20 @@ if (import.meta.main) {
 		});
 	}
 
+	const db = database(config.database);
+	const cache = redis && redisCache(redis);
+
 	const aiki = server({
-		db: config.database,
-		cache: redis && redisCache(redis),
+		db,
+		cache,
 		logger,
-		handler: {
-			auth: {
-				secret: config.auth.secret,
-				baseURL: config.baseURL,
-				trustedOrigins: config.corsOrigins,
-			},
-		},
+		iam: iam({
+			db,
+			cache,
+			secret: config.auth.secret,
+			baseURL: config.baseURL,
+			trustedOrigins: config.corsOrigins,
+		}),
 		runtime: {
 			...(redis && {
 				publisher: redisPublisher(redis),

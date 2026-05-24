@@ -52,6 +52,15 @@ export function createNamespaceRepository(db: PgDb) {
 			return row ?? null;
 		},
 
+		async exists(filter: { organizationId: string; namespaceId: string }): Promise<boolean> {
+			const [row] = await db
+				.select({ id: namespace.id })
+				.from(namespace)
+				.where(and(eq(namespace.organizationId, filter.organizationId), eq(namespace.id, filter.namespaceId)))
+				.limit(1);
+			return row?.id !== undefined;
+		},
+
 		async listByUser(organizationId: string, userId: string): Promise<NamespaceRowWithRole[]> {
 			const rows = await db
 				.select({

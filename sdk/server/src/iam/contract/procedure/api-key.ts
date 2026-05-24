@@ -3,27 +3,28 @@ import type {
 	ApiKeyApi,
 	ApiKeyCreateRequestV1,
 	ApiKeyCreateResponseV1,
+	ApiKeyListRequestV1,
 	ApiKeyListResponseV1,
 	ApiKeyRevokeRequestV1,
 } from "@aikirun/types/api/api-key";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
-import type { ContractProcedure, ContractProcedureToApi } from "./helper";
+import type { ContractProcedure, ContractProcedureToApi } from "../../../contract/procedure/helper";
 import { apiKeyInfoSchema } from "../schema/api-key";
 
 export type { ApiKeyApi, ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api/api-key";
 
 const createV1: ContractProcedure<ApiKeyCreateRequestV1, ApiKeyCreateResponseV1> = oc
-	.input(type({ name: "string > 0", "expiresAt?": "number > 0 | undefined" }))
+	.input(type({ namespaceId: "string > 0", name: "string > 0", "expiresAt?": "number > 0 | undefined" }))
 	.output(type({ key: "string > 0", info: apiKeyInfoSchema }));
 
-const listV1: ContractProcedure<void, ApiKeyListResponseV1> = oc
-	.input(type("undefined"))
+const listV1: ContractProcedure<ApiKeyListRequestV1, ApiKeyListResponseV1> = oc
+	.input(type({ namespaceId: "string > 0" }))
 	.output(type({ keyInfos: apiKeyInfoSchema.array() }));
 
 const revokeV1: ContractProcedure<ApiKeyRevokeRequestV1, void> = oc
-	.input(type({ id: "string > 0" }))
+	.input(type({ id: "string > 0", namespaceId: "string > 0" }))
 	.output(type("undefined"));
 
 export const apiKeyContract = {

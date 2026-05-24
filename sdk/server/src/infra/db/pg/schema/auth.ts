@@ -1,5 +1,6 @@
 import { API_KEY_STATUSES } from "@aikirun/types/api/api-key";
 import { NAMESPACE_ROLES } from "@aikirun/types/namespace";
+import { ORGANIZATION_ROLES } from "@aikirun/types/organization";
 import { sql } from "drizzle-orm";
 import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
@@ -7,7 +8,6 @@ import { timestampMs } from "./timestamp";
 import { NAMESPACE_STATUSES } from "../../constants/namespace";
 import {
 	ORGANIZATION_INVITATION_STATUSES,
-	ORGANIZATION_ROLES,
 	ORGANIZATION_STATUSES,
 	ORGANIZATION_TYPES,
 } from "../../constants/organization";
