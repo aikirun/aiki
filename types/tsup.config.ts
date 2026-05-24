@@ -8,7 +8,6 @@ export default defineConfig({
 		"api/workflow": "src/api/workflow.ts",
 		"api/workflow-run": "src/api/workflow-run.ts",
 		client: "src/client.ts",
-		context: "src/context.ts",
 		iam: "src/iam.ts",
 		"infra/cache": "src/infra/cache.ts",
 		"infra/db": "src/infra/db.ts",

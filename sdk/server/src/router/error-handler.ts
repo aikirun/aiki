@@ -1,4 +1,4 @@
-import type { ContextBase } from "@aikirun/types/context";
+import type { ContextBase } from "@aikirun/lib/context";
 import { ORPCError } from "@orpc/server";
 
 import {

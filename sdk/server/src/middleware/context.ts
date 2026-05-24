@@ -1,5 +1,5 @@
+import type { AuthedRequestContextBase, ContextBase, RequestContextBase } from "@aikirun/lib/context";
 import type { Logger } from "@aikirun/lib/logger";
-import type { AuthedRequestContextBase, ContextBase, RequestContextBase } from "@aikirun/types/context";
 import type { ApiAuthorizer } from "@aikirun/types/iam";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";

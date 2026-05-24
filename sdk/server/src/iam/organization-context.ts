@@ -1,4 +1,4 @@
-import type { AuthedRequestContextBase } from "@aikirun/types/context";
+import type { AuthedRequestContextBase } from "@aikirun/lib/context";
 import type { OrganizationId, OrganizationRole } from "@aikirun/types/organization";
 
 export interface OrganizationSessionRequestContext extends AuthedRequestContextBase {

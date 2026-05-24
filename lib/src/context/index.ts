@@ -1,4 +1,4 @@
-import type { Logger } from "@aikirun/lib/logger";
+import type { Logger } from "../logger";
 
 export interface ContextBase {
 	type: "request" | "daemon";

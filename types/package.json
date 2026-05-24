@@ -28,10 +28,6 @@
 			"types": "./dist/client.d.ts",
 			"import": "./dist/client.js"
 		},
-		"./context": {
-			"types": "./dist/context.d.ts",
-			"import": "./dist/context.js"
-		},
 		"./iam": {
 			"types": "./dist/iam.d.ts",
 			"import": "./dist/iam.js"
