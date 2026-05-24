@@ -1,11 +1,11 @@
+import type { Database } from "@aikirun/types/infra/db";
+import { INTERNAL } from "@aikirun/types/symbols";
 import { type } from "arktype";
 
-import { createPgRepositories } from "./pg";
 import { createPgDatabaseConn } from "./pg/provider";
-import { betterAuthSchema as pgBetterAuthSchema } from "./pg/schema/better-auth";
 import { type DatabaseConfig, databaseConfigSchema } from "../../config";
 
-export function createDatabase(params: DatabaseConfig) {
+export function database(params: DatabaseConfig): Database {
 	const validationResult = databaseConfigSchema(params);
 	if (validationResult instanceof type.errors) {
 		throw new Error(`Invalid database config: ${validationResult.summary}`);
@@ -14,11 +14,7 @@ export function createDatabase(params: DatabaseConfig) {
 	switch (params.provider) {
 		case "pg": {
 			const conn = createPgDatabaseConn(params);
-			return {
-				conn,
-				repos: createPgRepositories(conn),
-				betterAuthSchema: pgBetterAuthSchema,
-			};
+			return { provider: params.provider, [INTERNAL]: { conn } };
 		}
 		case "sqlite":
 			throw new Error("SQLite support not yet implemented");

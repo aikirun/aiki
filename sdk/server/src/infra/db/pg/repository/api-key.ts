@@ -1,4 +1,5 @@
 import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OrganizationId } from "@aikirun/types/organization";
 import { and, eq } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
@@ -26,7 +27,12 @@ export function createApiKeyRepository(db: PgDb) {
 			return result[0] ?? null;
 		},
 
-		async list(filters: { namespaceId: NamespaceId; createdByUserId?: string; name?: string }) {
+		async list(filter: {
+			organizationId: OrganizationId;
+			namespaceId: NamespaceId;
+			createdByUserId?: string;
+			name?: string;
+		}) {
 			return db
 				.select({
 					id: apiKey.id,
@@ -39,9 +45,10 @@ export function createApiKeyRepository(db: PgDb) {
 				.from(apiKey)
 				.where(
 					and(
-						eq(apiKey.namespaceId, filters.namespaceId),
-						filters.createdByUserId !== undefined ? eq(apiKey.createdByUserId, filters.createdByUserId) : undefined,
-						filters.name !== undefined ? eq(apiKey.name, filters.name) : undefined
+						eq(apiKey.organizationId, filter.organizationId),
+						eq(apiKey.namespaceId, filter.namespaceId),
+						filter.createdByUserId !== undefined ? eq(apiKey.createdByUserId, filter.createdByUserId) : undefined,
+						filter.name !== undefined ? eq(apiKey.name, filter.name) : undefined
 					)
 				);
 		},
@@ -50,14 +57,14 @@ export function createApiKeyRepository(db: PgDb) {
 			await db.update(apiKey).set({ status: "expired" }).where(eq(apiKey.id, id));
 		},
 
-		async revoke(id: string): Promise<string | null> {
+		async revoke(filter: { id: string; namespaceId: NamespaceId }): Promise<string | null> {
 			const rows = await db
 				.update(apiKey)
 				.set({
 					status: "revoked",
 					revokedAt: Date.now(),
 				})
-				.where(eq(apiKey.id, id))
+				.where(and(eq(apiKey.id, filter.id), eq(apiKey.namespaceId, filter.namespaceId)))
 				.returning({ keyHash: apiKey.keyHash });
 			return rows[0]?.keyHash ?? null;
 		},

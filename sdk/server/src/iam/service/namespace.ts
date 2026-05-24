@@ -1,23 +1,26 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { fireAndForget } from "@aikirun/lib/async";
 import type { NamespaceInfo, NamespaceMemberInfo, NamespaceMemberInput } from "@aikirun/types/api/namespace";
+import type { Cache } from "@aikirun/types/infra/cache";
 import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";
 import { ulid } from "ulidx";
 
-import type { ApiKeyService } from "./api-key";
-import { ForbiddenError, ValidationError } from "../errors";
-import type { Repositories } from "../infra/db/types";
-import type { NamespaceRow } from "../infra/db/types/namespace";
+import type { ApiKeyAuthorizationInfo } from "./api-key";
+import { ForbiddenError, ValidationError } from "../../errors";
+import type { Repositories } from "../../infra/db/types";
+import type { NamespaceRow } from "../../infra/db/types/namespace";
 import {
 	isOrganizationManager,
 	type OrganizationManagerSessionRequestContext,
 	type OrganizationSessionRequestContext,
-} from "../middleware/context";
+} from "../organization-context";
 
-export function createNamespaceService(
-	repos: Pick<Repositories, "namespace" | "session" | "transaction">,
-	apiKeyService: ApiKeyService
-) {
+export interface NamespaceServiceDeps {
+	repos: Pick<Repositories, "namespace" | "apiKey" | "session" | "transaction">;
+	apiKeyCache?: Cache<ApiKeyAuthorizationInfo>;
+}
+
+export function createNamespaceService({ repos, apiKeyCache }: NamespaceServiceDeps) {
 	return {
 		async createNamespaceWithMember(
 			context: OrganizationManagerSessionRequestContext,
@@ -59,7 +62,10 @@ export function createNamespaceService(
 			}));
 		},
 
-		async listNamespacesForUser(context: OrganizationSessionRequestContext, userId: string): Promise<NamespaceInfo[]> {
+		async listNamespacesForUser(
+			context: OrganizationManagerSessionRequestContext,
+			userId: string
+		): Promise<NamespaceInfo[]> {
 			const namespaces = await repos.namespace.listByUser(context.organizationId, userId);
 			return namespaces.map((namespace) => ({
 				id: namespace.id,
@@ -79,6 +85,10 @@ export function createNamespaceService(
 				throw new ForbiddenError("Not a member of this namespace");
 			}
 			return member.role;
+		},
+
+		async namespaceExists(context: OrganizationSessionRequestContext, namespaceId: NamespaceId): Promise<boolean> {
+			return repos.namespace.exists({ organizationId: context.organizationId, namespaceId: namespaceId });
 		},
 
 		async setMembership(
@@ -119,11 +129,11 @@ export function createNamespaceService(
 				}
 				await txRepos.namespace.softDelete(namespaceId);
 				await txRepos.session.clearActiveByNamespaceId(namespaceId);
-				return apiKeyService.revokeByNamespaceId(namespaceId, txRepos.apiKey);
+				return txRepos.apiKey.revokeByNamespace(namespaceId);
 			});
 
-			if (isNonEmptyArray(revokedKeyHashes)) {
-				fireAndForget(apiKeyService.invalidateCacheByHashes(revokedKeyHashes), (_error) => {});
+			if (apiKeyCache && isNonEmptyArray(revokedKeyHashes)) {
+				fireAndForget(apiKeyCache.invalidate(revokedKeyHashes), (_error) => {});
 			}
 		},
 	};

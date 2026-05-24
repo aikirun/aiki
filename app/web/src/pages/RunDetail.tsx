@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { client } from "../api/client";
+import { namespaceAuthedClient } from "../api/client";
 import { useWorkflowRun, useWorkflowRunTransitions } from "../api/hooks";
 import { CopyButton } from "../components/common/CopyButton";
 import { SpinnerIcon } from "../components/common/Icons";
@@ -337,7 +337,7 @@ export function RunDetail() {
 									loading={actionLoading === "resume"}
 									onClick={() =>
 										handleAction("resume", () =>
-											client.workflowRun.transitionStateV1({
+											namespaceAuthedClient.workflowRun.transitionStateV1({
 												type: "pessimistic",
 												id: currentRun.id,
 												state: { status: "scheduled", scheduledInMs: 0, reason: "resume" },
@@ -354,7 +354,7 @@ export function RunDetail() {
 									loading={actionLoading === "pause"}
 									onClick={() =>
 										handleAction("pause", () =>
-											client.workflowRun.transitionStateV1({
+											namespaceAuthedClient.workflowRun.transitionStateV1({
 												type: "pessimistic",
 												id: currentRun.id,
 												state: { status: "paused" },
@@ -371,7 +371,7 @@ export function RunDetail() {
 									loading={actionLoading === "cancel"}
 									onClick={() =>
 										handleAction("cancel", () =>
-											client.workflowRun.transitionStateV1({
+											namespaceAuthedClient.workflowRun.transitionStateV1({
 												type: "pessimistic",
 												id: currentRun.id,
 												state: { status: "cancelled" },

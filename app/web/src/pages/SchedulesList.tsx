@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { client } from "../api/client";
+import { namespaceAuthedClient } from "../api/client";
 import { useSchedules, useWorkflowVersions } from "../api/hooks";
 import { CopyButton } from "../components/common/CopyButton";
 import { WorkflowSearchInput } from "../components/runs/WorkflowSearchInput";
@@ -236,9 +236,9 @@ export function SchedulesList() {
 	};
 
 	const handleAction = async (action: "pause" | "resume" | "delete", id: string) => {
-		if (action === "pause") await client.schedule.pauseV1({ id });
-		else if (action === "resume") await client.schedule.resumeV1({ id });
-		else if (action === "delete") await client.schedule.deleteV1({ id });
+		if (action === "pause") await namespaceAuthedClient.schedule.pauseV1({ id });
+		else if (action === "resume") await namespaceAuthedClient.schedule.resumeV1({ id });
+		else if (action === "delete") await namespaceAuthedClient.schedule.deleteV1({ id });
 		queryClient.invalidateQueries({ queryKey: ["schedules"] });
 	};
 

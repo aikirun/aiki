@@ -43,12 +43,12 @@ export function createWorkflowRunRepository(db: PgDb) {
 		},
 
 		async update(
-			filters: { id: WorkflowRunId; revision?: number },
+			filter: { id: WorkflowRunId; revision?: number },
 			updates: WorkflowRunRowUpdate
 		): Promise<{ revision: number } | undefined> {
-			const conditions = [eq(workflowRun.id, filters.id)];
-			if (filters.revision !== undefined) {
-				conditions.push(eq(workflowRun.revision, filters.revision));
+			const conditions = [eq(workflowRun.id, filter.id)];
+			if (filter.revision !== undefined) {
+				conditions.push(eq(workflowRun.revision, filter.revision));
 			}
 
 			const whereClause = and(...conditions);
@@ -136,15 +136,15 @@ export function createWorkflowRunRepository(db: PgDb) {
 				.where(and(inArray(workflowRun.id, ids), eq(workflowRun.status, status)));
 		},
 
-		async getChildRuns(filters: {
+		async getChildRuns(filter: {
 			parentRunId: string;
 			status?: NonEmptyArray<WorkflowRunStatus>;
 		}): Promise<WorkflowRunRow[]> {
 			// TODO: explore loading in chunks
 
-			const conditions = [eq(workflowRun.parentWorkflowRunId, filters.parentRunId)];
-			if (filters.status) {
-				conditions.push(inArray(workflowRun.status, filters.status));
+			const conditions = [eq(workflowRun.parentWorkflowRunId, filter.parentRunId)];
+			if (filter.status) {
+				conditions.push(inArray(workflowRun.status, filter.status));
 			}
 
 			const whereClause = and(...conditions);
@@ -185,17 +185,17 @@ export function createWorkflowRunRepository(db: PgDb) {
 			return result[0] ?? null;
 		},
 
-		async listByWorkflowAndReferenceIdPairs(filters: {
+		async listByWorkflowAndReferenceIdPairs(filter: {
 			pairs: NonEmptyArray<{ workflowId: string; referenceId: string }>;
 			status?: NonEmptyArray<WorkflowRunStatus>;
 		}): Promise<WorkflowRunRow[]> {
 			const pairConditions = or(
-				...filters.pairs.map(({ workflowId, referenceId }) =>
+				...filter.pairs.map(({ workflowId, referenceId }) =>
 					and(eq(workflowRun.workflowId, workflowId), eq(workflowRun.referenceId, referenceId))
 				)
 			);
-			const conditions = filters.status
-				? and(pairConditions, inArray(workflowRun.status, filters.status))
+			const conditions = filter.status
+				? and(pairConditions, inArray(workflowRun.status, filter.status))
 				: pairConditions;
 
 			return db.select().from(workflowRun).where(conditions);
@@ -203,7 +203,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 
 		async listByFilters(
 			namespaceId: NamespaceId,
-			filters: {
+			filter: {
 				id?: string;
 				scheduleId?: string;
 				status?: NonEmptyArray<WorkflowRunStatus>;
@@ -217,19 +217,19 @@ export function createWorkflowRunRepository(db: PgDb) {
 			sort: { order: "asc" | "desc" }
 		) {
 			const conditions = [eq(workflowRun.namespaceId, namespaceId)];
-			if (filters.id) {
-				conditions.push(eq(workflowRun.id, filters.id));
+			if (filter.id) {
+				conditions.push(eq(workflowRun.id, filter.id));
 			}
-			if (filters.scheduleId) {
-				conditions.push(eq(workflowRun.scheduleId, filters.scheduleId));
+			if (filter.scheduleId) {
+				conditions.push(eq(workflowRun.scheduleId, filter.scheduleId));
 			}
-			if (filters.status) {
-				conditions.push(inArray(workflowRun.status, filters.status));
+			if (filter.status) {
+				conditions.push(inArray(workflowRun.status, filter.status));
 			}
-			if (filters.workflow) {
-				conditions.push(inArray(workflowRun.workflowId, filters.workflow.ids));
-				if (filters.workflow.referenceId) {
-					conditions.push(eq(workflowRun.referenceId, filters.workflow.referenceId));
+			if (filter.workflow) {
+				conditions.push(inArray(workflowRun.workflowId, filter.workflow.ids));
+				if (filter.workflow.referenceId) {
+					conditions.push(eq(workflowRun.referenceId, filter.workflow.referenceId));
 				}
 			}
 

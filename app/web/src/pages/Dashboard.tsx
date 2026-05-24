@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { client } from "../api/client";
+import { namespaceAuthedClient } from "../api/client";
 import { useSchedules, useWorkflowStats, useWorkflows } from "../api/hooks";
 import { CopyButton } from "../components/common/CopyButton";
 import { EmptyState } from "../components/common/EmptyState";
@@ -365,7 +365,7 @@ function ScheduleRow({ schedule, runCount }: { schedule: Schedule; runCount: num
 		e.stopPropagation();
 		setIsActioning(true);
 		try {
-			await client.schedule.pauseV1({ id: schedule.id });
+			await namespaceAuthedClient.schedule.pauseV1({ id: schedule.id });
 			queryClient.invalidateQueries({ queryKey: ["schedules"] });
 		} finally {
 			setIsActioning(false);
@@ -377,7 +377,7 @@ function ScheduleRow({ schedule, runCount }: { schedule: Schedule; runCount: num
 		e.stopPropagation();
 		setIsActioning(true);
 		try {
-			await client.schedule.resumeV1({ id: schedule.id });
+			await namespaceAuthedClient.schedule.resumeV1({ id: schedule.id });
 			queryClient.invalidateQueries({ queryKey: ["schedules"] });
 		} finally {
 			setIsActioning(false);
@@ -389,7 +389,7 @@ function ScheduleRow({ schedule, runCount }: { schedule: Schedule; runCount: num
 		e.stopPropagation();
 		setIsActioning(true);
 		try {
-			await client.schedule.deleteV1({ id: schedule.id });
+			await namespaceAuthedClient.schedule.deleteV1({ id: schedule.id });
 			queryClient.invalidateQueries({ queryKey: ["schedules"] });
 		} finally {
 			setIsActioning(false);

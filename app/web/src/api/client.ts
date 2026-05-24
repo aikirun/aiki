@@ -12,23 +12,27 @@ const fetchWithCredentials = (url: RequestInfo | URL, options?: RequestInit) =>
 	fetch(url, { ...options, credentials: "include" });
 
 const namespaceAuthedLink = new RPCLink({
-	url: `${AIKI_SERVER_URL}/web`,
+	url: `${AIKI_SERVER_URL}/api`,
 	fetch: fetchWithCredentials,
 });
 
 const organizationAuthedLink = new RPCLink({
-	url: `${AIKI_SERVER_URL}/web/namespace`,
+	url: `${AIKI_SERVER_URL}/dashboard`,
 	fetch: fetchWithCredentials,
 });
 
-export const client = createORPCClient(namespaceAuthedLink) as unknown as {
-	apiKey: ApiKeyApi;
+export const namespaceAuthedClient = createORPCClient(namespaceAuthedLink) as unknown as {
 	schedule: ScheduleApi;
 	workflow: WorkflowApi;
 	workflowRun: WorkflowRunApi;
 };
 
-export const namespaceManagementClient = createORPCClient(organizationAuthedLink) as unknown as NamespaceApi;
+export const organizationAuthedClient = createORPCClient(organizationAuthedLink) as unknown as {
+	apiKey: ApiKeyApi;
+	namespace: NamespaceApi;
+};
+
+export const namespaceManagementClient = organizationAuthedClient.namespace;
 
 export async function createNamespace(name: string) {
 	const data = await namespaceManagementClient.createV1({ name });

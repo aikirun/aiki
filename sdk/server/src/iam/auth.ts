@@ -1,22 +1,38 @@
+import type { Database } from "@aikirun/types/infra/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
 
-import type { DatabaseProvider } from "../config";
-import type { BetterAuthSchema } from "../infra/db/types/better-auth";
+import type { PgDatabaseConn } from "../infra/db/pg/provider";
+import { betterAuthSchema as pgBetterAuthSchema } from "../infra/db/pg/schema/better-auth";
+import { extractDatabaseConn } from "../infra/db/repo";
 
 export interface AuthOptions {
-	dbConn: Parameters<typeof drizzleAdapter>[0];
-	dbProvider: DatabaseProvider;
-	betterAuthSchema: BetterAuthSchema;
+	db: Database;
 	baseURL: string;
 	secret: string;
 	trustedOrigins: string[];
 }
 
+function createDrizzleAdapter(db: Database) {
+	switch (db.provider) {
+		case "pg":
+			return drizzleAdapter(extractDatabaseConn(db) as PgDatabaseConn, {
+				provider: db.provider,
+				schema: pgBetterAuthSchema,
+			});
+		case "mysql":
+			throw new Error("MySQL support not yet implemented");
+		case "sqlite":
+			throw new Error("SQLite support not yet implemented");
+		default:
+			return db.provider satisfies never;
+	}
+}
+
 export function createAuthService(options: AuthOptions) {
 	return betterAuth({
-		database: drizzleAdapter(options.dbConn, { provider: options.dbProvider, schema: options.betterAuthSchema }),
+		database: createDrizzleAdapter(options.db),
 		baseURL: options.baseURL,
 		basePath: "/auth",
 		secret: options.secret,

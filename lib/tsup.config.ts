@@ -5,6 +5,7 @@ export default defineConfig({
 		"address/index": "src/address/index.ts",
 		"array/index": "src/array/index.ts",
 		"async/index": "src/async/index.ts",
+		"context/index": "src/context/index.ts",
 		"crypto/index": "src/crypto/index.ts",
 		"duration/index": "src/duration/index.ts",
 		"json/index": "src/json/index.ts",

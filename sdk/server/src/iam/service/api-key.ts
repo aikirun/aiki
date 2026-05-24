@@ -2,14 +2,12 @@ import { randomBytes } from "node:crypto";
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { sha256Sync } from "@aikirun/lib/crypto";
 import type { Cache } from "@aikirun/types/infra/cache";
-import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";
+import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { ulid } from "ulidx";
 
-import { UnauthorizedError } from "../errors";
-import type { Repositories } from "../infra/db/types";
-import type { ApiKeyRepository, ApiKeyRowInsert } from "../infra/db/types/api-key";
-import type { NamespaceSessionRequestContext } from "../middleware/context";
+import type { Repositories } from "../../infra/db/types";
+import type { ApiKeyRowInsert } from "../../infra/db/types/api-key";
 
 const PLATFORM = "aiki";
 const PREFIX_LENGTH = 8;
@@ -48,24 +46,12 @@ function isValidKeyFormat(key: string): boolean {
 }
 
 export interface ApiKeyServiceDeps {
-	repos: Pick<Repositories, "apiKey" | "organization" | "namespace">;
+	repos: Pick<Repositories, "apiKey">;
 	cache?: Cache<ApiKeyAuthorizationInfo>;
 }
 
 export function createApiKeyService({ repos, cache }: ApiKeyServiceDeps) {
 	return {
-		async resolveNamespaceRole(context: NamespaceSessionRequestContext): Promise<NamespaceRole> {
-			const organizationRole = await repos.organization.getMemberRole(context.organizationId, context.userId);
-			if (organizationRole === "owner" || organizationRole === "admin") {
-				return "admin";
-			}
-			const namespaceMember = await repos.namespace.getMember(context.namespaceId, context.userId);
-			if (!namespaceMember) {
-				throw new UnauthorizedError("Not a member of this namespace");
-			}
-			return namespaceMember.role;
-		},
-
 		async create(
 			input: Pick<ApiKeyRowInsert, "organizationId" | "namespaceId" | "createdByUserId" | "name" | "expiresAt">
 		) {
@@ -133,16 +119,12 @@ export function createApiKeyService({ repos, cache }: ApiKeyServiceDeps) {
 			};
 		},
 
-		async list(filters: { namespaceId: NamespaceId }) {
-			return repos.apiKey.list(filters);
+		async list(filter: { organizationId: OrganizationId; namespaceId: NamespaceId }) {
+			return repos.apiKey.list(filter);
 		},
 
-		async revoke(id: string): Promise<string | null> {
-			return repos.apiKey.revoke(id);
-		},
-
-		async revokeByNamespaceId(namespaceId: NamespaceId, txRepo: ApiKeyRepository): Promise<string[]> {
-			return txRepo.revokeByNamespace(namespaceId);
+		async revoke(filter: { id: string; namespaceId: NamespaceId }): Promise<string | null> {
+			return repos.apiKey.revoke(filter);
 		},
 
 		async invalidateCacheByHashes(keyHashes: string | NonEmptyArray<string>): Promise<void> {

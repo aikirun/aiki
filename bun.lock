@@ -65,6 +65,7 @@
       },
       "dependencies": {
         "@aikirun/server": "workspace:*",
+        "@aikirun/types": "workspace:*",
         "cac": "^6.7.14",
         "dotenv": "^16.4.5",
         "drizzle-orm": "^0.45.1",

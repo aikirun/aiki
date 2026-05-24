@@ -17,6 +17,10 @@
 			"types": "./dist/async/index.d.ts",
 			"import": "./dist/async/index.js"
 		},
+		"./context": {
+			"types": "./dist/context/index.d.ts",
+			"import": "./dist/context/index.js"
+		},
 		"./crypto": {
 			"types": "./dist/crypto/index.d.ts",
 			"import": "./dist/crypto/index.js"

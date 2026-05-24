@@ -91,7 +91,7 @@ export function createScheduleRepository(db: PgDb) {
 
 		async listByFilters(
 			namespaceId: NamespaceId,
-			filters: {
+			filter: {
 				id?: string;
 				referenceId?: string;
 				status?: string[];
@@ -102,17 +102,17 @@ export function createScheduleRepository(db: PgDb) {
 		) {
 			const conditions = [eq(schedule.namespaceId, namespaceId)];
 
-			if (filters.id) {
-				conditions.push(eq(schedule.id, filters.id));
+			if (filter.id) {
+				conditions.push(eq(schedule.id, filter.id));
 			}
-			if (filters.referenceId) {
-				conditions.push(eq(schedule.referenceId, filters.referenceId));
+			if (filter.referenceId) {
+				conditions.push(eq(schedule.referenceId, filter.referenceId));
 			}
-			if (filters.status && filters.status.length > 0) {
-				conditions.push(inArray(schedule.status, filters.status as typeof schedule.status.enumValues));
+			if (filter.status && filter.status.length > 0) {
+				conditions.push(inArray(schedule.status, filter.status as typeof schedule.status.enumValues));
 			}
-			if (filters.workflowIds && filters.workflowIds.length > 0) {
-				conditions.push(inArray(schedule.workflowId, filters.workflowIds));
+			if (filter.workflowIds && filter.workflowIds.length > 0) {
+				conditions.push(inArray(schedule.workflowId, filter.workflowIds));
 			}
 
 			const whereClause = and(...conditions);
