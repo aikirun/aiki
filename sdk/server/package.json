@@ -14,6 +14,30 @@
 			"types": "./dist/config/index.d.ts",
 			"import": "./dist/config/index.js"
 		},
+		"./internal/contract": {
+			"types": "./dist/internal/contract.d.ts",
+			"import": "./dist/internal/contract.js"
+		},
+		"./internal/db-pg": {
+			"types": "./dist/internal/db-pg.d.ts",
+			"import": "./dist/internal/db-pg.js"
+		},
+		"./internal/db-types": {
+			"types": "./dist/internal/db-types.d.ts",
+			"import": "./dist/internal/db-types.js"
+		},
+		"./internal/errors": {
+			"types": "./dist/internal/errors.d.ts",
+			"import": "./dist/internal/errors.js"
+		},
+		"./internal/repo": {
+			"types": "./dist/internal/repo.d.ts",
+			"import": "./dist/internal/repo.js"
+		},
+		"./internal/router": {
+			"types": "./dist/internal/router.d.ts",
+			"import": "./dist/internal/router.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"files": [

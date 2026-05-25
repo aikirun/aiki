@@ -1,0 +1,37 @@
+{
+	"name": "@aikirun/iam",
+	"version": "0.28.0",
+	"description": "Aiki IAM library — pluggable identity & access management for @aikirun/server.",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup"
+	},
+	"dependencies": {
+		"@aikirun/server": "workspace:*",
+		"@aikirun/types": "workspace:*",
+		"@orpc/contract": "^1.9.3",
+		"@orpc/server": "^1.9.3",
+		"arktype": "^2.1.29",
+		"better-auth": "^1.4.14",
+		"ulidx": "^2.4.1"
+	},
+	"devDependencies": {
+		"@aikirun/lib": "workspace:*"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"license": "Apache-2.0"
+}

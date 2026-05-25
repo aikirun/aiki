@@ -1,14 +1,13 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { fireAndForget } from "@aikirun/lib/async";
+import type { NamespaceRow, Repositories } from "@aikirun/server/internal/db-types";
+import { ForbiddenError, ValidationError } from "@aikirun/server/internal/errors";
 import type { NamespaceInfo, NamespaceMemberInfo, NamespaceMemberInput } from "@aikirun/types/api/namespace";
 import type { Cache } from "@aikirun/types/infra/cache";
 import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";
 import { ulid } from "ulidx";
 
 import type { ApiKeyAuthorizationInfo } from "./api-key";
-import { ForbiddenError, ValidationError } from "../../errors";
-import type { Repositories } from "../../infra/db/types";
-import type { NamespaceRow } from "../../infra/db/types/namespace";
 import {
 	isOrganizationManager,
 	type OrganizationManagerSessionRequestContext,

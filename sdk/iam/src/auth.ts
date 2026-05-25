@@ -1,11 +1,9 @@
+import { type PgDatabaseConn, pgBetterAuthSchema } from "@aikirun/server/internal/db-pg";
+import { extractDatabaseConn } from "@aikirun/server/internal/repo";
 import type { Database } from "@aikirun/types/infra/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
-
-import type { PgDatabaseConn } from "../infra/db/pg/provider";
-import { betterAuthSchema as pgBetterAuthSchema } from "../infra/db/pg/schema/better-auth";
-import { extractDatabaseConn } from "../infra/db/repo";
 
 export interface AuthOptions {
 	db: Database;

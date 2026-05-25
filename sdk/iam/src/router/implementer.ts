@@ -1,6 +1,6 @@
+import { handleError } from "@aikirun/server/internal/router";
 import { implement } from "@orpc/server";
 
-import { handleError } from "../../router/error-handler";
 import { organizationAuthedContract } from "../contract/organization-authed";
 import type { OrganizationSessionRequestContext } from "../organization-context";
 

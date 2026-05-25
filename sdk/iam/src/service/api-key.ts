@@ -1,13 +1,11 @@
 import { randomBytes } from "node:crypto";
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { sha256Sync } from "@aikirun/lib/crypto";
+import type { ApiKeyRowInsert, Repositories } from "@aikirun/server/internal/db-types";
 import type { Cache } from "@aikirun/types/infra/cache";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { ulid } from "ulidx";
-
-import type { Repositories } from "../../infra/db/types";
-import type { ApiKeyRowInsert } from "../../infra/db/types/api-key";
 
 const PLATFORM = "aiki";
 const PREFIX_LENGTH = 8;
