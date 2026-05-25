@@ -19,6 +19,7 @@
       "name": "@aikirun/app-server",
       "version": "0.28.0",
       "dependencies": {
+        "@aikirun/iam": "workspace:*",
         "@aikirun/lib": "workspace:*",
         "@aikirun/redis": "workspace:*",
         "@aikirun/server": "workspace:*",
@@ -133,6 +134,22 @@
         "@aikirun/lib": "workspace:*",
       },
     },
+    "sdk/iam": {
+      "name": "@aikirun/iam",
+      "version": "0.28.0",
+      "dependencies": {
+        "@aikirun/server": "workspace:*",
+        "@aikirun/types": "workspace:*",
+        "@orpc/contract": "^1.9.3",
+        "@orpc/server": "^1.9.3",
+        "arktype": "^2.1.29",
+        "better-auth": "^1.4.14",
+        "ulidx": "^2.4.1",
+      },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+      },
+    },
     "sdk/server": {
       "name": "@aikirun/server",
       "version": "0.28.0",
@@ -196,6 +213,8 @@
     "@aikirun/examples": ["@aikirun/examples@workspace:examples"],
 
     "@aikirun/http": ["@aikirun/http@workspace:sdk/adapter/http"],
+
+    "@aikirun/iam": ["@aikirun/iam@workspace:sdk/iam"],
 
     "@aikirun/lib": ["@aikirun/lib@workspace:lib"],
 

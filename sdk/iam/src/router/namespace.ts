@@ -1,8 +1,8 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
+import { ForbiddenError, NotFoundError } from "@aikirun/server/internal/errors";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
 import { organizationAuthedImplementer } from "./implementer";
-import { ForbiddenError, NotFoundError } from "../../errors";
 import {
 	isOrganizationManager,
 	type OrganizationManagerSessionRequestContext,

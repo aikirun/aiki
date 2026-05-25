@@ -13,6 +13,7 @@
 		"db:migrate": "aiki migrate apply --env-file ./.env"
 	},
 	"dependencies": {
+		"@aikirun/iam": "workspace:*",
 		"@aikirun/lib": "workspace:*",
 		"@aikirun/redis": "workspace:*",
 		"@aikirun/server": "workspace:*",

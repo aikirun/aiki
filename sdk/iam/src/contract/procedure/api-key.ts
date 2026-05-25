@@ -1,4 +1,5 @@
 import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
+import type { ContractProcedure, ContractProcedureToApi } from "@aikirun/server/internal/contract";
 import type {
 	ApiKeyApi,
 	ApiKeyCreateRequestV1,
@@ -10,7 +11,6 @@ import type {
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
-import type { ContractProcedure, ContractProcedureToApi } from "../../../contract/procedure/helper";
 import { apiKeyInfoSchema } from "../schema/api-key";
 
 export type { ApiKeyApi, ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api/api-key";

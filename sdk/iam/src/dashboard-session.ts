@@ -1,3 +1,6 @@
+import type { OrganizationRepository } from "@aikirun/server/internal/db-types";
+import { UnauthorizedError } from "@aikirun/server/internal/errors";
+import { createRepos } from "@aikirun/server/internal/repo";
 import type {
 	CreateDashboardAuthenticator,
 	CreateDashboardIam,
@@ -18,9 +21,6 @@ import type { OrganizationSessionRequestContext } from "./organization-context";
 import { createOrganizationAuthedRouter } from "./router/index";
 import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 import { createNamespaceService } from "./service/namespace";
-import { UnauthorizedError } from "../errors";
-import { createRepos } from "../infra/db/repo";
-import type { OrganizationRepository } from "../infra/db/types/organization";
 
 export interface OrganizationDashboardAuthorization {
 	organizationId: OrganizationId;

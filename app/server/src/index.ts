@@ -1,6 +1,7 @@
 import process from "node:process";
+import { iam } from "@aikirun/iam";
 import { redisCache, redisPublisher, redisTimerSortedSet } from "@aikirun/redis";
-import { database, iam, server } from "@aikirun/server";
+import { database, server } from "@aikirun/server";
 import { Redis } from "ioredis";
 
 import { loadConfig } from "./config/loader";

@@ -1,4 +1,5 @@
 import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
+import type { ContractProcedure, ContractProcedureToApi } from "@aikirun/server/internal/contract";
 import type {
 	NamespaceApi,
 	NamespaceCreateRequestV1,
@@ -15,7 +16,6 @@ import type {
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
-import type { ContractProcedure, ContractProcedureToApi } from "../../../contract/procedure/helper";
 import { namespaceInfoSchema, namespaceMemberInfoSchema, namespaceRoleSchema } from "../schema/namespace";
 
 export type { NamespaceApi, NamespaceInfo } from "@aikirun/types/api/namespace";
