@@ -12,7 +12,7 @@ import {
 	isOrganizationManager,
 	type OrganizationManagerSessionRequestContext,
 	type OrganizationSessionRequestContext,
-} from "../organization-context";
+} from "../context";
 
 export interface NamespaceServiceDeps {
 	repos: Pick<Repositories, "namespace" | "apiKey" | "session" | "transaction">;

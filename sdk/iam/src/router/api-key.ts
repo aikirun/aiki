@@ -3,7 +3,7 @@ import { ForbiddenError, NotFoundError } from "@aikirun/server/internal/errors";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
 import { organizationAuthedImplementer } from "./implementer";
-import type { OrganizationSessionRequestContext } from "../organization-context";
+import type { OrganizationSessionRequestContext } from "../context";
 import type { ApiKeyService } from "../service/api-key";
 import type { NamespaceService } from "../service/namespace";
 

@@ -17,7 +17,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { ulid } from "ulidx";
 
 import { type AuthService, createAuthService } from "./auth";
-import type { OrganizationSessionRequestContext } from "./organization-context";
+import type { OrganizationSessionRequestContext } from "./context";
 import { createOrganizationAuthedRouter } from "./router/index";
 import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 import { createNamespaceService } from "./service/namespace";
@@ -109,7 +109,6 @@ function createOrganizationHandler(
 			headers: request.headers,
 			method: request.method,
 			url: request.url,
-			authMethod: "organization_session",
 			organizationId: authorization.organizationId,
 			userId: authorization.userId,
 			organizationRole: authorization.organizationRole,

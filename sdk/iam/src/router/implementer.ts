@@ -1,8 +1,8 @@
 import { handleError } from "@aikirun/server/internal/router";
 import { implement } from "@orpc/server";
 
+import type { OrganizationSessionRequestContext } from "../context";
 import { organizationAuthedContract } from "../contract/organization-authed";
-import type { OrganizationSessionRequestContext } from "../organization-context";
 
 const baseOrganizationAuthedImplementer =
 	implement(organizationAuthedContract).$context<OrganizationSessionRequestContext>();

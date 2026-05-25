@@ -7,7 +7,7 @@ import {
 	isOrganizationManager,
 	type OrganizationManagerSessionRequestContext,
 	type OrganizationSessionRequestContext,
-} from "../organization-context";
+} from "../context";
 import type { NamespaceService } from "../service/namespace";
 
 export function createNamespaceRouter(namespaceService: NamespaceService) {
