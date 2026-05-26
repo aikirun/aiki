@@ -15,27 +15,8 @@
         "typescript": "^5.7.2",
       },
     },
-    "app/server": {
-      "name": "@aikirun/app-server",
-      "version": "0.28.0",
-      "dependencies": {
-        "@aikirun/iam": "workspace:*",
-        "@aikirun/lib": "workspace:*",
-        "@aikirun/redis": "workspace:*",
-        "@aikirun/server": "workspace:*",
-        "@aikirun/types": "workspace:*",
-        "arktype": "^2.1.29",
-        "dotenv": "^16.4.5",
-        "ioredis": "^5.4.1",
-        "pino": "^9.6.0",
-        "pino-pretty": "^13.0.0",
-      },
-      "devDependencies": {
-        "@aikirun/cli": "workspace:*",
-      },
-    },
-    "app/web": {
-      "name": "@aikirun/app-web",
+    "app/dashboard": {
+      "name": "@aikirun/app-dashboard",
       "version": "0.28.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
@@ -58,6 +39,25 @@
         "typescript": "~5.7.2",
         "vite": "^6.0.7",
         "vite-tsconfig-paths": "^6.1.1",
+      },
+    },
+    "app/server": {
+      "name": "@aikirun/app-server",
+      "version": "0.28.0",
+      "dependencies": {
+        "@aikirun/iam": "workspace:*",
+        "@aikirun/lib": "workspace:*",
+        "@aikirun/redis": "workspace:*",
+        "@aikirun/server": "workspace:*",
+        "@aikirun/types": "workspace:*",
+        "arktype": "^2.1.29",
+        "dotenv": "^16.4.5",
+        "ioredis": "^5.4.1",
+        "pino": "^9.6.0",
+        "pino-pretty": "^13.0.0",
+      },
+      "devDependencies": {
+        "@aikirun/cli": "workspace:*",
       },
     },
     "cli": {
@@ -212,9 +212,9 @@
     },
   },
   "packages": {
-    "@aikirun/app-server": ["@aikirun/app-server@workspace:app/server"],
+    "@aikirun/app-dashboard": ["@aikirun/app-dashboard@workspace:app/dashboard"],
 
-    "@aikirun/app-web": ["@aikirun/app-web@workspace:app/web"],
+    "@aikirun/app-server": ["@aikirun/app-server@workspace:app/server"],
 
     "@aikirun/cli": ["@aikirun/cli@workspace:cli"],
 
@@ -1052,7 +1052,7 @@
 
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
-    "@aikirun/app-web/typescript": ["typescript@5.7.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw=="],
+    "@aikirun/app-dashboard/typescript": ["typescript@5.7.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw=="],
 
     "@babel/core/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 

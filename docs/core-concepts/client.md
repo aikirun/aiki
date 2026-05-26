@@ -17,7 +17,7 @@ const aikiClient = client({
 
 ### apiKey
 
-API key for authentication. Create one from the web UI:
+API key for authentication. Create one from the dashboard UI:
 
 ```typescript
 apiKey: "your-api-key"

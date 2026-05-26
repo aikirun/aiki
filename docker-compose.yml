@@ -27,16 +27,16 @@ services:
       PRETTY_LOGS: ${PRETTY_LOGS:-true}
     restart: unless-stopped
 
-  web:
+  dashboard:
     build:
       context: .
-      dockerfile: app/web/Dockerfile
+      dockerfile: app/dashboard/Dockerfile
       args:
         VITE_AIKI_SERVER_URL: ${VITE_AIKI_SERVER_URL:-http://localhost:9850}
-    image: aikirun/web
-    container_name: aiki-web
+    image: aikirun/dashboard
+    container_name: aiki-dashboard
     ports:
-      - "${AIKI_WEB_PORT:-9851}:9851"
+      - "${AIKI_DASHBOARD_PORT:-9851}:9851"
     depends_on:
       - server
     restart: unless-stopped
