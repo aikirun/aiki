@@ -1,5 +1,7 @@
 import type { AuthedRequestContextBase } from "@aikirun/lib/context";
-import type { OrganizationId, OrganizationRole } from "@aikirun/types/organization";
+import type { OrganizationId } from "@aikirun/types/organization";
+
+import type { OrganizationRole } from "./infra/db/constants/organization";
 
 export interface OrganizationSessionRequestContext extends AuthedRequestContextBase {
 	organizationId: OrganizationId;

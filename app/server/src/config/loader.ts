@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { omitUndefined } from "@aikirun/lib/object";
-import { loadDatabaseConfig } from "@aikirun/server/config";
+import { DATABASE_PROVIDERS, isDatabaseProvider } from "@aikirun/types/infra/db";
 import { type } from "arktype";
 import { config } from "dotenv";
 
@@ -29,7 +29,7 @@ export async function loadConfig(): Promise<Config> {
 		baseURL: process.env.AIKI_SERVER_BASE_URL,
 		corsOrigins: process.env.CORS_ORIGINS,
 		redis,
-		database: loadDatabaseConfig(),
+		db: readDatabaseEnv(),
 		auth: {
 			secret: process.env.AIKI_SERVER_AUTH_SECRET,
 		},
@@ -43,4 +43,26 @@ export async function loadConfig(): Promise<Config> {
 	}
 
 	return result;
+}
+
+function readDatabaseEnv() {
+	const provider = process.env.DATABASE_PROVIDER ?? "pg";
+	if (!isDatabaseProvider(provider)) {
+		throw new Error(`Unsupported DATABASE_PROVIDER: ${provider}. Must be one of: ${DATABASE_PROVIDERS.join(", ")}`);
+	}
+
+	switch (provider) {
+		case "sqlite":
+			return { provider, path: process.env.DATABASE_PATH };
+		case "pg":
+		case "mysql":
+			return {
+				provider,
+				url: process.env.DATABASE_URL,
+				maxConnections: process.env.DATABASE_MAX_CONNECTIONS,
+				ssl: process.env.DATABASE_SSL,
+			};
+		default:
+			return provider satisfies never;
+	}
 }

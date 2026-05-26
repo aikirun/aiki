@@ -1,4 +1,4 @@
-import type { ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api/api-key";
+import type { ApiKeyInfo } from "@aikirun/iam/contract";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -10,13 +10,13 @@ import { API_KEY_STATUS_COLORS } from "../constants/status-colors";
 
 type PageState = { mode: "idle" } | { mode: "creating" } | { mode: "revealed"; key: string };
 
-const STATUS_GLYPHS: Record<ApiKeyStatus, string> = {
+const STATUS_GLYPHS: Record<ApiKeyInfo["status"], string> = {
 	active: "●",
 	revoked: "●",
 	expired: "●",
 };
 
-const STATUS_LABELS: Record<ApiKeyStatus, string> = {
+const STATUS_LABELS: Record<ApiKeyInfo["status"], string> = {
 	active: "Active",
 	revoked: "Revoked",
 	expired: "Expired",

@@ -1,5 +1,5 @@
 import { fireAndForget } from "@aikirun/lib/async";
-import { ForbiddenError, NotFoundError } from "@aikirun/server/internal/errors";
+import { ForbiddenError, NotFoundError } from "@aikirun/lib/error";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
 import { organizationAuthedImplementer } from "./implementer";

@@ -1,24 +1,16 @@
-import type { ContextBase } from "@aikirun/lib/context";
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@aikirun/lib/error";
 import { ORPCError } from "@orpc/server";
 
 import {
-	ConflictError,
-	ForbiddenError,
 	InvalidTaskStateTransitionError,
 	InvalidWorkflowRunStateTransitionError,
-	NotFoundError,
 	ScheduleConflictError,
-	UnauthorizedError,
-	ValidationError,
 	WorkflowRunConflictError,
 	WorkflowRunRevisionConflictError,
 } from "../errors";
+import type { RequestContext } from "../middleware/context";
 
-export function handleError<T extends ContextBase>(context: T, error: unknown) {
-	if (context.type === "daemon") {
-		throw error;
-	}
-
+export function handleError<T extends RequestContext>(context: T, error: unknown) {
 	if (error instanceof NotFoundError) {
 		throw new ORPCError("NOT_FOUND", { message: error.message });
 	}

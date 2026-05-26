@@ -10,54 +10,28 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
 		},
-		"./config": {
-			"types": "./dist/config/index.d.ts",
-			"import": "./dist/config/index.js"
-		},
-		"./internal/contract": {
-			"types": "./dist/internal/contract.d.ts",
-			"import": "./dist/internal/contract.js"
-		},
-		"./internal/db-pg": {
-			"types": "./dist/internal/db-pg.d.ts",
-			"import": "./dist/internal/db-pg.js"
-		},
-		"./internal/db-types": {
-			"types": "./dist/internal/db-types.d.ts",
-			"import": "./dist/internal/db-types.js"
-		},
-		"./internal/errors": {
-			"types": "./dist/internal/errors.d.ts",
-			"import": "./dist/internal/errors.js"
-		},
-		"./internal/repo": {
-			"types": "./dist/internal/repo.d.ts",
-			"import": "./dist/internal/repo.js"
-		},
-		"./internal/router": {
-			"types": "./dist/internal/router.d.ts",
-			"import": "./dist/internal/router.js"
-		},
 		"./package.json": "./package.json"
 	},
 	"files": [
 		"dist"
 	],
 	"scripts": {
-		"build": "tsup"
+		"build": "tsup",
+		"db:generate": "aiki migrate generate --package server",
+		"db:generate:custom": "aiki migrate generate --package server --custom"
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
 		"@orpc/contract": "^1.9.3",
 		"@orpc/server": "^1.9.3",
 		"arktype": "^2.1.29",
-		"better-auth": "^1.4.14",
 		"cron-parser": "^5.4.0",
 		"drizzle-orm": "^0.45.1",
 		"postgres": "^3.4.8",
 		"ulidx": "^2.4.1"
 	},
 	"devDependencies": {
+		"@aikirun/cli": "workspace:*",
 		"@aikirun/lib": "workspace:*"
 	},
 	"publishConfig": {

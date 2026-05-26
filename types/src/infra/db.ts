@@ -14,5 +14,5 @@ export function isDatabaseProvider(provider: string): provider is DatabaseProvid
 
 export interface Database {
 	readonly provider: DatabaseProvider;
-	readonly [INTERNAL]: { conn: unknown };
+	readonly [INTERNAL]: { client: unknown };
 }

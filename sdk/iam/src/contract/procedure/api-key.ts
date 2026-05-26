@@ -1,31 +1,15 @@
-import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
-import type { ContractProcedure, ContractProcedureToApi } from "@aikirun/server/internal/contract";
-import type {
-	ApiKeyApi,
-	ApiKeyCreateRequestV1,
-	ApiKeyCreateResponseV1,
-	ApiKeyListRequestV1,
-	ApiKeyListResponseV1,
-	ApiKeyRevokeRequestV1,
-} from "@aikirun/types/api/api-key";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import { apiKeyInfoSchema } from "../schema/api-key";
 
-export type { ApiKeyApi, ApiKeyInfo, ApiKeyStatus } from "@aikirun/types/api/api-key";
-
-const createV1: ContractProcedure<ApiKeyCreateRequestV1, ApiKeyCreateResponseV1> = oc
+const createV1 = oc
 	.input(type({ namespaceId: "string > 0", name: "string > 0", "expiresAt?": "number > 0 | undefined" }))
 	.output(type({ key: "string > 0", info: apiKeyInfoSchema }));
 
-const listV1: ContractProcedure<ApiKeyListRequestV1, ApiKeyListResponseV1> = oc
-	.input(type({ namespaceId: "string > 0" }))
-	.output(type({ keyInfos: apiKeyInfoSchema.array() }));
+const listV1 = oc.input(type({ namespaceId: "string > 0" })).output(type({ keyInfos: apiKeyInfoSchema.array() }));
 
-const revokeV1: ContractProcedure<ApiKeyRevokeRequestV1, void> = oc
-	.input(type({ id: "string > 0", namespaceId: "string > 0" }))
-	.output(type("undefined"));
+const revokeV1 = oc.input(type({ id: "string > 0", namespaceId: "string > 0" })).output(type("undefined"));
 
 export const apiKeyContract = {
 	createV1,
@@ -34,5 +18,3 @@ export const apiKeyContract = {
 };
 
 export type ApiKeyContract = typeof apiKeyContract;
-
-export type _ContractSatisfiesApi = ExpectTrue<Equal<ContractProcedureToApi<ApiKeyContract>, ApiKeyApi>>;

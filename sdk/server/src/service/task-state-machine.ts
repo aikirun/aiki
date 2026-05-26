@@ -1,4 +1,5 @@
 import { hashInput } from "@aikirun/lib/crypto";
+import { NotFoundError } from "@aikirun/lib/error";
 import type {
 	TransitionTaskStateToRunning,
 	WorkflowRunTransitionTaskStateRequestV1,
@@ -7,7 +8,7 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import type { TaskId, TaskInfo, TaskName, TaskState, TaskStatus } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import { InvalidTaskStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "../errors";
+import { InvalidTaskStateTransitionError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 

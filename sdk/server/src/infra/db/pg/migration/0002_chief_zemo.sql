@@ -1,1 +1,0 @@
-ALTER TABLE "namespace_member" ALTER COLUMN "role" SET DEFAULT 'viewer';

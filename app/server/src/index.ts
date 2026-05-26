@@ -24,7 +24,7 @@ if (import.meta.main) {
 		});
 	}
 
-	const db = database(config.database);
+	const db = database(config.db);
 	const cache = redis && redisCache(redis);
 
 	const aiki = server({

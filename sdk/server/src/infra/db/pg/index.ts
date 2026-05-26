@@ -1,11 +1,7 @@
-import type { PgDatabaseConn, PgDb } from "./provider";
-import { createApiKeyRepository } from "./repository/api-key";
+import type { PgDb, PgHandle } from "./provider";
 import { createChildWorkflowRunWaitQueueRepository } from "./repository/child-workflow-run-wait-queue";
 import { createEventWaitQueueRepository } from "./repository/event-wait-queue";
-import { createNamespaceRepository } from "./repository/namespace";
-import { createOrganizationRepository } from "./repository/organization";
 import { createScheduleRepository } from "./repository/schedule";
-import { createSessionRepository } from "./repository/session";
 import { createSleepQueueRepository } from "./repository/sleep-queue";
 import { createStateTransitionRepository } from "./repository/state-transition";
 import { createTaskRepository } from "./repository/task";
@@ -14,7 +10,7 @@ import { createWorkflowRunRepository } from "./repository/workflow-run";
 import { createWorkflowRunOutboxRepository } from "./repository/workflow-run-outbox";
 import type { Repositories } from "../types";
 
-export function createPgRepositories(db: PgDatabaseConn): Repositories {
+export function createPgRepos(db: PgHandle): Repositories {
 	return {
 		...createRepos(db),
 		async transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T> {
@@ -34,9 +30,5 @@ function createRepos(db: PgDb): Omit<Repositories, "transaction"> {
 		eventWaitQueue: createEventWaitQueueRepository(db),
 		childWorkflowRunWaitQueue: createChildWorkflowRunWaitQueueRepository(db),
 		workflowRunOutbox: createWorkflowRunOutboxRepository(db),
-		namespace: createNamespaceRepository(db),
-		organization: createOrganizationRepository(db),
-		session: createSessionRepository(db),
-		apiKey: createApiKeyRepository(db),
 	};
 }

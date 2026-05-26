@@ -1,6 +1,4 @@
-import type { OrganizationRepository } from "@aikirun/server/internal/db-types";
-import { UnauthorizedError } from "@aikirun/server/internal/errors";
-import { createRepos } from "@aikirun/server/internal/repo";
+import { UnauthorizedError } from "@aikirun/lib/error";
 import type {
 	CreateDashboardAuthenticator,
 	CreateDashboardIam,
@@ -12,12 +10,15 @@ import type {
 } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
 import type { Database } from "@aikirun/types/infra/db";
-import type { OrganizationId, OrganizationRole } from "@aikirun/types/organization";
+import type { OrganizationId } from "@aikirun/types/organization";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ulid } from "ulidx";
 
 import { type AuthService, createAuthService } from "./auth";
 import type { OrganizationSessionRequestContext } from "./context";
+import type { OrganizationRole } from "./infra/db/constants/organization";
+import { createRepos } from "./infra/db/repo";
+import type { OrganizationRepository } from "./infra/db/types/organization";
 import { createOrganizationAuthedRouter } from "./router/index";
 import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 import { createNamespaceService } from "./service/namespace";
@@ -59,7 +60,7 @@ async function authorizeOrganizationSession(
 	return {
 		organizationId: activeOrganizationId as OrganizationId,
 		userId: session.session.userId,
-		organizationRole: organizationRole as OrganizationRole,
+		organizationRole,
 	};
 }
 

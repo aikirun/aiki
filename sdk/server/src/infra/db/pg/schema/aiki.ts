@@ -32,7 +32,6 @@ import {
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import { namespace } from "./auth";
 import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../../constants/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
@@ -72,11 +71,6 @@ export const workflow = pgTable(
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
-		foreignKey({
-			name: "fk_workflow_namespace_id",
-			columns: [table.namespaceId],
-			foreignColumns: [namespace.id],
-		}),
 		uniqueIndex("uqidx_workflow_namespace_source_name_version").on(
 			table.namespaceId,
 			table.source,
@@ -115,11 +109,6 @@ export const schedule = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
-		foreignKey({
-			name: "fk_schedule_namespace_id",
-			columns: [table.namespaceId],
-			foreignColumns: [namespace.id],
-		}),
 		foreignKey({
 			name: "fk_schedule_workflow_id",
 			columns: [table.workflowId],
@@ -163,11 +152,6 @@ export const workflowRun = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(table) => [
-		foreignKey({
-			name: "fk_workflow_run_namespace_id",
-			columns: [table.namespaceId],
-			foreignColumns: [namespace.id],
-		}),
 		foreignKey({
 			name: "fk_workflow_run_workflow_id",
 			columns: [table.workflowId],

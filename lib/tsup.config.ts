@@ -8,6 +8,7 @@ export default defineConfig({
 		"context/index": "src/context/index.ts",
 		"crypto/index": "src/crypto/index.ts",
 		"duration/index": "src/duration/index.ts",
+		"error/index": "src/error/index.ts",
 		"json/index": "src/json/index.ts",
 		"logger/index": "src/logger/index.ts",
 		"object/index": "src/object/index.ts",

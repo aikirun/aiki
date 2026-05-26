@@ -1,5 +1,4 @@
-import { UnauthorizedError } from "@aikirun/server/internal/errors";
-import { createRepos } from "@aikirun/server/internal/repo";
+import { UnauthorizedError } from "@aikirun/lib/error";
 import type { ApiAuthorizer, CreateApiAuthorizer } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
 import type { Database } from "@aikirun/types/infra/db";
@@ -7,6 +6,7 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 
 import { type AuthService, createAuthService } from "./auth";
+import { createRepos } from "./infra/db/repo";
 import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 
 export interface ApiAuthorizerParams {

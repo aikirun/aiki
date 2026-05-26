@@ -1,3 +1,4 @@
+import { NotFoundError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
 import type {
 	WorkflowRunStateRequest,
@@ -16,7 +17,7 @@ import type {
 import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import { InvalidWorkflowRunStateTransitionError, NotFoundError, WorkflowRunRevisionConflictError } from "../errors";
+import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 import type { ChildRunCanceller } from "../service/cancel-child-runs";

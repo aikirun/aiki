@@ -1,54 +1,57 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { loadDatabaseConfig } from "@aikirun/server/config";
 import type { DatabaseProvider } from "@aikirun/types/infra/db";
 
+import { loadDatabaseProvider } from "../lib/db-config";
 import { loadEnv } from "../lib/env";
-import { resolveServerRoot } from "../lib/resolve-server";
+import { resolvePackageRoot, type SupportedPackage } from "../lib/resolve-package";
 
 interface MigrateGenerateOptions {
+	pkg: SupportedPackage;
 	custom?: boolean;
 	envFile?: string;
 }
 
+const providerDialects: Record<DatabaseProvider, string> = {
+	pg: "postgresql",
+	sqlite: "sqlite",
+	mysql: "mysql",
+};
+
 export async function migrateGenerate(options: MigrateGenerateOptions): Promise<void> {
 	loadEnv(options.envFile);
-	const dbConfig = loadDatabaseConfig();
+	const dbProvider = loadDatabaseProvider();
 
-	const serverRoot = resolveServerRoot();
-	ensureWorkspaceMode(serverRoot, dbConfig.provider);
+	const packageRoot = resolvePackageRoot(options.pkg);
+	const schemaDir = path.join("src", "infra", "db", dbProvider, "schema");
+	const outDir = path.join("src", "infra", "db", dbProvider, "migration");
 
-	const configPath = resolveDrizzleConfigPath();
-	const args = ["drizzle-kit", "generate", "--config", configPath];
+	ensureWorkspaceMode(path.join(packageRoot, schemaDir));
+
+	const args = [
+		"drizzle-kit",
+		"generate",
+		"--schema",
+		schemaDir,
+		"--out",
+		outDir,
+		"--dialect",
+		providerDialects[dbProvider],
+	];
 	if (options.custom) {
 		args.push("--custom");
 	}
 
-	await spawnDrizzle(args, serverRoot);
+	await spawnDrizzle(args, packageRoot);
 }
 
-function ensureWorkspaceMode(serverRoot: string, provider: DatabaseProvider): void {
-	const schemaDir = path.join(serverRoot, "src", "infra", "db", provider, "schema");
+function ensureWorkspaceMode(schemaDir: string): void {
 	if (!fs.existsSync(schemaDir)) {
 		throw new Error(
 			"aiki migrate generate is only supported inside the Aiki monorepo. Schema generation is a maintainer operation; end users do not need it."
 		);
 	}
-}
-
-function resolveDrizzleConfigPath(): string {
-	// Source mode runs from cli/src/commands/, compiled mode runs from cli/dist/.
-	// Walk up until we hit the first package.json — in both layouts that's the cli package root.
-	let dir = path.dirname(fileURLToPath(import.meta.url));
-	while (dir !== path.dirname(dir)) {
-		if (fs.existsSync(path.join(dir, "package.json"))) {
-			return path.join(dir, "drizzle.config.ts");
-		}
-		dir = path.dirname(dir);
-	}
-	throw new Error("Could not locate @aikirun/cli root for drizzle.config.ts");
 }
 
 function spawnDrizzle(args: string[], cwd: string): Promise<void> {

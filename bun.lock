@@ -47,6 +47,8 @@
         "react-router-dom": "^7.1.1",
       },
       "devDependencies": {
+        "@aikirun/iam": "workspace:*",
+        "@orpc/contract": "^1.4.3",
         "@types/react": "^18.3.18",
         "@types/react-dom": "^18.3.5",
         "@vitejs/plugin-react": "^4.3.4",
@@ -65,8 +67,8 @@
         "aiki": "./dist/index.js",
       },
       "dependencies": {
-        "@aikirun/server": "workspace:*",
         "@aikirun/types": "workspace:*",
+        "arktype": "^2.1.29",
         "cac": "^6.7.14",
         "dotenv": "^16.4.5",
         "drizzle-orm": "^0.45.1",
@@ -76,6 +78,14 @@
         "@aikirun/lib": "workspace:*",
         "drizzle-kit": "^0.31.8",
       },
+      "peerDependencies": {
+        "@aikirun/iam": "workspace:^",
+        "@aikirun/server": "workspace:^",
+      },
+      "optionalPeers": [
+        "@aikirun/iam",
+        "@aikirun/server",
+      ],
     },
     "examples": {
       "name": "@aikirun/examples",
@@ -138,16 +148,18 @@
       "name": "@aikirun/iam",
       "version": "0.28.0",
       "dependencies": {
-        "@aikirun/server": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@orpc/contract": "^1.9.3",
         "@orpc/server": "^1.9.3",
         "arktype": "^2.1.29",
         "better-auth": "^1.4.14",
+        "drizzle-orm": "^0.45.1",
         "ulidx": "^2.4.1",
       },
       "devDependencies": {
+        "@aikirun/cli": "workspace:*",
         "@aikirun/lib": "workspace:*",
+        "postgres": "^3.4.8",
       },
     },
     "sdk/server": {
@@ -158,13 +170,13 @@
         "@orpc/contract": "^1.9.3",
         "@orpc/server": "^1.9.3",
         "arktype": "^2.1.29",
-        "better-auth": "^1.4.14",
         "cron-parser": "^5.4.0",
         "drizzle-orm": "^0.45.1",
         "postgres": "^3.4.8",
         "ulidx": "^2.4.1",
       },
       "devDependencies": {
+        "@aikirun/cli": "workspace:*",
         "@aikirun/lib": "workspace:*",
       },
     },

@@ -1,27 +1,27 @@
 import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
-import { createPgRepositories } from "./pg";
-import type { PgDatabaseConn } from "./pg/provider";
+import { createPgRepos } from "./pg";
+import { createPgHandle, type PgClient } from "./pg/provider";
 import type { Repositories } from "./types";
 
-export function extractDatabaseConn(database: Database): unknown {
-	const internal = database[INTERNAL];
-	if (!internal || internal.conn === undefined) {
+function extractDbClient(db: Database): unknown {
+	const internal = db[INTERNAL];
+	if (!internal || internal.client === undefined) {
 		throw new Error("Database must be created via database().");
 	}
-	return internal.conn;
+	return internal.client;
 }
 
-export function createRepos(database: Database): Repositories {
-	switch (database.provider) {
+export function createRepos(db: Database): Repositories {
+	switch (db.provider) {
 		case "pg":
-			return createPgRepositories(extractDatabaseConn(database) as PgDatabaseConn);
+			return createPgRepos(createPgHandle(extractDbClient(db) as PgClient));
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
 		case "sqlite":
 			throw new Error("SQLite support not yet implemented");
 		default:
-			return database.provider satisfies never;
+			return db.provider satisfies never;
 	}
 }

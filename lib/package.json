@@ -29,6 +29,10 @@
 			"types": "./dist/duration/index.d.ts",
 			"import": "./dist/duration/index.js"
 		},
+		"./error": {
+			"types": "./dist/error/index.d.ts",
+			"import": "./dist/error/index.js"
+		},
 		"./json": {
 			"types": "./dist/json/index.d.ts",
 			"import": "./dist/json/index.js"

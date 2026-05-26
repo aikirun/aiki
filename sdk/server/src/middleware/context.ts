@@ -1,13 +1,9 @@
-import type { AuthedRequestContextBase, ContextBase, RequestContextBase } from "@aikirun/lib/context";
+import type { AuthedRequestContextBase, ContextBase, PublicRequestContext } from "@aikirun/lib/context";
 import type { Logger } from "@aikirun/lib/logger";
 import type { ApiAuthorizer } from "@aikirun/types/iam";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { ulid } from "ulidx";
-
-export interface PublicRequestContext extends RequestContextBase {
-	requestType: "public";
-}
 
 export interface NamespaceRequestContext extends AuthedRequestContextBase {
 	organizationId: OrganizationId;

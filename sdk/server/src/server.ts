@@ -1,4 +1,5 @@
 import { delay } from "@aikirun/lib/async";
+import { UnauthorizedError } from "@aikirun/lib/error";
 import { ConsoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { Iam } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
@@ -9,7 +10,6 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { ulid } from "ulidx";
 
 import { initDaemons } from "./daemons";
-import { UnauthorizedError } from "./errors";
 import { createRepos } from "./infra/db/repo";
 import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
 import { createNamespaceAuthedRouter } from "./router/index";
