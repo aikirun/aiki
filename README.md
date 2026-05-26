@@ -119,11 +119,11 @@ cd aiki
 docker-compose up
 
 # Or run directly with Bun
-bun run server  # Terminal 1 - start the server
-bun run web     # Terminal 2 - start the web UI
+bun run server     # Terminal 1 - start the server
+bun run dashboard  # Terminal 2 - start the dashboard
 ```
 
-The server runs on `http://localhost:9850` and the web UI on `http://localhost:9851`.
+The server runs on `http://localhost:9850` and the dashboard on `http://localhost:9851`.
 
 ```typescript
 import { client } from "@aikirun/client";
@@ -149,7 +149,7 @@ await workerHandle.stop();
 ```
 <br>
 <p align="center">
-  <img src="docs/assets/aiki-web-demo.gif" alt="Aiki Web UI Demo" width="800">
+  <img src="docs/assets/aiki-dashboard-demo.gif" alt="Aiki Dashboard Demo" width="800">
 </p>
 
 ## Features

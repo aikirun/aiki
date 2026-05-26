@@ -4,7 +4,7 @@
 	"type": "module",
 	"workspaces": [
 		"app/server",
-		"app/web",
+		"app/dashboard",
 		"cli",
 		"examples",
 		"lib",
@@ -19,7 +19,7 @@
 		"types"
 	],
 	"scripts": {
-		"check": "tsc --noEmit && tsc --noEmit -p app/web/tsconfig.json",
+		"check": "tsc --noEmit && tsc --noEmit -p app/dashboard/tsconfig.json",
 		"lint": "bunx @biomejs/biome check .",
 		"lint:fix": "bunx @biomejs/biome check --write .",
 		"test": "bun test",
@@ -35,10 +35,10 @@
 		"db:migrate": "bun run --cwd app/server db:migrate",
 		"server": "bun run --cwd app/server start",
 		"server:watch": "bun run --cwd app/server start:watch",
-		"web": "bun run --cwd app/web dev",
+		"dashboard": "bun run --cwd app/dashboard dev",
 		"changeset": "changeset",
 		"bump": "changeset version && find . -path ./node_modules -prune -o -path ./CHANGELOG.md -prune -o -name CHANGELOG.md -print -exec rm {} + && rm bun.lock && bun install && bun run lint:fix",
-		"clean": "rm -rf lib/dist types/dist app/server/dist app/web/dist cli/dist sdk/*/dist sdk/adapter/*/dist sdk/iam/dist",
+		"clean": "rm -rf lib/dist types/dist app/server/dist app/dashboard/dist cli/dist sdk/*/dist sdk/adapter/*/dist sdk/iam/dist",
 		"build:lib": "bun run --cwd lib build",
 		"build:types": "bun run --cwd types build",
 		"build:sdk": "bun run --cwd sdk/workflow build && bun run --cwd sdk/client build && bun run --cwd sdk/worker build && bun run --cwd sdk/endpoint build && bun run --cwd sdk/server build && bun run --cwd sdk/iam build && bun run --cwd sdk/adapter/http build && bun run --cwd sdk/adapter/redis build",

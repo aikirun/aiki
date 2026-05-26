@@ -15,7 +15,7 @@ COPY sdk/worker/package.json ./sdk/worker/
 COPY sdk/workflow/package.json ./sdk/workflow/
 COPY cli/package.json ./cli/
 COPY app/server/package.json ./app/server/
-COPY app/web/package.json ./app/web/
+COPY app/dashboard/package.json ./app/dashboard/
 COPY examples/package.json ./examples/
 
 RUN bun install --frozen-lockfile
@@ -23,7 +23,7 @@ RUN bun install --frozen-lockfile
 COPY lib/ ./lib/
 COPY types/ ./types/
 COPY sdk/iam/ ./sdk/iam/
-COPY app/web/ ./app/web/
+COPY app/dashboard/ ./app/dashboard/
 COPY tsconfig.json ./
 
 RUN bun run --cwd types build
@@ -31,13 +31,13 @@ RUN bun run --cwd types build
 ARG VITE_AIKI_SERVER_URL
 ENV VITE_AIKI_SERVER_URL=${VITE_AIKI_SERVER_URL}
 
-WORKDIR /aiki/app/web
+WORKDIR /aiki/app/dashboard
 RUN bun run build
 
 FROM nginx:alpine
 
-COPY --from=builder /aiki/app/web/dist /usr/share/nginx/html
-COPY app/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /aiki/app/dashboard/dist /usr/share/nginx/html
+COPY app/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 9851
 CMD ["nginx", "-g", "daemon off;"]

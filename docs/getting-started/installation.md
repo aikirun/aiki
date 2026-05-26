@@ -2,7 +2,7 @@
 
 This guide covers two ways to run Aiki:
 
-- **Option A: Docker Compose** — Runs Aiki server and web UI in containers
+- **Option A: Docker Compose** — Runs Aiki server and dashboard in containers
 - **Option B: Direct with Bun** — Runs Aiki directly on your machine
 
 Both options require PostgreSQL running externally. Redis is optional — it enables lower-latency message delivery but Aiki works without it.
@@ -48,7 +48,7 @@ docker-compose up
 
 This starts:
 - **Aiki Server** on http://localhost:9850
-- **Aiki Web UI** on http://localhost:9851
+- **Aiki Dashboard** on http://localhost:9851
 
 ### Step 4: Install SDK Packages
 
@@ -93,13 +93,13 @@ Edit `app/server/.env` with your PostgreSQL connection details (and optionally R
 # Terminal 1 - Start the server
 bun run server
 
-# Terminal 2 - Start the web UI
-bun run web
+# Terminal 2 - Start the dashboard
+bun run dashboard
 ```
 
 This starts:
 - **Aiki Server** on http://localhost:9850
-- **Aiki Web UI** on http://localhost:9851
+- **Aiki Dashboard** on http://localhost:9851
 
 ### Step 4: Install SDK Packages
 
@@ -133,14 +133,14 @@ You're ready! Continue to the [Quick Start](./quick-start.md) guide.
 | `REDIS_PORT` | No | `6379` | Redis server port |
 | `REDIS_PASSWORD` | No | - | Redis password (if required) |
 
-### Web UI
+### Dashboard
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VITE_AIKI_SERVER_URL` | No | `http://localhost:9850` | Server URL for the web UI to connect to |
-| `AIKI_WEB_PORT` | No | `9851` | Port for the web UI |
+| `VITE_AIKI_SERVER_URL` | No | `http://localhost:9850` | Server URL for the dashboard to connect to |
+| `AIKI_DASHBOARD_PORT` | No | `9851` | Port for the dashboard |
 
-Note: `VITE_AIKI_SERVER_URL` is a build-time variable. If you change it, you need to rebuild the web image.
+Note: `VITE_AIKI_SERVER_URL` is a build-time variable. If you change it, you need to rebuild the dashboard image.
 
 ---
 
