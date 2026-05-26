@@ -1,24 +1,39 @@
-import { type PgDatabaseConn, pgBetterAuthSchema } from "@aikirun/server/internal/db-pg";
-import { extractDatabaseConn } from "@aikirun/server/internal/repo";
 import type { Database } from "@aikirun/types/infra/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
+import { drizzle } from "drizzle-orm/postgres-js";
 
-export interface AuthOptions {
-	db: Database;
-	baseURL: string;
-	secret: string;
-	trustedOrigins: string[];
-}
+import type { PgClient } from "./infra/db/pg/provider";
+import * as pgIamSchema from "./infra/db/pg/schema/iam";
+import { extractDbClient } from "./infra/db/repo";
+
+const pgBetterAuthSchema = {
+	user: pgIamSchema.user,
+	session: pgIamSchema.session,
+	account: pgIamSchema.account,
+	verification: pgIamSchema.verification,
+	organization: pgIamSchema.organization,
+	organization_member: pgIamSchema.organizationMember,
+	organization_invitation: pgIamSchema.organizationInvitation,
+	namespace: pgIamSchema.namespace,
+	namespace_member: pgIamSchema.namespaceMember,
+};
+
+// Inferred from PG's betterAuthSchema — enforces that all providers
+// export a schema object with the same keys.
+// The values are `unknown` because PG uses pgTable objects and SQLite
+// uses sqliteTable objects — different types, same key structure.
+type BetterAuthSchema = Record<keyof typeof pgBetterAuthSchema, unknown>;
 
 function createDrizzleAdapter(db: Database) {
 	switch (db.provider) {
-		case "pg":
-			return drizzleAdapter(extractDatabaseConn(db) as PgDatabaseConn, {
-				provider: db.provider,
-				schema: pgBetterAuthSchema,
-			});
+		case "pg": {
+			const schema: BetterAuthSchema = pgBetterAuthSchema;
+			const client = extractDbClient(db) as PgClient;
+			const handle = drizzle(client, { schema });
+			return drizzleAdapter(handle, { provider: db.provider, schema });
+		}
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
 		case "sqlite":
@@ -28,13 +43,20 @@ function createDrizzleAdapter(db: Database) {
 	}
 }
 
-export function createAuthService(options: AuthOptions) {
+export interface AuthServiceParams {
+	db: Database;
+	baseURL: string;
+	secret: string;
+	trustedOrigins: string[];
+}
+
+export function createAuthService(params: AuthServiceParams) {
 	return betterAuth({
-		database: createDrizzleAdapter(options.db),
-		baseURL: options.baseURL,
+		database: createDrizzleAdapter(params.db),
+		baseURL: params.baseURL,
 		basePath: "/auth",
-		secret: options.secret,
-		trustedOrigins: options.trustedOrigins,
+		secret: params.secret,
+		trustedOrigins: params.trustedOrigins,
 		advanced: {
 			defaultCookieAttributes: {
 				sameSite: "none",

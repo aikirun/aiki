@@ -9,6 +9,7 @@ COPY sdk/client/package.json ./sdk/client/
 COPY sdk/endpoint/package.json ./sdk/endpoint/
 COPY sdk/adapter/http/package.json ./sdk/adapter/http/
 COPY sdk/adapter/redis/package.json ./sdk/adapter/redis/
+COPY sdk/iam/package.json ./sdk/iam/
 COPY sdk/server/package.json ./sdk/server/
 COPY sdk/worker/package.json ./sdk/worker/
 COPY sdk/workflow/package.json ./sdk/workflow/
@@ -22,6 +23,7 @@ RUN bun install --frozen-lockfile
 COPY lib/ ./lib/
 COPY types/ ./types/
 COPY sdk/adapter/redis/ ./sdk/adapter/redis/
+COPY sdk/iam/ ./sdk/iam/
 COPY sdk/server/ ./sdk/server/
 COPY app/server/ ./app/server/
 COPY tsconfig.json ./

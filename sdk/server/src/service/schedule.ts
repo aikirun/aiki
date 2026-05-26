@@ -1,5 +1,6 @@
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { hashInput, sha256 } from "@aikirun/lib/crypto";
+import { NotFoundError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
 import type { ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { NamespaceId } from "@aikirun/types/namespace";
@@ -14,7 +15,7 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import CronExpressionParser from "cron-parser";
 import { ulid } from "ulidx";
 
-import { NotFoundError, ScheduleConflictError } from "../errors";
+import { ScheduleConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { ScheduleRow } from "../infra/db/types/schedule";
 import type { Context } from "../middleware/context";

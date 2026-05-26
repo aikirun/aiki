@@ -1,9 +1,10 @@
+import type { PublicRequestContext } from "@aikirun/lib/context";
 import { implement } from "@orpc/server";
 
 import { handleError } from "./error-handler";
 import { namespaceAuthedContract } from "../contract/namespace-authed";
 import { publicContract } from "../contract/public";
-import type { NamespaceRequestContext, PublicRequestContext } from "../middleware/context";
+import type { NamespaceRequestContext } from "../middleware/context";
 
 const basePublicImplementer = implement(publicContract).$context<PublicRequestContext>();
 const baseNamespaceAuthedImplementer = implement(namespaceAuthedContract).$context<NamespaceRequestContext>();

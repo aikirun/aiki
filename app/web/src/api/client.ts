@@ -1,10 +1,10 @@
-import type { ApiKeyApi } from "@aikirun/types/api/api-key";
-import type { NamespaceApi } from "@aikirun/types/api/namespace";
+import type { ApiKeyContract, NamespaceContract } from "@aikirun/iam/contract";
 import type { ScheduleApi } from "@aikirun/types/api/schedule";
 import type { WorkflowApi } from "@aikirun/types/api/workflow";
 import type { WorkflowRunApi } from "@aikirun/types/api/workflow-run";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
+import type { ContractRouterClient } from "@orpc/contract";
 
 const AIKI_SERVER_URL = import.meta.env.VITE_AIKI_SERVER_URL || "http://localhost:9850";
 
@@ -28,8 +28,8 @@ export const namespaceAuthedClient = createORPCClient(namespaceAuthedLink) as un
 };
 
 export const organizationAuthedClient = createORPCClient(organizationAuthedLink) as unknown as {
-	apiKey: ApiKeyApi;
-	namespace: NamespaceApi;
+	apiKey: ContractRouterClient<ApiKeyContract>;
+	namespace: ContractRouterClient<NamespaceContract>;
 };
 
 export const namespaceManagementClient = organizationAuthedClient.namespace;

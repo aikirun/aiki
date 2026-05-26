@@ -15,12 +15,24 @@
 		"build": "tsup"
 	},
 	"dependencies": {
-		"@aikirun/server": "workspace:*",
 		"@aikirun/types": "workspace:*",
+		"arktype": "^2.1.29",
 		"cac": "^6.7.14",
 		"dotenv": "^16.4.5",
 		"drizzle-orm": "^0.45.1",
 		"postgres": "^3.4.8"
+	},
+	"peerDependencies": {
+		"@aikirun/iam": "workspace:^",
+		"@aikirun/server": "workspace:^"
+	},
+	"peerDependenciesMeta": {
+		"@aikirun/iam": {
+			"optional": true
+		},
+		"@aikirun/server": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@aikirun/lib": "workspace:*",

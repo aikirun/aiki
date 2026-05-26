@@ -4,16 +4,7 @@ import { DATABASE_PROVIDERS } from "@aikirun/types/infra/db";
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-	entry: {
-		index: "src/index.ts",
-		"config/index": "src/config/index.ts",
-		"internal/contract": "src/internal/contract.ts",
-		"internal/db-pg": "src/internal/db-pg.ts",
-		"internal/db-types": "src/internal/db-types.ts",
-		"internal/errors": "src/internal/errors.ts",
-		"internal/repo": "src/internal/repo.ts",
-		"internal/router": "src/internal/router.ts",
-	},
+	entry: ["src/index.ts"],
 	format: ["esm"],
 	dts: true,
 	clean: true,

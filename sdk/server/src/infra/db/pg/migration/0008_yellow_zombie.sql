@@ -1,1 +1,0 @@
-ALTER TABLE "workflow_run_outbox" ADD CONSTRAINT "chk_workflow_run_outbox_claimed_requires_claimed_at" CHECK ("workflow_run_outbox"."status" != 'claimed' OR "workflow_run_outbox"."claimed_at" IS NOT NULL);

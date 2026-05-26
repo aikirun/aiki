@@ -2,6 +2,7 @@ import { getTaskAddress, getWorkflowRunAddress } from "@aikirun/lib/address";
 import { isNonEmptyArray } from "@aikirun/lib/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
+import { NotFoundError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
 import type {
 	WorkflowRunCancelByIdsRequestV1,
@@ -33,7 +34,7 @@ import type {
 import type { TaskInfo, TaskQueue, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { monotonicFactory, ulid } from "ulidx";
 
-import { NotFoundError, WorkflowRunConflictError } from "../errors";
+import { WorkflowRunConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { ChildWorkflowRunWaitQueueRow } from "../infra/db/types/child-workflow-run-wait-queue";
 import type { EventWaitQueueRow, EventWaitQueueRowInsert } from "../infra/db/types/event-wait-queue";

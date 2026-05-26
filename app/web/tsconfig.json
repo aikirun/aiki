@@ -2,6 +2,8 @@
 	"compilerOptions": {
 		"baseUrl": "../..",
 		"paths": {
+			"@aikirun/iam": ["./sdk/iam/src/index.ts"],
+			"@aikirun/iam/*": ["./sdk/iam/src/*.ts", "./sdk/iam/src/*/index.ts"],
 			"@aikirun/lib/*": ["./lib/src/*/index.ts"],
 			"@aikirun/types": ["./types/src/index.ts"],
 			"@aikirun/types/*": ["./types/src/*.ts", "./types/src/*/index.ts"]

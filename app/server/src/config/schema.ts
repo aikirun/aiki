@@ -32,7 +32,7 @@ export const configSchema = type({
 	baseURL: "string > 0",
 	corsOrigins: uniqueCommaSeparatedToItems,
 	"redis?": redisConfigSchema.or(type("undefined")),
-	database: databaseConfigSchema,
+	db: databaseConfigSchema,
 	auth: authConfigSchema,
 	logLevel: type.enumerated(...logLevels).default("info"),
 	prettyLogs: type("boolean").or(coerceBool).default(false),

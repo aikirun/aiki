@@ -1,7 +1,7 @@
 {
 	"name": "@aikirun/iam",
 	"version": "0.28.0",
-	"description": "Aiki IAM library — pluggable identity & access management for @aikirun/server.",
+	"description": "Aiki IAM library — pluggable identity & access management",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -16,19 +16,23 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "tsup"
+		"build": "tsup",
+		"db:generate": "aiki migrate generate --package iam",
+		"db:generate:custom": "aiki migrate generate --package iam --custom"
 	},
 	"dependencies": {
-		"@aikirun/server": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"@orpc/contract": "^1.9.3",
 		"@orpc/server": "^1.9.3",
 		"arktype": "^2.1.29",
 		"better-auth": "^1.4.14",
+		"drizzle-orm": "^0.45.1",
 		"ulidx": "^2.4.1"
 	},
 	"devDependencies": {
-		"@aikirun/lib": "workspace:*"
+		"@aikirun/cli": "workspace:*",
+		"@aikirun/lib": "workspace:*",
+		"postgres": "^3.4.8"
 	},
 	"publishConfig": {
 		"access": "public"

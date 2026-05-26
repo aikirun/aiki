@@ -1,7 +1,7 @@
 import type { Logger } from "../logger";
 
 export interface ContextBase {
-	type: "request" | "daemon";
+	type: string;
 	traceId: string;
 	spanId: string;
 	logger: Logger;
@@ -14,6 +14,10 @@ export interface RequestContextBase extends ContextBase {
 	headers: Headers;
 	method: string;
 	url: string;
+}
+
+export interface PublicRequestContext extends RequestContextBase {
+	requestType: "public";
 }
 
 export interface AuthedRequestContextBase extends RequestContextBase {

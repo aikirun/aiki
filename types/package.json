@@ -4,14 +4,6 @@
 	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
 	"type": "module",
 	"exports": {
-		"./api/api-key": {
-			"types": "./dist/api/api-key.d.ts",
-			"import": "./dist/api/api-key.js"
-		},
-		"./api/namespace": {
-			"types": "./dist/api/namespace.d.ts",
-			"import": "./dist/api/namespace.js"
-		},
 		"./api/schedule": {
 			"types": "./dist/api/schedule.d.ts",
 			"import": "./dist/api/schedule.js"
