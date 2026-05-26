@@ -49,7 +49,9 @@ export async function createNamespaceRequestContext(params: {
 	const { request, logger, authorizer } = params;
 	const traceId = request.headers.get("x-trace-id") ?? ulid();
 	const spanId = ulid();
-	const authorization = await authorizer(request);
+	const authorization = authorizer(request);
+	const { organizationId, namespaceId, userId } =
+		authorization instanceof Promise ? await authorization : authorization;
 
 	return {
 		type: "request",
@@ -65,9 +67,9 @@ export async function createNamespaceRequestContext(params: {
 		headers: request.headers,
 		method: request.method,
 		url: request.url,
-		organizationId: authorization.organizationId,
-		namespaceId: authorization.namespaceId,
-		userId: authorization.userId,
+		organizationId,
+		namespaceId,
+		userId,
 	};
 }
 
