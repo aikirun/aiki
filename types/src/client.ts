@@ -7,7 +7,7 @@ import type { WorkflowRun } from "./workflow/run";
 
 export interface ClientParams<AppContext = null> {
 	url: string;
-	apiKey: string;
+	apiKey?: string;
 	logger?: Logger;
 	appContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
 }
