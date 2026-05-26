@@ -5,34 +5,33 @@ import { organization } from "better-auth/plugins";
 import { drizzle } from "drizzle-orm/postgres-js";
 
 import type { PgClient } from "./infra/db/pg/provider";
-import * as pgIamSchema from "./infra/db/pg/schema/iam";
+import * as schema from "./infra/db/pg/schema";
 import { extractDbClient } from "./infra/db/repo";
 
 const pgBetterAuthSchema = {
-	user: pgIamSchema.user,
-	session: pgIamSchema.session,
-	account: pgIamSchema.account,
-	verification: pgIamSchema.verification,
-	organization: pgIamSchema.organization,
-	organization_member: pgIamSchema.organizationMember,
-	organization_invitation: pgIamSchema.organizationInvitation,
-	namespace: pgIamSchema.namespace,
-	namespace_member: pgIamSchema.namespaceMember,
+	user: schema.user,
+	session: schema.session,
+	account: schema.account,
+	verification: schema.verification,
+	organization: schema.organization,
+	organization_member: schema.organizationMember,
+	organization_invitation: schema.organizationInvitation,
+	namespace: schema.namespace,
+	namespace_member: schema.namespaceMember,
 };
 
 // Inferred from PG's betterAuthSchema — enforces that all providers
 // export a schema object with the same keys.
 // The values are `unknown` because PG uses pgTable objects and SQLite
 // uses sqliteTable objects — different types, same key structure.
-type BetterAuthSchema = Record<keyof typeof pgBetterAuthSchema, unknown>;
+// type BetterAuthSchema = Record<keyof typeof pgBetterAuthSchema, unknown>;
 
 function createDrizzleAdapter(db: Database) {
 	switch (db.provider) {
 		case "pg": {
-			const schema: BetterAuthSchema = pgBetterAuthSchema;
 			const client = extractDbClient(db) as PgClient;
-			const handle = drizzle(client, { schema });
-			return drizzleAdapter(handle, { provider: db.provider, schema });
+			const handle = drizzle(client, { schema: pgBetterAuthSchema });
+			return drizzleAdapter(handle, { provider: db.provider, schema: pgBetterAuthSchema });
 		}
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");

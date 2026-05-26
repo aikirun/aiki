@@ -6,7 +6,7 @@ import { ulid } from "ulidx";
 
 import type { NamespaceMemberInfo, NamespaceMemberInput } from "../../../../contract/schema/namespace";
 import type { PgDb } from "../provider";
-import { namespace, namespaceMember, user } from "../schema/iam";
+import { namespace, namespaceMember, user } from "../schema";
 
 export type NamespaceRow = typeof namespace.$inferSelect;
 export type NamespaceRowInsert = Pick<typeof namespace.$inferInsert, "name" | "organizationId">;

@@ -3,7 +3,7 @@ import type { OrganizationId } from "@aikirun/types/organization";
 import { and, eq } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { apiKey } from "../schema/iam";
+import { apiKey } from "../schema";
 
 export type ApiKeyRow = typeof apiKey.$inferSelect;
 export type ApiKeyRowInsert = typeof apiKey.$inferInsert;

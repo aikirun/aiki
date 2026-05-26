@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { session } from "../schema/iam";
+import { session } from "../schema";
 
 export function createSessionRepository(db: PgDb) {
 	return {
