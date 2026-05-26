@@ -8,8 +8,8 @@
 		"start": "bun run src/index.ts",
 		"start:watch": "bun --watch run src/index.ts",
 		"build": "bun build src/index.ts --compile --outfile dist/aiki-server",
-		"db:migrate:server": "aiki migrate apply --package server --env-file ./.env",
-		"db:migrate:iam": "aiki migrate apply --package iam --env-file ./.env",
+		"db:migrate:server": "bun run --filter='@aikirun/server' build && aiki migrate apply --package server --env-file ./.env",
+		"db:migrate:iam": "bun run --filter='@aikirun/iam' build && aiki migrate apply --package iam --env-file ./.env",
 		"db:migrate": "bun run db:migrate:server && bun run db:migrate:iam"
 	},
 	"dependencies": {
