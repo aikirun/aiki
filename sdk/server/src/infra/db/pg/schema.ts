@@ -32,7 +32,7 @@ import {
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../../constants/workflow-run-outbox";
+import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../constants/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
 

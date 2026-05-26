@@ -6,7 +6,7 @@ import { timerStreamCursorFilter } from "./lib/timer-stream";
 import type { TimerStreamCursor } from "../../../../lib/timer-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
-import { task } from "../schema/aiki";
+import { task } from "../schema";
 
 export type TaskRow = typeof task.$inferSelect;
 type TaskRowInsert = typeof task.$inferInsert;
