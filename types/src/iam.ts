@@ -9,7 +9,7 @@ export interface ApiAuthorization {
 	userId?: string;
 }
 
-export type ApiAuthorizer = (request: Request) => Promise<ApiAuthorization>;
+export type ApiAuthorizer = (request: Request) => ApiAuthorization | Promise<ApiAuthorization>;
 export type DashboardAuthenticator = (request: Request) => Promise<Response>;
 export type OrganizationDashboardHandler = (request: Request) => Promise<Response>;
 

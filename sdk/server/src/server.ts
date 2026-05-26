@@ -1,11 +1,13 @@
 import { delay } from "@aikirun/lib/async";
 import { UnauthorizedError } from "@aikirun/lib/error";
 import { ConsoleLogger, type Logger } from "@aikirun/lib/logger";
-import type { Iam } from "@aikirun/types/iam";
+import type { ApiAuthorizer, Iam, IamContext } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
 import type { Database } from "@aikirun/types/infra/db";
 import type { CreatePublisher } from "@aikirun/types/infra/queue";
 import type { CreateTimerSortedSet } from "@aikirun/types/infra/timer";
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OrganizationId } from "@aikirun/types/organization";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ulid } from "ulidx";
 
@@ -33,7 +35,7 @@ export interface ServerRuntimeParams {
 
 export interface ServerParams {
 	db: Database;
-	iam: Iam;
+	iam?: Iam;
 	cache?: CreateCache;
 	logger?: Logger;
 	runtime?: ServerRuntimeParams;
@@ -58,8 +60,8 @@ export function server(params: ServerParams): Server {
 	const childRunCanceller = createChildRunCanceller();
 
 	const createHandler = () => {
-		const apiAuthorizer = params.iam.api?.({ logger });
-		const dashboardIam = params.iam.dashboard?.({ logger });
+		const apiAuthorizer = (params.iam?.api ?? noopApiAuthorizer)({ logger });
+		const dashboardIam = params.iam?.dashboard?.({ logger });
 
 		const workflowRunStateMachineService = createWorkflowRunStateMachineService({
 			repos,
@@ -90,10 +92,6 @@ export function server(params: ServerParams): Server {
 			const pathname = new URL(request.url).pathname;
 
 			if (pathname.startsWith("/api/")) {
-				if (!apiAuthorizer) {
-					return new Response("Not Found", { status: 404 });
-				}
-
 				let context: NamespaceRequestContext;
 				try {
 					context = await createNamespaceRequestContext({ request, logger, authorizer: apiAuthorizer });
@@ -158,6 +156,16 @@ export function server(params: ServerParams): Server {
 	});
 
 	return { handler: createHandler(), runtime: createRuntime() };
+}
+
+function noopApiAuthorizer(_context: IamContext): ApiAuthorizer {
+	const noopOrganizationId = "00000000000000000000000000" as OrganizationId;
+	const noopNamespaceId = "00000000000000000000000000" as NamespaceId;
+
+	return async () => ({
+		organizationId: noopOrganizationId,
+		namespaceId: noopNamespaceId,
+	});
 }
 
 interface RuntimeHandleDeps {
