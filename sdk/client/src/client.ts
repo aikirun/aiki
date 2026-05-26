@@ -56,9 +56,7 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 
 		const rpcLink = new RPCLink({
 			url: `${params.url}/api`,
-			headers: () => ({
-				Authorization: `Bearer ${apiKey}`,
-			}),
+			headers: () => (apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
 		});
 		// Type safety: The server package has compile-time tests (see server/contract/workflow-run/procedure.ts)
 		// that verify the contract matches WorkflowRunApi. If the contract changes, server won't compile.
