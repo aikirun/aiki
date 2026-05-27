@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useAuth } from "./auth/AuthProvider";
+import { useCapabilities } from "./capabilities/CapabilitiesProvider";
 import { NotFound } from "./components/common/NotFound";
 import { AppShell } from "./components/layout/AppShell";
 import { SettingsLayout } from "./components/layout/SettingsLayout";
@@ -17,32 +18,45 @@ import { SchedulesList } from "./pages/SchedulesList";
 import { OnboardingRoute, ProtectedRoute } from "./routes/ProtectedRoute";
 
 export default function App() {
+	const { iam } = useCapabilities();
+
 	return (
 		<Routes>
-			{/* Public auth routes */}
-			<Route path="/auth/sign-in" element={<SignIn />} />
-			<Route path="/auth/sign-up" element={<SignUp />} />
+			{iam.dashboard ? (
+				<>
+					{/* Public auth routes */}
+					<Route path="/auth/sign-in" element={<SignIn />} />
+					<Route path="/auth/sign-up" element={<SignUp />} />
 
-			{/* Public: invitation acceptance — handles its own auth redirect logic */}
-			<Route path="/invite/:invitationId" element={<AcceptInvitation />} />
+					{/* Public: invitation acceptance — handles its own auth redirect logic */}
+					<Route path="/invite/:invitationId" element={<AcceptInvitation />} />
 
-			{/* Onboarding routes - authenticated but may not have org/namespace */}
-			<Route
-				path="/onboarding/organization"
-				element={
-					<OnboardingRoute>
-						<CreateOrganization />
-					</OnboardingRoute>
-				}
-			/>
-			<Route
-				path="/onboarding/namespace"
-				element={
-					<OnboardingRoute>
-						<CreateNamespace />
-					</OnboardingRoute>
-				}
-			/>
+					{/* Onboarding routes - authenticated but may not have org/namespace */}
+					<Route
+						path="/onboarding/organization"
+						element={
+							<OnboardingRoute>
+								<CreateOrganization />
+							</OnboardingRoute>
+						}
+					/>
+					<Route
+						path="/onboarding/namespace"
+						element={
+							<OnboardingRoute>
+								<CreateNamespace />
+							</OnboardingRoute>
+						}
+					/>
+				</>
+			) : (
+				<>
+					{/* Noop mode: dashboard-only paths redirect home */}
+					<Route path="/auth/*" element={<Navigate to="/" replace />} />
+					<Route path="/onboarding/*" element={<Navigate to="/" replace />} />
+					<Route path="/invite/*" element={<Navigate to="/" replace />} />
+				</>
+			)}
 
 			{/* Protected routes - require full auth with org and namespace */}
 			<Route
@@ -56,11 +70,15 @@ export default function App() {
 				<Route path="/runs/:id" element={<RunDetail />} />
 				<Route path="/schedules" element={<SchedulesList />} />
 
-				<Route path="/settings" element={<SettingsLayout />}>
-					<Route index element={<SettingsRedirect />} />
-					<Route path="api-keys" element={<ApiKeys />} />
-					<Route path="organization" element={<OrganizationSettings />} />
-				</Route>
+				{iam.dashboard ? (
+					<Route path="/settings" element={<SettingsLayout />}>
+						<Route index element={<SettingsRedirect />} />
+						<Route path="api-keys" element={<ApiKeys />} />
+						<Route path="organization" element={<OrganizationSettings />} />
+					</Route>
+				) : (
+					<Route path="/settings/*" element={<Navigate to="/" replace />} />
+				)}
 
 				{/* Redirects from old routes */}
 				<Route path="/workflow/:name/run/:id" element={<OldRunRedirect />} />

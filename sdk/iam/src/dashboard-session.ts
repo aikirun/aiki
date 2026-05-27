@@ -25,8 +25,8 @@ import { createNamespaceService } from "./service/namespace";
 
 export interface OrganizationDashboardAuthorization {
 	organizationId: OrganizationId;
-	userId: string;
 	organizationRole: OrganizationRole;
+	userId: string;
 }
 
 export interface DashboardSessionIamParams {

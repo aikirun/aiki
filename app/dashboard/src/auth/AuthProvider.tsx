@@ -4,6 +4,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useS
 
 import { authClient } from "./client";
 import { namespaceManagementClient } from "../api/client";
+import { useCapabilities } from "../capabilities/CapabilitiesProvider";
 
 interface Organization {
 	id: string;
@@ -44,7 +45,51 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const NOOP_SENTINEL_ID = "00000000000000000000000000";
+
+const NOOP_ORGANIZATION: Organization = {
+	id: NOOP_SENTINEL_ID,
+	name: "default",
+	slug: "default",
+	createdAt: new Date(0),
+};
+
+const NOOP_NAMESPACE: Namespace = {
+	id: NOOP_SENTINEL_ID,
+	name: "default",
+	role: "admin",
+	createdAt: new Date(0),
+};
+
+const NOOP_CONTEXT_VALUE: AuthContextValue = {
+	isLoading: false,
+	isAuthenticated: true,
+	user: null,
+	organizations: [NOOP_ORGANIZATION],
+	namespaces: [NOOP_NAMESPACE],
+	activeOrganization: NOOP_ORGANIZATION,
+	activeNamespace: NOOP_NAMESPACE,
+	setActiveOrganization: async () => {},
+	setActiveNamespace: async () => {},
+	refreshOrganizations: async () => {},
+	refreshNamespaces: async () => {},
+	signOut: async () => {},
+	refetchSession: async () => {},
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+	const { iam } = useCapabilities();
+	if (!iam.dashboard) {
+		return <NoopAuthProvider>{children}</NoopAuthProvider>;
+	}
+	return <FullAuthProvider>{children}</FullAuthProvider>;
+}
+
+function NoopAuthProvider({ children }: { children: ReactNode }) {
+	return <AuthContext.Provider value={NOOP_CONTEXT_VALUE}>{children}</AuthContext.Provider>;
+}
+
+function FullAuthProvider({ children }: { children: ReactNode }) {
 	const queryClient = useQueryClient();
 	const { data: session, isPending: sessionLoading, refetch } = authClient.useSession();
 

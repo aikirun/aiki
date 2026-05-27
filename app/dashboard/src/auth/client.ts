@@ -1,7 +1,7 @@
 import { organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-const AIKI_SERVER_URL = import.meta.env.VITE_AIKI_SERVER_URL || "http://localhost:9850";
+import { AIKI_SERVER_URL } from "../config";
 
 export const authClient = createAuthClient({
 	baseURL: AIKI_SERVER_URL,

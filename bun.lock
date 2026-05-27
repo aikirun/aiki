@@ -29,6 +29,7 @@
       },
       "devDependencies": {
         "@aikirun/iam": "workspace:*",
+        "@aikirun/server": "workspace:*",
         "@orpc/contract": "^1.4.3",
         "@types/react": "^18.3.18",
         "@types/react-dom": "^18.3.5",
