@@ -11,6 +11,7 @@ import type { OrganizationId } from "@aikirun/types/organization";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ulid } from "ulidx";
 
+import type { Capabilities } from "./capabilities";
 import { initDaemons } from "./daemons";
 import { createRepos } from "./infra/db/repo";
 import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
@@ -108,17 +109,26 @@ export function server(params: ServerParams): Server {
 			}
 
 			if (pathname.startsWith("/dashboard/")) {
-				if (!dashboardIam) {
+				if (!dashboardIam?.organization) {
 					return new Response("Not Found", { status: 404 });
 				}
 				return dashboardIam.organization(request);
 			}
 
 			if (pathname.startsWith("/auth/")) {
-				if (!dashboardIam) {
+				if (!dashboardIam?.authenticator) {
 					return new Response("Not Found", { status: 404 });
 				}
 				return dashboardIam.authenticator(request);
+			}
+
+			if (pathname === "/capabilities") {
+				if (request.method !== "GET") {
+					return new Response("Method Not Allowed", { status: 405 });
+				}
+				return Response.json({
+					iam: { dashboard: dashboardIam !== undefined },
+				} satisfies Capabilities);
 			}
 
 			if (pathname === "/health") {

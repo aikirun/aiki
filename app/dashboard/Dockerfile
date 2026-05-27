@@ -23,6 +23,7 @@ RUN bun install --frozen-lockfile
 COPY lib/ ./lib/
 COPY types/ ./types/
 COPY sdk/iam/ ./sdk/iam/
+COPY sdk/server/ ./sdk/server/
 COPY app/dashboard/ ./app/dashboard/
 COPY tsconfig.json ./
 

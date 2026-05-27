@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../auth/AuthProvider";
+import { useCapabilities } from "../../capabilities/CapabilitiesProvider";
 import { getNamespaceDotColor } from "../../constants/namespace";
 import { useTheme } from "../../hooks/useTheme";
 
@@ -24,6 +25,7 @@ export function Sidebar() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { signOut, user } = useAuth();
+	const { iam } = useCapabilities();
 
 	useEffect(() => {
 		const mql = window.matchMedia(SMALL_SCREEN_QUERY);
@@ -83,10 +85,12 @@ export function Sidebar() {
 			</div>
 
 			{/* Org & Namespace Switchers */}
-			<div style={{ padding: collapsed ? "0 6px 10px" : "0 8px 10px" }}>
-				<OrgSwitcher collapsed={collapsed} />
-				<NamespaceSwitcher collapsed={collapsed} />
-			</div>
+			{iam.dashboard && (
+				<div style={{ padding: collapsed ? "0 6px 10px" : "0 8px 10px" }}>
+					<OrgSwitcher collapsed={collapsed} />
+					<NamespaceSwitcher collapsed={collapsed} />
+				</div>
+			)}
 
 			{/* Navigation */}
 			<nav
@@ -108,13 +112,15 @@ export function Sidebar() {
 			<div
 				style={{ padding: collapsed ? "0 6px 12px" : "0 8px 12px", display: "flex", flexDirection: "column", gap: 2 }}
 			>
-				<NavButton
-					icon="⚙"
-					label="Settings"
-					active={location.pathname.startsWith("/settings")}
-					collapsed={collapsed}
-					onClick={() => navigate("/settings")}
-				/>
+				{iam.dashboard && (
+					<NavButton
+						icon="⚙"
+						label="Settings"
+						active={location.pathname.startsWith("/settings")}
+						collapsed={collapsed}
+						onClick={() => navigate("/settings")}
+					/>
+				)}
 
 				<ThemeToggle collapsed={collapsed} />
 

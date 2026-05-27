@@ -6,7 +6,7 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
 
-const AIKI_SERVER_URL = import.meta.env.VITE_AIKI_SERVER_URL || "http://localhost:9850";
+import { AIKI_SERVER_URL } from "../config";
 
 const fetchWithCredentials = (url: RequestInfo | URL, options?: RequestInit) =>
 	fetch(url, { ...options, credentials: "include" });
