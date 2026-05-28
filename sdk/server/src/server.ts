@@ -1,5 +1,6 @@
 import { delay } from "@aikirun/lib/async";
 import { UnauthorizedError } from "@aikirun/lib/error";
+import { SENTINEL_ULID } from "@aikirun/lib/id";
 import { ConsoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { ApiAuthorizer, Iam, IamContext } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
@@ -169,12 +170,9 @@ export function server(params: ServerParams): Server {
 }
 
 function noopApiAuthorizer(_context: IamContext): ApiAuthorizer {
-	const noopOrganizationId = "00000000000000000000000000" as OrganizationId;
-	const noopNamespaceId = "00000000000000000000000000" as NamespaceId;
-
 	return async () => ({
-		organizationId: noopOrganizationId,
-		namespaceId: noopNamespaceId,
+		organizationId: SENTINEL_ULID as OrganizationId,
+		namespaceId: SENTINEL_ULID as NamespaceId,
 	});
 }
 

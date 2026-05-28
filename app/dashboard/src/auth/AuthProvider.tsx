@@ -1,3 +1,4 @@
+import { SENTINEL_ULID } from "@aikirun/lib/id";
 import type { NamespaceRole } from "@aikirun/types/namespace";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
@@ -45,17 +46,15 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const NOOP_SENTINEL_ID = "00000000000000000000000000";
-
 const NOOP_ORGANIZATION: Organization = {
-	id: NOOP_SENTINEL_ID,
+	id: SENTINEL_ULID,
 	name: "default",
 	slug: "default",
 	createdAt: new Date(0),
 };
 
 const NOOP_NAMESPACE: Namespace = {
-	id: NOOP_SENTINEL_ID,
+	id: SENTINEL_ULID,
 	name: "default",
 	role: "admin",
 	createdAt: new Date(0),

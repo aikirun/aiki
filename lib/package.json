@@ -33,6 +33,10 @@
 			"types": "./dist/error/index.d.ts",
 			"import": "./dist/error/index.js"
 		},
+		"./id": {
+			"types": "./dist/id/index.d.ts",
+			"import": "./dist/id/index.js"
+		},
 		"./json": {
 			"types": "./dist/json/index.d.ts",
 			"import": "./dist/json/index.js"

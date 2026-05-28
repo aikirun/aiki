@@ -55,7 +55,7 @@
 		}
 	},
 	"files": {
-		"includes": ["**", "!*.md", "!!**/npm", "!!**/dist", "!!**/node_modules", "!!**/coverage"]
+		"includes": ["**", "!*.md", "!!**/npm", "!!**/dist", "!!**/node_modules", "!!**/coverage", "!!notes"]
 	},
 	"overrides": [
 		{

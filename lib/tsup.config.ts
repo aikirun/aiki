@@ -9,6 +9,7 @@ export default defineConfig({
 		"crypto/index": "src/crypto/index.ts",
 		"duration/index": "src/duration/index.ts",
 		"error/index": "src/error/index.ts",
+		"id/index": "src/id/index.ts",
 		"json/index": "src/json/index.ts",
 		"logger/index": "src/logger/index.ts",
 		"object/index": "src/object/index.ts",

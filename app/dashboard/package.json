@@ -9,6 +9,7 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
+		"@aikirun/lib": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"@orpc/client": "^1.4.3",
 		"better-auth": "^1.4.14",
