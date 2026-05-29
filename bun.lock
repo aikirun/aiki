@@ -19,6 +19,7 @@
       "name": "@aikirun/app-dashboard",
       "version": "0.28.0",
       "dependencies": {
+        "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.4.3",
         "@tanstack/react-query": "^5.62.16",
@@ -92,6 +93,10 @@
       "name": "@aikirun/examples",
       "version": "0.28.0",
       "dependencies": {
+        "@aikirun/memory": "workspace:*",
+        "@aikirun/redis": "workspace:*",
+        "@aikirun/server": "workspace:*",
+        "arktype": "^2.1.29",
         "dotenv": "^16.4.5",
       },
       "devDependencies": {
@@ -104,6 +109,16 @@
     },
     "sdk/adapter/http": {
       "name": "@aikirun/http",
+      "version": "0.28.0",
+      "dependencies": {
+        "@aikirun/types": "workspace:*",
+      },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+      },
+    },
+    "sdk/adapter/memory": {
+      "name": "@aikirun/memory",
       "version": "0.28.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
@@ -230,6 +245,8 @@
     "@aikirun/iam": ["@aikirun/iam@workspace:sdk/iam"],
 
     "@aikirun/lib": ["@aikirun/lib@workspace:lib"],
+
+    "@aikirun/memory": ["@aikirun/memory@workspace:sdk/adapter/memory"],
 
     "@aikirun/redis": ["@aikirun/redis@workspace:sdk/adapter/redis"],
 
