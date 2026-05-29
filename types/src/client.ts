@@ -3,11 +3,11 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { ScheduleApi } from "./api/schedule";
 import type { WorkflowRunApi } from "./api/workflow-run";
 import { INTERNAL } from "./symbols";
-import type { WorkflowRun } from "./workflow/run";
+import type { WorkflowRunRecord } from "./workflow/run";
 
 interface BaseClientParams<AppContext = null> {
 	logger?: Logger;
-	appContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
+	appContext?: (run: Readonly<WorkflowRunRecord>) => AppContext | Promise<AppContext>;
 }
 
 export interface RemoteClientParams<AppContext = null> extends BaseClientParams<AppContext> {
@@ -25,7 +25,7 @@ export interface Client<AppContext = null> {
 	api: ApiClient;
 	logger: Logger;
 	[INTERNAL]: {
-		appContext?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
+		appContext?: (run: WorkflowRunRecord) => AppContext | Promise<AppContext>;
 	};
 }
 

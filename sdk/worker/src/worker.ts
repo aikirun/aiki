@@ -7,7 +7,7 @@ import type { Client } from "@aikirun/types/client";
 import type { CreateSubscriber, Subscriber, WorkflowRunMessage } from "@aikirun/types/infra/queue";
 import type { WorkerId } from "@aikirun/types/worker";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	type AnyWorkflowVersion,
 	executeWorkflowRun,
@@ -112,7 +112,7 @@ class WorkerImpl implements Worker {
 }
 
 interface ActiveWorkflowRun {
-	run: WorkflowRun;
+	run: WorkflowRunRecord;
 	executionPromise: Promise<void>;
 }
 
@@ -386,7 +386,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				}
 
 				// TODO: maybe load multiple workflows in one request
-				let workflowRun: WorkflowRun | undefined;
+				let workflowRun: WorkflowRunRecord | undefined;
 				try {
 					const response = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
 					workflowRun = response.run;
@@ -438,7 +438,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	}
 
 	private async executeWorkflow(
-		workflowRun: WorkflowRun,
+		workflowRun: WorkflowRunRecord,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 		subscriber: Subscriber,
 		abortSignal: AbortSignal

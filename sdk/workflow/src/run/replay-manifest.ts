@@ -4,12 +4,12 @@ import type {
 	ChildWorkflowRunInfo,
 	ReplayManifest,
 	UnconsumedManifestEntries,
-	WorkflowRun,
 	WorkflowRunAddress,
+	WorkflowRunRecord,
 } from "@aikirun/types/workflow/run";
 import type { TaskAddress, TaskInfo } from "@aikirun/types/workflow/task";
 
-export function createReplayManifest(run: WorkflowRun): ReplayManifest {
+export function createReplayManifest(run: WorkflowRunRecord): ReplayManifest {
 	const { taskQueues, childWorkflowRunQueues } = run;
 
 	let totalEntries = 0;

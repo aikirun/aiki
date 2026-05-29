@@ -1,6 +1,6 @@
 import type { Client } from "@aikirun/types/client";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	type AnyWorkflowVersion,
 	executeWorkflowRun,
@@ -64,7 +64,7 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 			return jsonResponse(400);
 		}
 
-		let workflowRun: WorkflowRun | undefined;
+		let workflowRun: WorkflowRunRecord | undefined;
 		try {
 			const response = await client.api.workflowRun.getByIdV1({ id: workflowRunId });
 			workflowRun = response.run;

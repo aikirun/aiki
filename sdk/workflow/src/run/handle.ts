@@ -13,8 +13,8 @@ import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
 	TerminalWorkflowRunStatus,
-	WorkflowRun,
 	WorkflowRunId,
+	WorkflowRunRecord,
 	WorkflowRunState,
 } from "@aikirun/types/workflow/run";
 import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from "@aikirun/types/workflow/run";
@@ -31,21 +31,21 @@ export function workflowRunHandle<Input, Output, AppContext, TEvents extends Eve
 
 export function workflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
-	run: WorkflowRun<Input, Output>,
+	run: WorkflowRunRecord<Input, Output>,
 	eventsDefinition?: TEvents,
 	logger?: Logger
 ): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
 export async function workflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
-	runOrId: WorkflowRunId | WorkflowRun<Input, Output>,
+	runOrId: WorkflowRunId | WorkflowRunRecord<Input, Output>,
 	eventsDefinition?: TEvents,
 	logger?: Logger
 ): Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 	const run =
 		typeof runOrId !== "string"
 			? runOrId
-			: ((await client.api.workflowRun.getByIdV1({ id: runOrId })).run as WorkflowRun<Input, Output>);
+			: ((await client.api.workflowRun.getByIdV1({ id: runOrId })).run as WorkflowRunRecord<Input, Output>);
 
 	return new WorkflowRunHandleImpl(
 		client,
@@ -61,7 +61,7 @@ export async function workflowRunHandle<Input, Output, AppContext, TEvents exten
 }
 
 export interface WorkflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition = EventsDefinition> {
-	run: Readonly<WorkflowRun<Input, Output>>;
+	run: Readonly<WorkflowRunRecord<Input, Output>>;
 
 	events: EventSenders<TEvents>;
 
@@ -182,7 +182,7 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 
 	constructor(
 		client: Client<AppContext>,
-		private _run: WorkflowRun<Input, Output>,
+		private _run: WorkflowRunRecord<Input, Output>,
 		eventsDefinition: TEvents,
 		private readonly logger: Logger
 	) {
@@ -197,13 +197,13 @@ class WorkflowRunHandleImpl<Input, Output, AppContext, TEvents extends EventsDef
 		};
 	}
 
-	public get run(): Readonly<WorkflowRun<Input, Output>> {
+	public get run(): Readonly<WorkflowRunRecord<Input, Output>> {
 		return this._run;
 	}
 
 	public async refresh() {
 		const { run: currentRun } = await this.api.workflowRun.getByIdV1({ id: this.run.id });
-		this._run = currentRun as WorkflowRun<Input, Output>;
+		this._run = currentRun as WorkflowRunRecord<Input, Output>;
 	}
 
 	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(

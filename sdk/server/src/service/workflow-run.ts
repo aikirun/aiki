@@ -25,8 +25,8 @@ import type {
 	SleepQueue,
 	TerminalWorkflowRunState,
 	TerminalWorkflowRunStatus,
-	WorkflowRun,
 	WorkflowRunId,
+	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStateCancelled,
 	WorkflowStartOptions,
@@ -80,7 +80,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		return repos.transaction(async (txRepos) => createWorkflowRunInTx(context, request, inputHash, txRepos));
 	}
 
-	async function getWorkflowRunById(context: NamespaceRequestContext, id: string): Promise<WorkflowRun> {
+	async function getWorkflowRunById(context: NamespaceRequestContext, id: string): Promise<WorkflowRunRecord> {
 		const { namespaceId } = context;
 
 		const runRow = await repos.workflowRun.getById(namespaceId, id);
@@ -99,7 +99,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 	async function getWorkflowRunByReferenceId(
 		context: NamespaceRequestContext,
 		filter: WorkflowRunReference
-	): Promise<WorkflowRun> {
+	): Promise<WorkflowRunRecord> {
 		const { namespaceId } = context;
 		const { name, versionId, referenceId } = filter;
 
@@ -120,7 +120,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		namespaceId: NamespaceId,
 		workflowRow: WorkflowRow,
 		runRow: WorkflowRunRow
-	): Promise<WorkflowRun> {
+	): Promise<WorkflowRunRecord> {
 		const [latestTransition, taskRows, sleepRows, eventWaitRows, childRunRows, childWorkflowRunWaitRows] =
 			await Promise.all([
 				repos.stateTransition.getById(runRow.latestStateTransitionId),

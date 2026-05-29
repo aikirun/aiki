@@ -1,9 +1,9 @@
-import type { WorkflowRun } from "@aikirun/types/workflow/run";
+import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
 
 import { CopyButton } from "../common/CopyButton";
 
 interface DataTabProps {
-	run: WorkflowRun;
+	run: WorkflowRunRecord;
 }
 
 export function DataTab({ run }: DataTabProps) {

@@ -19,9 +19,9 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ReplayManifest,
 	WorkflowDefinitionOptions,
-	WorkflowRun,
 	WorkflowRunAddress,
 	WorkflowRunId,
+	WorkflowRunRecord,
 	WorkflowRunStateFailed,
 	WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
@@ -197,7 +197,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 
 				return childWorkflowRunHandle(
 					client,
-					existingRun as WorkflowRun<Input, Output>,
+					existingRun as WorkflowRunRecord<Input, Output>,
 					parentRun,
 					existingRunInfo.childWorkflowRunWaitQueues,
 					logger,
@@ -228,7 +228,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 
 		return childWorkflowRunHandle(
 			client,
-			newRun as WorkflowRun<Input, Output>,
+			newRun as WorkflowRunRecord<Input, Output>,
 			parentRun,
 			{
 				cancelled: { childWorkflowRunWaits: [] },
@@ -284,7 +284,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 			versionId: this.versionId,
 			referenceId,
 		});
-		return workflowRunHandle(client, run as WorkflowRun<Input, Output>, this[INTERNAL].eventsDefinition);
+		return workflowRunHandle(client, run as WorkflowRunRecord<Input, Output>, this[INTERNAL].eventsDefinition);
 	}
 
 	private async handler(

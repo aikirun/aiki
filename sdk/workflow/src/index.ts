@@ -20,8 +20,8 @@ export type {
 	ReplayManifest,
 	TriggerStrategy,
 	UnconsumedManifestEntries,
-	WorkflowRun,
 	WorkflowRunId,
+	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";

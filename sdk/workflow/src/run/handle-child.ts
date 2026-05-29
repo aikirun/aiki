@@ -7,7 +7,7 @@ import {
 	type ChildWorkflowRunWaitQueue,
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
-	type WorkflowRun,
+	type WorkflowRunRecord,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
@@ -23,7 +23,7 @@ import {
 
 export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
-	run: WorkflowRun<Input, Output>,
+	run: WorkflowRunRecord<Input, Output>,
 	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
 	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger,

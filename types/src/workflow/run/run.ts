@@ -236,7 +236,7 @@ export type WorkflowRunState<Output = unknown> = WorkflowRunStateInComplete | Wo
 
 export type TerminalWorkflowRunState = Extract<WorkflowRunState, { status: "cancelled" | "completed" | "failed" }>;
 
-export interface WorkflowRun<Input = unknown, Output = unknown> {
+export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	id: string;
 	name: string;
 	versionId: string;

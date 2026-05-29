@@ -2,7 +2,7 @@ import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
 
 import type { WorkflowSource } from "../workflow";
 import type {
-	WorkflowRun,
+	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStateAwaitingChildWorkflow,
 	WorkflowRunStateAwaitingEvent,
@@ -90,7 +90,7 @@ export interface WorkflowRunGetByIdRequestV1 {
 }
 
 export interface WorkflowRunGetByIdResponseV1 {
-	run: WorkflowRun;
+	run: WorkflowRunRecord;
 }
 
 export interface WorkflowRunReference {
@@ -102,7 +102,7 @@ export interface WorkflowRunReference {
 export type WorkflowRunGetByReferenceIdRequestV1 = WorkflowRunReference;
 
 export interface WorkflowRunGetByReferenceIdResponseV1 {
-	run: WorkflowRun;
+	run: WorkflowRunRecord;
 }
 
 export interface WorkflowRunGetStateRequestV1 {

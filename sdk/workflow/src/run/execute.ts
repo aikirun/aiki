@@ -3,7 +3,7 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	NonDeterminismError,
 	WorkflowRunFailedError,
@@ -20,7 +20,7 @@ import type { UnknownWorkflowVersion } from "../workflow-version";
 
 export interface ExecuteWorkflowParams<AppContext> {
 	client: Client<AppContext>;
-	workflowRun: WorkflowRun;
+	workflowRun: WorkflowRunRecord;
 	workflowVersion: UnknownWorkflowVersion;
 	logger: Logger;
 	options: Required<WorkflowExecutionOptions>;

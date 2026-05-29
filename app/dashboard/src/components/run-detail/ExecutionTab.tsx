@@ -4,7 +4,7 @@ import type {
 	EventWaitQueue,
 	SleepQueue,
 	TerminalWorkflowRunStatus,
-	WorkflowRun,
+	WorkflowRunRecord,
 } from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 import { memo, useEffect, useRef, useState } from "react";
@@ -15,7 +15,7 @@ import { CopyButton } from "../common/CopyButton";
 import { StatusBadge } from "../common/StatusBadge";
 
 interface ExecutionTabProps {
-	run: WorkflowRun;
+	run: WorkflowRunRecord;
 	scrollToTaskId?: string | null;
 }
 
@@ -715,7 +715,7 @@ function EventWaitRow({ wait }: { wait: EventWaitQueue<unknown>["eventWaits"][nu
 
 // ── Error block ───────────────────────────────────────────────────────────────
 
-type FailedState = Extract<WorkflowRun["state"], { status: "failed" }>;
+type FailedState = Extract<WorkflowRunRecord["state"], { status: "failed" }>;
 
 function ErrorBlock({ state }: { state: FailedState }) {
 	const error = state.cause === "self" ? state.error : undefined;
