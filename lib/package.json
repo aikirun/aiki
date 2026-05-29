@@ -33,6 +33,10 @@
 			"types": "./dist/error/index.d.ts",
 			"import": "./dist/error/index.js"
 		},
+		"./heap": {
+			"types": "./dist/heap/index.d.ts",
+			"import": "./dist/heap/index.js"
+		},
 		"./id": {
 			"types": "./dist/id/index.d.ts",
 			"import": "./dist/id/index.js"

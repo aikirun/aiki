@@ -16,6 +16,7 @@
 			"@aikirun/iam": ["./sdk/iam/src/index.ts"],
 			"@aikirun/lib/*": ["./lib/src/*/index.ts"],
 			"@aikirun/http": ["./sdk/adapter/http/src/index.ts"],
+			"@aikirun/memory": ["./sdk/adapter/memory/src/index.ts"],
 			"@aikirun/redis": ["./sdk/adapter/redis/src/index.ts"],
 			"@aikirun/server": ["./sdk/server/src/index.ts"],
 			"@aikirun/server/*": ["./sdk/server/src/*.ts", "./sdk/server/src/*/index.ts"],

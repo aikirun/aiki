@@ -1,4 +1,4 @@
-import { isNonEmptyArray, shuffleArray } from "@aikirun/lib/array";
+import { shuffleArray } from "@aikirun/lib/array";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type {
 	CreateSubscriber,
@@ -7,11 +7,10 @@ import type {
 	SubscriberDelayParams,
 	WorkflowRunMessage,
 } from "@aikirun/types/infra/queue";
-import type { WorkflowMeta } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { Redis } from "ioredis";
 
-import { getWorkflowQueueName } from "./key";
+import { getWorkflowQueueNames } from "./key";
 import { attachConnectionSupervisor, type RedisConnectionParams } from "../connection";
 
 export interface RedisSubscriberOptions {
@@ -114,7 +113,8 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 
 		return {
 			getNextDelay,
-			async getReadyRuns(size: number): Promise<WorkflowRunMessage[]> {
+
+			async getReadyRuns(limit: number): Promise<WorkflowRunMessage[]> {
 				const shuffledQueueNames = shuffleArray(queueNames);
 				const firstItem = (await redis.bzpopmin(...shuffledQueueNames, 0)) as
 					| [key: string, member: WorkflowRunId, score: string]
@@ -123,9 +123,9 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 					return [];
 				}
 
-				const batch: WorkflowRunMessage[] = [{ data: { id: firstItem[1] } }];
+				const runs: WorkflowRunMessage[] = [{ data: { id: firstItem[1] } }];
 
-				const remainingCapacity = size - 1;
+				const remainingCapacity = limit - 1;
 				if (remainingCapacity > 0) {
 					const workflowRunIds = (await redis.eval(
 						ROUND_ROBIN_ZPOPMIN_SCRIPT,
@@ -135,26 +135,17 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 					)) as WorkflowRunId[];
 
 					for (const workflowRunId of workflowRunIds) {
-						batch.push({ data: { id: workflowRunId } });
+						runs.push({ data: { id: workflowRunId } });
 					}
 				}
 
-				return batch;
+				return runs;
 			},
+
 			async close(): Promise<void> {
 				connectionSupervisor.detach();
 				redis.disconnect();
 			},
 		};
 	};
-}
-
-function getWorkflowQueueNames(workflows: WorkflowMeta[], shards?: string[]): string[] {
-	if (!isNonEmptyArray(shards)) {
-		return workflows.map((workflow) => getWorkflowQueueName(workflow.name, workflow.versionId));
-	}
-
-	return workflows.flatMap((workflow) =>
-		shards.map((shard) => getWorkflowQueueName(workflow.name, workflow.versionId, shard))
-	);
 }
