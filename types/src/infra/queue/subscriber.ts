@@ -11,7 +11,7 @@ export interface WorkflowRunMessage {
 export type SubscriberDelayParams = { type: "no_work" } | { type: "retry"; attemptNumber: number };
 
 export interface Subscriber {
-	getNextDelay: (context: SubscriberDelayParams) => number;
+	getNextDelay: (params: SubscriberDelayParams) => number;
 	getReadyRuns: (limit: number, options?: { abortSignal?: AbortSignal }) => Promise<WorkflowRunMessage[]>;
 	heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>;
 	acknowledge?: (workflowRunId: WorkflowRunId) => Promise<void>;
