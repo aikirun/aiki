@@ -34,7 +34,7 @@ import {
 import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import type { WorkflowRun } from "./run/context";
+import type { WorkflowRun } from "./run";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
@@ -198,7 +198,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 				return childWorkflowRunHandle(
 					client,
 					existingRun as WorkflowRunRecord<Input, Output>,
-					parentRun,
+					parentRun[INTERNAL].handle,
 					existingRunInfo.childWorkflowRunWaitQueues,
 					logger,
 					this[INTERNAL].eventsDefinition
@@ -229,7 +229,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		return childWorkflowRunHandle(
 			client,
 			newRun as WorkflowRunRecord<Input, Output>,
-			parentRun,
+			parentRun[INTERNAL].handle,
 			{
 				cancelled: { childWorkflowRunWaits: [] },
 				completed: { childWorkflowRunWaits: [] },

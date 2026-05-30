@@ -37,7 +37,7 @@ export { TaskFailedError } from "@aikirun/types/workflow/task";
 
 export type { WorkflowRegistry } from "./registry";
 export { workflowRegistry } from "./registry";
-export type { WorkflowRun } from "./run/context";
+export type { WorkflowRun } from "./run";
 export type {
 	EventDefinition,
 	EventMulticaster,

@@ -32,7 +32,7 @@ import type {
 import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import type { WorkflowRun } from "./run/context";
+import type { WorkflowRun } from "./run";
 import type { WorkflowRunHandle } from "./run/handle";
 
 type UnknownWorkflowRun = WorkflowRun<unknown, unknown>;

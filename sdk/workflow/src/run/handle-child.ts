@@ -7,12 +7,12 @@ import {
 	type ChildWorkflowRunWaitQueue,
 	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
+	type WorkflowRunId,
 	type WorkflowRunRecord,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 
-import type { WorkflowRun } from "./context";
 import type { EventsDefinition } from "./event";
 import {
 	type WorkflowRunHandle,
@@ -24,7 +24,7 @@ import {
 export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
 	run: WorkflowRunRecord<Input, Output>,
-	parentRun: WorkflowRun<unknown, AppContext, EventsDefinition>,
+	parentRunHandle: WorkflowRunHandle<unknown, unknown, AppContext, EventsDefinition>,
 	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger,
 	eventsDefinition?: TEvents
@@ -35,7 +35,7 @@ export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents 
 		run: handle.run,
 		events: handle.events,
 		refresh: handle.refresh.bind(handle),
-		waitForStatus: createStatusWaiter(handle, parentRun, childWorkflowRunWaitQueues, logger),
+		waitForStatus: createStatusWaiter(handle, parentRunHandle, childWorkflowRunWaitQueues, logger),
 		cancel: handle.cancel.bind(handle),
 		pause: handle.pause.bind(handle),
 		resume: handle.resume.bind(handle),
@@ -103,7 +103,7 @@ export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 
 function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	handle: WorkflowRunHandle<Input, Output, AppContext, TEvents>,
-	parentRun: WorkflowRun<unknown, AppContext, EventsDefinition>,
+	parentRunHandle: WorkflowRunHandle<unknown, unknown, AppContext, EventsDefinition>,
 	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger
 ) {
@@ -127,8 +127,6 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 		expectedStatus: Status,
 		options?: ChildWorkflowRunWaitOptions<boolean>
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, false>> {
-		const parentRunHandle = parentRun[INTERNAL].handle;
-
 		const nextIndex = nextIndexByStatus[expectedStatus];
 
 		const { run } = handle;
@@ -195,12 +193,12 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 			});
 		} catch (error) {
 			if (error instanceof WorkflowRunRevisionConflictError) {
-				throw new WorkflowRunSuspendedError(parentRun.id);
+				throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);
 			}
 			throw error;
 		}
 
-		throw new WorkflowRunSuspendedError(parentRun.id);
+		throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);
 	}
 
 	return waitForStatus;
