@@ -5,27 +5,27 @@ import type { WorkflowRunApi } from "./api/workflow-run";
 import { INTERNAL } from "./symbols";
 import type { WorkflowRunRecord } from "./workflow/run";
 
-interface BaseClientParams<AppContext = null> {
+interface BaseClientParams<Context = null> {
 	logger?: Logger;
-	appContext?: (run: Readonly<WorkflowRunRecord>) => AppContext | Promise<AppContext>;
+	context?: (run: Readonly<WorkflowRunRecord>) => Context | Promise<Context>;
 }
 
-export interface RemoteClientParams<AppContext = null> extends BaseClientParams<AppContext> {
+export interface RemoteClientParams<Context = null> extends BaseClientParams<Context> {
 	url: string;
 	apiKey?: string;
 }
 
-export interface EmbeddedClientParams<AppContext = null> extends BaseClientParams<AppContext> {
+export interface EmbeddedClientParams<Context = null> extends BaseClientParams<Context> {
 	handler: (request: Request) => Promise<Response>;
 }
 
-export type ClientParams<AppContext = null> = RemoteClientParams<AppContext> | EmbeddedClientParams<AppContext>;
+export type ClientParams<Context = null> = RemoteClientParams<Context> | EmbeddedClientParams<Context>;
 
-export interface Client<AppContext = null> {
+export interface Client<Context = null> {
 	api: ApiClient;
 	logger: Logger;
 	[INTERNAL]: {
-		appContext?: (run: WorkflowRunRecord) => AppContext | Promise<AppContext>;
+		context?: (run: WorkflowRunRecord) => Context | Promise<Context>;
 	};
 }
 

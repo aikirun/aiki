@@ -57,7 +57,7 @@ import {
  *
  * @see {@link https://github.com/aikirun/aiki} for complete documentation
  */
-export function workflow<AppContext = null>(params: WorkflowParams): Workflow<AppContext> {
+export function workflow<Context = null>(params: WorkflowParams): Workflow<Context> {
 	return new WorkflowImpl(params);
 }
 
@@ -65,7 +65,7 @@ export interface WorkflowParams {
 	name: string;
 }
 
-export interface Workflow<AppContext> {
+export interface Workflow<Context> {
 	name: WorkflowName;
 
 	v: <
@@ -74,8 +74,8 @@ export interface Workflow<AppContext> {
 		TEvents extends EventsDefinition = Record<string, never>,
 	>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
-	) => WorkflowVersion<Input, Output, AppContext, TEvents>;
+		params: WorkflowVersionParams<Input, Output, Context, TEvents>
+	) => WorkflowVersion<Input, Output, Context, TEvents>;
 
 	[INTERNAL]: {
 		getAllVersions: () => UnknownWorkflowVersion[];
@@ -83,9 +83,9 @@ export interface Workflow<AppContext> {
 	};
 }
 
-class WorkflowImpl<AppContext> implements Workflow<AppContext> {
+class WorkflowImpl<Context> implements Workflow<Context> {
 	public readonly name: WorkflowName;
-	public readonly [INTERNAL]: Workflow<AppContext>[typeof INTERNAL];
+	public readonly [INTERNAL]: Workflow<Context>[typeof INTERNAL];
 	private workflowVersions = new Map<WorkflowVersionId, UnknownWorkflowVersion>();
 
 	constructor(params: WorkflowParams) {
@@ -98,8 +98,8 @@ class WorkflowImpl<AppContext> implements Workflow<AppContext> {
 
 	v<Input extends Serializable, Output extends Serializable, TEvents extends EventsDefinition>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
-	): WorkflowVersion<Input, Output, AppContext, TEvents> {
+		params: WorkflowVersionParams<Input, Output, Context, TEvents>
+	): WorkflowVersion<Input, Output, Context, TEvents> {
 		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
 			throw new Error(`Workflow "${this.name}:${versionId}" already exists`);
 		}

@@ -21,14 +21,14 @@ import {
 	workflowRunHandle,
 } from "./handle";
 
-export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
-	client: Client<AppContext>,
+export async function childWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
+	client: Client<Context>,
 	run: WorkflowRunRecord<Input, Output>,
-	parentRunHandle: WorkflowRunHandle<unknown, unknown, AppContext, EventsDefinition>,
+	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
 	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger,
 	eventsDefinition?: TEvents
-): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
+): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>> {
 	const handle = await workflowRunHandle(client, run, eventsDefinition, logger);
 
 	return {
@@ -44,12 +44,10 @@ export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents 
 	};
 }
 
-export type ChildWorkflowRunHandle<
-	Input,
-	Output,
-	AppContext,
-	TEvents extends EventsDefinition = EventsDefinition,
-> = Omit<WorkflowRunHandle<Input, Output, AppContext, TEvents>, "waitForStatus"> & {
+export type ChildWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> = Omit<
+	WorkflowRunHandle<Input, Output, Context, TEvents>,
+	"waitForStatus"
+> & {
 	/**
 	 * Waits for the child workflow run to reach a terminal status.
 	 *
@@ -101,9 +99,9 @@ export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 	timeout?: Timed extends true ? DurationObject : never;
 }
 
-function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDefinition>(
-	handle: WorkflowRunHandle<Input, Output, AppContext, TEvents>,
-	parentRunHandle: WorkflowRunHandle<unknown, unknown, AppContext, EventsDefinition>,
+function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefinition>(
+	handle: WorkflowRunHandle<Input, Output, Context, TEvents>,
+	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
 	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger
 ) {

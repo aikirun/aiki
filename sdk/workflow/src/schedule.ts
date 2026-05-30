@@ -35,9 +35,9 @@ export interface ScheduleBuilder {
 		value: TypeOfValueAtPath<ScheduleActivateOptions, Path>
 	): ScheduleBuilder;
 
-	activate<Input, Output, AppContext, TEvents extends EventsDefinition>(
-		client: Client<AppContext>,
-		workflow: WorkflowVersion<Input, Output, AppContext, TEvents>,
+	activate<Input, Output, Context, TEvents extends EventsDefinition>(
+		client: Client<Context>,
+		workflow: WorkflowVersion<Input, Output, Context, TEvents>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ScheduleHandle>;
 }
@@ -45,17 +45,17 @@ export interface ScheduleBuilder {
 export type ScheduleDefinition = ScheduleParams & {
 	with(): ScheduleBuilder;
 
-	activate<Input, Output, AppContext, TEvents extends EventsDefinition>(
-		client: Client<AppContext>,
-		workflow: WorkflowVersion<Input, Output, AppContext, TEvents>,
+	activate<Input, Output, Context, TEvents extends EventsDefinition>(
+		client: Client<Context>,
+		workflow: WorkflowVersion<Input, Output, Context, TEvents>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ScheduleHandle>;
 };
 
 export function schedule(params: ScheduleParams): ScheduleDefinition {
-	async function activateWithOptions<Input, Output, AppContext, TEvents extends EventsDefinition>(
-		client: Client<AppContext>,
-		workflow: WorkflowVersion<Input, Output, AppContext, TEvents>,
+	async function activateWithOptions<Input, Output, Context, TEvents extends EventsDefinition>(
+		client: Client<Context>,
+		workflow: WorkflowVersion<Input, Output, Context, TEvents>,
 		options: ScheduleActivateOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ScheduleHandle> {

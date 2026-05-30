@@ -100,13 +100,13 @@ export type EventMulticasters<TEvents extends EventsDefinition> = {
 
 export interface EventMulticaster<Data> {
 	with(): EventMulticasterBuilder<Data>;
-	send: <AppContext>(
-		client: Client<AppContext>,
+	send: <Context>(
+		client: Client<Context>,
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	) => Promise<void>;
-	sendByReferenceId: <AppContext>(
-		client: Client<AppContext>,
+	sendByReferenceId: <Context>(
+		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	) => Promise<void>;
@@ -117,13 +117,13 @@ export interface EventMulticasterBuilder<Data> {
 		path: Path,
 		value: TypeOfValueAtPath<EventSendOptions, Path>
 	): EventMulticasterBuilder<Data>;
-	send: <AppContext>(
-		client: Client<AppContext>,
+	send: <Context>(
+		client: Client<Context>,
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	) => Promise<void>;
-	sendByReferenceId: <AppContext>(
-		client: Client<AppContext>,
+	sendByReferenceId: <Context>(
+		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	) => Promise<void>;
@@ -320,18 +320,14 @@ function createEventMulticaster<Data>(
 
 	const createBuilder = (optionsBuilder: ReturnType<typeof optionsOverrider>): EventMulticasterBuilder<Data> => ({
 		opt: (path, value) => createBuilder(optionsBuilder.with(path, value)),
-		send: <AppContext>(
-			client: Client<AppContext>,
-			runId: string | string[],
-			...args: Data extends void ? [] : [Data]
-		) =>
+		send: <Context>(client: Client<Context>, runId: string | string[], ...args: Data extends void ? [] : [Data]) =>
 			createEventMulticaster(workflowName, workflowVersionId, eventName, schema, optionsBuilder.build()).send(
 				client,
 				runId,
 				...args
 			),
-		sendByReferenceId: <AppContext>(
-			client: Client<AppContext>,
+		sendByReferenceId: <Context>(
+			client: Client<Context>,
 			referenceId: string | string[],
 			...args: Data extends void ? [] : [Data]
 		) =>
@@ -344,8 +340,8 @@ function createEventMulticaster<Data>(
 			).sendByReferenceId(client, referenceId, ...args),
 	});
 
-	async function send<AppContext>(
-		client: Client<AppContext>,
+	async function send<Context>(
+		client: Client<Context>,
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	): Promise<void> {
@@ -386,8 +382,8 @@ function createEventMulticaster<Data>(
 		});
 	}
 
-	async function sendByReferenceId<AppContext>(
-		client: Client<AppContext>,
+	async function sendByReferenceId<Context>(
+		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	): Promise<void> {

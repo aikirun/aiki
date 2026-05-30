@@ -64,25 +64,27 @@ const db = createDatabaseConnection(process.env.DATABASE_URL);
 export const orderWorkflowV1 = createOrderWorkflow(db);
 ```
 
-## AppContext (Per-Execution Context)
+## Context (Per-Execution Context)
 
-Use `AppContext` for data that should be unique per workflow execution, like trace IDs or request metadata. The `appContext` function is called before each workflow execution.
+Use `Context` for data that should be unique per workflow execution, like trace IDs or request metadata. The `context` function is called before each workflow execution.
+
+Bind the `Context` type once on `workflow()` and `client()`; the handler's `context` parameter is then inferred automatically.
 
 ```typescript
 import { workflow } from "@aikirun/workflow";
 import { client } from "@aikirun/client";
 
-interface AppContext {
+interface Context {
 	traceId: string;
 	workflowRunId: string;
 	userId?: string;
 }
 
-// Workflow receives context as third parameter
-const auditWorkflow = workflow({ name: "audit" });
+// Bind Context at the workflow factory — handler infers `context` for free
+const auditWorkflow = workflow<Context>({ name: "audit" });
 
 const auditWorkflowV1 = auditWorkflow.v("1.0.0", {
-	async handler(run, input: { action: string }, context: AppContext) {
+	async handler(run, input: { action: string }, context) {
 		run.logger.info("Processing action", {
 			traceId: context.traceId,
 			userId: context.userId,
@@ -92,10 +94,10 @@ const auditWorkflowV1 = auditWorkflow.v("1.0.0", {
 	},
 });
 
-// Client is typed with AppContext
-const aikiClient = await client<AppContext>({
+// Client is typed with the same Context
+const aikiClient = await client<Context>({
 	url: "http://localhost:9850",
-	appContext: (run) => ({
+	context: (run) => ({
 		traceId: crypto.randomUUID(),
 		workflowRunId: run.id,
 	}),
@@ -107,14 +109,14 @@ const aikiClient = await client<AppContext>({
 | Pattern | Use Case | Lifetime |
 |---------|----------|----------|
 | **Higher-order functions** | Database connections, API clients, services | Created once at startup |
-| **AppContext** | Trace IDs, request metadata, user context | Created per execution |
+| **Context** | Trace IDs, request metadata, user context | Created per execution |
 
 **Higher-order functions** are best for:
 - Dependencies that are expensive to create (DB connections, HTTP clients)
 - Stateful services that should be shared
 - External service clients with connection pooling
 
-**AppContext** is best for:
+**Context** is best for:
 - Per-request tracing and observability
 - User-specific context that varies per execution
 - Lightweight metadata that doesn't need connection management

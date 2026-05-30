@@ -7,7 +7,7 @@ import type { ReplayManifest, SleepResult, WorkflowRunId, WorkflowStartOptions }
 import type { EventsDefinition, EventWaiters } from "./event";
 import type { WorkflowRunHandle } from "./handle";
 
-export interface WorkflowRun<Input, AppContext, TEvents extends EventsDefinition = EventsDefinition> {
+export interface WorkflowRun<Input, Context, TEvents extends EventsDefinition = EventsDefinition> {
 	id: WorkflowRunId;
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
@@ -15,9 +15,9 @@ export interface WorkflowRun<Input, AppContext, TEvents extends EventsDefinition
 	logger: Logger;
 	sleep: (name: string, duration: Duration) => Promise<SleepResult>;
 	events: EventWaiters<TEvents>;
-	context: AppContext;
+	context: Context;
 	[INTERNAL]: {
-		handle: WorkflowRunHandle<Input, unknown, AppContext, TEvents>;
+		handle: WorkflowRunHandle<Input, unknown, Context, TEvents>;
 		replayManifest: ReplayManifest;
 		options: {
 			spinThresholdMs: number;

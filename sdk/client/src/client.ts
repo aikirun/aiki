@@ -35,18 +35,18 @@ const EMBEDDED_BASE_URL = "aiki://embedded/api";
  * );
  * ```
  */
-export function client<AppContext = null>(params: RemoteClientParams<AppContext>): Client<AppContext>;
-export function client<AppContext = null>(params: EmbeddedClientParams<AppContext>): Client<AppContext>;
-export function client<AppContext = null>(params: ClientParams<AppContext>): Client<AppContext> {
+export function client<Context = null>(params: RemoteClientParams<Context>): Client<Context>;
+export function client<Context = null>(params: EmbeddedClientParams<Context>): Client<Context>;
+export function client<Context = null>(params: ClientParams<Context>): Client<Context> {
 	return new ClientImpl(params);
 }
 
-class ClientImpl<AppContext> implements Client<AppContext> {
+class ClientImpl<Context> implements Client<Context> {
 	public readonly api: ApiClient;
-	public readonly [INTERNAL]: Client<AppContext>[typeof INTERNAL];
+	public readonly [INTERNAL]: Client<Context>[typeof INTERNAL];
 	public readonly logger: Logger;
 
-	constructor(params: ClientParams<AppContext>) {
+	constructor(params: ClientParams<Context>) {
 		this.logger = params.logger ?? new ConsoleLogger();
 
 		const rpcLink = isEmbeddedParams(params)
@@ -73,11 +73,11 @@ class ClientImpl<AppContext> implements Client<AppContext> {
 		}
 
 		this[INTERNAL] = {
-			appContext: params.appContext,
+			context: params.context,
 		};
 	}
 }
 
-function isEmbeddedParams<AppContext>(params: ClientParams<AppContext>): params is EmbeddedClientParams<AppContext> {
+function isEmbeddedParams<Context>(params: ClientParams<Context>): params is EmbeddedClientParams<Context> {
 	return "handler" in params;
 }

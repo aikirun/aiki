@@ -18,8 +18,8 @@ import { createReplayManifest } from "./replay-manifest";
 import { createSleeper } from "./sleeper";
 import type { UnknownWorkflowVersion } from "../workflow-version";
 
-export interface ExecuteWorkflowParams<AppContext> {
-	client: Client<AppContext>;
+export interface ExecuteWorkflowParams<Context> {
+	client: Client<Context>;
 	workflowRun: WorkflowRunRecord;
 	workflowVersion: UnknownWorkflowVersion;
 	logger: Logger;
@@ -41,7 +41,7 @@ export interface WorkflowExecutionOptions {
 	spinThresholdMs?: number;
 }
 
-export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowParams<AppContext>): Promise<boolean> {
+export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
 	const { client, workflowRun, workflowVersion, logger, options, heartbeat, abortSignal } = params;
 
 	let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
@@ -68,7 +68,7 @@ export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowPara
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
 		const handle = await workflowRunHandle(client, workflowRun, eventsDefinition, logger);
 
-		const appContext = client[INTERNAL].appContext ? client[INTERNAL].appContext(workflowRun) : null;
+		const context = client[INTERNAL].context ? client[INTERNAL].context(workflowRun) : null;
 
 		await workflowVersion[INTERNAL].handler(
 			{
@@ -79,7 +79,7 @@ export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowPara
 				logger,
 				sleep: createSleeper(handle, logger),
 				events: createEventWaiters(handle, eventsDefinition, logger),
-				context: appContext instanceof Promise ? await appContext : appContext,
+				context: context instanceof Promise ? await context : context,
 				[INTERNAL]: {
 					handle,
 					replayManifest: createReplayManifest(workflowRun),

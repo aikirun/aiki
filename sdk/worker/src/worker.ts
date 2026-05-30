@@ -80,7 +80,7 @@ export interface WorkerSpawnOptions extends WorkerDefinitionOptions {
 
 export interface Worker {
 	with(): WorkerBuilder;
-	spawn: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
+	spawn: <Context>(client: Client<Context>) => Promise<WorkerHandle>;
 }
 
 export interface WorkerHandle {
@@ -97,12 +97,12 @@ class WorkerImpl implements Worker {
 		return new WorkerBuilderImpl(this, spawnOptionsOverrider());
 	}
 
-	public async spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
+	public async spawn<Context>(client: Client<Context>): Promise<WorkerHandle> {
 		return this.spawnWithOptions(client, this.params.options ?? {});
 	}
 
-	public async spawnWithOptions<AppContext>(
-		client: Client<AppContext>,
+	public async spawnWithOptions<Context>(
+		client: Client<Context>,
 		spawnOptions: WorkerSpawnOptions
 	): Promise<WorkerHandle> {
 		const handle = new WorkerHandleImpl(client, this.params, spawnOptions);
@@ -116,7 +116,7 @@ interface ActiveWorkflowRun {
 	executionPromise: Promise<void>;
 }
 
-class WorkerHandleImpl<AppContext> implements WorkerHandle {
+class WorkerHandleImpl<Context> implements WorkerHandle {
 	public readonly id: WorkerId;
 	private readonly workflowRunOptions: Required<WorkflowExecutionOptions>;
 	private readonly registry: WorkflowRegistry;
@@ -135,7 +135,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private stopPromise: Promise<void> | undefined;
 
 	constructor(
-		private readonly client: Client<AppContext>,
+		private readonly client: Client<Context>,
 		private readonly params: Omit<WorkerParams, "options">,
 		private readonly spawnOptions: WorkerSpawnOptions
 	) {
@@ -512,7 +512,7 @@ class WorkerBuilderImpl implements WorkerBuilder {
 		return new WorkerBuilderImpl(this.worker, this.spawnOptionsBuilder.with(path, value));
 	}
 
-	spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
+	spawn<Context>(client: Client<Context>): Promise<WorkerHandle> {
 		return this.worker.spawnWithOptions(client, this.spawnOptionsBuilder.build());
 	}
 }
