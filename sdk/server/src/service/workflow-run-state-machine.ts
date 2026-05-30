@@ -264,7 +264,7 @@ async function transitionStateInTx(
 	}
 
 	if (toState.status === "scheduled" && toState.reason === "retry") {
-		await discardStaleTasks(runId, txRepos);
+		await discardStaleTasks(runId, ["running", "awaiting_retry", "failed"], txRepos);
 	}
 
 	if (toState.status === "awaiting_child_workflow") {
