@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";

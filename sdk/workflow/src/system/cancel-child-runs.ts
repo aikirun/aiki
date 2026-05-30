@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { ApiClient } from "@aikirun/types/client";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
 

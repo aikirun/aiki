@@ -1,4 +1,4 @@
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import type { Logger } from "@aikirun/lib/logger";
 import type { NamespaceId } from "@aikirun/types/namespace";

@@ -1,5 +1,5 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 
 import type { Repositories } from "../infra/db/types";

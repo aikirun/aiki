@@ -1,4 +1,4 @@
-import { shuffleArray } from "@aikirun/lib/array";
+import { shuffleArray } from "@aikirun/lib/collection/array";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type {
 	CreateSubscriber,

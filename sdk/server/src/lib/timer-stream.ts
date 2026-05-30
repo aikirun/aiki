@@ -1,5 +1,5 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 
 import { computeRank, type Ranked } from "../lib/rank";
 

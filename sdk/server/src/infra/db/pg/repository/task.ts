@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 

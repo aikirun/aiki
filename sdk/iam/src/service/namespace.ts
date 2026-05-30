@@ -1,5 +1,5 @@
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { fireAndForget } from "@aikirun/lib/async";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { ForbiddenError, ValidationError } from "@aikirun/lib/error";
 import type { Cache } from "@aikirun/types/infra/cache";
 import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";

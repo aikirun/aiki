@@ -1,6 +1,6 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
-import { isNonEmptyArray, partitionArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import { isNonEmptyArray, partitionArray } from "@aikirun/lib/collection/array";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";

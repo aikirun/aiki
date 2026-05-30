@@ -1,6 +1,6 @@
 import { httpSubscriber } from "@aikirun/http";
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { createBinaryLatch, delay } from "@aikirun/lib/async";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Logger } from "@aikirun/lib/logger";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";

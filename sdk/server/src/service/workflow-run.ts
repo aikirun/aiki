@@ -1,5 +1,5 @@
 import { getTaskAddress, getWorkflowRunAddress } from "@aikirun/lib/address";
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { NotFoundError } from "@aikirun/lib/error";

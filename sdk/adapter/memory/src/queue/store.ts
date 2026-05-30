@@ -1,5 +1,5 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
-import { createMinHeap } from "@aikirun/lib/heap";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import { createMinHeap } from "@aikirun/lib/collection/heap";
 import type { WorkflowRunMessage } from "@aikirun/types/infra/queue";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 

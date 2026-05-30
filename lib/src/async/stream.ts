@@ -1,4 +1,4 @@
-import { isNonEmptyArray, type NonEmptyArray } from "../array";
+import { isNonEmptyArray, type NonEmptyArray } from "../collection/array";
 import type { OptionalProp } from "../object";
 
 export interface StreamChunksOptions<Item, Cursor> {

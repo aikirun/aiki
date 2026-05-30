@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { WorkflowRunClaimReadyRequestV1 } from "@aikirun/types/api/workflow-run";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 

@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { WorkflowMeta } from "@aikirun/types/workflow/workflow";
 
 export function getWorkflowQueueName(name: string, versionId: string, shard?: string): string {

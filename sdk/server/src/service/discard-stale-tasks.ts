@@ -1,5 +1,5 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TaskStateDiscarded } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 

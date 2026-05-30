@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "../array";
+import type { NonEmptyArray } from "../collection/array";
 import type { Equal, ExpectTrue } from "../testing/expect/types";
 
 export type EmptyRecord = Record<PropertyKey, never>;

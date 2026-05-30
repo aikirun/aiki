@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type {
 	CreateSubscriber,
 	Subscriber,

@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput, sha256 } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";

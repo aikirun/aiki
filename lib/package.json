@@ -9,13 +9,17 @@
 			"types": "./dist/address/index.d.ts",
 			"import": "./dist/address/index.js"
 		},
-		"./array": {
-			"types": "./dist/array/index.d.ts",
-			"import": "./dist/array/index.js"
-		},
 		"./async": {
 			"types": "./dist/async/index.d.ts",
 			"import": "./dist/async/index.js"
+		},
+		"./collection/array": {
+			"types": "./dist/collection/array/index.d.ts",
+			"import": "./dist/collection/array/index.js"
+		},
+		"./collection/heap": {
+			"types": "./dist/collection/heap/index.d.ts",
+			"import": "./dist/collection/heap/index.js"
 		},
 		"./context": {
 			"types": "./dist/context/index.d.ts",
@@ -32,10 +36,6 @@
 		"./error": {
 			"types": "./dist/error/index.d.ts",
 			"import": "./dist/error/index.js"
-		},
-		"./heap": {
-			"types": "./dist/heap/index.d.ts",
-			"import": "./dist/heap/index.js"
 		},
 		"./id": {
 			"types": "./dist/id/index.d.ts",

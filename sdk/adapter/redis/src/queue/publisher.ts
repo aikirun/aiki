@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { CreatePublisher, Publisher, PublisherContext, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 import type { Redis } from "ioredis";
 

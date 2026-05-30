@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { ConflictError } from "@aikirun/lib/error";
 import type { NamespaceRole } from "@aikirun/types/namespace";
 import { and, eq, sql } from "drizzle-orm";

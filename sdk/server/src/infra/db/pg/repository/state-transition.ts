@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { TERMINAL_WORKFLOW_RUN_STATUSES, type WorkflowRunState } from "@aikirun/types/workflow/run";
 import type { TaskState } from "@aikirun/types/workflow/task";

@@ -1,6 +1,6 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
-import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow/run";

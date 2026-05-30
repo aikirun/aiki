@@ -1,5 +1,5 @@
-import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
+import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Logger } from "@aikirun/lib/logger";
 import { withRetry } from "@aikirun/lib/retry";
 import type { Publisher } from "@aikirun/types/infra/queue";
