@@ -286,6 +286,7 @@ async function transitionStateInTx(
 	const newRevision = await updateWorkflowRun(runId, request, toState, stateTransitionId, attempts, txRepos);
 
 	if (toState.status === "cancelled") {
+		await discardStaleTasks(runId, ["running", "awaiting_retry"], txRepos);
 		const shard = (run.options as WorkflowStartOptions | null)?.shard;
 		await childRunCanceller.cancel([{ namespaceId, runId, shard }], txRepos, context.logger);
 	}

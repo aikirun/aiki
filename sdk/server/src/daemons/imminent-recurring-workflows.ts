@@ -23,6 +23,7 @@ import { computeRank } from "../lib/rank";
 import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "../service/cancel-child-runs";
+import { discardStaleTasks } from "../service/discard-stale-tasks";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "../service/schedule";
 
 export interface ProcessImminentRecurringWorkflowsDeps {
@@ -403,8 +404,11 @@ async function processOverlapCancelPreviousSchedules(
 			? await txRepos.workflowRun.bulkTransitionToCancelled(runIdsToCancel)
 			: [];
 
-		// Step 2: Insert cancel state transitions only for actually cancelled runs, then set latestStateTransitionId
+		// Step 2: Discard in-flight tasks for the cancelled runs, then insert cancel state transitions
+		// only for actually cancelled runs and set latestStateTransitionId
 		if (isNonEmptyArray(cancelledRunIds)) {
+			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+
 			const cancelledRunIdsSet = new Set(cancelledRunIds);
 			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
 			const cancelledRunStateTransitionIdUpdates: { id: string; stateTransitionId: string }[] = [];
