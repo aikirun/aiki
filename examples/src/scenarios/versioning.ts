@@ -1,4 +1,4 @@
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import { greeterV1, greeterV2 } from "../workflows/versioning";
 
 await runWithWorker([greeterV1, greeterV2], async (client) => {

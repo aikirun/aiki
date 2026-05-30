@@ -1,6 +1,6 @@
 import { delay } from "@aikirun/lib/async";
 
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import { longRunningPipelineV1 } from "../workflows/long-running-pipeline";
 
 await runWithWorker([longRunningPipelineV1], async (client) => {

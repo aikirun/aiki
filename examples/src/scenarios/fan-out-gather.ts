@@ -1,4 +1,4 @@
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import { childV1, fanOutGatherV1 } from "../workflows/fan-out-gather";
 
 await runWithWorker([childV1, fanOutGatherV1], async (client) => {

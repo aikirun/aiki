@@ -1,4 +1,4 @@
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import { concurrentTasksV1 } from "../workflows/concurrent-tasks";
 
 await runWithWorker([concurrentTasksV1], async (client) => {

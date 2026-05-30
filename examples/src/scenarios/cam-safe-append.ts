@@ -1,6 +1,6 @@
 import { delay } from "@aikirun/lib/async";
 
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import * as cam from "../workflows/cam-divergence";
 
 await runWithWorker([cam.camAppendV1], async (client) => {

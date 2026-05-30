@@ -1,7 +1,7 @@
 import { delay } from "@aikirun/lib/async";
 import { schedule } from "@aikirun/workflow";
 
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import { notify } from "../workflows/notify";
 
 const everyFiveSeconds = schedule({

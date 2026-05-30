@@ -1,6 +1,6 @@
 import { delay } from "@aikirun/lib/async";
 
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import { childWorkflowV1, grandparentWorkflowV1, parentWorkflowV1 } from "../workflows/cancellation-cascade";
 
 await runWithWorker([childWorkflowV1, parentWorkflowV1, grandparentWorkflowV1], async (client) => {

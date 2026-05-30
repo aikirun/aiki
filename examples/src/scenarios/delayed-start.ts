@@ -1,4 +1,4 @@
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import { notify } from "../workflows/notify";
 
 await runWithWorker([notify], async (client) => {

@@ -24,11 +24,14 @@ interface Setup {
 }
 
 /**
- * Spawns two workers with the given workflows, runs the callback, then shuts down.
- * Two workers demonstrate the distributed nature of child workflows — a parent
- * running on worker-A can have its children picked up by worker-B.
+ * Spawns two workers that listen for the given workflows, runs the callback,
+ * then shuts down.
  *
- * Switches between embedded mode (server, workers, and client all in this process)
+ * Two workers demonstrate the distributed nature of workflows.
+ * For instance, a parent workflow running on worker-A can have
+ * its children picked up by worker-B.
+ *
+ * Switches between embedded mode (server and workers all in this process)
  * and remote mode (talks to a separately-deployed server over HTTP) via
  * AIKI_EXAMPLE_MODE.
  */

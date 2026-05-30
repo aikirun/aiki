@@ -1,6 +1,6 @@
 import { delay } from "@aikirun/lib/async";
 
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import { echoV1 } from "../workflows/echo";
 
 await runWithWorker([echoV1], async (client) => {
