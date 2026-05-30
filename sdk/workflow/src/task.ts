@@ -32,10 +32,10 @@ import type {
 import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import type { WorkflowRunContext } from "./run/context";
+import type { WorkflowRun } from "./run/context";
 import type { WorkflowRunHandle } from "./run/handle";
 
-type UnknownWorkflowRunContext = WorkflowRunContext<unknown, unknown>;
+type UnknownWorkflowRun = WorkflowRun<unknown, unknown>;
 type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
 
 /**
@@ -100,7 +100,7 @@ export interface TaskParams<Input, Output> {
 export interface Task<Input, Output> {
 	name: TaskName;
 	with(): TaskBuilder<Input, Output>;
-	start: (run: UnknownWorkflowRunContext, ...args: Input extends void ? [] : [Input]) => Promise<Output>;
+	start: (run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]) => Promise<Output>;
 }
 
 class TaskImpl<Input, Output> implements Task<Input, Output> {
@@ -116,12 +116,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		return new TaskBuilderImpl(this, startOptionsOverrider());
 	}
 
-	public async start(run: UnknownWorkflowRunContext, ...args: Input extends void ? [] : [Input]): Promise<Output> {
+	public async start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
 		return this.startWithOptions(run, this.params.options ?? {}, ...args);
 	}
 
 	public async startWithOptions(
-		run: UnknownWorkflowRunContext,
+		run: UnknownWorkflowRun,
 		startOptions: TaskStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<Output> {
@@ -181,7 +181,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async getExistingTaskResult(
-		run: UnknownWorkflowRunContext,
+		run: UnknownWorkflowRun,
 		handle: UnknownWorkflowRunHandle,
 		startOptions: TaskStartOptions,
 		input: Input,
@@ -218,7 +218,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async throwNonDeterminismError(
-		run: UnknownWorkflowRunContext,
+		run: UnknownWorkflowRun,
 		handle: UnknownWorkflowRunHandle,
 		inputHash: string,
 		unconsumedManifestEntries: UnconsumedManifestEntries
@@ -238,7 +238,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	private async retryAndExecute(
-		run: UnknownWorkflowRunContext,
+		run: UnknownWorkflowRun,
 		handle: UnknownWorkflowRunHandle,
 		input: Input,
 		taskId: string,
@@ -414,7 +414,7 @@ class TaskBuilderImpl<Input, Output> implements TaskBuilder<Input, Output> {
 		return new TaskBuilderImpl(this.task, this.startOptionsBuilder.with(path, value));
 	}
 
-	start(run: UnknownWorkflowRunContext, ...args: Input extends void ? [] : [Input]): Promise<Output> {
+	start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
 		return this.task.startWithOptions(run, this.startOptionsBuilder.build(), ...args);
 	}
 }

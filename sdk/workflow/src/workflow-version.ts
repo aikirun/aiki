@@ -34,14 +34,14 @@ import {
 import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import type { WorkflowRunContext } from "./run/context";
+import type { WorkflowRun } from "./run/context";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
 
 export interface WorkflowVersionParams<Input, Output, AppContext, TEvents extends EventsDefinition> {
 	handler: (
-		run: Readonly<WorkflowRunContext<Input, AppContext, TEvents>>,
+		run: Readonly<WorkflowRun<Input, AppContext, TEvents>>,
 		input: Input,
 		context: AppContext
 	) => Promise<Output>;
@@ -66,7 +66,7 @@ export interface WorkflowVersion<Input, Output, AppContext, TEvents extends Even
 	) => Promise<WorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
 	startAsChild: <ParentInput, ParentEvents extends EventsDefinition>(
-		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEvents>,
+		parentRun: WorkflowRun<ParentInput, AppContext, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
 	) => Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>>;
 
@@ -82,7 +82,7 @@ export interface WorkflowVersion<Input, Output, AppContext, TEvents extends Even
 
 	[INTERNAL]: {
 		eventsDefinition: TEvents;
-		handler: (run: WorkflowRunContext<Input, AppContext, TEvents>, input: Input, context: AppContext) => Promise<void>;
+		handler: (run: WorkflowRun<Input, AppContext, TEvents>, input: Input, context: AppContext) => Promise<void>;
 	};
 }
 
@@ -157,14 +157,14 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 	}
 
 	public async startAsChild(
-		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
+		parentRun: WorkflowRun<unknown, AppContext, EventsDefinition>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		return this.startAsChildWithOptions(parentRun, this.params.options ?? {}, ...args);
 	}
 
 	public async startAsChildWithOptions(
-		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
+		parentRun: WorkflowRun<unknown, AppContext, EventsDefinition>,
 		startOptions: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
@@ -241,7 +241,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 	}
 
 	private async throwNonDeterminismError(
-		parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
+		parentRun: WorkflowRun<unknown, AppContext, EventsDefinition>,
 		parentRunHandle: WorkflowRunHandle<unknown, unknown, AppContext, EventsDefinition>,
 		inputHash: string,
 		referenceId: string | undefined,
@@ -288,7 +288,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 	}
 
 	private async handler(
-		run: WorkflowRunContext<Input, AppContext, TEvents>,
+		run: WorkflowRun<Input, AppContext, TEvents>,
 		input: Input,
 		context: AppContext
 	): Promise<void> {
@@ -310,7 +310,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 
 	private async tryExecuteWorkflow(
 		input: Input,
-		run: WorkflowRunContext<Input, AppContext, TEvents>,
+		run: WorkflowRun<Input, AppContext, TEvents>,
 		context: AppContext,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
@@ -466,7 +466,7 @@ class WorkflowBuilderImpl<Input, Output, AppContext, TEvents extends EventsDefin
 	}
 
 	startAsChild<ParentInput, ParentEvents extends EventsDefinition>(
-		parentRun: WorkflowRunContext<ParentInput, AppContext, ParentEvents>,
+		parentRun: WorkflowRun<ParentInput, AppContext, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
 		return this.workflow.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);

@@ -12,7 +12,7 @@ import {
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 
-import type { WorkflowRunContext } from "./context";
+import type { WorkflowRun } from "./context";
 import type { EventsDefinition } from "./event";
 import {
 	type WorkflowRunHandle,
@@ -24,7 +24,7 @@ import {
 export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	client: Client<AppContext>,
 	run: WorkflowRunRecord<Input, Output>,
-	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
+	parentRun: WorkflowRun<unknown, AppContext, EventsDefinition>,
 	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger,
 	eventsDefinition?: TEvents
@@ -103,7 +103,7 @@ export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 
 function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDefinition>(
 	handle: WorkflowRunHandle<Input, Output, AppContext, TEvents>,
-	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
+	parentRun: WorkflowRun<unknown, AppContext, EventsDefinition>,
 	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger
 ) {

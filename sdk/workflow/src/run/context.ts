@@ -7,7 +7,7 @@ import type { ReplayManifest, SleepResult, WorkflowRunId, WorkflowStartOptions }
 import type { EventsDefinition, EventWaiters } from "./event";
 import type { WorkflowRunHandle } from "./handle";
 
-export interface WorkflowRunContext<Input, AppContext, TEvents extends EventsDefinition = EventsDefinition> {
+export interface WorkflowRun<Input, AppContext, TEvents extends EventsDefinition = EventsDefinition> {
 	id: WorkflowRunId;
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
