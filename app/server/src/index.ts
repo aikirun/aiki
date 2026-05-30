@@ -31,13 +31,16 @@ if (import.meta.main) {
 		db,
 		cache,
 		logger,
-		iam: iam({
-			db,
-			cache,
-			secret: config.auth.secret,
-			baseURL: config.baseURL,
-			trustedOrigins: config.corsOrigins,
-		}),
+		iam:
+			config.auth && config.baseURL
+				? iam({
+						db,
+						cache,
+						secret: config.auth.secret,
+						baseURL: config.baseURL,
+						trustedOrigins: config.corsOrigins,
+					})
+				: undefined,
 		runtime: {
 			...(redis && {
 				publisher: redisPublisher(redis),

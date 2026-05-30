@@ -23,6 +23,12 @@ export async function loadConfig(): Promise<Config> {
 			}
 		: undefined;
 
+	const auth = process.env.AIKI_SERVER_AUTH_SECRET
+		? {
+				secret: process.env.AIKI_SERVER_AUTH_SECRET,
+			}
+		: undefined;
+
 	const raw = {
 		host: process.env.AIKI_SERVER_HOST,
 		port: process.env.AIKI_SERVER_PORT,
@@ -30,9 +36,7 @@ export async function loadConfig(): Promise<Config> {
 		corsOrigins: process.env.CORS_ORIGINS,
 		redis,
 		db: readDatabaseEnv(),
-		auth: {
-			secret: process.env.AIKI_SERVER_AUTH_SECRET,
-		},
+		auth,
 		logLevel: process.env.LOG_LEVEL,
 		prettyLogs: process.env.PRETTY_LOGS,
 	};

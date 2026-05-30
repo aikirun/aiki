@@ -29,13 +29,22 @@ export const authConfigSchema = type({
 export const configSchema = type({
 	host: "string > 0 = '0.0.0.0'",
 	port: "string.integer.parse | number.integer > 0 = 9850",
-	baseURL: "string > 0",
+	"baseURL?": "string > 0",
 	corsOrigins: uniqueCommaSeparatedToItems,
 	"redis?": redisConfigSchema.or(type("undefined")),
 	db: databaseConfigSchema,
-	auth: authConfigSchema,
+	"auth?": authConfigSchema.or(type("undefined")),
 	logLevel: type.enumerated(...logLevels).default("info"),
 	prettyLogs: type("boolean").or(coerceBool).default(false),
+}).narrow((config, context) => {
+	if (config.auth && !config.baseURL) {
+		return context.reject({
+			code: "predicate",
+			path: ["baseURL"],
+			expected: "set when auth is configured",
+		});
+	}
+	return true;
 });
 
 export type RedisConfig = typeof redisConfigSchema.infer;
