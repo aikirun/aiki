@@ -57,7 +57,7 @@ import {
  *
  * @see {@link https://github.com/aikirun/aiki} for complete documentation
  */
-export function workflow(params: WorkflowParams): Workflow {
+export function workflow<AppContext = null>(params: WorkflowParams): Workflow<AppContext> {
 	return new WorkflowImpl(params);
 }
 
@@ -65,13 +65,12 @@ export interface WorkflowParams {
 	name: string;
 }
 
-export interface Workflow {
+export interface Workflow<AppContext> {
 	name: WorkflowName;
 
 	v: <
 		Input extends Serializable,
 		Output extends Serializable,
-		AppContext = null,
 		TEvents extends EventsDefinition = Record<string, never>,
 	>(
 		versionId: string,
@@ -84,9 +83,9 @@ export interface Workflow {
 	};
 }
 
-class WorkflowImpl implements Workflow {
+class WorkflowImpl<AppContext> implements Workflow<AppContext> {
 	public readonly name: WorkflowName;
-	public readonly [INTERNAL]: Workflow[typeof INTERNAL];
+	public readonly [INTERNAL]: Workflow<AppContext>[typeof INTERNAL];
 	private workflowVersions = new Map<WorkflowVersionId, UnknownWorkflowVersion>();
 
 	constructor(params: WorkflowParams) {
@@ -97,7 +96,7 @@ class WorkflowImpl implements Workflow {
 		};
 	}
 
-	v<Input extends Serializable, Output extends Serializable, AppContext, TEvents extends EventsDefinition>(
+	v<Input extends Serializable, Output extends Serializable, TEvents extends EventsDefinition>(
 		versionId: string,
 		params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
 	): WorkflowVersion<Input, Output, AppContext, TEvents> {

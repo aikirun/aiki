@@ -40,11 +40,7 @@ import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
 
 export interface WorkflowVersionParams<Input, Output, AppContext, TEvents extends EventsDefinition> {
-	handler: (
-		run: Readonly<WorkflowRun<Input, AppContext, TEvents>>,
-		input: Input,
-		context: AppContext
-	) => Promise<Output>;
+	handler: (run: Readonly<WorkflowRun<Input, AppContext, TEvents>>, input: Input) => Promise<Output>;
 	events?: TEvents;
 	options?: WorkflowDefinitionOptions;
 	schema?: RequireAtLeastOneProp<{
@@ -82,7 +78,7 @@ export interface WorkflowVersion<Input, Output, AppContext, TEvents extends Even
 
 	[INTERNAL]: {
 		eventsDefinition: TEvents;
-		handler: (run: WorkflowRun<Input, AppContext, TEvents>, input: Input, context: AppContext) => Promise<void>;
+		handler: (run: WorkflowRun<Input, AppContext, TEvents>, input: Input) => Promise<void>;
 	};
 }
 
@@ -287,11 +283,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		return workflowRunHandle(client, run as WorkflowRunRecord<Input, Output>, this[INTERNAL].eventsDefinition);
 	}
 
-	private async handler(
-		run: WorkflowRun<Input, AppContext, TEvents>,
-		input: Input,
-		context: AppContext
-	): Promise<void> {
+	private async handler(run: WorkflowRun<Input, AppContext, TEvents>, input: Input): Promise<void> {
 		const { logger } = run;
 		const { handle } = run[INTERNAL];
 
@@ -302,7 +294,7 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 		logger.info("Starting workflow");
 		await handle[INTERNAL].transitionState({ status: "running" });
 
-		const output = await this.tryExecuteWorkflow(input, run, context, retryStrategy);
+		const output = await this.tryExecuteWorkflow(input, run, retryStrategy);
 
 		await handle[INTERNAL].transitionState({ status: "completed", output });
 		logger.info("Workflow complete");
@@ -311,14 +303,13 @@ export class WorkflowVersionImpl<Input, Output, AppContext, TEvents extends Even
 	private async tryExecuteWorkflow(
 		input: Input,
 		run: WorkflowRun<Input, AppContext, TEvents>,
-		context: AppContext,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
 		const { handle } = run[INTERNAL];
 
 		while (true) {
 			try {
-				const outputRaw = await this.params.handler(run, input, context);
+				const outputRaw = await this.params.handler(run, input);
 				const output = await this.parse(handle, this.params.schema?.output, outputRaw, run.logger);
 				return output;
 			} catch (error) {

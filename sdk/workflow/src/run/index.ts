@@ -15,7 +15,7 @@ export interface WorkflowRun<Input, AppContext, TEvents extends EventsDefinition
 	logger: Logger;
 	sleep: (name: string, duration: Duration) => Promise<SleepResult>;
 	events: EventWaiters<TEvents>;
-
+	context: AppContext;
 	[INTERNAL]: {
 		handle: WorkflowRunHandle<Input, unknown, AppContext, TEvents>;
 		replayManifest: ReplayManifest;

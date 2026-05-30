@@ -79,14 +79,14 @@ export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowPara
 				logger,
 				sleep: createSleeper(handle, logger),
 				events: createEventWaiters(handle, eventsDefinition, logger),
+				context: appContext instanceof Promise ? await appContext : appContext,
 				[INTERNAL]: {
 					handle,
 					replayManifest: createReplayManifest(workflowRun),
 					options: { spinThresholdMs: options.spinThresholdMs },
 				},
 			},
-			workflowRun.input,
-			appContext instanceof Promise ? await appContext : appContext
+			workflowRun.input
 		);
 
 		return true;
