@@ -86,8 +86,6 @@ async function processChunk(
 ): Promise<void> {
 	const completedAt = new Date();
 
-	const workflowRunIds = runs.map((run) => run.id) as NonEmptyArray<string>;
-
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -135,11 +133,12 @@ async function processChunk(
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
-		await txRepos.sleepQueue.bulkCompleteByWorkflowRunIds(workflowRunIds, completedAt);
 		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("sleeping", workflowRunUpdates);
 		if (!isNonEmptyArray(transitionedRunIds)) {
 			return [];
 		}
+
+		await txRepos.sleepQueue.bulkCompleteByWorkflowRunIds(transitionedRunIds, completedAt);
 
 		let stateTransitionEntriesToInsert = stateTransitionEntries;
 		let outboxEntriesToInsert = outboxEntries;
