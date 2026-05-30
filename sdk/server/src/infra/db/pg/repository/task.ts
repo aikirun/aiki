@@ -43,12 +43,7 @@ export function createTaskRepository(db: PgDb) {
 				.limit(10_000);
 		},
 
-		async listRetryableTaskWorkflowRuns(
-			_context: DaemonContext,
-			before: Date,
-			limit: number,
-			cursor?: TimerStreamCursor
-		) {
+		async listRetryableTasks(_context: DaemonContext, before: Date, limit: number, cursor?: TimerStreamCursor) {
 			const dueAtExpr = min(task.nextAttemptAt);
 
 			return db

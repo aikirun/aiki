@@ -44,7 +44,7 @@ export async function processImminentRetryableTaskRuns(
 
 	let now = Date.now();
 	for await (const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } of streamChunks(
-		(cursor) => repos.task.listRetryableTaskWorkflowRuns(context, dueBefore, limit, cursor),
+		(cursor) => repos.task.listRetryableTasks(context, dueBefore, limit, cursor),
 		{
 			advanceCursor: advanceTaskCursor,
 			until: (chunk) => chunk.length < limit,
