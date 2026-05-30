@@ -141,7 +141,7 @@ async function processChunk(
 			return [];
 		}
 
-		await discardStaleTasks(transitionedRunIds, txRepos);
+		await discardStaleTasks(transitionedRunIds, ["running", "awaiting_retry", "failed"], txRepos);
 
 		let stateTransitionEntriesToInsert = stateTransitionEntries;
 		let outboxEntriesToInsert = outboxEntries;

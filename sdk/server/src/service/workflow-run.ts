@@ -49,6 +49,7 @@ import type { WorkflowRepository, WorkflowRow } from "../infra/db/types/workflow
 import type { WorkflowRunRow } from "../infra/db/types/workflow-run";
 import type { NamespaceRequestContext } from "../middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "../service/cancel-child-runs";
+import { discardStaleTasks } from "../service/discard-stale-tasks";
 import type { WorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
 
 export interface WorkflowRunServiceDeps {
@@ -536,6 +537,8 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 			if (!isNonEmptyArray(cancelledRunIds)) {
 				return { cancelledIds: [] };
 			}
+
+			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
 
 			const cancelledRuns = await txRepos.workflowRun.getByIds(context.namespaceId, cancelledRunIds);
 
