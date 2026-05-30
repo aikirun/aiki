@@ -161,23 +161,38 @@ async function processChunk(
 		});
 	}
 
-	if (
-		!isNonEmptyArray(eventWaitEntries) ||
-		!isNonEmptyArray(stateTransitionEntries) ||
-		!isNonEmptyArray(workflowRunUpdates)
-	) {
+	if (!isNonEmptyArray(workflowRunUpdates)) {
 		return;
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
-		await txRepos.eventWaitQueue.insert(eventWaitEntries);
-		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("awaiting_event", workflowRunUpdates);
-		const transitionedRunIdsSet = new Set(transitionedRunIds);
-		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
-		if (!isNonEmptyArray(outboxEntriesToInsert)) {
+		if (!isNonEmptyArray(transitionedRunIds)) {
 			return [];
 		}
+
+		let eventWaitEntriesToInsert = eventWaitEntries;
+		let stateTransitionEntriesToInsert = stateTransitionEntries;
+		let outboxEntriesToInsert = outboxEntries;
+		if (transitionedRunIds.length !== stateTransitionEntries.length) {
+			const transitionedRunIdsSet = new Set(transitionedRunIds);
+			eventWaitEntriesToInsert = eventWaitEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
+			stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
+				transitionedRunIdsSet.has(entry.workflowRunId)
+			);
+			outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
+		}
+
+		if (
+			!isNonEmptyArray(eventWaitEntriesToInsert) ||
+			!isNonEmptyArray(stateTransitionEntriesToInsert) ||
+			!isNonEmptyArray(outboxEntriesToInsert)
+		) {
+			return [];
+		}
+
+		await txRepos.eventWaitQueue.insert(eventWaitEntriesToInsert);
+		await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
 		await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
 		return outboxEntriesToInsert;
 	});
