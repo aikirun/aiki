@@ -1,10 +1,10 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import type {
-	CreateTimerSortedSet,
+	CreateTimerPriorityQueue,
 	DueTimer,
 	TimerEntry,
+	TimerPriorityQueue,
 	TimerSignalWaiter,
-	TimerSortedSet,
 	TimerType,
 } from "@aikirun/types/infra/timer";
 import type { Redis } from "ioredis";
@@ -70,10 +70,10 @@ end
 return minSignal
 `;
 
-export function redisTimerSortedSet(redis: Redis, key: string): CreateTimerSortedSet {
+export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerPriorityQueue {
 	const signalKey = `${key}:signal`;
 
-	return ({ logger }): TimerSortedSet => ({
+	return ({ logger }): TimerPriorityQueue => ({
 		async add(timers: NonEmptyArray<TimerEntry>): Promise<void> {
 			let minDueAt = timers[0].dueAt;
 			const args: (string | number)[] = [];

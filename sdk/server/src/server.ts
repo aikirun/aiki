@@ -6,7 +6,7 @@ import type { ApiAuthorizer, Iam, IamContext } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
 import type { Database } from "@aikirun/types/infra/db";
 import type { CreatePublisher } from "@aikirun/types/infra/queue";
-import type { CreateTimerSortedSet } from "@aikirun/types/infra/timer";
+import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { RPCHandler } from "@orpc/server/fetch";
@@ -31,7 +31,7 @@ export interface ServerRuntimeOptions {
 
 export interface ServerRuntimeParams {
 	publisher?: CreatePublisher;
-	timerSortedSet?: CreateTimerSortedSet;
+	timerPriorityQueue?: CreateTimerPriorityQueue;
 	options?: ServerRuntimeOptions;
 }
 
@@ -150,7 +150,7 @@ export function server(params: ServerParams): Server {
 				workflowRunPublisher: params.runtime?.publisher?.({
 					logger: logger.child({ "aiki.component": "workflow-run-publisher" }),
 				}),
-				timerSortedSet: params.runtime?.timerSortedSet?.({
+				timerPriorityQueue: params.runtime?.timerPriorityQueue?.({
 					logger: logger.child({ "aiki.component": "timer-sorted-set" }),
 				}),
 				childRunCanceller,

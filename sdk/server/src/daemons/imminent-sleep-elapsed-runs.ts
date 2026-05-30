@@ -1,6 +1,6 @@
 import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
 import type { Publisher } from "@aikirun/types/infra/queue";
-import type { TimerEntry, TimerSortedSet } from "@aikirun/types/infra/timer";
+import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
@@ -23,12 +23,12 @@ type Repos = Pick<
 export interface ProcessImminentSleepElapsedRunsDeps {
 	repos: Repos;
 	workflowRunPublisher?: Publisher;
-	timerSortedSet?: TimerSortedSet;
+	timerPriorityQueue?: TimerPriorityQueue;
 }
 
 export async function processImminentSleepElapsedRuns(
 	context: DaemonContext,
-	{ repos, workflowRunPublisher, timerSortedSet }: ProcessImminentSleepElapsedRunsDeps,
+	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentSleepElapsedRunsDeps,
 	options?: { limit?: number; imminenceThresholdMs?: number }
 ) {
 	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
@@ -43,14 +43,14 @@ export async function processImminentSleepElapsedRuns(
 			await queueSleepElapsedRuns(context, repos, workflowRunPublisher, runsDueNow);
 		}
 
-		if (timerSortedSet && isNonEmptyArray(runsDueSoon)) {
+		if (timerPriorityQueue && isNonEmptyArray(runsDueSoon)) {
 			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
 				type: "sleep",
 				id: run.id,
 				dueAt: run.dueAt.getTime(),
 				rank: run.rank,
 			}));
-			await timerSortedSet.add(timers as NonEmptyArray<TimerEntry>);
+			await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
 		}
 	}
 }

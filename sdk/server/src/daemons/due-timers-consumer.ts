@@ -3,7 +3,7 @@ import { streamChunks } from "@aikirun/lib/async";
 import type { Logger } from "@aikirun/lib/logger";
 import { withRetry } from "@aikirun/lib/retry";
 import type { Publisher } from "@aikirun/types/infra/queue";
-import type { DueTimer, TimerSignalWaiter, TimerSortedSet, TimerType } from "@aikirun/types/infra/timer";
+import type { DueTimer, TimerPriorityQueue, TimerSignalWaiter, TimerType } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 
@@ -24,7 +24,7 @@ import { scheduleRowToDomain } from "../service/schedule";
 
 export interface DueTimersConsumerDeps {
 	repos: Repositories;
-	timerSortedSet: TimerSortedSet;
+	timerPriorityQueue: TimerPriorityQueue;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: Publisher;
 }
@@ -46,7 +46,7 @@ export function spawnDueTimersConsumer(
 	const abortController = new AbortController();
 	const { signal: abortSignal } = abortController;
 
-	const timerSignalWaiter = deps.timerSortedSet.createSignalWaiter();
+	const timerSignalWaiter = deps.timerPriorityQueue.createSignalWaiter();
 
 	const promise = withRetry(
 		() => dueTimersConsumerLoop(logger, deps, timerSignalWaiter, abortSignal, options),
@@ -81,7 +81,7 @@ async function dueTimersConsumerLoop(
 	const { limit = 1_000, overshootMs = 30 } = options ?? {};
 
 	// Peek on startup to discover any entries left over from a previous consumer's lifecycle.
-	let nextTimerRank = await deps.timerSortedSet.peekNextRank();
+	let nextTimerRank = await deps.timerPriorityQueue.peekNextRank();
 	let nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
 
 	while (!abortSignal.aborted) {
@@ -109,7 +109,7 @@ async function dueTimersConsumerLoop(
 
 		const context = createDaemonContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
 
-		const next = () => deps.timerSortedSet.popDue(computeRank(Date.now()), limit);
+		const next = () => deps.timerPriorityQueue.popDue(computeRank(Date.now()), limit);
 
 		for await (const dueTimers of streamChunks(next, { until: (chunk) => chunk.length < limit })) {
 			try {
@@ -119,7 +119,7 @@ async function dueTimersConsumerLoop(
 			}
 		}
 
-		nextTimerRank = await deps.timerSortedSet.peekNextRank();
+		nextTimerRank = await deps.timerPriorityQueue.peekNextRank();
 		nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
 	}
 }

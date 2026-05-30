@@ -2,7 +2,7 @@ import { delay } from "@aikirun/lib/async";
 import type { Logger } from "@aikirun/lib/logger";
 import { withRetry } from "@aikirun/lib/retry";
 import type { Publisher } from "@aikirun/types/infra/queue";
-import type { TimerSortedSet } from "@aikirun/types/infra/timer";
+import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 
 import { type DueTimersConsumerHandle, spawnDueTimersConsumer } from "./due-timers-consumer";
 import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
@@ -22,7 +22,7 @@ import type { ChildRunCanceller } from "../service/cancel-child-runs";
 export interface InitDaemonsDeps {
 	repos: Repositories;
 	workflowRunPublisher?: Publisher;
-	timerSortedSet?: TimerSortedSet;
+	timerPriorityQueue?: TimerPriorityQueue;
 	childRunCanceller: ChildRunCanceller;
 }
 
@@ -71,38 +71,38 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 		initDaemon(logger, 1_000, processImminentScheduledRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
-			timerSortedSet: deps.timerSortedSet,
+			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
 		initDaemon(logger, 1_000, processImminentSleepElapsedRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
-			timerSortedSet: deps.timerSortedSet,
+			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
 		initDaemon(logger, 1_000, processImminentRetryableRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
-			timerSortedSet: deps.timerSortedSet,
+			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
 		initDaemon(logger, 1_000, processImminentRetryableTaskRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
-			timerSortedSet: deps.timerSortedSet,
+			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
 		initDaemon(logger, 1_000, processImminentEventWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
-			timerSortedSet: deps.timerSortedSet,
+			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
 		initDaemon(logger, 1_000, processImminentChildRunWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
-			timerSortedSet: deps.timerSortedSet,
+			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
 		initDaemon(logger, 1_000, processImminentRecurringWorkflows, {
 			repos: deps.repos,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
-			timerSortedSet: deps.timerSortedSet,
+			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
 	];
 
@@ -120,10 +120,10 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 	}
 
 	let dueTimersConsumer: DueTimersConsumerHandle | undefined;
-	if (deps.timerSortedSet) {
+	if (deps.timerPriorityQueue) {
 		dueTimersConsumer = spawnDueTimersConsumer(logger, {
 			repos: deps.repos,
-			timerSortedSet: deps.timerSortedSet,
+			timerPriorityQueue: deps.timerPriorityQueue,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
 		});

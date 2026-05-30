@@ -2,7 +2,7 @@ import type { NonEmptyArray } from "@aikirun/lib/array";
 import { isNonEmptyArray, partitionArray } from "@aikirun/lib/array";
 import { streamChunks } from "@aikirun/lib/async";
 import type { Publisher } from "@aikirun/types/infra/queue";
-import type { TimerEntry, TimerSortedSet } from "@aikirun/types/infra/timer";
+import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
 import {
@@ -29,7 +29,7 @@ export interface ProcessImminentRecurringWorkflowsDeps {
 	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "schedule" | "workflowRunOutbox" | "transaction">;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: Publisher;
-	timerSortedSet?: TimerSortedSet;
+	timerPriorityQueue?: TimerPriorityQueue;
 }
 
 export type DueSchedule = Schedule & {
@@ -78,15 +78,15 @@ export async function processImminentRecurringWorkflows(
 			await queueRecurringWorkflows(context, deps, schedulesDueNow);
 		}
 
-		const { timerSortedSet } = deps;
-		if (timerSortedSet && isNonEmptyArray(schedulesDueSoon)) {
+		const { timerPriorityQueue } = deps;
+		if (timerPriorityQueue && isNonEmptyArray(schedulesDueSoon)) {
 			const timers: TimerEntry[] = schedulesDueSoon.map((schedule) => ({
 				type: "recurring",
 				id: schedule.id,
 				dueAt: schedule.nextRunAt,
 				rank: computeRank(schedule.nextRunAt),
 			}));
-			await timerSortedSet.add(timers as NonEmptyArray<TimerEntry>);
+			await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
 		}
 	}
 }

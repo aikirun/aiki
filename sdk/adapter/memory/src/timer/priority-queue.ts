@@ -1,12 +1,12 @@
 import type { NonEmptyArray } from "@aikirun/lib/array";
 import { createMinHeap } from "@aikirun/lib/heap";
 import type {
-	CreateTimerSortedSet,
+	CreateTimerPriorityQueue,
 	DueTimer,
 	TimerEntry,
+	TimerPriorityQueue,
+	TimerPriorityQueueContext,
 	TimerSignalWaiter,
-	TimerSortedSet,
-	TimerSortedSetContext,
 	TimerType,
 } from "@aikirun/types/infra/timer";
 
@@ -34,16 +34,16 @@ function compareTimerItems(a: TimerHeapItem, b: TimerHeapItem): number {
 }
 
 /**
- * In-process TimerSortedSet backed by a min-heap and an internal signal queue.
+ * In-process TimerPriorityQueue backed by a min-heap and an internal signal queue.
  *
  * Returns a factory for creating the sorted set.
  *
- * State is allocated once per call to `inMemoryTimerSortedSet()` and persists
+ * State is allocated once per call to `inMemoryTimerPriorityQueue()` and persists
  * for the lifetime of the returned factory. That factory returns the
  * same underlying instance on every invocation, so a server can be stopped
  * and restarted (which re-invokes the factory) without losing queued timers.
  */
-export function inMemoryTimerSortedSet(): CreateTimerSortedSet {
+export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 	const heap = createMinHeap<TimerHeapItem>(compareTimerItems);
 	const signals: number[] = [];
 
@@ -60,7 +60,7 @@ export function inMemoryTimerSortedSet(): CreateTimerSortedSet {
 		return min ?? 0;
 	}
 
-	const timerSortedSet: TimerSortedSet = {
+	const timerPriorityQueue: TimerPriorityQueue = {
 		async add(timers: NonEmptyArray<TimerEntry>): Promise<void> {
 			let minDueAt = timers[0].dueAt;
 			for (const timer of timers) {
@@ -160,5 +160,5 @@ export function inMemoryTimerSortedSet(): CreateTimerSortedSet {
 		},
 	};
 
-	return (_context: TimerSortedSetContext): TimerSortedSet => timerSortedSet;
+	return (_context: TimerPriorityQueueContext): TimerPriorityQueue => timerPriorityQueue;
 }

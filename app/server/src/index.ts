@@ -1,6 +1,6 @@
 import process from "node:process";
 import { iam } from "@aikirun/iam";
-import { redisCache, redisPublisher, redisTimerSortedSet } from "@aikirun/redis";
+import { redisCache, redisPublisher, redisTimerPriorityQueue } from "@aikirun/redis";
 import { database, server } from "@aikirun/server";
 import { Redis } from "ioredis";
 
@@ -41,7 +41,7 @@ if (import.meta.main) {
 		runtime: {
 			...(redis && {
 				publisher: redisPublisher(redis),
-				timerSortedSet: redisTimerSortedSet(redis, "aiki:timers"),
+				timerPriorityQueue: redisTimerPriorityQueue(redis, "aiki:timers"),
 			}),
 		},
 	});

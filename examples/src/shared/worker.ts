@@ -3,7 +3,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { type Client, client } from "@aikirun/client";
 import { omitUndefined } from "@aikirun/lib/object";
-import { inMemoryQueue, inMemoryTimerSortedSet } from "@aikirun/memory";
+import { inMemoryQueue, inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { redisSubscriber } from "@aikirun/redis";
 import { database, type ServerRuntimeHandle, server } from "@aikirun/server";
 import { databaseConfigSchema } from "@aikirun/server/config";
@@ -80,11 +80,11 @@ async function setup(): Promise<Setup> {
 
 	if (mode === "embedded") {
 		const queue = inMemoryQueue();
-		const timerSortedSet = inMemoryTimerSortedSet();
+		const timerPriorityQueue = inMemoryTimerPriorityQueue();
 
 		const aiki = server({
 			db: database(readDatabaseEnv()),
-			runtime: { publisher: queue.publisher, timerSortedSet },
+			runtime: { publisher: queue.publisher, timerPriorityQueue },
 		});
 		const runtimeHandle = await aiki.runtime.start();
 
