@@ -3,6 +3,8 @@ import { INTERNAL } from "@aikirun/types/symbols";
 
 import { createPgRepos } from "./pg";
 import { createPgHandle, type PgClient } from "./pg/provider";
+import { createSqliteRepos } from "./sqlite";
+import { createSqliteHandle, type SqliteClient } from "./sqlite/provider";
 import type { Repositories } from "./types";
 
 function extractDbClient(db: Database): unknown {
@@ -19,8 +21,10 @@ export function createRepos(db: Database): Repositories {
 			return createPgRepos(createPgHandle(extractDbClient(db) as PgClient));
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
-		case "sqlite":
-			throw new Error("SQLite support not yet implemented");
+		case "sqlite": {
+			const client = extractDbClient(db) as SqliteClient;
+			return createSqliteRepos(createSqliteHandle(client), client);
+		}
 		default:
 			return db.provider satisfies never;
 	}

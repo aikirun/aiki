@@ -5,9 +5,14 @@
 
 .claude
 
+.env
 app/server/.env
 app/server/.env.prod
 examples/.env
+
+*.db
+*.db-shm
+*.db-wal
 
 notes/
 

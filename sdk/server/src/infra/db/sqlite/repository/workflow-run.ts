@@ -1,0 +1,530 @@
+import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow/run";
+import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
+import type { TaskStatus } from "@aikirun/types/workflow/task";
+import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
+
+import { timerStreamCursorFilter } from "./lib/timer-stream";
+import type { TimerStreamCursor } from "../../../../lib/timer-stream";
+import type { DaemonContext } from "../../../../middleware/context";
+import { toWorkflowRunState } from "../../pg/repository/state-transition";
+import type { DueWorkflowRun } from "../../pg/repository/workflow-run";
+import type { SqliteDb } from "../provider";
+import { stateTransition, task, workflow, workflowRun } from "../schema";
+
+export type WorkflowRunRow = typeof workflowRun.$inferSelect;
+export type WorkflowRunRowInsert = typeof workflowRun.$inferInsert;
+type WorkflowRunRowUpdate = Partial<
+	Pick<
+		WorkflowRunRowInsert,
+		"status" | "attempts" | "latestStateTransitionId" | "scheduledAt" | "awakeAt" | "timeoutAt" | "nextAttemptAt"
+	>
+>;
+
+export function createWorkflowRunRepository(db: SqliteDb) {
+	return {
+		async insert(input: WorkflowRunRowInsert | NonEmptyArray<WorkflowRunRowInsert>): Promise<void> {
+			const values = Array.isArray(input) ? input : [input];
+			await db.insert(workflowRun).values(values);
+		},
+
+		async update(
+			filter: { id: WorkflowRunId; revision?: number },
+			updates: WorkflowRunRowUpdate
+		): Promise<{ revision: number } | undefined> {
+			const conditions = [eq(workflowRun.id, filter.id)];
+			if (filter.revision !== undefined) {
+				conditions.push(eq(workflowRun.revision, filter.revision));
+			}
+
+			const whereClause = and(...conditions);
+
+			const result = await db
+				.update(workflowRun)
+				.set({
+					...updates,
+					revision: sql`${workflowRun.revision} + 1`,
+				})
+				.where(whereClause)
+				.returning({ revision: workflowRun.revision });
+
+			const revision = result[0]?.revision;
+			if (revision === undefined) {
+				return undefined;
+			}
+
+			return { revision };
+		},
+
+		async exists(namespaceId: NamespaceId, id: string): Promise<boolean> {
+			const result = await db
+				.select({ id: workflowRun.id })
+				.from(workflowRun)
+				.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
+				.limit(1);
+			return result.length > 0;
+		},
+
+		async getById(namespaceId: NamespaceId, id: string): Promise<WorkflowRunRow | null> {
+			const result = await db
+				.select()
+				.from(workflowRun)
+				.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
+				.limit(1);
+			return result[0] ?? null;
+		},
+
+		async getByIds(namespaceId: NamespaceId, ids: NonEmptyArray<string>): Promise<WorkflowRunRow[]> {
+			return db
+				.select()
+				.from(workflowRun)
+				.where(and(eq(workflowRun.namespaceId, namespaceId), inArray(workflowRun.id, ids)));
+		},
+
+		async getByIdWithState(namespaceId: NamespaceId, id: string, _options?: { forUpdate?: boolean }) {
+			// SQLite has no SELECT ... FOR UPDATE; write serialization is handled by the
+			// transaction serializer and BEGIN IMMEDIATE, so forUpdate is a no-op here.
+			const result = await db
+				.select({
+					id: workflowRun.id,
+					status: workflowRun.status,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					parentWorkflowRunId: workflowRun.parentWorkflowRunId,
+					options: workflowRun.options,
+					state: stateTransition.state,
+				})
+				.from(workflowRun)
+				.innerJoin(stateTransition, eq(workflowRun.latestStateTransitionId, stateTransition.id))
+				.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
+				.limit(1);
+
+			const row = result[0];
+			if (!row) {
+				return null;
+			}
+			(row as Record<string, unknown>).state = toWorkflowRunState(row.state);
+			return row as Omit<typeof row, "state"> & { state: WorkflowRunState };
+		},
+
+		async listByIdsAndStatus(_context: DaemonContext, ids: NonEmptyArray<string>, status: WorkflowRunStatus) {
+			return db
+				.select({
+					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+				})
+				.from(workflowRun)
+				.where(and(inArray(workflowRun.id, ids), eq(workflowRun.status, status)));
+		},
+
+		async getChildRuns(filter: {
+			parentRunId: string;
+			status?: NonEmptyArray<WorkflowRunStatus>;
+		}): Promise<WorkflowRunRow[]> {
+			const conditions = [eq(workflowRun.parentWorkflowRunId, filter.parentRunId)];
+			if (filter.status) {
+				conditions.push(inArray(workflowRun.status, filter.status));
+			}
+
+			const whereClause = and(...conditions);
+
+			return db.select().from(workflowRun).where(whereClause).limit(10_000);
+		},
+
+		async hasChildRuns(
+			parentRunIds: NonEmptyArray<string>,
+			childRunStatus?: NonEmptyArray<WorkflowRunStatus>
+		): Promise<Set<string>> {
+			const conditions = [inArray(workflowRun.parentWorkflowRunId, parentRunIds)];
+			if (childRunStatus) {
+				conditions.push(inArray(workflowRun.status, childRunStatus));
+			}
+
+			const rows = await db
+				.select({ parentWorkflowRunId: workflowRun.parentWorkflowRunId })
+				.from(workflowRun)
+				.where(and(...conditions))
+				.groupBy(workflowRun.parentWorkflowRunId);
+
+			const result = new Set<string>();
+			for (const row of rows) {
+				if (row.parentWorkflowRunId) {
+					result.add(row.parentWorkflowRunId);
+				}
+			}
+			return result;
+		},
+
+		async getByWorkflowAndReferenceId(workflowId: string, referenceId: string): Promise<WorkflowRunRow | null> {
+			const result = await db
+				.select()
+				.from(workflowRun)
+				.where(and(eq(workflowRun.workflowId, workflowId), eq(workflowRun.referenceId, referenceId)))
+				.limit(1);
+			return result[0] ?? null;
+		},
+
+		async listByWorkflowAndReferenceIdPairs(filter: {
+			pairs: NonEmptyArray<{ workflowId: string; referenceId: string }>;
+			status?: NonEmptyArray<WorkflowRunStatus>;
+		}): Promise<WorkflowRunRow[]> {
+			const pairConditions = or(
+				...filter.pairs.map(({ workflowId, referenceId }) =>
+					and(eq(workflowRun.workflowId, workflowId), eq(workflowRun.referenceId, referenceId))
+				)
+			);
+			const conditions = filter.status
+				? and(pairConditions, inArray(workflowRun.status, filter.status))
+				: pairConditions;
+
+			return db.select().from(workflowRun).where(conditions);
+		},
+
+		async listByFilters(
+			namespaceId: NamespaceId,
+			filter: {
+				id?: string;
+				scheduleId?: string;
+				status?: NonEmptyArray<WorkflowRunStatus>;
+				workflow?: {
+					ids: NonEmptyArray<string>;
+					referenceId?: string;
+				};
+			},
+			limit: number,
+			offset: number,
+			sort: { order: "asc" | "desc" }
+		) {
+			const conditions = [eq(workflowRun.namespaceId, namespaceId)];
+			if (filter.id) {
+				conditions.push(eq(workflowRun.id, filter.id));
+			}
+			if (filter.scheduleId) {
+				conditions.push(eq(workflowRun.scheduleId, filter.scheduleId));
+			}
+			if (filter.status) {
+				conditions.push(inArray(workflowRun.status, filter.status));
+			}
+			if (filter.workflow) {
+				conditions.push(inArray(workflowRun.workflowId, filter.workflow.ids));
+				if (filter.workflow.referenceId) {
+					conditions.push(eq(workflowRun.referenceId, filter.workflow.referenceId));
+				}
+			}
+
+			const whereClause = and(...conditions);
+			const orderBy = sql`${workflowRun.id} ${sql.raw(sort.order)}`;
+
+			const [rows, countResult] = await Promise.all([
+				db
+					.select({
+						id: workflowRun.id,
+						status: workflowRun.status,
+						referenceId: workflowRun.referenceId,
+						createdAt: workflowRun.createdAt,
+						name: workflow.name,
+						versionId: workflow.versionId,
+					})
+					.from(workflowRun)
+					.innerJoin(workflow, eq(workflowRun.workflowId, workflow.id))
+					.where(whereClause)
+					.orderBy(orderBy)
+					.limit(limit)
+					.offset(offset),
+				db.select({ count: count() }).from(workflowRun).where(whereClause),
+			]);
+
+			return { rows, total: countResult[0]?.count ?? 0 };
+		},
+
+		async getTaskCountsByRunIds(runIds: NonEmptyArray<string>): Promise<Map<string, Record<TaskStatus, number>>> {
+			const rows = await db
+				.select({
+					workflowRunId: task.workflowRunId,
+					status: task.status,
+					count: count(),
+				})
+				.from(task)
+				.where(inArray(task.workflowRunId, runIds))
+				.groupBy(task.workflowRunId, task.status);
+
+			const result = new Map<string, Record<TaskStatus, number>>();
+			for (const row of rows) {
+				let taskCounts = result.get(row.workflowRunId);
+				if (!taskCounts) {
+					taskCounts = { completed: 0, running: 0, failed: 0, awaiting_retry: 0, discarded: 0 };
+					result.set(row.workflowRunId, taskCounts);
+				}
+				taskCounts[row.status] = row.count;
+			}
+			return result;
+		},
+
+		async countByStatus(
+			filter: { namespaceId: NamespaceId } | { workflowIds: NonEmptyArray<string> }
+		): Promise<Array<{ status: WorkflowRunStatus; count: number }>> {
+			const whereClause =
+				"workflowIds" in filter
+					? inArray(workflowRun.workflowId, filter.workflowIds)
+					: eq(workflowRun.namespaceId, filter.namespaceId);
+
+			return db
+				.select({
+					status: workflowRun.status,
+					count: count(),
+				})
+				.from(workflowRun)
+				.where(whereClause)
+				.groupBy(workflowRun.status);
+		},
+
+		async listDueScheduleRuns(
+			_context: DaemonContext,
+			before: Date,
+			limit: number,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
+			return db
+				.select({
+					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: sql<Date>`${workflowRun.scheduledAt}`.mapWith(workflowRun.scheduledAt),
+				})
+				.from(workflowRun)
+				.where(
+					and(
+						eq(workflowRun.status, "scheduled"),
+						lte(workflowRun.scheduledAt, before),
+						timerStreamCursorFilter(workflowRun.scheduledAt, workflowRun.id, cursor)
+					)
+				)
+				.orderBy(workflowRun.scheduledAt, workflowRun.id)
+				.limit(limit);
+		},
+
+		async listSleepElapsedRuns(
+			_context: DaemonContext,
+			before: Date,
+			limit: number,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
+			return db
+				.select({
+					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: sql<Date>`${workflowRun.awakeAt}`.mapWith(workflowRun.awakeAt),
+				})
+				.from(workflowRun)
+				.where(
+					and(
+						eq(workflowRun.status, "sleeping"),
+						lte(workflowRun.awakeAt, before),
+						timerStreamCursorFilter(workflowRun.awakeAt, workflowRun.id, cursor)
+					)
+				)
+				.orderBy(workflowRun.awakeAt, workflowRun.id)
+				.limit(limit);
+		},
+
+		async listRetryableRuns(
+			_context: DaemonContext,
+			before: Date,
+			limit: number,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
+			return db
+				.select({
+					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: sql<Date>`${workflowRun.nextAttemptAt}`.mapWith(workflowRun.nextAttemptAt),
+				})
+				.from(workflowRun)
+				.where(
+					and(
+						eq(workflowRun.status, "awaiting_retry"),
+						lte(workflowRun.nextAttemptAt, before),
+						timerStreamCursorFilter(workflowRun.nextAttemptAt, workflowRun.id, cursor)
+					)
+				)
+				.orderBy(workflowRun.nextAttemptAt, workflowRun.id)
+				.limit(limit);
+		},
+
+		async listEventWaitTimedOutRuns(
+			_context: DaemonContext,
+			before: Date,
+			limit: number,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
+			return db
+				.select({
+					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: sql<Date>`${workflowRun.timeoutAt}`.mapWith(workflowRun.timeoutAt),
+				})
+				.from(workflowRun)
+				.where(
+					and(
+						eq(workflowRun.status, "awaiting_event"),
+						lte(workflowRun.timeoutAt, before),
+						timerStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
+					)
+				)
+				.orderBy(workflowRun.timeoutAt, workflowRun.id)
+				.limit(limit);
+		},
+
+		async listChildRunWaitTimedOutRuns(
+			_context: DaemonContext,
+			before: Date,
+			limit: number,
+			cursor?: TimerStreamCursor
+		): Promise<DueWorkflowRun[]> {
+			return db
+				.select({
+					id: workflowRun.id,
+					namespaceId: workflowRun.namespaceId,
+					workflowId: workflowRun.workflowId,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					options: workflowRun.options,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					dueAt: sql<Date>`${workflowRun.timeoutAt}`.mapWith(workflowRun.timeoutAt),
+				})
+				.from(workflowRun)
+				.where(
+					and(
+						eq(workflowRun.status, "awaiting_child_workflow"),
+						lte(workflowRun.timeoutAt, before),
+						timerStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
+					)
+				)
+				.orderBy(workflowRun.timeoutAt, workflowRun.id)
+				.limit(limit);
+		},
+
+		async bulkTransitionToQueued(
+			fromStatus:
+				| "scheduled"
+				| "sleeping"
+				| "awaiting_retry"
+				| "awaiting_event"
+				| "awaiting_child_workflow"
+				| "running",
+			runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
+			options?: { incrementAttempts?: boolean }
+		): Promise<string[]> {
+			// SQLite has no UPDATE ... FROM (VALUES ...); express the per-row update with CASE.
+			const orConditions = runs.map(
+				({ filter }) => sql`(${workflowRun.id} = ${filter.id} AND ${workflowRun.revision} = ${filter.revision})`
+			);
+			const caseFragments = runs.map(({ filter, update }) => sql`WHEN ${filter.id} THEN ${update.stateTransitionId}`);
+
+			const result = await db
+				.update(workflowRun)
+				.set({
+					status: "queued",
+					revision: sql`${workflowRun.revision} + 1`,
+					attempts: options?.incrementAttempts ? sql`${workflowRun.attempts} + 1` : workflowRun.attempts,
+					scheduledAt: null,
+					awakeAt: null,
+					timeoutAt: null,
+					nextAttemptAt: null,
+					latestStateTransitionId: sql`CASE ${workflowRun.id} ${sql.join(caseFragments, sql` `)} END`,
+				})
+				.where(and(eq(workflowRun.status, fromStatus), or(...orConditions)))
+				.returning({ id: workflowRun.id });
+
+			return result.map((row) => row.id);
+		},
+
+		async bulkTransitionToCancelled(runIds: NonEmptyArray<string>): Promise<string[]> {
+			const result = await db
+				.update(workflowRun)
+				.set({
+					status: "cancelled",
+					revision: sql`${workflowRun.revision} + 1`,
+					scheduledAt: null,
+					awakeAt: null,
+					timeoutAt: null,
+					nextAttemptAt: null,
+				})
+				.where(and(inArray(workflowRun.id, runIds), inArray(workflowRun.status, NON_TERMINAL_WORKFLOW_RUN_STATUSES)))
+				.returning({ id: workflowRun.id });
+
+			return result.map((row) => row.id);
+		},
+
+		async bulkSetLatestStateTransitionId(
+			runs: NonEmptyArray<{ id: string; stateTransitionId: string }>
+		): Promise<void> {
+			const ids: string[] = [];
+			const caseFragments = [];
+
+			for (const run of runs) {
+				ids.push(run.id);
+				caseFragments.push(sql`WHEN ${run.id} THEN ${run.stateTransitionId}`);
+			}
+
+			await db
+				.update(workflowRun)
+				.set({
+					latestStateTransitionId: sql`CASE ${workflowRun.id} ${sql.join(caseFragments, sql` `)} END`,
+				})
+				.where(inArray(workflowRun.id, ids));
+		},
+
+		async getRunCount(scheduleId: string): Promise<number> {
+			const result = await db
+				.select({ count: count() })
+				.from(workflowRun)
+				.where(eq(workflowRun.scheduleId, scheduleId));
+			return result[0]?.count ?? 0;
+		},
+
+		async getRunCounts(scheduleIds: NonEmptyArray<string>): Promise<Map<string, number>> {
+			const rows = await db
+				.select({ scheduleId: workflowRun.scheduleId, count: count() })
+				.from(workflowRun)
+				.where(inArray(workflowRun.scheduleId, scheduleIds))
+				.groupBy(workflowRun.scheduleId);
+
+			const map = new Map<string, number>();
+			for (const row of rows) {
+				if (row.scheduleId) {
+					map.set(row.scheduleId, row.count);
+				}
+			}
+			return map;
+		},
+	};
+}
+
+export type WorkflowRunRepository = ReturnType<typeof createWorkflowRunRepository>;

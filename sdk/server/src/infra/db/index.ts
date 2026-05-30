@@ -3,6 +3,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import { type } from "arktype";
 
 import { createPgClient } from "./pg/provider";
+import { createSqliteClient } from "./sqlite/provider";
 import { type DatabaseConfig, databaseConfigSchema } from "../../config";
 
 export function database(params: DatabaseConfig): Database {
@@ -16,8 +17,10 @@ export function database(params: DatabaseConfig): Database {
 			const client = createPgClient(params);
 			return { provider: params.provider, [INTERNAL]: { client } };
 		}
-		case "sqlite":
-			throw new Error("SQLite support not yet implemented");
+		case "sqlite": {
+			const client = createSqliteClient(params);
+			return { provider: params.provider, [INTERNAL]: { client } };
+		}
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
 		default:

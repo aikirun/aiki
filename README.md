@@ -108,14 +108,14 @@ Install the Aiki SDK:
 npm install @aikirun/workflow @aikirun/client @aikirun/worker
 ```
 
-Start Aiki (requires PostgreSQL — see [Installation Guide](./docs/getting-started/installation.md)):
+Start Aiki (PostgreSQL by default, or SQLite for a zero-dependency setup — see [Installation Guide](./docs/getting-started/installation.md)):
 
 ```bash
 # First clone the repo
 git clone https://github.com/aikirun/aiki.git
 cd aiki
 
-# Configure your database connection, then start
+# docker-compose provisions PostgreSQL; skip it when using DATABASE_PROVIDER=sqlite
 docker-compose up
 
 # Or run directly with Bun

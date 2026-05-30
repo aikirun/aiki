@@ -2,11 +2,14 @@ import type { Database } from "@aikirun/types/infra/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
+import { drizzle as bunSqliteDrizzle } from "drizzle-orm/bun-sqlite";
 import { drizzle } from "drizzle-orm/postgres-js";
 
 import type { PgClient } from "./infra/db/pg/provider";
 import * as schema from "./infra/db/pg/schema";
 import { extractDbClient } from "./infra/db/repo";
+import { sqliteBetterAuthSchema } from "./infra/db/sqlite/better-auth";
+import type { SqliteClient } from "./infra/db/sqlite/provider";
 
 const pgBetterAuthSchema = {
 	user: schema.user,
@@ -35,8 +38,11 @@ function createDrizzleAdapter(db: Database) {
 		}
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
-		case "sqlite":
-			throw new Error("SQLite support not yet implemented");
+		case "sqlite": {
+			const client = extractDbClient(db) as SqliteClient;
+			const handle = bunSqliteDrizzle(client, { schema: sqliteBetterAuthSchema });
+			return drizzleAdapter(handle, { provider: db.provider, schema: sqliteBetterAuthSchema });
+		}
 		default:
 			return db.provider satisfies never;
 	}

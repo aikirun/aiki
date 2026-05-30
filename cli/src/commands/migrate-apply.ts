@@ -1,7 +1,7 @@
 import path from "node:path";
 import { ConsoleLogger } from "@aikirun/lib/logger";
 
-import { loadDatabaseConfig, type PgDatabaseConfig } from "../lib/db-config";
+import { loadDatabaseConfig, type PgDatabaseConfig, type SqliteDatabaseConfig } from "../lib/db-config";
 import { loadEnv } from "../lib/env";
 import { resolvePackageRoot, type SupportedPackage } from "../lib/resolve-package";
 
@@ -24,6 +24,8 @@ export async function migrateApply(options: MigrateApplyOptions): Promise<void> 
 			await applyPg(dbConfig, migrationsFolder, migrationsTable, logger);
 			break;
 		case "sqlite":
+			await applySqlite(dbConfig, migrationsFolder, migrationsTable, logger);
+			break;
 		case "mysql":
 			throw new Error(`DATABASE_PROVIDER=${dbConfig.provider} is not yet supported by aiki migrate.`);
 		default:
@@ -86,5 +88,27 @@ async function applyPg(
 		logger.info("Migrations applied");
 	} finally {
 		await client.end();
+	}
+}
+
+async function applySqlite(
+	config: SqliteDatabaseConfig,
+	migrationsFolder: string,
+	migrationsTable: string,
+	logger: ConsoleLogger
+): Promise<void> {
+	const { Database } = await import("bun:sqlite");
+	const { drizzle } = await import("drizzle-orm/bun-sqlite");
+	const { migrate } = await import("drizzle-orm/bun-sqlite/migrator");
+
+	const client = new Database(config.path);
+	client.exec("PRAGMA journal_mode = WAL");
+	client.exec("PRAGMA foreign_keys = ON");
+
+	try {
+		migrate(drizzle(client), { migrationsFolder, migrationsTable });
+		logger.info("Migrations applied");
+	} finally {
+		client.close();
 	}
 }
