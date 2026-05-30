@@ -10,6 +10,7 @@ export default defineConfig({
 	clean: true,
 	outDir: "dist",
 	noExternal: ["@aikirun/lib"],
+	external: ["bun:sqlite"],
 	async onSuccess() {
 		for (const provider of DATABASE_PROVIDERS) {
 			const sourceDir = path.join("src", "infra", "db", provider, "migration");
