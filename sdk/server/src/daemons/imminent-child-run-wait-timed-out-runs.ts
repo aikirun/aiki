@@ -161,26 +161,43 @@ async function processChunk(
 		});
 	}
 
-	if (
-		!isNonEmptyArray(childRunWaitEntries) ||
-		!isNonEmptyArray(stateTransitionEntries) ||
-		!isNonEmptyArray(workflowRunUpdates)
-	) {
+	if (!isNonEmptyArray(workflowRunUpdates)) {
 		return;
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
-		await txRepos.childWorkflowRunWaitQueue.insert(childRunWaitEntries);
-		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
 			"awaiting_child_workflow",
 			workflowRunUpdates
 		);
-		const transitionedRunIdsSet = new Set(transitionedRunIds);
-		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
-		if (!isNonEmptyArray(outboxEntriesToInsert)) {
+		if (!isNonEmptyArray(transitionedRunIds)) {
 			return [];
 		}
+
+		let childRunWaitEntriesToInsert = childRunWaitEntries;
+		let stateTransitionEntriesToInsert = stateTransitionEntries;
+		let outboxEntriesToInsert = outboxEntries;
+		if (transitionedRunIds.length !== stateTransitionEntries.length) {
+			const transitionedRunIdsSet = new Set(transitionedRunIds);
+			childRunWaitEntriesToInsert = childRunWaitEntries.filter((entry) =>
+				transitionedRunIdsSet.has(entry.parentWorkflowRunId)
+			);
+			stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
+				transitionedRunIdsSet.has(entry.workflowRunId)
+			);
+			outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
+		}
+
+		if (
+			!isNonEmptyArray(childRunWaitEntriesToInsert) ||
+			!isNonEmptyArray(stateTransitionEntriesToInsert) ||
+			!isNonEmptyArray(outboxEntriesToInsert)
+		) {
+			return [];
+		}
+
+		await txRepos.childWorkflowRunWaitQueue.insert(childRunWaitEntriesToInsert);
+		await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
 		await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
 		return outboxEntriesToInsert;
 	});

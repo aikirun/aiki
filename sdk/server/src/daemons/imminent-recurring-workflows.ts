@@ -395,8 +395,8 @@ async function processOverlapCancelPreviousSchedules(
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await deps.repos.transaction(async (txRepos) => {
-		// To espace the race condition that might arise when a concurrent actor moves the runId to non cancellable state,
-		// we should only insert cancellation state transistions if the cancellation occurred, otherwise, we'll have dangling transitions
+		// To escape the race condition that might arise when a concurrent actor moves the runId to non cancellable state,
+		// we should only insert cancellation state transitions if the cancellation occurred, otherwise, we'll have dangling transitions
 
 		// Step 1: Cancel active runs (without setting latestStateTransitionId)
 		const cancelledRunIds = isNonEmptyArray(runIdsToCancel)

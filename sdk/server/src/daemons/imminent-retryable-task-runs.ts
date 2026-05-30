@@ -161,18 +161,32 @@ async function processChunk(
 		});
 	}
 
-	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(workflowRunUpdates)) {
+	if (!isNonEmptyArray(workflowRunUpdates)) {
 		return;
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
-		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("running", workflowRunUpdates);
-		const transitionedRunIdsSet = new Set(transitionedRunIds);
-		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
-		if (!isNonEmptyArray(outboxEntriesToInsert)) {
+		if (!isNonEmptyArray(transitionedRunIds)) {
 			return [];
 		}
+
+		let stateTransitionEntriesToInsert = stateTransitionEntries;
+		let outboxEntriesToInsert = outboxEntries;
+		if (transitionedRunIds.length !== stateTransitionEntries.length) {
+			const transitionedRunIdsSet = new Set(transitionedRunIds);
+			stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
+				transitionedRunIdsSet.has(entry.workflowRunId)
+			);
+			outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
+		}
+
+		if (!isNonEmptyArray(stateTransitionEntriesToInsert) || !isNonEmptyArray(outboxEntriesToInsert)) {
+			return [];
+		}
+
+		await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
+
 		const workflowRunIds = outboxEntriesToInsert.map((entry) => entry.workflowRunId) as NonEmptyArray<string>;
 		// Outbox entries are only deleted on workflow suspension or termination.
 		// In our case, the workflow is still running, hence the outbox entry is still in claimed state.

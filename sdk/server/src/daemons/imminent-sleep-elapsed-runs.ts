@@ -130,19 +130,32 @@ async function processChunk(
 		});
 	}
 
-	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(workflowRunUpdates)) {
+	if (!isNonEmptyArray(workflowRunUpdates)) {
 		return;
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
 		await txRepos.sleepQueue.bulkCompleteByWorkflowRunIds(workflowRunIds, completedAt);
-		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("sleeping", workflowRunUpdates);
-		const transitionedRunIdsSet = new Set(transitionedRunIds);
-		const outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
-		if (!isNonEmptyArray(outboxEntriesToInsert)) {
+		if (!isNonEmptyArray(transitionedRunIds)) {
 			return [];
 		}
+
+		let stateTransitionEntriesToInsert = stateTransitionEntries;
+		let outboxEntriesToInsert = outboxEntries;
+		if (transitionedRunIds.length !== stateTransitionEntries.length) {
+			const transitionedRunIdsSet = new Set(transitionedRunIds);
+			stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
+				transitionedRunIdsSet.has(entry.workflowRunId)
+			);
+			outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
+		}
+
+		if (!isNonEmptyArray(stateTransitionEntriesToInsert) || !isNonEmptyArray(outboxEntriesToInsert)) {
+			return [];
+		}
+
+		await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
 		await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
 		return outboxEntriesToInsert;
 	});
