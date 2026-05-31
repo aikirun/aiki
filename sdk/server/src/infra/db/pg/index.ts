@@ -1,4 +1,4 @@
-import type { PgDb, PgHandle } from "./provider";
+import { createPgHandle, type PgClient, type PgDb } from "./provider";
 import { createChildWorkflowRunWaitQueueRepository } from "./repository/child-workflow-run-wait-queue";
 import { createEventWaitQueueRepository } from "./repository/event-wait-queue";
 import { createScheduleRepository } from "./repository/schedule";
@@ -10,7 +10,8 @@ import { createWorkflowRunRepository } from "./repository/workflow-run";
 import { createWorkflowRunOutboxRepository } from "./repository/workflow-run-outbox";
 import type { Repositories } from "../types";
 
-export function createPgRepos(db: PgHandle): Repositories {
+export function createPgRepos(client: PgClient): Repositories {
+	const db = createPgHandle(client);
 	return {
 		...createRepos(db),
 		async transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T> {
