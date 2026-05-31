@@ -11,8 +11,6 @@ import {
 	SLEEP_STATUSES,
 	TERMINAL_WORKFLOW_RUN_STATUSES,
 	WORKFLOW_RUN_CONFLICT_POLICIES,
-	WORKFLOW_RUN_FAILURE_CAUSE,
-	WORKFLOW_RUN_SCHEDULED_REASON,
 	WORKFLOW_RUN_STATUSES,
 } from "@aikirun/types/workflow/run";
 import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition";
@@ -44,8 +42,6 @@ export const scheduleConflictPolicyEnum = pgEnum("schedule_conflict_policy", SCH
 export const workflowRunStatusEnum = pgEnum("workflow_run_status", WORKFLOW_RUN_STATUSES);
 export const terminalWorkflowRunStatusEnum = pgEnum("terminal_workflow_run_status", TERMINAL_WORKFLOW_RUN_STATUSES);
 export const workflowRunConflictPolicyEnum = pgEnum("workflow_run_conflict_policy", WORKFLOW_RUN_CONFLICT_POLICIES);
-export const workflowRunScheduledReason = pgEnum("workflow_run_scheduled_reason", WORKFLOW_RUN_SCHEDULED_REASON);
-export const workflowRunFailureCause = pgEnum("workflow_run_failure_cause", WORKFLOW_RUN_FAILURE_CAUSE);
 
 export const taskStatusEnum = pgEnum("task_status", TASK_STATUSES);
 
