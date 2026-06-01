@@ -24,7 +24,7 @@ export async function migrateGenerate(options: MigrateGenerateOptions): Promise<
 	const dbProvider = loadDatabaseProvider();
 
 	const packageRoot = resolvePackageRoot(options.pkg);
-	const schemaDir = path.join("src", "infra", "db", dbProvider, "schema");
+	const schemaDir = path.join("src", "infra", "db", dbProvider);
 	const outDir = path.join("src", "infra", "db", dbProvider, "migration");
 
 	ensureWorkspaceMode(path.join(packageRoot, schemaDir));
