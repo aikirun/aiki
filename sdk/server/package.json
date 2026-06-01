@@ -27,12 +27,20 @@
 		"arktype": "^2.1.29",
 		"cron-parser": "^5.4.0",
 		"drizzle-orm": "^0.45.1",
-		"postgres": "^3.4.8",
 		"ulidx": "^2.4.1"
+	},
+	"peerDependencies": {
+		"postgres": "^3.4.8"
+	},
+	"peerDependenciesMeta": {
+		"postgres": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@aikirun/cli": "workspace:*",
-		"@aikirun/lib": "workspace:*"
+		"@aikirun/lib": "workspace:*",
+		"postgres": "^3.4.8"
 	},
 	"publishConfig": {
 		"access": "public"

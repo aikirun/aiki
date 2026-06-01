@@ -1,29 +1,9 @@
-import { delay } from "@aikirun/lib/async";
-import { UnauthorizedError } from "@aikirun/lib/error";
-import { SENTINEL_ULID } from "@aikirun/lib/id";
 import { ConsoleLogger, type Logger } from "@aikirun/lib/logger";
-import type { ApiAuthorizer, Iam, IamContext } from "@aikirun/types/iam";
+import type { Iam } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
-import type { Database } from "@aikirun/types/infra/db";
+import type { CreateDatabase } from "@aikirun/types/infra/db";
 import type { CreatePublisher } from "@aikirun/types/infra/queue";
 import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
-import type { NamespaceId } from "@aikirun/types/namespace";
-import type { OrganizationId } from "@aikirun/types/organization";
-import { RPCHandler } from "@orpc/server/fetch";
-import { ulid } from "ulidx";
-
-import type { Capabilities } from "./capabilities";
-import { initDaemons } from "./daemons";
-import { createRepos } from "./infra/db/repo";
-import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
-import { createNamespaceAuthedRouter } from "./router/index";
-import { createChildRunCanceller } from "./service/cancel-child-runs";
-import { createScheduleService } from "./service/schedule";
-import { createTaskStateMachineService } from "./service/task-state-machine";
-import { createWorkflowService } from "./service/workflow";
-import { createWorkflowRunService } from "./service/workflow-run";
-import { createWorkflowRunOutboxService } from "./service/workflow-run-outbox";
-import { createWorkflowRunStateMachineService } from "./service/workflow-run-state-machine";
 
 export interface ServerRuntimeOptions {
 	gracefulShutdownTimeoutMs?: number;
@@ -36,7 +16,7 @@ export interface ServerRuntimeParams {
 }
 
 export interface ServerParams {
-	db: Database;
+	db: CreateDatabase;
 	iam?: Iam;
 	cache?: CreateCache;
 	logger?: Logger;
@@ -57,162 +37,29 @@ export interface Server {
 
 export function server(params: ServerParams): Server {
 	const logger: Logger = params.logger ?? new ConsoleLogger();
-	const repos = createRepos(params.db);
 
-	const childRunCanceller = createChildRunCanceller();
-
-	const createHandler = () => {
-		const apiAuthorizer = (params.iam?.api ?? noopApiAuthorizer)({ logger });
-		const dashboardIam = params.iam?.dashboard?.({ logger });
-
-		const workflowRunStateMachineService = createWorkflowRunStateMachineService({
-			repos,
-			childRunCanceller,
-		});
-		const taskStateMachineService = createTaskStateMachineService({ repos });
-		const workflowRunService = createWorkflowRunService({
-			repos,
-			childRunCanceller,
-			workflowRunStateMachineService,
-		});
-		const workflowService = createWorkflowService({ repos });
-		const scheduleService = createScheduleService({ repos });
-		const workflowRunOutboxService = createWorkflowRunOutboxService({ repos });
-
-		const namespaceAuthedRouter = createNamespaceAuthedRouter({
-			workflowRunService,
-			workflowRunStateMachineService,
-			taskStateMachineService,
-			workflowService,
-			scheduleService,
-			workflowRunOutboxService,
-		});
-
-		const namespaceAuthedHandler = new RPCHandler(namespaceAuthedRouter, {});
-
-		return async (request: Request): Promise<Response> => {
-			const pathname = new URL(request.url).pathname;
-
-			if (pathname.startsWith("/api/")) {
-				let context: NamespaceRequestContext;
-				try {
-					context = await createNamespaceRequestContext({ request, logger, authorizer: apiAuthorizer });
-				} catch (error) {
-					if (error instanceof UnauthorizedError) {
-						return new Response(error.message, { status: 401 });
-					}
-					logger.error("Unhandled error", { error });
-					return new Response("Internal Server Error", { status: 500 });
-				}
-
-				const result = await namespaceAuthedHandler.handle(request, { context, prefix: "/api" });
-				return result.response ?? new Response("Not Found", { status: 404 });
-			}
-
-			if (pathname.startsWith("/dashboard/")) {
-				if (!dashboardIam?.organization) {
-					return new Response("Not Found", { status: 404 });
-				}
-				return dashboardIam.organization(request);
-			}
-
-			if (pathname.startsWith("/auth/")) {
-				if (!dashboardIam?.authenticator) {
-					return new Response("Not Found", { status: 404 });
-				}
-				return dashboardIam.authenticator(request);
-			}
-
-			if (pathname === "/capabilities") {
-				if (request.method !== "GET") {
-					return new Response("Method Not Allowed", { status: 405 });
-				}
-				return Response.json({
-					iam: { dashboard: dashboardIam !== undefined },
-				} satisfies Capabilities);
-			}
-
-			if (pathname === "/health") {
-				if (request.method !== "GET") {
-					return new Response("Method Not Allowed", { status: 405 });
-				}
-				return Response.json({ status: "ok" });
-			}
-
-			return new Response("Not Found", { status: 404 });
-		};
-	};
-
-	const createRuntime = () => ({
-		async start(): Promise<ServerRuntimeHandle> {
-			const daemons = initDaemons(logger, {
-				repos,
-				workflowRunPublisher: params.runtime?.publisher?.({
-					logger: logger.child({ "aiki.component": "workflow-run-publisher" }),
-				}),
-				timerPriorityQueue: params.runtime?.timerPriorityQueue?.({
-					logger: logger.child({ "aiki.component": "timer-sorted-set" }),
-				}),
-				childRunCanceller,
-			});
-
-			const gracefulShutdownTimeoutMs = params.runtime?.options?.gracefulShutdownTimeoutMs ?? 5_000;
-
-			return createRuntimeHandle({
-				logger,
-				daemons,
-				gracefulShutdownTimeoutMs,
-			});
-		},
-	});
-
-	return { handler: createHandler(), runtime: createRuntime() };
-}
-
-function noopApiAuthorizer(_context: IamContext): ApiAuthorizer {
-	return async () => ({
-		organizationId: SENTINEL_ULID as OrganizationId,
-		namespaceId: SENTINEL_ULID as NamespaceId,
-	});
-}
-
-interface RuntimeHandleDeps {
-	logger: Logger;
-	daemons: { shutdown: () => Promise<void> };
-	gracefulShutdownTimeoutMs: number;
-}
-
-function createRuntimeHandle(deps: RuntimeHandleDeps): ServerRuntimeHandle {
-	const id = ulid() as ServerRuntimeId;
-	let stopPromise: Promise<void> | undefined;
-
-	const _stop = async (): Promise<void> => {
-		const daemonShutdownPromise = deps.daemons.shutdown();
-
-		if (deps.gracefulShutdownTimeoutMs <= 0) {
-			await daemonShutdownPromise;
-			return;
-		}
-
-		const result = await Promise.race([
-			daemonShutdownPromise.then(() => "done" as const),
-			delay(deps.gracefulShutdownTimeoutMs).then(() => "timeout" as const),
-		]);
-		if (result === "timeout") {
-			deps.logger.warn("Runtime did not shut down within graceful timeout", {
-				"aiki.runtimeId": id,
-				"aiki.gracefulShutdownTimeoutMs": deps.gracefulShutdownTimeoutMs,
-			});
-		}
-	};
+	let handler: Server["handler"] | undefined;
+	let createHandlerPromise: Promise<Server["handler"]> | undefined;
 
 	return {
-		id,
-		stop(): Promise<void> {
-			if (!stopPromise) {
-				stopPromise = _stop();
-			}
-			return stopPromise;
+		handler: (request) => {
+			if (handler) return handler(request);
+			return (async () => {
+				createHandlerPromise ??= (async () => {
+					const db = await params.db();
+					const { createHandler } = await import("./handler");
+					return createHandler({ db, logger, iam: params.iam, cache: params.cache });
+				})();
+				handler = await createHandlerPromise;
+				return handler(request);
+			})();
+		},
+		runtime: {
+			async start(): Promise<ServerRuntimeHandle> {
+				const db = await params.db();
+				const { createRuntime } = await import("./runtime");
+				return createRuntime({ db, logger, runtime: params.runtime }).start();
+			},
 		},
 	};
 }

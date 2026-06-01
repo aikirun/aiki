@@ -1,26 +1,35 @@
-import type { Database } from "@aikirun/types/infra/db";
+import type { CreateDatabase, Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { type } from "arktype";
 
-import { createPgClient } from "./pg/provider";
 import { type DatabaseConfig, databaseConfigSchema } from "../../config";
 
-export function database(params: DatabaseConfig): Database {
-	const validationResult = databaseConfigSchema(params);
+export function database(config: DatabaseConfig): CreateDatabase {
+	const validationResult = databaseConfigSchema(config);
 	if (validationResult instanceof type.errors) {
 		throw new Error(`Invalid database config: ${validationResult.summary}`);
 	}
 
-	switch (params.provider) {
+	let createDatabasePromise: Promise<Database> | undefined;
+	return () => {
+		if (!createDatabasePromise) {
+			createDatabasePromise = createDatabase(config);
+		}
+		return createDatabasePromise;
+	};
+}
+
+async function createDatabase(config: DatabaseConfig): Promise<Database> {
+	switch (config.provider) {
 		case "pg": {
-			const client = createPgClient(params);
-			return { provider: params.provider, [INTERNAL]: { client } };
+			const { createPgClient } = await import("./pg/provider");
+			return { provider: "pg", [INTERNAL]: { client: createPgClient(config) } };
 		}
 		case "sqlite":
 			throw new Error("SQLite support not yet implemented");
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
 		default:
-			return params satisfies never;
+			return config satisfies never;
 	}
 }

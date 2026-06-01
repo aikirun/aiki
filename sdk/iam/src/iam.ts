@@ -1,12 +1,12 @@
 import type { Iam } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
-import type { Database } from "@aikirun/types/infra/db";
+import type { CreateDatabase } from "@aikirun/types/infra/db";
 
 import { apiAuthorizer } from "./api-authorizer";
 import { dashboardSessionIam } from "./dashboard-session";
 
 export interface IamParams {
-	db: Database;
+	db: CreateDatabase;
 	secret: string;
 	baseURL: string;
 	trustedOrigins: string[];

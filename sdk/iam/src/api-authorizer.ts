@@ -1,16 +1,16 @@
 import { UnauthorizedError } from "@aikirun/lib/error";
-import type { ApiAuthorizer, CreateApiAuthorizer } from "@aikirun/types/iam";
+import type { ApiAuthorizer, CreateApiAuthorizer, IamContext } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
-import type { Database } from "@aikirun/types/infra/db";
+import type { CreateDatabase } from "@aikirun/types/infra/db";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 
-import { type AuthService, createAuthService } from "./auth";
+import type { AuthService } from "./auth";
 import { createRepos } from "./infra/db/repo";
 import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 
 export interface ApiAuthorizerParams {
-	db: Database;
+	db: CreateDatabase;
 	cache?: CreateCache;
 	secret: string;
 	baseURL: string;
@@ -18,12 +18,12 @@ export interface ApiAuthorizerParams {
 }
 
 export interface ApiAuthorizerKeyParams {
-	db: Database;
+	db: CreateDatabase;
 	cache?: CreateCache;
 }
 
 export interface ApiAuthorizerSessionParams {
-	db: Database;
+	db: CreateDatabase;
 	secret: string;
 	baseURL: string;
 	trustedOrigins: string[];
@@ -39,34 +39,44 @@ function extractBearerToken(headers: Headers): string | null {
 	return null;
 }
 
-function createApiKeyAuthorizer(
-	params: ApiAuthorizerKeyParams,
-	{ logger }: { logger: import("@aikirun/lib/logger").Logger }
-): ApiAuthorizer {
-	const repos = createRepos(params.db);
-	const apiKeyService = createApiKeyService({
-		repos,
-		cache: params.cache?.<ApiKeyAuthorizationInfo>({
-			logger: logger.child({ "aiki.component": "cache.apiKeyAuth" }),
-			keyPrefix: "api_key:",
-		}),
-	});
+function createApiKeyAuthorizer(params: ApiAuthorizerKeyParams, context: IamContext): ApiAuthorizer {
+	let authorizer: ApiAuthorizer | undefined;
+	let createAuthorizerPromise: Promise<ApiAuthorizer> | undefined;
 
-	return async (request: Request) => {
-		const apiKey = extractBearerToken(request.headers);
-		if (!apiKey) {
-			throw new UnauthorizedError("Invalid API key");
-		}
+	return (request: Request) => {
+		if (authorizer) return authorizer(request);
+		return (async () => {
+			createAuthorizerPromise ??= (async () => {
+				const db = await params.db();
+				const repos = await createRepos(db);
+				const apiKeyService = createApiKeyService({
+					repos,
+					cache: params.cache?.<ApiKeyAuthorizationInfo>({
+						logger: context.logger.child({ "aiki.component": "cache.apiKeyAuth" }),
+						keyPrefix: "api_key:",
+					}),
+				});
 
-		const result = await apiKeyService.verify(apiKey);
-		if (!result) {
-			throw new UnauthorizedError("Invalid API key");
-		}
+				return async (request: Request) => {
+					const apiKey = extractBearerToken(request.headers);
+					if (!apiKey) {
+						throw new UnauthorizedError("Invalid API key");
+					}
 
-		return {
-			organizationId: result.organizationId as OrganizationId,
-			namespaceId: result.namespaceId as NamespaceId,
-		};
+					const result = await apiKeyService.verify(apiKey);
+					if (!result) {
+						throw new UnauthorizedError("Invalid API key");
+					}
+
+					return {
+						organizationId: result.organizationId as OrganizationId,
+						namespaceId: result.namespaceId as NamespaceId,
+					};
+				};
+			})();
+			authorizer = await createAuthorizerPromise;
+			return authorizer(request);
+		})();
 	};
 }
 
@@ -75,29 +85,47 @@ function key(params: ApiAuthorizerKeyParams): CreateApiAuthorizer {
 }
 
 function createSessionAuthorizer(params: ApiAuthorizerSessionParams): ApiAuthorizer {
-	const authService: AuthService = createAuthService(params);
+	let authorizer: ApiAuthorizer | undefined;
+	let createAuthorizerPromise: Promise<ApiAuthorizer> | undefined;
 
-	return async (request: Request) => {
-		const session = await authService.api.getSession({ headers: request.headers });
-		if (!session?.session) {
-			throw new UnauthorizedError("Not authenticated");
-		}
+	return (request: Request) => {
+		if (authorizer) return authorizer(request);
+		return (async () => {
+			createAuthorizerPromise ??= (async () => {
+				const [{ createAuthService }, db] = await Promise.all([import("./auth"), params.db()]);
+				const authService: AuthService = await createAuthService({
+					db,
+					baseURL: params.baseURL,
+					secret: params.secret,
+					trustedOrigins: params.trustedOrigins,
+				});
 
-		const activeOrganizationId = session.session.activeOrganizationId;
-		if (!activeOrganizationId) {
-			throw new UnauthorizedError("No active organization selected");
-		}
+				return async (request: Request) => {
+					const session = await authService.api.getSession({ headers: request.headers });
+					if (!session?.session) {
+						throw new UnauthorizedError("Not authenticated");
+					}
 
-		const activeNamespaceId = session.session.activeTeamId;
-		if (!activeNamespaceId) {
-			throw new UnauthorizedError("No active namespace selected");
-		}
+					const activeOrganizationId = session.session.activeOrganizationId;
+					if (!activeOrganizationId) {
+						throw new UnauthorizedError("No active organization selected");
+					}
 
-		return {
-			organizationId: activeOrganizationId as OrganizationId,
-			namespaceId: activeNamespaceId as NamespaceId,
-			userId: session.session.userId,
-		};
+					const activeNamespaceId = session.session.activeTeamId;
+					if (!activeNamespaceId) {
+						throw new UnauthorizedError("No active namespace selected");
+					}
+
+					return {
+						organizationId: activeOrganizationId as OrganizationId,
+						namespaceId: activeNamespaceId as NamespaceId,
+						userId: session.session.userId,
+					};
+				};
+			})();
+			authorizer = await createAuthorizerPromise;
+			return authorizer(request);
+		})();
 	};
 }
 
