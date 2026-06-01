@@ -15,7 +15,7 @@ import { type } from "arktype";
 import { config } from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: join(__dirname, "../../.env") });
+config({ path: join(__dirname, "../.env") });
 
 interface Setup {
 	client: Client;
