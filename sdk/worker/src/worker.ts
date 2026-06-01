@@ -171,7 +171,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			this.primarySubscriber.heartbeat?.bind(this.primarySubscriber)
 		);
 
-		if (!this.params.subscriber) {
+		if (this.params.subscriber) {
 			const createBackupSubscriber = httpSubscriber({ api: this.client.api });
 			this.backupSubscriber = createBackupSubscriber({
 				workerId: this.id,
