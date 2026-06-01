@@ -43,7 +43,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			await db.insert(workflowRunOutbox).values(rows);
 		},
 
-		async deleteByWorkflowRunIds(_context: DaemonContext, workflowRunIds: NonEmptyArray<string>): Promise<void> {
+		async deleteByWorkflowRunIds(workflowRunIds: NonEmptyArray<string>): Promise<void> {
 			await db.delete(workflowRunOutbox).where(inArray(workflowRunOutbox.workflowRunId, workflowRunIds));
 		},
 

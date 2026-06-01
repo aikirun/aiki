@@ -47,7 +47,7 @@ export function isTaskStateTransitionToRunning(
 }
 
 export interface TaskStateMachineServiceDeps {
-	repos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "transaction">;
+	repos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox" | "transaction">;
 }
 
 export function createTaskStateMachineService(deps: TaskStateMachineServiceDeps) {
@@ -56,7 +56,7 @@ export function createTaskStateMachineService(deps: TaskStateMachineServiceDeps)
 		async transitionState(
 			context: NamespaceRequestContext,
 			request: WorkflowRunTransitionTaskStateRequestV1,
-			txRepos?: Pick<Repositories, "workflowRun" | "task" | "stateTransition">
+			txRepos?: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
 		): Promise<TaskInfo> {
 			if (txRepos) {
 				return transitionStateInTx(context, request, txRepos);
@@ -72,7 +72,7 @@ export type TaskStateMachineService = ReturnType<typeof createTaskStateMachineSe
 async function transitionStateInTx(
 	context: NamespaceRequestContext,
 	request: WorkflowRunTransitionTaskStateRequestV1,
-	txRepos: Pick<Repositories, "workflowRun" | "task" | "stateTransition">
+	txRepos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
 ): Promise<TaskInfo> {
 	const namespaceId = context.namespaceId;
 	const runId = request.id as WorkflowRunId;
@@ -177,6 +177,15 @@ async function transitionStateInTx(
 		latestStateTransitionId: stateTransitionId,
 		nextAttemptAt: taskState.status === "awaiting_retry" ? new Date(taskState.nextAttemptAt) : null,
 	});
+
+	if (taskState.status === "awaiting_retry") {
+		// The workflow run stays in `running` while the task waits for its retry, so the outbox row
+		// is not cleared by the workflow state machine. Delete it here so `republish-stale-runs`
+		// cannot re-dispatch the run before `imminent-retryable-task-runs` requeues it at the
+		// task's nextAttemptAt. The retry-tasks daemon will reinsert a fresh outbox row when it
+		// transitions the workflow to `queued`.
+		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
+	}
 
 	context.logger.info("Transitioning task state", { runId, taskId, taskState });
 

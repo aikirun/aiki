@@ -404,10 +404,11 @@ async function processOverlapCancelPreviousSchedules(
 			? await txRepos.workflowRun.bulkTransitionToCancelled(runIdsToCancel)
 			: [];
 
-		// Step 2: Discard in-flight tasks for the cancelled runs, then insert cancel state transitions
-		// only for actually cancelled runs and set latestStateTransitionId
+		// Step 2: Discard in-flight tasks and outbox entries for the cancelled runs, then insert
+		// cancel state transitions only for actually cancelled runs and set latestStateTransitionId
 		if (isNonEmptyArray(cancelledRunIds)) {
 			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+			await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
 			const cancelledRunIdsSet = new Set(cancelledRunIds);
 			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
