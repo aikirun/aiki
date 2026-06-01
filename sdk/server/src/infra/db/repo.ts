@@ -1,7 +1,6 @@
 import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
-import { createPgRepos } from "./pg";
 import type { PgClient } from "./pg/provider";
 import type { Repositories } from "./types";
 
@@ -13,10 +12,13 @@ function extractDbClient(db: Database): unknown {
 	return internal.client;
 }
 
-export function createRepos(db: Database): Repositories {
+export async function createRepos(db: Database): Promise<Repositories> {
 	switch (db.provider) {
-		case "pg":
-			return createPgRepos(extractDbClient(db) as PgClient);
+		case "pg": {
+			const { createPgRepos } = await import("./pg");
+			const client = extractDbClient(db) as PgClient;
+			return createPgRepos(client);
+		}
 		case "mysql":
 			throw new Error("MySQL support not yet implemented");
 		case "sqlite":

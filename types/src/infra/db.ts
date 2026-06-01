@@ -16,3 +16,5 @@ export interface Database {
 	readonly provider: DatabaseProvider;
 	readonly [INTERNAL]: { client: unknown };
 }
+
+export type CreateDatabase = () => Promise<Database>;
