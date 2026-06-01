@@ -68,12 +68,10 @@ export async function processImminentRecurringWorkflows(
 		}));
 
 		const now = Date.now();
-		const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = partitionArray(schedules, (schedule) => {
-			if (schedule.nextRunAt > now) {
-				return { meetsCondition: false, item: schedule };
-			}
-			return { meetsCondition: true, item: schedule };
-		});
+		const { whenTrue: schedulesDueNow, whenFalse: schedulesDueSoon } = partitionArray(schedules, (schedule) => ({
+			meetsCondition: schedule.nextRunAt <= now,
+			item: schedule,
+		}));
 
 		if (isNonEmptyArray(schedulesDueNow)) {
 			await queueRecurringWorkflows(context, deps, schedulesDueNow);
@@ -190,7 +188,7 @@ async function processOverlapAllowSchedules(
 		}
 
 		// biome-ignore lint/style/noNonNullAssertion: isNonEmptyArray guarantees at least one element
-		const lastOccurrence = occurrences[occurrences.length - 1]!;
+		const lastOccurrence = occurrences.at(-1)!;
 		scheduleUpdates.push({
 			id: schedule.id,
 			lastOccurrence: new Date(lastOccurrence),
@@ -201,24 +199,21 @@ async function processOverlapAllowSchedules(
 	if (
 		!isNonEmptyArray(workflowRunEntries) ||
 		!isNonEmptyArray(stateTransitionEntries) ||
+		!isNonEmptyArray(outboxEntries) ||
 		!isNonEmptyArray(scheduleUpdates)
 	) {
 		return;
 	}
 
-	const insertedOutboxEntries: WorkflowRunOutboxRowInsert[] = await repos.transaction(async (txRepos) => {
+	await repos.transaction(async (txRepos) => {
 		await txRepos.workflowRun.insert(workflowRunEntries);
 		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 		await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
-		if (!isNonEmptyArray(outboxEntries)) {
-			return [];
-		}
 		await txRepos.workflowRunOutbox.createBatch(outboxEntries);
-		return outboxEntries;
 	});
 
-	if (workflowRunPublisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishRuns(context, repos, workflowRunPublisher, insertedOutboxEntries);
+	if (workflowRunPublisher) {
+		await publishRuns(context, repos, workflowRunPublisher, outboxEntries);
 	}
 }
 
@@ -229,7 +224,7 @@ async function processOverlapSkipSchedules(
 	now: number,
 	workflowRunPublisher?: Publisher
 ) {
-	const { scheduleIdsWithActiveRuns } = await fetchActiveRunsBySchedule(repos, schedules);
+	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(repos, schedules);
 
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -243,7 +238,7 @@ async function processOverlapSkipSchedules(
 		}
 		const occurrence = occurrences[0];
 
-		if (scheduleIdsWithActiveRuns.has(schedule.id)) {
+		if (activeRunsByScheduleId.has(schedule.id)) {
 			scheduleUpdates.push({
 				id: schedule.id,
 				nextRunAt: new Date(getNextOccurrence(schedule.spec, occurrence)),
@@ -479,7 +474,6 @@ async function fetchActiveRunsBySchedule(
 		schedulesByReferenceId.set(referenceId, schedule);
 	}
 
-	const scheduleIdsWithActiveRuns = new Set<string>();
 	const activeRunsByScheduleId = new Map<string, { id: string; attempts: number; shard?: string }>();
 
 	if (isNonEmptyArray(workflowAndReferenceIdPairs) && isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
@@ -492,7 +486,6 @@ async function fetchActiveRunsBySchedule(
 			if (run.referenceId) {
 				const schedule = schedulesByWorkflowAndReferenceId.get(run.workflowId)?.get(run.referenceId);
 				if (schedule) {
-					scheduleIdsWithActiveRuns.add(schedule.id);
 					const shard = (run.options as WorkflowStartOptions | null)?.shard;
 					activeRunsByScheduleId.set(schedule.id, { id: run.id, attempts: run.attempts, shard });
 				}
@@ -500,5 +493,5 @@ async function fetchActiveRunsBySchedule(
 		}
 	}
 
-	return { scheduleIdsWithActiveRuns, activeRunsByScheduleId };
+	return { activeRunsByScheduleId };
 }
