@@ -186,13 +186,6 @@ async function processChunk(
 		}
 
 		await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
-
-		const workflowRunIds = outboxEntriesToInsert.map((entry) => entry.workflowRunId) as NonEmptyArray<string>;
-		// Outbox entries are only deleted on workflow suspension or termination.
-		// In our case, the workflow is still running, hence the outbox entry is still in claimed state.
-		// It needs to be deleted to avoid conflict.
-		// Upsert is another option, but one needs think carefully about which columns get updated.
-		await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(context, workflowRunIds);
 		await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
 		return outboxEntriesToInsert;
 	});

@@ -539,12 +539,13 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 			}
 
 			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+			await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
 			const cancelledRuns = await txRepos.workflowRun.getByIds(context.namespaceId, cancelledRunIds);
 
 			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
 			const cancelledRunStateTransitionUpdates: { id: string; stateTransitionId: string }[] = [];
-			const cancelledParentRuns: CancelledParentRun[] = [];
+			const cancelledRunsMeta: CancelledParentRun[] = [];
 
 			for (const run of cancelledRuns) {
 				const stateTransitionId = ulid();
@@ -554,10 +555,10 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					type: "workflow_run",
 					status: "cancelled",
 					attempt: run.attempts,
-					state: { status: "cancelled", reason: "Bulk cancel" } satisfies WorkflowRunStateCancelled,
+					state: { status: "cancelled", reason: "Cancelled" } satisfies WorkflowRunStateCancelled,
 				});
 				cancelledRunStateTransitionUpdates.push({ id: run.id, stateTransitionId });
-				cancelledParentRuns.push({
+				cancelledRunsMeta.push({
 					namespaceId: context.namespaceId,
 					runId: run.id,
 					shard: (run.options as WorkflowStartOptions | null)?.shard,
@@ -569,8 +570,8 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionUpdates);
 			}
 
-			if (isNonEmptyArray(cancelledParentRuns)) {
-				await childRunCanceller.cancel(cancelledParentRuns, txRepos, context.logger);
+			if (isNonEmptyArray(cancelledRunsMeta)) {
+				await childRunCanceller.cancel(cancelledRunsMeta, txRepos, context.logger);
 			}
 
 			return { cancelledIds: cancelledRunIds };
