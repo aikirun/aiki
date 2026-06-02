@@ -1,5 +1,6 @@
 import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	TransitionTaskStateToRunning,
 	WorkflowRunTransitionTaskStateRequestV1,
@@ -175,7 +176,7 @@ async function transitionStateInTx(
 		status: taskState.status,
 		attempts: taskState.attempts,
 		latestStateTransitionId: stateTransitionId,
-		nextAttemptAt: taskState.status === "awaiting_retry" ? new Date(taskState.nextAttemptAt) : null,
+		nextAttemptAt: taskState.status === "awaiting_retry" ? (taskState.nextAttemptAt as TimestampMs) : null,
 	});
 
 	if (taskState.status === "awaiting_retry") {

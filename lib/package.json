@@ -68,6 +68,10 @@
 		"./testing/expect": {
 			"types": "./dist/testing/expect/index.d.ts",
 			"import": "./dist/testing/expect/index.js"
+		},
+		"./timestamp": {
+			"types": "./dist/timestamp/index.d.ts",
+			"import": "./dist/timestamp/index.js"
 		}
 	},
 	"files": [

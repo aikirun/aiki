@@ -1,5 +1,6 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunStateRequest,
 	WorkflowRunTransitionStateRequestV1,
@@ -239,7 +240,7 @@ async function transitionStateInTx(
 			workflowRunId: runId,
 			name: toState.sleepName,
 			status: "sleeping",
-			awakeAt: new Date(toState.awakeAt),
+			awakeAt: toState.awakeAt as TimestampMs,
 		});
 	}
 
@@ -324,12 +325,12 @@ async function finalizeSleep(
 	if (toState.reason === "awake") {
 		await txRepos.sleepQueue.update(activeSleep.id, {
 			status: "completed",
-			completedAt: new Date(now),
+			completedAt: now as TimestampMs,
 		});
 	} else {
 		await txRepos.sleepQueue.update(activeSleep.id, {
 			status: "cancelled",
-			cancelledAt: new Date(now),
+			cancelledAt: now as TimestampMs,
 		});
 	}
 }
@@ -354,7 +355,7 @@ async function childWorkflowRunWaitNotNeeded(
 			childWorkflowRunId: childRunId,
 			childWorkflowRunStatus: toState.childWorkflowRunStatus,
 			status: "completed",
-			completedAt: new Date(now),
+			completedAt: now as TimestampMs,
 			childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
 		});
 
@@ -388,16 +389,16 @@ async function updateWorkflowRun(
 		nextAttemptAt: null,
 	};
 	if (toState.status === "scheduled") {
-		updates.scheduledAt = new Date(toState.scheduledAt);
+		updates.scheduledAt = toState.scheduledAt as TimestampMs;
 	} else if (toState.status === "sleeping") {
-		updates.awakeAt = new Date(toState.awakeAt);
+		updates.awakeAt = toState.awakeAt as TimestampMs;
 	} else if (
 		(toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") &&
 		toState.timeoutAt !== undefined
 	) {
-		updates.timeoutAt = new Date(toState.timeoutAt);
+		updates.timeoutAt = toState.timeoutAt as TimestampMs;
 	} else if (toState.status === "awaiting_retry") {
-		updates.nextAttemptAt = new Date(toState.nextAttemptAt);
+		updates.nextAttemptAt = toState.nextAttemptAt as TimestampMs;
 	}
 
 	if (request.type === "optimistic") {
@@ -457,7 +458,7 @@ async function notifyParentOfStateChangeIfNecessary(
 			childWorkflowRunId: childRun.id,
 			childWorkflowRunStatus: parentRunState.childWorkflowRunStatus,
 			status: "completed",
-			completedAt: new Date(now),
+			completedAt: now as TimestampMs,
 			childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
 		});
 

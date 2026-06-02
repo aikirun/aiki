@@ -1,3 +1,4 @@
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { and, eq } from "drizzle-orm";
@@ -62,7 +63,7 @@ export function createApiKeyRepository(db: PgDb) {
 				.update(apiKey)
 				.set({
 					status: "revoked",
-					revokedAt: Date.now(),
+					revokedAt: Date.now() as TimestampMs,
 				})
 				.where(and(eq(apiKey.id, filter.id), eq(apiKey.namespaceId, filter.namespaceId)))
 				.returning({ keyHash: apiKey.keyHash });
@@ -74,7 +75,7 @@ export function createApiKeyRepository(db: PgDb) {
 				.update(apiKey)
 				.set({
 					status: "revoked",
-					revokedAt: Date.now(),
+					revokedAt: Date.now() as TimestampMs,
 				})
 				.where(and(eq(apiKey.namespaceId, namespaceId), eq(apiKey.status, "active")))
 				.returning({ keyHash: apiKey.keyHash });

@@ -18,6 +18,7 @@ export default defineConfig({
 		"retry/index": "src/retry/index.ts",
 		"serializable/index": "src/serializable/index.ts",
 		"testing/expect/index": "src/testing/expect/index.ts",
+		"timestamp/index": "src/timestamp/index.ts",
 	},
 	format: ["esm"],
 	dts: true,

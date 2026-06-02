@@ -1,21 +1,22 @@
 import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 
 import { computeRank, type Ranked } from "../lib/rank";
 
 interface Timer {
-	dueAt: Date;
+	dueAt: TimestampMs;
 	id: string;
 }
 
 export interface TimerStreamCursor {
-	dueAt: Date;
+	dueAt: TimestampMs;
 	id: string;
 	maxId: string;
 }
 
 export function createTimerStreamCursorAdvancer<Item>(options: {
-	getDueAt: (item: Item) => Date;
+	getDueAt: (item: Item) => TimestampMs;
 	getId: (item: Item) => string;
 }): (cursor: TimerStreamCursor | undefined, item: Item) => TimerStreamCursor {
 	const { getDueAt, getId } = options;
@@ -31,7 +32,7 @@ export function createTimerStreamCursorAdvancer<Item>(options: {
 		const { maxId: cursorMaxId } = cursor;
 		const maxId = id > cursorMaxId ? id : cursorMaxId;
 
-		if (dueAt.getTime() >= cursor.dueAt.getTime()) {
+		if (dueAt >= cursor.dueAt) {
 			return { dueAt, id, maxId };
 		} else {
 			return { dueAt: cursor.dueAt, id: cursor.id, maxId };
@@ -56,7 +57,7 @@ export async function* streamTimers<Item extends Timer>(
 		advanceCursor: advanceTimerStreamCursor,
 		until: options?.until,
 		partition: (timer) => {
-			const dueAtMs = timer.dueAt.getTime();
+			const dueAtMs = timer.dueAt;
 			const rank = computeRank(dueAtMs);
 			return { meetsCondition: dueAtMs <= now, item: { ...timer, rank } };
 		},

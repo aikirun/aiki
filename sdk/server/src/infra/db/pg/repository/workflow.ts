@@ -1,4 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/api/workflow";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
@@ -177,7 +178,7 @@ export function createWorkflowRepository(db: PgDb) {
 			namespaceId: NamespaceId,
 			request: WorkflowListVersionsRequestV1
 		): Promise<{
-			items: Array<{ versionId: string; firstSeenAt: Date; lastRunId: string | null; runCount: number }>;
+			items: Array<{ versionId: string; firstSeenAt: TimestampMs; lastRunId: string | null; runCount: number }>;
 			total: number;
 		}> {
 			const { name, source, limit = 50, offset = 0, sort } = request;

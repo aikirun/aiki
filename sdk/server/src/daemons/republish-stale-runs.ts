@@ -1,5 +1,6 @@
 import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 
 import type { Repositories } from "../infra/db/types";
@@ -12,12 +13,12 @@ export interface RepublishStaleRuns {
 	workflowRunPublisher: Publisher;
 }
 
-const advanceClaimedCursor = createTimerStreamCursorAdvancer<{ id: string; claimedAt: Date }>({
+const advanceClaimedCursor = createTimerStreamCursorAdvancer<{ id: string; claimedAt: TimestampMs }>({
 	getDueAt: (entry) => entry.claimedAt,
 	getId: (entry) => entry.id,
 });
 
-const advancePublishedCursor = createTimerStreamCursorAdvancer<{ id: string; publishedAt: Date }>({
+const advancePublishedCursor = createTimerStreamCursorAdvancer<{ id: string; publishedAt: TimestampMs }>({
 	getDueAt: (entry) => entry.publishedAt,
 	getId: (entry) => entry.id,
 });

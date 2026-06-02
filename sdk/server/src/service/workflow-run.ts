@@ -4,6 +4,7 @@ import { hashInput } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { NotFoundError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunCancelByIdsRequestV1,
 	WorkflowRunCreateRequestV1,
@@ -157,7 +158,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 			id: runRow.id,
 			name: workflowRow.name,
 			versionId: workflowRow.versionId,
-			createdAt: runRow.createdAt.getTime(),
+			createdAt: runRow.createdAt,
 			revision: runRow.revision,
 			stateTransitionId: runRow.latestStateTransitionId,
 			input: runRow.input,
@@ -249,7 +250,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				id: row.id,
 				name: row.name,
 				versionId: row.versionId,
-				createdAt: row.createdAt.getTime(),
+				createdAt: row.createdAt,
 				status: row.status,
 				referenceId: row.referenceId ?? undefined,
 				taskCounts: taskCountsByRunId.get(row.id),
@@ -279,7 +280,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					return {
 						id: row.id,
 						type: row.type,
-						createdAt: row.createdAt.getTime(),
+						createdAt: row.createdAt,
 						attempt: row.attempt,
 						taskId: row.taskId,
 						taskState: row.state as TaskState,
@@ -288,7 +289,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				return {
 					id: row.id,
 					type: row.type satisfies "workflow_run",
-					createdAt: row.createdAt.getTime(),
+					createdAt: row.createdAt,
 					attempt: row.attempt,
 					state: row.state as WorkflowRunState,
 				};
@@ -660,7 +661,7 @@ async function createWorkflowRunInTx(
 		referenceId,
 		conflictPolicy: options?.reference?.conflictPolicy,
 		latestStateTransitionId: transitionId,
-		scheduledAt: new Date(scheduledAt),
+		scheduledAt: scheduledAt as TimestampMs,
 	});
 
 	const state = {
@@ -725,7 +726,7 @@ function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<s
 
 		switch (row.status) {
 			case "sleeping":
-				queue.sleeps.push({ status: row.status, awakeAt: row.awakeAt.getTime() });
+				queue.sleeps.push({ status: row.status, awakeAt: row.awakeAt });
 				break;
 			case "completed": {
 				const { completedAt } = row;
@@ -734,8 +735,8 @@ function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<s
 				}
 				queue.sleeps.push({
 					status: row.status,
-					durationMs: completedAt.getTime() - row.createdAt.getTime(),
-					completedAt: completedAt.getTime(),
+					durationMs: completedAt - row.createdAt,
+					completedAt: completedAt,
 				});
 				break;
 			}
@@ -744,7 +745,7 @@ function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<s
 				if (cancelledAt === null) {
 					throw Error(`Sleep ${row.id} cancelled but no cancelledAt timestamp`);
 				}
-				queue.sleeps.push({ status: row.status, cancelledAt: cancelledAt.getTime() });
+				queue.sleeps.push({ status: row.status, cancelledAt: cancelledAt });
 				break;
 			}
 			default:
@@ -770,7 +771,7 @@ function buildEventWaitQueuesByNameRecord(eventWaitRows: EventWaitQueueRow[]): R
 				queue.eventWaits.push({
 					status: row.status,
 					data: row.data,
-					receivedAt: row.createdAt.getTime(),
+					receivedAt: row.createdAt,
 					reference: row.referenceId ? { id: row.referenceId } : undefined,
 				});
 				break;
@@ -781,7 +782,7 @@ function buildEventWaitQueuesByNameRecord(eventWaitRows: EventWaitQueueRow[]): R
 				}
 				queue.eventWaits.push({
 					status: row.status,
-					timedOutAt: timedOutAt.getTime(),
+					timedOutAt: timedOutAt,
 				});
 				break;
 			}
@@ -845,7 +846,7 @@ async function buildChildWorkflowRunQueuesByAddressRecord(
 
 				queues[childWorkflowRunStatus].childWorkflowRunWaits.push({
 					status: childRunWaitQueue.status,
-					completedAt: completedAt.getTime(),
+					completedAt: completedAt,
 					childWorkflowRunState: childStateTransition.state as TerminalWorkflowRunState,
 				});
 				break;
@@ -858,7 +859,7 @@ async function buildChildWorkflowRunQueuesByAddressRecord(
 
 				queues[childWorkflowRunStatus].childWorkflowRunWaits.push({
 					status: childRunWaitQueue.status,
-					timedOutAt: timedOutAt.getTime(),
+					timedOutAt: timedOutAt,
 				});
 				break;
 			}
