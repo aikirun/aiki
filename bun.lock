@@ -177,6 +177,12 @@
         "@aikirun/lib": "workspace:*",
         "postgres": "^3.4.8",
       },
+      "peerDependencies": {
+        "postgres": "^3.4.8",
+      },
+      "optionalPeers": [
+        "postgres",
+      ],
     },
     "sdk/server": {
       "name": "@aikirun/server",
@@ -188,13 +194,19 @@
         "arktype": "^2.1.29",
         "cron-parser": "^5.4.0",
         "drizzle-orm": "^0.45.1",
-        "postgres": "^3.4.8",
         "ulidx": "^2.4.1",
       },
       "devDependencies": {
         "@aikirun/cli": "workspace:*",
         "@aikirun/lib": "workspace:*",
+        "postgres": "^3.4.8",
       },
+      "peerDependencies": {
+        "postgres": "^3.4.8",
+      },
+      "optionalPeers": [
+        "postgres",
+      ],
     },
     "sdk/worker": {
       "name": "@aikirun/worker",
