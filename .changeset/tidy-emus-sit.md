@@ -16,7 +16,7 @@
 "@aikirun/types": minor
 ---
 
-## Unreleased
+## 0.29.0
 
 ### New Features
 
