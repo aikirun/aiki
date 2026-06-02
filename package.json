@@ -69,5 +69,8 @@
 		"lint-staged": "^16.2.7",
 		"tsup": "^8.5.1",
 		"typescript": "^5.7.2"
+	},
+	"overrides": {
+		"better-auth": "1.6.11"
 	}
 }
