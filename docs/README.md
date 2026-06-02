@@ -33,7 +33,7 @@ Best practices and patterns:
 - **[Refactoring Workflows](./guides/refactoring-workflows.md)** - Safely modify running workflows
 - **[Reliable Hooks](./guides/reliable-hooks.md)** - Trigger durable follow-up actions on workflow completion/failure/cancellation
 
-## 🏗️ Architecture
+## 🏗 Architecture
 
 Deep dive into system design:
 

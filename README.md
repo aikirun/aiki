@@ -173,10 +173,10 @@ Pick the deployment shape that fits your stack — everything in one process, a 
 
 ## Documentation
 
-- **[Getting Started](./docs/getting-started/quick-start.md)** — Install, set up, and build your first workflow
-- **[Core Concepts](./docs/core-concepts/)** — Workflows, tasks, events, schedules, workers, and the client
-- **[Guides](./docs/guides/)** — Determinism, retries, refactoring, reference IDs, and reliable hooks
-- **[Architecture](./docs/architecture/overview.md)** — How orchestration, state, and work discovery fit together
+- **[Getting Started](./docs/README.md#-getting-started)** — Install, set up, and build your first workflow
+- **[Core Concepts](./docs/README.md#-core-concepts)** — Workflows, tasks, events, schedules, workers, and the client
+- **[Guides](./docs/README.md#-guides)** — Determinism, retries, refactoring, reference IDs, and reliable hooks
+- **[Architecture](./docs/README.md#-architecture)** — How orchestration, state, and work discovery fit together
 - **[Examples](./examples/src/workflows)** — Runnable workflows
 
 ## Requirements
