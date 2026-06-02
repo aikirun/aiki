@@ -56,25 +56,22 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 
 	with(): WorkflowBuilder<Input, Output, Context, TEvents>;
 
-	start: (
+	start(
 		client: Client<Context>,
 		...args: Input extends void ? [] : [Input]
-	) => Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
+	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
 
-	startAsChild: <ParentInput, ParentEvents extends EventsDefinition>(
+	startAsChild<ParentInput, ParentEvents extends EventsDefinition>(
 		parentRun: WorkflowRun<ParentInput, Context, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
-	) => Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>>;
+	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>>;
 
-	getHandleById: (
-		client: Client<Context>,
-		runId: string
-	) => Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
+	getHandleById(client: Client<Context>, runId: string): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
 
-	getHandleByReferenceId: (
+	getHandleByReferenceId(
 		client: Client<Context>,
 		referenceId: string
-	) => Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
+	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
 
 	[INTERNAL]: {
 		eventsDefinition: TEvents;
@@ -429,9 +426,15 @@ export interface WorkflowBuilder<Input, Output, Context, TEvents extends EventsD
 		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
 	): WorkflowBuilder<Input, Output, Context, TEvents>;
 
-	start: WorkflowVersion<Input, Output, Context, TEvents>["start"];
+	start(
+		client: Client<Context>,
+		...args: Input extends void ? [] : [Input]
+	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
 
-	startAsChild: WorkflowVersion<Input, Output, Context, TEvents>["startAsChild"];
+	startAsChild<ParentInput, ParentEvents extends EventsDefinition>(
+		parentRun: WorkflowRun<ParentInput, Context, ParentEvents>,
+		...args: Input extends void ? [] : [Input]
+	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>>;
 }
 
 class WorkflowBuilderImpl<Input, Output, Context, TEvents extends EventsDefinition>

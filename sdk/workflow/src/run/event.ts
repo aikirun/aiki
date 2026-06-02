@@ -105,11 +105,11 @@ export interface EventMulticaster<Data> {
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
 	) => Promise<void>;
-	sendByReferenceId: <Context>(
+	sendByReferenceId<Context>(
 		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	) => Promise<void>;
+	): Promise<void>;
 }
 
 export interface EventMulticasterBuilder<Data> {
@@ -117,16 +117,16 @@ export interface EventMulticasterBuilder<Data> {
 		path: Path,
 		value: TypeOfValueAtPath<EventSendOptions, Path>
 	): EventMulticasterBuilder<Data>;
-	send: <Context>(
+	send<Context>(
 		client: Client<Context>,
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	) => Promise<void>;
-	sendByReferenceId: <Context>(
+	): Promise<void>;
+	sendByReferenceId<Context>(
 		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	) => Promise<void>;
+	): Promise<void>;
 }
 
 export function createEventWaiters<TEvents extends EventsDefinition>(
