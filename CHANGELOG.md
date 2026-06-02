@@ -2,6 +2,16 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.29.1
+
+### Bug Fixes
+
+- **Restore type variance on `WorkflowVersion`, `WorkflowBuilder`, and `EventMulticaster`.** Methods declared as arrow-function properties (`name: (...) => T`) are checked with strict function variance, which broke assignability of generic workflow types. Rewrote `start`, `startAsChild`, `getHandleById`, `getHandleByReferenceId`, `send`, and `sendByReferenceId` as method signatures (`name(...): T`) so they're checked bivariantly and accept the same inputs they did before.
+
+### Build / Tooling
+
+- Pin `better-auth` to `1.6.11` via root `overrides` so a transitive `kysely` upgrade can't break the build on fresh installs.
+
 ## 0.29.0
 
 ### New Features
