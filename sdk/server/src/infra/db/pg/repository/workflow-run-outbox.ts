@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 
@@ -13,8 +14,8 @@ import { workflowRunOutbox } from "../schema";
 
 export type WorkflowRunOutboxRow = typeof workflowRunOutbox.$inferSelect;
 export type WorkflowRunOutboxRowInsert = typeof workflowRunOutbox.$inferInsert;
-export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & { status: "published"; publishedAt: Date };
-export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "claimed"; claimedAt: Date };
+export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & { status: "published"; publishedAt: TimestampMs };
+export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "claimed"; claimedAt: TimestampMs };
 
 interface ClaimFilter {
 	workflows: NonEmptyArray<{ name: string; versionId: string }>;
@@ -68,35 +69,35 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 		async markPublished(ids: NonEmptyArray<string>): Promise<void> {
 			await db
 				.update(workflowRunOutbox)
-				.set({ status: "published", publishedAt: new Date() })
+				.set({ status: "published", publishedAt: Date.now() as TimestampMs })
 				.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, ids)));
 		},
 
 		async markRepublished(ids: NonEmptyArray<string>): Promise<void> {
 			await db
 				.update(workflowRunOutbox)
-				.set({ publishedAt: new Date() })
+				.set({ publishedAt: Date.now() as TimestampMs })
 				.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, ids)));
 		},
 
 		async releaseStaleClaim(ids: NonEmptyArray<string>): Promise<void> {
 			await db
 				.update(workflowRunOutbox)
-				.set({ status: "published", claimedAt: null, publishedAt: new Date() })
+				.set({ status: "published", claimedAt: null, publishedAt: Date.now() as TimestampMs })
 				.where(and(eq(workflowRunOutbox.status, "claimed"), inArray(workflowRunOutbox.id, ids)));
 		},
 
 		async markClaimed(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
 			await db
 				.update(workflowRunOutbox)
-				.set({ status: "claimed", claimedAt: new Date() })
+				.set({ status: "claimed", claimedAt: Date.now() as TimestampMs })
 				.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
 		},
 
 		async reclaim(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
 			await db
 				.update(workflowRunOutbox)
-				.set({ claimedAt: new Date() })
+				.set({ claimedAt: Date.now() as TimestampMs })
 				.where(
 					and(
 						eq(workflowRunOutbox.namespaceId, namespaceId),
@@ -113,7 +114,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			cursor?: TimerStreamCursor
 		): Promise<WorkflowRunOutboxRowPublished[]> {
 			const now = Date.now();
-			const staleThreshold = new Date(now - claimMinIdleTimeMs);
+			const staleThreshold = (now - claimMinIdleTimeMs) as TimestampMs;
 
 			const rows = await db
 				.select()
@@ -138,7 +139,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			cursor?: TimerStreamCursor
 		): Promise<WorkflowRunOutboxRowClaimed[]> {
 			const now = Date.now();
-			const staleThreshold = new Date(now - claimMinIdleTimeMs);
+			const staleThreshold = (now - claimMinIdleTimeMs) as TimestampMs;
 
 			const rows = await db
 				.select()
@@ -164,7 +165,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 
 		async stealStaleClaimed(namespaceId: string, filters: ClaimFilter, claimMinIdleTimeMs: number, limit: number) {
 			const now = Date.now();
-			const staleThreshold = new Date(now - claimMinIdleTimeMs);
+			const staleThreshold = (now - claimMinIdleTimeMs) as TimestampMs;
 
 			const staleEntries = await db
 				.select({ id: workflowRunOutbox.id })
@@ -187,7 +188,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 
 			return db
 				.update(workflowRunOutbox)
-				.set({ claimedAt: new Date(now) })
+				.set({ claimedAt: now as TimestampMs })
 				.where(
 					and(
 						eq(workflowRunOutbox.status, "claimed"),
@@ -219,7 +220,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 
 			return db
 				.update(workflowRunOutbox)
-				.set({ status: "claimed", claimedAt: new Date() })
+				.set({ status: "claimed", claimedAt: Date.now() as TimestampMs })
 				.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, entryIds)))
 				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
 		},
@@ -245,7 +246,7 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 
 			return db
 				.update(workflowRunOutbox)
-				.set({ status: "claimed", claimedAt: new Date() })
+				.set({ status: "claimed", claimedAt: Date.now() as TimestampMs })
 				.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, pendingEntryIds)))
 				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
 		},

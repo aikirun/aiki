@@ -1,4 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -16,7 +17,7 @@ export function createSleepQueueRepository(db: PgDb) {
 
 		async update(
 			id: string,
-			updates: { status: "completed"; completedAt: Date } | { status: "cancelled"; cancelledAt: Date }
+			updates: { status: "completed"; completedAt: TimestampMs } | { status: "cancelled"; cancelledAt: TimestampMs }
 		): Promise<void> {
 			await db.update(sleepQueue).set(updates).where(eq(sleepQueue.id, id));
 		},
@@ -31,7 +32,7 @@ export function createSleepQueueRepository(db: PgDb) {
 				.limit(10_000);
 		},
 
-		async bulkCompleteByWorkflowRunIds(workflowRunIds: NonEmptyArray<string>, completedAt: Date): Promise<void> {
+		async bulkCompleteByWorkflowRunIds(workflowRunIds: NonEmptyArray<string>, completedAt: TimestampMs): Promise<void> {
 			await db
 				.update(sleepQueue)
 				.set({ status: "completed", completedAt })

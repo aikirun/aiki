@@ -1,4 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, count, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
 
@@ -50,11 +51,11 @@ export function createScheduleRepository(db: PgDb) {
 		},
 
 		async bulkUpdateOccurrence(
-			entries: NonEmptyArray<{ id: string; lastOccurrence?: Date; nextRunAt: Date }>
+			entries: NonEmptyArray<{ id: string; lastOccurrence?: TimestampMs; nextRunAt: TimestampMs }>
 		): Promise<void> {
 			const valueRows = entries.map((entry, index) => {
-				const lastOccurrenceIso = entry.lastOccurrence ? entry.lastOccurrence.toISOString() : null;
-				const nextRunAtIso = entry.nextRunAt.toISOString();
+				const lastOccurrenceIso = entry.lastOccurrence ? new Date(entry.lastOccurrence).toISOString() : null;
+				const nextRunAtIso = new Date(entry.nextRunAt).toISOString();
 				if (index === 0) {
 					return sql`(${entry.id}::text, ${nextRunAtIso}::timestamptz, ${lastOccurrenceIso}::timestamptz)`;
 				}
@@ -146,7 +147,7 @@ export function createScheduleRepository(db: PgDb) {
 				.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
 		},
 
-		async listDueSchedules(_context: DaemonContext, before: Date, limit: number, cursor?: TimerStreamCursor) {
+		async listDueSchedules(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: TimerStreamCursor) {
 			return db
 				.select({
 					schedule: {

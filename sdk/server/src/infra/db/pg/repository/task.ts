@@ -1,4 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 
@@ -43,13 +44,13 @@ export function createTaskRepository(db: PgDb) {
 				.limit(10_000);
 		},
 
-		async listRetryableTasks(_context: DaemonContext, before: Date, limit: number, cursor?: TimerStreamCursor) {
+		async listRetryableTasks(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: TimerStreamCursor) {
 			const dueAtExpr = min(task.nextAttemptAt);
 
 			return db
 				.select({
 					workflowRunId: task.workflowRunId,
-					dueAt: sql<Date>`${dueAtExpr}`.mapWith(task.nextAttemptAt),
+					dueAt: sql<TimestampMs>`${dueAtExpr}`.mapWith(task.nextAttemptAt),
 				})
 				.from(task)
 				.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, before)))

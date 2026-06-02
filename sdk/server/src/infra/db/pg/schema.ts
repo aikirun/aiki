@@ -26,10 +26,10 @@ import {
 	pgEnum,
 	pgTable,
 	text,
-	timestamp,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { timestampMs } from "./timestamp";
 import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../constants/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
@@ -64,7 +64,7 @@ export const workflow = pgTable(
 		source: workflowSourceEnum("source").notNull().default("user"),
 		name: text("name").notNull(),
 		versionId: text("version_id").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		uniqueIndex("uqidx_workflow_namespace_source_name_version").on(
@@ -98,11 +98,11 @@ export const schedule = pgTable(
 		referenceId: text("reference_id"),
 		conflictPolicy: scheduleConflictPolicyEnum("conflict_policy"),
 
-		lastOccurrence: timestamp("last_occurrence", { withTimezone: true }),
-		nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+		lastOccurrence: timestampMs("last_occurrence"),
+		nextRunAt: timestampMs("next_run_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -139,13 +139,13 @@ export const workflowRun = pgTable(
 		conflictPolicy: workflowRunConflictPolicyEnum("conflict_policy"),
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
-		scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
-		awakeAt: timestamp("awake_at", { withTimezone: true }),
-		timeoutAt: timestamp("timeout_at", { withTimezone: true }),
-		nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+		scheduledAt: timestampMs("scheduled_at"),
+		awakeAt: timestampMs("awake_at"),
+		timeoutAt: timestampMs("timeout_at"),
+		nextAttemptAt: timestampMs("next_attempt_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -199,10 +199,10 @@ export const task = pgTable(
 		options: jsonb("options"),
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
-		nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+		nextAttemptAt: timestampMs("next_attempt_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -226,7 +226,7 @@ export const stateTransition = pgTable(
 		status: text("status").notNull(),
 		attempt: integer("attempt").notNull(),
 		state: jsonb("state").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -260,11 +260,11 @@ export const sleepQueue = pgTable(
 		name: text("name").notNull(),
 		status: sleepStatusEnum("status").notNull(),
 
-		awakeAt: timestamp("awake_at", { withTimezone: true }).notNull(),
-		completedAt: timestamp("completed_at", { withTimezone: true }),
-		cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+		awakeAt: timestampMs("awake_at").notNull(),
+		completedAt: timestampMs("completed_at"),
+		cancelledAt: timestampMs("cancelled_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -299,9 +299,9 @@ export const eventWaitQueue = pgTable(
 
 		data: jsonb("data"),
 
-		timedOutAt: timestamp("timed_out_at", { withTimezone: true }),
+		timedOutAt: timestampMs("timed_out_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -331,12 +331,12 @@ export const childWorkflowRunWaitQueue = pgTable(
 		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status").notNull(),
 
 		status: childWorkflowRunWaitStatusEnum("status").notNull(),
-		completedAt: timestamp("completed_at", { withTimezone: true }),
-		timedOutAt: timestamp("timed_out_at", { withTimezone: true }),
+		completedAt: timestampMs("completed_at"),
+		timedOutAt: timestampMs("timed_out_at"),
 
 		childWorkflowRunStateTransitionId: text("child_workflow_run_state_transition_id"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -379,11 +379,11 @@ export const workflowRunOutbox = pgTable(
 
 		status: workflowRunOutboxStatusEnum("status").notNull(),
 
-		publishedAt: timestamp("published_at", { withTimezone: true }),
-		claimedAt: timestamp("claimed_at", { withTimezone: true }),
+		publishedAt: timestampMs("published_at"),
+		claimedAt: timestampMs("claimed_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		uniqueIndex("uqidx_workflow_run_outbox_workflow_run_id").on(table.workflowRunId),

@@ -1,4 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
@@ -32,7 +33,7 @@ export interface WorkflowRunMeta {
 }
 
 export interface DueWorkflowRun extends WorkflowRunMeta {
-	dueAt: Date;
+	dueAt: TimestampMs;
 }
 
 export function createWorkflowRunRepository(db: PgDb) {
@@ -301,7 +302,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 
 		async listDueScheduleRuns(
 			_context: DaemonContext,
-			before: Date,
+			before: TimestampMs,
 			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
@@ -314,7 +315,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.scheduledAt}`.mapWith(workflowRun.scheduledAt),
+					dueAt: sql<TimestampMs>`${workflowRun.scheduledAt}`.mapWith(workflowRun.scheduledAt),
 				})
 				.from(workflowRun)
 				.where(
@@ -330,7 +331,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 
 		async listSleepElapsedRuns(
 			_context: DaemonContext,
-			before: Date,
+			before: TimestampMs,
 			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
@@ -343,7 +344,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.awakeAt}`.mapWith(workflowRun.awakeAt),
+					dueAt: sql<TimestampMs>`${workflowRun.awakeAt}`.mapWith(workflowRun.awakeAt),
 				})
 				.from(workflowRun)
 				.where(
@@ -359,7 +360,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 
 		async listRetryableRuns(
 			_context: DaemonContext,
-			before: Date,
+			before: TimestampMs,
 			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
@@ -372,7 +373,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.nextAttemptAt}`.mapWith(workflowRun.nextAttemptAt),
+					dueAt: sql<TimestampMs>`${workflowRun.nextAttemptAt}`.mapWith(workflowRun.nextAttemptAt),
 				})
 				.from(workflowRun)
 				.where(
@@ -388,7 +389,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 
 		async listEventWaitTimedOutRuns(
 			_context: DaemonContext,
-			before: Date,
+			before: TimestampMs,
 			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
@@ -401,7 +402,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.timeoutAt}`.mapWith(workflowRun.timeoutAt),
+					dueAt: sql<TimestampMs>`${workflowRun.timeoutAt}`.mapWith(workflowRun.timeoutAt),
 				})
 				.from(workflowRun)
 				.where(
@@ -417,7 +418,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 
 		async listChildRunWaitTimedOutRuns(
 			_context: DaemonContext,
-			before: Date,
+			before: TimestampMs,
 			limit: number,
 			cursor?: TimerStreamCursor
 		): Promise<DueWorkflowRun[]> {
@@ -430,7 +431,7 @@ export function createWorkflowRunRepository(db: PgDb) {
 					attempts: workflowRun.attempts,
 					options: workflowRun.options,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					dueAt: sql<Date>`${workflowRun.timeoutAt}`.mapWith(workflowRun.timeoutAt),
+					dueAt: sql<TimestampMs>`${workflowRun.timeoutAt}`.mapWith(workflowRun.timeoutAt),
 				})
 				.from(workflowRun)
 				.where(

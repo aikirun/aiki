@@ -1,4 +1,5 @@
 import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow/run";
@@ -33,7 +34,7 @@ export async function processImminentSleepElapsedRuns(
 ) {
 	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
 
-	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
+	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
 		(cursor) => repos.workflowRun.listSleepElapsedRuns(context, dueBefore, limit, cursor),
@@ -47,7 +48,7 @@ export async function processImminentSleepElapsedRuns(
 			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
 				type: "sleep",
 				id: run.id,
-				dueAt: run.dueAt.getTime(),
+				dueAt: run.dueAt,
 				rank: run.rank,
 			}));
 			await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
@@ -84,7 +85,7 @@ async function processChunk(
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
-	const completedAt = new Date();
+	const completedAt = Date.now() as TimestampMs;
 
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =

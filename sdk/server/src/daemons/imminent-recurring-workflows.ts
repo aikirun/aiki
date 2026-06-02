@@ -1,6 +1,7 @@
 import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { isNonEmptyArray, partitionArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
@@ -39,7 +40,7 @@ export type DueSchedule = Schedule & {
 	workflowRunInputHash: string;
 };
 
-const advanceScheduleCursor = createTimerStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: Date } }>({
+const advanceScheduleCursor = createTimerStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: TimestampMs } }>({
 	getDueAt: (row) => row.schedule.nextRunAt,
 	getId: (row) => row.schedule.id,
 });
@@ -51,7 +52,7 @@ export async function processImminentRecurringWorkflows(
 ) {
 	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
 
-	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
+	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	for await (const rows of streamChunks(
 		(cursor) => deps.repos.schedule.listDueSchedules(context, dueBefore, limit, cursor),
@@ -142,7 +143,7 @@ async function processOverlapAllowSchedules(
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsert[] = [];
-	const scheduleUpdates: { id: string; lastOccurrence: Date; nextRunAt: Date }[] = [];
+	const scheduleUpdates: { id: string; lastOccurrence: TimestampMs; nextRunAt: TimestampMs }[] = [];
 
 	for (const schedule of schedules) {
 		const occurrences = getDueOccurrences(schedule, now);
@@ -191,8 +192,8 @@ async function processOverlapAllowSchedules(
 		const lastOccurrence = occurrences.at(-1)!;
 		scheduleUpdates.push({
 			id: schedule.id,
-			lastOccurrence: new Date(lastOccurrence),
-			nextRunAt: new Date(getNextOccurrence(schedule.spec, lastOccurrence)),
+			lastOccurrence: lastOccurrence as TimestampMs,
+			nextRunAt: getNextOccurrence(schedule.spec, lastOccurrence) as TimestampMs,
 		});
 	}
 
@@ -229,7 +230,7 @@ async function processOverlapSkipSchedules(
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsert[] = [];
-	const scheduleUpdates: { id: string; lastOccurrence?: Date; nextRunAt: Date }[] = [];
+	const scheduleUpdates: { id: string; lastOccurrence?: TimestampMs; nextRunAt: TimestampMs }[] = [];
 
 	for (const schedule of schedules) {
 		const occurrences = getDueOccurrences(schedule, now);
@@ -241,7 +242,7 @@ async function processOverlapSkipSchedules(
 		if (activeRunsByScheduleId.has(schedule.id)) {
 			scheduleUpdates.push({
 				id: schedule.id,
-				nextRunAt: new Date(getNextOccurrence(schedule.spec, occurrence)),
+				nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
 			});
 			continue;
 		}
@@ -282,8 +283,8 @@ async function processOverlapSkipSchedules(
 		});
 		scheduleUpdates.push({
 			id: schedule.id,
-			lastOccurrence: new Date(occurrence),
-			nextRunAt: new Date(getNextOccurrence(schedule.spec, occurrence)),
+			lastOccurrence: occurrence as TimestampMs,
+			nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
 		});
 	}
 
@@ -323,7 +324,7 @@ async function processOverlapCancelPreviousSchedules(
 	const newWorkflowRunEntries: WorkflowRunRowInsert[] = [];
 	const newRunStateTransitionEntries: StateTransitionRowInsert[] = [];
 	const newOutboxEntries: WorkflowRunOutboxRowInsert[] = [];
-	const scheduleUpdates: { id: string; lastOccurrence: Date; nextRunAt: Date }[] = [];
+	const scheduleUpdates: { id: string; lastOccurrence: TimestampMs; nextRunAt: TimestampMs }[] = [];
 
 	for (const schedule of schedules) {
 		const occurrences = getDueOccurrences(schedule, now);
@@ -377,8 +378,8 @@ async function processOverlapCancelPreviousSchedules(
 		});
 		scheduleUpdates.push({
 			id: schedule.id,
-			lastOccurrence: new Date(occurrence),
-			nextRunAt: new Date(getNextOccurrence(schedule.spec, occurrence)),
+			lastOccurrence: occurrence as TimestampMs,
+			nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
 		});
 	}
 

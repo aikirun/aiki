@@ -36,7 +36,7 @@ export function createWorkflowService(deps: WorkflowServiceDeps) {
 			return {
 				versions: items.map((item) => ({
 					versionId: item.versionId,
-					firstSeenAt: item.firstSeenAt.getTime(),
+					firstSeenAt: item.firstSeenAt,
 					lastRunAt: item.lastRunId ? decodeTime(item.lastRunId) : null,
 					runCount: item.runCount,
 				})),

@@ -2,6 +2,7 @@ import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput, sha256 } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type {
@@ -114,8 +115,8 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 		id: string,
 		updates: Partial<{
 			status: ScheduleStatus;
-			lastOccurrence: Date | null;
-			nextRunAt: Date | null;
+			lastOccurrence: TimestampMs | null;
+			nextRunAt: TimestampMs | null;
 		}>
 	): Promise<void> {
 		const schedule = await repos.schedule.update(namespaceId, id, updates);
@@ -182,7 +183,7 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 					workflowRunInput: input,
 					workflowRunInputHash,
 					definitionHash,
-					nextRunAt: new Date(getNextOccurrence(spec, now)),
+					nextRunAt: getNextOccurrence(spec, now) as TimestampMs,
 				});
 				if (!updatedRow) {
 					throw new NotFoundError(`Schedule not found: ${existingSchedule.id}`);
@@ -208,7 +209,7 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 				definitionHash,
 				referenceId,
 				conflictPolicy: options?.reference?.conflictPolicy ?? null,
-				nextRunAt: new Date(nextRunAt),
+				nextRunAt: nextRunAt as TimestampMs,
 			});
 			return { schedule: scheduleRowToDomain(createdRow, workflowInfo) };
 		});
@@ -336,9 +337,9 @@ export function scheduleRowToDomain(
 		options: schedule.referenceId
 			? { reference: { id: schedule.referenceId, conflictPolicy: schedule.conflictPolicy ?? undefined } }
 			: undefined,
-		createdAt: schedule.createdAt.getTime(),
-		updatedAt: schedule.updatedAt.getTime(),
-		lastOccurrence: schedule.lastOccurrence?.getTime(),
-		nextRunAt: schedule.nextRunAt?.getTime() ?? 0,
+		createdAt: schedule.createdAt,
+		updatedAt: schedule.updatedAt,
+		lastOccurrence: schedule.lastOccurrence ?? undefined,
+		nextRunAt: schedule.nextRunAt ?? 0,
 	};
 }

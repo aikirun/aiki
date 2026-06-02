@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { WorkflowRunState, WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow/run";
@@ -31,7 +32,7 @@ export async function processImminentScheduledRuns(
 ) {
 	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
 
-	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
+	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
 		(cursor) => repos.workflowRun.listDueScheduleRuns(context, dueBefore, limit, cursor),
@@ -45,7 +46,7 @@ export async function processImminentScheduledRuns(
 			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
 				type: "scheduled",
 				id: run.id,
-				dueAt: run.dueAt.getTime(),
+				dueAt: run.dueAt,
 				rank: run.rank,
 			}));
 			await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);

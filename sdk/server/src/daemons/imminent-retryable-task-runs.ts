@@ -1,6 +1,7 @@
 import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow/run";
@@ -28,7 +29,7 @@ export interface ProcessImminentRetryableTaskRunsDeps {
 	timerPriorityQueue?: TimerPriorityQueue;
 }
 
-const advanceTaskCursor = createTimerStreamCursorAdvancer<{ workflowRunId: string; dueAt: Date }>({
+const advanceTaskCursor = createTimerStreamCursorAdvancer<{ workflowRunId: string; dueAt: TimestampMs }>({
 	getDueAt: (entry) => entry.dueAt,
 	getId: (entry) => entry.workflowRunId,
 });
@@ -40,7 +41,7 @@ export async function processImminentRetryableTaskRuns(
 ) {
 	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
 
-	const dueBefore = new Date(Date.now() + imminenceThresholdMs);
+	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	let now = Date.now();
 	for await (const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } of streamChunks(
@@ -48,8 +49,8 @@ export async function processImminentRetryableTaskRuns(
 		{
 			advanceCursor: advanceTaskCursor,
 			until: (chunk) => chunk.length < limit,
-			partition: (task: { workflowRunId: string; dueAt: Date }) => ({
-				meetsCondition: task.dueAt.getTime() <= now,
+			partition: (task: { workflowRunId: string; dueAt: TimestampMs }) => ({
+				meetsCondition: task.dueAt <= now,
 				item: task,
 			}),
 		}
@@ -59,7 +60,7 @@ export async function processImminentRetryableTaskRuns(
 			const rankByRunId = new Map<string, number>();
 			for (const { workflowRunId, dueAt } of tasksDueNow) {
 				runIds.push(workflowRunId);
-				rankByRunId.set(workflowRunId, computeRank(dueAt.getTime()));
+				rankByRunId.set(workflowRunId, computeRank(dueAt));
 			}
 
 			const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds as NonEmptyArray<string>, "running");
@@ -79,8 +80,8 @@ export async function processImminentRetryableTaskRuns(
 			const timers: TimerEntry[] = tasksDueSoon.map((task) => ({
 				type: "task_retry",
 				id: task.workflowRunId,
-				dueAt: task.dueAt.getTime(),
-				rank: computeRank(task.dueAt.getTime()),
+				dueAt: task.dueAt,
+				rank: computeRank(task.dueAt),
 			}));
 			await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
 		}
