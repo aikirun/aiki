@@ -50,20 +50,20 @@ export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
 });
 ```
 
-This is regular TypeScript. Behind it, Aiki makes the workflow durable: persisted at every step, resumable from any point, and free to wait without holding system resources.
+This is regular TypeScript. Behind it, Aiki makes the workflow durable: persisted at every step, resumable, and free to wait without holding system resources.
 
 ## What Aiki handles automatically
 
-- **Crash recovery** — Workflows resume from the last checkpoint, not the start.
-- **Automatic retries** — Failed tasks retry on the policy you configure.
-- **Event suspension** — Waiting on an event releases the worker until the event arrives.
-- **Durable sleep** — Multi day/month/year waits cost nothing.
-- **Horizontal scaling** — Add workers; Aiki distributes work automatically.
-- **Parallel execution** — Child workflows run on different workers in parallel.
+- **Crash recovery**: Workflows resume from the last checkpoint.
+- **Automatic retries**: Failed tasks retry on the policy you configure.
+- **Event suspension**: Waiting on an event releases the worker until the event arrives.
+- **Durable sleep**: Multi day/month/year waits cost nothing.
+- **Horizontal scaling**: Add workers; Aiki distributes work automatically.
+- **Parallel execution**: Child workflows run on different workers in parallel.
 
 ## Quick Start
 
-The Aiki server is a library: `server({ db })` returns an HTTP handler (`(Request) => Promise<Response>`) and a background runtime. Mount the handler in any HTTP framework — in the same process as your app, or in a process dedicated to Aiki. The example below puts everything in one process.
+The Aiki server is a library: `server({ db })` returns a fetch API HTTP handler `(Request) => Promise<Response>` and a background runtime. Mount the handler in any HTTP server — in the same process as your app, or in a process dedicated to Aiki. The example below puts everything in one process.
 
 Install the SDK packages:
 
@@ -91,10 +91,10 @@ import { trialV1 } from "./workflow";
 const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
 
 // Server and worker, both running in this process
-const aiki = server({ db: database({ provider: "pg", url: databaseUrl }) });
-const runtimeHandle = await aiki.runtime.start();
+const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+const runtimeHandle = await aikiServer.runtime.start();
 
-const aikiClient = client({ handler: aiki.handler });
+const aikiClient = client({ handler: aikiServer.handler });
 const workerHandle = await worker({ workflows: [trialV1] }).spawn(aikiClient);
 
 // Start the workflow
@@ -108,7 +108,7 @@ await workerHandle.stop();
 await runtimeHandle.stop();
 ```
 
-Above, the client invokes `aiki.handler` directly — no network hop. If the server runs in a different process, point the client at it with `client({ url: "https://..." })`. Workflow code is unchanged.
+Above, the client invokes `aikiServer.handler` directly — no network hop. If the server runs in a different process, point the client at it with `client({ url: "https://..." })`. Workflow code is unchanged.
 
 ### Bundled standalone server + dashboard
 
@@ -177,7 +177,7 @@ Pick the deployment shape that fits your stack — everything in one process, a 
 - **[Core Concepts](./docs/core-concepts/)** — Workflows, tasks, events, schedules, workers, and the client
 - **[Guides](./docs/guides/)** — Determinism, retries, refactoring, reference IDs, and reliable hooks
 - **[Architecture](./docs/architecture/overview.md)** — How orchestration, state, and work discovery fit together
-- **[Examples](./examples/src/workflows)** — Runnable workflows: fan-out, cancellation cascade, long-running pipeline, and more
+- **[Examples](./examples/src/workflows)** — Runnable workflows
 
 ## Requirements
 
