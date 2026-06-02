@@ -52,7 +52,7 @@
 		"docker:down": "docker compose down",
 		"docker:logs": "docker compose logs -f",
 		"release": "bun run build:lib && bun run build:types && bun run build:sdk && bun run build:cli && bun run release:publish && git tag v$(bun -e \"console.log(require('./types/package.json').version)\") && git push && git push --tags",
-		"release:publish": "for pkg in types sdk/workflow sdk/client sdk/adapter/redis sdk/worker sdk/endpoint sdk/server sdk/iam cli; do (cd $pkg && bun publish --access public) || true; done",
+		"release:publish": "for pkg in types sdk/workflow sdk/client sdk/adapter/redis sdk/worker sdk/endpoint sdk/server sdk/iam cli; do (cd $pkg && bun publish --access public) || exit 1; done",
 		"prepare": "husky"
 	},
 	"lint-staged": {
