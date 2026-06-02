@@ -112,7 +112,7 @@ Above, the client invokes `aikiServer.handler` directly — no network hop. If t
 
 ### Bundled standalone server + dashboard
 
-The repo ships a standalone server (`app/server`) and a web dashboard (`app/dashboard`), packaged in `docker-compose.yml` for one-command startup:
+Prefer to run the server in its own process with a web dashboard? The repo ships a standalone server (`app/server`) and dashboard (`app/dashboard`) in a `docker-compose.yml`:
 
 ```bash
 git clone https://github.com/aikirun/aiki.git && cd aiki
