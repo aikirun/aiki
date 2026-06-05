@@ -6,6 +6,7 @@
 .claude
 
 .env
+.env.prod
 
 notes/
 
