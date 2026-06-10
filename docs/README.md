@@ -34,6 +34,7 @@ Best practices and patterns:
 - **[Determinism](./guides/determinism.md)** - Workflow determinism and task idempotency
 - **[Refactoring Workflows](./guides/refactoring-workflows.md)** - Safely modify running workflows
 - **[Reliable Hooks](./guides/reliable-hooks.md)** - Trigger durable follow-up actions on workflow completion/failure/cancellation
+- **[IAM](./guides/iam.md)** - Multi-tenancy, API keys, and dashboard auth — optional, off by default
 
 ## 🏗 Architecture
 

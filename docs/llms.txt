@@ -27,6 +27,7 @@
 - [Refactoring Workflows](https://github.com/aikirun/aiki/blob/main/docs/guides/refactoring-workflows.md): Change workflow code without breaking in-flight runs
 - [Reliable Hooks](https://github.com/aikirun/aiki/blob/main/docs/guides/reliable-hooks.md): Reliable webhook handling
 - [Dependency Injection](https://github.com/aikirun/aiki/blob/main/docs/guides/dependency-injection.md): Inject dependencies into workflows and tasks
+- [IAM](https://github.com/aikirun/aiki/blob/main/docs/guides/iam.md): Multi-tenancy, API keys, and dashboard auth — optional, off by default
 
 ## Architecture
 
