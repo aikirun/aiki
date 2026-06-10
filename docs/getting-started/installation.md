@@ -1,137 +1,103 @@
 # Installation
 
-This guide covers two ways to run Aiki:
+Aiki's server is a library: you install the SDK packages into your project, apply the schema migration to your database, and choose where the server runs — in the same process as your app, in a process of its own, or as the bundled standalone server with a web dashboard.
 
-- **Option A: Docker Compose** — Runs Aiki server and dashboard in containers
-- **Option B: Direct with Bun** — Runs Aiki directly on your machine
+The install and migration steps are the same for every topology.
 
-Both options require PostgreSQL running externally. Redis is optional — it enables lower-latency message delivery but Aiki works without it.
+## Prerequisites
 
----
+- Node.js 18+ or Bun 1.0+
+- PostgreSQL 14+ (SQLite and MySQL coming soon)
 
-## Option A: Using Docker Compose
+## Install the SDK packages
 
-### Prerequisites
+```bash
+npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
+npm install --save-dev @aikirun/cli
+```
 
-- Docker and Docker Compose
-- PostgreSQL 14+
-- Redis 6.2+ (optional, for lower-latency message delivery)
+## Apply the schema migration
 
-### Step 1: Clone the Repository
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
+  npx aiki migrate apply --package server
+```
+
+Re-run this command when upgrading Aiki to apply new migrations.
+
+## Choose where the server runs
+
+Both shapes below run the same server, and workflow code is identical either way.
+
+### Embedded in your process
+
+Mount `aikiServer.handler` in any HTTP framework — in the same process as your app, or in a process dedicated to Aiki. The [Quick Start](./quick-start.md) walks through this end-to-end, including worker and client.
+
+### Bundled standalone server + dashboard
+
+The repo ships a prebuilt server (`app/server`) and a web dashboard (`app/dashboard`), bundled in `docker-compose.yml`.
+
+#### Run with Docker Compose
 
 ```bash
 git clone https://github.com/aikirun/aiki.git
 cd aiki
 ```
 
-### Step 2: Configure Environment
-
-Create a `.env` file in the repository root with your connection details:
+Create a `.env` in the repo root with your database URL:
 
 ```bash
-# .env
-DATABASE_URL=postgresql://user:password@host.docker.internal:5432/aiki
-
-# Optional: Redis for lower-latency message delivery
-# REDIS_HOST=host.docker.internal
-# REDIS_PORT=6379
-# REDIS_PASSWORD=
+DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
 ```
-
-Replace with your actual credentials. Use `host.docker.internal` to connect to services running on your host machine.
-
-### Step 3: Start Aiki
 
 ```bash
-docker-compose up
+docker-compose up -d
 ```
 
-This starts:
-- **Aiki Server** on http://localhost:9850
-- **Aiki Dashboard** on http://localhost:9851
+- Server: http://localhost:9850
+- Dashboard: http://localhost:9851
 
-### Step 4: Install SDK Packages
+Point the client at the server's URL:
 
-In a separate terminal, navigate to your own application project (not the aiki directory) and install the SDK:
-
-```bash
-npm install @aikirun/client @aikirun/worker @aikirun/workflow
-# or: bun add, pnpm add, yarn add
+```typescript
+const aikiClient = client({ url: "http://localhost:9850" });
 ```
 
-You're ready! Continue to the [Quick Start](./quick-start.md) guide.
-
----
-
-## Option B: Running Directly with Bun
-
-### Prerequisites
-
-- Bun 1.0+
-- PostgreSQL 14+
-- Redis 6.2+ (optional, for lower-latency message delivery)
-
-### Step 1: Clone the Repository
+#### Run with Bun (no Docker)
 
 ```bash
 git clone https://github.com/aikirun/aiki.git
 cd aiki
 bun install
-```
-
-### Step 2: Configure Environment
-
-```bash
 cp app/server/.env.example app/server/.env
+# Edit app/server/.env with your DATABASE_URL
+
+bun run server     # Terminal 1
+bun run dashboard  # Terminal 2
 ```
-
-Edit `app/server/.env` with your PostgreSQL connection details (and optionally Redis).
-
-### Step 3: Start Aiki
-
-```bash
-# Terminal 1 - Start the server
-bun run server
-
-# Terminal 2 - Start the dashboard
-bun run dashboard
-```
-
-This starts:
-- **Aiki Server** on http://localhost:9850
-- **Aiki Dashboard** on http://localhost:9851
-
-### Step 4: Install SDK Packages
-
-In a separate terminal, navigate to your own application project (not the aiki directory) and install the SDK:
-
-```bash
-npm install @aikirun/client @aikirun/worker @aikirun/workflow
-# or: bun add, pnpm add, yarn add
-```
-
-You're ready! Continue to the [Quick Start](./quick-start.md) guide.
-
----
 
 ## Environment Variable Reference
+
+These apply to the bundled `app/server` and `app/dashboard`. If you embed the server in your own app, you control configuration directly via the `server({...})` factory and don't need these.
 
 ### Server
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_PROVIDER` | No | `pg` | Database type: `pg` (PostgreSQL) |
-| `DATABASE_URL` | Yes | - | Connection string (e.g., `postgresql://user:password@host:port/database`) |
-| `DATABASE_MAX_CONNECTIONS` | No | `10` | Maximum database connections in pool |
-| `DATABASE_SSL` | No | `false` | Enable SSL for database connection |
-| `AIKI_SERVER_HOST` | No | `0.0.0.0` | Host address to bind the server to |
-| `AIKI_SERVER_PORT` | No | `9850` | Port for the Aiki server |
-| `AIKI_SERVER_BASE_URL` | Yes | - | Public URL of the Aiki server |
-| `AIKI_SERVER_AUTH_SECRET` | Yes | - | Secret key for authentication |
-| `CORS_ORIGINS` | No | - | Comma-separated list of allowed origins |
-| `REDIS_HOST` | No | - | Redis server hostname (enables Redis-based message delivery) |
-| `REDIS_PORT` | No | `6379` | Redis server port |
-| `REDIS_PASSWORD` | No | - | Redis password (if required) |
+| `DATABASE_PROVIDER` | No | `pg` | Database provider; `pg` is supported today, `sqlite` and `mysql` coming soon |
+| `DATABASE_URL` | Yes | — | Postgres connection string |
+| `DATABASE_MAX_CONNECTIONS` | No | `10` | Connection pool size |
+| `DATABASE_SSL` | No | `false` | Enable SSL for Postgres |
+| `AIKI_SERVER_HOST` | No | `0.0.0.0` | Bind address |
+| `AIKI_SERVER_PORT` | No | `9850` | Server port |
+| `AIKI_SERVER_BASE_URL` | If IAM is on | — | Public URL of the server; required only when `AIKI_SERVER_AUTH_SECRET` is also set |
+| `AIKI_SERVER_AUTH_SECRET` | If IAM is on | — | Authentication secret; setting this (with `AIKI_SERVER_BASE_URL`) activates the IAM package |
+| `CORS_ORIGINS` | No | — | Comma-separated allowed origins for cross-origin requests |
+| `REDIS_HOST` | No | — | Enables Redis-backed work distribution and timer dispatch |
+| `REDIS_PORT` | No | `6379` | Redis port |
+| `REDIS_PASSWORD` | No | — | Redis password |
+| `LOG_LEVEL` | No | `info` | Log level |
+| `PRETTY_LOGS` | No | `true` | Pretty-print logs (set `false` for JSON output) |
 
 ### Dashboard
 
@@ -147,4 +113,4 @@ Note: `VITE_AIKI_SERVER_URL` is a build-time variable. If you change it, you nee
 ## Next Steps
 
 - [Quick Start](./quick-start.md) — Create your first workflow
-- [Your First Workflow](./first-workflow.md) — Learn core concepts with a real example
+- **[Your First Workflow](./first-workflow.md)** — A multi-step workflow with events, child workflows, and durable sleep

@@ -50,7 +50,7 @@ const sendFeedbackEmail = task({
 
 ## Step 2: Define the Courier Delivery Workflow
 
-The courier delivery is a child workflow; a separate workflow that runs independently:
+The courier delivery is a child workflow — a separate workflow that runs independently:
 
 ```typescript
 import { event, workflow } from "@aikirun/workflow";
@@ -153,34 +153,36 @@ const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 });
 ```
 
-## Step 4: Set Up Infrastructure
+## Step 4: Bootstrap the Server and Worker
 
-Create the client and worker:
+Run the server and a worker in this process, connected by the client:
 
 ```typescript
-import process from "node:process";
 import { client } from "@aikirun/client";
+import { database, server } from "@aikirun/server";
 import { worker } from "@aikirun/worker";
 
-const aikiClient = client({
-	url: "http://localhost:9850",
-	apiKey: "your-api-key",
-});
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
+
+const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+const runtimeHandle = await aikiServer.runtime.start();
+
+const aikiClient = client({ handler: aikiServer.handler });
 
 const aikiWorker = worker({
 	workflows: [restaurantOrderV1, courierDeliveryV1],
 });
-
 const workerHandle = await aikiWorker.spawn(aikiClient);
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
 	await workerHandle.stop();
+	await runtimeHandle.stop();
 	process.exit(0);
 });
 ```
 
-> **Note:** In production, workers typically run in a separate terminal or process from your application code. The worker runs continuously, listening for work, while your API or scripts start workflows as needed. For this tutorial, we're combining everything in one file for simplicity.
+> **Note:** This tutorial runs the server and worker in a single process — the simplest shape. The server can also run in its own process, with workers and application code connecting over HTTP (`client({ url })`); workflow code is unchanged either way. See [Installation](./installation.md) for the standalone setup.
 
 ## Step 5: Execute the Workflow
 
@@ -235,7 +237,7 @@ Courier delivery runs as a separate workflow. It can be monitored independently,
 The 1-day wait for feedback doesn't block any workers or consume resources. The workflow simply resumes the next day.
 
 **Crash Recovery**
-If the server crashes at any point—during payment, delivery, or the 1-day wait—the workflow resumes exactly where it left off.
+If the server crashes at any point—while waiting on the restaurant, mid-delivery, or during the 1-day feedback wait—the workflow resumes exactly where it left off.
 
 ## Next Steps
 

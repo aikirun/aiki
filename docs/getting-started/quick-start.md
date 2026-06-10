@@ -1,104 +1,94 @@
 # Quick Start
 
-Build your first workflow!
+Get a workflow running end-to-end in a single file.
 
 ## Prerequisites
 
-Make sure you've completed the [Installation](./installation.md) steps:
+- A Postgres database
+- SDK packages installed and the schema migration applied — see [Installation](./installation.md)
 
-- PostgreSQL running
-- Aiki Server running
-- SDK packages installed
-- API key created via the Aiki Dashboard UI
+## Code
 
-## Create Your First Workflow File
-
-Create a file called `my-first-workflow.ts`:
+Save the following as `app.ts` in your project — a workflow that activates a 14-day free trial and waits for the user to pay. If payment arrives early, it completes immediately. If the trial expires, the user is downgraded.
 
 ```typescript
 import { client } from "@aikirun/client";
+import { database, server } from "@aikirun/server";
 import { worker } from "@aikirun/worker";
-import { task, workflow } from "@aikirun/workflow";
+import { event, task, workflow } from "@aikirun/workflow";
 
-// 1. Define a task (unit of work)
-const greet = task({
-    name: "greet",
-    async handler(input: { name: string }) {
-        return { greeting: `👋 Hello, ${input.name}!` };
-    },
+const activateTrial = task({
+  name: "activate-trial",
+  async handler(userId: string) { /**/ },
 });
 
-// 2. Define a workflow (orchestrates tasks)
-const helloWorkflow = workflow({ name: "hello" });
-
-const helloV1 = helloWorkflow.v("1.0.0", {
-    async handler(run, input: { name: string }) {
-        const {greeting} = await greet.start(run, {name: input.name});
-        run.logger.info(greeting);
-        return { message: `I said hello to ${input.name}` };
-    },
+const downgradeToFree = task({
+  name: "downgrade-to-free",
+  async handler(userId: string) { /**/ },
 });
 
-// 3. Set up the client
-const aikiClient = client({
-    url: "http://localhost:9850",
-    apiKey: "your-api-key",
+const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
+  async handler(run, input: { userId: string }) {
+    await activateTrial.start(run, input.userId);
+
+    // Wait up to 14 days — ends early if user pays
+    const result = await run.events.paymentReceived.wait({ timeout: { days: 14 } });
+    if (result.timeout) {
+      await downgradeToFree.start(run, input.userId);
+    }
+  },
+  events: {
+    paymentReceived: event(),
+  },
 });
 
-// 4. Create a worker (executes workflows)
-const myWorker = worker({ workflows: [helloV1] });
-const workerHandle = await myWorker.spawn(aikiClient);
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
 
-// 5. Execute your workflow
-const workflowHandle = await helloV1.start(aikiClient, { name: "Alice" });
+// Server and worker, both running in this process
+const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+const runtimeHandle = await aikiServer.runtime.start();
 
-// 6. Wait for completion
-const result = await workflowHandle.waitForStatus("completed");
-if (result.success) {
-    aikiClient.logger.info(result.state.output.message);
-}
+const aikiClient = client({ handler: aikiServer.handler });
+const workerHandle = await worker({ workflows: [trialV1] }).spawn(aikiClient);
 
-// 7. Cleanup
+// Start the workflow
+const handle = await trialV1.start(aikiClient, { userId: "user-123" });
+
+// Simulate the payment arriving
+await handle.events.paymentReceived.send();
+await handle.waitForStatus("completed");
+
 await workerHandle.stop();
+await runtimeHandle.stop();
 ```
 
-## Run Your Workflow
+## Run
 
 ```bash
-# Using Node.js with tsx
-npx tsx my-first-workflow.ts
+# Node.js with tsx
+npx tsx app.ts
 
-# Using Bun
-bun run my-first-workflow.ts
+# Bun
+bun run app.ts
 ```
 
-## Expected Output
+The trial activates, the payment event ends the 14-day wait early, and the run completes.
 
-```
-👋 Hello, Alice!
-I said hello to Alice
-```
+> By default, `waitForStatus` waits indefinitely. To bound it, pass a timeout: `await handle.waitForStatus("completed", { timeout: { seconds: 60 } })`.
 
-Note: By default, `waitForStatus` waits indefinitely. To add a timeout, use:
-`await run.waitForStatus("completed", { timeout: { seconds: 60 } })`
+## What just happened?
 
-## What Just Happened?
+1. **Task** — `activateTrial` and `downgradeToFree` are units of work; each result is persisted so a workflow doesn't redo it after a crash.
+2. **Workflow** — `trialV1` orchestrates tasks and events. Its execution is tracked at every step.
+3. **Event** — `paymentReceived.wait()` suspends the run without holding any resources; `handle.events.paymentReceived.send()` wakes it. If nothing arrives in 14 days, the wait times out instead.
+4. **Server** — `server({ db })` builds the orchestration engine; `runtime.start()` runs its background loops.
+5. **Client** — `client({ handler })` connects to the server in-process. Workers and your application code both attach to it.
+6. **Worker** — `worker({...}).spawn(client)` claims ready runs from the server and executes them.
 
-1. **Task** - The `greet` function is a reusable unit of work that can be retried independently
-2. **Workflow** - The `helloWorkflow` orchestrates when and how tasks run
-3. **Client** - Connects to the Aiki server to create and track workflow runs
-4. **Worker** - Executes your workflows (typically runs in your infrastructure)
-5. **Execution** - You started a workflow run and waited for it to complete
-
-## Key Concepts
-
-- **Durable**: If your server restarts, workflows resume from where they left off
-- **Retryable**: Tasks automatically retry on failure
-- **Observable**: Each workflow run is tracked and queryable
-- **Scalable**: Multiple workers can process workflows in parallel
+Everything in this example lives in one process. The same workflow code runs against a separately deployed server — swap `client({ handler: aikiServer.handler })` for `client({ url: "..." })`.
 
 ## Next Steps
 
-- **[Your First Workflow](./first-workflow.md)** - Build a more realistic workflow with multiple tasks and delays
-- **[Core Concepts](../core-concepts/)** - Understand workflows, tasks, and workers in depth
-- **[Determinism](../guides/determinism.md)** - Learn best practices for reliable workflows
+- **[Your First Workflow](./first-workflow.md)** — Build a multi-step workflow with events, child workflows, and durable sleep
+- **[Workflows](../core-concepts/workflows.md)** — Deep dive into workflow concepts
+- **[Determinism](../guides/determinism.md)** — Writing deterministic workflows
