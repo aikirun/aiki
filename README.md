@@ -4,18 +4,18 @@
 
 <p>
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
-  <br>
+  <a href="https://www.npmjs.com/package/@aikirun/workflow"><img src="https://img.shields.io/npm/v/@aikirun/workflow?label=npm" alt="npm version"></a>
+  <a href="https://discord.aiki.run"><img src="https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
 **A durable execution platform.**
 
-Durable execution is a fault tolerant paradigm for building applications, especially long running workflows. 
+Durable execution is a fault-tolerant paradigm for building applications, especially long-running workflows. Some workflows take minutes, others take days, months or years. They wait on humans, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means wiring together message queues, crons, state machines, and fragile recovery logic.
 
-Some workflows take minutes, others take days, months or years. They often need to wait for human interaction, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means coordinating message queues, crons, state machines, and fragile recovery logic. 
+With Aiki, workflows are plain TypeScript. The platform makes them durable: each workflow is a virtual thread of execution that can be suspended intentionally or due to crashes/intermittent failures, and automatically resumed from where it left off.
 
-With Aiki, you focus on writing business logic and let the platform handle durability.
-
-Aiki workflows are like a virtual thread of execution that can be suspended (intentionally or due to crashes/intermittent-failures) and automatically resumed from where they left off.
+Aiki's architecture is a server that orchestrates, and workers or endpoints that execute — shipped as a library. Run everything in a single process, or pull the components apart as you grow. Where each component runs is configuration, not architecture; workflow code never changes.
 
 ## Example: Subscription Trial
 
@@ -26,12 +26,12 @@ import { event, task, workflow } from "@aikirun/workflow";
 
 const activateTrial = task({
   name: "activate-trial",
-  async handler(userId: string) { },
+  async handler(userId: string) { /**/ },
 });
 
 const downgradeToFree = task({
   name: "downgrade-to-free",
-  async handler(userId: string) { },
+  async handler(userId: string) { /**/ },
 });
 
 export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
@@ -50,20 +50,11 @@ export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
 });
 ```
 
-This is regular TypeScript. Behind it, Aiki makes the workflow durable: persisted at every step, resumable, and free to wait without holding system resources.
-
-## What Aiki handles automatically
-
-- **Crash recovery**: Workflows resume from the last checkpoint.
-- **Automatic retries**: Failed tasks retry on the policy you configure.
-- **Event suspension**: Waiting on an event releases the worker until the event arrives.
-- **Durable sleep**: Multi day/month/year waits cost nothing.
-- **Horizontal scaling**: Add workers; Aiki distributes work automatically.
-- **Parallel execution**: Child workflows run on different workers in parallel.
+Behind this code, the workflow is persisted at every step: it survives crashes and waits out the 14 days without holding any system resources.
 
 ## Quick Start
 
-The Aiki server is a library: `server({ db })` returns a fetch API HTTP handler `(Request) => Promise<Response>` and a background runtime. Mount the handler in any HTTP server — in the same process as your app, or in a process dedicated to Aiki. The example below puts everything in one process.
+The Aiki server is a library: `server({ db })` returns a fetch API HTTP handler `(Request) => Promise<Response>` and a background runtime. Mount the handler in any HTTP server — in the same process as your app, or in a process dedicated to Aiki. The example below runs everything in one process.
 
 Install the SDK packages:
 
@@ -108,6 +99,14 @@ await workerHandle.stop();
 await runtimeHandle.stop();
 ```
 
+Run it:
+
+```bash
+npx tsx app.ts   # or: bun run app.ts
+```
+
+The trial activates, the payment event ends the 14-day wait early, and the run completes.
+
 Above, the client invokes `aikiServer.handler` directly — no network hop. If the server runs in a different process, point the client at it with `client({ url: "https://..." })`. Workflow code is unchanged.
 
 ### Bundled standalone server + dashboard
@@ -117,8 +116,9 @@ Prefer to run the server in its own process with a web dashboard? The repo ships
 ```bash
 git clone https://github.com/aikirun/aiki.git && cd aiki
 
-# Configure DATABASE_URL in .env, then:
-docker-compose up
+# Create a .env with your DATABASE_URL, then:
+docker-compose up -d
+
 # Server: http://localhost:9850 — Dashboard: http://localhost:9851
 ```
 
@@ -133,17 +133,18 @@ See the [Installation Guide](./docs/getting-started/installation.md) for env var
 
 | Feature | Description |
 |---------|-------------|
-| **Durable Execution** | Workflows survive crashes and restarts |
+| **Durable Execution** | Workflows survive crashes and resume from the last checkpoint |
+| **Workflow Versioning** | Ship new workflow versions without breaking in-flight runs |
+| **Flexible Topology** | One process or many — split the server, workers, and endpoints apart with a config change, not a rewrite |
 | **Workers or Serverless** | Long-lived workers, or push-based endpoints for serverless platforms |
-| **Child Workflows** | Modular, reusable sub-workflows |
-| **Typed Events** | Wait for external signals with full TypeScript support |
+| **Child Workflows** | Modular, reusable sub-workflows that run in parallel on other workers |
+| **Typed Events** | Wait for external signals with full TypeScript support; waiting releases the worker until the event arrives |
 | **Event Timeouts** | Set deadlines for human responses |
-| **Durable Sleep** | Sleep for days without blocking workers |
+| **Durable Sleep** | Sleep for days, months, or years without blocking workers |
 | **Scheduled & Recurring Runs** | Cron and interval-based workflow schedules |
-| **Retries** | Configure retry policies for failed tasks |
+| **Retries** | Failed tasks retry on the policy you configure |
 | **Idempotency** | Attach your own IDs to correlate runs with your data; duplicate submits return the existing run |
-| **Library, not a binary** | Server is `(Request) => Response`; mount it in your app, a separate process, or the bundled standalone server |
-| **Horizontal Scaling** | Add workers to distribute load |
+| **Horizontal Scaling** | Add workers; Aiki distributes work automatically |
 
 ## Architecture
 
@@ -156,7 +157,7 @@ See the [Installation Guide](./docs/getting-started/installation.md) for env var
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Aiki Server                                    │
-│              Orchestrates runs, persists state in Postgres                  │
+│             Orchestrates runs, persists state in your database              │
 │         Embedded in your process, or hosted as a standalone service         │
 └─────────────────────┬─────────────────────────────────┬─────────────────────┘
                       │                                 │
@@ -169,7 +170,7 @@ See the [Installation Guide](./docs/getting-started/installation.md) for env var
         └──────────────────────────┘       └──────────────────────────┘
 ```
 
-Pick the deployment shape that fits your stack — everything in one process, a hosted central orchestrator with distributed workers, or push-based execution on serverless functions. Workflow code stays the same.
+You choose where each component runs: everything in one process, a central server with distributed workers, or push-based execution on serverless functions. Workflow code stays the same.
 
 ## Documentation
 
@@ -183,7 +184,7 @@ Pick the deployment shape that fits your stack — everything in one process, a 
 
 - **Runtime**: Node.js 18+ or Bun 1.0+
 - **Modules**: ESM only (`import`/`export`); CommonJS is not supported
-- **Database**: PostgreSQL 14+
+- **Database**: PostgreSQL 14+ (SQLite and MySQL coming soon)
 
 See the [Installation Guide](./docs/getting-started/installation.md) for detailed setup instructions including environment variable configuration.
 
@@ -202,6 +203,13 @@ See the [Installation Guide](./docs/getting-started/installation.md) for detaile
 - [`@aikirun/endpoint`](https://www.npmjs.com/package/@aikirun/endpoint) — Run workflows on serverless platforms via push instead of pull
 - [`@aikirun/iam`](https://www.npmjs.com/package/@aikirun/iam) — Multi-tenancy, API keys, and dashboard auth
 - [`@aikirun/redis`](https://www.npmjs.com/package/@aikirun/redis) — Sub-second timer dispatch and cross-host work distribution
+
+## Community
+
+Aiki is in alpha — APIs may change between releases. Feedback shapes where it goes:
+
+- [Discord](https://discord.aiki.run) — questions, feedback, and discussion
+- [GitHub Issues](https://github.com/aikirun/aiki/issues) — bugs and feature requests
 
 ## License
 
