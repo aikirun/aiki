@@ -4,7 +4,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
-  <a href="https://www.npmjs.com/package/@aikirun/workflow"><img src="https://img.shields.io/npm/v/@aikirun/workflow?label=npm" alt="npm version"></a>
+  <a href="https://www.npmjs.com/org/aikirun"><img src="https://img.shields.io/npm/v/@aikirun/workflow?label=npm" alt="npm version"></a>
   <a href="https://discord.aiki.run"><img src="https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
