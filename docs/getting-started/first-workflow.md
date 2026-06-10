@@ -7,9 +7,9 @@ Build a restaurant ordering workflow that demonstrates Aiki's key features: even
 A restaurant ordering system that:
 - Notifies the restaurant and waits for acceptance (with timeout)
 - Coordinates courier delivery as a child workflow
-- Sends a feedback email the next day
+- Sends a follow-up feedback email after a short delay
 
-This workflow spans hours or days and coordinates multiple humans—exactly what Aiki is designed for.
+In production, a workflow like this spans hours or days and coordinates multiple humans—exactly what Aiki is designed for. The tutorial compresses every wait to seconds so you can watch it run end to end.
 
 ## Step 1: Define Tasks
 
@@ -138,8 +138,8 @@ const restaurantOrderV1 = restaurantOrder.v("1.0.0", {
 			message: `Your order was delivered by ${courierName}. Enjoy!`,
 		});
 
-		// Step 7: Sleep for 1 day, then request feedback
-		await run.sleep("feedback-delay", { days: 1 });
+		// Step 7: Sleep briefly, then request feedback
+		await run.sleep("feedback-delay", { seconds: 30 });
 		await sendFeedbackEmail.start(run, {
 			orderId: input.orderId,
 			customerId: input.customerId,
@@ -216,7 +216,7 @@ setTimeout(async () => {
 	console.log("Food is ready for pickup!");
 }, 10000);
 
-// Wait for completion (this will take a while due to the 1-day sleep)
+// Wait for completion (the 30-second feedback sleep happens here)
 const result = await handle.waitForStatus("completed");
 if (result.success) {
 	console.log("Order completed:", result.state.output);
@@ -234,10 +234,10 @@ The workflow waits for the restaurant to accept, but won't wait forever. If no r
 Courier delivery runs as a separate workflow. It can be monitored independently, and if the main workflow crashes, the child continues running.
 
 **Durable Sleep**
-The 1-day wait for feedback doesn't block any workers or consume resources. The workflow simply resumes the next day.
+A sleeping workflow doesn't block any workers or consume resources, and the cost is the same whether it sleeps 30 seconds or 30 days. Change the feedback delay to `{ days: 1 }` and the workflow simply resumes the next day.
 
 **Crash Recovery**
-If the server crashes at any point—while waiting on the restaurant, mid-delivery, or during the 1-day feedback wait—the workflow resumes exactly where it left off.
+If the server crashes at any point—while waiting on the restaurant, mid-delivery, or during the feedback wait—the workflow resumes exactly where it left off.
 
 ## Next Steps
 

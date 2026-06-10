@@ -24,15 +24,15 @@ const aikiWorker = worker({
 const handle = await aikiWorker.spawn(aikiClient);
 ```
 
-Worker definitions are static and reusable. The `worker()` function creates a definition with a `name` that uniquely identifies the worker and a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution; it returns a handle for controlling the running worker.
+Worker definitions are static and reusable. The `worker()` function creates a definition with a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution; it returns a handle for controlling the running worker.
 
 ## How Workers Operate
 
-When you call `spawn()`, the worker begins discovering ready workflow runs through its subscriber (DB polling by default). When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
+When you call `spawn()`, the worker begins discovering ready workflow runs through its subscriber — claiming them from the server by default. When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
 
-During execution, the worker sends periodic heartbeats to maintain its claim on the run. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the claim expires after a configurable idle time (default: 90 seconds). Other workers detect the orphaned work and claim it. The workflow then re-executes from its last checkpoint.
+During execution, the worker sends periodic heartbeats to maintain its claim on the run. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the claim expires after a configurable idle time (default: 90 seconds) and the run is handed to a healthy worker. The workflow then re-executes from its last checkpoint.
 
-When execution completes successfully or fails in an expected way, the worker acknowledges the run, marking it as processed.
+When execution completes or fails, the worker reports the terminal state to the server.
 
 ## Scaling
 
@@ -63,7 +63,7 @@ process.on("SIGTERM", async () => {
 });
 ```
 
-The `stop()` method on the handle signals the worker to stop accepting new work, waits for active executions to finish (up to `gracefulShutdownTimeoutMs`), then returns. Any workflows that don't complete in time remain unacknowledged and will be claimed by other workers.
+The `stop()` method on the handle signals the worker to stop accepting new work, waits for active executions to finish (up to `gracefulShutdownTimeoutMs`), then returns. Any workflows that don't complete in time keep their state in the database; once their claims go stale, other workers pick them up.
 
 ## Configuration Reference
 
@@ -73,9 +73,8 @@ Worker configuration is split between **params** (identity) and **options** (tun
 
 | Param | Description |
 |-------|-------------|
-| `name` | Unique worker identifier |
 | `workflows` | Workflow versions this worker executes |
-| `subscriber` | Optional subscriber factory for work discovery (default: DB polling). Use `redisSubscriber()` from `@aikirun/redis` for lower-latency delivery |
+| `subscriber` | Optional subscriber factory for work discovery (default: claims from the server over HTTP). Use `redisSubscriber()` from `@aikirun/redis` for lower-latency delivery |
 
 **Options** are passed via `options` param or `with()` builder:
 
@@ -88,7 +87,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 
 ## Pluggable Subscribers
 
-Workers use DB polling by default, which requires no additional setup beyond the Aiki server connection. For lower-latency work discovery, install `@aikirun/redis`:
+By default, workers claim work from the server over HTTP, which requires no setup beyond the Aiki server connection. For sub-second work discovery, install `@aikirun/redis`:
 
 ```bash
 npm install @aikirun/redis
@@ -103,7 +102,7 @@ const aikiWorker = worker({
 });
 ```
 
-You can also implement your own subscriber by providing a function that matches the `CreateSubscriber` type from `@aikirun/types/subscriber`.
+You can also implement your own subscriber by providing a function that matches the `CreateSubscriber` type from `@aikirun/types/infra/queue`. See [Subscribers](../architecture/subscribers.md) for how the implementations work and what custom subscribers must provide.
 
 ## Next Steps
 

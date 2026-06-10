@@ -130,8 +130,8 @@ const exampleTask = task({
 ## Task Best Practices
 
 1. **Keep tasks focused** - One responsibility per task
-2. **Make tasks deterministic** - Same input → same output
-3. **Avoid side effects** - Be careful with external state
+2. **Make tasks idempotent** - A task may re-execute after a crash; running it twice with the same input should be safe
+3. **Put side effects in tasks** - API calls, database writes, and anything non-deterministic belong in tasks, keeping the workflow handler deterministic
 4. **Use meaningful names** - Clear, descriptive task names
 
 ## Next Steps

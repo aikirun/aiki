@@ -1,0 +1,55 @@
+# Aiki
+
+> Aiki is a durable execution platform. Workflows are plain TypeScript that survive crashes, retry on failure, wait on humans, and coordinate across systems. The server ships as a library — run everything in a single process, or pull the server, workers, and endpoints apart as you grow; workflow code never changes.
+
+## Getting Started
+
+- [README](https://github.com/aikirun/aiki/blob/main/README.md): Overview and quick start
+- [Installation](https://github.com/aikirun/aiki/blob/main/docs/getting-started/installation.md): Install packages, apply the schema migration, choose where the server runs
+- [Quick Start](https://github.com/aikirun/aiki/blob/main/docs/getting-started/quick-start.md): A workflow running end-to-end in a single file
+- [Your First Workflow](https://github.com/aikirun/aiki/blob/main/docs/getting-started/first-workflow.md): Multi-step workflow with events, child workflows, and durable sleep
+
+## Core Concepts
+
+- [Workflows](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workflows.md): Define durable workflows with versioning, retries, and child workflows
+- [Tasks](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/tasks.md): Define durable tasks with automatic retries
+- [Events](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/events.md): Wait for external signals with typed events
+- [Sleeps](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/sleeps.md): Durable timers that survive restarts
+- [Schedules](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/schedules.md): Cron and interval-based recurring workflows
+- [Workers](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workers.md): Execute workflows with horizontal scaling
+- [Client](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/client.md): Typed connection to the Aiki server, embedded or remote
+
+## Guides
+
+- [Determinism](https://github.com/aikirun/aiki/blob/main/docs/guides/determinism.md): Writing deterministic workflows
+- [Retry Strategies](https://github.com/aikirun/aiki/blob/main/docs/guides/retry-strategies.md): Configure retry behavior
+- [Reference IDs](https://github.com/aikirun/aiki/blob/main/docs/guides/reference-ids.md): Deduplication and idempotency
+- [Refactoring Workflows](https://github.com/aikirun/aiki/blob/main/docs/guides/refactoring-workflows.md): Change workflow code without breaking in-flight runs
+- [Reliable Hooks](https://github.com/aikirun/aiki/blob/main/docs/guides/reliable-hooks.md): Reliable webhook handling
+- [Dependency Injection](https://github.com/aikirun/aiki/blob/main/docs/guides/dependency-injection.md): Inject dependencies into workflows and tasks
+
+## Architecture
+
+- [Overview](https://github.com/aikirun/aiki/blob/main/docs/architecture/overview.md): How orchestration, execution, and state fit together
+- [Server](https://github.com/aikirun/aiki/blob/main/docs/architecture/server.md): The server library, work distribution, and background jobs
+- [Subscribers](https://github.com/aikirun/aiki/blob/main/docs/architecture/subscribers.md): Work discovery and fault tolerance
+
+## Examples
+
+- [Fan-out/Gather](https://github.com/aikirun/aiki/blob/main/examples/src/workflows/fan-out-gather.ts): Parallel child workflows with result aggregation
+- [Long-running Pipeline](https://github.com/aikirun/aiki/blob/main/examples/src/workflows/long-running-pipeline.ts): Durable sleep + human-in-the-loop approval
+- [Cancellation Cascade](https://github.com/aikirun/aiki/blob/main/examples/src/workflows/cancellation-cascade.ts): Parent-child cancellation propagation
+- [Parallel Tasks](https://github.com/aikirun/aiki/blob/main/examples/src/workflows/concurrent-tasks.ts): Concurrent task execution
+- [Versioning](https://github.com/aikirun/aiki/blob/main/examples/src/workflows/versioning.ts): Multiple workflow versions side by side
+- [Retry Until Success](https://github.com/aikirun/aiki/blob/main/examples/src/workflows/retry-until-success.ts): Task retry policies in action
+
+## Packages
+
+- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow): Define workflows and tasks
+- [@aikirun/client](https://www.npmjs.com/package/@aikirun/client): Typed connection to the Aiki server (embedded or hosted)
+- [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker): Long-lived worker for pull-based execution
+- [@aikirun/server](https://www.npmjs.com/package/@aikirun/server): Embeddable server library
+- [@aikirun/cli](https://www.npmjs.com/package/@aikirun/cli): aiki migrate and related tooling
+- [@aikirun/endpoint](https://www.npmjs.com/package/@aikirun/endpoint): Run workflows on serverless platforms via push instead of pull
+- [@aikirun/iam](https://www.npmjs.com/package/@aikirun/iam): Multi-tenancy, API keys, and dashboard auth
+- [@aikirun/redis](https://www.npmjs.com/package/@aikirun/redis): Sub-second timer dispatch and cross-host work distribution

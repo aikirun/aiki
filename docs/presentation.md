@@ -711,7 +711,7 @@ We've been solving infrastructure problems in application code.
 ```bash
 git clone https://github.com/aikirun/aiki
 cd aiki
-docker-compose up
+docker-compose up -d
 ```
 
 ---

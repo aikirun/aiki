@@ -27,7 +27,7 @@ import { ulid } from "ulidx";
  *
  * @param params - Worker configuration parameters
  * @param params.workflows - Array of workflow versions this worker can execute
- * @param params.subscriber - Optional subscriber factory for work discovery (default: DB polling)
+ * @param params.subscriber - Optional subscriber factory for work discovery (default: claims work from the server over HTTP)
  * @returns Worker definition, call spawn(client) to begin execution
  *
  * @example

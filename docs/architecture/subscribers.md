@@ -1,34 +1,33 @@
 # Subscribers
 
-Workers discover ready workflow runs through **subscribers**. A subscriber is a pluggable component that controls how workers find and claim work. Aiki ships two implementations and supports custom ones.
+Workers discover ready workflow runs through **subscribers**. A subscriber is a pluggable component that controls how a worker finds and claims work. Aiki ships two implementations and supports custom ones.
 
-## DB Subscriber (Default)
+## HTTP Subscriber (Default)
 
-The DB subscriber polls the Aiki server API directly for ready workflow runs. It requires no external dependencies beyond the Aiki server itself.
+The HTTP subscriber claims ready workflow runs through the Aiki server's claim API. It requires no infrastructure beyond the server itself.
 
-When no subscriber is specified, workers use the DB subscriber automatically:
+When no subscriber is specified, workers use the HTTP subscriber automatically:
 
 ```typescript
 const aikiWorker = worker({
   workflows: [orderWorkflowV1],
-  // No subscriber specified — uses DB polling by default
+  // No subscriber specified — uses the HTTP subscriber by default
 });
 ```
 
-The DB subscriber calls the server's claim endpoint to atomically fetch and claim ready runs. It handles work stealing by claiming runs that have been idle longer than `claimMinIdleTimeMs`, and sends heartbeats through the API to maintain claims on in-flight runs.
+The claim endpoint atomically fetches and claims ready runs. It also recovers orphaned work by claiming runs that have been idle longer than `claimMinIdleTimeMs` (see [Fault Tolerance](#fault-tolerance)).
 
-### DB Subscriber Configuration
+### HTTP Subscriber Configuration
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `intervalMs` | 1,000 | Poll interval (ms) |
-| `maxRetryIntervalMs` | 30,000 | Max backoff on retries (ms) |
-| `atCapacityIntervalMs` | 500 | Backoff when worker is at max capacity (ms) |
+| `intervalMs` | 1,000 | Poll interval when no work is found (ms) |
+| `maxRetryIntervalMs` | 30,000 | Max backoff on errors (ms) |
 | `claimMinIdleTimeMs` | 90,000 | Claim runs idle longer than this (ms) |
 
 ## Redis Subscriber (Optional)
 
-For lower-latency work discovery, install the Redis subscriber:
+For sub-second work discovery, install the Redis subscriber:
 
 ```bash
 npm install @aikirun/redis
@@ -46,63 +45,50 @@ const aikiWorker = worker({
 });
 ```
 
-The Redis subscriber uses Redis Streams for work distribution. This document explains how Aiki leverages streams, not how Redis Streams work (see the [official Redis documentation](https://redis.io/docs/latest/develop/data-types/streams/) for that).
+It pairs with the server's Redis publisher — work flows through Redis only if the server is configured to publish there. See [Server](./server.md).
 
-### Stream Per Workflow
+### Queue Per Workflow
 
-Each workflow type gets its own stream:
+Each workflow version gets its own queue — a Redis sorted set ordered by when each run became due, with priority breaking ties between runs due at the same moment:
 
 ```
-workflow/order-processing/1.0.0
-workflow/user-onboarding/1.0.0
-workflow/email-sending/2.0.0
+aiki:workflow:order-processing:1.0.0
+aiki:workflow:user-onboarding:1.0.0
 ```
 
 With sharding enabled:
 
 ```
-workflow/order-processing/1.0.0/us-east
-workflow/order-processing/1.0.0/eu-west
+aiki:workflow:order-processing:1.0.0:us-east
+aiki:workflow:order-processing:1.0.0:eu-west
 ```
 
 ### Work Distribution
 
-Workers use consumer groups to receive work:
+- When a workflow run becomes ready, the server publishes it to the matching queue
+- Workers block on their queues, so work is delivered the moment it's published — no idle polling
+- Popping a run removes it from the queue, so each run is delivered to exactly one worker
+- After the first pop, remaining worker capacity is filled round-robin across queues, so busy workflows don't starve quiet ones
 
-- When a workflow is started, the server publishes a message to the appropriate stream
-- Workers receive messages when they have capacity (automatic load balancing)
-- Each message is delivered to exactly one worker in the consumer group
-- No central coordinator assigns work; workers pull when ready
-
-### Message Lifecycle
-
-1. Server publishes workflow run message to stream
-2. Worker receives message from consumer group
-3. Worker executes workflow, sending periodic heartbeats to refresh its claim
-4. Worker acknowledges message on completion
-5. If worker crashes before acknowledging, message remains pending (heartbeats stop)
+Queue contents are disposable. The server's database outbox is the source of truth for deliverable work; if Redis goes down, the server re-publishes anything lost once it recovers, and the worker fails over to its backup subscriber in the meantime (see [Backup Subscriber](#backup-subscriber)).
 
 ### Redis Subscriber Configuration
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `claimMinIdleTimeMs` | 90,000 | How long a message must be idle before other workers can claim it |
-| `blockTimeMs` | 1,000 | How long to wait for new messages before checking for claimable work |
-| `intervalMs` | 50 | Poll interval (ms) |
-| `maxRetryIntervalMs` | 30,000 | Max backoff on retries (ms) |
-| `atCapacityIntervalMs` | 50 | Backoff when worker is at max capacity (ms) |
+| `maxRetryIntervalMs` | 30,000 | Max backoff on connection errors (ms) |
 
 ## Custom Subscribers
 
 You can implement your own subscriber by providing a function that matches the `CreateSubscriber` type:
 
 ```typescript
-import type { CreateSubscriber } from "@aikirun/types/subscriber";
+import type { CreateSubscriber } from "@aikirun/types/infra/queue";
 
 const mySubscriber: CreateSubscriber = (context) => {
   return {
     getNextDelay: (params) => 1000,
-    getNextBatch: async (size) => {
+    getReadyRuns: async (limit) => {
       // Your work discovery logic here
       return [];
     },
@@ -123,19 +109,21 @@ The `Subscriber` interface:
 
 | Method | Required | Description |
 |--------|----------|-------------|
-| `getNextBatch(size)` | Yes | Fetch up to `size` ready workflow runs |
-| `getNextDelay(params)` | Yes | Return milliseconds to wait before next poll |
-| `heartbeat(workflowRunId)` | No | Keep an in-flight workflow run's claim alive |
-| `acknowledge(workflowRunId)` | No | Mark a workflow run as processed |
-| `close()` | No | Cleanup when worker shuts down |
+| `getReadyRuns(limit)` | Yes | Fetch up to `limit` ready workflow runs; may block until work arrives |
+| `getNextDelay(params)` | Yes | Return milliseconds to wait before the next call (`no_work` or `retry`) |
+| `heartbeat(workflowRunId)` | No | Keep an in-flight run's claim alive in your transport (e.g. extending an SQS visibility timeout) |
+| `acknowledge(workflowRunId)` | No | Mark a workflow run as processed in your transport |
+| `close()` | No | Cleanup when the worker shuts down |
+
+If your subscriber blocks inside `getReadyRuns` until work arrives — as the Redis subscriber does — return `0` from `getNextDelay` for `no_work`; the delay between calls only matters for polling subscribers. Give the `retry` variant a real backoff either way: it's applied when `getReadyRuns` fails, and a zero delay there means hammering a failing dependency.
 
 ## Fault Tolerance
 
-All subscribers support fault tolerance through heartbeats and work claiming. The mechanism differs by implementation, but the guarantees are the same.
+Crashed or stuck workers don't strand workflow runs. Recovery is driven by the server and works the same regardless of subscriber.
 
 ### Heartbeats
 
-While executing a workflow run, the worker sends periodic heartbeats to maintain its claim. If a worker crashes, heartbeats stop and the claim eventually expires.
+While executing a workflow run, the worker sends periodic heartbeats to the server to keep its claim alive. If the worker crashes, heartbeats stop and the claim eventually goes stale.
 
 Heartbeat interval is configured in worker options:
 
@@ -143,16 +131,16 @@ Heartbeat interval is configured in worker options:
 |--------|---------|-------------|
 | `workflowRun.heartbeatIntervalMs` | 30,000 | How often workers refresh their claim |
 
+If a custom subscriber provides its own `heartbeat` method, the worker calls both — the server's and the subscriber's.
+
 ### Work Stealing
 
 When a worker crashes mid-execution:
 
 1. The workflow run's claim goes stale (no heartbeats)
-2. Other workers detect the idle run (via `claimMinIdleTimeMs`)
-3. A healthy worker claims the orphaned run
+2. After `claimMinIdleTimeMs`, the run is up for grabs again — the claim API hands it to the next claiming worker, and when a publisher is configured, the server's republish daemon also puts it back on the queue
+3. A healthy worker picks up the orphaned run
 4. The workflow re-executes from its last checkpoint
-
-The DB subscriber detects idle runs through the server's claim API. The Redis subscriber uses Redis's XCLAIM command to claim messages from pending lists.
 
 ### Zombie Worker Prevention
 
@@ -183,7 +171,7 @@ Work stealing is safe. Re-executing a workflow doesn't cause duplicate side effe
 
 ### Backup Subscriber
 
-Workers automatically create a backup http subscriber alongside the primary subscriber. If the primary subscriber fails, the worker switches to the backup to maintain availability. This ensures workflow execution continues even if an external dependency like Redis goes down.
+When you provide a custom subscriber (including the Redis subscriber), the worker also creates a backup HTTP subscriber. If the primary subscriber fails, the worker switches to the backup to maintain availability. This ensures workflow execution continues even if an external dependency like Redis goes down.
 
 ## Next Steps
 

@@ -18,9 +18,11 @@ Understand the building blocks:
 
 - **[Workflows](./core-concepts/workflows.md)** - Define long-running business processes
 - **[Tasks](./core-concepts/tasks.md)** - Individual units of work
+- **[Events](./core-concepts/events.md)** - Let external systems signal running workflows
+- **[Sleeps](./core-concepts/sleeps.md)** - Durable timers that survive restarts
 - **[Schedules](./core-concepts/schedules.md)** - Trigger workflows on a recurring basis
 - **[Workers](./core-concepts/workers.md)** - Execute workflows in your infrastructure
-- **[Client](./core-concepts/client.md)** - Interact with the Aiki server
+- **[Client](./core-concepts/client.md)** - Connect to the Aiki server, embedded or remote
 
 ## 🎯 Guides
 
@@ -43,6 +45,7 @@ Deep dive into system design:
 
 ## 🔗 Quick Links
 
-- [GitHub Repository](https://github.com/shobande-femi/aiki)
-- [Examples](../examples/)
+- [GitHub Repository](https://github.com/aikirun/aiki)
+- [Discord](https://discord.aiki.run)
+- [Examples](../examples/src/workflows)
 - [License](../LICENSE)

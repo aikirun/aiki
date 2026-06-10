@@ -1,29 +1,32 @@
 # Client
 
-The Aiki client connects to the server and lets you start workflows.
+The Aiki client is the typed connection to the server. Workers, schedules, and your application code all attach to it — to start workflows, send events, and inspect runs.
 
 ## Creating a Client
+
+Two transports are supported. **Remote** connects to a server over HTTP:
 
 ```typescript
 import { client } from "@aikirun/client";
 
 const aikiClient = client({
 	url: "http://localhost:9850",
-	apiKey: "your-api-key",
 });
 ```
 
-## Configuration Options
-
-### apiKey
-
-API key for authentication. Create one from the dashboard UI:
+**Embedded** invokes an in-process server's handler directly — no network hop:
 
 ```typescript
-apiKey: "your-api-key"
+const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+
+const aikiClient = client({ handler: aikiServer.handler });
 ```
 
-### url
+Switching transports is a config-only change; workers and workflow code are unaffected.
+
+## Configuration Options
+
+### url (remote)
 
 The URL of the Aiki server:
 
@@ -31,14 +34,29 @@ The URL of the Aiki server:
 url: "http://localhost:9850"; // Local development
 ```
 
+### apiKey (remote)
+
+API key for authentication — required when the server has IAM enabled. Create one from the dashboard UI:
+
+```typescript
+apiKey: "your-api-key"
+```
+
+### handler (embedded)
+
+The in-process server's request handler:
+
+```typescript
+handler: aikiServer.handler
+```
+
 ### context
 
 Optional function to create per-execution context for workflows. Called before each workflow execution:
 
 ```typescript
-const aikiClient = await client<Context>({
+const aikiClient = client<Context>({
 	url: "http://localhost:9850",
-	apiKey: "your-api-key",
 	context: (run) => ({
 		traceId: crypto.randomUUID(),
 		workflowRunId: run.id,
@@ -55,7 +73,6 @@ Optional custom logger implementation. Defaults to console logging:
 ```typescript
 const aikiClient = client({
 	url: "http://localhost:9850",
-	apiKey: "your-api-key",
 	logger: myCustomLogger, // Must implement Logger interface
 });
 ```

@@ -31,7 +31,7 @@ const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
   async handler(run, input: { userId: string }) {
     await activateTrial.start(run, input.userId);
 
-    // Wait up to 14 days — ends early if user pays
+    // Wait until payment is received or the 14-day trial expires
     const result = await run.events.paymentReceived.wait({ timeout: { days: 14 } });
     if (result.timeout) {
       await downgradeToFree.start(run, input.userId);
@@ -81,7 +81,7 @@ The trial activates, the payment event ends the 14-day wait early, and the run c
 1. **Task** — `activateTrial` and `downgradeToFree` are units of work; each result is persisted so a workflow doesn't redo it after a crash.
 2. **Workflow** — `trialV1` orchestrates tasks and events. Its execution is tracked at every step.
 3. **Event** — `paymentReceived.wait()` suspends the run without holding any resources; `handle.events.paymentReceived.send()` wakes it. If nothing arrives in 14 days, the wait times out instead.
-4. **Server** — `server({ db })` builds the orchestration engine; `runtime.start()` runs its background loops.
+4. **Server** — `server({ db })` creates the server; `runtime.start()` runs its background loops.
 5. **Client** — `client({ handler })` connects to the server in-process. Workers and your application code both attach to it.
 6. **Worker** — `worker({...}).spawn(client)` claims ready runs from the server and executes them.
 

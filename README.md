@@ -38,7 +38,7 @@ export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
   async handler(run, input: { userId: string }) {
     await activateTrial.start(run, input.userId);
 
-    // Wait up to 14 days — ends early if user pays
+    // Wait until payment is received or the 14-day trial expires
     const result = await run.events.paymentReceived.wait({ timeout: { days: 14 } });
     if (result.timeout) {
       await downgradeToFree.start(run, input.userId);
@@ -179,6 +179,7 @@ You choose where each component runs: everything in one process, a central serve
 - **[Guides](./docs/README.md#-guides)** — Determinism, retries, refactoring, reference IDs, and reliable hooks
 - **[Architecture](./docs/README.md#-architecture)** — How orchestration, state, and work discovery fit together
 - **[Examples](./examples/src/workflows)** — Runnable workflows
+- **[llms.txt](https://aiki.run/llms.txt)** — Docs index for AI agents and LLMs
 
 ## Requirements
 

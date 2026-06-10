@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Aiki follows a distributed architecture where workflow orchestration is separated from execution. This provides security, scalability, and flexibility.
+Aiki separates workflow orchestration from execution: a server orchestrates, workers and endpoints execute. The separation is architectural, not physical — the server is a library, so the components can share a single process or be deployed independently. Workflow code is identical either way.
 
 ## System Design
 
@@ -48,15 +48,17 @@ retrieve results.
 The Aiki Server orchestrates workflows and manages state through three key functions: workflow orchestration manages the
 workflow lifecycle, task management tracks task execution, and the storage layer persists state and history.
 
+The server ships as a library — `server({ db })` returns an HTTP handler and a background runtime — so it runs embedded in your process or as a standalone service. See [Server](./server.md).
+
 ### 3. Work Delivery
 
 Aiki supports two models for delivering workflow runs to your code:
 
-- **Pull (Workers)** - Long-lived processes that discover ready work through pluggable [subscribers](./subscribers.md). Workers poll for work, execute workflows, and report results. Scale by running multiple instances.
+- **Pull (Workers)** - Long-lived processes that discover ready work through pluggable [subscribers](./subscribers.md) — claiming from the server's API by default, or receiving from Redis queues. Scale by running multiple instances.
 
 - **Push (Endpoints)** - The server pushes workflow runs via HTTP to a request handler you expose. Designed for serverless platforms (Cloudflare Workers, AWS Lambda, Vercel) where long-lived polling isn't possible.
 
-Both models use the same execution engine. A workflow behaves identically whether executed by a worker or an endpoint.
+A workflow behaves identically whether executed by a worker or an endpoint.
 
 ### 4. Workers
 
@@ -65,7 +67,7 @@ logic and tasks, reporting results to the server, and handling retries and failu
 
 ### 5. Endpoints
 
-Endpoints execute workflows in serverless environments. The server sends a signed HTTP request containing the workflow run ID. The endpoint handler verifies the signature, fetches the workflow run state, and executes it using the same engine as workers.
+Endpoints execute workflows in serverless environments. The server sends a signed HTTP request containing the workflow run ID. The endpoint handler verifies the signature, fetches the workflow run state, and executes it exactly as a worker would.
 
 ## Data Flow
 
@@ -114,10 +116,10 @@ Worker/Endpoint → Server → Storage
 
 1. Worker or endpoint updates workflow run state via server
 2. Server persists state to storage
-3. Server streams updates to subscribers (SSE for browsers, pub-sub for backend services)
+3. Clients observe progress through run handles (e.g. `handle.waitForStatus`)
 
 ## Next Steps
 
 - **[Server](./server.md)** - Server component details
-- **[Workers](./workers.md)** - Worker architecture deep dive
+- **[Workers](../core-concepts/workers.md)** - Worker configuration and execution
 - **[Subscribers](./subscribers.md)** - Work discovery implementations
