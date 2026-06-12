@@ -1,10 +1,10 @@
 import { streamChunks } from "@aikirun/lib/async";
-import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
-import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
+import type { Publisher } from "@aikirun/types/infra/queue";
 
+import { publishOutboxEntries } from "./publish-ready-runs";
 import type { Repositories } from "../infra/db/types";
-import type { WorkflowRunOutboxRow } from "../infra/db/types/workflow-run-outbox";
 import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 
@@ -37,10 +37,11 @@ export async function republishStaleRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		context.logger.info("Releasing stale outbox claims", { count: staleEntries.length });
-		await republishRuns(context, deps.workflowRunPublisher, staleEntries);
-		const staleEntryIds = staleEntries.map((entry) => entry.id) as NonEmptyArray<string>;
-		await deps.repos.workflowRunOutbox.releaseStaleClaim(staleEntryIds);
+		context.logger.debug("Releasing stale outbox claims", { count: staleEntries.length });
+		const publishedEntryIds = await publishOutboxEntries(context, deps.workflowRunPublisher, staleEntries);
+		if (isNonEmptyArray(publishedEntryIds)) {
+			await deps.repos.workflowRunOutbox.releaseStaleClaim(publishedEntryIds);
+		}
 	}
 
 	for await (const staleEntries of streamChunks(
@@ -50,27 +51,10 @@ export async function republishStaleRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		context.logger.info("Republishing stale published outbox entries", { count: staleEntries.length });
-		await republishRuns(context, deps.workflowRunPublisher, staleEntries);
-		const staleEntryIds = staleEntries.map((entry) => entry.id) as NonEmptyArray<string>;
-		await deps.repos.workflowRunOutbox.markRepublished(staleEntryIds);
+		context.logger.debug("Republishing stale published outbox entries", { count: staleEntries.length });
+		const publishedEntryIds = await publishOutboxEntries(context, deps.workflowRunPublisher, staleEntries);
+		if (isNonEmptyArray(publishedEntryIds)) {
+			await deps.repos.workflowRunOutbox.markRepublished(publishedEntryIds);
+		}
 	}
-}
-
-async function republishRuns(
-	context: DaemonContext,
-	workflowRunPublisher: Publisher,
-	entries: NonEmptyArray<WorkflowRunOutboxRow>
-): Promise<void> {
-	const runs = entries.map((entry) => ({
-		namespaceId: entry.namespaceId,
-		id: entry.workflowRunId,
-		name: entry.workflowName,
-		versionId: entry.workflowVersionId,
-		rank: entry.rank,
-		shard: entry.shard ?? undefined,
-	})) as NonEmptyArray<ReadyWorkflowRun>;
-
-	await workflowRunPublisher.publishReadyRuns(runs);
-	context.logger.debug("Published ready workflow runs", { count: runs.length });
 }

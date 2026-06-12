@@ -1,9 +1,12 @@
 import { streamChunks } from "@aikirun/lib/async";
-import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Publisher, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 
 import type { Repositories } from "../infra/db/types";
-import type { WorkflowRunOutboxRowInsert } from "../infra/db/types/workflow-run-outbox";
+import type {
+	WorkflowRunOutboxRowInsert,
+	WorkflowRunOutboxRowInsertPending,
+} from "../infra/db/types/workflow-run-outbox";
 import { createRankStreamCursorAdvancer } from "../lib/rank-stream";
 import type { DaemonContext } from "../middleware/context";
 
@@ -31,20 +34,31 @@ export async function publishReadyRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		await publishRuns(context, deps.repos, deps.workflowRunPublisher, pendingEntries);
+		await publishPendingOutboxEntries(context, deps.repos, deps.workflowRunPublisher, pendingEntries);
 	}
 }
 
-export async function publishRuns(
+export async function publishPendingOutboxEntries(
 	context: DaemonContext,
 	repos: Pick<Repositories, "workflowRunOutbox">,
 	workflowRunPublisher: Publisher,
-	entries: NonEmptyArray<WorkflowRunOutboxRowInsert>
+	entries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>
 ): Promise<void> {
-	const entryIds: string[] = [];
+	const publishedEntryIds = await publishOutboxEntries(context, workflowRunPublisher, entries);
+	if (isNonEmptyArray(publishedEntryIds)) {
+		await repos.workflowRunOutbox.markPublished(publishedEntryIds);
+	}
+}
+
+export async function publishOutboxEntries(
+	context: DaemonContext,
+	workflowRunPublisher: Publisher,
+	entries: NonEmptyArray<WorkflowRunOutboxRowInsert>
+): Promise<string[]> {
+	const entryIdByRunId = new Map<string, string>();
 	const runs: ReadyWorkflowRun[] = [];
 	for (const entry of entries) {
-		entryIds.push(entry.id);
+		entryIdByRunId.set(entry.workflowRunId, entry.id);
 		runs.push({
 			namespaceId: entry.namespaceId,
 			id: entry.workflowRunId,
@@ -55,8 +69,30 @@ export async function publishRuns(
 		});
 	}
 
-	await workflowRunPublisher.publishReadyRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
-	context.logger.debug("Published ready workflow runs", { count: runs.length });
+	const result = await workflowRunPublisher.publishReadyRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
 
-	await repos.workflowRunOutbox.markPublished(entryIds as NonEmptyArray<string>);
+	const publishedEntryIds: string[] = [];
+	if (isNonEmptyArray(result.published)) {
+		context.logger.debug("Published ready workflow runs", { count: result.published.length });
+		for (const run of result.published) {
+			const entryId = entryIdByRunId.get(run.id);
+			if (entryId !== undefined) {
+				publishedEntryIds.push(entryId);
+			}
+		}
+	}
+
+	if (isNonEmptyArray(result.deferred)) {
+		context.logger.debug("Deferred publishing workflow runs", { count: result.deferred.length });
+	}
+
+	if (isNonEmptyArray(result.failed)) {
+		context.logger.debug("Failed to publish workflow runs", { count: result.failed.length });
+	}
+
+	if (isNonEmptyArray(result.declined)) {
+		context.logger.warn("Declined to publish workflow runs", { count: result.declined.length });
+	}
+
+	return publishedEntryIds;
 }

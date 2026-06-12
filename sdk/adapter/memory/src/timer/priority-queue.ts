@@ -3,6 +3,7 @@ import { createMinHeap } from "@aikirun/lib/collection/heap";
 import type {
 	CreateTimerPriorityQueue,
 	DueTimer,
+	TimerAddResult,
 	TimerEntry,
 	TimerPriorityQueue,
 	TimerPriorityQueueContext,
@@ -61,7 +62,7 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 	}
 
 	const timerPriorityQueue: TimerPriorityQueue = {
-		async add(timers: NonEmptyArray<TimerEntry>): Promise<void> {
+		async add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult> {
 			let minDueAt = timers[0].dueAt;
 			for (const timer of timers) {
 				if (timer.dueAt < minDueAt) {
@@ -71,6 +72,7 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 			}
 			signals.push(minDueAt);
 			waiterHandles.values().next().value?.wake();
+			return { status: "added" };
 		},
 
 		async popDue(maxRank: number, limit: number): Promise<DueTimer[]> {

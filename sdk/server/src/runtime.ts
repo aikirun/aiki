@@ -45,7 +45,7 @@ export function createRuntime(params: CreateRuntimeParams) {
 
 interface RuntimeHandleDeps {
 	logger: Logger;
-	daemons: { shutdown: () => Promise<void> };
+	daemons: { stop: () => Promise<void> };
 	gracefulShutdownTimeoutMs: number;
 }
 
@@ -54,7 +54,7 @@ function createRuntimeHandle(deps: RuntimeHandleDeps): ServerRuntimeHandle {
 	let stopPromise: Promise<void> | undefined;
 
 	const _stop = async (): Promise<void> => {
-		const daemonShutdownPromise = deps.daemons.shutdown();
+		const daemonShutdownPromise = deps.daemons.stop();
 
 		if (deps.gracefulShutdownTimeoutMs <= 0) {
 			await daemonShutdownPromise;

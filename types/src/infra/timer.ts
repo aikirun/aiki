@@ -28,8 +28,10 @@ export interface TimerSignalWaiter {
 	close(): Promise<void>;
 }
 
+export type TimerAddResult = { status: "added" } | { status: "failed" };
+
 export interface TimerPriorityQueue {
-	add(timers: NonEmptyArray<TimerEntry>): Promise<void>;
+	add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult>;
 	popDue(maxRank: number, limit: number): Promise<DueTimer[]>;
 	peekNextRank(): Promise<number | null>;
 	createSignalWaiter(): TimerSignalWaiter;

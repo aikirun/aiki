@@ -2,6 +2,7 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type {
 	CreateTimerPriorityQueue,
 	DueTimer,
+	TimerAddResult,
 	TimerEntry,
 	TimerPriorityQueue,
 	TimerSignalWaiter,
@@ -9,7 +10,7 @@ import type {
 } from "@aikirun/types/infra/timer";
 import type { Redis } from "ioredis";
 
-import { attachConnectionSupervisor } from "../connection";
+import { attachConnectionSupervisor, connectionTracker } from "../connection";
 
 function encodeMember(type: TimerType, id: string): string {
 	return `${type}:${id}`;
@@ -73,83 +74,99 @@ return minSignal
 export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerPriorityQueue {
 	const signalKey = `${key}:signal`;
 
-	return ({ logger }): TimerPriorityQueue => ({
-		async add(timers: NonEmptyArray<TimerEntry>): Promise<void> {
-			let minDueAt = timers[0].dueAt;
-			const args: (string | number)[] = [];
-			for (const timer of timers) {
-				if (timer.dueAt < minDueAt) {
-					minDueAt = timer.dueAt;
+	return ({ logger }): TimerPriorityQueue => {
+		const redisTracker = connectionTracker(redis);
+
+		return {
+			async add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult> {
+				if (!redisTracker.isAvailable()) {
+					return { status: "failed" };
 				}
-				const member = encodeMember(timer.type, timer.id);
-				args.push(timer.rank, member);
-			}
 
-			await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minDueAt, ...args);
-		},
-
-		async popDue(maxRank: number, limit: number): Promise<DueTimer[]> {
-			const pairs = (await redis.eval(POP_DUE_TIMERS_SCRIPT, 1, key, maxRank, limit)) as string[];
-			if (pairs.length === 0) {
-				return [];
-			}
-
-			const result: DueTimer[] = [];
-			for (let i = 0; i + 1 < pairs.length; i += 2) {
-				const member = pairs[i] as string;
-				const rank = Number(pairs[i + 1]);
-				result.push(decodeMember(member, rank));
-			}
-			return result;
-		},
-
-		async peekNextRank(): Promise<number | null> {
-			const result = await redis.zrangebyscore(key, "-inf", "+inf", "WITHSCORES", "LIMIT", 0, 1);
-			if (result.length < 2) {
-				return null;
-			}
-			return Number(result[1]);
-		},
-
-		createSignalWaiter(): TimerSignalWaiter {
-			const redisDuplicate = redis.duplicate({
-				maxRetriesPerRequest: 0,
-				enableOfflineQueue: false,
-			});
-			const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger });
-			let closed = false;
-
-			return {
-				/**
-				 * Blocks on the signal list, then drains any remaining signals.
-				 * Returns the minimum signal observed (combining BRPOP value with drained values).
-				 * Returns 0 if BRPOP timed out — drained values are discarded in that case since
-				 * peek-after-pop will rediscover them.
-				 */
-				async wait(timeoutSeconds: number): Promise<number> {
-					const result = await redisDuplicate.brpop(signalKey, timeoutSeconds);
-					if (result === null) {
-						await redisDuplicate.del(signalKey);
-						return 0;
+				let minDueAt = timers[0].dueAt;
+				const args: (string | number)[] = [];
+				for (const timer of timers) {
+					if (timer.dueAt < minDueAt) {
+						minDueAt = timer.dueAt;
 					}
+					const member = encodeMember(timer.type, timer.id);
+					args.push(timer.rank, member);
+				}
 
-					const signal = Number(result[1]);
-					const minSignal = (await redisDuplicate.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
-					if (minSignal === null) {
-						return signal;
-					}
-					return Math.min(signal, minSignal);
-				},
+				try {
+					await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minDueAt, ...args);
+				} catch (err) {
+					logger.warn("Timer add command failed", { err, count: timers.length });
+					return { status: "failed" };
+				}
+				return { status: "added" };
+			},
 
-				async close(): Promise<void> {
-					if (closed) {
-						return;
-					}
-					closed = true;
-					connectionSupervisor.detach();
-					redisDuplicate.disconnect();
-				},
-			};
-		},
-	});
+			async popDue(maxRank: number, limit: number): Promise<DueTimer[]> {
+				redisTracker.assertIsAvailable();
+				const pairs = (await redis.eval(POP_DUE_TIMERS_SCRIPT, 1, key, maxRank, limit)) as string[];
+				if (pairs.length === 0) {
+					return [];
+				}
+
+				const result: DueTimer[] = [];
+				for (let i = 0; i + 1 < pairs.length; i += 2) {
+					const member = pairs[i] as string;
+					const rank = Number(pairs[i + 1]);
+					result.push(decodeMember(member, rank));
+				}
+				return result;
+			},
+
+			async peekNextRank(): Promise<number | null> {
+				redisTracker.assertIsAvailable();
+				const result = await redis.zrangebyscore(key, "-inf", "+inf", "WITHSCORES", "LIMIT", 0, 1);
+				if (result.length < 2) {
+					return null;
+				}
+				return Number(result[1]);
+			},
+
+			createSignalWaiter(): TimerSignalWaiter {
+				const redisDuplicate = redis.duplicate({
+					maxRetriesPerRequest: 0,
+					enableOfflineQueue: false,
+				});
+				const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger });
+				let closed = false;
+
+				return {
+					/**
+					 * Blocks on the signal list, then drains any remaining signals.
+					 * Returns the minimum signal observed (combining BRPOP value with drained values).
+					 * Returns 0 if BRPOP timed out — drained values are discarded in that case since
+					 * peek-after-pop will rediscover them.
+					 */
+					async wait(timeoutSeconds: number): Promise<number> {
+						const result = await redisDuplicate.brpop(signalKey, timeoutSeconds);
+						if (result === null) {
+							await redisDuplicate.del(signalKey);
+							return 0;
+						}
+
+						const signal = Number(result[1]);
+						const minSignal = (await redisDuplicate.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
+						if (minSignal === null) {
+							return signal;
+						}
+						return Math.min(signal, minSignal);
+					},
+
+					async close(): Promise<void> {
+						if (closed) {
+							return;
+						}
+						closed = true;
+						connectionSupervisor.detach();
+						redisDuplicate.disconnect();
+					},
+				};
+			},
+		};
+	};
 }
