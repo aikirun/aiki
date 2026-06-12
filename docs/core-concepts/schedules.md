@@ -104,7 +104,7 @@ Overlap policies are evaluated per schedule instance, not globally. If you activ
 
 Calling `activate()` is idempotent. If a schedule already exists with the same parameters, the existing schedule is returned unchanged.
 
-If you call `activate()` with a **different input or timing configuration** (such as a new cron expression or interval), the existing schedule is updated with the new values.
+If you call `activate()` with a **different input or timing configuration** (such as a new cron expression or interval), that is a different schedule identity: you are activating a new schedule, not modifying the first. To change a schedule in place, give it a [reference ID](#reference-ids) — activating with the same reference ID and different parameters updates the existing schedule.
 
 ## Reference IDs
 
