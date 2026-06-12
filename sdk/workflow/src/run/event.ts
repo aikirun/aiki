@@ -208,11 +208,11 @@ export function createEventWaiter<TEvents extends EventsDefinition, Data>(
 			logger.info("Waiting for event", {
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
-		} catch (error) {
-			if (error instanceof WorkflowRunRevisionConflictError) {
+		} catch (err) {
+			if (err instanceof WorkflowRunRevisionConflictError) {
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
-			throw error;
+			throw err;
 		}
 
 		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);

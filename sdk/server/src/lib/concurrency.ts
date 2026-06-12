@@ -33,9 +33,9 @@ export async function runConcurrently<Item, TContext extends Context>(
 			const spanCtx = forkContext(context);
 			try {
 				await fn(next.value, spanCtx);
-			} catch (error) {
+			} catch (err) {
 				if (!firstError) {
-					firstError = error;
+					firstError = err;
 				}
 				if (failFast) {
 					stopped = true;

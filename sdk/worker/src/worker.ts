@@ -322,14 +322,14 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				this.backupSubscriberFailedAttempts = 0;
 				this.primarySubscriberNextAttemptAt = 0;
 				return { success: true, batch, activeSubscriber: this.primarySubscriber };
-			} catch (error) {
+			} catch (err) {
 				if (abortSignal.aborted) {
 					return { success: false, retryDelayMs: 0 };
 				}
 
 				this.logger.error("Subscriber failed", {
 					"aiki.subscriber": "primary",
-					"aiki.error": error instanceof Error ? error.message : String(error),
+					"aiki.error": err instanceof Error ? err.message : String(err),
 				});
 
 				this.primarySubscriberFailedAttempts++;
@@ -352,14 +352,14 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			const batch = await this.backupSubscriber.getReadyRuns(size, { abortSignal });
 			this.backupSubscriberFailedAttempts = 0;
 			return { success: true, batch, activeSubscriber: this.backupSubscriber };
-		} catch (error) {
+		} catch (err) {
 			if (abortSignal.aborted) {
 				return { success: false, retryDelayMs: 0 };
 			}
 
 			this.logger.error("Subscriber failed", {
 				"aiki.subscriber": "backup",
-				"aiki.error": error instanceof Error ? error.message : String(error),
+				"aiki.error": err instanceof Error ? err.message : String(err),
 			});
 
 			this.backupSubscriberFailedAttempts++;
@@ -390,10 +390,10 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				try {
 					const response = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
 					workflowRun = response.run;
-				} catch (error) {
+				} catch (err) {
 					this.logger.warn("Failed to fetch workflow run", {
 						"aiki.workflowRunId": workflowRunId,
-						"aiki.error": error instanceof Error ? error.message : String(error),
+						"aiki.error": err instanceof Error ? err.message : String(err),
 					});
 					this.pendingWorkflowRunIds.delete(workflowRunId);
 					this.availableCapacityLatch.signal();
@@ -471,11 +471,11 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				if (success) {
 					try {
 						await subscriber.acknowledge(workflowRunId);
-					} catch (error) {
+					} catch (err) {
 						if (!abortSignal.aborted) {
 							logger.error("Failed to acknowledge message, it may be reprocessed", {
 								"aiki.errorType": "MESSAGE_ACK_FAILED",
-								"aiki.error": error instanceof Error ? error.message : String(error),
+								"aiki.error": err instanceof Error ? err.message : String(err),
 							});
 						}
 					}

@@ -12,18 +12,18 @@ const baseNamespaceAuthedImplementer = implement(namespaceAuthedContract).$conte
 const publicErrorHandler = basePublicImplementer.middleware(async ({ context, next }) => {
 	try {
 		return await next({ context });
-	} catch (error) {
-		handleError(context, error);
-		throw error;
+	} catch (err) {
+		handleError(context, err);
+		throw err;
 	}
 });
 
 const namespaceAuthedErrorHandler = baseNamespaceAuthedImplementer.middleware(async ({ context, next }) => {
 	try {
 		return await next({ context });
-	} catch (error) {
-		handleError(context, error);
-		throw error;
+	} catch (err) {
+		handleError(context, err);
+		throw err;
 	}
 });
 

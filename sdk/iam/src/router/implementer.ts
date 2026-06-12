@@ -10,9 +10,9 @@ const baseOrganizationAuthedImplementer =
 const organizationAuthedErrorHandler = baseOrganizationAuthedImplementer.middleware(async ({ context, next }) => {
 	try {
 		return await next({ context });
-	} catch (error) {
-		handleError(context, error);
-		throw error;
+	} catch (err) {
+		handleError(context, err);
+		throw err;
 	}
 });
 

@@ -189,11 +189,11 @@ function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefini
 				"aiki.childWorkflowExpectedStatus": expectedStatus,
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
-		} catch (error) {
-			if (error instanceof WorkflowRunRevisionConflictError) {
+		} catch (err) {
+			if (err instanceof WorkflowRunRevisionConflictError) {
 				throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);
 			}
-			throw error;
+			throw err;
 		}
 
 		throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);

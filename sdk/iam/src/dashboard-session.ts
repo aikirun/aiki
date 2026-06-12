@@ -131,11 +131,11 @@ function createOrganizationHandler(
 					let authorization: OrganizationDashboardAuthorization;
 					try {
 						authorization = await authorizeOrganizationSession(authService, repos.organization, request);
-					} catch (error) {
-						if (error instanceof UnauthorizedError) {
-							return new Response(error.message, { status: 401 });
+					} catch (err) {
+						if (err instanceof UnauthorizedError) {
+							return new Response(err.message, { status: 401 });
 						}
-						context.logger.error("Unhandled error", { error });
+						context.logger.error("Unhandled error", { err });
 						return new Response("Internal Server Error", { status: 500 });
 					}
 

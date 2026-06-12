@@ -88,6 +88,11 @@ export class ConsoleLogger implements Logger {
 		if (Object.keys(mergedMetadata).length > 0) {
 			const entries = Object.entries(mergedMetadata)
 				.map(([key, value]) => {
+					// Error properties are non-enumerable, so JSON.stringify renders an
+					// Error as "{}".
+					if (value instanceof Error) {
+						return `${colors.magenta}${key}:${colors.reset} ${value.stack ?? `${value.name}: ${value.message}`}`;
+					}
 					const valueStr = typeof value === "object" ? JSON.stringify(value) : String(value);
 					return `${colors.magenta}${key}:${colors.reset} ${valueStr}`;
 				})

@@ -33,11 +33,11 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 					"aiki.sleepName": sleepName,
 					"aiki.durationMs": durationMs,
 				});
-			} catch (error) {
-				if (error instanceof WorkflowRunRevisionConflictError) {
+			} catch (err) {
+				if (err instanceof WorkflowRunRevisionConflictError) {
 					throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 				}
-				throw error;
+				throw err;
 			}
 
 			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
@@ -88,11 +88,11 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 				"aiki.sleepName": sleepName,
 				"aiki.durationMs": durationMs,
 			});
-		} catch (error) {
-			if (error instanceof WorkflowRunRevisionConflictError) {
+		} catch (err) {
+			if (err instanceof WorkflowRunRevisionConflictError) {
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
-			throw error;
+			throw err;
 		}
 
 		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);

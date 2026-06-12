@@ -309,21 +309,21 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				const outputRaw = await this.params.handler(run, input);
 				const output = await this.parse(handle, this.params.schema?.output, outputRaw, run.logger);
 				return output;
-			} catch (error) {
+			} catch (err) {
 				if (
-					error instanceof WorkflowRunSuspendedError ||
-					error instanceof WorkflowRunFailedError ||
-					error instanceof WorkflowRunRevisionConflictError ||
-					error instanceof NonDeterminismError
+					err instanceof WorkflowRunSuspendedError ||
+					err instanceof WorkflowRunFailedError ||
+					err instanceof WorkflowRunRevisionConflictError ||
+					err instanceof NonDeterminismError
 				) {
-					throw error;
+					throw err;
 				}
 
 				const attempts = handle.run.attempts;
 				const retryParams = getRetryParams(attempts, retryStrategy);
 
 				if (!retryParams.retriesLeft) {
-					const failedState = this.createFailedState(error);
+					const failedState = this.createFailedState(err);
 					await handle[INTERNAL].transitionState(failedState);
 
 					const logMeta: Record<string, unknown> = {};
@@ -337,7 +337,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					throw new WorkflowRunFailedError(run.id, attempts);
 				}
 
-				const awaitingRetryState = this.createAwaitingRetryState(error, retryParams.delayMs);
+				const awaitingRetryState = this.createAwaitingRetryState(err, retryParams.delayMs);
 				await handle[INTERNAL].transitionState(awaitingRetryState);
 
 				const logMeta: Record<string, unknown> = {};

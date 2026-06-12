@@ -67,8 +67,8 @@ export async function runWithWorker(
 
 	try {
 		await callback(aikiClient);
-	} catch (error) {
-		aikiClient.logger.error("Scenario failed", { error });
+	} catch (err) {
+		aikiClient.logger.error("Scenario failed", { err });
 		await shutdown(1);
 	}
 

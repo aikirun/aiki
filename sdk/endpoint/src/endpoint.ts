@@ -68,10 +68,10 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 		try {
 			const response = await client.api.workflowRun.getByIdV1({ id: workflowRunId });
 			workflowRun = response.run;
-		} catch (error) {
+		} catch (err) {
 			logger.warn("Failed to fetch workflow run", {
 				"aiki.workflowRunId": workflowRunId,
-				"aiki.error": error instanceof Error ? error.message : String(error),
+				"aiki.error": err instanceof Error ? err.message : String(err),
 			});
 			return jsonResponse(404);
 		}

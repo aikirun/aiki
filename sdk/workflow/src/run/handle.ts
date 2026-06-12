@@ -340,11 +340,11 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 			this._run.revision = response.revision;
 			this._run.state = response.state as WorkflowRunState<Output>;
 			this._run.attempts = response.attempts;
-		} catch (error) {
-			if (isWorkflowRunRevisionConflictError(error)) {
+		} catch (err) {
+			if (isWorkflowRunRevisionConflictError(err)) {
 				throw new WorkflowRunRevisionConflictError(this.run.id as WorkflowRunId);
 			}
-			throw error;
+			throw err;
 		}
 	}
 
@@ -358,11 +358,11 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 				expectedWorkflowRunRevision: this.run.revision,
 			});
 			return taskInfo;
-		} catch (error) {
-			if (isWorkflowRunRevisionConflictError(error)) {
+		} catch (err) {
+			if (isWorkflowRunRevisionConflictError(err)) {
 				throw new WorkflowRunRevisionConflictError(this.run.id as WorkflowRunId);
 			}
-			throw error;
+			throw err;
 		}
 	}
 

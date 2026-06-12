@@ -90,20 +90,20 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		);
 
 		return true;
-	} catch (error) {
+	} catch (err) {
 		if (
-			error instanceof WorkflowRunNotExecutableError ||
-			error instanceof WorkflowRunSuspendedError ||
-			error instanceof WorkflowRunFailedError ||
-			error instanceof WorkflowRunRevisionConflictError ||
-			error instanceof NonDeterminismError
+			err instanceof WorkflowRunNotExecutableError ||
+			err instanceof WorkflowRunSuspendedError ||
+			err instanceof WorkflowRunFailedError ||
+			err instanceof WorkflowRunRevisionConflictError ||
+			err instanceof NonDeterminismError
 		) {
 			return true;
 		}
 
 		logger.error("Unexpected error during workflow execution", {
-			"aiki.error": error instanceof Error ? error.message : String(error),
-			"aiki.stack": error instanceof Error ? error.stack : undefined,
+			"aiki.error": err instanceof Error ? err.message : String(err),
+			"aiki.stack": err instanceof Error ? err.stack : undefined,
 		});
 		return false;
 	} finally {

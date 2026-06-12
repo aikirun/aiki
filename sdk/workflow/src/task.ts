@@ -302,16 +302,16 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				const outputRaw = await this.params.handler(input);
 				const output = await this.parse(handle, this.params.schema?.output, outputRaw, logger);
 				return { output, lastAttempt: attempts };
-			} catch (error) {
+			} catch (err) {
 				if (
-					error instanceof WorkflowRunSuspendedError ||
-					error instanceof WorkflowRunFailedError ||
-					error instanceof WorkflowRunRevisionConflictError
+					err instanceof WorkflowRunSuspendedError ||
+					err instanceof WorkflowRunFailedError ||
+					err instanceof WorkflowRunRevisionConflictError
 				) {
-					throw error;
+					throw err;
 				}
 
-				const serializableError = createSerializableError(error);
+				const serializableError = createSerializableError(err);
 
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {

@@ -67,11 +67,11 @@ export async function createHandler(params: CreateHandlerParams) {
 			let context: NamespaceRequestContext;
 			try {
 				context = await createNamespaceRequestContext({ request, logger, authorizer: apiAuthorizer });
-			} catch (error) {
-				if (error instanceof UnauthorizedError) {
-					return new Response(error.message, { status: 401 });
+			} catch (err) {
+				if (err instanceof UnauthorizedError) {
+					return new Response(err.message, { status: 401 });
 				}
-				logger.error("Unhandled error", { error });
+				logger.error("Unhandled error", { err });
 				return new Response("Internal Server Error", { status: 500 });
 			}
 
