@@ -10,8 +10,19 @@ export interface ReadyWorkflowRun {
 	shard?: string;
 }
 
+export interface PublishResult {
+	/** Delivered. */
+	published: ReadyWorkflowRun[];
+	/** Deliverable, but withheld by policy (admission, fairness, throttling). */
+	deferred: ReadyWorkflowRun[];
+	/** Could not be delivered, or delivery is uncertain. */
+	failed: ReadyWorkflowRun[];
+	/** Not handled. */
+	declined: ReadyWorkflowRun[];
+}
+
 export interface Publisher {
-	publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<void>;
+	publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishResult>;
 }
 
 export interface PublisherContext {

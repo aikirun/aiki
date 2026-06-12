@@ -14,6 +14,8 @@ import { workflowRunOutbox } from "../schema";
 
 export type WorkflowRunOutboxRow = typeof workflowRunOutbox.$inferSelect;
 export type WorkflowRunOutboxRowInsert = typeof workflowRunOutbox.$inferInsert;
+export type WorkflowRunOutboxRowInsertPending = WorkflowRunOutboxRowInsert & { status: "pending" };
+export type WorkflowRunOutboxRowPending = WorkflowRunOutboxRow & { status: "pending" };
 export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & { status: "published"; publishedAt: TimestampMs };
 export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "claimed"; claimedAt: TimestampMs };
 
@@ -52,8 +54,8 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 			_context: DaemonContext,
 			limit: number,
 			cursor?: RankStreamCursor
-		): Promise<WorkflowRunOutboxRow[]> {
-			return db
+		): Promise<WorkflowRunOutboxRowPending[]> {
+			const rows = await db
 				.select()
 				.from(workflowRunOutbox)
 				.where(
@@ -64,6 +66,8 @@ export function createWorkflowRunOutboxRepository(db: PgDb) {
 				)
 				.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
 				.limit(limit);
+
+			return rows as WorkflowRunOutboxRowPending[];
 		},
 
 		async markPublished(ids: NonEmptyArray<string>): Promise<void> {

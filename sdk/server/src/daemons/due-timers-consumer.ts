@@ -53,11 +53,11 @@ export function spawnDueTimersConsumer(
 		{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
 		{
 			abortSignal,
-			onError: (error) => {
+			onError: (err) => {
 				if (abortSignal.aborted) {
 					return;
 				}
-				logger.error("Due timers consumer crashed unexpectedly", { error });
+				logger.warn("Due timers consumer failed, will retry", { err });
 			},
 		}
 	).run();
@@ -114,8 +114,8 @@ async function dueTimersConsumerLoop(
 		for await (const dueTimers of streamChunks(next, { until: (chunk) => chunk.length < limit })) {
 			try {
 				await processDueTimers(context, deps, dueTimers);
-			} catch (error) {
-				context.logger.error("Failed to process due timers batch", { error });
+			} catch (err) {
+				context.logger.error("Failed to process due timers batch", { err });
 			}
 		}
 

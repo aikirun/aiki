@@ -130,7 +130,7 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 	}
 
 	return {
-		async shutdown() {
+		async stop() {
 			const daemonPromises: Promise<unknown>[] = [];
 			for (const { abortController, promise } of daemons) {
 				abortController.abort();
