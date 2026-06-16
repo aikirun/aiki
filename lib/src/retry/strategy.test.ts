@@ -196,16 +196,16 @@ describe("withRetry", () => {
 
 	describe("shouldNotRetryOnError", () => {
 		test("re-throws when callback returns true", async () => {
-			const err = new Error("fatal");
+			const error = new Error("fatal");
 			expect(
 				withRetry(
 					async () => {
-						throw err;
+						throw error;
 					},
 					strategy,
 					{ shouldNotRetryOnError: () => true }
 				).run()
-			).rejects.toThrow(err);
+			).rejects.toThrow(error);
 		});
 
 		test("continues retrying when callback returns false", async () => {
