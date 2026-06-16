@@ -13,6 +13,14 @@ export interface StreamChunkPartitionsOptions<Item, Cursor, ItemWhenTrue = Item,
 	) => { meetsCondition: true; item: ItemWhenTrue } | { meetsCondition: false; item: ItemWhenFalse };
 }
 
+/**
+ * Async generator that pages through results by calling `next(cursor)` repeatedly.
+ * Stops when `next` returns an empty array, or when `until` returns true for a chunk.
+ *
+ * @param options.advanceCursor - Updates the cursor after each item, passed to the next `next()` call.
+ * @param options.until - Stops iteration after the chunk that satisfies the condition (that chunk is still yielded).
+ * @param options.partition - When provided, each chunk is split into `{ whenTrue, whenFalse }` instead of yielded raw.
+ */
 export function streamChunks<Item, Cursor>(
 	next: (cursor?: Cursor) => Item[] | Promise<Item[]>,
 	options: StreamChunksOptions<Item, Cursor>
