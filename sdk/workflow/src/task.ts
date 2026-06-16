@@ -129,7 +129,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const inputRaw = args[0];
-		const input = await this.parse(handle, this.params.schema?.input, inputRaw, run.logger);
+		const inputSchema = this.params.schema?.input;
+		const input = inputSchema ? await this.parse(handle, inputSchema, inputRaw, run.logger) : (inputRaw as Input);
 		const inputHash = await hashInput(input);
 		const address = getTaskAddress(this.name, inputHash) as TaskAddress;
 
@@ -190,7 +191,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return this.parse(handle, this.params.schema?.output, existingTaskState.output, run.logger);
+			const outputSchema = this.params.schema?.output;
+			return outputSchema
+				? this.parse(handle, outputSchema, existingTaskState.output, run.logger)
+				: (existingTaskState.output as Output);
 		}
 
 		if (existingTaskState.status === "failed") {
@@ -300,7 +304,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(input);
-				const output = await this.parse(handle, this.params.schema?.output, outputRaw, logger);
+				const outputSchema = this.params.schema?.output;
+				const output = outputSchema ? await this.parse(handle, outputSchema, outputRaw, logger) : (outputRaw as Output);
 				return { output, lastAttempt: attempts };
 			} catch (err) {
 				if (
@@ -366,14 +371,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 	private async parse<T>(
 		handle: UnknownWorkflowRunHandle,
-		schema: StandardSchemaV1<T> | undefined,
+		schema: StandardSchemaV1<T>,
 		data: unknown,
 		logger: Logger
 	): Promise<T> {
-		if (!schema) {
-			return data as T;
-		}
-
 		const schemaValidation = schema["~standard"].validate(data);
 		const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
 		if (!schemaValidationResult.issues) {
