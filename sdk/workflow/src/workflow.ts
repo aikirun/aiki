@@ -57,10 +57,6 @@ import {
  *
  * @see {@link https://github.com/aikirun/aiki} for complete documentation
  */
-export function workflow<Context = null>(params: WorkflowParams): Workflow<Context> {
-	return new WorkflowImpl(params);
-}
-
 export interface WorkflowParams {
 	name: string;
 }
@@ -83,38 +79,27 @@ export interface Workflow<Context> {
 	};
 }
 
-class WorkflowImpl<Context> implements Workflow<Context> {
-	public readonly name: WorkflowName;
-	public readonly [INTERNAL]: Workflow<Context>[typeof INTERNAL];
-	private workflowVersions = new Map<WorkflowVersionId, AnyWorkflowVersion>();
+export function workflow<Context = null>(params: WorkflowParams): Workflow<Context> {
+	const name = params.name as WorkflowName;
+	const workflowVersions = new Map<WorkflowVersionId, AnyWorkflowVersion>();
 
-	constructor(params: WorkflowParams) {
-		this.name = params.name as WorkflowName;
-		this[INTERNAL] = {
-			getAllVersions: this.getAllVersions.bind(this),
-			getVersion: this.getVersion.bind(this),
-		};
-	}
+	return {
+		name,
 
-	v<Input extends Serializable, Output extends Serializable, TEvents extends EventsDefinition>(
-		versionId: string,
-		params: WorkflowVersionParams<Input, Output, Context, TEvents>
-	): WorkflowVersion<Input, Output, Context, TEvents> {
-		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
-			throw new Error(`Workflow "${this.name}:${versionId}" already exists`);
-		}
+		v(versionId, versionParams) {
+			if (workflowVersions.has(versionId as WorkflowVersionId)) {
+				throw new Error(`Workflow "${name}:${versionId}" already exists`);
+			}
 
-		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
-		this.workflowVersions.set(versionId as WorkflowVersionId, workflowVersion);
+			const workflowVersion = new WorkflowVersionImpl(name, versionId as WorkflowVersionId, versionParams);
+			workflowVersions.set(versionId as WorkflowVersionId, workflowVersion);
 
-		return workflowVersion;
-	}
+			return workflowVersion;
+		},
 
-	private getAllVersions(): AnyWorkflowVersion[] {
-		return Array.from(this.workflowVersions.values());
-	}
-
-	private getVersion(versionId: WorkflowVersionId): AnyWorkflowVersion | undefined {
-		return this.workflowVersions.get(versionId);
-	}
+		[INTERNAL]: {
+			getAllVersions: () => Array.from(workflowVersions.values()),
+			getVersion: (versionId) => workflowVersions.get(versionId),
+		},
+	};
 }
