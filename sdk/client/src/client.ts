@@ -1,4 +1,3 @@
-import type { Logger } from "@aikirun/lib/logger";
 import { createConsoleLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client, ClientParams, EmbeddedClientParams, RemoteClientParams } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -35,44 +34,38 @@ const EMBEDDED_BASE_URL = "aiki://embedded/api";
 export function client<Context = null>(params: RemoteClientParams<Context>): Client<Context>;
 export function client<Context = null>(params: EmbeddedClientParams<Context>): Client<Context>;
 export function client<Context = null>(params: ClientParams<Context>): Client<Context> {
-	return new ClientImpl(params);
-}
+	const logger = params.logger ?? createConsoleLogger();
 
-class ClientImpl<Context> implements Client<Context> {
-	public readonly api: ApiClient;
-	public readonly [INTERNAL]: Client<Context>[typeof INTERNAL];
-	public readonly logger: Logger;
-
-	constructor(params: ClientParams<Context>) {
-		this.logger = params.logger ?? createConsoleLogger();
-
-		const rpcLink = isEmbeddedParams(params)
-			? new RPCLink({
-					url: EMBEDDED_BASE_URL,
-					fetch: (request) => params.handler(request),
-				})
-			: new RPCLink({
-					url: `${params.url}/api`,
-					headers: () => (params.apiKey ? { Authorization: `Bearer ${params.apiKey}` } : {}),
-				});
-
-		// Type safety: The server package has compile-time tests (see server/contract/workflow-run/procedure.ts)
-		// that ensures the contract matches WorkflowRunApi. If the contract changes, server won't compile.
-		this.api = createORPCClient(rpcLink) as unknown as ApiClient;
-
-		if (isEmbeddedParams(params)) {
-			this.logger.info("Aiki client initialized", { "aiki.transport": "embedded" });
-		} else {
-			this.logger.info("Aiki client initialized", {
-				"aiki.transport": "remote",
-				"aiki.url": params.url,
+	const rpcLink = isEmbeddedParams(params)
+		? new RPCLink({
+				url: EMBEDDED_BASE_URL,
+				fetch: (request) => params.handler(request),
+			})
+		: new RPCLink({
+				url: `${params.url}/api`,
+				headers: () => (params.apiKey ? { Authorization: `Bearer ${params.apiKey}` } : {}),
 			});
-		}
 
-		this[INTERNAL] = {
-			context: params.context,
-		};
+	// Type safety: The server package has compile-time tests (see server/contract/workflow-run/procedure.ts)
+	// that ensures the contract matches WorkflowRunApi. If the contract changes, server won't compile.
+	const api = createORPCClient(rpcLink) as unknown as ApiClient;
+
+	if (isEmbeddedParams(params)) {
+		logger.info("Aiki client initialized", { "aiki.transport": "embedded" });
+	} else {
+		logger.info("Aiki client initialized", {
+			"aiki.transport": "remote",
+			"aiki.url": params.url,
+		});
 	}
+
+	return {
+		api,
+		logger,
+		[INTERNAL]: {
+			context: params.context,
+		},
+	};
 }
 
 function isEmbeddedParams<Context>(params: ClientParams<Context>): params is EmbeddedClientParams<Context> {
