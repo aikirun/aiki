@@ -113,7 +113,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	public with(): TaskBuilder<Input, Output> {
 		const startOptions: TaskStartOptions = this.params.options ?? {};
 		const startOptionsOverrider = objectOverrider(startOptions);
-		return new TaskBuilderImpl(this, startOptionsOverrider());
+		return createTaskBuilder(this, startOptionsOverrider());
 	}
 
 	public async start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
@@ -401,20 +401,17 @@ export interface TaskBuilder<Input, Output> {
 	start: Task<Input, Output>["start"];
 }
 
-class TaskBuilderImpl<Input, Output> implements TaskBuilder<Input, Output> {
-	constructor(
-		private readonly task: TaskImpl<Input, Output>,
-		private readonly startOptionsBuilder: ObjectBuilder<TaskStartOptions>
-	) {}
+function createTaskBuilder<Input, Output>(
+	task: TaskImpl<Input, Output>,
+	startOptionsBuilder: ObjectBuilder<TaskStartOptions>
+): TaskBuilder<Input, Output> {
+	return {
+		opt(path, value) {
+			return createTaskBuilder(task, startOptionsBuilder.with(path, value));
+		},
 
-	opt<Path extends PathFromObject<TaskStartOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<TaskStartOptions, Path>
-	): TaskBuilder<Input, Output> {
-		return new TaskBuilderImpl(this.task, this.startOptionsBuilder.with(path, value));
-	}
-
-	start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
-		return this.task.startWithOptions(run, this.startOptionsBuilder.build(), ...args);
-	}
+		start(run, ...args) {
+			return task.startWithOptions(run, startOptionsBuilder.build(), ...args);
+		},
+	};
 }
