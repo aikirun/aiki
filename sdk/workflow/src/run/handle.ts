@@ -261,7 +261,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 			return terminated;
 		};
 
-		const shouldRetryOnResult = async (terminated: boolean) => !terminated;
+		const shouldRetryOnResult = (terminated: boolean) => !terminated;
 
 		const maybeResult = options?.abortSignal
 			? await withRetry(hasTerminated, retryStrategy, {

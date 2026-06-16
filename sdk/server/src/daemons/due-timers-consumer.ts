@@ -1,7 +1,8 @@
 import { streamChunks } from "@aikirun/lib/async";
 import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Logger } from "@aikirun/lib/logger";
-import { withRetry } from "@aikirun/lib/retry";
+import { type RetryStrategy, withRetry } from "@aikirun/lib/retry";
+import type { ConfigProvider } from "@aikirun/types/infra/config";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { DueTimer, TimerPriorityQueue, TimerSignalWaiter, TimerType } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
@@ -14,6 +15,7 @@ import { queueRetryableRuns } from "./imminent-retryable-runs";
 import { queueRetryableTaskRuns } from "./imminent-retryable-task-runs";
 import { queueScheduledRuns } from "./imminent-scheduled-runs";
 import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
+import type { ServerConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import { computeRank, type Ranked, rankDueAtMs } from "../lib/rank";
@@ -27,40 +29,20 @@ export interface DueTimersConsumerDeps {
 	timerPriorityQueue: TimerPriorityQueue;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: Publisher;
-}
-
-export interface DueTimersConsumerOptions {
-	limit?: number;
-	overshootMs?: number;
+	configProvider: ConfigProvider<ServerConfig>;
 }
 
 export interface DueTimersConsumerHandle {
 	stop(): Promise<void>;
 }
 
-export function spawnDueTimersConsumer(
-	logger: Logger,
-	deps: DueTimersConsumerDeps,
-	options?: DueTimersConsumerOptions
-): DueTimersConsumerHandle {
+export function spawnDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): DueTimersConsumerHandle {
 	const abortController = new AbortController();
 	const { signal: abortSignal } = abortController;
 
 	const timerSignalWaiter = deps.timerPriorityQueue.createSignalWaiter();
 
-	const promise = withRetry(
-		() => dueTimersConsumerLoop(logger, deps, timerSignalWaiter, abortSignal, options),
-		{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
-		{
-			abortSignal,
-			onError: (err) => {
-				if (abortSignal.aborted) {
-					return;
-				}
-				logger.warn("Due timers consumer failed, will retry", { err });
-			},
-		}
-	).run();
+	const promise = dueTimersConsumerLoop(logger, deps, timerSignalWaiter, abortSignal);
 
 	return {
 		async stop() {
@@ -75,52 +57,79 @@ async function dueTimersConsumerLoop(
 	logger: Logger,
 	deps: DueTimersConsumerDeps,
 	timerSignalWaiter: TimerSignalWaiter,
-	abortSignal: AbortSignal,
-	options?: DueTimersConsumerOptions
+	abortSignal: AbortSignal
 ): Promise<void> {
-	const { limit = 1_000, overshootMs = 30 } = options ?? {};
+	const retryStrategy: RetryStrategy = {
+		type: "jittered",
+		maxAttempts: Number.POSITIVE_INFINITY,
+		baseDelayMs: 1_000,
+		maxDelayMs: 30_000,
+	};
+	const retryOptions = {
+		abortSignal,
+		onError: (err: unknown) => {
+			if (abortSignal.aborted) {
+				return;
+			}
+			logger.warn("Due timers consumer failed, will retry", { err });
+		},
+	};
 
-	// Peek on startup to discover any entries left over from a previous consumer's lifecycle.
-	let nextTimerRank = await deps.timerPriorityQueue.peekNextRank();
-	let nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
+	// Peek on startup to discover entries left over from a previous consumer's lifecycle: they have
+	// no pending signal, so without this the first wait could block indefinitely.
+	const nextTimerRankResponse = await withRetry(
+		() => deps.timerPriorityQueue.peekNextRank(),
+		retryStrategy,
+		retryOptions
+	).run();
+	if (nextTimerRankResponse.state !== "completed") {
+		return;
+	}
+	let nextTimerDueAtMs = nextTimerRankResponse.result && rankDueAtMs(nextTimerRankResponse.result);
 
 	while (!abortSignal.aborted) {
-		let signal = 0;
+		await withRetry(
+			async () => {
+				const { limit, overshootMs } = deps.configProvider.get("daemons.dueTimersConsumer");
+				let signal = 0;
 
-		if (nextTimerDueAtMs === null) {
-			signal = await timerSignalWaiter.wait(0);
-		} else {
-			const waitMs = nextTimerDueAtMs - Date.now() + overshootMs;
-			if (waitMs > 0) {
-				signal = await timerSignalWaiter.wait(waitMs / 1_000);
-			}
-		}
+				if (nextTimerDueAtMs === null) {
+					signal = await timerSignalWaiter.wait(0);
+				} else {
+					const waitMs = nextTimerDueAtMs - Date.now() + overshootMs;
+					if (waitMs > 0) {
+						signal = await timerSignalWaiter.wait(waitMs / 1_000);
+					}
+				}
 
-		if (abortSignal.aborted) {
-			break;
-		}
+				if (abortSignal.aborted) {
+					return;
+				}
 
-		if (signal > Date.now()) {
-			if (nextTimerDueAtMs === null || signal < nextTimerDueAtMs) {
-				nextTimerDueAtMs = signal;
-			}
-			continue;
-		}
+				if (signal > Date.now()) {
+					if (nextTimerDueAtMs === null || signal < nextTimerDueAtMs) {
+						nextTimerDueAtMs = signal;
+					}
+					return;
+				}
 
-		const context = createDaemonContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
+				const context = createDaemonContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
+				const next = () => deps.timerPriorityQueue.popDue(computeRank(Date.now()), limit);
 
-		const next = () => deps.timerPriorityQueue.popDue(computeRank(Date.now()), limit);
+				for await (const dueTimers of streamChunks(next, { until: (chunk) => chunk.length < limit })) {
+					try {
+						await processDueTimers(context, deps, dueTimers);
+					} catch (err) {
+						context.logger.error("Failed to process due timers batch", { err });
+					}
+				}
 
-		for await (const dueTimers of streamChunks(next, { until: (chunk) => chunk.length < limit })) {
-			try {
-				await processDueTimers(context, deps, dueTimers);
-			} catch (err) {
-				context.logger.error("Failed to process due timers batch", { err });
-			}
-		}
-
-		nextTimerRank = await deps.timerPriorityQueue.peekNextRank();
-		nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
+				const nextTimerRank = await deps.timerPriorityQueue.peekNextRank();
+				nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
+			},
+			retryStrategy,
+			retryOptions
+		).run();
 	}
 }
 

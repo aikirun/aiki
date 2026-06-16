@@ -48,10 +48,8 @@ const advanceScheduleCursor = createTimerStreamCursorAdvancer<{ schedule: { id: 
 export async function processImminentRecurringWorkflows(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringWorkflowsDeps,
-	options?: { limit?: number; imminenceThresholdMs?: number }
+	{ limit, imminenceThresholdMs }: { limit: number; imminenceThresholdMs: number }
 ) {
-	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
-
 	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	for await (const rows of streamChunks(

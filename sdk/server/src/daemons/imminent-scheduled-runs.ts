@@ -28,10 +28,8 @@ export interface ProcessImminentScheduledRunsDeps {
 export async function processImminentScheduledRuns(
 	context: DaemonContext,
 	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentScheduledRunsDeps,
-	options?: { limit?: number; imminenceThresholdMs?: number }
+	{ limit, imminenceThresholdMs }: { limit: number; imminenceThresholdMs: number }
 ) {
-	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
-
 	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(

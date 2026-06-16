@@ -29,8 +29,8 @@ export interface JitteredRetryStrategy {
 export type RetryStrategy = NeverRetryStrategy | FixedRetryStrategy | ExponentialRetryStrategy | JitteredRetryStrategy;
 
 export type WithRetryOptions<Result, Abortable extends boolean> = {
-	shouldRetryOnResult?: (previousResult: Result) => Promise<boolean>;
-	shouldNotRetryOnError?: (error: unknown) => Promise<boolean>;
+	shouldRetryOnResult?: (previousResult: Result) => boolean | Promise<boolean>;
+	shouldNotRetryOnError?: (error: unknown) => boolean | Promise<boolean>;
 	onError?: (error: unknown) => void | Promise<void>;
 } & (Abortable extends true ? { abortSignal: AbortSignal } : { abortSignal?: never });
 
@@ -64,6 +64,10 @@ export function withRetry<Args, Result>(
 	strategy: RetryStrategy,
 	options?: WithRetryOptions<Result, boolean>
 ): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult | AbortedResult> } {
+	const shouldRetryOnResult = options?.shouldRetryOnResult;
+	const shouldNotRetryOnError = options?.shouldNotRetryOnError;
+	const onError = options?.onError;
+
 	return {
 		run: async (...args: Args[]) => {
 			let attempts = 0;
@@ -82,7 +86,16 @@ export function withRetry<Args, Result>(
 
 				try {
 					result = await fn(...args);
-					if (options?.shouldRetryOnResult === undefined || !(await options.shouldRetryOnResult(result))) {
+					if (shouldRetryOnResult === undefined) {
+						return {
+							state: "completed",
+							result,
+							attempts,
+						};
+					}
+					const maybeShouldRetry = shouldRetryOnResult(result);
+					const shouldRetry = maybeShouldRetry instanceof Promise ? await maybeShouldRetry : maybeShouldRetry;
+					if (!shouldRetry) {
 						return {
 							state: "completed",
 							result,
@@ -90,14 +103,19 @@ export function withRetry<Args, Result>(
 						};
 					}
 				} catch (err) {
-					if (options?.onError) {
-						const onErrorResult = options.onError(err);
+					if (onError) {
+						const onErrorResult = onError(err);
 						if (onErrorResult instanceof Promise) {
 							await onErrorResult;
 						}
 					}
-					if (options?.shouldNotRetryOnError && (await options.shouldNotRetryOnError(err))) {
-						throw err;
+					if (shouldNotRetryOnError) {
+						const maybeShouldNotRetry = shouldNotRetryOnError(err);
+						const shouldNotRetry =
+							maybeShouldNotRetry instanceof Promise ? await maybeShouldNotRetry : maybeShouldNotRetry;
+						if (shouldNotRetry) {
+							throw err;
+						}
 					}
 				}
 

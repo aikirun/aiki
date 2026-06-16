@@ -26,10 +26,8 @@ const advancePublishedCursor = createTimerStreamCursorAdvancer<{ id: string; pub
 export async function republishStaleRuns(
 	context: DaemonContext,
 	deps: RepublishStaleRuns,
-	options?: { claimMinIdleTimeMs?: number; limit?: number }
+	{ claimMinIdleTimeMs, limit }: { claimMinIdleTimeMs: number; limit: number }
 ) {
-	const { claimMinIdleTimeMs = 90_000, limit = 1_000 } = options ?? {};
-
 	for await (const staleEntries of streamChunks(
 		(cursor) => deps.repos.workflowRunOutbox.listStaleClaimed(context, claimMinIdleTimeMs, limit, cursor),
 		{
