@@ -23,7 +23,6 @@
 		"check": "tsc --noEmit && tsc --noEmit -p app/dashboard/tsconfig.json",
 		"lint": "bunx @biomejs/biome check .",
 		"lint:fix": "bunx @biomejs/biome check --write .",
-		"test": "bun test",
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage",
 		"db:generate:server": "bun run --cwd sdk/server db:generate",
