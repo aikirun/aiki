@@ -94,7 +94,7 @@ class WorkerImpl implements Worker {
 	public with(): WorkerBuilder {
 		const spawnOptions: WorkerSpawnOptions = this.params.options ?? {};
 		const spawnOptionsOverrider = objectOverrider(spawnOptions);
-		return new WorkerBuilderImpl(this, spawnOptionsOverrider());
+		return createWorkerBuilder(this, spawnOptionsOverrider());
 	}
 
 	public async spawn<Context>(client: Client<Context>): Promise<WorkerHandle> {
@@ -499,20 +499,17 @@ export interface WorkerBuilder {
 	spawn: Worker["spawn"];
 }
 
-class WorkerBuilderImpl implements WorkerBuilder {
-	constructor(
-		private readonly worker: WorkerImpl,
-		private readonly spawnOptionsBuilder: ObjectBuilder<WorkerSpawnOptions>
-	) {}
+function createWorkerBuilder(
+	worker: WorkerImpl,
+	spawnOptionsBuilder: ObjectBuilder<WorkerSpawnOptions>
+): WorkerBuilder {
+	return {
+		opt(path, value) {
+			return createWorkerBuilder(worker, spawnOptionsBuilder.with(path, value));
+		},
 
-	opt<Path extends PathFromObject<WorkerSpawnOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<WorkerSpawnOptions, Path>
-	): WorkerBuilder {
-		return new WorkerBuilderImpl(this.worker, this.spawnOptionsBuilder.with(path, value));
-	}
-
-	spawn<Context>(client: Client<Context>): Promise<WorkerHandle> {
-		return this.worker.spawnWithOptions(client, this.spawnOptionsBuilder.build());
-	}
+		spawn(client) {
+			return worker.spawnWithOptions(client, spawnOptionsBuilder.build());
+		},
+	};
 }
