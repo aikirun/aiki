@@ -16,12 +16,12 @@ import { createEventWaiters } from "./event";
 import { workflowRunHandle } from "./handle";
 import { createReplayManifest } from "./replay-manifest";
 import { createSleeper } from "./sleeper";
-import type { UnknownWorkflowVersion } from "../workflow-version";
+import type { AnyWorkflowVersion } from "../workflow-version";
 
 export interface ExecuteWorkflowParams<Context> {
 	client: Client<Context>;
 	workflowRun: WorkflowRunRecord;
-	workflowVersion: UnknownWorkflowVersion;
+	workflowVersion: AnyWorkflowVersion;
 	logger: Logger;
 	options: Required<WorkflowExecutionOptions>;
 	heartbeat?: () => Promise<void>;

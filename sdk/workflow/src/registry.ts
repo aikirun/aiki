@@ -1,19 +1,19 @@
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
-import type { UnknownWorkflowVersion } from "./workflow-version";
+import type { AnyWorkflowVersion } from "./workflow-version";
 
 export interface WorkflowRegistry {
-	add: (workflow: UnknownWorkflowVersion) => WorkflowRegistry;
-	addMany: (workflows: UnknownWorkflowVersion[]) => WorkflowRegistry;
-	remove: (workflow: UnknownWorkflowVersion) => WorkflowRegistry;
-	removeMany: (workflows: UnknownWorkflowVersion[]) => WorkflowRegistry;
+	add: (workflow: AnyWorkflowVersion) => WorkflowRegistry;
+	addMany: (workflows: AnyWorkflowVersion[]) => WorkflowRegistry;
+	remove: (workflow: AnyWorkflowVersion) => WorkflowRegistry;
+	removeMany: (workflows: AnyWorkflowVersion[]) => WorkflowRegistry;
 	removeAll: () => WorkflowRegistry;
-	getAll(): UnknownWorkflowVersion[];
-	get: (name: WorkflowName, versionId: WorkflowVersionId) => UnknownWorkflowVersion | undefined;
+	getAll(): AnyWorkflowVersion[];
+	get: (name: WorkflowName, versionId: WorkflowVersionId) => AnyWorkflowVersion | undefined;
 }
 
 export function workflowRegistry(): WorkflowRegistry {
-	const workflowsByName = new Map<WorkflowName, Map<WorkflowVersionId, UnknownWorkflowVersion>>();
+	const workflowsByName = new Map<WorkflowName, Map<WorkflowVersionId, AnyWorkflowVersion>>();
 
 	const registry: WorkflowRegistry = {
 		add(workflow) {
@@ -57,7 +57,7 @@ export function workflowRegistry(): WorkflowRegistry {
 		},
 
 		getAll() {
-			const workflows: UnknownWorkflowVersion[] = [];
+			const workflows: AnyWorkflowVersion[] = [];
 			for (const workflowVersions of workflowsByName.values()) {
 				for (const workflow of workflowVersions.values()) {
 					workflows.push(workflow);

@@ -4,7 +4,7 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
 import type { EventsDefinition } from "./run/event";
 import {
-	type UnknownWorkflowVersion,
+	type AnyWorkflowVersion,
 	type WorkflowVersion,
 	WorkflowVersionImpl,
 	type WorkflowVersionParams,
@@ -78,15 +78,15 @@ export interface Workflow<Context> {
 	) => WorkflowVersion<Input, Output, Context, TEvents>;
 
 	[INTERNAL]: {
-		getAllVersions: () => UnknownWorkflowVersion[];
-		getVersion: (versionId: WorkflowVersionId) => UnknownWorkflowVersion | undefined;
+		getAllVersions: () => AnyWorkflowVersion[];
+		getVersion: (versionId: WorkflowVersionId) => AnyWorkflowVersion | undefined;
 	};
 }
 
 class WorkflowImpl<Context> implements Workflow<Context> {
 	public readonly name: WorkflowName;
 	public readonly [INTERNAL]: Workflow<Context>[typeof INTERNAL];
-	private workflowVersions = new Map<WorkflowVersionId, UnknownWorkflowVersion>();
+	private workflowVersions = new Map<WorkflowVersionId, AnyWorkflowVersion>();
 
 	constructor(params: WorkflowParams) {
 		this.name = params.name as WorkflowName;
@@ -105,16 +105,16 @@ class WorkflowImpl<Context> implements Workflow<Context> {
 		}
 
 		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
-		this.workflowVersions.set(versionId as WorkflowVersionId, workflowVersion as unknown as UnknownWorkflowVersion);
+		this.workflowVersions.set(versionId as WorkflowVersionId, workflowVersion);
 
 		return workflowVersion;
 	}
 
-	private getAllVersions(): UnknownWorkflowVersion[] {
+	private getAllVersions(): AnyWorkflowVersion[] {
 		return Array.from(this.workflowVersions.values());
 	}
 
-	private getVersion(versionId: WorkflowVersionId): UnknownWorkflowVersion | undefined {
+	private getVersion(versionId: WorkflowVersionId): AnyWorkflowVersion | undefined {
 		return this.workflowVersions.get(versionId);
 	}
 }

@@ -82,8 +82,6 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 // biome-ignore lint/suspicious/noExplicitAny: I want any workflow
 export type AnyWorkflowVersion = WorkflowVersion<any, any, any, any>;
 
-export type UnknownWorkflowVersion = WorkflowVersion<unknown, unknown, unknown>;
-
 export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsDefinition>
 	implements WorkflowVersion<Input, Output, Context, TEvents>
 {
