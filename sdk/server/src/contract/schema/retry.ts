@@ -19,6 +19,6 @@ export const retryStrategySchema = type({
 		type: "'jittered'",
 		maxAttempts: "number.integer > 0",
 		baseDelayMs: "number.integer > 0",
-		"jitterFactor?": "number.integer > 0 | undefined",
+		"factor?": "number.integer > 0 | undefined",
 		"maxDelayMs?": "number.integer > 0 | undefined",
 	});

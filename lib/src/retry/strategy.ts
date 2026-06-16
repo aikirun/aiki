@@ -22,7 +22,7 @@ export interface JitteredRetryStrategy {
 	type: "jittered";
 	maxAttempts: number;
 	baseDelayMs: number;
-	jitterFactor?: number;
+	factor?: number;
 	maxDelayMs?: number;
 }
 
@@ -169,7 +169,7 @@ export function getRetryParams(attempts: number, strategy: RetryStrategy): Retry
 					retriesLeft: false,
 				};
 			}
-			const base = strategy.baseDelayMs * (strategy.jitterFactor ?? 2) ** (attempts - 1);
+			const base = strategy.baseDelayMs * (strategy.factor ?? 2) ** (attempts - 1);
 			const delayMs = Math.random() * base;
 			return {
 				retriesLeft: true,
