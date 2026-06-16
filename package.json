@@ -36,8 +36,7 @@
 		"server": "bun run --cwd app/server start",
 		"server:watch": "bun run --cwd app/server start:watch",
 		"dashboard": "bun run --cwd app/dashboard dev",
-		"changeset": "changeset",
-		"bump": "changeset version && find . -path ./node_modules -prune -o -path ./CHANGELOG.md -prune -o -name CHANGELOG.md -print -exec rm {} + && rm bun.lock && bun install && bun run lint:fix",
+		"bump": "bun scripts/bump.ts",
 		"clean": "rm -rf lib/dist types/dist app/server/dist app/dashboard/dist cli/dist sdk/*/dist sdk/adapter/*/dist sdk/iam/dist",
 		"build:lib": "bun run --cwd lib build",
 		"build:types": "bun run --cwd types build",
@@ -61,7 +60,6 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.9",
-		"@changesets/cli": "^2.27.1",
 		"@types/node": "^22.10.2",
 		"bun-types": "^1.1.38",
 		"husky": "^9.1.7",
