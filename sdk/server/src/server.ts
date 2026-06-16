@@ -1,4 +1,4 @@
-import { ConsoleLogger, type Logger } from "@aikirun/lib/logger";
+import { createConsoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { Iam } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
 import type { CreateConfigProvider } from "@aikirun/types/infra/config";
@@ -35,7 +35,7 @@ export interface Server {
 }
 
 export function server(params: ServerParams): Server {
-	const logger: Logger = params.logger ?? new ConsoleLogger();
+	const logger: Logger = params.logger ?? createConsoleLogger();
 
 	let handler: Server["handler"] | undefined;
 	let createHandlerPromise: Promise<Server["handler"]> | undefined;

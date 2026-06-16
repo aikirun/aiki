@@ -1,5 +1,5 @@
 import type { Logger } from "@aikirun/lib/logger";
-import { ConsoleLogger } from "@aikirun/lib/logger";
+import { createConsoleLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client, ClientParams, EmbeddedClientParams, RemoteClientParams } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { createORPCClient } from "@orpc/client";
@@ -44,7 +44,7 @@ class ClientImpl<Context> implements Client<Context> {
 	public readonly logger: Logger;
 
 	constructor(params: ClientParams<Context>) {
-		this.logger = params.logger ?? new ConsoleLogger();
+		this.logger = params.logger ?? createConsoleLogger();
 
 		const rpcLink = isEmbeddedParams(params)
 			? new RPCLink({

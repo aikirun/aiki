@@ -28,59 +28,17 @@ interface ConsoleLoggerOptions {
 	bindings?: Record<string, unknown>;
 }
 
-export class ConsoleLogger implements Logger {
-	private readonly level: number;
-	private readonly bindings: Record<string, unknown>;
+export function createConsoleLogger(options: ConsoleLoggerOptions = {}): Logger {
+	const level = logLevelConfig[options.level ?? "INFO"].level;
+	const bindings = options.bindings ?? {};
 
-	constructor(options: ConsoleLoggerOptions = {}) {
-		this.level = logLevelConfig[options.level ?? "INFO"].level;
-		this.bindings = options.bindings ?? {};
-	}
-
-	trace(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.TRACE.level) {
-			console.debug(this.format("TRACE", message, metadata));
-		}
-	}
-
-	debug(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.DEBUG.level) {
-			console.debug(this.format("DEBUG", message, metadata));
-		}
-	}
-
-	info(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.INFO.level) {
-			console.info(this.format("INFO", message, metadata));
-		}
-	}
-
-	warn(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.WARN.level) {
-			console.warn(this.format("WARN", message, metadata));
-		}
-	}
-
-	error(message: string, metadata?: Record<string, unknown>): void {
-		if (this.level <= logLevelConfig.ERROR.level) {
-			console.error(this.format("ERROR", message, metadata));
-		}
-	}
-
-	child(bindings: Record<string, unknown>): Logger {
-		return new ConsoleLogger({
-			level: Object.entries(logLevelConfig).find(([, v]) => v.level === this.level)?.[0] as LogLevel,
-			bindings: { ...this.bindings, ...bindings },
-		});
-	}
-
-	private format(level: LogLevel, message: string, metadata?: Record<string, unknown>): string {
+	function format(logLevel: LogLevel, message: string, metadata?: Record<string, unknown>): string {
 		const timestamp = new Date().toISOString();
-		const mergedMetadata = { ...this.bindings, ...metadata };
-		const levelColor = logLevelConfig[level].color ?? colors.reset;
+		const mergedMetadata = { ...bindings, ...metadata };
+		const levelColor = logLevelConfig[logLevel].color ?? colors.reset;
 
 		const timestampStr = `${colors.dim}${timestamp}${colors.reset}`;
-		const levelStr = `${levelColor}${colors.bold}${level.padEnd(5)}${colors.reset}`;
+		const levelStr = `${levelColor}${colors.bold}${logLevel.padEnd(5)}${colors.reset}`;
 		const messageStr = `${colors.cyan}${message}${colors.reset}`;
 
 		let output = `${timestampStr} ${levelStr} ${messageStr}`;
@@ -102,4 +60,38 @@ export class ConsoleLogger implements Logger {
 
 		return output;
 	}
+
+	return {
+		trace(message, metadata) {
+			if (level <= logLevelConfig.TRACE.level) {
+				console.debug(format("TRACE", message, metadata));
+			}
+		},
+		debug(message, metadata) {
+			if (level <= logLevelConfig.DEBUG.level) {
+				console.debug(format("DEBUG", message, metadata));
+			}
+		},
+		info(message, metadata) {
+			if (level <= logLevelConfig.INFO.level) {
+				console.info(format("INFO", message, metadata));
+			}
+		},
+		warn(message, metadata) {
+			if (level <= logLevelConfig.WARN.level) {
+				console.warn(format("WARN", message, metadata));
+			}
+		},
+		error(message, metadata) {
+			if (level <= logLevelConfig.ERROR.level) {
+				console.error(format("ERROR", message, metadata));
+			}
+		},
+		child(childBindings) {
+			return createConsoleLogger({
+				level: Object.entries(logLevelConfig).find(([, v]) => v.level === level)?.[0] as LogLevel,
+				bindings: { ...bindings, ...childBindings },
+			});
+		},
+	};
 }

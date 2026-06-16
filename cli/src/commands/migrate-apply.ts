@@ -1,5 +1,6 @@
 import path from "node:path";
-import { ConsoleLogger } from "@aikirun/lib/logger";
+import type { Logger } from "@aikirun/lib/logger";
+import { createConsoleLogger } from "@aikirun/lib/logger";
 
 import { loadDatabaseConfig, type PgDatabaseConfig } from "../lib/db-config";
 import { loadEnv } from "../lib/env";
@@ -17,7 +18,7 @@ export async function migrateApply(options: MigrateApplyOptions): Promise<void> 
 	const packageRoot = resolvePackageRoot(options.pkg);
 	const migrationsFolder = path.join(packageRoot, "dist", "infra", "db", dbConfig.provider, "migration");
 	const migrationsTable = `__drizzle_migrations__${options.pkg}`;
-	const logger = new ConsoleLogger();
+	const logger = createConsoleLogger();
 
 	switch (dbConfig.provider) {
 		case "pg":
@@ -35,7 +36,7 @@ async function applyPg(
 	config: PgDatabaseConfig,
 	migrationsFolder: string,
 	migrationsTable: string,
-	logger: ConsoleLogger
+	logger: Logger
 ): Promise<void> {
 	const { sql } = await import("drizzle-orm");
 	const { readMigrationFiles } = await import("drizzle-orm/migrator");
