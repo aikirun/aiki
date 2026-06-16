@@ -21,12 +21,24 @@ function stringifyValue(value: unknown): string {
 		return "null";
 	}
 
+	if (typeof value === "function") {
+		throw new Error("stableStringify does not support function values");
+	}
+
+	if (typeof value === "symbol") {
+		throw new Error("stableStringify does not support symbol values");
+	}
+
 	if (typeof value !== "object") {
 		return JSON.stringify(value);
 	}
 
 	if (Array.isArray(value)) {
 		return `[${value.map(stringifyValue).join(",")}]`;
+	}
+
+	if (value instanceof Promise) {
+		throw new Error("stableStringify does not support Promise values");
 	}
 
 	const keys = Object.keys(value).sort();
