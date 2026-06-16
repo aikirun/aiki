@@ -1,6 +1,8 @@
 import { delay } from "@aikirun/lib/async";
 import type { Logger } from "@aikirun/lib/logger";
+import type { PathFromObject, TypeOfValueAtPath } from "@aikirun/lib/object";
 import { withRetry } from "@aikirun/lib/retry";
+import type { ConfigProvider } from "@aikirun/types/infra/config";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 
@@ -14,6 +16,7 @@ import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { publishReadyRuns } from "./publish-ready-runs";
 import { republishStaleRuns } from "./republish-stale-runs";
+import type { ServerConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
 import type { DaemonContext } from "../middleware/context";
 import { createDaemonContext } from "../middleware/context";
@@ -21,84 +24,103 @@ import type { ChildRunCanceller } from "../service/cancel-child-runs";
 
 export interface InitDaemonsDeps {
 	repos: Repositories;
+	configProvider: ConfigProvider<ServerConfig>;
 	workflowRunPublisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
 	childRunCanceller: ChildRunCanceller;
 }
 
-function initDaemon<Deps, Options>(
+type DaemonConfigPath<Path extends string> = Path extends `daemons.${infer SubPath}`
+	? SubPath extends `${string}.${string}`
+		? never
+		: Path
+	: never;
+type PollingDaemonConfigPath = Exclude<DaemonConfigPath<PathFromObject<ServerConfig>>, "daemons.dueTimersConsumer">;
+
+function initDaemon<Deps, ConfigPath extends PollingDaemonConfigPath>(
 	logger: Logger,
-	intervalMs: number,
-	fn: (context: DaemonContext, deps: Deps, options?: Options) => Promise<void>,
-	deps: Deps,
-	options?: Options
+	configProvider: ConfigProvider<ServerConfig>,
+	configPath: ConfigPath,
+	fn: (context: DaemonContext, deps: Deps, options: TypeOfValueAtPath<ServerConfig, ConfigPath>) => Promise<void>,
+	deps: Deps
 ) {
 	const name = fn.name;
 	const abortController = new AbortController();
 	const { signal } = abortController;
 
-	const promise = withRetry(
-		async () => {
-			while (!signal.aborted) {
-				const context = createDaemonContext({ name, logger, signal });
-				const start = performance.now();
-				await fn(context, deps, options);
-				const durationMs = Math.round(performance.now() - start);
-				context.logger.debug("Completed", { durationMs });
-				const delayMs = intervalMs - durationMs;
-				if (delayMs > 0) {
-					await delay(delayMs, { abortSignal: signal });
+	const promise = (async () => {
+		while (!signal.aborted) {
+			const context = createDaemonContext({ name, logger, signal });
+			const start = performance.now();
+			await withRetry(
+				async () => {
+					const config = configProvider.get(configPath);
+					await fn(context, deps, config);
+					const durationMs = Math.round(performance.now() - start);
+					context.logger.debug("Completed", { durationMs });
+					const delayMs = config.intervalMs - durationMs;
+					if (delayMs > 0) {
+						await delay(delayMs, { abortSignal: signal });
+					}
+				},
+				{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
+				{
+					abortSignal: signal,
+					onError: (err) => {
+						if (signal.aborted) {
+							return;
+						}
+						logger.error(`Daemon ${name} failed`, { err });
+					},
 				}
-			}
-		},
-		{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
-		{
-			abortSignal: signal,
-			onError: (err) => {
-				if (signal.aborted) {
-					return;
-				}
-				logger.error(`Daemon ${name} failed`, { err });
-			},
+			).run();
 		}
-	).run();
+	})();
 
 	return { abortController, promise };
 }
 
 export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
+	const { configProvider } = deps;
+
 	const daemons = [
-		initDaemon(logger, 1_000, processImminentScheduledRuns, {
+		initDaemon(logger, configProvider, "daemons.imminentScheduledRuns", processImminentScheduledRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
-		initDaemon(logger, 1_000, processImminentSleepElapsedRuns, {
+		initDaemon(logger, configProvider, "daemons.imminentSleepElapsedRuns", processImminentSleepElapsedRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
-		initDaemon(logger, 1_000, processImminentRetryableRuns, {
+		initDaemon(logger, configProvider, "daemons.imminentRetryableRuns", processImminentRetryableRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
-		initDaemon(logger, 1_000, processImminentRetryableTaskRuns, {
+		initDaemon(logger, configProvider, "daemons.imminentRetryableTaskRuns", processImminentRetryableTaskRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
-		initDaemon(logger, 1_000, processImminentEventWaitTimedOutRuns, {
+		initDaemon(logger, configProvider, "daemons.imminentEventWaitTimedOutRuns", processImminentEventWaitTimedOutRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerPriorityQueue: deps.timerPriorityQueue,
 		}),
-		initDaemon(logger, 1_000, processImminentChildRunWaitTimedOutRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
-		}),
-		initDaemon(logger, 1_000, processImminentRecurringWorkflows, {
+		initDaemon(
+			logger,
+			configProvider,
+			"daemons.imminentChildRunWaitTimedOutRuns",
+			processImminentChildRunWaitTimedOutRuns,
+			{
+				repos: deps.repos,
+				workflowRunPublisher: deps.workflowRunPublisher,
+				timerPriorityQueue: deps.timerPriorityQueue,
+			}
+		),
+		initDaemon(logger, configProvider, "daemons.imminentRecurringWorkflows", processImminentRecurringWorkflows, {
 			repos: deps.repos,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
@@ -108,11 +130,11 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 
 	if (deps.workflowRunPublisher) {
 		daemons.push(
-			initDaemon(logger, 1_000, publishReadyRuns, {
+			initDaemon(logger, configProvider, "daemons.publishReadyRuns", publishReadyRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			}),
-			initDaemon(logger, 1_000, republishStaleRuns, {
+			initDaemon(logger, configProvider, "daemons.republishStaleRuns", republishStaleRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			})
@@ -126,6 +148,7 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 			timerPriorityQueue: deps.timerPriorityQueue,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
+			configProvider,
 		});
 	}
 

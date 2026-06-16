@@ -1,18 +1,17 @@
 import { ConsoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { Iam } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
+import type { CreateConfigProvider } from "@aikirun/types/infra/config";
 import type { CreateDatabase } from "@aikirun/types/infra/db";
 import type { CreatePublisher } from "@aikirun/types/infra/queue";
 import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 
-export interface ServerRuntimeOptions {
-	gracefulShutdownTimeoutMs?: number;
-}
+import type { ServerConfig } from "./config";
 
 export interface ServerRuntimeParams {
 	publisher?: CreatePublisher;
 	timerPriorityQueue?: CreateTimerPriorityQueue;
-	options?: ServerRuntimeOptions;
+	config?: CreateConfigProvider<ServerConfig>;
 }
 
 export interface ServerParams {

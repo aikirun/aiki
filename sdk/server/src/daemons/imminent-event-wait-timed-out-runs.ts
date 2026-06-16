@@ -32,10 +32,8 @@ export interface ProcessImminentEventWaitTimedOutRunsDeps {
 export async function processImminentEventWaitTimedOutRuns(
 	context: DaemonContext,
 	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentEventWaitTimedOutRunsDeps,
-	options?: { limit?: number; imminenceThresholdMs?: number }
+	{ limit, imminenceThresholdMs }: { limit: number; imminenceThresholdMs: number }
 ) {
-	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
-
 	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(

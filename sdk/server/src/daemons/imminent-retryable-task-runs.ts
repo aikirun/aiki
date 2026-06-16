@@ -37,10 +37,8 @@ const advanceTaskCursor = createTimerStreamCursorAdvancer<{ workflowRunId: strin
 export async function processImminentRetryableTaskRuns(
 	context: DaemonContext,
 	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentRetryableTaskRunsDeps,
-	options?: { limit?: number; imminenceThresholdMs?: number }
+	{ limit, imminenceThresholdMs }: { limit: number; imminenceThresholdMs: number }
 ) {
-	const { limit = 1_000, imminenceThresholdMs = 3_000 } = options ?? {};
-
 	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	let now = Date.now();

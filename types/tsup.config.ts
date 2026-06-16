@@ -8,6 +8,7 @@ export default defineConfig({
 		client: "src/client.ts",
 		iam: "src/iam.ts",
 		"infra/cache": "src/infra/cache.ts",
+		"infra/config": "src/infra/config.ts",
 		"infra/db": "src/infra/db.ts",
 		"infra/queue/index": "src/infra/queue/index.ts",
 		"infra/timer": "src/infra/timer.ts",

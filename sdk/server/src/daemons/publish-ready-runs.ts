@@ -23,10 +23,8 @@ const advanceRankStreamCursor = createRankStreamCursorAdvancer<{ id: string; ran
 export async function publishReadyRuns(
 	context: DaemonContext,
 	deps: PublishReadyRunsDeps,
-	options?: { limit?: number }
+	{ limit }: { limit: number }
 ) {
-	const { limit = 1_000 } = options ?? {};
-
 	for await (const pendingEntries of streamChunks(
 		(cursor) => deps.repos.workflowRunOutbox.listPending(context, limit, cursor),
 		{
