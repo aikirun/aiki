@@ -165,7 +165,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		const { client } = parentRunHandle[INTERNAL];
 
 		const inputRaw = args[0];
-		const input = await this.parse(parentRunHandle, this.params.schema?.input, inputRaw, parentRun.logger);
+		const inputSchema = this.params.schema?.input;
+		const input = inputSchema ? await this.parse(parentRunHandle, inputSchema, inputRaw, parentRun.logger) : inputRaw;
 		const inputHash = await hashInput(input);
 
 		const referenceId = startOptions.reference?.id;
@@ -176,8 +177,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			const existingRunInfo = replayManifest.consumeNextChildWorkflowRun(address);
 			if (existingRunInfo) {
 				const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
-				if (existingRun.state.status === "completed") {
-					await this.parse(parentRunHandle, this.params.schema?.output, existingRun.state.output, parentRun.logger);
+				const outputSchema = this.params.schema?.output;
+				if (existingRun.state.status === "completed" && outputSchema) {
+					await this.parse(parentRunHandle, outputSchema, existingRun.state.output, parentRun.logger);
 				}
 
 				const logger = parentRun.logger.child({
@@ -305,7 +307,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(run, input);
-				const output = await this.parse(handle, this.params.schema?.output, outputRaw, run.logger);
+				const outputSchema = this.params.schema?.output;
+				const output = outputSchema
+					? await this.parse(handle, outputSchema, outputRaw, run.logger)
+					: (outputRaw as Output);
 				return output;
 			} catch (err) {
 				if (
@@ -357,14 +362,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 	private async parse<T>(
 		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
-		schema: StandardSchemaV1<T> | undefined,
+		schema: StandardSchemaV1<T>,
 		data: unknown,
 		logger: Logger
 	): Promise<T> {
-		if (!schema) {
-			return data as T;
-		}
-
 		const schemaValidation = schema["~standard"].validate(data);
 		const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
 		if (!schemaValidationResult.issues) {
