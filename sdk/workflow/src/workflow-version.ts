@@ -104,7 +104,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	public with(): WorkflowBuilder<Input, Output, Context, TEvents> {
 		const startOptions: WorkflowStartOptions = this.params.options ?? {};
 		const startOptionsOverrider = objectOverrider(startOptions);
-		return new WorkflowBuilderImpl(this, startOptionsOverrider());
+		return createWorkflowBuilder(this, startOptionsOverrider());
 	}
 
 	public async start(
@@ -435,32 +435,21 @@ export interface WorkflowBuilder<Input, Output, Context, TEvents extends EventsD
 	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>>;
 }
 
-class WorkflowBuilderImpl<Input, Output, Context, TEvents extends EventsDefinition>
-	implements WorkflowBuilder<Input, Output, Context, TEvents>
-{
-	constructor(
-		private readonly workflow: WorkflowVersionImpl<Input, Output, Context, TEvents>,
-		private readonly startOptionsBuilder: ObjectBuilder<WorkflowStartOptions>
-	) {}
+function createWorkflowBuilder<Input, Output, Context, TEvents extends EventsDefinition>(
+	workflowVersion: WorkflowVersionImpl<Input, Output, Context, TEvents>,
+	startOptionsBuilder: ObjectBuilder<WorkflowStartOptions>
+): WorkflowBuilder<Input, Output, Context, TEvents> {
+	return {
+		opt(path, value) {
+			return createWorkflowBuilder(workflowVersion, startOptionsBuilder.with(path, value));
+		},
 
-	opt<Path extends PathFromObject<WorkflowStartOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
-	): WorkflowBuilder<Input, Output, Context, TEvents> {
-		return new WorkflowBuilderImpl(this.workflow, this.startOptionsBuilder.with(path, value));
-	}
+		start(client, ...args) {
+			return workflowVersion.startWithOptions(client, startOptionsBuilder.build(), ...args);
+		},
 
-	start(
-		client: Client<Context>,
-		...args: Input extends void ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
-		return this.workflow.startWithOptions(client, this.startOptionsBuilder.build(), ...args);
-	}
-
-	startAsChild<ParentInput, ParentEvents extends EventsDefinition>(
-		parentRun: WorkflowRun<ParentInput, Context, ParentEvents>,
-		...args: Input extends void ? [] : [Input]
-	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>> {
-		return this.workflow.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);
-	}
+		startAsChild(parentRun, ...args) {
+			return workflowVersion.startAsChildWithOptions(parentRun, startOptionsBuilder.build(), ...args);
+		},
+	};
 }
