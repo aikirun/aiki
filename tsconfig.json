@@ -34,6 +34,6 @@
 
 		"types": ["bun-types", "@types/node"]
 	},
-	"include": ["lib/**/*", "types/**/*", "sdk/**/*", "app/server/**/*", "cli/**/*", "examples/**/*"],
+	"include": ["lib/**/*", "types/**/*", "sdk/**/*", "app/server/**/*", "cli/**/*", "examples/**/*", "scripts/**/*"],
 	"exclude": ["node_modules", "**/dist"]
 }
