@@ -23,11 +23,11 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
  * Converts a Duration to milliseconds.
  *
  * Accepts either raw milliseconds (number) or a DurationObject with time units.
- * All values must be non-negative and finite. The maximum duration is 1 year (31,536,000,000ms).
+ * All values must be non-negative and finite.
  *
  * @param duration - Duration as milliseconds or object with time units (days, hours, minutes, seconds, milliseconds)
  * @returns Duration in milliseconds
- * @throws {Error} If duration is invalid (negative, non-finite, zero value, or exceeds 1 year)
+ * @throws {Error} If duration is invalid (negative or non-finite)
  *
  * @example
  * // Using milliseconds
