@@ -14,7 +14,6 @@ export default defineConfig({
 		"json/index": "src/json/index.ts",
 		"logger/index": "src/logger/index.ts",
 		"object/index": "src/object/index.ts",
-		"polling/index": "src/polling/index.ts",
 		"retry/index": "src/retry/index.ts",
 		"serializable/index": "src/serializable/index.ts",
 		"testing/expect/index": "src/testing/expect/index.ts",

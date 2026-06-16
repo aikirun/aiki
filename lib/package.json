@@ -53,10 +53,6 @@
 			"types": "./dist/object/index.d.ts",
 			"import": "./dist/object/index.js"
 		},
-		"./polling": {
-			"types": "./dist/polling/index.d.ts",
-			"import": "./dist/polling/index.js"
-		},
 		"./retry": {
 			"types": "./dist/retry/index.d.ts",
 			"import": "./dist/retry/index.js"
