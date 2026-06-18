@@ -35,8 +35,8 @@ export interface Client<Context = null> {
  * requests without polluting the wire contract types.
  */
 type WithClientOptions<T> = {
-	[K in keyof T]: T[K] extends (input: infer I) => Promise<infer O>
-		? (input: I, options?: { signal?: AbortSignal }) => Promise<O>
+	[K in keyof T]: T[K] extends (input: infer Input) => Promise<infer Output>
+		? (input: Input, options?: { signal?: AbortSignal }) => Promise<Output>
 		: T[K];
 };
 
