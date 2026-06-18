@@ -4,9 +4,7 @@ import { runWithWorker } from "../runner";
 import { longRunningPipelineV1 } from "../workflows/long-running-pipeline";
 
 await runWithWorker([longRunningPipelineV1], async (client) => {
-	const handle = await longRunningPipelineV1.start(client, {
-		dataUrl: "https://example.com/data.csv",
-	});
+	const handle = await longRunningPipelineV1.start(client);
 	// Wait for it to reach the approval stage, then approve
 	await delay(35_000);
 	await handle.events.approve.send({ approver: "admin@example.com" });
