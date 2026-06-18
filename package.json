@@ -17,6 +17,7 @@
 		"sdk/server",
 		"sdk/worker",
 		"sdk/workflow",
+		"testing",
 		"types"
 	],
 	"scripts": {

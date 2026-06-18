@@ -18,6 +18,7 @@ COPY cli/package.json ./cli/
 COPY app/server/package.json ./app/server/
 COPY app/dashboard/package.json ./app/dashboard/
 COPY examples/package.json ./examples/
+COPY testing/package.json ./testing/
 
 RUN bun install --frozen-lockfile
 
