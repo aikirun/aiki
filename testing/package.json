@@ -1,0 +1,19 @@
+{
+	"name": "@aikirun/testing",
+	"version": "0.30.0",
+	"private": true,
+	"description": "Testing utilities for Aiki - a fake client and fishery data factories for testing SDK code (in-repo; not yet published)",
+	"type": "module",
+	"exports": {
+		"./api/schedule": "./src/api/schedule.ts",
+		"./client": "./src/client.ts",
+		"./schedule": "./src/schedule.ts",
+		"./workflow/task": "./src/workflow/task.ts",
+		"./workflow/run": "./src/workflow/run.ts"
+	},
+	"dependencies": {
+		"@aikirun/types": "workspace:*",
+		"fishery": "^2.4.0"
+	},
+	"license": "Apache-2.0"
+}

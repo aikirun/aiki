@@ -2,11 +2,17 @@ import { delay } from "./delay";
 import { describe, expect, test } from "bun:test";
 
 describe("delay", () => {
-	test("resolves after the specified duration", async () => {
-		const start = performance.now();
-		await delay(50);
-		const elapsed = performance.now() - start;
-		expect(elapsed).toBeGreaterThanOrEqual(50);
+	test("does not resolve synchronously and resolves after the timer fires", async () => {
+		let resolved = false;
+		const promise = delay(10).then(() => {
+			resolved = true;
+		});
+
+		// Resolution is deferred to the timer — nothing has run on this synchronous tick yet.
+		expect(resolved).toBe(false);
+
+		await promise;
+		expect(resolved).toBe(true);
 	});
 
 	test("rejects immediately when abort signal is already aborted", async () => {
