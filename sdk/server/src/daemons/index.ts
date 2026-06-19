@@ -5,7 +5,7 @@ import type { ConfigProvider } from "@aikirun/types/infra/config";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 
-import { type DueTimersConsumerHandle, spawnDueTimersConsumer } from "./due-timers-consumer";
+import { spawnDueTimersConsumer } from "./due-timers-consumer";
 import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { processImminentRecurringWorkflows } from "./imminent-recurring-workflows";
@@ -30,116 +30,78 @@ export interface InitDaemonsDeps {
 	childRunCanceller: ChildRunCanceller;
 }
 
-function initDaemon<Deps, DaemonOptions>(
-	logger: Logger,
-	signal: AbortSignal,
-	configProvider: ConfigProvider<ServerConfig>,
-	getDaemonConfig: (config: ServerConfig) => DaemonOptions & { intervalMs: number },
-	fn: (context: DaemonContext, deps: Deps, options: DaemonOptions) => Promise<void>,
-	deps: Deps
-) {
-	const name = fn.name;
+function pollingDaemon(logger: Logger, signal: AbortSignal, configProvider: ConfigProvider<ServerConfig>) {
+	return {
+		spawn<Deps, DaemonOptions>(
+			getDaemonConfig: (config: ServerConfig) => DaemonOptions & { intervalMs: number },
+			fn: (context: DaemonContext, deps: Deps, options: DaemonOptions) => Promise<void>,
+			deps: Deps
+		) {
+			const name = fn.name;
 
-	const promise = (async () => {
-		while (!signal.aborted) {
-			const context = createDaemonContext({ name, logger, signal });
-			const start = performance.now();
-			await withRetry(
-				async () => {
-					const daemonConfig = getDaemonConfig(configProvider.config);
-					await fn(context, deps, daemonConfig);
-					const durationMs = Math.round(performance.now() - start);
-					context.logger.debug("Completed", { durationMs });
-					const delayMs = daemonConfig.intervalMs - durationMs;
-					if (delayMs > 0) {
-						await delay(delayMs, { signal });
-					}
-				},
-				{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
-				{
-					signal,
-					onError: (err) => {
-						if (signal.aborted) {
-							return;
+			return (async () => {
+				while (!signal.aborted) {
+					const context = createDaemonContext({ name, logger, signal });
+					const start = performance.now();
+					await withRetry(
+						async () => {
+							const daemonConfig = getDaemonConfig(configProvider.config);
+							await fn(context, deps, daemonConfig);
+							const durationMs = Math.round(performance.now() - start);
+							context.logger.debug("Completed", { durationMs });
+							const delayMs = daemonConfig.intervalMs - durationMs;
+							if (delayMs > 0) {
+								await delay(delayMs, { signal });
+							}
+						},
+						{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
+						{
+							signal,
+							onError: (err) => {
+								if (signal.aborted) {
+									return;
+								}
+								logger.error(`Daemon ${name} failed`, { err });
+							},
 						}
-						logger.error(`Daemon ${name} failed`, { err });
-					},
+					).run();
 				}
-			).run();
-		}
-	})();
-
-	return { promise };
+			})();
+		},
+	};
 }
 
 export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 	const { configProvider, signal } = deps;
+	const { spawn: spawnPollingDaemon } = pollingDaemon(logger, signal, configProvider);
 
-	const daemons = [
-		initDaemon(
-			logger,
-			signal,
-			configProvider,
-			(config) => config.daemons.imminentScheduledRuns,
-			processImminentScheduledRuns,
-			{
-				repos: deps.repos,
-				workflowRunPublisher: deps.workflowRunPublisher,
-				timerPriorityQueue: deps.timerPriorityQueue,
-			}
-		),
-		initDaemon(
-			logger,
-			signal,
-			configProvider,
-			(config) => config.daemons.imminentSleepElapsedRuns,
-			processImminentSleepElapsedRuns,
-			{
-				repos: deps.repos,
-				workflowRunPublisher: deps.workflowRunPublisher,
-				timerPriorityQueue: deps.timerPriorityQueue,
-			}
-		),
-		initDaemon(
-			logger,
-			signal,
-			configProvider,
-			(config) => config.daemons.imminentRetryableRuns,
-			processImminentRetryableRuns,
-			{
-				repos: deps.repos,
-				workflowRunPublisher: deps.workflowRunPublisher,
-				timerPriorityQueue: deps.timerPriorityQueue,
-			}
-		),
-		initDaemon(
-			logger,
-			signal,
-			configProvider,
-			(config) => config.daemons.imminentRetryableTaskRuns,
-			processImminentRetryableTaskRuns,
-			{
-				repos: deps.repos,
-				workflowRunPublisher: deps.workflowRunPublisher,
-				timerPriorityQueue: deps.timerPriorityQueue,
-			}
-		),
-		initDaemon(
-			logger,
-			signal,
-			configProvider,
-			(config) => config.daemons.imminentEventWaitTimedOutRuns,
-			processImminentEventWaitTimedOutRuns,
-			{
-				repos: deps.repos,
-				workflowRunPublisher: deps.workflowRunPublisher,
-				timerPriorityQueue: deps.timerPriorityQueue,
-			}
-		),
-		initDaemon(
-			logger,
-			signal,
-			configProvider,
+	const daemonPromises: Promise<void>[] = [
+		spawnPollingDaemon((config) => config.daemons.imminentScheduledRuns, processImminentScheduledRuns, {
+			repos: deps.repos,
+			workflowRunPublisher: deps.workflowRunPublisher,
+			timerPriorityQueue: deps.timerPriorityQueue,
+		}),
+		spawnPollingDaemon((config) => config.daemons.imminentSleepElapsedRuns, processImminentSleepElapsedRuns, {
+			repos: deps.repos,
+			workflowRunPublisher: deps.workflowRunPublisher,
+			timerPriorityQueue: deps.timerPriorityQueue,
+		}),
+		spawnPollingDaemon((config) => config.daemons.imminentRetryableRuns, processImminentRetryableRuns, {
+			repos: deps.repos,
+			workflowRunPublisher: deps.workflowRunPublisher,
+			timerPriorityQueue: deps.timerPriorityQueue,
+		}),
+		spawnPollingDaemon((config) => config.daemons.imminentRetryableTaskRuns, processImminentRetryableTaskRuns, {
+			repos: deps.repos,
+			workflowRunPublisher: deps.workflowRunPublisher,
+			timerPriorityQueue: deps.timerPriorityQueue,
+		}),
+		spawnPollingDaemon((config) => config.daemons.imminentEventWaitTimedOutRuns, processImminentEventWaitTimedOutRuns, {
+			repos: deps.repos,
+			workflowRunPublisher: deps.workflowRunPublisher,
+			timerPriorityQueue: deps.timerPriorityQueue,
+		}),
+		spawnPollingDaemon(
 			(config) => config.daemons.imminentChildRunWaitTimedOutRuns,
 			processImminentChildRunWaitTimedOutRuns,
 			{
@@ -148,50 +110,43 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 				timerPriorityQueue: deps.timerPriorityQueue,
 			}
 		),
-		initDaemon(
-			logger,
-			signal,
-			configProvider,
-			(config) => config.daemons.imminentRecurringWorkflows,
-			processImminentRecurringWorkflows,
-			{
-				repos: deps.repos,
-				childRunCanceller: deps.childRunCanceller,
-				workflowRunPublisher: deps.workflowRunPublisher,
-				timerPriorityQueue: deps.timerPriorityQueue,
-			}
-		),
+		spawnPollingDaemon((config) => config.daemons.imminentRecurringWorkflows, processImminentRecurringWorkflows, {
+			repos: deps.repos,
+			childRunCanceller: deps.childRunCanceller,
+			workflowRunPublisher: deps.workflowRunPublisher,
+			timerPriorityQueue: deps.timerPriorityQueue,
+		}),
 	];
 
 	if (deps.workflowRunPublisher) {
-		daemons.push(
-			initDaemon(logger, signal, configProvider, (config) => config.daemons.publishReadyRuns, publishReadyRuns, {
+		daemonPromises.push(
+			spawnPollingDaemon((config) => config.daemons.publishReadyRuns, publishReadyRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			}),
-			initDaemon(logger, signal, configProvider, (config) => config.daemons.republishStaleRuns, republishStaleRuns, {
+			spawnPollingDaemon((config) => config.daemons.republishStaleRuns, republishStaleRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			})
 		);
 	}
 
-	let dueTimersConsumer: DueTimersConsumerHandle | undefined;
 	if (deps.timerPriorityQueue) {
-		dueTimersConsumer = spawnDueTimersConsumer(logger, {
-			repos: deps.repos,
-			signal,
-			timerPriorityQueue: deps.timerPriorityQueue,
-			childRunCanceller: deps.childRunCanceller,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			configProvider,
-		});
+		daemonPromises.push(
+			spawnDueTimersConsumer(logger, {
+				repos: deps.repos,
+				signal,
+				timerPriorityQueue: deps.timerPriorityQueue,
+				childRunCanceller: deps.childRunCanceller,
+				workflowRunPublisher: deps.workflowRunPublisher,
+				configProvider,
+			})
+		);
 	}
 
 	return {
 		async stop() {
-			await Promise.all(daemons.map((daemon) => daemon.promise));
-			await dueTimersConsumer?.stop();
+			await Promise.all(daemonPromises);
 		},
 	};
 }

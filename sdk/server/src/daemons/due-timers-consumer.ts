@@ -33,21 +33,15 @@ export interface DueTimersConsumerDeps {
 	configProvider: ConfigProvider<ServerConfig>;
 }
 
-export interface DueTimersConsumerHandle {
-	stop(): Promise<void>;
-}
-
-export function spawnDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): DueTimersConsumerHandle {
+export async function spawnDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): Promise<void> {
 	const timerSignalWaiter = deps.timerPriorityQueue.createSignalWaiter();
+	deps.signal.addEventListener("abort", () => void timerSignalWaiter.close(), { once: true });
 
-	const promise = dueTimersConsumerLoop(logger, deps, timerSignalWaiter, deps.signal);
-
-	return {
-		async stop() {
-			await timerSignalWaiter.close();
-			await promise;
-		},
-	};
+	try {
+		await dueTimersConsumerLoop(logger, deps, timerSignalWaiter, deps.signal);
+	} finally {
+		await timerSignalWaiter.close();
+	}
 }
 
 async function dueTimersConsumerLoop(
