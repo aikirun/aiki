@@ -40,6 +40,7 @@
 	"devDependencies": {
 		"@aikirun/cli": "workspace:*",
 		"@aikirun/lib": "workspace:*",
+		"@aikirun/memory": "workspace:*",
 		"postgres": "^3.4.8"
 	},
 	"publishConfig": {

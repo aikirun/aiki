@@ -1,0 +1,40 @@
+import { delay } from "@aikirun/lib/async";
+import { createConsoleLogger } from "@aikirun/lib/logger";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+
+import { spawnDueTimersConsumer } from "./due-timers-consumer";
+import { describe, expect, test } from "bun:test";
+import { staticConfigProvider } from "../config";
+import type { Repositories } from "../infra/db/types";
+import { createChildRunCanceller } from "../service/cancel-child-runs";
+
+describe("spawnDueTimersConsumer", () => {
+	test("resolves when the runtime signal aborts while parked in an indefinite wait", async () => {
+		const abortController = new AbortController();
+		const { signal } = abortController;
+		const logger = createConsoleLogger({ level: "ERROR" });
+
+		const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger, signal });
+		const configProvider = await staticConfigProvider()({ logger, signal });
+
+		let resolved = false;
+		const consumer = spawnDueTimersConsumer(logger, {
+			repos: {} as unknown as Repositories,
+			signal,
+			timerPriorityQueue,
+			childRunCanceller: createChildRunCanceller(),
+			configProvider,
+		}).then(() => {
+			resolved = true;
+		});
+
+		// Let the consumer reach the indefinite wait, then confirm it is genuinely parked.
+		await delay(20);
+		expect(resolved).toBe(false);
+
+		abortController.abort();
+		await consumer;
+
+		expect(resolved).toBe(true);
+	}, 2_000);
+});
