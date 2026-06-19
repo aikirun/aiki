@@ -21,18 +21,20 @@ if (import.meta.main) {
 
 	const aiki = server({
 		db,
-		cache,
 		logger,
-		iam:
-			config.auth && config.baseURL
-				? iam({
-						db,
-						cache,
-						secret: config.auth.secret,
-						baseURL: config.baseURL,
-						trustedOrigins: config.corsOrigins,
-					})
-				: undefined,
+		handler: {
+			cache,
+			iam:
+				config.auth && config.baseURL
+					? iam({
+							db,
+							cache,
+							secret: config.auth.secret,
+							baseURL: config.baseURL,
+							trustedOrigins: config.corsOrigins,
+						})
+					: undefined,
+		},
 		runtime: {
 			...(redis && {
 				publisher: redisPublisher(redis.client),

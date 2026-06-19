@@ -26,6 +26,7 @@ import { scheduleRowToDomain } from "../service/schedule";
 
 export interface DueTimersConsumerDeps {
 	repos: Repositories;
+	signal: AbortSignal;
 	timerPriorityQueue: TimerPriorityQueue;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: Publisher;
@@ -37,16 +38,12 @@ export interface DueTimersConsumerHandle {
 }
 
 export function spawnDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): DueTimersConsumerHandle {
-	const abortController = new AbortController();
-	const { signal } = abortController;
-
 	const timerSignalWaiter = deps.timerPriorityQueue.createSignalWaiter();
 
-	const promise = dueTimersConsumerLoop(logger, deps, timerSignalWaiter, signal);
+	const promise = dueTimersConsumerLoop(logger, deps, timerSignalWaiter, deps.signal);
 
 	return {
 		async stop() {
-			abortController.abort();
 			await timerSignalWaiter.close();
 			await promise;
 		},
