@@ -1,6 +1,5 @@
 import { delay } from "@aikirun/lib/async";
 import type { Logger } from "@aikirun/lib/logger";
-import type { PathFromObject, TypeOfValueAtPath } from "@aikirun/lib/object";
 import { withRetry } from "@aikirun/lib/retry";
 import type { ConfigProvider } from "@aikirun/types/infra/config";
 import type { Publisher } from "@aikirun/types/infra/queue";
@@ -30,18 +29,11 @@ export interface InitDaemonsDeps {
 	childRunCanceller: ChildRunCanceller;
 }
 
-type DaemonConfigPath<Path extends string> = Path extends `daemons.${infer SubPath}`
-	? SubPath extends `${string}.${string}`
-		? never
-		: Path
-	: never;
-type PollingDaemonConfigPath = Exclude<DaemonConfigPath<PathFromObject<ServerConfig>>, "daemons.dueTimersConsumer">;
-
-function initDaemon<Deps, ConfigPath extends PollingDaemonConfigPath>(
+function initDaemon<Deps, DaemonOptions>(
 	logger: Logger,
 	configProvider: ConfigProvider<ServerConfig>,
-	configPath: ConfigPath,
-	fn: (context: DaemonContext, deps: Deps, options: TypeOfValueAtPath<ServerConfig, ConfigPath>) => Promise<void>,
+	getDaemonConfig: (config: ServerConfig) => DaemonOptions & { intervalMs: number },
+	fn: (context: DaemonContext, deps: Deps, options: DaemonOptions) => Promise<void>,
 	deps: Deps
 ) {
 	const name = fn.name;
@@ -54,11 +46,11 @@ function initDaemon<Deps, ConfigPath extends PollingDaemonConfigPath>(
 			const start = performance.now();
 			await withRetry(
 				async () => {
-					const config = configProvider.get(configPath);
-					await fn(context, deps, config);
+					const daemonConfig = getDaemonConfig(configProvider.config);
+					await fn(context, deps, daemonConfig);
 					const durationMs = Math.round(performance.now() - start);
 					context.logger.debug("Completed", { durationMs });
-					const delayMs = config.intervalMs - durationMs;
+					const delayMs = daemonConfig.intervalMs - durationMs;
 					if (delayMs > 0) {
 						await delay(delayMs, { abortSignal: signal });
 					}
@@ -84,27 +76,7 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 	const { configProvider } = deps;
 
 	const daemons = [
-		initDaemon(logger, configProvider, "daemons.imminentScheduledRuns", processImminentScheduledRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
-		}),
-		initDaemon(logger, configProvider, "daemons.imminentSleepElapsedRuns", processImminentSleepElapsedRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
-		}),
-		initDaemon(logger, configProvider, "daemons.imminentRetryableRuns", processImminentRetryableRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
-		}),
-		initDaemon(logger, configProvider, "daemons.imminentRetryableTaskRuns", processImminentRetryableTaskRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
-		}),
-		initDaemon(logger, configProvider, "daemons.imminentEventWaitTimedOutRuns", processImminentEventWaitTimedOutRuns, {
+		initDaemon(logger, configProvider, (config) => config.daemons.imminentScheduledRuns, processImminentScheduledRuns, {
 			repos: deps.repos,
 			workflowRunPublisher: deps.workflowRunPublisher,
 			timerPriorityQueue: deps.timerPriorityQueue,
@@ -112,7 +84,45 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 		initDaemon(
 			logger,
 			configProvider,
-			"daemons.imminentChildRunWaitTimedOutRuns",
+			(config) => config.daemons.imminentSleepElapsedRuns,
+			processImminentSleepElapsedRuns,
+			{
+				repos: deps.repos,
+				workflowRunPublisher: deps.workflowRunPublisher,
+				timerPriorityQueue: deps.timerPriorityQueue,
+			}
+		),
+		initDaemon(logger, configProvider, (config) => config.daemons.imminentRetryableRuns, processImminentRetryableRuns, {
+			repos: deps.repos,
+			workflowRunPublisher: deps.workflowRunPublisher,
+			timerPriorityQueue: deps.timerPriorityQueue,
+		}),
+		initDaemon(
+			logger,
+			configProvider,
+			(config) => config.daemons.imminentRetryableTaskRuns,
+			processImminentRetryableTaskRuns,
+			{
+				repos: deps.repos,
+				workflowRunPublisher: deps.workflowRunPublisher,
+				timerPriorityQueue: deps.timerPriorityQueue,
+			}
+		),
+		initDaemon(
+			logger,
+			configProvider,
+			(config) => config.daemons.imminentEventWaitTimedOutRuns,
+			processImminentEventWaitTimedOutRuns,
+			{
+				repos: deps.repos,
+				workflowRunPublisher: deps.workflowRunPublisher,
+				timerPriorityQueue: deps.timerPriorityQueue,
+			}
+		),
+		initDaemon(
+			logger,
+			configProvider,
+			(config) => config.daemons.imminentChildRunWaitTimedOutRuns,
 			processImminentChildRunWaitTimedOutRuns,
 			{
 				repos: deps.repos,
@@ -120,21 +130,27 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 				timerPriorityQueue: deps.timerPriorityQueue,
 			}
 		),
-		initDaemon(logger, configProvider, "daemons.imminentRecurringWorkflows", processImminentRecurringWorkflows, {
-			repos: deps.repos,
-			childRunCanceller: deps.childRunCanceller,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
-		}),
+		initDaemon(
+			logger,
+			configProvider,
+			(config) => config.daemons.imminentRecurringWorkflows,
+			processImminentRecurringWorkflows,
+			{
+				repos: deps.repos,
+				childRunCanceller: deps.childRunCanceller,
+				workflowRunPublisher: deps.workflowRunPublisher,
+				timerPriorityQueue: deps.timerPriorityQueue,
+			}
+		),
 	];
 
 	if (deps.workflowRunPublisher) {
 		daemons.push(
-			initDaemon(logger, configProvider, "daemons.publishReadyRuns", publishReadyRuns, {
+			initDaemon(logger, configProvider, (config) => config.daemons.publishReadyRuns, publishReadyRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			}),
-			initDaemon(logger, configProvider, "daemons.republishStaleRuns", republishStaleRuns, {
+			initDaemon(logger, configProvider, (config) => config.daemons.republishStaleRuns, republishStaleRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			})

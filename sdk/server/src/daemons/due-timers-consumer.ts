@@ -90,7 +90,7 @@ async function dueTimersConsumerLoop(
 	while (!abortSignal.aborted) {
 		await withRetry(
 			async () => {
-				const { limit, overshootMs } = deps.configProvider.get("daemons.dueTimersConsumer");
+				const { limit, overshootMs } = deps.configProvider.config.daemons.dueTimersConsumer;
 				let signal = 0;
 
 				if (nextTimerDueAtMs === null) {
