@@ -293,7 +293,7 @@ describe("withRetry", () => {
 			controller.abort("cancelled");
 
 			const result = await withRetry(async () => "ok", strategy, {
-				abortSignal: controller.signal,
+				signal: controller.signal,
 			}).run();
 
 			expect(result).toEqual({ state: "aborted", reason: "cancelled" });
@@ -312,7 +312,7 @@ describe("withRetry", () => {
 					throw new Error("fail");
 				},
 				strategy,
-				{ abortSignal: controller.signal }
+				{ signal: controller.signal }
 			).run();
 
 			expect(result).toEqual({ state: "aborted", reason: "stopped" });

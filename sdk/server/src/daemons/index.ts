@@ -52,12 +52,12 @@ function initDaemon<Deps, DaemonOptions>(
 					context.logger.debug("Completed", { durationMs });
 					const delayMs = daemonConfig.intervalMs - durationMs;
 					if (delayMs > 0) {
-						await delay(delayMs, { abortSignal: signal });
+						await delay(delayMs, { signal });
 					}
 				},
 				{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
 				{
-					abortSignal: signal,
+					signal,
 					onError: (err) => {
 						if (signal.aborted) {
 							return;

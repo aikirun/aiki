@@ -38,11 +38,11 @@ export interface DueTimersConsumerHandle {
 
 export function spawnDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): DueTimersConsumerHandle {
 	const abortController = new AbortController();
-	const { signal: abortSignal } = abortController;
+	const { signal } = abortController;
 
 	const timerSignalWaiter = deps.timerPriorityQueue.createSignalWaiter();
 
-	const promise = dueTimersConsumerLoop(logger, deps, timerSignalWaiter, abortSignal);
+	const promise = dueTimersConsumerLoop(logger, deps, timerSignalWaiter, signal);
 
 	return {
 		async stop() {
@@ -91,14 +91,14 @@ async function dueTimersConsumerLoop(
 		await withRetry(
 			async () => {
 				const { limit, overshootMs } = deps.configProvider.config.daemons.dueTimersConsumer;
-				let signal = 0;
+				let timerSignal = 0;
 
 				if (nextTimerDueAtMs === null) {
-					signal = await timerSignalWaiter.wait(0);
+					timerSignal = await timerSignalWaiter.wait(0);
 				} else {
 					const waitMs = nextTimerDueAtMs - Date.now() + overshootMs;
 					if (waitMs > 0) {
-						signal = await timerSignalWaiter.wait(waitMs / 1_000);
+						timerSignal = await timerSignalWaiter.wait(waitMs / 1_000);
 					}
 				}
 
@@ -106,9 +106,9 @@ async function dueTimersConsumerLoop(
 					return;
 				}
 
-				if (signal > Date.now()) {
-					if (nextTimerDueAtMs === null || signal < nextTimerDueAtMs) {
-						nextTimerDueAtMs = signal;
+				if (timerSignal > Date.now()) {
+					if (nextTimerDueAtMs === null || timerSignal < nextTimerDueAtMs) {
+						nextTimerDueAtMs = timerSignal;
 					}
 					return;
 				}

@@ -32,7 +32,7 @@ export type WithRetryOptions<Result, Abortable extends boolean> = {
 	shouldRetryOnResult?: (previousResult: Result) => boolean | Promise<boolean>;
 	shouldNotRetryOnError?: (error: unknown) => boolean | Promise<boolean>;
 	onError?: (error: unknown) => void | Promise<void>;
-} & (Abortable extends true ? { abortSignal: AbortSignal } : { abortSignal?: never });
+} & (Abortable extends true ? { signal: AbortSignal } : { signal?: never });
 
 type CompletedResult<Result> = {
 	state: "completed";
@@ -73,10 +73,10 @@ export function withRetry<Args, Result>(
 			let attempts = 0;
 
 			while (true) {
-				if (options?.abortSignal?.aborted) {
+				if (options?.signal?.aborted) {
 					return {
 						state: "aborted",
-						reason: options.abortSignal.reason,
+						reason: options.signal.reason,
 					};
 				}
 
@@ -126,7 +126,7 @@ export function withRetry<Args, Result>(
 					};
 				}
 
-				await delay(retryParams.delayMs, { abortSignal: options?.abortSignal }).catch(() => {});
+				await delay(retryParams.delayMs, { signal: options?.signal }).catch(() => {});
 			}
 		},
 	};

@@ -185,10 +185,10 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		}
 
 		this.abortController = new AbortController();
-		const abortSignal = this.abortController.signal;
+		const signal = this.abortController.signal;
 
-		this.subscriberLoopPromise = this.subscriberLoop(abortSignal).catch((error) => {
-			if (!abortSignal.aborted) {
+		this.subscriberLoopPromise = this.subscriberLoop(signal).catch((error) => {
+			if (!signal.aborted) {
 				this.logger.error("Unexpected error", {
 					"aiki.error": error.message,
 				});
@@ -251,7 +251,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		};
 	}
 
-	private async subscriberLoop(abortSignal: AbortSignal): Promise<void> {
+	private async subscriberLoop(signal: AbortSignal): Promise<void> {
 		if (!this.primarySubscriber) {
 			throw new Error("Subscriber not initialized");
 		}
@@ -265,9 +265,9 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		let activeSubscriber: Subscriber = this.primarySubscriber;
 		let nextDelayMs = activeSubscriber.getNextDelay({ type: "no_work" });
 
-		while (!abortSignal.aborted) {
+		while (!signal.aborted) {
 			if (nextDelayMs > 0) {
-				await delay(nextDelayMs, { abortSignal });
+				await delay(nextDelayMs, { signal });
 			}
 
 			const availableCapacity =
@@ -277,7 +277,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				continue;
 			}
 
-			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, abortSignal);
+			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, signal);
 			if (!nextBatchResponse.success) {
 				nextDelayMs = nextBatchResponse.retryDelayMs;
 				continue;
@@ -299,14 +299,14 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				continue;
 			}
 
-			this.enqueueWorkflowRunBatch(workflowRunIdsToEnqueue, activeSubscriber, abortSignal);
+			this.enqueueWorkflowRunBatch(workflowRunIdsToEnqueue, activeSubscriber, signal);
 			nextDelayMs = 0;
 		}
 	}
 
 	private async fetchNextWorkflowRunBatch(
 		size: number,
-		abortSignal: AbortSignal
+		signal: AbortSignal
 	): Promise<
 		| { success: true; batch: WorkflowRunMessage[]; activeSubscriber: Subscriber }
 		| { success: false; retryDelayMs: number }
@@ -317,13 +317,13 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 
 		if (Date.now() >= this.primarySubscriberNextAttemptAt) {
 			try {
-				const batch = await this.primarySubscriber.getReadyRuns(size, { abortSignal });
+				const batch = await this.primarySubscriber.getReadyRuns(size, { signal });
 				this.primarySubscriberFailedAttempts = 0;
 				this.backupSubscriberFailedAttempts = 0;
 				this.primarySubscriberNextAttemptAt = 0;
 				return { success: true, batch, activeSubscriber: this.primarySubscriber };
 			} catch (err) {
-				if (abortSignal.aborted) {
+				if (signal.aborted) {
 					return { success: false, retryDelayMs: 0 };
 				}
 
@@ -349,11 +349,11 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		}
 
 		try {
-			const batch = await this.backupSubscriber.getReadyRuns(size, { abortSignal });
+			const batch = await this.backupSubscriber.getReadyRuns(size, { signal });
 			this.backupSubscriberFailedAttempts = 0;
 			return { success: true, batch, activeSubscriber: this.backupSubscriber };
 		} catch (err) {
-			if (abortSignal.aborted) {
+			if (signal.aborted) {
 				return { success: false, retryDelayMs: 0 };
 			}
 
@@ -377,11 +377,11 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 	private enqueueWorkflowRunBatch(
 		workflowRunIds: NonEmptyArray<WorkflowRunId>,
 		subscriber: Subscriber,
-		abortSignal: AbortSignal
+		signal: AbortSignal
 	): void {
 		const enqueue = async () => {
 			for (const workflowRunId of workflowRunIds) {
-				if (abortSignal.aborted) {
+				if (signal.aborted) {
 					return;
 				}
 
@@ -400,7 +400,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 					continue;
 				}
 
-				if (abortSignal.aborted) {
+				if (signal.aborted) {
 					return;
 				}
 
@@ -420,7 +420,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				}
 
 				this.pendingWorkflowRunIds.delete(workflowRunId);
-				const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber, abortSignal);
+				const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber, signal);
 				this.activeWorkflowRunsById.set(workflowRun.id, {
 					run: workflowRun,
 					executionPromise: workflowExecutionPromise,
@@ -429,7 +429,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		};
 
 		enqueue().catch((error) => {
-			if (!abortSignal.aborted) {
+			if (!signal.aborted) {
 				this.logger.error("Error enqueuing workflow run batch", {
 					"aiki.error": error instanceof Error ? error.message : String(error),
 				});
@@ -441,7 +441,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		workflowRun: WorkflowRunRecord,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 		subscriber: Subscriber,
-		abortSignal: AbortSignal
+		signal: AbortSignal
 	): Promise<void> {
 		const workflowRunId = workflowRun.id as WorkflowRunId;
 
@@ -464,15 +464,15 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 					heartbeatIntervalMs: this.workflowRunOptions.heartbeatIntervalMs,
 				},
 				heartbeat: heartbeat ? () => heartbeat(workflowRunId) : undefined,
-				abortSignal,
+				signal,
 			});
 
-			if (!abortSignal.aborted && subscriber.acknowledge) {
+			if (!signal.aborted && subscriber.acknowledge) {
 				if (success) {
 					try {
 						await subscriber.acknowledge(workflowRunId);
 					} catch (err) {
-						if (!abortSignal.aborted) {
+						if (!signal.aborted) {
 							logger.error("Failed to acknowledge message, it may be reprocessed", {
 								"aiki.errorType": "MESSAGE_ACK_FAILED",
 								"aiki.error": err instanceof Error ? err.message : String(err),

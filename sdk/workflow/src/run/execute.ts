@@ -25,7 +25,7 @@ export interface ExecuteWorkflowParams<Context> {
 	logger: Logger;
 	options: Required<WorkflowExecutionOptions>;
 	heartbeat?: () => Promise<void>;
-	abortSignal?: AbortSignal;
+	signal?: AbortSignal;
 }
 
 export interface WorkflowExecutionOptions {
@@ -42,7 +42,7 @@ export interface WorkflowExecutionOptions {
 }
 
 export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
-	const { client, workflowRun, workflowVersion, logger, options, heartbeat, abortSignal } = params;
+	const { client, workflowRun, workflowVersion, logger, options, heartbeat, signal } = params;
 
 	let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
 	let onAbort: (() => void) | undefined;
@@ -51,7 +51,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		if (heartbeat) {
 			heartbeatInterval = setInterval(() => {
 				fireAndForget(heartbeat(), (error) => {
-					if (!abortSignal?.aborted) {
+					if (!signal?.aborted) {
 						logger.warn("Failed to send heartbeat", {
 							"aiki.error": error.message,
 						});
@@ -59,9 +59,9 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				});
 			}, options.heartbeatIntervalMs);
 
-			if (abortSignal) {
+			if (signal) {
 				onAbort = () => clearInterval(heartbeatInterval);
-				abortSignal.addEventListener("abort", onAbort, { once: true });
+				signal.addEventListener("abort", onAbort, { once: true });
 			}
 		}
 
@@ -111,7 +111,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 			clearInterval(heartbeatInterval);
 		}
 		if (onAbort) {
-			abortSignal?.removeEventListener("abort", onAbort);
+			signal?.removeEventListener("abort", onAbort);
 		}
 	}
 }

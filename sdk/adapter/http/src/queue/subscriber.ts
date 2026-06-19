@@ -52,7 +52,7 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 
 		return {
 			getNextDelay,
-			async getReadyRuns(size: number, options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
+			async getReadyRuns(size: number, options?: { signal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
 				const response = await api.workflowRun.claimReadyV1(
 					{
 						workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
@@ -60,7 +60,7 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 						limit: size,
 						claimMinIdleTimeMs,
 					},
-					{ signal: options?.abortSignal }
+					{ signal: options?.signal }
 				);
 
 				return response.runs.map((run) => ({

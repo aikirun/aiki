@@ -39,7 +39,7 @@ export function dynamicConfigProvider(params: {
 
 		const refreshConfigLoop = async (): Promise<void> => {
 			while (!signal.aborted) {
-				await delay(params.refreshIntervalMs, { abortSignal: signal }).catch(() => {});
+				await delay(params.refreshIntervalMs, { signal }).catch(() => {});
 				if (signal.aborted) {
 					break;
 				}
@@ -47,7 +47,7 @@ export function dynamicConfigProvider(params: {
 					refreshConfig,
 					{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
 					{
-						abortSignal: signal,
+						signal,
 						onError: (err) => {
 							if (signal.aborted) {
 								return;

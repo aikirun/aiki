@@ -77,7 +77,7 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 	 * Possible failure causes:
 	 * - `"run_terminated"` - workflow reached a terminal state other than expected
 	 * - `"timeout"` - timeout elapsed (only when timeout option provided)
-	 * - `"aborted"` - abort signal triggered (only when abortSignal option provided)
+	 * - `"aborted"` - abort signal triggered (only when signal option provided)
 	 *
 	 * @param status - The target status to wait for
 	 * @param options - Optional configuration for polling interval, timeout, and abort signal
@@ -106,7 +106,7 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 	 * // Wait with an abort signal
 	 * const controller = new AbortController();
 	 * const result = await handle.waitForStatus("completed", {
-	 *   abortSignal: controller.signal
+	 *   signal: controller.signal
 	 * });
 	 * if (!result.success) {
 	 *   console.log(`Wait ended: ${result.cause}`);
@@ -150,7 +150,7 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 export interface WorkflowRunWaitOptions<Timed extends boolean, Abortable extends boolean> {
 	interval?: DurationObject;
 	timeout?: Timed extends true ? DurationObject : never;
-	abortSignal?: Abortable extends true ? AbortSignal : never;
+	signal?: Abortable extends true ? AbortSignal : never;
 }
 
 export type WorkflowRunWaitResultSuccess<Status extends TerminalWorkflowRunStatus, Output> = Extract<
@@ -237,7 +237,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 		expectedStatus: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
-		if (options?.abortSignal?.aborted) {
+		if (options?.signal?.aborted) {
 			return {
 				success: false,
 				cause: "aborted",
@@ -263,9 +263,9 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 
 		const shouldRetryOnResult = (terminated: boolean) => !terminated;
 
-		const maybeResult = options?.abortSignal
+		const maybeResult = options?.signal
 			? await withRetry(hasTerminated, retryStrategy, {
-					abortSignal: options.abortSignal,
+					signal: options.signal,
 					shouldRetryOnResult,
 				}).run()
 			: await withRetry(hasTerminated, retryStrategy, { shouldRetryOnResult }).run();

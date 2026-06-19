@@ -43,8 +43,8 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 		return {
 			getNextDelay,
 
-			async getReadyRuns(limit: number, options?: { abortSignal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
-				if (closed || options?.abortSignal?.aborted) {
+			async getReadyRuns(limit: number, options?: { signal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
+				if (closed || options?.signal?.aborted) {
 					return [];
 				}
 
@@ -57,7 +57,7 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 					const detach = (): void => {
 						if (waiterHandle) {
 							if (waiterHandle.abortHandler !== undefined) {
-								options?.abortSignal?.removeEventListener("abort", waiterHandle.abortHandler);
+								options?.signal?.removeEventListener("abort", waiterHandle.abortHandler);
 							}
 							waiterHandle = undefined;
 						}
@@ -120,13 +120,13 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 							resolve([]);
 						},
 
-						abortHandler: options?.abortSignal ? () => handle.close() : undefined,
+						abortHandler: options?.signal ? () => handle.close() : undefined,
 					};
 
 					waiterHandle = handle;
 
 					if (handle.abortHandler !== undefined) {
-						options?.abortSignal?.addEventListener("abort", handle.abortHandler, { once: true });
+						options?.signal?.addEventListener("abort", handle.abortHandler, { once: true });
 					}
 
 					for (const queueName of queueNames) {
