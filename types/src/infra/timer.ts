@@ -39,6 +39,7 @@ export interface TimerPriorityQueue {
 
 export interface TimerPriorityQueueContext {
 	logger: Logger;
+	signal: AbortSignal;
 }
 
 export type CreateTimerPriorityQueue = (context: TimerPriorityQueueContext) => TimerPriorityQueue;

@@ -27,6 +27,7 @@ export interface Publisher {
 
 export interface PublisherContext {
 	logger: Logger;
+	signal: AbortSignal;
 }
 
 export type CreatePublisher = (context: PublisherContext) => Publisher;

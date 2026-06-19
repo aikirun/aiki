@@ -8,6 +8,11 @@ import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 
 import type { ServerConfig } from "./config";
 
+export interface ServerHandlerParams {
+	iam?: Iam;
+	cache?: CreateCache;
+}
+
 export interface ServerRuntimeParams {
 	publisher?: CreatePublisher;
 	timerPriorityQueue?: CreateTimerPriorityQueue;
@@ -16,9 +21,8 @@ export interface ServerRuntimeParams {
 
 export interface ServerParams {
 	db: CreateDatabase;
-	iam?: Iam;
-	cache?: CreateCache;
 	logger?: Logger;
+	handler?: ServerHandlerParams;
 	runtime?: ServerRuntimeParams;
 }
 
@@ -35,7 +39,7 @@ export interface Server {
 }
 
 export function server(params: ServerParams): Server {
-	const logger: Logger = params.logger ?? createConsoleLogger();
+	const logger = params.logger ?? createConsoleLogger();
 
 	let handler: Server["handler"] | undefined;
 	let createHandlerPromise: Promise<Server["handler"]> | undefined;
@@ -47,7 +51,7 @@ export function server(params: ServerParams): Server {
 				createHandlerPromise ??= (async () => {
 					const db = await params.db();
 					const { createHandler } = await import("./handler");
-					return createHandler({ db, logger, iam: params.iam, cache: params.cache });
+					return createHandler({ db, logger, iam: params.handler?.iam, cache: params.handler?.cache });
 				})();
 				handler = await createHandlerPromise;
 				return handler(request);

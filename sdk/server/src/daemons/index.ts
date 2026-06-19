@@ -23,6 +23,7 @@ import type { ChildRunCanceller } from "../service/cancel-child-runs";
 
 export interface InitDaemonsDeps {
 	repos: Repositories;
+	signal: AbortSignal;
 	configProvider: ConfigProvider<ServerConfig>;
 	workflowRunPublisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
@@ -31,14 +32,13 @@ export interface InitDaemonsDeps {
 
 function initDaemon<Deps, DaemonOptions>(
 	logger: Logger,
+	signal: AbortSignal,
 	configProvider: ConfigProvider<ServerConfig>,
 	getDaemonConfig: (config: ServerConfig) => DaemonOptions & { intervalMs: number },
 	fn: (context: DaemonContext, deps: Deps, options: DaemonOptions) => Promise<void>,
 	deps: Deps
 ) {
 	const name = fn.name;
-	const abortController = new AbortController();
-	const { signal } = abortController;
 
 	const promise = (async () => {
 		while (!signal.aborted) {
@@ -69,20 +69,28 @@ function initDaemon<Deps, DaemonOptions>(
 		}
 	})();
 
-	return { abortController, promise };
+	return { promise };
 }
 
 export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
-	const { configProvider } = deps;
+	const { configProvider, signal } = deps;
 
 	const daemons = [
-		initDaemon(logger, configProvider, (config) => config.daemons.imminentScheduledRuns, processImminentScheduledRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
-		}),
 		initDaemon(
 			logger,
+			signal,
+			configProvider,
+			(config) => config.daemons.imminentScheduledRuns,
+			processImminentScheduledRuns,
+			{
+				repos: deps.repos,
+				workflowRunPublisher: deps.workflowRunPublisher,
+				timerPriorityQueue: deps.timerPriorityQueue,
+			}
+		),
+		initDaemon(
+			logger,
+			signal,
 			configProvider,
 			(config) => config.daemons.imminentSleepElapsedRuns,
 			processImminentSleepElapsedRuns,
@@ -92,13 +100,21 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 				timerPriorityQueue: deps.timerPriorityQueue,
 			}
 		),
-		initDaemon(logger, configProvider, (config) => config.daemons.imminentRetryableRuns, processImminentRetryableRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
-		}),
 		initDaemon(
 			logger,
+			signal,
+			configProvider,
+			(config) => config.daemons.imminentRetryableRuns,
+			processImminentRetryableRuns,
+			{
+				repos: deps.repos,
+				workflowRunPublisher: deps.workflowRunPublisher,
+				timerPriorityQueue: deps.timerPriorityQueue,
+			}
+		),
+		initDaemon(
+			logger,
+			signal,
 			configProvider,
 			(config) => config.daemons.imminentRetryableTaskRuns,
 			processImminentRetryableTaskRuns,
@@ -110,6 +126,7 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 		),
 		initDaemon(
 			logger,
+			signal,
 			configProvider,
 			(config) => config.daemons.imminentEventWaitTimedOutRuns,
 			processImminentEventWaitTimedOutRuns,
@@ -121,6 +138,7 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 		),
 		initDaemon(
 			logger,
+			signal,
 			configProvider,
 			(config) => config.daemons.imminentChildRunWaitTimedOutRuns,
 			processImminentChildRunWaitTimedOutRuns,
@@ -132,6 +150,7 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 		),
 		initDaemon(
 			logger,
+			signal,
 			configProvider,
 			(config) => config.daemons.imminentRecurringWorkflows,
 			processImminentRecurringWorkflows,
@@ -146,11 +165,11 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 
 	if (deps.workflowRunPublisher) {
 		daemons.push(
-			initDaemon(logger, configProvider, (config) => config.daemons.publishReadyRuns, publishReadyRuns, {
+			initDaemon(logger, signal, configProvider, (config) => config.daemons.publishReadyRuns, publishReadyRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			}),
-			initDaemon(logger, configProvider, (config) => config.daemons.republishStaleRuns, republishStaleRuns, {
+			initDaemon(logger, signal, configProvider, (config) => config.daemons.republishStaleRuns, republishStaleRuns, {
 				repos: deps.repos,
 				workflowRunPublisher: deps.workflowRunPublisher,
 			})
@@ -161,6 +180,7 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 	if (deps.timerPriorityQueue) {
 		dueTimersConsumer = spawnDueTimersConsumer(logger, {
 			repos: deps.repos,
+			signal,
 			timerPriorityQueue: deps.timerPriorityQueue,
 			childRunCanceller: deps.childRunCanceller,
 			workflowRunPublisher: deps.workflowRunPublisher,
@@ -170,12 +190,7 @@ export function initDaemons(logger: Logger, deps: InitDaemonsDeps) {
 
 	return {
 		async stop() {
-			const daemonPromises: Promise<unknown>[] = [];
-			for (const { abortController, promise } of daemons) {
-				abortController.abort();
-				daemonPromises.push(promise);
-			}
-			await Promise.all(daemonPromises);
+			await Promise.all(daemons.map((daemon) => daemon.promise));
 			await dueTimersConsumer?.stop();
 		},
 	};

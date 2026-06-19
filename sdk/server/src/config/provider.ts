@@ -24,10 +24,8 @@ export function dynamicConfigProvider(params: {
 	refreshIntervalMs: number;
 	refresh: (current: ServerConfig) => ServerConfig | Promise<ServerConfig>;
 }): CreateConfigProvider<ServerConfig> {
-	return async ({ logger }) => {
+	return async ({ logger, signal }) => {
 		let config = parseServerConfig({});
-		const abortController = new AbortController();
-		const { signal } = abortController;
 
 		const refreshConfig = async (): Promise<void> => {
 			const response = params.refresh(config);
@@ -66,9 +64,6 @@ export function dynamicConfigProvider(params: {
 		return {
 			get config() {
 				return config;
-			},
-			stop() {
-				abortController.abort();
 			},
 		};
 	};
