@@ -4,15 +4,16 @@ This guide is about refactoring workflow versions while it has in-flight runs. I
 
 > As a caveat; when in doubt, instead of refacotoring, upgrade the workflow by creating a new version via `workflow.v()`.
 
-Aiki's content-addressable design allows you to safely refactor running workflows in ways that would cause determinism errors in other durable execution platforms. This guide explains what changes are safe and what to watch out for.
+Aiki's content-addressable design allows you to safely refactor running workflows while preserving safety guarantees in ways that would cause determinism errors in other durable execution platforms. This guide explains what changes are safe and what to watch out for.
 
 ## How Aiki Differs
 
 Traditional durable execution systems like Temporal require strict determinism; any change to workflow code can cause replay errors. Aiki takes a different approach:
 
-- **Tasks are identified by name + input hash** (content-addressable)
-- **Already-executed tasks return cached results** regardless of code order
-- **New tasks can be appended** after all previous tasks have been consumed
+- **Tasks are identified by name + input hash** (content-addressable), never by position in an execution log
+- **Each address maps to an ordered queue of recorded results, not a single value.** Calling the same task with the same input twice records two entries, replayed in order
+- **Already-recorded tasks return their cached result** regardless of the order the code reaches them
+- **New tasks can be appended** after all previously-recorded entries have been consumed
 - **Non-determinism detection** catches unsafe changes before new tasks execute
 
 This gives you flexibility to evolve your workflows without breaking running executions. For the full technical details, see [Content-Addressed Memoization](../architecture/cam.md).
@@ -21,9 +22,13 @@ This gives you flexibility to evolve your workflows without breaking running exe
 
 Whether a refactoring operation is safe depends on one rule:
 
-> When the runtime encounters a task with no memoized result (a new address), it checks whether unconsumed entries remain in the manifest from the previous execution. If they do, it errors immediately — before the new task executes.
+> When the runtime encounters a task with no remaining memoized result — either a brand-new address, or an existing address whose recorded results have all been consumed — it checks whether unconsumed entries remain in the manifest from the previous execution. If they do, it errors immediately — before the new task executes.
 
 In other words: a new task can only execute when all previously-recorded entries have been consumed. This single rule determines whether reordering, removal, appending, and insertion are safe.
+
+This rule governs **child-workflow starts** too. They are recorded in the manifest alongside tasks and addressed the same way, so everything this guide says about tasks applies equally to starting a child workflow.
+
+**The event-wait and sleep operations are not themselves manifest entries.** Each has its own per-name queue, and encountering a new event wait or sleep *suspends* the workflow rather than executing work — so the wait or sleep on its own never trips the check, even when task entries remain unconsumed. Event *data* is a different matter: once it flows into a task's input it becomes part of that task's address, so any divergence in how it's used is caught at that task. See [Adding Event Waits](#adding-event-waits).
 
 ## Safe Refactoring Operations
 
@@ -148,6 +153,10 @@ async handler(run, input) {
 }
 ```
 
+The wait itself never trips the divergence check — it performs no work, it just suspends until the event arrives, and the wait is not a manifest entry. Here `processOrder` still receives the same `input`, so its address is unchanged and it replays from cache.
+
+The event's *data*, though, is not outside determinism. The moment you feed `approval` into a task's input, it becomes part of that task's address. If that task was already recorded under a different input, its address changes and you get a non-determinism error at that task — the same as any other [input change](#changing-task-inputs). So adding an event wait is safe only when it doesn't alter a downstream task's input.
+
 ### Reordering Different-Named Sleeps
 
 Sleeps with different names can be reordered. Each sleep name has its own queue, so the order doesn't matter:
@@ -199,7 +208,7 @@ async handler(run, input) {
 
 ## Unsafe Operations (Non-Determinism Errors)
 
-The following changes cause a non-determinism error on replay. When the runtime encounters a new address (no memoized result) while unconsumed entries remain from the previous execution, it errors immediately — before the new task executes. This prevents silent data corruption.
+The following changes cause a non-determinism error on replay. When the runtime encounters a task with no remaining memoized result — a new address, or one whose recorded results are all consumed — while unconsumed entries remain from the previous execution, it errors immediately, before the new task executes. This prevents silent data corruption.
 
 ### Inserting Tasks
 
