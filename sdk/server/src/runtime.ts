@@ -57,7 +57,7 @@ function createRuntimeHandle({ configProvider, daemonsHandle, logger }: RuntimeH
 	let stopPromise: Promise<void> | undefined;
 
 	const _stop = async (): Promise<void> => {
-		const gracefulShutdownTimeoutMs = configProvider.get("gracefulShutdownTimeoutMs");
+		const gracefulShutdownTimeoutMs = configProvider.config.gracefulShutdownTimeoutMs;
 		const daemonShutdownPromise = daemonsHandle.stop();
 
 		if (gracefulShutdownTimeoutMs <= 0) {

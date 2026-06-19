@@ -1,5 +1,4 @@
 import { delay, fireAndForget } from "@aikirun/lib/async";
-import { getByPath } from "@aikirun/lib/object";
 import { withRetry } from "@aikirun/lib/retry";
 import type { CreateConfigProvider } from "@aikirun/types/infra/config";
 
@@ -10,14 +9,9 @@ import { parseServerConfig, type ServerConfig, type ServerConfigOverrides } from
  * Pass `overrides` to change any setting; omit them for the defaults.
  */
 export function staticConfigProvider(overrides?: ServerConfigOverrides): CreateConfigProvider<ServerConfig> {
-	return () => {
-		const config = parseServerConfig(overrides ?? {});
-		return {
-			get(path) {
-				return getByPath(config, path);
-			},
-		};
-	};
+	return () => ({
+		config: parseServerConfig(overrides ?? {}),
+	});
 }
 
 /**
@@ -70,8 +64,8 @@ export function dynamicConfigProvider(params: {
 		});
 
 		return {
-			get(path) {
-				return getByPath(config, path);
+			get config() {
+				return config;
 			},
 			stop() {
 				abortController.abort();
