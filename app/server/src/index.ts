@@ -43,7 +43,7 @@ if (import.meta.main) {
 		},
 	});
 
-	const runtimeHandle = await aiki.runtime.start();
+	const runtimeHandle = aiki.runtime.start();
 
 	const { createCorsResponse, withCorsHeaders } = createCorsHelpers(config.corsOrigins);
 

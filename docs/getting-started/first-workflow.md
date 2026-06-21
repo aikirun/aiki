@@ -165,14 +165,14 @@ import { worker } from "@aikirun/worker";
 const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
 
 const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
-const runtimeHandle = await aikiServer.runtime.start();
+const runtimeHandle = aikiServer.runtime.start();
 
 const aikiClient = client({ handler: aikiServer.handler });
 
 const aikiWorker = worker({
 	workflows: [restaurantOrderV1, courierDeliveryV1],
 });
-const workerHandle = await aikiWorker.spawn(aikiClient);
+const workerHandle = aikiWorker.spawn(aikiClient);
 
 // Graceful shutdown
 process.on("SIGINT", async () => {

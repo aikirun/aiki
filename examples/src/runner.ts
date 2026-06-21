@@ -53,8 +53,8 @@ export async function runWithWorker(
 		config: { maxConcurrentWorkflowRuns: 10 },
 	});
 
-	const handleA = await workerA.spawn(aikiClient);
-	const handleB = await workerB.spawn(aikiClient);
+	const handleA = workerA.spawn(aikiClient);
+	const handleB = workerB.spawn(aikiClient);
 
 	const shutdown = async (exitCode: number) => {
 		await Promise.all([handleA.stop(), handleB.stop()]);
@@ -89,7 +89,7 @@ async function setup(): Promise<Setup> {
 			db: database(readDatabaseEnv()),
 			runtime: { publisher: queue.publisher, timerPriorityQueue },
 		});
-		const runtimeHandle = await aiki.runtime.start();
+		const runtimeHandle = aiki.runtime.start();
 
 		return {
 			client: client({ handler: aiki.handler }),
