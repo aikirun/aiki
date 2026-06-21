@@ -2,14 +2,24 @@ import { getTaskAddress } from "@aikirun/lib/address";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { fakeClient } from "@aikirun/testing/client";
-import { runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
-import { completedTaskInfoFactory, runningTaskInfoFactory } from "@aikirun/testing/workflow/task";
+import { pausedWorkflowRunRecordFactory, runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
+import {
+	completedTaskInfoFactory,
+	failedTaskInfoFactory,
+	runningTaskInfoFactory,
+} from "@aikirun/testing/workflow/task";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
-import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import {
+	NonDeterminismError,
+	WorkflowRunFailedError,
+	WorkflowRunNotExecutableError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
 import { TaskFailedError } from "@aikirun/types/workflow/task";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
 import { workflowRunHandle } from "./run/handle";
@@ -275,6 +285,176 @@ describe("task", () => {
 
 			expect(await sendEmail.start(run, input)).toBe(output);
 			expect(handlerCalls).toBe(0);
+		});
+
+		test("fails the run and throws WorkflowRunFailedError when the input schema rejects", async () => {
+			using client = fakeClient();
+			const runRecord = runningWorkflowRunRecordFactory.build();
+			const run = createTestWorkflowRun(client, runRecord);
+
+			const alwaysInvalid: StandardSchemaV1<string> = {
+				"~standard": {
+					version: 1,
+					vendor: "test",
+					validate: () => ({ issues: [{ message: "invalid input" }] }),
+				},
+			};
+			const validateInput = task<string, string>({
+				name: "validate-input",
+				handler: async (value) => value,
+				schema: { input: alwaysInvalid },
+			});
+
+			client.api.workflowRun.transitionStateV1.once(
+				{
+					type: "optimistic",
+					id: runRecord.id,
+					state: expect.objectContaining({ status: "failed", cause: "self" }),
+					expectedRevision: runRecord.revision,
+				},
+				{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+			);
+
+			let error: unknown;
+			try {
+				await validateInput.start(run, "anything");
+			} catch (caught) {
+				error = caught;
+			}
+			expect(error).toBeInstanceOf(WorkflowRunFailedError);
+		});
+
+		test("replays a failed task from history as TaskFailedError without touching the client", async () => {
+			using client = fakeClient();
+
+			let handlerCalls = 0;
+			const chargeCard = task<{ cardId: string }, string>({
+				name: "charge-card",
+				handler: async () => {
+					handlerCalls++;
+					return "charged";
+				},
+			});
+
+			const input = { cardId: "card-1" };
+			const inputHash = await hashInput(input);
+			const address = getTaskAddress(chargeCard.name, inputHash);
+			const failedTask = failedTaskInfoFactory.build({ name: chargeCard.name });
+			const runRecord = runningWorkflowRunRecordFactory.build({
+				taskQueues: { [address]: { tasks: [failedTask] } },
+			});
+			const run = createTestWorkflowRun(client, runRecord);
+
+			let error: unknown;
+			try {
+				await chargeCard.start(run, input);
+			} catch (caught) {
+				error = caught;
+			}
+			expect(error).toBeInstanceOf(TaskFailedError);
+			expect(handlerCalls).toBe(0);
+		});
+
+		test("fails the run with NonDeterminismError when the replay history diverges", async () => {
+			using client = fakeClient();
+
+			const chargeCard = task<{ cardId: string }, string>({
+				name: "charge-card",
+				handler: async () => "charged",
+			});
+
+			const runRecord = runningWorkflowRunRecordFactory.build({
+				taskQueues: { "other-task:other-hash": { tasks: [completedTaskInfoFactory.build()] } },
+			});
+			const run = createTestWorkflowRun(client, runRecord);
+
+			client.api.workflowRun.transitionStateV1.once(
+				{
+					type: "optimistic",
+					id: runRecord.id,
+					state: expect.objectContaining({ status: "failed", cause: "self" }),
+					expectedRevision: runRecord.revision,
+				},
+				{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+			);
+
+			let error: unknown;
+			try {
+				await chargeCard.start(run, { cardId: "card-1" });
+			} catch (caught) {
+				error = caught;
+			}
+			expect(error).toBeInstanceOf(NonDeterminismError);
+		});
+
+		test("throws WorkflowRunNotExecutableError when the run is not executable", async () => {
+			using client = fakeClient();
+			const runRecord = pausedWorkflowRunRecordFactory.build();
+			const run = createTestWorkflowRun(client, runRecord);
+
+			let handlerCalls = 0;
+			const sendEmail = task<{ to: string }, string>({
+				name: "send-email",
+				handler: async () => {
+					handlerCalls++;
+					return "sent";
+				},
+			});
+
+			let error: unknown;
+			try {
+				await sendEmail.start(run, { to: "info@aiki.run" });
+			} catch (caught) {
+				error = caught;
+			}
+			expect(error).toBeInstanceOf(WorkflowRunNotExecutableError);
+			expect(handlerCalls).toBe(0);
+		});
+
+		test("applies builder options to the create transition call", async () => {
+			using client = fakeClient();
+			const runRecord = runningWorkflowRunRecordFactory.build();
+			const run = createTestWorkflowRun(client, runRecord);
+
+			const sendEmail = task<{ to: string }, string>({
+				name: "send-email",
+				handler: async () => "sent",
+			});
+
+			const input = { to: "info@aiki.run" };
+			const output = "sent";
+			const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
+
+			const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name, state: { input } });
+			const completedTaskInfo = completedTaskInfoFactory.build({
+				id: runningTaskInfo.id,
+				name: sendEmail.name,
+				state: { output },
+			});
+
+			client.api.workflowRun.transitionTaskStateV1
+				.once(
+					{
+						type: "create",
+						taskName: sendEmail.name,
+						options: { retry },
+						taskState: runningTaskInfo.state,
+						id: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+					},
+					{ taskInfo: runningTaskInfo }
+				)
+				.once(
+					{
+						taskId: runningTaskInfo.id,
+						taskState: completedTaskInfo.state,
+						id: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+					},
+					{ taskInfo: completedTaskInfo }
+				);
+
+			expect(await sendEmail.with().opt("retry", retry).start(run, input)).toBe(output);
 		});
 	});
 });
