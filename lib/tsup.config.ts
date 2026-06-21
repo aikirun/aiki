@@ -6,6 +6,7 @@ export default defineConfig({
 		"async/index": "src/async/index.ts",
 		"collection/array/index": "src/collection/array/index.ts",
 		"collection/heap/index": "src/collection/heap/index.ts",
+		"config/index": "src/config/index.ts",
 		"context/index": "src/context/index.ts",
 		"crypto/index": "src/crypto/index.ts",
 		"duration/index": "src/duration/index.ts",

@@ -1,8 +1,8 @@
 import { streamChunks } from "@aikirun/lib/async";
 import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import { type RetryStrategy, withRetry } from "@aikirun/lib/retry";
-import type { ConfigProvider } from "@aikirun/types/infra/config";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { DueTimer, TimerPriorityQueue, TimerSignalWaiter, TimerType } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
@@ -15,7 +15,7 @@ import { queueRetryableRuns } from "./imminent-retryable-runs";
 import { queueRetryableTaskRuns } from "./imminent-retryable-task-runs";
 import { queueScheduledRuns } from "./imminent-scheduled-runs";
 import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
-import type { ServerConfig } from "../config";
+import type { ServerRuntimeConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import { computeRank, type Ranked, rankDueAtMs } from "../lib/rank";
@@ -30,7 +30,7 @@ export interface DueTimersConsumerDeps {
 	timerPriorityQueue: TimerPriorityQueue;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: Publisher;
-	configProvider: ConfigProvider<ServerConfig>;
+	configProvider: ConfigProvider<ServerRuntimeConfig["daemons"]["dueTimersConsumer"]>;
 }
 
 export async function spawnDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): Promise<void> {
@@ -56,23 +56,18 @@ async function dueTimersConsumerLoop(
 		baseDelayMs: 1_000,
 		maxDelayMs: 30_000,
 	};
-	const retryOptions = {
-		abortSignal,
+
+	// Peek on startup to discover entries left over from a previous consumer's lifecycle: they have
+	// no pending signal, so without this the first wait could block indefinitely.
+	const nextTimerRankResponse = await withRetry(() => deps.timerPriorityQueue.peekNextRank(), retryStrategy, {
+		signal: abortSignal,
 		onError: (err: unknown) => {
 			if (abortSignal.aborted) {
 				return;
 			}
 			logger.warn("Due timers consumer failed, will retry", { err });
 		},
-	};
-
-	// Peek on startup to discover entries left over from a previous consumer's lifecycle: they have
-	// no pending signal, so without this the first wait could block indefinitely.
-	const nextTimerRankResponse = await withRetry(
-		() => deps.timerPriorityQueue.peekNextRank(),
-		retryStrategy,
-		retryOptions
-	).run();
+	}).run();
 	if (nextTimerRankResponse.state !== "completed") {
 		return;
 	}
@@ -81,7 +76,7 @@ async function dueTimersConsumerLoop(
 	while (!abortSignal.aborted) {
 		await withRetry(
 			async () => {
-				const { limit, overshootMs } = deps.configProvider.config.daemons.dueTimersConsumer;
+				const { limit, overshootMs } = deps.configProvider.config;
 				let timerSignal = 0;
 
 				if (nextTimerDueAtMs === null) {
@@ -119,7 +114,15 @@ async function dueTimersConsumerLoop(
 				nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
 			},
 			retryStrategy,
-			retryOptions
+			{
+				signal: abortSignal,
+				onError: (err: unknown) => {
+					if (abortSignal.aborted) {
+						return;
+					}
+					logger.warn("Due timers consumer failed, will retry", { err });
+				},
+			}
 		).run();
 	}
 }

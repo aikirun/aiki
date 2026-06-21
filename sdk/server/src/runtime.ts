@@ -1,11 +1,12 @@
-import { delay } from "@aikirun/lib/async";
+import { settleWithin } from "@aikirun/lib/async";
+import { asConfigProvider, type ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
-import type { ConfigProvider } from "@aikirun/types/infra/config";
+import { merge } from "@aikirun/lib/object";
 import type { Database } from "@aikirun/types/infra/db";
 import { ulid } from "ulidx";
 
-import { type ServerConfig, staticConfigProvider } from "./config";
-import { initDaemons } from "./daemons";
+import { defaultServerRuntimeConfig, type ServerRuntimeConfig } from "./config";
+import { spawnDaemons } from "./daemons";
 import { createRepos } from "./infra/db/repo";
 import type { ServerRuntimeHandle, ServerRuntimeId, ServerRuntimeParams } from "./server";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
@@ -26,14 +27,16 @@ export function createRuntime(params: CreateRuntimeParams) {
 			const abortController = new AbortController();
 			const { signal } = abortController;
 
-			const createConfigProvider = params.runtime?.config ?? staticConfigProvider();
-			const maybeConfigProvider = createConfigProvider({
-				logger: logger.child({ "aiki.component": "config-provider" }),
-				signal,
-			});
-			const configProvider = maybeConfigProvider instanceof Promise ? await maybeConfigProvider : maybeConfigProvider;
+			const configParam = params.runtime?.config;
+			let configProvider: ConfigProvider<ServerRuntimeConfig>;
+			if (typeof configParam === "function") {
+				configProvider = configParam({ logger: logger.child({ "aiki.component": "config-provider" }), signal });
+			} else {
+				const config = merge(defaultServerRuntimeConfig, configParam);
+				configProvider = asConfigProvider(() => config);
+			}
 
-			const daemonsHandle = initDaemons(logger, {
+			const daemonsPromise = spawnDaemons(logger, {
 				repos,
 				configProvider,
 				signal,
@@ -48,21 +51,21 @@ export function createRuntime(params: CreateRuntimeParams) {
 				childRunCanceller,
 			});
 
-			return createRuntimeHandle({ logger, daemonsHandle, configProvider, abortController });
+			return createRuntimeHandle({ logger, daemonsPromise, configProvider, abortController });
 		},
 	};
 }
 
 interface RuntimeHandleDeps {
 	logger: Logger;
-	daemonsHandle: { stop: () => Promise<void> };
-	configProvider: ConfigProvider<ServerConfig>;
+	daemonsPromise: Promise<void>;
+	configProvider: ConfigProvider<ServerRuntimeConfig>;
 	abortController: AbortController;
 }
 
 function createRuntimeHandle({
 	configProvider,
-	daemonsHandle,
+	daemonsPromise,
 	logger,
 	abortController,
 }: RuntimeHandleDeps): ServerRuntimeHandle {
@@ -74,21 +77,16 @@ function createRuntimeHandle({
 
 		abortController.abort();
 
-		const daemonShutdownPromise = daemonsHandle.stop();
-
 		if (gracefulShutdownTimeoutMs <= 0) {
-			await daemonShutdownPromise;
-		} else {
-			const result = await Promise.race([
-				daemonShutdownPromise.then(() => "done" as const),
-				delay(gracefulShutdownTimeoutMs).then(() => "timeout" as const),
-			]);
-			if (result === "timeout") {
-				logger.warn("Runtime did not shut down within graceful timeout", {
-					"aiki.runtimeId": id,
-					"aiki.gracefulShutdownTimeoutMs": gracefulShutdownTimeoutMs,
-				});
-			}
+			return;
+		}
+
+		const drained = await settleWithin(daemonsPromise, gracefulShutdownTimeoutMs);
+		if (!drained) {
+			logger.warn("Runtime did not shut down within graceful timeout", {
+				"aiki.runtimeId": id,
+				"aiki.gracefulShutdownTimeoutMs": gracefulShutdownTimeoutMs,
+			});
 		}
 	};
 

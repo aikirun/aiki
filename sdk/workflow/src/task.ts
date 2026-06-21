@@ -1,5 +1,6 @@
 import { getTaskAddress } from "@aikirun/lib/address";
 import { delay } from "@aikirun/lib/async";
+import type { ConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import type { Logger } from "@aikirun/lib/logger";
 import {
@@ -33,6 +34,7 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
+import type { WorkflowExecutionConfig } from "./run/execute";
 import type { WorkflowRunHandle } from "./run/handle";
 
 type UnknownWorkflowRun = WorkflowRun<unknown, unknown>;
@@ -168,7 +170,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			taskInfo.id as TaskId,
 			retryStrategy,
 			attempts,
-			run[INTERNAL].options.spinThresholdMs,
+			run[INTERNAL].configProvider,
 			logger
 		);
 
@@ -271,7 +273,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			taskInfo.id as TaskId,
 			retryStrategy,
 			attempts,
-			run[INTERNAL].options.spinThresholdMs,
+			run[INTERNAL].configProvider,
 			logger
 		);
 
@@ -290,7 +292,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		taskId: TaskId,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
-		spinThresholdMs: number,
+		configProvider: ConfigProvider<Required<WorkflowExecutionConfig>>,
 		logger: Logger
 	): Promise<{ output: Output; lastAttempt: number }> {
 		let attempts = currentAttempt;
@@ -337,7 +339,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					"aiki.reason": serializableError.message,
 				});
 
-				if (retryParams.delayMs <= spinThresholdMs) {
+				if (retryParams.delayMs <= configProvider.config.spinThresholdMs) {
 					await delay(retryParams.delayMs);
 					attempts++;
 					continue;

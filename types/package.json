@@ -28,10 +28,6 @@
 			"types": "./dist/infra/cache.d.ts",
 			"import": "./dist/infra/cache.js"
 		},
-		"./infra/config": {
-			"types": "./dist/infra/config.d.ts",
-			"import": "./dist/infra/config.js"
-		},
 		"./infra/db": {
 			"types": "./dist/infra/db.d.ts",
 			"import": "./dist/infra/db.js"

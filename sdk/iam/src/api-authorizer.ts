@@ -44,7 +44,9 @@ function createApiKeyAuthorizer(params: ApiAuthorizerKeyParams, context: IamCont
 	let createAuthorizerPromise: Promise<ApiAuthorizer> | undefined;
 
 	return (request: Request) => {
-		if (authorizer) return authorizer(request);
+		if (authorizer) {
+			return authorizer(request);
+		}
 		return (async () => {
 			createAuthorizerPromise ??= (async () => {
 				const db = await params.db();
@@ -89,7 +91,9 @@ function createSessionAuthorizer(params: ApiAuthorizerSessionParams): ApiAuthori
 	let createAuthorizerPromise: Promise<ApiAuthorizer> | undefined;
 
 	return (request: Request) => {
-		if (authorizer) return authorizer(request);
+		if (authorizer) {
+			return authorizer(request);
+		}
 		return (async () => {
 			createAuthorizerPromise ??= (async () => {
 				const [{ createAuthService }, db] = await Promise.all([import("./auth"), params.db()]);

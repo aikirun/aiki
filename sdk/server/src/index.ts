@@ -1,7 +1,7 @@
 export type { Logger } from "@aikirun/lib/logger";
 
-export type { ServerConfig, ServerConfigOverrides } from "./config";
-export { dynamicConfigProvider, staticConfigProvider } from "./config";
+export type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./config";
+export { dynamicRuntimeConfigProvider, staticRuntimeConfigProvider } from "./config";
 export { database } from "./infra/db";
 export type {
 	Server,

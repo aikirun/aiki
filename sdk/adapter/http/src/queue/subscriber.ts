@@ -3,7 +3,6 @@ import type { ApiClient } from "@aikirun/types/client";
 import type {
 	CreateSubscriber,
 	Subscriber,
-	SubscriberContext,
 	SubscriberDelayParams,
 	WorkflowRunMessage,
 } from "@aikirun/types/infra/queue";
@@ -47,12 +46,10 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 		}
 	};
 
-	return (context: SubscriberContext): Subscriber => {
-		const { workflows, shards } = context;
-
+	return ({ workflows, shards, signal }): Subscriber => {
 		return {
 			getNextDelay,
-			async getReadyRuns(size: number, options?: { signal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
+			async getReadyRuns(size: number): Promise<WorkflowRunMessage[]> {
 				const response = await api.workflowRun.claimReadyV1(
 					{
 						workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
@@ -60,7 +57,7 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 						limit: size,
 						claimMinIdleTimeMs,
 					},
-					{ signal: options?.signal }
+					{ signal }
 				);
 
 				return response.runs.map((run) => ({

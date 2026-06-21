@@ -28,7 +28,7 @@ export interface JitteredRetryStrategy {
 
 export type RetryStrategy = NeverRetryStrategy | FixedRetryStrategy | ExponentialRetryStrategy | JitteredRetryStrategy;
 
-export type WithRetryOptions<Result, Abortable extends boolean> = {
+export type RetryOptions<Result, Abortable extends boolean> = {
 	shouldRetryOnResult?: (previousResult: Result) => boolean | Promise<boolean>;
 	shouldNotRetryOnError?: (error: unknown) => boolean | Promise<boolean>;
 	onError?: (error: unknown) => void | Promise<void>;
@@ -52,17 +52,17 @@ interface AbortedResult {
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
-	options?: WithRetryOptions<Result, false>
+	options?: RetryOptions<Result, false>
 ): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult> };
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
-	options: WithRetryOptions<Result, true>
+	options: RetryOptions<Result, true>
 ): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult | AbortedResult> };
 export function withRetry<Args, Result>(
 	fn: (...args: Args[]) => Promise<Result>,
 	strategy: RetryStrategy,
-	options?: WithRetryOptions<Result, boolean>
+	options?: RetryOptions<Result, boolean>
 ): { run: (...args: Args[]) => Promise<CompletedResult<Result> | TimeoutResult | AbortedResult> } {
 	const shouldRetryOnResult = options?.shouldRetryOnResult;
 	const shouldNotRetryOnError = options?.shouldNotRetryOnError;
