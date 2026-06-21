@@ -11,11 +11,9 @@ export type TaskAddress = string & { _brand: "task_address" };
 export const TASK_STATUSES = ["running", "awaiting_retry", "completed", "failed", "discarded"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-export interface TaskDefinitionOptions {
+export interface TaskStartOptions {
 	retry?: RetryStrategy;
 }
-
-export interface TaskStartOptions extends TaskDefinitionOptions {}
 
 interface TaskStateBase {
 	status: TaskStatus;

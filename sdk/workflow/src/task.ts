@@ -22,14 +22,7 @@ import {
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
-import type {
-	TaskAddress,
-	TaskDefinitionOptions,
-	TaskId,
-	TaskInfo,
-	TaskName,
-	TaskStartOptions,
-} from "@aikirun/types/workflow/task";
+import type { TaskAddress, TaskId, TaskInfo, TaskName, TaskStartOptions } from "@aikirun/types/workflow/task";
 import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
@@ -70,12 +63,10 @@ type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
  *   handler(input: { cardId: string; amount: number }) {
  *     return paymentService.charge(input.cardId, input.amount);
  *   },
- *   options: {
- *     retry: {
- *       type: "fixed",
- *       maxAttempts: 3,
- *       delayMs: 1_000,
- *     },
+ *   retry: {
+ *     type: "fixed",
+ *     maxAttempts: 3,
+ *     delayMs: 1_000,
  *   },
  * });
  *
@@ -92,7 +83,7 @@ export function task<Input extends Serializable = void, Output extends Serializa
 export interface TaskParams<Input, Output> {
 	name: string;
 	handler: (input: Input) => Promise<Output>;
-	options?: TaskDefinitionOptions;
+	retry?: RetryStrategy;
 	schema?: RequireAtLeastOneProp<{
 		input?: StandardSchemaV1<Input>;
 		output?: StandardSchemaV1<Output>;
@@ -112,14 +103,17 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		this.name = params.name as TaskName;
 	}
 
+	private definitionStartOptions(): TaskStartOptions {
+		return this.params.retry === undefined ? {} : { retry: this.params.retry };
+	}
+
 	public with(): TaskBuilder<Input, Output> {
-		const startOptions: TaskStartOptions = this.params.options ?? {};
-		const startOptionsOverrider = objectOverrider(startOptions);
+		const startOptionsOverrider = objectOverrider(this.definitionStartOptions());
 		return createTaskBuilder(this, startOptionsOverrider());
 	}
 
 	public async start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
-		return this.startWithOptions(run, this.params.options ?? {}, ...args);
+		return this.startWithOptions(run, this.definitionStartOptions(), ...args);
 	}
 
 	public async startWithOptions(

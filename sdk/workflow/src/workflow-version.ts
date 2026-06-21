@@ -18,7 +18,6 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ReplayManifest,
-	WorkflowDefinitionOptions,
 	WorkflowRunAddress,
 	WorkflowRunId,
 	WorkflowRunRecord,
@@ -42,7 +41,7 @@ import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handl
 export interface WorkflowVersionParams<Input, Output, Context, TEvents extends EventsDefinition> {
 	handler: (run: Readonly<WorkflowRun<Input, Context, TEvents>>, input: Input) => Promise<Output>;
 	events?: TEvents;
-	options?: WorkflowDefinitionOptions;
+	retry?: RetryStrategy;
 	schema?: RequireAtLeastOneProp<{
 		input?: StandardSchemaV1<Input>;
 		output?: StandardSchemaV1<Output>;
@@ -101,9 +100,12 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		};
 	}
 
+	private definitionStartOptions(): WorkflowStartOptions {
+		return this.params.retry === undefined ? {} : { retry: this.params.retry };
+	}
+
 	public with(): WorkflowBuilder<Input, Output, Context, TEvents> {
-		const startOptions: WorkflowStartOptions = this.params.options ?? {};
-		const startOptionsOverrider = objectOverrider(startOptions);
+		const startOptionsOverrider = objectOverrider(this.definitionStartOptions());
 		return createWorkflowBuilder(this, startOptionsOverrider());
 	}
 
@@ -111,7 +113,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		client: Client<Context>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
-		return this.startWithOptions(client, this.params.options ?? {}, ...args);
+		return this.startWithOptions(client, this.definitionStartOptions(), ...args);
 	}
 
 	public async startWithOptions(
@@ -151,7 +153,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		parentRun: WorkflowRun<unknown, Context, EventsDefinition>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>> {
-		return this.startAsChildWithOptions(parentRun, this.params.options ?? {}, ...args);
+		return this.startAsChildWithOptions(parentRun, this.definitionStartOptions(), ...args);
 	}
 
 	public async startAsChildWithOptions(
@@ -286,7 +288,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		handle[INTERNAL].assertExecutionAllowed();
 
-		const retryStrategy = this.params.options?.retry ?? { type: "never" };
+		// TODO: test this - that persisted strategy takes precedence over defined strategy
+		const retryStrategy = run.options.retry ?? this.params.retry ?? { type: "never" };
 
 		logger.info("Starting workflow");
 		await handle[INTERNAL].transitionState({ status: "running" });

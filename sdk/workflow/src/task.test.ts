@@ -149,7 +149,7 @@ describe("task", () => {
 					}
 					return "charged";
 				},
-				options: { retry },
+				retry,
 			});
 
 			const input = { cardId: "card-1" };
@@ -199,7 +199,7 @@ describe("task", () => {
 				handler: async () => {
 					throw new Error("down");
 				},
-				options: { retry },
+				retry,
 			});
 
 			const input = { cardId: "card-1" };
