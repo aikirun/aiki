@@ -2,7 +2,6 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type {
 	CreateSubscriber,
 	Subscriber,
-	SubscriberContext,
 	SubscriberDelayParams,
 	WorkflowRunMessage,
 } from "@aikirun/types/infra/queue";
@@ -22,9 +21,7 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 		}
 	};
 
-	return (context: SubscriberContext): Subscriber => {
-		const { workflows, shards } = context;
-
+	return ({ workflows, shards, signal }): Subscriber => {
 		const queueNames = getWorkflowQueueNames(workflows, shards) as NonEmptyArray<string>;
 		const queueNamesByIndex = new Map<string, number>();
 		for (const [queueIndex, queueName] of queueNames.entries()) {
@@ -33,18 +30,17 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 
 		let waiterHandle:
 			| {
-					abortHandler: (() => void) | undefined;
+					abortHandler: () => void;
 					wake: (wakeQueueName: string) => void;
 					close: () => void;
 			  }
 			| undefined;
-		let closed = false;
 
 		return {
 			getNextDelay,
 
-			async getReadyRuns(limit: number, options?: { signal?: AbortSignal }): Promise<WorkflowRunMessage[]> {
-				if (closed || options?.signal?.aborted) {
+			async getReadyRuns(limit: number): Promise<WorkflowRunMessage[]> {
+				if (signal.aborted) {
 					return [];
 				}
 
@@ -56,9 +52,7 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 				return new Promise<WorkflowRunMessage[]>((resolve) => {
 					const detach = (): void => {
 						if (waiterHandle) {
-							if (waiterHandle.abortHandler !== undefined) {
-								options?.signal?.removeEventListener("abort", waiterHandle.abortHandler);
-							}
+							signal.removeEventListener("abort", waiterHandle.abortHandler);
 							waiterHandle = undefined;
 						}
 					};
@@ -120,27 +114,17 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 							resolve([]);
 						},
 
-						abortHandler: options?.signal ? () => handle.close() : undefined,
+						abortHandler: () => handle.close(),
 					};
 
 					waiterHandle = handle;
 
-					if (handle.abortHandler !== undefined) {
-						options?.signal?.addEventListener("abort", handle.abortHandler, { once: true });
-					}
+					signal.addEventListener("abort", handle.abortHandler, { once: true });
 
 					for (const queueName of queueNames) {
 						store.getOrCreateQueue(queueName).waiterHandles.add(handle);
 					}
 				});
-			},
-
-			async close(): Promise<void> {
-				if (closed) {
-					return;
-				}
-				closed = true;
-				waiterHandle?.close();
 			},
 		};
 	};

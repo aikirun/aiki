@@ -87,7 +87,9 @@ function createAuthenticator(getAuthService: GetAuthService): DashboardAuthentic
 	let createAuthenticatorPromise: Promise<DashboardAuthenticator> | undefined;
 
 	return (request: Request) => {
-		if (authenticator) return authenticator(request);
+		if (authenticator) {
+			return authenticator(request);
+		}
 		return (async () => {
 			createAuthenticatorPromise ??= (async () => {
 				const authService = await getAuthService();
@@ -112,7 +114,9 @@ function createOrganizationHandler(
 	let createHandlerPromise: Promise<OrganizationDashboardHandler> | undefined;
 
 	return (request: Request) => {
-		if (handler) return handler(request);
+		if (handler) {
+			return handler(request);
+		}
 		return (async () => {
 			createHandlerPromise ??= (async () => {
 				const db = await params.db();

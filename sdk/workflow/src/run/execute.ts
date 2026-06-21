@@ -1,4 +1,5 @@
 import { fireAndForget } from "@aikirun/lib/async";
+import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -23,12 +24,12 @@ export interface ExecuteWorkflowParams<Context> {
 	workflowRun: WorkflowRunRecord;
 	workflowVersion: AnyWorkflowVersion;
 	logger: Logger;
-	options: Required<WorkflowExecutionOptions>;
+	configProvider: ConfigProvider<Required<WorkflowExecutionConfig>>;
 	heartbeat?: () => Promise<void>;
 	signal?: AbortSignal;
 }
 
-export interface WorkflowExecutionOptions {
+export interface WorkflowExecutionConfig {
 	heartbeatIntervalMs?: number;
 	/**
 	 * Threshold for spinning vs persisting task retry delays (default: 10ms).
@@ -42,25 +43,33 @@ export interface WorkflowExecutionOptions {
 }
 
 export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
-	const { client, workflowRun, workflowVersion, logger, options, heartbeat, signal } = params;
+	const { client, workflowRun, workflowVersion, logger, configProvider, heartbeat, signal } = params;
 
-	let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
+	let heartbeatTimeout: ReturnType<typeof setTimeout> | undefined;
 	let onAbort: (() => void) | undefined;
 
 	try {
 		if (heartbeat) {
-			heartbeatInterval = setInterval(() => {
-				fireAndForget(heartbeat(), (error) => {
-					if (!signal?.aborted) {
-						logger.warn("Failed to send heartbeat", {
-							"aiki.error": error.message,
-						});
-					}
-				});
-			}, options.heartbeatIntervalMs);
+			const scheduleHeartbeat = (): void => {
+				heartbeatTimeout = setTimeout(() => {
+					fireAndForget(heartbeat(), (error) => {
+						if (!signal?.aborted) {
+							logger.warn("Failed to send heartbeat", {
+								"aiki.error": error.message,
+							});
+						}
+					});
+					scheduleHeartbeat();
+				}, configProvider.config.heartbeatIntervalMs);
+			};
+			scheduleHeartbeat();
 
 			if (signal) {
-				onAbort = () => clearInterval(heartbeatInterval);
+				onAbort = () => {
+					if (heartbeatTimeout) {
+						clearTimeout(heartbeatTimeout);
+					}
+				};
 				signal.addEventListener("abort", onAbort, { once: true });
 			}
 		}
@@ -83,7 +92,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				[INTERNAL]: {
 					handle,
 					replayManifest: createReplayManifest(workflowRun),
-					options: { spinThresholdMs: options.spinThresholdMs },
+					configProvider,
 				},
 			},
 			workflowRun.input
@@ -107,8 +116,8 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		});
 		return false;
 	} finally {
-		if (heartbeatInterval) {
-			clearInterval(heartbeatInterval);
+		if (heartbeatTimeout) {
+			clearTimeout(heartbeatTimeout);
 		}
 		if (onAbort) {
 			signal?.removeEventListener("abort", onAbort);

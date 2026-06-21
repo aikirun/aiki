@@ -1,12 +1,12 @@
+import type { CreateConfigProvider } from "@aikirun/lib/config";
 import { createConsoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { Iam } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
-import type { CreateConfigProvider } from "@aikirun/types/infra/config";
 import type { CreateDatabase } from "@aikirun/types/infra/db";
 import type { CreatePublisher } from "@aikirun/types/infra/queue";
 import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 
-import type { ServerConfig } from "./config";
+import type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./config";
 
 export interface ServerHandlerParams {
 	iam?: Iam;
@@ -16,7 +16,7 @@ export interface ServerHandlerParams {
 export interface ServerRuntimeParams {
 	publisher?: CreatePublisher;
 	timerPriorityQueue?: CreateTimerPriorityQueue;
-	config?: CreateConfigProvider<ServerConfig>;
+	config?: ServerRuntimeConfigOverrides | CreateConfigProvider<ServerRuntimeConfig>;
 }
 
 export interface ServerParams {
@@ -46,7 +46,9 @@ export function server(params: ServerParams): Server {
 
 	return {
 		handler: (request) => {
-			if (handler) return handler(request);
+			if (handler) {
+				return handler(request);
+			}
 			return (async () => {
 				createHandlerPromise ??= (async () => {
 					const db = await params.db();

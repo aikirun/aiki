@@ -12,10 +12,9 @@ export type SubscriberDelayParams = { type: "no_work" } | { type: "retry"; attem
 
 export interface Subscriber {
 	getNextDelay: (params: SubscriberDelayParams) => number;
-	getReadyRuns: (limit: number, options?: { signal?: AbortSignal }) => Promise<WorkflowRunMessage[]>;
+	getReadyRuns: (limit: number) => Promise<WorkflowRunMessage[]>;
 	heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>;
 	acknowledge?: (workflowRunId: WorkflowRunId) => Promise<void>;
-	close?: () => Promise<void>;
 }
 
 export interface SubscriberContext {
@@ -23,6 +22,7 @@ export interface SubscriberContext {
 	workflows: NonEmptyArray<WorkflowMeta>;
 	shards?: string[];
 	logger: Logger;
+	signal: AbortSignal;
 }
 
 export type CreateSubscriber = (context: SubscriberContext) => Subscriber;

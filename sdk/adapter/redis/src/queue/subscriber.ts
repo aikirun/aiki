@@ -3,7 +3,6 @@ import { getRetryParams } from "@aikirun/lib/retry";
 import type {
 	CreateSubscriber,
 	Subscriber,
-	SubscriberContext,
 	SubscriberDelayParams,
 	WorkflowRunMessage,
 } from "@aikirun/types/infra/queue";
@@ -93,9 +92,8 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 		}
 	};
 
-	return (context: SubscriberContext): Subscriber => {
+	return ({ workflows, shards, logger, signal }): Subscriber => {
 		const connectTimeoutMs = params.connectTimeoutMs ?? 5_000;
-		const { workflows, shards, logger } = context;
 
 		const redis = new Redis({
 			host: params.host,
@@ -108,6 +106,15 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 		});
 		redis.on("ready", () => logger.info("Redis connection established"));
 		const connectionSupervisor = attachConnectionSupervisor(redis, { logger });
+
+		signal.addEventListener(
+			"abort",
+			() => {
+				connectionSupervisor.detach();
+				redis.disconnect();
+			},
+			{ once: true }
+		);
 
 		const queueNames = getWorkflowQueueNames(workflows, shards);
 
@@ -140,11 +147,6 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 				}
 
 				return runs;
-			},
-
-			async close(): Promise<void> {
-				connectionSupervisor.detach();
-				redis.disconnect();
 			},
 		};
 	};

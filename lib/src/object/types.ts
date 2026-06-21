@@ -15,6 +15,10 @@ declare const _nonArrayObjectTypeTests: [
 	ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>,
 ];
 
+export type DeepPartial<T> = {
+	[Key in keyof T]?: T[Key] extends NonArrayObject<T[Key]> ? DeepPartial<T[Key]> : T[Key];
+};
+
 export type RequiredProp<T, K extends keyof T> = T & {
 	[Key in K]-?: Exclude<T[K], undefined>;
 };

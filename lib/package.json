@@ -21,6 +21,10 @@
 			"types": "./dist/collection/heap/index.d.ts",
 			"import": "./dist/collection/heap/index.js"
 		},
+		"./config": {
+			"types": "./dist/config/index.d.ts",
+			"import": "./dist/config/index.js"
+		},
 		"./context": {
 			"types": "./dist/context/index.d.ts",
 			"import": "./dist/context/index.js"
