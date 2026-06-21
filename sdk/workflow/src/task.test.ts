@@ -2,7 +2,7 @@ import { getTaskAddress } from "@aikirun/lib/address";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { fakeClient } from "@aikirun/testing/client";
-import { pausedWorkflowRunRecordFactory, runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
+import { baseWorkflowRunRecordFactory, runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
 import {
 	completedTaskInfoFactory,
 	failedTaskInfoFactory,
@@ -11,9 +11,15 @@ import {
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
+import type {
+	WorkflowRunId,
+	WorkflowRunRecord,
+	WorkflowRunState,
+	WorkflowRunStatus,
+} from "@aikirun/types/workflow/run";
 import {
 	NonDeterminismError,
+	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
 	WorkflowRunSuspendedError,
@@ -55,52 +61,77 @@ function createTestWorkflowRun(
 	};
 }
 
+const stateByStatus: { [Status in WorkflowRunStatus]: Extract<WorkflowRunState, { status: Status }> } = {
+	scheduled: { status: "scheduled", scheduledAt: 0, reason: "new" },
+	queued: { status: "queued", reason: "new" },
+	running: { status: "running" },
+	paused: { status: "paused" },
+	sleeping: { status: "sleeping", sleepName: "nap", awakeAt: 0 },
+	awaiting_event: { status: "awaiting_event", eventName: "order-shipped" },
+	awaiting_retry: {
+		status: "awaiting_retry",
+		cause: "self",
+		nextAttemptAt: 0,
+		error: { name: "Error", message: "boom" },
+	},
+	awaiting_child_workflow: {
+		status: "awaiting_child_workflow",
+		childWorkflowRunId: "child-1",
+		childWorkflowRunStatus: "completed",
+	},
+	cancelled: { status: "cancelled" },
+	completed: { status: "completed", output: undefined },
+	failed: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+};
+
 describe("task", () => {
 	describe("start", () => {
-		test("creates the task, then completes it with the handler output", async () => {
-			using client = fakeClient();
-			const runRecord = runningWorkflowRunRecordFactory.build();
-			const run = createTestWorkflowRun(client, runRecord);
+		for (const status of ["queued", "running"] as const) {
+			test(`creates the task, then completes it with the handler output when the run is ${status}`, async () => {
+				using client = fakeClient();
+				const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: stateByStatus[status] };
+				const run = createTestWorkflowRun(client, runRecord);
 
-			const sendEmail = task({
-				name: "send-email",
-				handler: async (to: string): Promise<string> => `Sent to ${to}`,
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+				});
+
+				const input = "info@aiki.run";
+				const output = "Sent to info@aiki.run";
+
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name, state: { input } });
+				const completedTaskInfo = completedTaskInfoFactory.build({
+					id: runningTaskInfo.id,
+					name: sendEmail.name,
+					state: { output },
+				});
+
+				client.api.workflowRun.transitionTaskStateV1
+					.once(
+						{
+							type: "create",
+							taskName: sendEmail.name,
+							options: {},
+							taskState: runningTaskInfo.state,
+							id: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							taskId: runningTaskInfo.id,
+							taskState: completedTaskInfo.state,
+							id: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: completedTaskInfo }
+					);
+
+				expect(await sendEmail.start(run, input)).toBe(output);
 			});
-
-			const input = "info@aiki.run";
-			const output = "Sent to info@aiki.run";
-
-			const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name, state: { input } });
-			const completedTaskInfo = completedTaskInfoFactory.build({
-				id: runningTaskInfo.id,
-				name: sendEmail.name,
-				state: { output },
-			});
-
-			client.api.workflowRun.transitionTaskStateV1
-				.once(
-					{
-						type: "create",
-						taskName: sendEmail.name,
-						options: {},
-						taskState: runningTaskInfo.state,
-						id: runRecord.id,
-						expectedWorkflowRunRevision: runRecord.revision,
-					},
-					{ taskInfo: runningTaskInfo }
-				)
-				.once(
-					{
-						taskId: runningTaskInfo.id,
-						taskState: completedTaskInfo.state,
-						id: runRecord.id,
-						expectedWorkflowRunRevision: runRecord.revision,
-					},
-					{ taskInfo: completedTaskInfo }
-				);
-
-			expect(await sendEmail.start(run, input)).toBe(output);
-		});
+		}
 
 		test("retries in-memory when the delay is within the spin threshold, recording no extra transition", async () => {
 			using client = fakeClient();
@@ -387,29 +418,35 @@ describe("task", () => {
 			expect(error).toBeInstanceOf(NonDeterminismError);
 		});
 
-		test("throws WorkflowRunNotExecutableError when the run is not executable", async () => {
-			using client = fakeClient();
-			const runRecord = pausedWorkflowRunRecordFactory.build();
-			const run = createTestWorkflowRun(client, runRecord);
-
-			let handlerCalls = 0;
-			const sendEmail = task<{ to: string }, string>({
-				name: "send-email",
-				handler: async () => {
-					handlerCalls++;
-					return "sent";
-				},
-			});
-
-			let error: unknown;
-			try {
-				await sendEmail.start(run, { to: "info@aiki.run" });
-			} catch (caught) {
-				error = caught;
+		for (const status of WORKFLOW_RUN_STATUSES) {
+			if (status === "queued" || status === "running") {
+				continue;
 			}
-			expect(error).toBeInstanceOf(WorkflowRunNotExecutableError);
-			expect(handlerCalls).toBe(0);
-		});
+
+			test(`throws WorkflowRunNotExecutableError when the run is ${status}`, async () => {
+				using client = fakeClient();
+				const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: stateByStatus[status] };
+				const run = createTestWorkflowRun(client, runRecord);
+
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "sent";
+					},
+				});
+
+				let error: unknown;
+				try {
+					await sendEmail.start(run, { to: "info@aiki.run" });
+				} catch (caught) {
+					error = caught;
+				}
+				expect(error).toBeInstanceOf(WorkflowRunNotExecutableError);
+				expect(handlerCalls).toBe(0);
+			});
+		}
 
 		test("applies builder options to the create transition call", async () => {
 			using client = fakeClient();
