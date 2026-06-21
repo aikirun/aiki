@@ -24,7 +24,7 @@ const aikiWorker = worker({
 	workflows: [orderWorkflowV1],
 });
 
-const handle = await aikiWorker.spawn(aikiClient);
+const handle = aikiWorker.spawn(aikiClient);
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {

@@ -46,7 +46,7 @@ import { defaultWorkerConfig, type WorkerConfig, type WorkerConfigOverrides } fr
  *   config: { maxConcurrentWorkflowRuns: 10 },
  * });
  *
- * const handle = await myWorker.spawn(client);
+ * const handle = myWorker.spawn(client);
  *
  * process.on("SIGINT", async () => {
  *   await handle.stop();
@@ -81,7 +81,7 @@ export interface WorkerSpawnOptions {
 
 export interface Worker {
 	with(): WorkerBuilder;
-	spawn: <Context>(client: Client<Context>) => Promise<WorkerHandle>;
+	spawn: <Context>(client: Client<Context>) => WorkerHandle;
 }
 
 export interface WorkerHandle {
@@ -97,14 +97,11 @@ class WorkerImpl implements Worker {
 		return createWorkerBuilder(this, spawnOptionsOverrider());
 	}
 
-	public spawn<Context>(client: Client<Context>): Promise<WorkerHandle> {
+	public spawn<Context>(client: Client<Context>): WorkerHandle {
 		return this.spawnWithOptions(client, {});
 	}
 
-	public async spawnWithOptions<Context>(
-		client: Client<Context>,
-		spawnOptions: WorkerSpawnOptions
-	): Promise<WorkerHandle> {
+	public spawnWithOptions<Context>(client: Client<Context>, spawnOptions: WorkerSpawnOptions): WorkerHandle {
 		return new WorkerHandleImpl(client, this.params, spawnOptions);
 	}
 }

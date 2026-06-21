@@ -83,10 +83,10 @@ const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@loca
 
 // Server and worker, both running in this process
 const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
-const runtimeHandle = await aikiServer.runtime.start();
+const runtimeHandle = aikiServer.runtime.start();
 
 const aikiClient = client({ handler: aikiServer.handler });
-const workerHandle = await worker({ workflows: [trialV1] }).spawn(aikiClient);
+const workerHandle = worker({ workflows: [trialV1] }).spawn(aikiClient);
 
 // Start the workflow
 const handle = await trialV1.start(aikiClient, { userId: "user-123" });

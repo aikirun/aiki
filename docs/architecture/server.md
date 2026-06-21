@@ -60,7 +60,7 @@ const aikiServer = server({
   db: database({ provider: "pg", url: databaseUrl }),
 });
 
-const runtimeHandle = await aikiServer.runtime.start();
+const runtimeHandle = aikiServer.runtime.start();
 ```
 
 Optional pieces plug in the same way — `cache`, `iam` (multi-tenancy and auth), and the Redis-backed runtime adapters:

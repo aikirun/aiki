@@ -21,7 +21,7 @@ const aikiWorker = worker({
   },
 });
 
-const handle = await aikiWorker.spawn(aikiClient);
+const handle = aikiWorker.spawn(aikiClient);
 ```
 
 Worker definitions are static and reusable. The `worker()` function creates a definition with a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution; it returns a handle for controlling the running worker.
@@ -44,8 +44,8 @@ Workers scale naturally. You can add capacity in several ways:
 const worker1 = worker({ workflows: [orderWorkflowV1] });
 const worker2 = worker({ workflows: [orderWorkflowV1] });
 
-const handle1 = await worker1.spawn(aikiClient);
-const handle2 = await worker2.spawn(aikiClient);
+const handle1 = worker1.spawn(aikiClient);
+const handle2 = worker2.spawn(aikiClient);
 ```
 
 **Specialize workers** by registering different workflows on different workers. Each worker only handles the workflows it knows about.

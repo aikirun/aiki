@@ -75,74 +75,75 @@ function pollingDaemon(
 	};
 }
 
-export function spawnDaemons(logger: Logger, deps: SpawnDaemonsDeps) {
-	const { configProvider, signal } = deps;
+export async function spawnDaemons(logger: Logger, deps: SpawnDaemonsDeps): Promise<void> {
+	const { repos, signal, configProvider, workflowRunPublisher, timerPriorityQueue, childRunCanceller } = deps;
+
 	const { spawn: spawnPollingDaemon } = pollingDaemon(logger, signal, configProvider.scope("daemons"));
 
 	const daemonPromises: Promise<void>[] = [
 		spawnPollingDaemon((config) => config.imminentScheduledRuns, processImminentScheduledRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
+			repos,
+			workflowRunPublisher,
+			timerPriorityQueue,
 		}),
 		spawnPollingDaemon((config) => config.imminentSleepElapsedRuns, processImminentSleepElapsedRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
+			repos,
+			workflowRunPublisher,
+			timerPriorityQueue,
 		}),
 		spawnPollingDaemon((config) => config.imminentRetryableRuns, processImminentRetryableRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
+			repos,
+			workflowRunPublisher,
+			timerPriorityQueue,
 		}),
 		spawnPollingDaemon((config) => config.imminentRetryableTaskRuns, processImminentRetryableTaskRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
+			repos,
+			workflowRunPublisher,
+			timerPriorityQueue,
 		}),
 		spawnPollingDaemon((config) => config.imminentEventWaitTimedOutRuns, processImminentEventWaitTimedOutRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
+			repos,
+			workflowRunPublisher,
+			timerPriorityQueue,
 		}),
 		spawnPollingDaemon((config) => config.imminentChildRunWaitTimedOutRuns, processImminentChildRunWaitTimedOutRuns, {
-			repos: deps.repos,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
+			repos,
+			workflowRunPublisher,
+			timerPriorityQueue,
 		}),
 		spawnPollingDaemon((config) => config.imminentRecurringWorkflows, processImminentRecurringWorkflows, {
-			repos: deps.repos,
-			childRunCanceller: deps.childRunCanceller,
-			workflowRunPublisher: deps.workflowRunPublisher,
-			timerPriorityQueue: deps.timerPriorityQueue,
+			repos,
+			childRunCanceller,
+			workflowRunPublisher,
+			timerPriorityQueue,
 		}),
 	];
 
-	if (deps.workflowRunPublisher) {
+	if (workflowRunPublisher) {
 		daemonPromises.push(
 			spawnPollingDaemon((config) => config.publishReadyRuns, publishReadyRuns, {
-				repos: deps.repos,
-				workflowRunPublisher: deps.workflowRunPublisher,
+				repos,
+				workflowRunPublisher,
 			}),
 			spawnPollingDaemon((config) => config.republishStaleRuns, republishStaleRuns, {
-				repos: deps.repos,
-				workflowRunPublisher: deps.workflowRunPublisher,
+				repos,
+				workflowRunPublisher,
 			})
 		);
 	}
 
-	if (deps.timerPriorityQueue) {
+	if (timerPriorityQueue) {
 		daemonPromises.push(
 			spawnDueTimersConsumer(logger, {
-				repos: deps.repos,
+				repos,
 				signal,
-				timerPriorityQueue: deps.timerPriorityQueue,
-				childRunCanceller: deps.childRunCanceller,
-				workflowRunPublisher: deps.workflowRunPublisher,
+				timerPriorityQueue,
+				childRunCanceller,
+				workflowRunPublisher,
 				configProvider: configProvider.scope("daemons").scope("dueTimersConsumer"),
 			})
 		);
 	}
 
-	return Promise.allSettled(daemonPromises).then(() => {});
+	await Promise.allSettled(daemonPromises);
 }

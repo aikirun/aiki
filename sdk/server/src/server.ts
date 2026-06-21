@@ -1,3 +1,4 @@
+import { settleWithin } from "@aikirun/lib/async";
 import type { CreateConfigProvider } from "@aikirun/lib/config";
 import { createConsoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { Iam } from "@aikirun/types/iam";
@@ -5,6 +6,7 @@ import type { CreateCache } from "@aikirun/types/infra/cache";
 import type { CreateDatabase } from "@aikirun/types/infra/db";
 import type { CreatePublisher } from "@aikirun/types/infra/queue";
 import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
+import { ulid } from "ulidx";
 
 import type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./config";
 
@@ -35,7 +37,7 @@ export interface ServerRuntimeHandle {
 
 export interface Server {
 	handler: (request: Request) => Promise<Response>;
-	runtime: { start: () => Promise<ServerRuntimeHandle> };
+	runtime: { start: () => ServerRuntimeHandle };
 }
 
 export function server(params: ServerParams): Server {
@@ -60,11 +62,72 @@ export function server(params: ServerParams): Server {
 			})();
 		},
 		runtime: {
-			async start(): Promise<ServerRuntimeHandle> {
-				const db = await params.db();
-				const { createRuntime } = await import("./runtime");
-				return createRuntime({ db, logger, runtime: params.runtime }).start();
+			start(): ServerRuntimeHandle {
+				return createRuntimeHandle({ db: params.db, logger, runtime: params.runtime });
 			},
+		},
+	};
+}
+
+function createRuntimeHandle(params: {
+	db: CreateDatabase;
+	logger: Logger;
+	runtime?: ServerRuntimeParams;
+}): ServerRuntimeHandle {
+	const { logger } = params;
+	const abortController = new AbortController();
+
+	const startRuntimePromise = (async () => {
+		try {
+			const db = await params.db();
+			const { startRuntime } = await import("./runtime");
+			return await startRuntime({
+				db,
+				logger,
+				signal: abortController.signal,
+				publisher: params.runtime?.publisher,
+				timerPriorityQueue: params.runtime?.timerPriorityQueue,
+				config: params.runtime?.config,
+			});
+		} catch (error) {
+			logger.error("Server runtime failed to start", { err: error });
+			return undefined;
+		}
+	})();
+
+	const id = ulid() as ServerRuntimeId;
+
+	let stopPromise: Promise<void> | undefined;
+
+	const _stop = async (): Promise<void> => {
+		abortController.abort();
+
+		const startedRuntime = await startRuntimePromise;
+		if (!startedRuntime) {
+			return;
+		}
+
+		const gracefulShutdownTimeoutMs = startedRuntime.configProvider.config.gracefulShutdownTimeoutMs;
+		if (gracefulShutdownTimeoutMs <= 0) {
+			return;
+		}
+
+		const drained = await settleWithin(startedRuntime.daemonsPromise, gracefulShutdownTimeoutMs);
+		if (!drained) {
+			logger.warn("Runtime did not shut down within graceful timeout", {
+				"aiki.runtimeId": id,
+				"aiki.gracefulShutdownTimeoutMs": gracefulShutdownTimeoutMs,
+			});
+		}
+	};
+
+	return {
+		id,
+		stop(): Promise<void> {
+			if (!stopPromise) {
+				stopPromise = _stop();
+			}
+			return stopPromise;
 		},
 	};
 }
