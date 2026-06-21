@@ -50,11 +50,8 @@ export interface WorkflowReferenceOptions {
 	conflictPolicy?: WorkflowRunConflictPolicy;
 }
 
-export interface WorkflowDefinitionOptions {
+export interface WorkflowStartOptions {
 	retry?: RetryStrategy;
-}
-
-export interface WorkflowStartOptions extends WorkflowDefinitionOptions {
 	trigger?: TriggerStrategy;
 	reference?: WorkflowReferenceOptions;
 	shard?: string;

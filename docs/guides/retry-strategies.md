@@ -9,9 +9,7 @@ Aiki provides automatic retry capabilities for both tasks and workflows. This gu
 No automatic retries. The task or workflow fails immediately on error.
 
 ```typescript
-options: {
-	retry: { type: "never" }
-}
+retry: { type: "never" }
 ```
 
 **Use when:**
@@ -24,12 +22,10 @@ options: {
 Retries with a constant delay between attempts.
 
 ```typescript
-options: {
-	retry: {
-		type: "fixed",
-		maxAttempts: 3,
-		delayMs: 1000, // 1 second between retries
-	}
+retry: {
+	type: "fixed",
+	maxAttempts: 3,
+	delayMs: 1000, // 1 second between retries
 }
 ```
 
@@ -43,14 +39,12 @@ options: {
 Retries with increasing delays (e.g., 1s, 2s, 4s, 8s...).
 
 ```typescript
-options: {
-	retry: {
-		type: "exponential",
-		maxAttempts: 5,
-		baseDelayMs: 1000,    // Start with 1 second
-		factor: 2,            // Double each time (default)
-		maxDelayMs: 30000,    // Cap at 30 seconds (optional)
-	}
+retry: {
+	type: "exponential",
+	maxAttempts: 5,
+	baseDelayMs: 1000,    // Start with 1 second
+	factor: 2,            // Double each time (default)
+	maxDelayMs: 30000,    // Cap at 30 seconds (optional)
 }
 ```
 
@@ -64,14 +58,12 @@ options: {
 Exponential backoff with randomization to prevent thundering herd problems.
 
 ```typescript
-options: {
-	retry: {
-		type: "jittered",
-		maxAttempts: 5,
-		baseDelayMs: 1000,
-		jitterFactor: 0.5,    // Add up to 50% random variation (default)
-		maxDelayMs: 30000,
-	}
+retry: {
+	type: "jittered",
+	maxAttempts: 5,
+	baseDelayMs: 1000,
+	jitterFactor: 0.5,    // Add up to 50% random variation (default)
+	maxDelayMs: 30000,
 }
 ```
 
@@ -94,12 +86,10 @@ const sendNotification = task({
 	handler(input) {
 		return notificationService.send(input);
 	},
-	options: {
-		retry: {
-			type: "exponential",
-			maxAttempts: 3,
-			baseDelayMs: 1000,
-		},
+	retry: {
+		type: "exponential",
+		maxAttempts: 3,
+		baseDelayMs: 1000,
 	},
 });
 ```
@@ -117,12 +107,10 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	handler(run, input) {
 		// ...
 	},
-	options: {
-		retry: {
-			type: "exponential",
-			maxAttempts: 3,
-			baseDelayMs: 5000,
-		},
+	retry: {
+		type: "exponential",
+		maxAttempts: 3,
+		baseDelayMs: 5000,
 	},
 });
 ```
@@ -146,9 +134,7 @@ const chargeCard = task({
 			idempotencyKey: input.transactionId, // Prevents duplicate charges
 		});
 	},
-	options: {
-		retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 },
-	},
+	retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 },
 });
 ```
 

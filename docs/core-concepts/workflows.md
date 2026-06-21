@@ -66,19 +66,17 @@ const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
 
 ## Workflow Retry
 
-Configure automatic retries for failed workflows using the `options.retry` property:
+Configure automatic retries for failed workflows using the `retry` property:
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	async handler(run, input: { orderId: string }) {
 		// Workflow logic...
 	},
-	options: {
-		retry: {
-			type: "exponential",
-			maxAttempts: 3,
-			baseDelayMs: 5000,
-		},
+	retry: {
+		type: "exponential",
+		maxAttempts: 3,
+		baseDelayMs: 5000,
 	},
 });
 ```
