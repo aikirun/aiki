@@ -34,19 +34,33 @@ export function workflowRunHandle<Input, Output, Context, TEvents extends Events
 	run: WorkflowRunRecord<Input, Output>,
 	eventsDefinition?: TEvents,
 	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
+): WorkflowRunHandle<Input, Output, Context, TEvents>;
 
-export async function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
+export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
 	runOrId: WorkflowRunId | WorkflowRunRecord<Input, Output>,
 	eventsDefinition?: TEvents,
 	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
-	const run =
-		typeof runOrId !== "string"
-			? runOrId
-			: ((await client.api.workflowRun.getByIdV1({ id: runOrId })).run as WorkflowRunRecord<Input, Output>);
+): WorkflowRunHandle<Input, Output, Context, TEvents> | Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
+	if (typeof runOrId === "string") {
+		const runId = runOrId;
+		return (async () => {
+			const run = (await client.api.workflowRun.getByIdV1({ id: runId })).run as WorkflowRunRecord<Input, Output>;
+			return new WorkflowRunHandleImpl(
+				client,
+				run,
+				eventsDefinition ?? ({} as TEvents),
+				logger ??
+					client.logger.child({
+						"aiki.workflowName": run.name,
+						"aiki.workflowVersionId": run.versionId,
+						"aiki.workflowRunId": run.id,
+					})
+			);
+		})();
+	}
 
+	const run = runOrId;
 	return new WorkflowRunHandleImpl(
 		client,
 		run,

@@ -21,15 +21,15 @@ import {
 	workflowRunHandle,
 } from "./handle";
 
-export async function childWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
+export function childWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
 	run: WorkflowRunRecord<Input, Output>,
 	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
 	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
 	logger: Logger,
 	eventsDefinition?: TEvents
-): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>> {
-	const handle = await workflowRunHandle(client, run, eventsDefinition, logger);
+): ChildWorkflowRunHandle<Input, Output, Context, TEvents> {
+	const handle = workflowRunHandle(client, run, eventsDefinition, logger);
 
 	return {
 		run: handle.run,
