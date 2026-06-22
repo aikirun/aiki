@@ -29,11 +29,10 @@ type MockApi<T> = {
 	[K in keyof T]: T[K] extends (...args: infer Args) => infer Return ? MockEndpoint<Args, Return> : MockApi<T[K]>;
 };
 
-export interface FakeClient<Context = null> extends Client<Context>, Disposable {
+export interface FakeClient<Context = null> extends Client<Context> {
 	api: MockApi<ApiClient>;
 	/**
-	 * Throws if any call queued via `once` was never made. Runs automatically on scope exit
-	 * when the client is declared with `using` (via `[Symbol.dispose]`).
+	 * Throws if any call queued via `once` was never made.
 	 */
 	verify(): void;
 }
@@ -52,16 +51,9 @@ interface RegisteredEndpoint {
  * A `Client` whose every API endpoint is an auto-created mock augmented with `once`.
  * Queue the calls a test expects; any call with no queued expectation throws.
  *
- * Declare it with `using` so `verify()` runs automatically on scope exit:
- *
- * @example
- * test("activates a schedule", async () => {
- *   using client = fakeClient();
- *   client.api.schedule.activateV1.once({ spec: mySpec }, { schedule: intervalScheduleFactory.build() });
- *   await schedule(myParams).activate(client, myWorkflow, input);
- * });
+ * Use it through {@link withFakeClient}, which calls `verify()` for you on success:
  */
-export function fakeClient<Context = null>(): FakeClient<Context> {
+function fakeClient<Context = null>(): FakeClient<Context> {
 	const endpoints: RegisteredEndpoint[] = [];
 
 	const createEndpoint = (endpointName: string): unknown => {
@@ -143,6 +135,26 @@ export function fakeClient<Context = null>(): FakeClient<Context> {
 		logger: createConsoleLogger({ level: "DEBUG" }),
 		[INTERNAL]: {},
 		verify,
-		[Symbol.dispose]: verify,
 	};
+}
+
+/**
+ * Runs `fn` with a fresh fake client, then asserts every queued call was made.
+ *
+ * `verify()` runs only after `fn` resolves, so a failure inside `fn` propagates with its own
+ * error — never masked by a verification error.
+ *
+ * @example
+ * test("activates a schedule", () =>
+ *   withFakeClient(async (client) => {
+ *     client.api.schedule.activateV1.once(request, response);
+ *     await schedule(params).activate(client, workflow, input);
+ *   }));
+ */
+export async function withFakeClient<Context = null>(
+	fn: (client: Omit<FakeClient<Context>, "verify">) => Promise<void> | void
+): Promise<void> {
+	const client = fakeClient<Context>();
+	await fn(client);
+	client.verify();
 }

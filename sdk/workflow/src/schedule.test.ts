@@ -2,7 +2,7 @@ import {
 	cronScheduleActivateRequestFactory,
 	intervalScheduleActivateRequestFactory,
 } from "@aikirun/testing/api/schedule";
-import { fakeClient } from "@aikirun/testing/client";
+import { withFakeClient } from "@aikirun/testing/client";
 import { cronScheduleFactory, intervalScheduleFactory } from "@aikirun/testing/schedule";
 import type { ScheduleId } from "@aikirun/types/schedule";
 
@@ -27,115 +27,115 @@ const cronScheduleActivateRequest = cronScheduleActivateRequestFactory.params({
 
 describe("schedule", () => {
 	describe("activate", () => {
-		test("maps the interval to everyMs and carries the overlap policy", async () => {
-			using client = fakeClient();
-			client.api.schedule.activateV1.once(
-				intervalScheduleActivateRequest.build({
-					spec: { type: "interval", overlapPolicy: "cancel_previous", everyMs: 5_000 },
-				}),
-				{ schedule: intervalScheduleFactory.build() }
-			);
+		test("maps the interval to everyMs and carries the overlap policy", () =>
+			withFakeClient(async (client) => {
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequest.build({
+						spec: { type: "interval", overlapPolicy: "cancel_previous", everyMs: 5_000 },
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
 
-			await schedule({ type: "interval", every: { seconds: 5 }, overlapPolicy: "cancel_previous" }).activate(
-				client,
-				syncInventoryWorkflow,
-				{ warehouseId: "wh-1" }
-			);
-		});
+				await schedule({ type: "interval", every: { seconds: 5 }, overlapPolicy: "cancel_previous" }).activate(
+					client,
+					syncInventoryWorkflow,
+					{ warehouseId: "wh-1" }
+				);
+			}));
 
-		test("passes a cron spec through unchanged", async () => {
-			using client = fakeClient();
-			client.api.schedule.activateV1.once(
-				cronScheduleActivateRequest.build({
-					spec: { type: "cron", expression: "0 * * * *", timezone: "UTC", overlapPolicy: "skip" },
-				}),
-				{ schedule: cronScheduleFactory.build() }
-			);
+		test("passes a cron spec through unchanged", () =>
+			withFakeClient(async (client) => {
+				client.api.schedule.activateV1.once(
+					cronScheduleActivateRequest.build({
+						spec: { type: "cron", expression: "0 * * * *", timezone: "UTC", overlapPolicy: "skip" },
+					}),
+					{ schedule: cronScheduleFactory.build() }
+				);
 
-			await schedule({ type: "cron", expression: "0 * * * *", timezone: "UTC", overlapPolicy: "skip" }).activate(
-				client,
-				syncInventoryWorkflow,
-				{ warehouseId: "wh-1" }
-			);
-		});
+				await schedule({ type: "cron", expression: "0 * * * *", timezone: "UTC", overlapPolicy: "skip" }).activate(
+					client,
+					syncInventoryWorkflow,
+					{ warehouseId: "wh-1" }
+				);
+			}));
 
-		test("returns a handle carrying the activated schedule id", async () => {
-			using client = fakeClient();
-			const activatedSchedule = intervalScheduleFactory.build();
+		test("returns a handle carrying the activated schedule id", () =>
+			withFakeClient(async (client) => {
+				const activatedSchedule = intervalScheduleFactory.build();
 
-			client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
+				client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
 
-			const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
-				client,
-				syncInventoryWorkflow,
-				{ warehouseId: "wh-1" }
-			);
+				const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					syncInventoryWorkflow,
+					{ warehouseId: "wh-1" }
+				);
 
-			expect(handle.id).toBe(activatedSchedule.id as ScheduleId);
-		});
+				expect(handle.id).toBe(activatedSchedule.id as ScheduleId);
+			}));
 	});
 
 	describe("with builder", () => {
-		test("opt sets the options sent to activate", async () => {
-			using client = fakeClient();
-			client.api.schedule.activateV1.once(
-				intervalScheduleActivateRequest.build({
-					options: { reference: { id: "ref-1" } },
-				}),
-				{ schedule: intervalScheduleFactory.build() }
-			);
+		test("opt sets the options sent to activate", () =>
+			withFakeClient(async (client) => {
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequest.build({
+						options: { reference: { id: "ref-1" } },
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
 
-			await schedule({ type: "interval", every: { seconds: 1 } })
-				.with()
-				.opt("reference.id", "ref-1")
-				.activate(client, syncInventoryWorkflow, { warehouseId: "wh-1" });
-		});
+				await schedule({ type: "interval", every: { seconds: 1 } })
+					.with()
+					.opt("reference.id", "ref-1")
+					.activate(client, syncInventoryWorkflow, { warehouseId: "wh-1" });
+			}));
 	});
 
 	describe("handle operations", () => {
-		test("pause calls pauseV1 with the schedule id", async () => {
-			using client = fakeClient();
-			const activatedSchedule = intervalScheduleFactory.build();
+		test("pause calls pauseV1 with the schedule id", () =>
+			withFakeClient(async (client) => {
+				const activatedSchedule = intervalScheduleFactory.build();
 
-			client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
-			client.api.schedule.pauseV1.once({ id: activatedSchedule.id });
+				client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
+				client.api.schedule.pauseV1.once({ id: activatedSchedule.id });
 
-			const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
-				client,
-				syncInventoryWorkflow,
-				{ warehouseId: "wh-1" }
-			);
-			await handle.pause();
-		});
+				const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					syncInventoryWorkflow,
+					{ warehouseId: "wh-1" }
+				);
+				await handle.pause();
+			}));
 
-		test("resume calls resumeV1 with the schedule id", async () => {
-			using client = fakeClient();
-			const activatedSchedule = intervalScheduleFactory.build();
+		test("resume calls resumeV1 with the schedule id", () =>
+			withFakeClient(async (client) => {
+				const activatedSchedule = intervalScheduleFactory.build();
 
-			client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
-			client.api.schedule.resumeV1.once({ id: activatedSchedule.id });
+				client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
+				client.api.schedule.resumeV1.once({ id: activatedSchedule.id });
 
-			const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
-				client,
-				syncInventoryWorkflow,
-				{ warehouseId: "wh-1" }
-			);
-			await handle.resume();
-		});
+				const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					syncInventoryWorkflow,
+					{ warehouseId: "wh-1" }
+				);
+				await handle.resume();
+			}));
 
-		test("delete calls deleteV1 with the schedule id", async () => {
-			using client = fakeClient();
-			const activatedSchedule = intervalScheduleFactory.build();
+		test("delete calls deleteV1 with the schedule id", () =>
+			withFakeClient(async (client) => {
+				const activatedSchedule = intervalScheduleFactory.build();
 
-			client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
-			client.api.schedule.deleteV1.once({ id: activatedSchedule.id });
+				client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
+				client.api.schedule.deleteV1.once({ id: activatedSchedule.id });
 
-			const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
-				client,
-				syncInventoryWorkflow,
-				{ warehouseId: "wh-1" }
-			);
-			await handle.delete();
-		});
+				const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					syncInventoryWorkflow,
+					{ warehouseId: "wh-1" }
+				);
+				await handle.delete();
+			}));
 	});
 });
