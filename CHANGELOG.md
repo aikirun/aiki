@@ -2,6 +2,103 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.31.0
+
+This release centers on a rework of runtime configuration and teardown. Config is now a snapshot-based provider shared by the server, worker, and endpoint; the server runtime tears down through a single abort signal; and `start()`/`spawn()` return synchronously.
+
+### New Features
+
+- **Pluggable runtime config for `@aikirun/worker` and `@aikirun/endpoint`.** Workers and endpoints join the server's config-provider model. The `config` field on `worker()`, `endpoint()`, and `server({ runtime })` accepts either a plain overrides object (deep-merged onto defaults) or a provider:
+  - `staticWorkerConfigProvider(overrides?)` — worker config fixed at spawn (`maxConcurrentWorkflowRuns`, `gracefulShutdownTimeoutMs`, `workflowRun.heartbeatIntervalMs`, `workflowRun.spinThresholdMs`).
+  - `dynamicWorkerConfigProvider({ initial?, refresh, refreshIntervalMs })` — reloads worker config on a timer so an operator can retune a running worker without redeploying; the loop runs off the teardown signal, and a failed refresh keeps the last-good snapshot with jittered backoff.
+  - `staticEndpointConfigProvider(overrides?)` — endpoint config fixed at construction (`signatureMaxAgeMs`, `workflowRun.heartbeatIntervalMs`, `workflowRun.spinThresholdMs`).
+
+### Bug Fixes
+
+- **Server graceful shutdown no longer hangs when `gracefulShutdownTimeoutMs <= 0`.** Previously a non-positive timeout (a value the config accepted) made `runtime.stop()` `await` the daemon drain with no bound, so a busy or stuck daemon could block shutdown indefinitely. A non-positive timeout now means "shut down immediately" — `stop()` returns without waiting. A positive timeout bounds the drain wait and logs a warning if it elapses. (The worker's shutdown already guarded on `> 0` and was not affected.)
+
+### Improvements
+
+- **Single abort signal for runtime teardown.** The server runtime creates one `AbortController` and threads its signal through every daemon, the publisher, the timer-priority queue, and the config refresh loop. `stop()` aborts once and waits (bounded) for everything to unwind via a single `daemonsPromise`. Per-component `AbortController`s, the daemons handle's `stop()`, the config provider's `stop()`, and `Subscriber.close()` are all gone — components clean up off the injected signal. A runtime that fails to start is caught and logged (`"Server runtime failed to start"`) instead of rejecting, and `stop()` is still safe to call.
+- **Config is read as a snapshot, not by path.** `ConfigProvider` now exposes a `.config` snapshot and `.scope(key)` narrowing in place of `.get("a.b.c")` string-path reads. Polling daemons re-read `configProvider.config` each cycle, so dynamic changes still take effect live.
+- **Server config is deep-merged, not schema-parsed.** `ServerRuntimeConfig` is now a plain interface with a `defaultServerRuntimeConfig` constant; overrides are deep-merged via the new `merge` / `DeepPartial` utilities in `@aikirun/lib/object`. This drops the `arktype` dependency and the `parseServerConfig` step — note that invalid config values are no longer rejected at runtime.
+- **Dynamic config no longer blocks startup.** The dynamic provider starts on `initial`/defaults and refreshes in the background; previously the first refresh ran (and was awaited) before startup could complete.
+- **Fewer microtasks on the workflow hot path.** `workflowRunHandle()` and `childWorkflowRunHandle()` return synchronously when handed a run record, returning a promise only when a run must be fetched by id. Workflow-run heartbeats moved from a fixed `setInterval` to a self-rescheduling `setTimeout`.
+- **Persisted retry strategy takes precedence.** At execution time a workflow run's persisted retry strategy now wins over the strategy defined on the workflow version.
+
+### Breaking Changes
+
+- **`runtime.start()` and `worker.spawn()` are now synchronous.** Both return a handle directly instead of a `Promise`; startup happens in the background and `stop()` stays async.
+  ```typescript
+  // Before
+  const runtimeHandle = await aikiServer.runtime.start();
+  const workerHandle = await worker({ workflows: [trialV1] }).spawn(client);
+
+  // After
+  const runtimeHandle = aikiServer.runtime.start();
+  const workerHandle = worker({ workflows: [trialV1] }).spawn(client);
+  ```
+- **`server()` moves `cache` and `iam` under a `handler` key.** They were top-level fields; the new `ServerHandlerParams` groups them.
+  ```typescript
+  // Before
+  server({ db, cache, iam, runtime: { ... } });
+
+  // After
+  server({ db, handler: { cache, iam }, runtime: { ... } });
+  ```
+- **`retry` is now a top-level field on task and workflow definitions.** It was nested under `options`; the `TaskDefinitionOptions` and `WorkflowDefinitionOptions` types are removed.
+  ```typescript
+  // Before
+  task({ name, handler, options: { retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 } } });
+
+  // After
+  task({ name, handler, retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 } });
+  ```
+  The same change applies to `workflow.v("1.0.0", { handler, retry: { ... } })`.
+- **`worker()` uses `config` instead of `options`.** The `options` field (`WorkerDefinitionOptions`) is replaced by a `config` field accepting either a `WorkerConfigOverrides` object or a config provider (`staticWorkerConfigProvider` / `dynamicWorkerConfigProvider`). Config is no longer overridable at spawn time — only `shards`, `reference`, and the like remain on `WorkerSpawnOptions`.
+  ```typescript
+  // Before
+  worker({ workflows, options: { maxConcurrentWorkflowRuns: 10 } });
+
+  // After
+  worker({ workflows, config: { maxConcurrentWorkflowRuns: 10 } });
+  ```
+- **`endpoint()` uses `config` instead of `options`.** The `options` field (`EndpointOptions`) is replaced by a `config` field accepting either an `EndpointConfigOverrides` object or a config provider (`staticEndpointConfigProvider`).
+  ```typescript
+  // Before
+  endpoint({ workflows, client, secret, options: { signatureMaxAgeMs: 30_000 } });
+
+  // After
+  endpoint({ workflows, client, secret, config: { signatureMaxAgeMs: 30_000 } });
+  ```
+- **Server config provider exports renamed** (and `server({ config })` now also accepts a plain overrides object, not only a provider; the dynamic variant gained an optional `initial`):
+  - `ServerConfig` → `ServerRuntimeConfig`
+  - `ServerConfigOverrides` → `ServerRuntimeConfigOverrides`
+  - `dynamicConfigProvider` → `dynamicRuntimeConfigProvider`
+  - `staticConfigProvider` → `staticRuntimeConfigProvider`
+- **The `ConfigProvider` contract moved and changed shape.** Import from `@aikirun/lib/config`; `@aikirun/types/infra/config` is removed. `get(path)` is replaced by `config` + `scope(key)`, `CreateConfigProvider` is now synchronous (no `Promise` return), its context carries a required `signal`, and the provider's `stop()` method is gone (teardown is via the signal). Only affects code implementing a custom provider.
+- **The `signal` option replaces `abortSignal`** across the public async APIs:
+  ```typescript
+  // Before
+  await delay(1000, { abortSignal });
+  await withRetry(fn, strategy, { abortSignal }).run();          // type: WithRetryOptions
+  await handle.waitForStatus("completed", { abortSignal });
+
+  // After
+  await delay(1000, { signal });
+  await withRetry(fn, strategy, { signal }).run();               // type: RetryOptions
+  await handle.waitForStatus("completed", { signal });
+  ```
+  The `WithRetryOptions` type is renamed `RetryOptions`.
+- **Custom queue/timer adapters: signal in context, no `close()`.** `SubscriberContext`, `PublisherContext`, and `TimerPriorityQueueContext` now include a required `signal: AbortSignal`. On `Subscriber`, `close()` is removed (clean up off the signal) and `getReadyRuns(limit, options?)` drops its options argument — it is now `getReadyRuns(limit)`, taking its signal from the context.
+- **`WorkflowExecutionOptions` renamed to `WorkflowExecutionConfig`** (exported from `@aikirun/workflow`).
+- **Task and workflow `Input`/`Output` default to `void`.** The generics previously had no default. A task or workflow that declares no input schema/type can no longer be passed input; declare an input schema or type parameter to accept one.
+
+### Build / Tooling
+
+- **New `@aikirun/testing` package** (in-repo, not yet published). A fake `Client` whose every API endpoint is a mock with queued `.once(request, response)` expectations and a `verify()` that fails on unmet calls, exposed via `withFakeClient`. Includes fishery data factories for schedules, workflow runs, and tasks.
+- Added SDK test coverage for tasks, schedules, the replay manifest, the due-timers consumer, the config provider, deep-merge, and `settleWithin`.
+
 ## 0.30.0
 
 ### New Features
