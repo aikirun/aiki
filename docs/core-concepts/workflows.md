@@ -64,6 +64,26 @@ const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
 });
 ```
 
+### Registering Versions
+
+A worker runs only the versions it registers. List every version you still need to serve in the `workflows` array. Versions coexist, on the same worker or across separate ones:
+
+```typescript
+const onboardingWorker = worker({
+	workflows: [userOnboardingV1, userOnboardingV2],
+});
+```
+
+### How Runs Resolve to a Version
+
+- **A run is pinned to its version when it is created.** A run started against `1.0.0` always executes and replays against `1.0.0`, even after `2.0.0` is deployed. The version is never reselected mid-run.
+- **Each version has its own queue.** A worker subscribes only to the versions in its registry, so a `1.0.0` run reaches only workers that register `1.0.0`. See [Subscribers](../architecture/subscribers.md) for the queue model.
+- **An unregistered version is never silently upgraded.** Stop registering `1.0.0` and its in-flight runs are no longer delivered. Aiki never reroutes them to `2.0.0`. A run that reaches a worker without its version in the registry is rejected, not coerced onto another version.
+
+A version bump is therefore the safe way to ship a breaking change. Publish the new version for new runs, keep the old version registered until its in-flight runs drain, then retire it. Because old runs stay on the handler that created them, the new version's handler can change shape freely.
+
+To change a single version's handler in place instead of publishing a new one, follow the determinism rules. See [Refactoring Workflows](../guides/refactoring-workflows.md) and [Determinism](../guides/determinism.md).
+
 ## Workflow Retry
 
 Configure automatic retries for failed workflows using the `retry` property:
