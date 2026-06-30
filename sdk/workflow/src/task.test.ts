@@ -37,7 +37,7 @@ function createTestWorkflowRun(
 	client: Client,
 	record: WorkflowRunRecord,
 	options: { spinThresholdMs?: number } = {}
-): WorkflowRun<unknown, null> {
+): WorkflowRun<unknown, null, Record<string, never>> {
 	const handle = workflowRunHandle(client, record);
 	return {
 		id: record.id as WorkflowRunId,

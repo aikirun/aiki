@@ -71,7 +71,6 @@ function fakeClient<Context = null>(): FakeClient<Context> {
 		const endpoint = mock(handler) as Mock<typeof handler> & {
 			once: (request: unknown, response?: unknown) => unknown;
 		};
-
 		endpoint.once = (request, response) => {
 			queuedCalls.push({ request, response });
 			return endpoint;

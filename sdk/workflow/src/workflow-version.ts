@@ -288,7 +288,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		handle[INTERNAL].assertExecutionAllowed();
 
-		// TODO: test this - that persisted strategy takes precedence over defined strategy
 		const retryStrategy = run.options.retry ?? this.params.retry ?? { type: "never" };
 
 		logger.info("Starting workflow");
