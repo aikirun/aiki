@@ -1,6 +1,7 @@
 import { asConfigProvider } from "@aikirun/lib/config";
 import { withFakeClient } from "@aikirun/testing/client";
 import { pausedWorkflowRunRecordFactory, runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
+import { runningTaskInfoFactory } from "@aikirun/testing/workflow/task";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -12,12 +13,12 @@ import {
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
-import { TaskFailedError, type TaskId } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
 import { workflowRunHandle } from "./run/handle";
 import { createReplayManifest } from "./run/replay-manifest";
+import { task } from "./task";
 import { workflow } from "./workflow";
 import { describe, expect, test } from "bun:test";
 
@@ -342,18 +343,50 @@ describe("workflow version execution", () => {
 	});
 
 	describe("task failures", () => {
-		const taskId = "task-1" as TaskId;
-
 		test("fails with cause 'task' when retries are exhausted", () =>
 			withFakeClient(async (client) => {
+				const chargeCard = task({
+					name: "charge-card",
+					handler: async () => {
+						throw new Error("declined");
+					},
+				});
 				const workflowVersion = workflow({ name: "task-failing-workflow" }).v("1.0.0", {
-					async handler() {
-						throw new TaskFailedError(taskId, 1, "downstream failure");
+					async handler(run) {
+						await chargeCard.start(run);
 					},
 					retry: { type: "never" },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.workflowRun.transitionTaskStateV1
+					.once(
+						{
+							type: "create",
+							taskName: chargeCard.name,
+							options: {},
+							taskState: runningTaskInfo.state,
+							id: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							taskId: runningTaskInfo.id,
+							taskState: {
+								status: "failed",
+								attempts: 1,
+								error: expect.objectContaining({ message: "declined" }),
+							},
+							id: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					);
 
 				client.api.workflowRun.transitionStateV1
 					.once(
@@ -369,12 +402,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "failed", cause: "task", taskId },
+							state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "failed", cause: "task", taskId },
+							state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
 							attempts: runRecord.attempts,
 						}
 					);
@@ -390,14 +423,48 @@ describe("workflow version execution", () => {
 
 		test("awaits retry with cause 'task' when retries remain", () =>
 			withFakeClient(async (client) => {
+				const chargeCard = task({
+					name: "charge-card",
+					handler: async () => {
+						throw new Error("declined");
+					},
+				});
 				const workflowVersion = workflow({ name: "task-retrying-workflow" }).v("1.0.0", {
-					async handler() {
-						throw new TaskFailedError(taskId, 1, "downstream failure");
+					async handler(run) {
+						await chargeCard.start(run);
 					},
 					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.workflowRun.transitionTaskStateV1
+					.once(
+						{
+							type: "create",
+							taskName: chargeCard.name,
+							options: {},
+							taskState: runningTaskInfo.state,
+							id: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							taskId: runningTaskInfo.id,
+							taskState: {
+								status: "failed",
+								attempts: 1,
+								error: expect.objectContaining({ message: "declined" }),
+							},
+							id: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					);
 
 				client.api.workflowRun.transitionStateV1
 					.once(
@@ -413,12 +480,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "awaiting_retry", cause: "task", nextAttemptInMs: 1, taskId },
+							state: { status: "awaiting_retry", cause: "task", nextAttemptInMs: 1, taskId: runningTaskInfo.id },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "awaiting_retry", cause: "task", nextAttemptAt: 0, taskId },
+							state: { status: "awaiting_retry", cause: "task", nextAttemptAt: 0, taskId: runningTaskInfo.id },
 							attempts: runRecord.attempts,
 						}
 					);
