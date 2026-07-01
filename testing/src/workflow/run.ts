@@ -1,4 +1,9 @@
-import type { ChildWorkflowRunInfo, WorkflowRunRecord, WorkflowRunStateRunning } from "@aikirun/types/workflow/run";
+import type {
+	ChildWorkflowRunInfo,
+	WorkflowRunRecord,
+	WorkflowRunStatePaused,
+	WorkflowRunStateRunning,
+} from "@aikirun/types/workflow/run";
 import { Factory } from "fishery";
 
 export const childWorkflowRunInfoFactory = Factory.define<ChildWorkflowRunInfo>(({ sequence }) => ({
@@ -34,4 +39,8 @@ export const baseWorkflowRunRecordFactory = Factory.define<Omit<WorkflowRunRecor
 
 export const runningWorkflowRunRecordFactory = Factory.define<WorkflowRunRecord & { state: WorkflowRunStateRunning }>(
 	({ sequence }) => ({ ...baseWorkflowRunRecord(sequence), state: { status: "running" } })
+);
+
+export const pausedWorkflowRunRecordFactory = Factory.define<WorkflowRunRecord & { state: WorkflowRunStatePaused }>(
+	({ sequence }) => ({ ...baseWorkflowRunRecord(sequence), state: { status: "paused" } })
 );
