@@ -4,6 +4,7 @@ import { pausedWorkflowRunRecordFactory, runningWorkflowRunRecordFactory } from 
 import { runningTaskInfoFactory } from "@aikirun/testing/workflow/task";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
+import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
@@ -563,6 +564,184 @@ describe("workflow version execution", () => {
 					error = caught;
 				}
 				expect(error).toBeInstanceOf(WorkflowRunNotExecutableError);
+			}));
+	});
+});
+
+describe("creating a workflow run", () => {
+	describe("start", () => {
+		test("creates the run with the given input and returns a handle to it", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return `Hello ${name}`;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{ name: "greet", versionId: "1.0.0", input: "world", options: {} },
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("forwards the schema-parsed value to createV1 when an input schema is provided", () =>
+			withFakeClient(async (client) => {
+				const toUpperCase: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: (value) => ({ value: String(value).toUpperCase() }),
+					},
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					schema: { input: toUpperCase },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{ name: "greet", versionId: "1.0.0", input: "WORLD", options: {} },
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("throws SchemaValidationError and does not create a run when the input schema rejects", () =>
+			withFakeClient(async (client) => {
+				const alwaysInvalid: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: () => ({ issues: [{ message: "invalid input" }] }),
+					},
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					schema: { input: alwaysInvalid },
+				});
+
+				let error: unknown;
+				try {
+					await workflowVersion.start(client, "world");
+				} catch (caught) {
+					error = caught;
+				}
+				expect(error).toBeInstanceOf(SchemaValidationError);
+			}));
+
+		test("passes the definition retry strategy as start options", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					retry: { type: "fixed", maxAttempts: 3, delayMs: 100 },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: "world",
+						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+	});
+
+	describe("with", () => {
+		test("overrides the definition start options via opt", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					retry: { type: "fixed", maxAttempts: 3, delayMs: 100 },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{ name: "greet", versionId: "1.0.0", input: "world", options: { retry: { type: "never" } } },
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with().opt("retry", { type: "never" }).start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("starts from the definition start options when no overrides are given", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					retry: { type: "fixed", maxAttempts: 3, delayMs: 100 },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: "world",
+						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with().start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("merges opt overrides with the definition start options", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					retry: { type: "fixed", maxAttempts: 3, delayMs: 100 },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: "world",
+						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, shard: "eu-west" },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with().opt("shard", "eu-west").start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
 			}));
 	});
 });
