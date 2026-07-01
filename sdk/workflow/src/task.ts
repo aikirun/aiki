@@ -126,7 +126,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
-		const input = inputSchema ? await this.parse(handle, inputSchema, inputRaw, run.logger) : (inputRaw as Input);
+		const parseInputResult = inputSchema ? this.parse(handle, inputSchema, inputRaw, run.logger) : (inputRaw as Input);
+		const input = parseInputResult instanceof Promise ? await parseInputResult : parseInputResult;
 		const inputHash = await hashInput(input);
 		const address = getTaskAddress(this.name, inputHash) as TaskAddress;
 
@@ -301,7 +302,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			try {
 				const outputRaw = await this.params.handler(input);
 				const outputSchema = this.params.schema?.output;
-				const output = outputSchema ? await this.parse(handle, outputSchema, outputRaw, logger) : (outputRaw as Output);
+				const parseOutputResult = outputSchema
+					? this.parse(handle, outputSchema, outputRaw, logger)
+					: (outputRaw as Output);
+				const output = parseOutputResult instanceof Promise ? await parseOutputResult : parseOutputResult;
 				return { output, lastAttempt: attempts };
 			} catch (err) {
 				if (
@@ -365,25 +369,46 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private async parse<T>(
+	private parse<T>(
 		handle: UnknownWorkflowRunHandle,
 		schema: StandardSchemaV1<T>,
 		data: unknown,
 		logger: Logger
-	): Promise<T> {
+	): T | Promise<T> {
 		const schemaValidation = schema["~standard"].validate(data);
-		const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
+		if (schemaValidation instanceof Promise) {
+			return this.parseAsync(handle, schemaValidation, logger);
+		}
+		if (!schemaValidation.issues) {
+			return schemaValidation.value;
+		}
+		return this.throwSchemaValidationError(handle, schemaValidation.issues, logger);
+	}
+
+	private async parseAsync<T>(
+		handle: UnknownWorkflowRunHandle,
+		schemaValidation: Promise<StandardSchemaV1.Result<T>>,
+		logger: Logger
+	): Promise<T> {
+		const schemaValidationResult = await schemaValidation;
 		if (!schemaValidationResult.issues) {
 			return schemaValidationResult.value;
 		}
+		return this.throwSchemaValidationError(handle, schemaValidationResult.issues, logger);
+	}
 
-		logger.error("Invalid task data", { "aiki.issues": schemaValidationResult.issues });
+	private async throwSchemaValidationError(
+		handle: UnknownWorkflowRunHandle,
+		issues: readonly StandardSchemaV1.Issue[],
+		logger: Logger
+	): Promise<never> {
+		logger.error("Invalid task data", { "aiki.issues": issues });
 		await handle[INTERNAL].transitionState({
 			status: "failed",
 			cause: "self",
 			error: {
 				name: "SchemaValidationError",
-				message: JSON.stringify(schemaValidationResult.issues),
+				message: JSON.stringify(issues),
 			},
 		});
 		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
