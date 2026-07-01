@@ -188,10 +188,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			const outputSchema = this.params.schema?.output;
-			return outputSchema
-				? this.parse(handle, outputSchema, existingTaskState.output, run.logger)
-				: (existingTaskState.output as Output);
+			return existingTaskState.output as Output;
 		}
 
 		if (existingTaskState.status === "failed") {

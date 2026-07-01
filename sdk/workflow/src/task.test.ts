@@ -317,6 +317,43 @@ describe("task", () => {
 				expect(handlerCalls).toBe(0);
 			}));
 
+		test("returns the recorded output on replay without re-applying the output schema validation", () =>
+			withFakeClient(async (client) => {
+				const appendBang: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: (value) => ({ value: `${String(value)}!` }),
+					},
+				};
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "freshly-sent";
+					},
+					schema: { output: appendBang },
+				});
+
+				const input = { to: "info@aiki.run" };
+				const recordedOutput = "recorded!";
+
+				const inputHash = await hashInput(input);
+				const address = getTaskAddress(sendEmail.name, inputHash);
+				const recordedTask = completedTaskInfoFactory.build({
+					name: sendEmail.name,
+					state: { output: recordedOutput },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					taskQueues: { [address]: { tasks: [recordedTask] } },
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				expect(await sendEmail.start(run, input)).toBe(recordedOutput);
+				expect(handlerCalls).toBe(0);
+			}));
+
 		test("fails the run and throws WorkflowRunFailedError when the input schema rejects", () =>
 			withFakeClient(async (client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
