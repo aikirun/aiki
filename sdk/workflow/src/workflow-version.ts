@@ -182,18 +182,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			const existingRunInfo = replayManifest.consumeNextChildWorkflowRun(address);
 			if (existingRunInfo) {
 				const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
-				const outputSchema = this.params.schema?.output;
-				if (existingRun.state.status === "completed" && outputSchema) {
-					const parseOutputResult = this.parse(
-						parentRunHandle,
-						outputSchema,
-						existingRun.state.output,
-						parentRun.logger
-					);
-					if (parseOutputResult instanceof Promise) {
-						await parseOutputResult;
-					}
-				}
 
 				const logger = parentRun.logger.child({
 					"aiki.childWorkflowName": existingRun.name,

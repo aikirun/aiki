@@ -1,5 +1,5 @@
-export function getTaskAddress(name: string, inputHash: string): string {
-	return `${name}:${inputHash}`;
+export function getTaskAddress(name: string, referenceId: string): string {
+	return `${name}:${referenceId}`;
 }
 
 export function getWorkflowRunAddress(name: string, versionId: string, referenceId: string): string {
