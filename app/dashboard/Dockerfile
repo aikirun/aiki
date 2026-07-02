@@ -31,16 +31,13 @@ COPY tsconfig.json ./
 
 RUN bun run --cwd types build
 
-ARG VITE_AIKI_SERVER_URL
-ENV VITE_AIKI_SERVER_URL=${VITE_AIKI_SERVER_URL}
-
 WORKDIR /aiki/app/dashboard
 RUN bun run build
 
 FROM nginx:alpine
 
 COPY --from=builder /aiki/app/dashboard/dist /usr/share/nginx/html
-COPY app/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
+COPY app/dashboard/nginx.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 9851
 CMD ["nginx", "-g", "daemon off;"]

@@ -116,7 +116,7 @@ export function SignIn() {
 				<p style={{ textAlign: "center", fontSize: 13, color: "var(--t2)" }}>
 					Don't have an account?{" "}
 					<Link
-						to={safeRedirect ? `/auth/sign-up?redirect=${encodeURIComponent(safeRedirect)}` : "/auth/sign-up"}
+						to={safeRedirect ? `/sign-up?redirect=${encodeURIComponent(safeRedirect)}` : "/sign-up"}
 						style={{ color: "#667eea", fontWeight: 600, textDecoration: "none" }}
 					>
 						Sign up

@@ -61,7 +61,7 @@ export function AcceptInvitation() {
 
 		if (!isAuthenticated) {
 			// Preserve the invite URL so the user can accept after signing in or signing up
-			navigate(`/auth/sign-in?redirect=/invite/${invitationId}`, { replace: true });
+			navigate(`/sign-in?redirect=/invite/${invitationId}`, { replace: true });
 			return;
 		}
 

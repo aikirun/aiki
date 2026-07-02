@@ -103,10 +103,14 @@ These apply to the bundled `app/server` and `app/dashboard`. If you embed the se
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VITE_AIKI_SERVER_URL` | No | `http://localhost:9850` | Server URL for the dashboard to connect to |
+| `AIKI_SERVER_UPSTREAM_URL` | If using the docker image | — | Server address the dashboard docker image proxies to; read at container start |
 | `AIKI_DASHBOARD_PORT` | No | `9851` | Port for the dashboard |
+| `VITE_AIKI_SERVER_URL` | If on a static host | — | Build-time server URL for a dashboard served outside the docker image (see below) |
 
-Note: `VITE_AIKI_SERVER_URL` is a build-time variable. If you change it, you need to rebuild the dashboard image.
+The dashboard runs in one of two modes:
+
+- **Dashboard docker image.** nginx inside the image serves the dashboard and forwards its server calls to the address in `AIKI_SERVER_UPSTREAM_URL`, read when the container starts. The bundled `docker-compose.yml` sets it for you; set it yourself when running the image directly. No build-time configuration is needed.
+- **Static host.** You build the dashboard and serve the files yourself, so the browser calls the server directly. Build with `VITE_AIKI_SERVER_URL` set to the server's URL, and add the dashboard's origin to the server's `CORS_ORIGINS`.
 
 ---
 
