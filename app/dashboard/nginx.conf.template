@@ -1,0 +1,45 @@
+server {
+    listen 9851;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Serve static files directly
+    location /assets {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # ${AIKI_SERVER_UPSTREAM_URL} is substituted by the nginx entrypoint at container start;
+    # the runtime nginx variables ($host, $uri, ...) are left untouched because
+    # envsubst only replaces variables defined in the environment
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    location /api/ {
+        proxy_pass ${AIKI_SERVER_UPSTREAM_URL};
+    }
+
+    location /dashboard/ {
+        proxy_pass ${AIKI_SERVER_UPSTREAM_URL};
+    }
+
+    location /auth/ {
+        proxy_pass ${AIKI_SERVER_UPSTREAM_URL};
+    }
+
+    location = /capabilities {
+        proxy_pass ${AIKI_SERVER_UPSTREAM_URL};
+    }
+
+    # Handle SPA routing - serve index.html for all routes
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    gzip_min_length 1000;
+}

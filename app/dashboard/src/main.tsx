@@ -51,9 +51,12 @@ function CapabilitiesError({ error }: { error: unknown }) {
 		>
 			<div style={{ maxWidth: 420, textAlign: "center" }}>
 				<h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>Unable to reach Aiki server</h1>
+				<p style={{ fontSize: 13, color: "#888", lineHeight: 1.5, marginBottom: 12 }}>
+					Could not load server capabilities from <code>{AIKI_SERVER_URL}</code>
+				</p>
 				<p style={{ fontSize: 13, color: "#888", lineHeight: 1.5, marginBottom: 16 }}>
-					Could not load server capabilities from <code>{AIKI_SERVER_URL}</code>. Check that the server is running and
-					reachable.
+					If the dashboard is served on a different origin than the server, it must be built with{" "}
+					<code>VITE_AIKI_SERVER_URL</code> set to the server's URL
 				</p>
 				<pre
 					style={{

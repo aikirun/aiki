@@ -133,7 +133,7 @@ export function Sidebar() {
 					user={user}
 					onSignOut={async () => {
 						await signOut();
-						navigate("/auth/sign-in");
+						navigate("/sign-in");
 					}}
 				/>
 			</div>

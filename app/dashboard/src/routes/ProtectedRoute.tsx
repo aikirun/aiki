@@ -35,7 +35,7 @@ export function ProtectedRoute({ children, requireOrganization = true, requireNa
 	}
 
 	if (!isAuthenticated) {
-		return <Navigate to="/auth/sign-in" replace />;
+		return <Navigate to="/sign-in" replace />;
 	}
 
 	if (requireOrganization && organizations.length === 0) {
@@ -61,7 +61,7 @@ export function OnboardingRoute({ children }: { children: ReactNode }) {
 	}
 
 	if (!isAuthenticated) {
-		return <Navigate to="/auth/sign-in" replace />;
+		return <Navigate to="/sign-in" replace />;
 	}
 
 	if (organizations.length > 0 && namespaces.length > 0) {

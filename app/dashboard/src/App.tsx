@@ -25,8 +25,8 @@ export default function App() {
 			{iam.dashboard ? (
 				<>
 					{/* Public auth routes */}
-					<Route path="/auth/sign-in" element={<SignIn />} />
-					<Route path="/auth/sign-up" element={<SignUp />} />
+					<Route path="/sign-in" element={<SignIn />} />
+					<Route path="/sign-up" element={<SignUp />} />
 
 					{/* Public: invitation acceptance — handles its own auth redirect logic */}
 					<Route path="/invite/:invitationId" element={<AcceptInvitation />} />
@@ -52,7 +52,8 @@ export default function App() {
 			) : (
 				<>
 					{/* Noop mode: dashboard-only paths redirect home */}
-					<Route path="/auth/*" element={<Navigate to="/" replace />} />
+					<Route path="/sign-in" element={<Navigate to="/" replace />} />
+					<Route path="/sign-up" element={<Navigate to="/" replace />} />
 					<Route path="/onboarding/*" element={<Navigate to="/" replace />} />
 					<Route path="/invite/*" element={<Navigate to="/" replace />} />
 				</>
