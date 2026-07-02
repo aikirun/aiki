@@ -38,6 +38,7 @@ FROM nginx:alpine
 
 COPY --from=builder /aiki/app/dashboard/dist /usr/share/nginx/html
 COPY app/dashboard/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=755 app/dashboard/docker-entrypoint.d/05-require-server-upstream-url.sh /docker-entrypoint.d/05-require-server-upstream-url.sh
 
 EXPOSE 9851
 CMD ["nginx", "-g", "daemon off;"]
