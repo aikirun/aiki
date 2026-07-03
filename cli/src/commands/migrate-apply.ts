@@ -22,7 +22,7 @@ export async function migrateApply(options: MigrateApplyOptions): Promise<void> 
 
 	switch (dbConfig.provider) {
 		case "pg":
-			await applyPg(dbConfig, migrationsFolder, migrationsTable, logger);
+			await applyPg(options.pkg, dbConfig, migrationsFolder, migrationsTable, logger);
 			break;
 		case "sqlite":
 		case "mysql":
@@ -33,6 +33,7 @@ export async function migrateApply(options: MigrateApplyOptions): Promise<void> 
 }
 
 async function applyPg(
+	pkg: SupportedPackage,
 	config: PgDatabaseConfig,
 	migrationsFolder: string,
 	migrationsTable: string,
@@ -84,7 +85,7 @@ async function applyPg(
 			});
 		}
 
-		logger.info("Migrations applied");
+		logger.info(`${pkg} migrations applied`);
 	} finally {
 		await client.end();
 	}
