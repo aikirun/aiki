@@ -1,0 +1,64 @@
+# Standalone Aiki stack — pulls the published images at a pinned version, so it
+# runs from an empty directory with no clone. Put a .env with your DATABASE_URL
+# next to this file, then: docker compose up -d
+#
+# The image tags are stamped by `bun run bump`; pick the file from a release tag
+# so the pinned version matches published images.
+services:
+  migrate:
+    image: aikirun/cli:0.31.0
+    container_name: aiki-migrate
+    environment:
+      AIKI_MIGRATE_PACKAGES: ${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}
+      DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
+      DATABASE_PATH: ${DATABASE_PATH:-:memory:}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        echo "migrating packages: $$AIKI_MIGRATE_PACKAGES" &&
+        for package in $$(echo "$$AIKI_MIGRATE_PACKAGES" | tr ',' ' ');
+        do aiki migrate apply --package "$$package" || exit 1;
+        done
+
+  server:
+    image: aikirun/server:0.31.0
+    container_name: aiki-server
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "${AIKI_SERVER_PORT:-9850}:${AIKI_SERVER_PORT:-9850}"
+    environment:
+      AIKI_SERVER_HOST: ${AIKI_SERVER_HOST:-0.0.0.0}
+      AIKI_SERVER_PORT: ${AIKI_SERVER_PORT:-9850}
+      AIKI_SERVER_BASE_URL: ${AIKI_SERVER_BASE_URL:-http://localhost:9850}
+      AIKI_SERVER_AUTH_SECRET: ${AIKI_SERVER_AUTH_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:9851}
+      DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
+      DATABASE_PATH: ${DATABASE_PATH:-:memory:}
+      DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
+      REDIS_HOST: ${REDIS_HOST:-}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PRETTY_LOGS: ${PRETTY_LOGS:-true}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  dashboard:
+    image: aikirun/dashboard:0.31.0
+    container_name: aiki-dashboard
+    ports:
+      - "${AIKI_DASHBOARD_PORT:-9851}:9851"
+    environment:
+      AIKI_SERVER_UPSTREAM_URL: http://server:${AIKI_SERVER_PORT:-9850}
+    depends_on:
+      - server
+    restart: unless-stopped

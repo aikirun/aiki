@@ -1,9 +1,10 @@
 // Lockstep version bump for the whole workspace.
 //
-// Sets every workspace package to the same version, then regenerates the
-// lockfile. The lockfile refresh is important: `bun publish` reads workspace
-// versions from it when rewriting `workspace:*` into concrete cross-package
-// pins, so a stale lockfile would publish packages pinned to old sibling versions.
+// Sets every workspace package to the same version, pins the standalone
+// docker compose file's image tags to it, then regenerates the lockfile.
+// The lockfile refresh is important: `bun publish` reads workspace versions
+// from it when rewriting `workspace:*` into concrete cross-package pins,
+// so a stale lockfile would publish packages pinned to old sibling versions.
 //
 // Usage:  bun run bump 0.31.0
 import { $ } from "bun";
@@ -21,6 +22,14 @@ for (const dir of workspaces) {
 	await Bun.write(path, text.replace(/"version":\s*"[^"]*"/, `"version": "${version}"`));
 	console.log(`  ${dir} → ${version}`);
 }
+
+const standaloneComposePath = "deploy/docker-compose.yml";
+const standaloneComposeText = await Bun.file(standaloneComposePath).text();
+await Bun.write(
+	standaloneComposePath,
+	standaloneComposeText.replace(/(aikirun\/(?:cli|server|dashboard)):[\w.-]+/g, `$1:${version}`)
+);
+console.log(`  ${standaloneComposePath} → ${version}`);
 
 await $`rm -f bun.lock`;
 await $`bun install`;
