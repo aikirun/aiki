@@ -18,7 +18,7 @@ npm install --save-dev @aikirun/cli
 
 ### Apply the schema migration
 
-If your server will be the standalone stack from [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard), skip this step — that stack applies migrations itself when it starts.
+If your server will be the standalone stack from [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard), skip this step — the Docker Compose path applies migrations itself on `up`, and the from-source instructions include their own migrate step.
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
@@ -35,7 +35,15 @@ Workflow code is identical against an embedded or standalone server, so you can 
 
 ## Run the standalone server and dashboard
 
-The prebuilt server and dashboard ship as a ready-made stack, run from a clone of [aikirun/aiki](https://github.com/aikirun/aiki). With Docker, one command applies the migrations, starts the server, and serves the dashboard (a from-source variant without Docker follows below):
+The stack is three containers:
+
+- **Migrate** — runs `aiki migrate apply --package server` and exits. Also runs `aiki migrate apply --package iam` if the server will run with auth (`AIKI_SERVER_AUTH_SECRET`). Needs `DATABASE_URL`.
+- **Server** — the Aiki server. Needs `DATABASE_URL`.
+- **Dashboard** — the web UI; proxies browser calls to the server set in `AIKI_SERVER_UPSTREAM_URL`.
+
+Start them in that order: migrate must finish before the server starts. You only need the migrate step on a fresh database or when an upgrade ships new migrations, but it is safe to run every time — already-applied migrations are skipped. Docker Compose is the easy path; one command does all of this.
+
+### With Docker Compose
 
 ```bash
 git clone https://github.com/aikirun/aiki.git
@@ -55,7 +63,7 @@ docker-compose up -d
 - Server: http://localhost:9850
 - Dashboard: http://localhost:9851
 
-Migrations are applied before the server starts. Re-running is safe; already-applied migrations are skipped.
+The migrate step applies the packages listed in `AIKI_MIGRATE_PACKAGES` — by default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set. Override the list to depart from that, for example to create the iam tables before turning auth on: `AIKI_MIGRATE_PACKAGES=server,iam docker-compose up -d`.
 
 Applications connect by pointing their client at the server's URL:
 
@@ -63,16 +71,23 @@ Applications connect by pointing their client at the server's URL:
 const aikiClient = client({ url: "http://localhost:9850" });
 ```
 
-Prefer no Docker? The same stack runs from source (this path needs Bun):
+### From source
+
+The same stack runs without Docker (this path needs Bun):
 
 ```bash
+git clone https://github.com/aikirun/aiki.git
+cd aiki
 bun install
 cp app/server/.env.example app/server/.env
 # Edit app/server/.env with your DATABASE_URL
 
-bun run server     # Terminal 1
-bun run dashboard  # Terminal 2
+bun run db:migrate:server   # the migrate step
+bun run server              # Terminal 1
+bun run dashboard           # Terminal 2
 ```
+
+Run `bun run db:migrate:iam` too when the server will run with auth. One piece differs from its container form: the dashboard here is a dev server, and the browser calls the Aiki server directly on `localhost:9850` — no proxy and no `AIKI_SERVER_UPSTREAM_URL` (the `.env.example` already allows the dashboard's origin through `CORS_ORIGINS`).
 
 ## Run the dashboard on its own
 

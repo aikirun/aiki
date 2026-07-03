@@ -24,10 +24,13 @@ RUN bun install --frozen-lockfile
 
 COPY lib/ ./lib/
 COPY types/ ./types/
+COPY sdk/adapter/memory/ ./sdk/adapter/memory/
 COPY sdk/iam/ ./sdk/iam/
 COPY sdk/server/ ./sdk/server/
 COPY cli/ ./cli/
 COPY tsconfig.json ./
+
+RUN bunx tsc --noEmit
 
 # Building @aikirun/server and @aikirun/iam places their migration files in
 # dist/, where `aiki migrate apply` resolves them from the workspace packages

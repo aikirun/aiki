@@ -6,7 +6,7 @@ services:
     image: aikirun/cli
     container_name: aiki-migrate
     environment:
-      AIKI_SERVER_AUTH_SECRET: ${AIKI_SERVER_AUTH_SECRET:-}
+      AIKI_MIGRATE_PACKAGES: ${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}
       DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
       DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
       DATABASE_PATH: ${DATABASE_PATH:-:memory:}
@@ -16,11 +16,10 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        aiki migrate apply --package server &&
-        if [ -n "$$AIKI_SERVER_AUTH_SECRET" ];
-        then aiki migrate apply --package iam;
-        else echo "AIKI_SERVER_AUTH_SECRET not set; skipping iam migrations";
-        fi
+        echo "migrating packages: $$AIKI_MIGRATE_PACKAGES" &&
+        for package in $$(echo "$$AIKI_MIGRATE_PACKAGES" | tr ',' ' ');
+        do aiki migrate apply --package "$$package" || exit 1;
+        done
 
   server:
     build:
