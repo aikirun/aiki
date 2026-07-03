@@ -37,7 +37,7 @@ services:
       AIKI_SERVER_PORT: ${AIKI_SERVER_PORT:-9850}
       AIKI_SERVER_BASE_URL: ${AIKI_SERVER_BASE_URL:-http://localhost:9850}
       AIKI_SERVER_AUTH_SECRET: ${AIKI_SERVER_AUTH_SECRET:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:9851}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
       DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
       DATABASE_PATH: ${DATABASE_PATH:-:memory:}

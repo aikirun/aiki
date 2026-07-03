@@ -1,7 +1,8 @@
 // Lockstep version bump for the whole workspace.
 //
 // Sets every workspace package to the same version, pins the standalone
-// docker compose file's image tags to it, then regenerates the lockfile.
+// docker compose file's image tags to it, updates the version in the
+// docs, then regenerates the lockfile.
 // The lockfile refresh is important: `bun publish` reads workspace versions
 // from it when rewriting `workspace:*` into concrete cross-package pins,
 // so a stale lockfile would publish packages pinned to old sibling versions.
@@ -25,11 +26,15 @@ for (const dir of workspaces) {
 
 const standaloneComposePath = "deploy/docker-compose.yml";
 const standaloneComposeText = await Bun.file(standaloneComposePath).text();
-await Bun.write(
-	standaloneComposePath,
-	standaloneComposeText.replace(/(aikirun\/(?:cli|server|dashboard)):[\w.-]+/g, `$1:${version}`)
-);
+await Bun.write(standaloneComposePath, standaloneComposeText.replace(/(aikirun\/[a-z]+):[\w.-]+/g, `$1:${version}`));
 console.log(`  ${standaloneComposePath} → ${version}`);
+
+const pinnedDocs = await $`grep -rl --include="*.md" -e "--branch v" docs README.md`.nothrow().quiet();
+for (const path of pinnedDocs.text().trim().split("\n").filter(Boolean)) {
+	const text = await Bun.file(path).text();
+	await Bun.write(path, text.replace(/--branch v[\w.-]+/g, `--branch v${version}`));
+	console.log(`  ${path} → ${version}`);
+}
 
 await $`rm -f bun.lock`;
 await $`bun install`;
