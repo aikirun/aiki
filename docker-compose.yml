@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: cli/Dockerfile
-    image: aikirun/cli
+    image: ghcr.io/aikirun/cli
     container_name: aiki-migrate
     environment:
       AIKI_MIGRATE_PACKAGES: ${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}
@@ -27,7 +27,7 @@ services:
       dockerfile: app/server/Dockerfile
       args:
         AIKI_SERVER_PORT: ${AIKI_SERVER_PORT:-9850}
-    image: aikirun/server
+    image: ghcr.io/aikirun/server
     container_name: aiki-server
     depends_on:
       migrate:
@@ -58,7 +58,7 @@ services:
     build:
       context: .
       dockerfile: app/dashboard/Dockerfile
-    image: aikirun/dashboard
+    image: ghcr.io/aikirun/dashboard
     container_name: aiki-dashboard
     ports:
       - "${AIKI_DASHBOARD_PORT:-9851}:9851"

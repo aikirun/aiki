@@ -114,7 +114,7 @@ Deploy `app/dashboard/dist/` to any static file host, and add the dashboard's or
 The image needs no build-time configuration: nginx inside it serves the dashboard and proxies its server calls to the address in `AIKI_SERVER_UPSTREAM_URL`, read at container start. Browser traffic stays on one origin, so no CORS setup is needed. Pick the version matching your server from the [releases](https://github.com/aikirun/aiki/releases):
 
 ```bash
-docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 aikirun/dashboard:<version>
+docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 ghcr.io/aikirun/dashboard:<version>
 ```
 
 ## Environment Variable Reference

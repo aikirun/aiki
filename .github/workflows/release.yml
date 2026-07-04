@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 concurrency:
   group: release
@@ -105,8 +106,9 @@ jobs:
 
       - uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build for smoke test
         if: matrix.image != 'server'
@@ -138,8 +140,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            aikirun/${{ matrix.image }}:${{ needs.verify.outputs.version }}
-            aikirun/${{ matrix.image }}:latest
+            ghcr.io/aikirun/${{ matrix.image }}:${{ needs.verify.outputs.version }}
+            ghcr.io/aikirun/${{ matrix.image }}:latest
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
 
@@ -171,7 +173,7 @@ jobs:
       - name: Redeploy the hosted server
         id: redeploy
         run: |
-          response="$(curl -fsS -G --data-urlencode "imgURL=docker.io/aikirun/server:$VERSION" "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")"
+          response="$(curl -fsS -G --data-urlencode "imgURL=ghcr.io/aikirun/server:$VERSION" "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")"
           deploy_id="$(echo "$response" | jq -r '.deploy.id')"
           if [ -z "$deploy_id" ] || [ "$deploy_id" = "null" ]; then
             echo "deploy hook did not return a deploy id: $response" >&2
