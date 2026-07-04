@@ -259,9 +259,8 @@ jobs:
       # made it through.
       - name: Publish npm packages
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
           for dir in types sdk/workflow sdk/client sdk/adapter/redis sdk/worker sdk/endpoint sdk/server sdk/iam cli; do
             name="$(jq -r .name "$dir/package.json")"
             if npm view "$name@$VERSION" version > /dev/null 2>&1; then
