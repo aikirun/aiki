@@ -45,12 +45,14 @@ Start them in that order: migrate must finish before the server starts. You only
 
 ### With Docker Compose
 
+Download the standalone compose file from the latest release into an empty directory — it pulls that release's published images, so there is nothing to clone or build:
+
 ```bash
-git clone https://github.com/aikirun/aiki.git
-cd aiki
+mkdir aiki && cd aiki
+curl -fsSL https://github.com/aikirun/aiki/releases/latest/download/docker-compose.yml -o docker-compose.yml
 ```
 
-Create a `.env` in the clone's root with your database URL:
+Create a `.env` next to it with your database URL:
 
 ```bash
 DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
@@ -73,10 +75,10 @@ const aikiClient = client({ url: "http://localhost:9850" });
 
 ### From source
 
-The same stack runs without Docker (this path needs Bun):
+The same stack runs without Docker (this path needs Bun). Clone at a release tag so you run released code:
 
 ```bash
-git clone https://github.com/aikirun/aiki.git
+git clone --branch v0.31.0 https://github.com/aikirun/aiki.git
 cd aiki
 bun install
 cp app/server/.env.example app/server/.env
@@ -109,11 +111,10 @@ Deploy `app/dashboard/dist/` to any static file host, and add the dashboard's or
 
 ### As a Docker image
 
-The image needs no build-time configuration: nginx inside it serves the dashboard and proxies its server calls to the address in `AIKI_SERVER_UPSTREAM_URL`, read at container start. Browser traffic stays on one origin, so no CORS setup is needed. From a clone of [aikirun/aiki](https://github.com/aikirun/aiki):
+The image needs no build-time configuration: nginx inside it serves the dashboard and proxies its server calls to the address in `AIKI_SERVER_UPSTREAM_URL`, read at container start. Browser traffic stays on one origin, so no CORS setup is needed. Pick the version matching your server from the [releases](https://github.com/aikirun/aiki/releases):
 
 ```bash
-docker build -f app/dashboard/Dockerfile -t aikirun/dashboard .
-docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 aikirun/dashboard
+docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 ghcr.io/aikirun/dashboard:<version>
 ```
 
 ## Environment Variable Reference
@@ -132,7 +133,7 @@ These apply to the standalone server and the dashboard. If you embed the server 
 | `AIKI_SERVER_PORT` | No | `9850` | Server port |
 | `AIKI_SERVER_BASE_URL` | If IAM is on | — | Public URL of the server; required only when `AIKI_SERVER_AUTH_SECRET` is also set |
 | `AIKI_SERVER_AUTH_SECRET` | If IAM is on | — | Authentication secret; setting this (with `AIKI_SERVER_BASE_URL`) activates the IAM package |
-| `CORS_ORIGINS` | No | — | Comma-separated allowed origins for cross-origin requests |
+| `CORS_ORIGINS` | If the dashboard is cross-origin | — | Comma-separated allowed origins, e.g. a static-host dashboard's; unneeded behind the dashboard image's proxy |
 | `REDIS_HOST` | No | — | Enables Redis-backed work distribution and timer dispatch |
 | `REDIS_PORT` | No | `6379` | Redis port |
 | `REDIS_PASSWORD` | No | — | Redis password |

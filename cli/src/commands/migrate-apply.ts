@@ -1,10 +1,9 @@
-import path from "node:path";
 import type { Logger } from "@aikirun/lib/logger";
 import { createConsoleLogger } from "@aikirun/lib/logger";
 
 import { loadDatabaseConfig, type PgDatabaseConfig } from "../lib/db-config";
 import { loadEnv } from "../lib/env";
-import { resolvePackageRoot, type SupportedPackage } from "../lib/resolve-package";
+import { resolveMigrationsFolder, type SupportedPackage } from "../lib/resolve-package";
 
 interface MigrateApplyOptions {
 	pkg: SupportedPackage;
@@ -15,8 +14,7 @@ export async function migrateApply(options: MigrateApplyOptions): Promise<void> 
 	loadEnv(options.envFile);
 	const dbConfig = loadDatabaseConfig();
 
-	const packageRoot = resolvePackageRoot(options.pkg);
-	const migrationsFolder = path.join(packageRoot, "dist", "infra", "db", dbConfig.provider, "migration");
+	const migrationsFolder = resolveMigrationsFolder(options.pkg, dbConfig.provider);
 	const migrationsTable = `__drizzle_migrations__${options.pkg}`;
 	const logger = createConsoleLogger();
 

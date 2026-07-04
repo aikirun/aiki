@@ -5,7 +5,7 @@ import { logLevels } from "../logger";
 
 const coerceBool = type("'true' | 'false' | '1' | '0'").pipe((v) => v === "true" || v === "1");
 
-const uniqueCommaSeparatedToItems = type("string > 0").pipe((v) =>
+const uniqueCommaSeparatedToItems = type("string").pipe((v) =>
 	Array.from(
 		new Set(
 			v
@@ -30,7 +30,7 @@ export const configSchema = type({
 	host: "string > 0 = '0.0.0.0'",
 	port: "string.integer.parse | number.integer > 0 = 9850",
 	"baseURL?": "string > 0",
-	corsOrigins: uniqueCommaSeparatedToItems,
+	corsOrigins: uniqueCommaSeparatedToItems.default(""),
 	"redis?": redisConfigSchema.or(type("undefined")),
 	db: databaseConfigSchema,
 	"auth?": authConfigSchema.or(type("undefined")),

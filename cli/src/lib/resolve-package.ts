@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
+import type { DatabaseProvider } from "@aikirun/types/infra/db";
 
 const require = createRequire(import.meta.url);
 
@@ -23,4 +24,8 @@ export function resolvePackageRoot(pkg: SupportedPackage): string {
 	} catch {
 		throw new Error(`@aikirun/${pkg} is not installed. Install it as a dependency of your project.`);
 	}
+}
+
+export function resolveMigrationsFolder(pkg: SupportedPackage, provider: DatabaseProvider): string {
+	return path.join(resolvePackageRoot(pkg), "dist", "infra", "db", provider, "migration");
 }

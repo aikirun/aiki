@@ -1,0 +1,271 @@
+name: Release
+
+# Cutting a release: bun run bump <version>, commit, bun run tag, push with
+# --follow-tags. The verify job re-checks everything in CI — tags can be
+# created without the tag script, so CI stays the authority.
+#
+# Steps run in a fixed order with npm publish last — it is the only
+# irreversible step, so nothing a user installs ships until everything before
+# it succeeded. deploy-cloud is the hosted deployment's slice of the pipeline;
+# it is the part that would move out if hosting ever gets its own repo.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Everything here runs before any side effect: a failure aborts the release
+  # with nothing pushed, migrated, or published.
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches the lockstep version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          package_version="$(jq -r .version types/package.json)"
+          if [ "$version" != "$package_version" ]; then
+            echo "tag $GITHUB_REF_NAME does not match workspace version $package_version — run bun run bump" >&2
+            exit 1
+          fi
+          for dir in $(jq -r '.workspaces[]' package.json); do
+            v="$(jq -r .version "$dir/package.json")"
+            if [ "$v" != "$version" ]; then
+              echo "$dir is at $v, expected $version — run bun run bump" >&2
+              exit 1
+            fi
+          done
+          pins="$(grep -oE 'aikirun/[a-z]+:[A-Za-z0-9_.-]+' deploy/docker-compose.yml || true)"
+          if [ -z "$pins" ]; then
+            echo "no aikirun image pins found in deploy/docker-compose.yml" >&2
+            exit 1
+          fi
+          escaped_version="$(printf '%s' "$version" | sed 's/[.]/\\./g')"
+          stale="$(echo "$pins" | grep -v ":$escaped_version\$" || true)"
+          if [ -n "$stale" ]; then
+            echo "deploy/docker-compose.yml pins not at $version — run bun run bump:" >&2
+            echo "$stale" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/setup-workspace
+
+      - run: bun run check
+
+      - run: bun run lint
+
+      - run: bun test
+
+      - run: bun run build:packages
+
+      # prove the migration files are inside the packages before anything ships anywhere.
+      - name: Verify packed tarballs contain migration files
+        run: |
+          for dir in sdk/server sdk/iam; do
+            tarball="$(cd "$dir" && bun pm pack --quiet | tail -n 1)"
+            if ! tar -tzf "$dir/$tarball" | grep -q "dist/infra/db/pg/migration/.*\.sql"; then
+              echo "$dir tarball is missing migration files" >&2
+              exit 1
+            fi
+            rm "$dir/$tarball"
+          done
+
+  images:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      matrix:
+        include:
+          - image: server
+            dockerfile: app/server/Dockerfile
+          - image: dashboard
+            dockerfile: app/dashboard/Dockerfile
+          - image: cli
+            dockerfile: cli/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build for smoke test
+        if: matrix.image != 'server'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          load: true
+          tags: aikirun/${{ matrix.image }}:smoke
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+
+      - name: Smoke test dashboard nginx config
+        if: matrix.image == 'dashboard'
+        run: docker run --rm -e AIKI_SERVER_UPSTREAM_URL=http://smoke:9850 aikirun/dashboard:smoke nginx -t
+
+      - name: Smoke test cli package resolution
+        if: matrix.image == 'cli'
+        run: |
+          docker run --rm -e DATABASE_PROVIDER=pg aikirun/cli:smoke migrate list --package server
+          docker run --rm -e DATABASE_PROVIDER=pg aikirun/cli:smoke migrate list --package iam
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/aikirun/${{ matrix.image }}:${{ needs.verify.outputs.version }}
+            ghcr.io/aikirun/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+
+  # The hosted deployment: migrate its database, roll its server to the new
+  # image, publish its dashboard. Secrets and vars live in the release
+  # environment.
+  deploy-cloud:
+    needs: [verify, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+
+      - run: bun run build:packages
+
+      - name: Migrate the hosted database
+        env:
+          DATABASE_PROVIDER: pg
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          bun cli/dist/index.js migrate apply --package server
+          bun cli/dist/index.js migrate apply --package iam
+
+      - name: Redeploy the hosted server
+        id: redeploy
+        run: |
+          response="$(curl -fsS -G --data-urlencode "imgURL=ghcr.io/aikirun/server:$VERSION" "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")"
+          deploy_id="$(echo "$response" | jq -r '.deploy.id')"
+          if [ -z "$deploy_id" ] || [ "$deploy_id" = "null" ]; then
+            echo "deploy hook did not return a deploy id: $response" >&2
+            exit 1
+          fi
+          echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the deploy to go live
+        run: |
+          for attempt in $(seq 1 90); do
+            status="$(curl -fsS --max-time 10 \
+              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+              "https://api.render.com/v1/services/${{ vars.RENDER_SERVICE_ID }}/deploys/${{ steps.redeploy.outputs.deploy_id }}" \
+              | jq -r '.status')"
+            case "$status" in
+              live)
+                echo "deploy live after $attempt checks"
+                exit 0
+                ;;
+              build_failed|update_failed|canceled|deactivated)
+                echo "deploy ended in status $status" >&2
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "deploy never went live" >&2
+          exit 1
+
+      - name: Confirm the release version is serving
+        run: |
+          for attempt in $(seq 1 12); do
+            deployed="$(curl -fsS --max-time 5 "${{ vars.AIKI_SERVER_BASE_URL }}/capabilities" | jq -r .version 2>/dev/null || true)"
+            if [ "$deployed" = "$VERSION" ]; then
+              echo "hosted server reports $VERSION"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "hosted server does not report version $VERSION" >&2
+          exit 1
+
+      - name: Deploy the hosted dashboard to Cloudflare Pages
+        env:
+          VITE_AIKI_SERVER_URL: ${{ vars.AIKI_SERVER_BASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          bun run build:dashboard
+          bunx wrangler@4 pages deploy app/dashboard/dist --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}"
+
+  # The public artifacts: the GitHub release and npm. npm is the commit point.
+  publish:
+    needs: [verify, deploy-cloud]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+
+      - run: bun run build:packages
+
+      # The standalone compose file is attached as an asset so
+      # releases/latest/download/docker-compose.yml always serves the newest
+      # release's pins. Safe to re-run: upload replaces the asset.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" deploy/docker-compose.yml --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes deploy/docker-compose.yml
+          fi
+
+      # Already-published packages are skipped so a re-run after a partial
+      # publish heals the gap instead of failing on the first package that
+      # made it through.
+      - name: Publish npm packages
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          for dir in types sdk/workflow sdk/client sdk/adapter/redis sdk/worker sdk/endpoint sdk/server sdk/iam cli; do
+            name="$(jq -r .name "$dir/package.json")"
+            if npm view "$name@$VERSION" version > /dev/null 2>&1; then
+              echo "$name@$VERSION already published; skipping"
+              continue
+            fi
+            (cd "$dir" && bun publish --access public)
+          done

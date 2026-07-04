@@ -19,6 +19,7 @@ import { createWorkflowService } from "./service/workflow";
 import { createWorkflowRunService } from "./service/workflow-run";
 import { createWorkflowRunOutboxService } from "./service/workflow-run-outbox";
 import { createWorkflowRunStateMachineService } from "./service/workflow-run-state-machine";
+import packageJson from "../package.json";
 
 export interface CreateHandlerParams {
 	db: Database;
@@ -98,6 +99,7 @@ export async function createHandler(params: CreateHandlerParams) {
 				return new Response("Method Not Allowed", { status: 405 });
 			}
 			return Response.json({
+				version: packageJson.version,
 				iam: { dashboard: dashboardIam !== undefined },
 			} satisfies Capabilities);
 		}
