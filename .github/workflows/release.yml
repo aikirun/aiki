@@ -226,7 +226,7 @@ jobs:
           bun run build:dashboard
           bunx wrangler@4 pages deploy app/dashboard/dist --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}"
 
-  # The public artifacts: the GitHub release and npm. npm is the commit point.
+  # The public artifacts: npm packages and the GitHub release page.
   publish:
     needs: [verify, deploy-cloud]
     runs-on: ubuntu-latest
@@ -240,19 +240,6 @@ jobs:
       - uses: ./.github/actions/setup-workspace
 
       - run: bun run build:packages
-
-      # The standalone compose file is attached as an asset so
-      # releases/latest/download/docker-compose.yml always serves the newest
-      # release's pins. Safe to re-run: upload replaces the asset.
-      - name: Create the GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" deploy/docker-compose.yml --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes deploy/docker-compose.yml
-          fi
 
       # Already-published packages are skipped so a re-run after a partial
       # publish heals the gap instead of failing on the first package that
@@ -269,3 +256,16 @@ jobs:
             fi
             (cd "$dir" && bun publish --access public)
           done
+
+      # The standalone compose file is attached as an asset so
+      # releases/latest/download/docker-compose.yml always serves the newest
+      # release's pins. Safe to re-run: upload replaces the asset.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" deploy/docker-compose.yml --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes deploy/docker-compose.yml
+          fi
