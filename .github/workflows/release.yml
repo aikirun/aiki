@@ -124,7 +124,7 @@ jobs:
 
       - name: Smoke test dashboard nginx config
         if: matrix.image == 'dashboard'
-        run: docker run --rm -e AIKI_SERVER_UPSTREAM_URL=http://smoke:9850 aikirun/dashboard:smoke nginx -t
+        run: docker run --rm -e AIKI_SERVER_UPSTREAM_URL=http://127.0.0.1:9850 aikirun/dashboard:smoke nginx -t
 
       - name: Smoke test cli package resolution
         if: matrix.image == 'cli'
