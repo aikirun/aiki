@@ -166,6 +166,7 @@ jobs:
         env:
           DATABASE_PROVIDER: pg
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_SSL: "true"
         run: |
           bun cli/dist/index.js migrate apply --package server
           bun cli/dist/index.js migrate apply --package iam
