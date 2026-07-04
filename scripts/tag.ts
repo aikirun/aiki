@@ -55,5 +55,5 @@ if (existing.exitCode === 0) {
 	process.exit(1);
 }
 
-await $`git tag ${tag}`;
+await $`git tag -a ${tag} -m ${tag}`;
 console.log(`created ${tag} — push with: git push --follow-tags`);
