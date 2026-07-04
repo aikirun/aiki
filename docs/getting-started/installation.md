@@ -78,7 +78,7 @@ const aikiClient = client({ url: "http://localhost:9850" });
 The same stack runs without Docker (this path needs Bun). Clone at a release tag so you run released code:
 
 ```bash
-git clone --branch v0.31.0 https://github.com/aikirun/aiki.git
+git clone --branch v0.32.0 https://github.com/aikirun/aiki.git
 cd aiki
 bun install
 cp app/server/.env.example app/server/.env
@@ -100,7 +100,7 @@ If you ran the standalone stack above, the dashboard is already up — skip this
 The right fit when the server is embedded in your app or hosted on its own. The server's URL is baked in at build time, so the dashboard is built per deployment (the build needs Bun) — from the release tag matching your installed `@aikirun/*` version:
 
 ```bash
-git clone --branch v0.31.0 https://github.com/aikirun/aiki.git
+git clone --branch v0.32.0 https://github.com/aikirun/aiki.git
 cd aiki
 bun install
 bun run build:types

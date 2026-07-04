@@ -6,7 +6,7 @@
 # so the pinned version matches published images.
 services:
   migrate:
-    image: ghcr.io/aikirun/cli:0.31.0
+    image: ghcr.io/aikirun/cli:0.32.0
     container_name: aiki-migrate
     environment:
       AIKI_MIGRATE_PACKAGES: ${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}
@@ -25,7 +25,7 @@ services:
         done
 
   server:
-    image: ghcr.io/aikirun/server:0.31.0
+    image: ghcr.io/aikirun/server:0.32.0
     container_name: aiki-server
     depends_on:
       migrate:
@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
 
   dashboard:
-    image: ghcr.io/aikirun/dashboard:0.31.0
+    image: ghcr.io/aikirun/dashboard:0.32.0
     container_name: aiki-dashboard
     ports:
       - "${AIKI_DASHBOARD_PORT:-9851}:9851"

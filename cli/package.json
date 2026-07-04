@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/cli",
-	"version": "0.31.0",
+	"version": "0.32.0",
 	"description": "Aiki CLI — manage Aiki server migrations.",
 	"type": "module",
 	"main": "./dist/index.js",

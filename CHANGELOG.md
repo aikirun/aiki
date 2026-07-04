@@ -2,6 +2,58 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.32.0
+
+This release makes Aiki self-hostable from published container images — no clone, no local build — and fixes workflow replay to stop re-validating already-persisted outputs.
+
+### New Features
+
+- **Official container images on GitHub Container Registry.** `ghcr.io/aikirun/server`, `ghcr.io/aikirun/dashboard`, and `ghcr.io/aikirun/cli` are published per release, multi-arch (amd64 + arm64). The standalone stack now runs from a one-command download instead of a clone:
+
+  ```bash
+  mkdir aiki && cd aiki
+  curl -fsSL https://github.com/aikirun/aiki/releases/latest/download/docker-compose.yml -o docker-compose.yml
+  # add a .env with DATABASE_URL, then:
+  docker compose up -d
+  ```
+
+  The stack runs a migrate container first — driven by `AIKI_MIGRATE_PACKAGES` (default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set) — then starts the server once it completes.
+
+- **`aiki migrate list --package <server|iam>`.** Lists the migrations a package ships, reading its migration journal without connecting to a database.
+
+- **The dashboard Docker image is configured at runtime.** nginx in the image serves the SPA and reverse-proxies API calls to `AIKI_SERVER_UPSTREAM_URL`, read at container start. Browser traffic stays same-origin, so the image needs no CORS setup.
+
+### Bug Fixes
+
+- **Workflow replay no longer re-validates already-persisted task and child-workflow outputs.** An output is validated against its schema when it's produced, before it's persisted. On replay, the stored output is now returned as-is rather than re-parsed. Re-parsing was unsafe: a validator that mutates its value (e.g. appends to a string) would double-apply on every replay, and a schema that changed after the run was persisted could falsely reject a previously-valid output.
+
+### Improvements
+
+- **Unsupported database providers fail fast.** Configuring a not-yet-implemented provider (`sqlite`, `mysql`) now throws synchronously when the database is constructed, instead of erroring later on first use.
+- **`/capabilities` reports the running server version.** The response gained a `version` field.
+
+### Breaking Changes
+
+- **The standalone compose stack no longer defaults `CORS_ORIGINS`.** It was `http://localhost:9851`; both compose files now leave it empty. It's optional behind the dashboard image's proxy, but a **cross-origin** dashboard (e.g. a static-host build) must now set `CORS_ORIGINS` on the server explicitly.
+
+- **Dashboard image: the `VITE_AIKI_SERVER_URL` build arg is replaced by the `AIKI_SERVER_UPSTREAM_URL` runtime env.** The prebuilt image no longer bakes the server URL at build time:
+
+  ```bash
+  # Before — server URL baked at build time
+  docker build --build-arg VITE_AIKI_SERVER_URL=http://your-server:9850 -t dashboard .
+
+  # After — read at container start
+  docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 ghcr.io/aikirun/dashboard:<version>
+  ```
+
+  Building the dashboard for a **static host** still uses `VITE_AIKI_SERVER_URL` at build time — that path is unchanged.
+
+- **Self-hosting pulls published images instead of building from a clone.** Download the compose file from a release (`releases/latest/download/docker-compose.yml`) rather than `git clone`. A build-from-source compose override remains for contributors.
+
+### Documentation
+
+- Rewrote the installation guide's self-hosting section for the image/compose flow, and added workflow-versioning docs.
+
 ## 0.31.0
 
 This release centers on a rework of runtime configuration and teardown. Config is now a snapshot-based provider shared by the server, worker, and endpoint; the server runtime tears down through a single abort signal; and `start()`/`spawn()` return synchronously.
