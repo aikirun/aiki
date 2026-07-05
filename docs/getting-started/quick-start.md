@@ -68,7 +68,7 @@ await runtimeHandle.stop();
 # Node.js with tsx
 npx tsx app.ts
 
-# Bun
+# or with Bun
 bun run app.ts
 ```
 
@@ -83,7 +83,7 @@ The trial activates, the payment event ends the 14-day wait early, and the run c
 3. **Event** — `paymentReceived.wait()` suspends the run without holding any resources; `handle.events.paymentReceived.send()` wakes it. If nothing arrives in 14 days, the wait times out instead.
 4. **Server** — `server({ db })` creates the server; `runtime.start()` runs its background loops.
 5. **Client** — `client({ handler })` connects to the server in-process. Workers and your application code both attach to it.
-6. **Worker** — `worker({...}).spawn(client)` claims ready runs from the server and executes them.
+6. **Worker** — `worker({...}).spawn(client)` starts the worker which claims ready runs from the server and executes them.
 
 Everything in this example lives in one process. The same workflow code runs against a separately deployed server — swap `client({ handler: aikiServer.handler })` for `client({ url: "..." })`.
 

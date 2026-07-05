@@ -1,9 +1,5 @@
-# Standalone Aiki stack — pulls the published images at a pinned version, so it
-# runs from an empty directory with no clone. Put a .env with your DATABASE_URL
-# next to this file, then: docker compose up -d
-#
-# The image tags are stamped by `bun run bump`; pick the file from a release tag
-# so the pinned version matches published images.
+# Standalone Aiki stack — pulls the published images at a pinned version. 
+# Put a .env with your DATABASE_URL next to this file, then: docker compose up -d
 services:
   migrate:
     image: ghcr.io/aikirun/cli:0.32.0

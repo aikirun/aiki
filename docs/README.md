@@ -43,6 +43,7 @@ Deep dive into system design:
 - **[Overview](./architecture/overview.md)** - High-level architecture and design principles
 - **[Server](./architecture/server.md)** - Workflow orchestration and state management
 - **[Subscribers](./architecture/subscribers.md)** - Work discovery and fault tolerance
+- **[Crash recovery](./architecture/cam.md)** - Underlying replay-based crash recovery mechanism
 
 ## 🔗 Quick Links
 

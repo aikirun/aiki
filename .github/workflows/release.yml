@@ -224,9 +224,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           bun run build:dashboard
-          # --branch must equal the Pages project's production branch, or wrangler
-          # publishes a preview deployment. A tag push is detached-HEAD, so without
-          # this it can't detect the branch and defaults to preview.
           bunx wrangler@4 pages deploy app/dashboard/dist --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}" --branch=main
 
   # The public artifacts: npm packages and the GitHub release page.
