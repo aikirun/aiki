@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../auth/AuthProvider";
 import { authClient } from "../../auth/client";
+import { getSafeRedirect } from "../../auth/redirect";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 import { FormInput } from "../../components/auth/FormInput";
 
@@ -11,9 +12,7 @@ export function SignIn() {
 	const location = useLocation();
 	const { refetchSession } = useAuth();
 
-	// Extract and validate the redirect param — only allow same-origin paths to prevent open redirect
-	const redirectParam = new URLSearchParams(location.search).get("redirect");
-	const safeRedirect = redirectParam?.startsWith("/") ? redirectParam : null;
+	const safeRedirect = getSafeRedirect(location.search);
 
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");

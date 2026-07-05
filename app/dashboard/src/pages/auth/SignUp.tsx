@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import { createNamespace } from "../../api/client";
 import { authClient } from "../../auth/client";
+import { getSafeRedirect } from "../../auth/redirect";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 import { FormInput } from "../../components/auth/FormInput";
 
@@ -19,9 +20,7 @@ function generatePersonalSlug(email: string): string {
 
 export function SignUp() {
 	const location = useLocation();
-	// Extract and validate the redirect param — only allow same-origin paths to prevent open redirect
-	const redirectParam = new URLSearchParams(location.search).get("redirect");
-	const safeRedirect = redirectParam?.startsWith("/") ? redirectParam : null;
+	const safeRedirect = getSafeRedirect(location.search);
 
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
