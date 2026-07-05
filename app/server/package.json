@@ -19,9 +19,9 @@
 		"@aikirun/server": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"arktype": "^2.1.29",
-		"dotenv": "^16.4.5",
+		"dotenv": "^17.4.2",
 		"ioredis": "^5.4.1",
-		"pino": "^9.6.0",
+		"pino": "^10.3.1",
 		"pino-pretty": "^13.0.0"
 	},
 	"devDependencies": {

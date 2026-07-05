@@ -25,7 +25,7 @@
 		"@orpc/contract": "^1.9.3",
 		"@orpc/server": "^1.9.3",
 		"arktype": "^2.1.29",
-		"better-auth": "^1.4.14",
+		"better-auth": "^1.6.23",
 		"drizzle-orm": "^0.45.1",
 		"ulidx": "^2.4.1"
 	},
