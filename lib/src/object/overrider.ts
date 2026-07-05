@@ -1,23 +1,21 @@
 import type { NonArrayObject, PathFromObject, TypeOfValueAtPath } from "./types";
 
-const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-
 /**
  * Sets a value at a dot-notation path in an object.
  * Mutates the object in place.
+ *
+ * The guards against __proto__/constructor/prototype segments prevent prototype
+ * pollution.
  */
 function set(obj: Record<string, unknown>, path: string, value: unknown): void {
 	const keys = path.split(".");
-
-	for (const key of keys) {
-		if (FORBIDDEN_KEYS.has(key)) {
-			throw new Error(`Cannot set path "${path}": segment "${key}" is not allowed`);
-		}
-	}
 	let currentValue: Record<string, unknown> = obj;
 
 	for (let i = 0; i < keys.length - 1; i++) {
 		const key = keys[i] as string;
+		if (key === "__proto__" || key === "constructor" || key === "prototype") {
+			throw new Error(`Cannot set path "${path}": segment "${key}" is not allowed`);
+		}
 		let nextValue = currentValue[key];
 		if (nextValue === undefined || nextValue === null) {
 			nextValue = {};
@@ -27,6 +25,9 @@ function set(obj: Record<string, unknown>, path: string, value: unknown): void {
 	}
 
 	const lastKey = keys[keys.length - 1] as string;
+	if (lastKey === "__proto__" || lastKey === "constructor" || lastKey === "prototype") {
+		throw new Error(`Cannot set path "${path}": segment "${lastKey}" is not allowed`);
+	}
 	currentValue[lastKey] = value;
 }
 
