@@ -146,7 +146,7 @@ export function createWorkflowRepository(db: PgDb) {
 
 			const namePrefixCondition =
 				namePrefix !== undefined
-					? like(workflow.name, `${namePrefix.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`)
+					? like(workflow.name, `${namePrefix.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_")}%`)
 					: undefined;
 
 			const items = await db
