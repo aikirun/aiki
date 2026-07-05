@@ -14,6 +14,9 @@ function mergeValues(defaults: unknown, overrides: unknown): unknown {
 
 	const result: Record<string, unknown> = { ...defaults };
 	for (const key of Object.keys(overrides)) {
+		if (key === "__proto__") {
+			continue;
+		}
 		const overrideValue = overrides[key];
 		if (overrideValue === undefined) {
 			continue;

@@ -65,4 +65,13 @@ describe("merge", () => {
 		const result = merge(defaults, { b: { z: 30 } });
 		expect(result).toEqual({ a: { x: 1, y: 2 }, b: { z: 30 } });
 	});
+
+	test("ignores an own __proto__ key in JSON-sourced overrides", () => {
+		const defaults = { label: "default" };
+		const overrides = JSON.parse('{"label": "custom", "__proto__": {"injected": true}}') as Partial<typeof defaults>;
+		const result = merge(defaults, overrides);
+		expect(result).toEqual({ label: "custom" });
+		expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+		expect((result as Record<string, unknown>).injected).toBeUndefined();
+	});
 });
