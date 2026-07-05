@@ -1,5 +1,5 @@
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
-import { hashInput, sha256 } from "@aikirun/lib/crypto";
+import { hashInput, sha256Async } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
@@ -137,7 +137,7 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 		}
 	): Promise<{ schedule: Schedule }> {
 		const { workflowName, workflowVersionId, input, spec, options } = request;
-		const definitionHash = await sha256(
+		const definitionHash = await sha256Async(
 			stableStringify({
 				workflowName,
 				workflowVersionId,

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import { sha256Sync } from "@aikirun/lib/crypto";
+import { sha256 } from "@aikirun/lib/crypto";
 import type { Cache } from "@aikirun/types/infra/cache";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
@@ -56,7 +56,7 @@ export function createApiKeyService({ repos, cache }: ApiKeyServiceDeps) {
 			input: Pick<ApiKeyRowInsert, "organizationId" | "namespaceId" | "createdByUserId" | "name" | "expiresAt">
 		) {
 			const { key, keyPrefix } = generateKey();
-			const keyHash = sha256Sync(key);
+			const keyHash = sha256(key);
 
 			const keyInfo = await repos.apiKey.create({
 				id: ulid(),
@@ -77,7 +77,7 @@ export function createApiKeyService({ repos, cache }: ApiKeyServiceDeps) {
 				return null;
 			}
 
-			const keyHash = sha256Sync(key);
+			const keyHash = sha256(key);
 
 			if (cache) {
 				const cachedKeyInfo = await cache.get(keyHash);
