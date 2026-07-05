@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.4 AS builder
+FROM oven/bun:1.3.14 AS builder
 
 WORKDIR /aiki
 
@@ -40,7 +40,7 @@ RUN bun run --cwd lib build \
 	&& bun run --cwd sdk/iam build \
 	&& bun run --cwd cli build
 
-FROM oven/bun:1.3.4-alpine
+FROM oven/bun:1.3.14-alpine
 
 WORKDIR /aiki
 
