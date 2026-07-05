@@ -79,4 +79,37 @@ describe("objectOverrider", () => {
 		expect(result.metadata?.label).toBe("important");
 		expect(result.metadata?.priority).toBeUndefined();
 	});
+
+	describe("prototype pollution guard", () => {
+		// PathFromObject rejects these paths at compile time; widening models a plain-JavaScript caller
+		const untypedBuilder = () =>
+			testObjectOverrider() as unknown as { with(path: string, value: unknown): { build(): TestObject } };
+
+		test("throws when a path segment is __proto__", () => {
+			expect(() => untypedBuilder().with("__proto__.injected", true).build()).toThrow(
+				'Cannot set path "__proto__.injected": segment "__proto__" is not allowed'
+			);
+		});
+
+		test("throws when a path segment is constructor", () => {
+			expect(() => untypedBuilder().with("constructor.prototype.injected", true).build()).toThrow(
+				'Cannot set path "constructor.prototype.injected": segment "constructor" is not allowed'
+			);
+		});
+
+		test("throws when a path segment is prototype", () => {
+			expect(() => untypedBuilder().with("metadata.prototype", true).build()).toThrow(
+				'Cannot set path "metadata.prototype": segment "prototype" is not allowed'
+			);
+		});
+
+		test("does not pollute Object.prototype when a hostile path is attempted", () => {
+			try {
+				untypedBuilder().with("__proto__.injected", true).build();
+			} catch {
+				// the guard throws; this test only asserts the absence of pollution
+			}
+			expect(({} as Record<string, unknown>).injected).toBeUndefined();
+		});
+	});
 });
