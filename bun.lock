@@ -105,6 +105,13 @@
     "lib": {
       "name": "@aikirun/lib",
       "version": "0.32.0",
+      "devDependencies": {
+        "arktype": "^2.1.29",
+        "cac": "^6.7.14",
+        "dotenv": "^16.4.5",
+        "drizzle-orm": "^0.45.1",
+        "postgres": "^3.4.8",
+      },
     },
     "sdk/adapter/http": {
       "name": "@aikirun/http",
@@ -162,18 +169,23 @@
     "sdk/iam": {
       "name": "@aikirun/iam",
       "version": "0.32.0",
+      "bin": {
+        "aiki-iam": "./dist/bin.js",
+      },
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/contract": "^1.9.3",
         "@orpc/server": "^1.9.3",
         "arktype": "^2.1.29",
         "better-auth": "^1.4.14",
+        "cac": "^6.7.14",
+        "dotenv": "^16.4.5",
         "drizzle-orm": "^0.45.1",
         "ulidx": "^2.4.1",
       },
       "devDependencies": {
-        "@aikirun/cli": "workspace:*",
         "@aikirun/lib": "workspace:*",
+        "drizzle-kit": "^0.31.8",
         "postgres": "^3.4.8",
       },
       "peerDependencies": {
@@ -186,19 +198,24 @@
     "sdk/server": {
       "name": "@aikirun/server",
       "version": "0.32.0",
+      "bin": {
+        "aiki-server": "./dist/bin.js",
+      },
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/contract": "^1.9.3",
         "@orpc/server": "^1.9.3",
         "arktype": "^2.1.29",
+        "cac": "^6.7.14",
         "cron-parser": "^5.4.0",
+        "dotenv": "^16.4.5",
         "drizzle-orm": "^0.45.1",
         "ulidx": "^2.4.1",
       },
       "devDependencies": {
-        "@aikirun/cli": "workspace:*",
         "@aikirun/lib": "workspace:*",
         "@aikirun/memory": "workspace:*",
+        "drizzle-kit": "^0.31.8",
         "postgres": "^3.4.8",
       },
       "peerDependencies": {

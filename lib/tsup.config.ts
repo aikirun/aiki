@@ -9,6 +9,9 @@ export default defineConfig({
 		"config/index": "src/config/index.ts",
 		"context/index": "src/context/index.ts",
 		"crypto/index": "src/crypto/index.ts",
+		"db/index": "src/db/index.ts",
+		"db/migrate/index": "src/db/migrate/index.ts",
+		"db/migrate/cli": "src/db/migrate/cli.ts",
 		"duration/index": "src/duration/index.ts",
 		"error/index": "src/error/index.ts",
 		"id/index": "src/id/index.ts",
@@ -24,4 +27,5 @@ export default defineConfig({
 	dts: true,
 	clean: true,
 	outDir: "dist",
+	external: ["arktype", "cac", "dotenv", "drizzle-orm", "postgres"],
 });

@@ -1,46 +1,33 @@
-import { loadDatabaseConfig, type PgDatabaseConfig } from "@aikirun/lib/db";
-import type { Logger } from "@aikirun/lib/logger";
-import { createConsoleLogger } from "@aikirun/lib/logger";
+// biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
+import type { DatabaseConfig, PgDatabaseConfig } from "../../config";
 
-import { loadEnv } from "../lib/env";
-import { resolveMigrationsFolder, type SupportedPackage } from "../lib/resolve-package";
-
-interface MigrateApplyOptions {
-	pkg: SupportedPackage;
-	envFile?: string;
+interface MigrateApplyParams {
+	migrationsDir: string;
+	migrationsTable: string;
+	db: DatabaseConfig;
 }
 
-export async function migrateApply(options: MigrateApplyOptions): Promise<void> {
-	loadEnv(options.envFile);
-	const dbConfig = loadDatabaseConfig();
-
-	const migrationsFolder = resolveMigrationsFolder(options.pkg, dbConfig.provider);
-	const migrationsTable = `__drizzle_migrations__${options.pkg}`;
-	const logger = createConsoleLogger();
+export async function migrateApply(params: MigrateApplyParams): Promise<void> {
+	const dbConfig = params.db;
 
 	switch (dbConfig.provider) {
 		case "pg":
-			await applyPg(options.pkg, dbConfig, migrationsFolder, migrationsTable, logger);
-			break;
+			await applyPg(dbConfig, params.migrationsDir, params.migrationsTable);
+			console.log("migrations applied");
+			return;
 		case "sqlite":
 		case "mysql":
-			throw new Error(`DATABASE_PROVIDER=${dbConfig.provider} is not yet supported by aiki migrate.`);
+			throw new Error(`DATABASE_PROVIDER=${dbConfig.provider} is not yet supported.`);
 		default:
 			dbConfig satisfies never;
 	}
 }
 
-async function applyPg(
-	pkg: SupportedPackage,
-	config: PgDatabaseConfig,
-	migrationsFolder: string,
-	migrationsTable: string,
-	logger: Logger
-): Promise<void> {
+async function applyPg(config: PgDatabaseConfig, migrationsDir: string, migrationsTable: string): Promise<void> {
 	const { sql } = await import("drizzle-orm");
 	const { readMigrationFiles } = await import("drizzle-orm/migrator");
 	const { drizzle } = await import("drizzle-orm/postgres-js");
-	const { default: postgres } = await import("postgres");
+	const postgres = await importPostgres();
 
 	const client = postgres(config.url, {
 		max: 1,
@@ -64,14 +51,14 @@ async function applyPg(
 		);
 		const appliedHashes = new Set(applied.map((row) => row.hash));
 
-		const migrations = readMigrationFiles({ migrationsFolder });
+		const migrations = readMigrationFiles({ migrationsFolder: migrationsDir });
 
 		for (const migration of migrations) {
 			if (appliedHashes.has(migration.hash)) {
 				continue;
 			}
 
-			logger.info("applying migration", { hash: migration.hash.slice(0, 12) });
+			console.log(`applying migration ${migration.hash.slice(0, 12)}`);
 
 			await db.transaction(async (tx) => {
 				for (const statement of migration.sql) {
@@ -82,9 +69,16 @@ async function applyPg(
 				);
 			});
 		}
-
-		logger.info(`${pkg} migrations applied`);
 	} finally {
 		await client.end();
+	}
+}
+
+async function importPostgres() {
+	try {
+		const { default: postgres } = await import("postgres");
+		return postgres;
+	} catch {
+		throw new Error("the pg provider requires the postgres driver, install it with: npm install postgres");
 	}
 }

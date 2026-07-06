@@ -1,9 +1,8 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import type { DatabaseProvider } from "@aikirun/types/infra/db";
+import { type DatabaseProvider, loadDatabaseProvider } from "@aikirun/lib/db";
 
-import { loadDatabaseProvider } from "../lib/db-config";
 import { loadEnv } from "../lib/env";
 import { resolvePackageRoot, type SupportedPackage } from "../lib/resolve-package";
 

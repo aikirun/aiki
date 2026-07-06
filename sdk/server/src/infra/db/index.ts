@@ -1,15 +1,8 @@
+import type { DatabaseConfig, PgDatabaseConfig } from "@aikirun/lib/db";
 import type { CreateDatabase, Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { type } from "arktype";
-
-import { type DatabaseConfig, databaseConfigSchema, type PgDatabaseConfig } from "../../config";
 
 export function database(config: DatabaseConfig): CreateDatabase {
-	const validationResult = databaseConfigSchema(config);
-	if (validationResult instanceof type.errors) {
-		throw new Error(`Invalid database config: ${validationResult.summary}`);
-	}
-
 	if (config.provider !== "pg") {
 		throw new Error(`${config.provider} support not yet implemented`);
 	}
@@ -24,6 +17,19 @@ export function database(config: DatabaseConfig): CreateDatabase {
 }
 
 async function createDatabase(config: PgDatabaseConfig): Promise<Database> {
-	const { createPgClient } = await import("./pg/provider");
-	return { provider: "pg", [INTERNAL]: { client: createPgClient(config) } };
+	const postgres = await importPostgres();
+	const client = postgres(config.url, {
+		max: config.maxConnections,
+		ssl: config.ssl,
+	});
+	return { provider: "pg", [INTERNAL]: { client } };
+}
+
+async function importPostgres() {
+	try {
+		const { default: postgres } = await import("postgres");
+		return postgres;
+	} catch {
+		throw new Error("the pg provider requires the postgres driver, install it with: npm install postgres");
+	}
 }

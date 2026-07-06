@@ -1,8 +1,8 @@
 // biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import fs from "node:fs";
 import path from "node:path";
+import { loadDatabaseProvider } from "@aikirun/lib/db";
 
-import { loadDatabaseProvider } from "../lib/db-config";
 import { loadEnv } from "../lib/env";
 import { resolveMigrationsFolder, type SupportedPackage } from "../lib/resolve-package";
 

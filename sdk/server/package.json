@@ -12,20 +12,25 @@
 		},
 		"./package.json": "./package.json"
 	},
+	"bin": {
+		"aiki-server": "./dist/bin.js"
+	},
 	"files": [
 		"dist"
 	],
 	"scripts": {
 		"build": "tsup",
-		"db:generate": "aiki migrate generate --package server",
-		"db:generate:custom": "aiki migrate generate --package server --custom"
+		"db:generate": "bun scripts/db-generate.ts",
+		"db:generate:custom": "bun scripts/db-generate.ts --custom"
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
 		"@orpc/contract": "^1.9.3",
 		"@orpc/server": "^1.9.3",
 		"arktype": "^2.1.29",
+		"cac": "^6.7.14",
 		"cron-parser": "^5.4.0",
+		"dotenv": "^16.4.5",
 		"drizzle-orm": "^0.45.1",
 		"ulidx": "^2.4.1"
 	},
@@ -38,9 +43,9 @@
 		}
 	},
 	"devDependencies": {
-		"@aikirun/cli": "workspace:*",
 		"@aikirun/lib": "workspace:*",
 		"@aikirun/memory": "workspace:*",
+		"drizzle-kit": "^0.31.8",
 		"postgres": "^3.4.8"
 	},
 	"publishConfig": {

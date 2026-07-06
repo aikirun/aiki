@@ -2,16 +2,13 @@ import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { type Client, client } from "@aikirun/client";
-import { omitUndefined } from "@aikirun/lib/object";
+import { loadDatabaseConfig } from "@aikirun/lib/db";
 import { inMemoryQueue, inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { redisSubscriber } from "@aikirun/redis";
 import { database, type ServerRuntimeHandle, server } from "@aikirun/server";
-import { databaseConfigSchema } from "@aikirun/server/config";
-import { DATABASE_PROVIDERS, isDatabaseProvider } from "@aikirun/types/infra/db";
 import type { CreateSubscriber } from "@aikirun/types/infra/queue";
 import { worker } from "@aikirun/worker";
 import type { AnyWorkflowVersion } from "@aikirun/workflow";
-import { type } from "arktype";
 import { config } from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -86,7 +83,7 @@ async function setup(): Promise<Setup> {
 		const timerPriorityQueue = inMemoryTimerPriorityQueue();
 
 		const aiki = server({
-			db: database(readDatabaseEnv()),
+			db: database(loadDatabaseConfig()),
 			runtime: { publisher: queue.publisher, timerPriorityQueue },
 		});
 		const runtimeHandle = aiki.runtime.start();
@@ -114,27 +111,4 @@ async function setup(): Promise<Setup> {
 		client: client({ url, ...(apiKey && { apiKey }) }),
 		...(subscriber && { subscriber }),
 	};
-}
-
-function readDatabaseEnv() {
-	const provider = process.env.DATABASE_PROVIDER ?? "pg";
-	if (!isDatabaseProvider(provider)) {
-		throw new Error(`Unsupported DATABASE_PROVIDER: ${provider}. Must be one of: ${DATABASE_PROVIDERS.join(", ")}`);
-	}
-
-	const raw =
-		provider === "sqlite"
-			? { provider, path: process.env.DATABASE_PATH }
-			: {
-					provider,
-					url: process.env.DATABASE_URL,
-					maxConnections: process.env.DATABASE_MAX_CONNECTIONS,
-					ssl: process.env.DATABASE_SSL,
-				};
-
-	const result = databaseConfigSchema(omitUndefined(raw));
-	if (result instanceof type.errors) {
-		throw new Error(`Invalid database config: ${result.summary}`);
-	}
-	return result;
 }

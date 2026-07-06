@@ -12,13 +12,16 @@
 		},
 		"./package.json": "./package.json"
 	},
+	"bin": {
+		"aiki-iam": "./dist/bin.js"
+	},
 	"files": [
 		"dist"
 	],
 	"scripts": {
 		"build": "tsup",
-		"db:generate": "aiki migrate generate --package iam",
-		"db:generate:custom": "aiki migrate generate --package iam --custom"
+		"db:generate": "bun scripts/db-generate.ts",
+		"db:generate:custom": "bun scripts/db-generate.ts --custom"
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
@@ -26,6 +29,8 @@
 		"@orpc/server": "^1.9.3",
 		"arktype": "^2.1.29",
 		"better-auth": "^1.4.14",
+		"cac": "^6.7.14",
+		"dotenv": "^16.4.5",
 		"drizzle-orm": "^0.45.1",
 		"ulidx": "^2.4.1"
 	},
@@ -38,8 +43,8 @@
 		}
 	},
 	"devDependencies": {
-		"@aikirun/cli": "workspace:*",
 		"@aikirun/lib": "workspace:*",
+		"drizzle-kit": "^0.31.8",
 		"postgres": "^3.4.8"
 	},
 	"publishConfig": {

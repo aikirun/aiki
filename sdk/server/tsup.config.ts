@@ -1,12 +1,13 @@
 import { cp, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
-import { DATABASE_PROVIDERS } from "@aikirun/types/infra/db";
+import { DATABASE_PROVIDERS } from "@aikirun/lib/db";
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-	entry: ["src/index.ts"],
+	entry: ["src/index.ts", "src/bin.ts"],
 	format: ["esm"],
-	dts: true,
+	// bin.js is reached through the bin map, never imported — no dts for it
+	dts: { entry: "src/index.ts" },
 	clean: true,
 	outDir: "dist",
 	noExternal: ["@aikirun/lib"],
