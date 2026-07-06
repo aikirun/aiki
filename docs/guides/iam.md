@@ -28,7 +28,7 @@ IAM owns its own tables (users, sessions, organizations, namespaces, members, AP
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
-  npx aiki migrate apply --package iam
+  npx aiki-iam migrate apply
 ```
 
 Use the same database as the server or a different one — the two schemas have no foreign keys between them.
