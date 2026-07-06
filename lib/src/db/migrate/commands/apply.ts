@@ -1,5 +1,5 @@
 // biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
-import type { DatabaseConfig, PgDatabaseConfig } from "../../db";
+import type { DatabaseConfig, PgDatabaseConfig } from "../../config";
 
 interface MigrateApplyParams {
 	migrationsDir: string;

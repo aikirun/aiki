@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DatabaseConfig } from "@aikirun/lib/db";
-import { migrateApply as _migrateApply } from "@aikirun/lib/migrate";
+import { migrateApply as _migrateApply } from "@aikirun/lib/db/migrate";
 
 export const MIGRATIONS_TABLE = "__drizzle_migrations__iam";
 

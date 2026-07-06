@@ -1,6 +1,6 @@
 import path from "node:path";
 import process from "node:process";
-import { migrateGenerate } from "@aikirun/lib/migrate";
+import { migrateGenerate } from "@aikirun/lib/db/migrate";
 
 const packageRoot = path.resolve(import.meta.dirname, "..");
 

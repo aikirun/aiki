@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-import { DATABASE_PROVIDERS, type DatabaseProvider } from "../../db";
+import { DATABASE_PROVIDERS, type DatabaseProvider } from "../../provider";
 
 const providerDialects: Record<DatabaseProvider, string> = {
 	pg: "postgresql",

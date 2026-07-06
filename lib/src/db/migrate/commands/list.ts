@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { DatabaseProvider } from "../../db";
+import type { DatabaseProvider } from "../../provider";
 
 interface JournalEntry {
 	tag: string;

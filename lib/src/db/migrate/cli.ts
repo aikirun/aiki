@@ -5,7 +5,8 @@ import { config as dotenvConfig } from "dotenv";
 
 import { migrateApply } from "./commands/apply";
 import { migrateList } from "./commands/list";
-import { type DatabaseProvider, loadDatabaseConfig, loadDatabaseProvider } from "../db";
+import { loadDatabaseConfig, loadDatabaseProvider } from "../config";
+import type { DatabaseProvider } from "../provider";
 
 const MIGRATE_SUBCOMMANDS = ["apply", "list"] as const;
 type MigrateSubcommand = (typeof MIGRATE_SUBCOMMANDS)[number];

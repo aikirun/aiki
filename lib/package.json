@@ -37,6 +37,14 @@
 			"types": "./dist/db/index.d.ts",
 			"import": "./dist/db/index.js"
 		},
+		"./db/migrate": {
+			"types": "./dist/db/migrate/index.d.ts",
+			"import": "./dist/db/migrate/index.js"
+		},
+		"./db/migrate/cli": {
+			"types": "./dist/db/migrate/cli.d.ts",
+			"import": "./dist/db/migrate/cli.js"
+		},
 		"./duration": {
 			"types": "./dist/duration/index.d.ts",
 			"import": "./dist/duration/index.js"
@@ -56,14 +64,6 @@
 		"./logger": {
 			"types": "./dist/logger/index.d.ts",
 			"import": "./dist/logger/index.js"
-		},
-		"./migrate": {
-			"types": "./dist/migrate/index.d.ts",
-			"import": "./dist/migrate/index.js"
-		},
-		"./migrate/cli": {
-			"types": "./dist/migrate/cli.d.ts",
-			"import": "./dist/migrate/cli.js"
 		},
 		"./object": {
 			"types": "./dist/object/index.d.ts",
