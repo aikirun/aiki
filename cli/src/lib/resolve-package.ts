@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
-import type { DatabaseProvider } from "@aikirun/types/infra/db";
+import type { DatabaseProvider } from "@aikirun/lib/db";
 
 const require = createRequire(import.meta.url);
 

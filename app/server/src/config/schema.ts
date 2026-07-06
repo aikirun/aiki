@@ -1,4 +1,3 @@
-import { databaseConfigSchema } from "@aikirun/server/config";
 import { type } from "arktype";
 
 import { logLevels } from "../logger";
@@ -32,7 +31,6 @@ export const configSchema = type({
 	"baseURL?": "string > 0",
 	corsOrigins: uniqueCommaSeparatedToItems.default(""),
 	"redis?": redisConfigSchema.or(type("undefined")),
-	db: databaseConfigSchema,
 	"auth?": authConfigSchema.or(type("undefined")),
 	logLevel: type.enumerated(...logLevels).default("info"),
 	prettyLogs: type("boolean").or(coerceBool).default(false),

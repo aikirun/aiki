@@ -33,6 +33,10 @@
 			"types": "./dist/crypto/index.d.ts",
 			"import": "./dist/crypto/index.js"
 		},
+		"./db": {
+			"types": "./dist/db/index.d.ts",
+			"import": "./dist/db/index.js"
+		},
 		"./duration": {
 			"types": "./dist/duration/index.d.ts",
 			"import": "./dist/duration/index.js"
@@ -52,6 +56,14 @@
 		"./logger": {
 			"types": "./dist/logger/index.d.ts",
 			"import": "./dist/logger/index.js"
+		},
+		"./migrate": {
+			"types": "./dist/migrate/index.d.ts",
+			"import": "./dist/migrate/index.js"
+		},
+		"./migrate/cli": {
+			"types": "./dist/migrate/cli.d.ts",
+			"import": "./dist/migrate/cli.js"
 		},
 		"./object": {
 			"types": "./dist/object/index.d.ts",
@@ -79,6 +91,13 @@
 	],
 	"scripts": {
 		"build": "tsup"
+	},
+	"devDependencies": {
+		"arktype": "^2.1.29",
+		"cac": "^6.7.14",
+		"dotenv": "^16.4.5",
+		"drizzle-orm": "^0.45.1",
+		"postgres": "^3.4.8"
 	},
 	"license": "Apache-2.0"
 }
