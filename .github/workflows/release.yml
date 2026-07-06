@@ -173,7 +173,7 @@ jobs:
 
       - name: Migrate the hosted database
         env:
-          DATABASE_PROVIDER: pg
+          DATABASE_PROVIDER: ${{ vars.DATABASE_PROVIDER }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_SSL: "true"
         run: |
