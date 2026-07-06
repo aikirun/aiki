@@ -28,12 +28,10 @@ async function applyPg(config: PgDatabaseConfig, migrationsDir: string, migratio
 	const { readMigrationFiles } = await import("drizzle-orm/migrator");
 	const { drizzle } = await import("drizzle-orm/postgres-js");
 	const postgres = await importPostgres();
-
 	const client = postgres(config.url, {
 		max: 1,
 		ssl: config.ssl ? "require" : undefined,
 	});
-
 	const db = drizzle(client);
 
 	try {
