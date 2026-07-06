@@ -17,8 +17,8 @@
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
 		"arktype": "^2.1.29",
-		"cac": "^6.7.14",
-		"dotenv": "^16.4.5",
+		"cac": "^7.0.0",
+		"dotenv": "^17.4.2",
 		"drizzle-orm": "^0.45.1",
 		"postgres": "^3.4.8"
 	},

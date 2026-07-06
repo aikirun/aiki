@@ -25,12 +25,12 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"@orpc/contract": "^1.9.3",
-		"@orpc/server": "^1.9.3",
+		"@orpc/contract": "^1.14.7",
+		"@orpc/server": "^1.14.7",
 		"arktype": "^2.1.29",
-		"cac": "^6.7.14",
+		"cac": "^7.0.0",
 		"cron-parser": "^5.4.0",
-		"dotenv": "^16.4.5",
+		"dotenv": "^17.4.2",
 		"drizzle-orm": "^0.45.1",
 		"ulidx": "^2.4.1"
 	},
