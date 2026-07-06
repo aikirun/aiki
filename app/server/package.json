@@ -8,9 +8,9 @@
 		"start": "bun run src/index.ts",
 		"start:watch": "bun --watch run src/index.ts",
 		"build": "bun build src/index.ts --compile --outfile dist/aiki-server",
-		"db:migrate:server": "bun ../../sdk/server/src/bin.ts migrate apply --env-file ./.env",
-		"db:migrate:iam": "bun ../../sdk/iam/src/bin.ts migrate apply --env-file ./.env",
-		"db:migrate": "bun run db:migrate:server && bun run db:migrate:iam"
+		"db:migrate:apply:server": "bun ../../sdk/server/src/bin.ts migrate apply --env-file ./.env",
+		"db:migrate:apply:iam": "bun ../../sdk/iam/src/bin.ts migrate apply --env-file ./.env",
+		"db:migrate:apply": "bun run db:migrate:apply:server && bun run db:migrate:apply:iam"
 	},
 	"dependencies": {
 		"@aikirun/iam": "workspace:*",

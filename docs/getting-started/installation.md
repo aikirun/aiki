@@ -83,12 +83,12 @@ bun install
 cp app/server/.env.example app/server/.env
 # Edit app/server/.env with your DATABASE_URL
 
-bun run db:migrate:server   # the migrate step
-bun run server              # Terminal 1
-bun run dashboard           # Terminal 2
+bun run db:migrate:apply:server   # the migrate step
+bun run server                    # Terminal 1
+bun run dashboard                 # Terminal 2
 ```
 
-Run `bun run db:migrate:iam` too when the server will run with auth. One piece differs from its container form: the dashboard here is a dev server, and the browser calls the Aiki server directly on `localhost:9850` — no proxy and no `AIKI_SERVER_UPSTREAM_URL` (the `.env.example` already allows the dashboard's origin through `CORS_ORIGINS`).
+Run `bun run db:migrate:apply:iam` too when the server will run with auth. One piece differs from its container form: the dashboard here is a dev server, and the browser calls the Aiki server directly on `localhost:9850` — no proxy and no `AIKI_SERVER_UPSTREAM_URL` (the `.env.example` already allows the dashboard's origin through `CORS_ORIGINS`).
 
 ## Run the dashboard on its own
 

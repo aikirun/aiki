@@ -20,8 +20,8 @@
 	],
 	"scripts": {
 		"build": "tsup",
-		"db:generate": "bun scripts/db-generate.ts",
-		"db:generate:custom": "bun scripts/db-generate.ts --custom"
+		"db:migrate:generate": "bun scripts/db-generate.ts",
+		"db:migrate:generate:custom": "bun scripts/db-generate.ts --custom"
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",

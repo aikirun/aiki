@@ -8,10 +8,10 @@ runs:
     # schema edit landed without its generated migration.
     - shell: bash
       run: |
-        bun run db:generate
+        bun run db:migrate:generate
         changed="$(git status --porcelain sdk/*/src/infra/db/*/migration)"
         if [ -n "$changed" ]; then
-          echo "migrations are out of date — run db:generate and commit the result:" >&2
+          echo "migrations are out of date — run db:migrate:generate and commit the result:" >&2
           echo "$changed" >&2
           exit 1
         fi
