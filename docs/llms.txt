@@ -50,7 +50,6 @@
 - [@aikirun/client](https://www.npmjs.com/package/@aikirun/client): Typed connection to the Aiki server (embedded or hosted)
 - [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker): Long-lived worker for pull-based execution
 - [@aikirun/server](https://www.npmjs.com/package/@aikirun/server): Embeddable server library
-- [@aikirun/cli](https://www.npmjs.com/package/@aikirun/cli): aiki migrate and related tooling
 - [@aikirun/endpoint](https://www.npmjs.com/package/@aikirun/endpoint): Run workflows on serverless platforms via push instead of pull
 - [@aikirun/iam](https://www.npmjs.com/package/@aikirun/iam): Multi-tenancy, API keys, and dashboard auth
 - [@aikirun/redis](https://www.npmjs.com/package/@aikirun/redis): Sub-second timer dispatch and cross-host work distribution

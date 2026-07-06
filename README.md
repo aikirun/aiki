@@ -60,14 +60,13 @@ Install the SDK packages:
 
 ```bash
 npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
-npm install --save-dev @aikirun/cli
 ```
 
 Apply Aiki's schema migration to your Postgres database:
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
-  npx aiki migrate apply --package server
+  npx aiki-server migrate apply
 ```
 
 Save the trial workflow above to `workflow.ts` (exported as `trialV1`), then bootstrap and run it:
@@ -198,7 +197,6 @@ See the [Installation Guide](./docs/getting-started/installation.md) for detaile
 - [`@aikirun/client`](https://www.npmjs.com/package/@aikirun/client) — Typed connection to the Aiki server (embedded or hosted); workflows, workers, and schedules attach to it
 - [`@aikirun/worker`](https://www.npmjs.com/package/@aikirun/worker) — Long-lived worker for pull-based execution
 - [`@aikirun/server`](https://www.npmjs.com/package/@aikirun/server) — Embeddable server library
-- [`@aikirun/cli`](https://www.npmjs.com/package/@aikirun/cli) — `aiki migrate` and related tooling
 
 **Optional** — add when you need it:
 

@@ -13,7 +13,6 @@ You need Node.js 18+ or Bun 1.0+, and a PostgreSQL 14+ database (SQLite and MySQ
 
 ```bash
 npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
-npm install --save-dev @aikirun/cli
 ```
 
 ### Apply the schema migration
@@ -22,7 +21,7 @@ If your server will be the standalone stack from [Run the standalone server and 
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
-  npx aiki migrate apply --package server
+  npx aiki-server migrate apply
 ```
 
 Re-run this command when upgrading Aiki to apply new migrations.

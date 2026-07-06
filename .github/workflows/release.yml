@@ -70,18 +70,29 @@ jobs:
 
       - run: bun test
 
+      - uses: ./.github/actions/check-migrations
+
       - run: bun run build:packages
 
-      # prove the migration files are inside the packages before anything ships anywhere.
-      - name: Verify packed tarballs contain migration files
+      # Prove each package's built tarball ships migrations byte-identical to
+      # the source, for every provider it has schema sources for, before
+      # anything ships anywhere.
+      - name: Verify packed tarballs match the source migrations
         run: |
-          for dir in sdk/server sdk/iam; do
+          for dir in sdk/*; do
+            ls "$dir"/src/infra/db/*/migration >/dev/null 2>&1 || continue
             tarball="$(cd "$dir" && bun pm pack --quiet | tail -n 1)"
-            if ! tar -tzf "$dir/$tarball" | grep -q "dist/infra/db/pg/migration/.*\.sql"; then
-              echo "$dir tarball is missing migration files" >&2
-              exit 1
-            fi
-            rm "$dir/$tarball"
+            workdir="$(mktemp -d)"
+            tar -xzf "$dir/$tarball" -C "$workdir"
+            for schema_dir in "$dir"/src/infra/db/*/migration; do
+              [ -d "$schema_dir" ] || continue
+              provider="$(basename "$(dirname "$schema_dir")")"
+              if ! diff -r "$schema_dir" "$workdir/package/dist/infra/db/$provider/migration"; then
+                echo "$dir tarball's $provider migrations differ from source" >&2
+                exit 1
+              fi
+            done
+            rm -rf "$workdir" "$dir/$tarball"
           done
 
   images:
@@ -160,16 +171,14 @@ jobs:
 
       - uses: ./.github/actions/setup-workspace
 
-      - run: bun run build:packages
-
       - name: Migrate the hosted database
         env:
-          DATABASE_PROVIDER: pg
+          DATABASE_PROVIDER: ${{ vars.DATABASE_PROVIDER }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_SSL: "true"
         run: |
-          bun cli/dist/index.js migrate apply --package server
-          bun cli/dist/index.js migrate apply --package iam
+          bun sdk/server/src/bin.ts migrate apply
+          bun sdk/iam/src/bin.ts migrate apply
 
       - name: Redeploy the hosted server
         id: redeploy
@@ -248,7 +257,7 @@ jobs:
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
         run: |
-          for dir in types sdk/workflow sdk/client sdk/adapter/redis sdk/worker sdk/endpoint sdk/server sdk/iam cli; do
+          for dir in types sdk/workflow sdk/client sdk/adapter/redis sdk/worker sdk/endpoint sdk/server sdk/iam; do
             name="$(jq -r .name "$dir/package.json")"
             if npm view "$name@$VERSION" version > /dev/null 2>&1; then
               echo "$name@$VERSION already published; skipping"
