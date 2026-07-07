@@ -102,6 +102,7 @@ function Meta({ label, children }: MetaProps) {
 export function RunDetail() {
 	const { id } = useParams<{ id: string }>();
 	const [searchParams, setSearchParams] = useSearchParams();
+	const runsListSearch = sessionStorage.getItem("runsListSearch") ?? "";
 	const queryClient = useQueryClient();
 	const [actionLoading, setActionLoading] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
@@ -222,7 +223,7 @@ export function RunDetail() {
 			{/* Nav bar */}
 			<div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
 				<Link
-					to="/"
+					to={{ pathname: "/", search: runsListSearch }}
 					style={{
 						background: "var(--s2)",
 						border: "1px solid var(--b0)",

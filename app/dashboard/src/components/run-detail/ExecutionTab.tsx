@@ -231,10 +231,13 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 						)}
 					</div>
 					<div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
-						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>{shortId(task.id)}</span>
+						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>ID: {shortId(task.id)}</span>
 						<CopyButton text={task.id} />
+						<span style={{ fontSize: 9.5, color: "var(--t1)", fontWeight: 700, marginLeft: -2, marginRight: 2 }}>
+							•
+						</span>
 						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>
-							· {shortId(task.inputHash)}
+							HASH: {shortId(task.inputHash)}
 						</span>
 						<CopyButton text={task.inputHash} />
 					</div>
