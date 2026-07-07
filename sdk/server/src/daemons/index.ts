@@ -30,50 +30,48 @@ export interface SpawnDaemonsDeps {
 	childRunCanceller: ChildRunCanceller;
 }
 
-function pollingDaemon(
+const pollingDaemon = (
 	logger: Logger,
 	signal: AbortSignal,
 	configProvider: ConfigProvider<ServerRuntimeConfig["daemons"]>
-) {
-	return {
-		spawn<Deps, DaemonOptions>(
-			getConfig: (config: ServerRuntimeConfig["daemons"]) => DaemonOptions & { intervalMs: number },
-			fn: (context: DaemonContext, deps: Deps, options: DaemonOptions) => Promise<void>,
-			deps: Deps
-		) {
-			const name = fn.name;
+) => ({
+	spawn<Deps, DaemonOptions>(
+		getConfig: (config: ServerRuntimeConfig["daemons"]) => DaemonOptions & { intervalMs: number },
+		fn: (context: DaemonContext, deps: Deps, options: DaemonOptions) => Promise<void>,
+		deps: Deps
+	) {
+		const name = fn.name;
 
-			return (async () => {
-				while (!signal.aborted) {
-					const context = createDaemonContext({ name, logger, signal });
-					const start = performance.now();
-					await withRetry(
-						async () => {
-							const config = getConfig(configProvider.config);
-							await fn(context, deps, config);
-							const durationMs = Math.round(performance.now() - start);
-							context.logger.debug("Completed", { durationMs });
-							const delayMs = config.intervalMs - durationMs;
-							if (delayMs > 0) {
-								await delay(delayMs, { signal });
-							}
-						},
-						{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
-						{
-							signal,
-							onError: (err) => {
-								if (signal.aborted) {
-									return;
-								}
-								logger.error(`Daemon ${name} failed`, { err });
-							},
+		return (async () => {
+			while (!signal.aborted) {
+				const context = createDaemonContext({ name, logger, signal });
+				const start = performance.now();
+				await withRetry(
+					async () => {
+						const config = getConfig(configProvider.config);
+						await fn(context, deps, config);
+						const durationMs = Math.round(performance.now() - start);
+						context.logger.debug("Completed", { durationMs });
+						const delayMs = config.intervalMs - durationMs;
+						if (delayMs > 0) {
+							await delay(delayMs, { signal });
 						}
-					).run();
-				}
-			})();
-		},
-	};
-}
+					},
+					{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
+					{
+						signal,
+						onError: (err) => {
+							if (signal.aborted) {
+								return;
+							}
+							logger.error(`Daemon ${name} failed`, { err });
+						},
+					}
+				).run();
+			}
+		})();
+	},
+});
 
 export async function spawnDaemons(logger: Logger, deps: SpawnDaemonsDeps): Promise<void> {
 	const { repos, signal, configProvider, workflowRunPublisher, timerPriorityQueue, childRunCanceller } = deps;

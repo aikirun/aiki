@@ -23,112 +23,110 @@ export interface CancelledParentRun {
 	shard: string | undefined;
 }
 
-export function createChildRunCanceller() {
-	return {
-		async cancel(
-			parentRuns: NonEmptyArray<CancelledParentRun>,
-			repos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">,
-			logger: Logger
-		): Promise<void> {
-			if (!isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
-				return;
-			}
+export const createChildRunCanceller = () => ({
+	async cancel(
+		parentRuns: NonEmptyArray<CancelledParentRun>,
+		repos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">,
+		logger: Logger
+	): Promise<void> {
+		if (!isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
+			return;
+		}
 
-			const parentRunIds = parentRuns.map((r) => r.runId);
-			const parentRunIdsHavingChildren = await repos.workflowRun.hasChildRuns(
-				parentRunIds as NonEmptyArray<string>,
-				NON_TERMINAL_WORKFLOW_RUN_STATUSES
-			);
-			if (parentRunIdsHavingChildren.size === 0) {
-				return;
-			}
+		const parentRunIds = parentRuns.map((r) => r.runId);
+		const parentRunIdsHavingChildren = await repos.workflowRun.hasChildRuns(
+			parentRunIds as NonEmptyArray<string>,
+			NON_TERMINAL_WORKFLOW_RUN_STATUSES
+		);
+		if (parentRunIdsHavingChildren.size === 0) {
+			return;
+		}
 
-			const parentRunsHavingChildren = parentRuns.filter((r) => parentRunIdsHavingChildren.has(r.runId));
-			if (!isNonEmptyArray(parentRunsHavingChildren)) {
-				return;
-			}
+		const parentRunsHavingChildren = parentRuns.filter((r) => parentRunIdsHavingChildren.has(r.runId));
+		if (!isNonEmptyArray(parentRunsHavingChildren)) {
+			return;
+		}
 
-			logger.info("Scheduling cancel-child-runs workflows", { parentRunIds: parentRunIdsHavingChildren });
+		logger.info("Scheduling cancel-child-runs workflows", { parentRunIds: parentRunIdsHavingChildren });
 
-			const workflowEntries: WorkflowRowInsert[] = [];
-			const inputHashPromises: Array<Promise<string>> = [];
-			const seenNamespaceIds = new Set<NamespaceId>();
+		const workflowEntries: WorkflowRowInsert[] = [];
+		const inputHashPromises: Array<Promise<string>> = [];
+		const seenNamespaceIds = new Set<NamespaceId>();
 
-			for (const { namespaceId, runId } of parentRunsHavingChildren) {
-				if (!seenNamespaceIds.has(namespaceId)) {
-					seenNamespaceIds.add(namespaceId);
-					workflowEntries.push({
-						namespaceId: namespaceId,
-						name: "aiki:cancel-child-runs" as WorkflowName,
-						versionId: "1.0.0" as WorkflowVersionId,
-						source: "system",
-					});
-				}
-				inputHashPromises.push(hashInput(runId));
-			}
-			if (!isNonEmptyArray(workflowEntries)) {
-				return;
-			}
-
-			const workflows = await repos.workflow.getOrCreateBulk(workflowEntries);
-			const workflowsByNamespaceId = new Map(workflows.map((w) => [w.namespaceId, w]));
-
-			const now = Date.now();
-			const inputHashes = await Promise.all(inputHashPromises);
-
-			const workflowRunEntries: WorkflowRunRowInsert[] = [];
-			const stateTransitionEntries: StateTransitionRowInsert[] = [];
-
-			for (const [i, parentRun] of parentRunsHavingChildren.entries()) {
-				const workflow = workflowsByNamespaceId.get(parentRun.namespaceId);
-				const inputHash = inputHashes[i];
-				if (!workflow || inputHash === undefined) {
-					continue;
-				}
-
-				const childrenCancellationRunId = ulid() as WorkflowRunId;
-				const cancellationRunStateTransitionId = ulid();
-
-				workflowRunEntries.push({
-					id: childrenCancellationRunId,
-					namespaceId: parentRun.namespaceId,
-					workflowId: workflow.id,
-					status: "scheduled",
-					input: parentRun.runId,
-					inputHash,
-					options: {
-						shard: parentRun.shard,
-						retry: {
-							type: "exponential",
-							maxAttempts: Number.MAX_SAFE_INTEGER,
-							baseDelayMs: 1_000,
-							maxDelayMs: 30_000,
-						},
-					} satisfies WorkflowStartOptions,
-					latestStateTransitionId: cancellationRunStateTransitionId,
-					scheduledAt: now as TimestampMs,
-				});
-
-				stateTransitionEntries.push({
-					id: cancellationRunStateTransitionId,
-					workflowRunId: childrenCancellationRunId,
-					type: "workflow_run",
-					status: "scheduled",
-					attempt: 1,
-					state: {
-						status: "scheduled",
-						scheduledAt: now,
-						reason: "new",
-					} satisfies WorkflowRunStateScheduled,
+		for (const { namespaceId, runId } of parentRunsHavingChildren) {
+			if (!seenNamespaceIds.has(namespaceId)) {
+				seenNamespaceIds.add(namespaceId);
+				workflowEntries.push({
+					namespaceId: namespaceId,
+					name: "aiki:cancel-child-runs" as WorkflowName,
+					versionId: "1.0.0" as WorkflowVersionId,
+					source: "system",
 				});
 			}
+			inputHashPromises.push(hashInput(runId));
+		}
+		if (!isNonEmptyArray(workflowEntries)) {
+			return;
+		}
 
-			if (isNonEmptyArray(workflowRunEntries) && isNonEmptyArray(stateTransitionEntries)) {
-				await repos.workflowRun.insert(workflowRunEntries);
-				await repos.stateTransition.appendBatch(stateTransitionEntries);
+		const workflows = await repos.workflow.getOrCreateBulk(workflowEntries);
+		const workflowsByNamespaceId = new Map(workflows.map((w) => [w.namespaceId, w]));
+
+		const now = Date.now();
+		const inputHashes = await Promise.all(inputHashPromises);
+
+		const workflowRunEntries: WorkflowRunRowInsert[] = [];
+		const stateTransitionEntries: StateTransitionRowInsert[] = [];
+
+		for (const [i, parentRun] of parentRunsHavingChildren.entries()) {
+			const workflow = workflowsByNamespaceId.get(parentRun.namespaceId);
+			const inputHash = inputHashes[i];
+			if (!workflow || inputHash === undefined) {
+				continue;
 			}
-		},
-	};
-}
+
+			const childrenCancellationRunId = ulid() as WorkflowRunId;
+			const cancellationRunStateTransitionId = ulid();
+
+			workflowRunEntries.push({
+				id: childrenCancellationRunId,
+				namespaceId: parentRun.namespaceId,
+				workflowId: workflow.id,
+				status: "scheduled",
+				input: parentRun.runId,
+				inputHash,
+				options: {
+					shard: parentRun.shard,
+					retry: {
+						type: "exponential",
+						maxAttempts: Number.MAX_SAFE_INTEGER,
+						baseDelayMs: 1_000,
+						maxDelayMs: 30_000,
+					},
+				} satisfies WorkflowStartOptions,
+				latestStateTransitionId: cancellationRunStateTransitionId,
+				scheduledAt: now as TimestampMs,
+			});
+
+			stateTransitionEntries.push({
+				id: cancellationRunStateTransitionId,
+				workflowRunId: childrenCancellationRunId,
+				type: "workflow_run",
+				status: "scheduled",
+				attempt: 1,
+				state: {
+					status: "scheduled",
+					scheduledAt: now,
+					reason: "new",
+				} satisfies WorkflowRunStateScheduled,
+			});
+		}
+
+		if (isNonEmptyArray(workflowRunEntries) && isNonEmptyArray(stateTransitionEntries)) {
+			await repos.workflowRun.insert(workflowRunEntries);
+			await repos.stateTransition.appendBatch(stateTransitionEntries);
+		}
+	},
+});
 
 export type ChildRunCanceller = ReturnType<typeof createChildRunCanceller>;

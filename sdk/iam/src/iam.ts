@@ -13,12 +13,10 @@ export interface IamParams {
 	cache?: CreateCache;
 }
 
-function iamFn(params: IamParams): Iam {
-	return {
-		api: apiAuthorizer(params),
-		dashboard: dashboardSessionIam(params),
-	};
-}
+const iamFn = (params: IamParams): Iam => ({
+	api: apiAuthorizer(params),
+	dashboard: dashboardSessionIam(params),
+});
 
 export const iam = Object.assign(iamFn, {
 	api: apiAuthorizer,

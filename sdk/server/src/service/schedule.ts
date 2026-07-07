@@ -107,10 +107,8 @@ export interface ScheduleServiceDeps {
 	repos: Pick<Repositories, "schedule" | "workflow" | "workflowRun" | "transaction">;
 }
 
-export function createScheduleService(deps: ScheduleServiceDeps) {
-	const { repos } = deps;
-
-	async function updateSchedule(
+export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
+	async updateSchedule(
 		namespaceId: NamespaceId,
 		id: string,
 		updates: Partial<{
@@ -123,9 +121,9 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
-	}
+	},
 
-	async function activateSchedule(
+	async activateSchedule(
 		_context: Context,
 		namespaceId: NamespaceId,
 		request: {
@@ -213,27 +211,27 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 			});
 			return { schedule: scheduleRowToDomain(createdRow, workflowInfo) };
 		});
-	}
+	},
 
-	async function getScheduleById(namespaceId: NamespaceId, id: string) {
+	async getScheduleById(namespaceId: NamespaceId, id: string) {
 		const result = await repos.schedule.getByIdWithWorkflow(namespaceId, id);
 		if (!result) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
 		const runCount = await repos.workflowRun.getRunCount(result.schedule.id);
 		return { schedule: scheduleRowToDomain(result.schedule, result.workflow), runCount };
-	}
+	},
 
-	async function getScheduleByReferenceId(namespaceId: NamespaceId, referenceId: string) {
+	async getScheduleByReferenceId(namespaceId: NamespaceId, referenceId: string) {
 		const result = await repos.schedule.getByReferenceIdWithWorkflow(namespaceId, referenceId);
 		if (!result) {
 			throw new NotFoundError(`Schedule not found with referenceId: ${referenceId}`);
 		}
 		const runCount = await repos.workflowRun.getRunCount(result.schedule.id);
 		return { schedule: scheduleRowToDomain(result.schedule, result.workflow), runCount };
-	}
+	},
 
-	async function listSchedules(
+	async listSchedules(
 		namespaceId: NamespaceId,
 		filters: ScheduleListRequestV1["filters"],
 		limit: number,
@@ -273,40 +271,29 @@ export function createScheduleService(deps: ScheduleServiceDeps) {
 			})),
 			total,
 		};
-	}
+	},
 
-	async function pauseSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
+	async pauseSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
 		const schedule = await repos.schedule.update(namespaceId, id, { status: "paused" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
-	}
+	},
 
-	async function resumeSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
+	async resumeSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
 		const schedule = await repos.schedule.update(namespaceId, id, { status: "active" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
-	}
+	},
 
-	async function deleteSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
+	async deleteSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
 		const schedule = await repos.schedule.update(namespaceId, id, { status: "deleted" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
-	}
-
-	return {
-		updateSchedule: updateSchedule,
-		activateSchedule: activateSchedule,
-		getScheduleById: getScheduleById,
-		getScheduleByReferenceId: getScheduleByReferenceId,
-		listSchedules: listSchedules,
-		pauseSchedule: pauseSchedule,
-		resumeSchedule: resumeSchedule,
-		deleteSchedule: deleteSchedule,
-	};
-}
+	},
+});
 
 export type ScheduleService = ReturnType<typeof createScheduleService>;
 
