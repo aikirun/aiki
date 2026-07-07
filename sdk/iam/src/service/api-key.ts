@@ -50,89 +50,87 @@ export interface ApiKeyServiceDeps {
 	cache?: Cache<ApiKeyAuthorizationInfo>;
 }
 
-export function createApiKeyService({ repos, cache }: ApiKeyServiceDeps) {
-	return {
-		async create(
-			input: Pick<ApiKeyRowInsert, "organizationId" | "namespaceId" | "createdByUserId" | "name" | "expiresAt">
-		) {
-			const { key, keyPrefix } = generateKey();
-			const keyHash = sha256(key);
+export const createApiKeyService = ({ repos, cache }: ApiKeyServiceDeps) => ({
+	async create(
+		input: Pick<ApiKeyRowInsert, "organizationId" | "namespaceId" | "createdByUserId" | "name" | "expiresAt">
+	) {
+		const { key, keyPrefix } = generateKey();
+		const keyHash = sha256(key);
 
-			const keyInfo = await repos.apiKey.create({
-				id: ulid(),
-				organizationId: input.organizationId,
-				namespaceId: input.namespaceId,
-				createdByUserId: input.createdByUserId,
-				name: input.name,
-				keyHash,
-				keyPrefix,
-				expiresAt: input.expiresAt,
-			});
+		const keyInfo = await repos.apiKey.create({
+			id: ulid(),
+			organizationId: input.organizationId,
+			namespaceId: input.namespaceId,
+			createdByUserId: input.createdByUserId,
+			name: input.name,
+			keyHash,
+			keyPrefix,
+			expiresAt: input.expiresAt,
+		});
 
-			return { key, info: keyInfo };
-		},
+		return { key, info: keyInfo };
+	},
 
-		async verify(key: string) {
-			if (!isValidKeyFormat(key)) {
-				return null;
-			}
+	async verify(key: string) {
+		if (!isValidKeyFormat(key)) {
+			return null;
+		}
 
-			const keyHash = sha256(key);
+		const keyHash = sha256(key);
 
-			if (cache) {
-				const cachedKeyInfo = await cache.get(keyHash);
-				if (cachedKeyInfo) {
-					if (cachedKeyInfo.expiresAt && cachedKeyInfo.expiresAt <= Date.now()) {
-						return null;
-					}
-
-					return {
-						namespaceId: cachedKeyInfo.namespaceId,
-						organizationId: cachedKeyInfo.organizationId,
-					};
+		if (cache) {
+			const cachedKeyInfo = await cache.get(keyHash);
+			if (cachedKeyInfo) {
+				if (cachedKeyInfo.expiresAt && cachedKeyInfo.expiresAt <= Date.now()) {
+					return null;
 				}
+
+				return {
+					namespaceId: cachedKeyInfo.namespaceId,
+					organizationId: cachedKeyInfo.organizationId,
+				};
 			}
+		}
 
-			const keyInfo = await repos.apiKey.getByActiveKeyByHash(keyHash);
-			if (!keyInfo) {
-				return null;
-			}
-			if (keyInfo.expiresAt && keyInfo.expiresAt <= Date.now()) {
-				return null;
-			}
+		const keyInfo = await repos.apiKey.getByActiveKeyByHash(keyHash);
+		if (!keyInfo) {
+			return null;
+		}
+		if (keyInfo.expiresAt && keyInfo.expiresAt <= Date.now()) {
+			return null;
+		}
 
-			if (cache) {
-				await cache.set(
-					keyHash,
-					{
-						organizationId: keyInfo.organizationId as OrganizationId,
-						namespaceId: keyInfo.namespaceId as NamespaceId,
-						expiresAt: keyInfo.expiresAt,
-					},
-					{ ttlSeconds: CACHE_TTL_SECONDS }
-				);
-			}
+		if (cache) {
+			await cache.set(
+				keyHash,
+				{
+					organizationId: keyInfo.organizationId as OrganizationId,
+					namespaceId: keyInfo.namespaceId as NamespaceId,
+					expiresAt: keyInfo.expiresAt,
+				},
+				{ ttlSeconds: CACHE_TTL_SECONDS }
+			);
+		}
 
-			return {
-				namespaceId: keyInfo.namespaceId,
-				organizationId: keyInfo.organizationId,
-			};
-		},
+		return {
+			namespaceId: keyInfo.namespaceId,
+			organizationId: keyInfo.organizationId,
+		};
+	},
 
-		async list(filter: { organizationId: OrganizationId; namespaceId: NamespaceId }) {
-			return repos.apiKey.list(filter);
-		},
+	async list(filter: { organizationId: OrganizationId; namespaceId: NamespaceId }) {
+		return repos.apiKey.list(filter);
+	},
 
-		async revoke(filter: { id: string; namespaceId: NamespaceId }): Promise<string | null> {
-			return repos.apiKey.revoke(filter);
-		},
+	async revoke(filter: { id: string; namespaceId: NamespaceId }): Promise<string | null> {
+		return repos.apiKey.revoke(filter);
+	},
 
-		async invalidateCacheByHashes(keyHashes: string | NonEmptyArray<string>): Promise<void> {
-			if (cache) {
-				await cache.invalidate(keyHashes);
-			}
-		},
-	};
-}
+	async invalidateCacheByHashes(keyHashes: string | NonEmptyArray<string>): Promise<void> {
+		if (cache) {
+			await cache.invalidate(keyHashes);
+		}
+	},
+});
 
 export type ApiKeyService = ReturnType<typeof createApiKeyService>;

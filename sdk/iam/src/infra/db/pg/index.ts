@@ -5,6 +5,13 @@ import { createOrganizationRepository } from "./repository/organization";
 import { createSessionRepository } from "./repository/session";
 import type { Repositories } from "../types";
 
+const createRepos = (db: PgDb): Omit<Repositories, "transaction"> => ({
+	namespace: createNamespaceRepository(db),
+	organization: createOrganizationRepository(db),
+	session: createSessionRepository(db),
+	apiKey: createApiKeyRepository(db),
+});
+
 export function createPgRepos(client: PgClient): Repositories {
 	const db = createPgHandle(client);
 	return {
@@ -12,14 +19,5 @@ export function createPgRepos(client: PgClient): Repositories {
 		async transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T> {
 			return db.transaction(async (tx) => fn(createRepos(tx)));
 		},
-	};
-}
-
-function createRepos(db: PgDb): Omit<Repositories, "transaction"> {
-	return {
-		namespace: createNamespaceRepository(db),
-		organization: createOrganizationRepository(db),
-		session: createSessionRepository(db),
-		apiKey: createApiKeyRepository(db),
 	};
 }

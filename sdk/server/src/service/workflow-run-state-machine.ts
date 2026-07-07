@@ -181,24 +181,23 @@ export interface WorkflowRunStateMachineServiceDeps {
 	childRunCanceller: ChildRunCanceller;
 }
 
-export function createWorkflowRunStateMachineService(deps: WorkflowRunStateMachineServiceDeps) {
-	const { repos, childRunCanceller } = deps;
-
-	return {
-		transitionState: async (
-			context: NamespaceRequestContext,
-			request: WorkflowRunTransitionStateRequestV1,
-			txRepos?: TxRepos
-		): Promise<WorkflowRunTransitionStateResponseV1> => {
-			if (txRepos) {
-				return transitionStateInTx(context, request, childRunCanceller, txRepos);
-			}
-			return repos.transaction(async (transactionRepos) =>
-				transitionStateInTx(context, request, childRunCanceller, transactionRepos)
-			);
-		},
-	};
-}
+export const createWorkflowRunStateMachineService = ({
+	repos,
+	childRunCanceller,
+}: WorkflowRunStateMachineServiceDeps) => ({
+	async transitionState(
+		context: NamespaceRequestContext,
+		request: WorkflowRunTransitionStateRequestV1,
+		txRepos?: TxRepos
+	): Promise<WorkflowRunTransitionStateResponseV1> {
+		if (txRepos) {
+			return transitionStateInTx(context, request, childRunCanceller, txRepos);
+		}
+		return repos.transaction(async (transactionRepos) =>
+			transitionStateInTx(context, request, childRunCanceller, transactionRepos)
+		);
+	},
+});
 
 export type WorkflowRunStateMachineService = ReturnType<typeof createWorkflowRunStateMachineService>;
 

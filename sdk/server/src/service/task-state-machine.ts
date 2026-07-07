@@ -51,22 +51,19 @@ export interface TaskStateMachineServiceDeps {
 	repos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox" | "transaction">;
 }
 
-export function createTaskStateMachineService(deps: TaskStateMachineServiceDeps) {
-	const { repos } = deps;
-	return {
-		async transitionState(
-			context: NamespaceRequestContext,
-			request: WorkflowRunTransitionTaskStateRequestV1,
-			txRepos?: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
-		): Promise<TaskInfo> {
-			if (txRepos) {
-				return transitionStateInTx(context, request, txRepos);
-			} else {
-				return repos.transaction(async (transactionRepos) => transitionStateInTx(context, request, transactionRepos));
-			}
-		},
-	};
-}
+export const createTaskStateMachineService = ({ repos }: TaskStateMachineServiceDeps) => ({
+	async transitionState(
+		context: NamespaceRequestContext,
+		request: WorkflowRunTransitionTaskStateRequestV1,
+		txRepos?: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
+	): Promise<TaskInfo> {
+		if (txRepos) {
+			return transitionStateInTx(context, request, txRepos);
+		} else {
+			return repos.transaction(async (transactionRepos) => transitionStateInTx(context, request, transactionRepos));
+		}
+	},
+});
 
 export type TaskStateMachineService = ReturnType<typeof createTaskStateMachineService>;
 

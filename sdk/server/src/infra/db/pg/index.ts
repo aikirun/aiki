@@ -10,6 +10,18 @@ import { createWorkflowRunRepository } from "./repository/workflow-run";
 import { createWorkflowRunOutboxRepository } from "./repository/workflow-run-outbox";
 import type { Repositories } from "../types";
 
+const createRepos = (db: PgDb): Omit<Repositories, "transaction"> => ({
+	workflowRun: createWorkflowRunRepository(db),
+	task: createTaskRepository(db),
+	stateTransition: createStateTransitionRepository(db),
+	schedule: createScheduleRepository(db),
+	workflow: createWorkflowRepository(db),
+	sleepQueue: createSleepQueueRepository(db),
+	eventWaitQueue: createEventWaitQueueRepository(db),
+	childWorkflowRunWaitQueue: createChildWorkflowRunWaitQueueRepository(db),
+	workflowRunOutbox: createWorkflowRunOutboxRepository(db),
+});
+
 export function createPgRepos(client: PgClient): Repositories {
 	const db = createPgHandle(client);
 	return {
@@ -17,19 +29,5 @@ export function createPgRepos(client: PgClient): Repositories {
 		async transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T> {
 			return db.transaction(async (tx) => fn(createRepos(tx)));
 		},
-	};
-}
-
-function createRepos(db: PgDb): Omit<Repositories, "transaction"> {
-	return {
-		workflowRun: createWorkflowRunRepository(db),
-		task: createTaskRepository(db),
-		stateTransition: createStateTransitionRepository(db),
-		schedule: createScheduleRepository(db),
-		workflow: createWorkflowRepository(db),
-		sleepQueue: createSleepQueueRepository(db),
-		eventWaitQueue: createEventWaitQueueRepository(db),
-		childWorkflowRunWaitQueue: createChildWorkflowRunWaitQueueRepository(db),
-		workflowRunOutbox: createWorkflowRunOutboxRepository(db),
 	};
 }

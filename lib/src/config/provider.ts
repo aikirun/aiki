@@ -23,16 +23,14 @@ export type CreatePassiveConfigProvider<Config> = (context: PassiveConfigProvide
  * `config` returns the latest value and
  * `scope` narrows to a sub-key, both lazily through `read`.
  */
-export function asConfigProvider<Config>(read: () => Config): ConfigProvider<Config> {
-	return {
-		get config() {
-			return read();
-		},
-		scope(key) {
-			return asConfigProvider(() => read()[key]);
-		},
-	};
-}
+export const asConfigProvider = <Config>(read: () => Config): ConfigProvider<Config> => ({
+	get config() {
+		return read();
+	},
+	scope(key) {
+		return asConfigProvider(() => read()[key]);
+	},
+});
 
 /**
  * A config provider that starts on initial value and refreshes it in the background.
