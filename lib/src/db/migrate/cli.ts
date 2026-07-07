@@ -5,6 +5,7 @@ import { config as dotenvConfig } from "dotenv";
 
 import { migrateApply } from "./commands/apply";
 import { migrateList } from "./commands/list";
+import type { MigrationSource } from "./source";
 import { loadDatabaseConfig, loadDatabaseProvider } from "../config";
 import type { DatabaseProvider } from "../provider";
 
@@ -23,7 +24,7 @@ function isMigrateSubcommand(value: string): value is MigrateSubcommand {
 export interface MigrateCliParams {
 	name: string;
 	version: string;
-	resolveMigrationsDir: (provider: DatabaseProvider) => string;
+	resolveSource: (provider: DatabaseProvider) => MigrationSource;
 	migrationsTable: string;
 }
 
@@ -56,7 +57,7 @@ export function runMigrateCli(params: MigrateCliParams): void {
 					case "apply": {
 						const dbConfig = loadDatabaseConfig();
 						await migrateApply({
-							migrationsDir: params.resolveMigrationsDir(dbConfig.provider),
+							source: params.resolveSource(dbConfig.provider),
 							migrationsTable: params.migrationsTable,
 							db: dbConfig,
 						});
@@ -64,8 +65,8 @@ export function runMigrateCli(params: MigrateCliParams): void {
 					}
 					case "list": {
 						const dbProvider = loadDatabaseProvider();
-						await migrateList({
-							migrationsDir: params.resolveMigrationsDir(dbProvider),
+						migrateList({
+							source: params.resolveSource(dbProvider),
 							dbProvider,
 						});
 						return;

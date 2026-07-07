@@ -1,8 +1,9 @@
 // biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import type { DatabaseConfig, PgDatabaseConfig } from "../../config";
+import type { MigrationMeta, MigrationSource } from "../source";
 
 interface MigrateApplyParams {
-	migrationsDir: string;
+	source: MigrationSource;
 	migrationsTable: string;
 	db: DatabaseConfig;
 }
@@ -12,7 +13,7 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 
 	switch (dbConfig.provider) {
 		case "pg":
-			await applyPg(dbConfig, params.migrationsDir, params.migrationsTable);
+			await applyPg(dbConfig, params.source.read(), params.migrationsTable);
 			console.log("migrations applied");
 			return;
 		case "sqlite":
@@ -23,9 +24,8 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 	}
 }
 
-async function applyPg(config: PgDatabaseConfig, migrationsDir: string, migrationsTable: string): Promise<void> {
+async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], migrationsTable: string): Promise<void> {
 	const { sql } = await import("drizzle-orm");
-	const { readMigrationFiles } = await import("drizzle-orm/migrator");
 	const { drizzle } = await import("drizzle-orm/postgres-js");
 	const postgres = await importPostgres();
 	const client = postgres(config.url, {
@@ -48,8 +48,6 @@ async function applyPg(config: PgDatabaseConfig, migrationsDir: string, migratio
 			sql`SELECT hash FROM drizzle.${sql.identifier(migrationsTable)}`
 		);
 		const appliedHashes = new Set(applied.map((row) => row.hash));
-
-		const migrations = readMigrationFiles({ migrationsFolder: migrationsDir });
 
 		for (const migration of migrations) {
 			if (appliedHashes.has(migration.hash)) {
