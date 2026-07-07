@@ -90,12 +90,15 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 
 		return {
 			id: scheduleId,
+
 			pause: async () => {
 				await client.api.schedule.pauseV1({ id: scheduleId });
 			},
+
 			resume: async () => {
 				await client.api.schedule.resumeV1({ id: scheduleId });
 			},
+
 			delete: async () => {
 				await client.api.schedule.deleteV1({ id: scheduleId });
 			},
@@ -105,6 +108,7 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 	function createBuilder(optionsBuilder: ObjectBuilder<ScheduleActivateOptions>): ScheduleBuilder {
 		return {
 			opt: (path, value) => createBuilder(optionsBuilder.with(path, value)),
+
 			async activate(client, workflow, ...args) {
 				return activateWithOptions(client, workflow, optionsBuilder.build(), ...args);
 			},
