@@ -68,29 +68,36 @@ export function RunRow({ run }: RunRowProps) {
 
 				{/* Line 2: short ID + copy, reference ID + copy, task counts */}
 				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-					<div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-						<span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t3)" }}>{run.id.slice(-6)}</span>
+					<div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+						<span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap" }}>
+							ID: {run.id.slice(-6)}
+						</span>
 						<CopyButton text={run.id} />
 					</div>
 
 					{run.referenceId ? (
-						<div style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
-							<span
-								style={{
-									fontFamily: "monospace",
-									fontSize: 10,
-									color: "var(--t2)",
-									overflow: "hidden",
-									textOverflow: "ellipsis",
-									whiteSpace: "nowrap",
-									maxWidth: 120,
-								}}
-								title={run.referenceId}
-							>
-								{run.referenceId}
+						<>
+							<span style={{ color: "var(--t1)", fontSize: 10, fontWeight: 700, marginLeft: -2, marginRight: 2 }}>
+								•
 							</span>
-							<CopyButton text={run.referenceId} />
-						</div>
+							<div style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
+								<span
+									style={{
+										fontFamily: "monospace",
+										fontSize: 10,
+										color: "var(--t3)",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										whiteSpace: "nowrap",
+										maxWidth: 120,
+									}}
+									title={run.referenceId}
+								>
+									REF: {run.referenceId}
+								</span>
+								<CopyButton text={run.referenceId} />
+							</div>
+						</>
 					) : null}
 
 					{run.taskCounts && <TaskSummaryBar taskCounts={run.taskCounts} />}
