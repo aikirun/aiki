@@ -40,7 +40,7 @@ ARG AIKI_SERVER_PORT=9850
 ENV AIKI_SERVER_PORT=${AIKI_SERVER_PORT}
 
 WORKDIR /aiki/app
-COPY --from=builder /aiki/app/server/dist/aiki-server ./
+COPY --from=builder /aiki/app/server/dist/aiki-app-server ./
 
 EXPOSE ${AIKI_SERVER_PORT}
-CMD ["./aiki-server"]
+CMD ["./aiki-app-server"]

@@ -5,9 +5,9 @@
 	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {
-		"start": "bun run src/index.ts",
-		"start:watch": "bun --watch run src/index.ts",
-		"build": "bun build src/index.ts --compile --outfile dist/aiki-server",
+		"start": "bun run src/main.ts",
+		"start:watch": "bun --watch run src/main.ts",
+		"build": "bun build src/main.ts --compile --outfile dist/aiki-app-server",
 		"db:migrate:apply:server": "bun ../../sdk/server/src/bin.ts migrate apply --env-file ./.env",
 		"db:migrate:apply:iam": "bun ../../sdk/iam/src/bin.ts migrate apply --env-file ./.env",
 		"db:migrate:apply": "bun run db:migrate:apply:server && bun run db:migrate:apply:iam"

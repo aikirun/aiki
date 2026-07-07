@@ -11,6 +11,7 @@
 
 		"baseUrl": ".",
 		"paths": {
+			"@aikirun/app-server": ["./app/server/src/index.ts"],
 			"@aikirun/client": ["./sdk/client/src/index.ts"],
 			"@aikirun/endpoint": ["./sdk/endpoint/src/index.ts"],
 			"@aikirun/iam": ["./sdk/iam/src/index.ts"],
