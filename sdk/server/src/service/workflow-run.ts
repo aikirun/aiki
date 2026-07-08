@@ -457,7 +457,7 @@ export const createWorkflowRunService = ({
 		});
 		return {
 			runs: childRuns.map((child) => {
-				const shard = (child.options as WorkflowStartOptions | null)?.shard;
+				const shard = child.options?.shard;
 				return {
 					id: child.id,
 					options: shard ? { shard } : undefined,

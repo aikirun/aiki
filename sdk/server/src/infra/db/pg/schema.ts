@@ -13,6 +13,7 @@ import {
 	TERMINAL_WORKFLOW_RUN_STATUSES,
 	WORKFLOW_RUN_CONFLICT_POLICIES,
 	WORKFLOW_RUN_STATUSES,
+	type WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition";
 import { TASK_STATUSES } from "@aikirun/types/workflow/task";
@@ -136,7 +137,7 @@ export const workflowRun = pgTable(
 
 		input: jsonb("input"),
 		inputHash: text("input_hash").notNull(),
-		options: jsonb("options"),
+		options: jsonb("options").$type<WorkflowStartOptions>(),
 
 		referenceId: text("reference_id"),
 		conflictPolicy: workflowRunConflictPolicyEnum("conflict_policy"),

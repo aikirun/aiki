@@ -13,7 +13,6 @@ import type {
 	WorkflowRunStateAwaitingChildWorkflow,
 	WorkflowRunStateScheduled,
 	WorkflowRunStatus,
-	WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
@@ -287,8 +286,7 @@ async function transitionStateInTx(
 
 	if (toState.status === "cancelled") {
 		await discardStaleTasks(runId, ["running", "awaiting_retry"], txRepos);
-		const shard = (run.options as WorkflowStartOptions | null)?.shard;
-		await childRunCanceller.cancel([{ namespaceId, runId, shard }], txRepos, context.logger);
+		await childRunCanceller.cancel([{ namespaceId, runId, shard: run.options?.shard }], txRepos, context.logger);
 	}
 
 	if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {
