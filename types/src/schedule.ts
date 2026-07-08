@@ -45,7 +45,7 @@ export interface Schedule {
 	workflowVersionId: string;
 	status: ScheduleStatus;
 	spec: ScheduleSpec;
-	input?: unknown;
+	workflowRunInput?: unknown;
 	options?: ScheduleActivateOptions;
 	createdAt: number;
 	updatedAt: number;

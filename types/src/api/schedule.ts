@@ -14,7 +14,7 @@ export interface ScheduleApi {
 export interface ScheduleActivateRequestV1 {
 	workflowName: string;
 	workflowVersionId: string;
-	input?: unknown;
+	workflowRunInput?: unknown;
 	spec: ScheduleSpec;
 	options?: ScheduleActivateOptions;
 }

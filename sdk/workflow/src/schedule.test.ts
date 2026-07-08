@@ -17,12 +17,12 @@ const syncInventoryWorkflow = workflow({ name: "sync-inventory" }).v<{ warehouse
 const intervalScheduleActivateRequest = intervalScheduleActivateRequestFactory.params({
 	workflowName: syncInventoryWorkflow.name,
 	workflowVersionId: syncInventoryWorkflow.versionId,
-	input: { warehouseId: "wh-1" },
+	workflowRunInput: { warehouseId: "wh-1" },
 });
 const cronScheduleActivateRequest = cronScheduleActivateRequestFactory.params({
 	workflowName: syncInventoryWorkflow.name,
 	workflowVersionId: syncInventoryWorkflow.versionId,
-	input: { warehouseId: "wh-1" },
+	workflowRunInput: { warehouseId: "wh-1" },
 });
 
 describe("schedule", () => {
