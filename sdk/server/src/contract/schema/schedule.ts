@@ -21,13 +21,13 @@ export const scheduleSpecSchema = cronScheduleSpecSchema.or(intervalScheduleSpec
 
 export const scheduleStatusSchema = type("'active' | 'paused' | 'deleted'");
 
-export const scheduleReferenceOptionsSchema = type({
+export const scheduleReferenceSchema = type({
 	id: "string > 0",
 	"conflictPolicy?": "'error' | 'return_existing'",
 });
 
 export const scheduleActivateOptionsSchema = type({
-	"reference?": scheduleReferenceOptionsSchema.or("undefined"),
+	"reference?": scheduleReferenceSchema.or("undefined"),
 });
 
 export const scheduleWorkflowFilterSchema = type({

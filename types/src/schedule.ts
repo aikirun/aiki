@@ -30,13 +30,13 @@ export type ScheduleSpec = CronScheduleSpec | IntervalScheduleSpec;
 export const SCHEDULE_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type ScheduleConflictPolicy = (typeof SCHEDULE_CONFLICT_POLICIES)[number];
 
-export interface ScheduleReferenceOptions {
+export interface ScheduleReference {
 	id: string;
 	conflictPolicy?: ScheduleConflictPolicy;
 }
 
 export interface ScheduleActivateOptions {
-	reference?: ScheduleReferenceOptions;
+	reference?: ScheduleReference;
 }
 
 export interface Schedule {
