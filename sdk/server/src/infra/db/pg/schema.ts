@@ -16,7 +16,7 @@ import {
 	type WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition";
-import { TASK_STATUSES } from "@aikirun/types/workflow/task";
+import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
 import { relations, sql } from "drizzle-orm";
 import {
 	check,
@@ -200,7 +200,7 @@ export const task = pgTable(
 
 		input: jsonb("input"),
 		inputHash: text("input_hash").notNull(),
-		options: jsonb("options"),
+		options: jsonb("options").$type<TaskStartOptions>(),
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
 		nextAttemptAt: timestampMs("next_attempt_at"),
