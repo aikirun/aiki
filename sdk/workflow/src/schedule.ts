@@ -59,7 +59,7 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 		options: ScheduleActivateOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ScheduleHandle> {
-		const input = args[0];
+		const workflowRunInput = args[0];
 
 		let scheduleSpec: ScheduleSpec;
 		if (params.type === "interval") {
@@ -76,7 +76,7 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 			workflowName: workflow.name,
 			workflowVersionId: workflow.versionId,
 			spec: scheduleSpec,
-			input,
+			workflowRunInput,
 			options,
 		});
 		client.logger.info("Schedule activated", {

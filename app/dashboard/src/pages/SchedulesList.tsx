@@ -649,34 +649,35 @@ function ScheduleRow({
 					</div>
 
 					{/* Input JSON */}
-					{schedule.input != null && Object.keys(schedule.input as Record<string, unknown>).length > 0 && (
-						<div style={{ marginBottom: 12 }}>
-							<div
-								style={{
-									fontSize: 9,
-									fontWeight: 700,
-									textTransform: "uppercase",
-									letterSpacing: "0.07em",
-									color: "var(--t3)",
-									marginBottom: 4,
-								}}
-							>
-								Input
+					{schedule.workflowRunInput != null &&
+						Object.keys(schedule.workflowRunInput as Record<string, unknown>).length > 0 && (
+							<div style={{ marginBottom: 12 }}>
+								<div
+									style={{
+										fontSize: 9,
+										fontWeight: 700,
+										textTransform: "uppercase",
+										letterSpacing: "0.07em",
+										color: "var(--t3)",
+										marginBottom: 4,
+									}}
+								>
+									Input
+								</div>
+								<pre
+									style={{
+										fontFamily: "monospace",
+										fontSize: 11,
+										color: "var(--t1)",
+										lineHeight: 1.5,
+										whiteSpace: "pre-wrap",
+										margin: 0,
+									}}
+								>
+									{JSON.stringify(schedule.workflowRunInput, null, 2)}
+								</pre>
 							</div>
-							<pre
-								style={{
-									fontFamily: "monospace",
-									fontSize: 11,
-									color: "var(--t1)",
-									lineHeight: 1.5,
-									whiteSpace: "pre-wrap",
-									margin: 0,
-								}}
-							>
-								{JSON.stringify(schedule.input, null, 2)}
-							</pre>
-						</div>
-					)}
+						)}
 
 					{/* Action buttons */}
 					<div style={{ display: "flex", gap: 6, alignItems: "center" }}>

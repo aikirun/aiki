@@ -40,7 +40,7 @@ export const scheduleSchema = type({
 	id: "string > 0",
 	workflowName: "string > 0",
 	workflowVersionId: "string > 0",
-	"input?": "unknown",
+	"workflowRunInput?": "unknown",
 	spec: scheduleSpecSchema,
 	status: scheduleStatusSchema,
 	"options?": scheduleActivateOptionsSchema.or("undefined"),

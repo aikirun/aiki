@@ -3,7 +3,7 @@ import { hashInput, sha256Async } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
-import type { ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
+import type { ScheduleActivateRequestV1, ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type {
 	Schedule,
@@ -126,26 +126,20 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 	async activateSchedule(
 		_context: Context,
 		namespaceId: NamespaceId,
-		request: {
-			workflowName: string;
-			workflowVersionId: string;
-			input?: unknown;
-			spec: ScheduleSpec;
-			options?: { reference?: { id: string; conflictPolicy?: ScheduleConflictPolicy | null } };
-		}
+		request: ScheduleActivateRequestV1
 	): Promise<{ schedule: Schedule }> {
-		const { workflowName, workflowVersionId, input, spec, options } = request;
+		const { workflowName, workflowVersionId, workflowRunInput, spec, options } = request;
 		const definitionHash = await sha256Async(
 			stableStringify({
 				workflowName,
 				workflowVersionId,
 				spec,
-				input,
+				workflowRunInput,
 			})
 		);
 		const referenceId = options?.reference?.id;
 		const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
-		const workflowRunInputHash = await hashInput(input);
+		const workflowRunInputHash = await hashInput(workflowRunInput);
 
 		return repos.transaction(async (txRepos) => {
 			const workflowRow = await txRepos.workflow.getOrCreate({
@@ -174,7 +168,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 							namespaceId,
 							workflowId: workflowRow.id,
 							spec,
-							workflowRunInput: input,
+							workflowRunInput,
 							workflowRunInputHash,
 							definitionHash,
 							referenceId: undefined,
@@ -232,7 +226,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 				namespaceId,
 				workflowId: workflowRow.id,
 				spec,
-				workflowRunInput: input,
+				workflowRunInput,
 				workflowRunInputHash,
 				definitionHash,
 				referenceId,
@@ -401,7 +395,7 @@ export function scheduleRowToDomain(
 		workflowVersionId: workflow.workflowVersionId,
 		status: schedule.status,
 		spec,
-		input: schedule.workflowRunInput,
+		workflowRunInput: schedule.workflowRunInput,
 		options: schedule.referenceId
 			? { reference: { id: schedule.referenceId, conflictPolicy: schedule.conflictPolicy ?? undefined } }
 			: undefined,
