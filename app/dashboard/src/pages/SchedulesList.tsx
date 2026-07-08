@@ -1,4 +1,4 @@
-import type { Schedule, ScheduleStatus } from "@aikirun/types/schedule";
+import type { Schedule, ScheduledWorkflowStartOptions, ScheduleStatus } from "@aikirun/types/schedule";
 import { useQueryClient } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
@@ -137,6 +137,30 @@ function fmtMs(ms: number): string {
 	if (ms < 60000) return `${Math.round(ms / 1000)}s`;
 	if (ms < 3600000) return `${Math.round(ms / 60000)}m`;
 	return `${Math.round(ms / 3600000)}h`;
+}
+
+function fmtDelay(ms: number): string {
+	if (ms < 1000) return `${ms}ms`;
+	const seconds = ms / 1000;
+	return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`;
+}
+
+function retrySummary(retry: NonNullable<ScheduledWorkflowStartOptions["retry"]>): string {
+	switch (retry.type) {
+		case "never":
+			return "never";
+		case "fixed":
+			return `fixed · ${retry.maxAttempts}× · ${fmtDelay(retry.delayMs)}`;
+		case "exponential":
+		case "jittered": {
+			const parts = [retry.type, `${retry.maxAttempts}×`, `${fmtDelay(retry.baseDelayMs)} base`];
+			if (retry.factor !== undefined) parts.push(`×${retry.factor}`);
+			if (retry.maxDelayMs !== undefined) parts.push(`≤ ${fmtDelay(retry.maxDelayMs)}`);
+			return parts.join(" · ");
+		}
+		default:
+			return retry satisfies never;
+	}
 }
 
 function fmtDate(ts: number): string {
@@ -644,6 +668,10 @@ function ScheduleRow({
 						)}
 						{schedule.spec.type === "interval" && <Meta label="Interval" value={fmtMs(schedule.spec.everyMs)} />}
 						{schedule.spec.overlapPolicy && <Meta label="Overlap" value={schedule.spec.overlapPolicy} />}
+						{schedule.workflowRunOptions?.retry && (
+							<Meta label="Retry" value={retrySummary(schedule.workflowRunOptions.retry)} />
+						)}
+						{schedule.workflowRunOptions?.shard && <Meta label="Shard" value={schedule.workflowRunOptions.shard} />}
 						<Meta label="Total Runs" value={runCount.toLocaleString()} />
 						<Meta label="Created" value={fmtDate(schedule.createdAt)} />
 					</div>

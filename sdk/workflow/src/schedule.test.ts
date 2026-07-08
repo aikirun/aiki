@@ -92,6 +92,65 @@ describe("schedule", () => {
 			}));
 	});
 
+	describe("workflow run options", () => {
+		const retryingSyncInventoryWorkflow = workflow({ name: "sync-inventory" }).v<{ warehouseId: string }>("1.0.0", {
+			handler: async () => {},
+			retry: { type: "fixed", maxAttempts: 5, delayMs: 300 },
+		});
+
+		test("opt carries retry and shard to every fired run", () =>
+			withFakeClient(async (client) => {
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequest.build({
+						workflowRunOptions: {
+							retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 },
+							shard: "eu",
+						},
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
+
+				await schedule({ type: "interval", every: { seconds: 1 } })
+					.with()
+					.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
+					.opt("workflowRun.shard", "eu")
+					.activate(client, syncInventoryWorkflow, { warehouseId: "wh-1" });
+			}));
+
+		test("carries the workflow's declared retry default when the schedule sets no overrides", () =>
+			withFakeClient(async (client) => {
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequest.build({
+						workflowRunOptions: { retry: { type: "fixed", maxAttempts: 5, delayMs: 300 } },
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
+
+				await schedule({ type: "interval", every: { seconds: 1 } }).activate(client, retryingSyncInventoryWorkflow, {
+					warehouseId: "wh-1",
+				});
+			}));
+
+		test("a schedule retry override replaces the workflow's declared default", () =>
+			withFakeClient(async (client) => {
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequest.build({
+						workflowRunOptions: {
+							retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 },
+							shard: "eu",
+						},
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
+
+				await schedule({ type: "interval", every: { seconds: 1 } })
+					.with()
+					.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
+					.opt("workflowRun.shard", "eu")
+					.activate(client, retryingSyncInventoryWorkflow, { warehouseId: "wh-1" });
+			}));
+	});
+
 	describe("handle operations", () => {
 		test("pause calls pauseV1 with the schedule id", () =>
 			withFakeClient(async (client) => {

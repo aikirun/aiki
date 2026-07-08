@@ -13,7 +13,9 @@ const everyFiveSeconds = schedule({
 await runWithWorker([notify], async (client) => {
 	const scheduleHandle = await everyFiveSeconds
 		.with()
-		.opt("reference.id", "my-correlation-id")
+		.opt("reference.id", "my-correlation-xxx")
+		.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
+		.opt("workflowRun.shard", "eu")
 		.activate(client, notify, "This is a reminder");
 	await delay(20_000);
 	await scheduleHandle.pause();

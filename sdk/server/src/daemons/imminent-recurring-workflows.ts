@@ -5,9 +5,10 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
+import type { Schedule, ScheduledWorkflowStartOptions, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
 import {
 	NON_TERMINAL_WORKFLOW_RUN_STATUSES,
+	type WorkflowReference,
 	type WorkflowRunId,
 	type WorkflowRunStateCancelled,
 	type WorkflowRunStateQueued,
@@ -165,7 +166,7 @@ async function processOverlapAllowSchedules(
 				status: "queued",
 				input: schedule.workflowRunInput,
 				inputHash: schedule.workflowRunInputHash,
-				options: { reference: { id: referenceId } },
+				options: scheduledRunOptions(schedule, referenceId),
 				referenceId,
 				latestStateTransitionId: stateTransitionId,
 			});
@@ -184,7 +185,7 @@ async function processOverlapAllowSchedules(
 				workflowName: schedule.workflowName,
 				workflowVersionId: schedule.workflowVersionId,
 				rank: computeRank(occurrence),
-				shard: null,
+				shard: schedule.workflowRunOptions?.shard ?? null,
 				status: "pending",
 			});
 		}
@@ -260,7 +261,7 @@ async function processOverlapSkipSchedules(
 			status: "queued",
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
-			options: { reference: { id: referenceId } },
+			options: scheduledRunOptions(schedule, referenceId),
 			referenceId,
 			latestStateTransitionId: stateTransitionId,
 		});
@@ -279,7 +280,7 @@ async function processOverlapSkipSchedules(
 			workflowName: schedule.workflowName,
 			workflowVersionId: schedule.workflowVersionId,
 			rank: computeRank(occurrence),
-			shard: null,
+			shard: schedule.workflowRunOptions?.shard ?? null,
 			status: "pending",
 		});
 		scheduleUpdates.push({
@@ -355,7 +356,7 @@ async function processOverlapCancelPreviousSchedules(
 			status: "queued",
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
-			options: { reference: { id: referenceId } },
+			options: scheduledRunOptions(schedule, referenceId),
 			referenceId,
 			latestStateTransitionId: stateTransitionId,
 		});
@@ -374,7 +375,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowName: schedule.workflowName,
 			workflowVersionId: schedule.workflowVersionId,
 			rank: computeRank(occurrence),
-			shard: null,
+			shard: schedule.workflowRunOptions?.shard ?? null,
 			status: "pending",
 		});
 		scheduleUpdates.push({
@@ -452,6 +453,17 @@ async function processOverlapCancelPreviousSchedules(
 	if (deps.workflowRunPublisher && isNonEmptyArray(insertedOutboxEntries)) {
 		await publishPendingOutboxEntries(context, deps.repos, deps.workflowRunPublisher, insertedOutboxEntries);
 	}
+}
+
+function scheduledRunOptions(
+	schedule: DueSchedule,
+	referenceId: string
+): ScheduledWorkflowStartOptions & { reference: WorkflowReference } {
+	return {
+		reference: { id: referenceId },
+		retry: schedule.workflowRunOptions?.retry,
+		shard: schedule.workflowRunOptions?.shard,
+	};
 }
 
 async function fetchActiveRunsBySchedule(

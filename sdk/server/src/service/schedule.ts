@@ -8,6 +8,7 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type {
 	Schedule,
 	ScheduleConflictPolicy,
+	ScheduledWorkflowStartOptions,
 	ScheduleId,
 	ScheduleSpec,
 	ScheduleStatus,
@@ -128,13 +129,14 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 		namespaceId: NamespaceId,
 		request: ScheduleActivateRequestV1
 	): Promise<{ schedule: Schedule }> {
-		const { workflowName, workflowVersionId, workflowRunInput, spec, options } = request;
+		const { workflowName, workflowVersionId, workflowRunInput, spec, options, workflowRunOptions } = request;
 		const definitionHash = await sha256Async(
 			stableStringify({
 				workflowName,
 				workflowVersionId,
 				spec,
 				workflowRunInput,
+				workflowRunOptions,
 			})
 		);
 		const referenceId = options?.reference?.id;
@@ -173,6 +175,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 							definitionHash,
 							referenceId: undefined,
 							conflictPolicy: options?.reference?.conflictPolicy,
+							workflowRunOptions,
 							nextRunAt,
 						});
 
@@ -231,6 +234,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 				definitionHash,
 				referenceId,
 				conflictPolicy: options?.reference?.conflictPolicy,
+				workflowRunOptions,
 				nextRunAt,
 			});
 			return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
@@ -350,6 +354,7 @@ async function createSchedule(
 		definitionHash: string;
 		referenceId: string | undefined;
 		conflictPolicy: ScheduleConflictPolicy | undefined | null;
+		workflowRunOptions: ScheduledWorkflowStartOptions | undefined;
 		nextRunAt: TimestampMs;
 	}
 ): Promise<ScheduleRow> {
@@ -368,6 +373,7 @@ async function createSchedule(
 		definitionHash: params.definitionHash,
 		referenceId: params.referenceId,
 		conflictPolicy: params.conflictPolicy,
+		workflowRunOptions: params.workflowRunOptions,
 		nextRunAt: params.nextRunAt,
 	});
 }
@@ -399,6 +405,7 @@ export function scheduleRowToDomain(
 		options: schedule.referenceId
 			? { reference: { id: schedule.referenceId, conflictPolicy: schedule.conflictPolicy ?? undefined } }
 			: undefined,
+		workflowRunOptions: schedule.workflowRunOptions ?? undefined,
 		createdAt: schedule.createdAt,
 		updatedAt: schedule.updatedAt,
 		lastOccurrence: schedule.lastOccurrence ?? undefined,

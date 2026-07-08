@@ -8,6 +8,7 @@ export const intervalScheduleActivateRequestFactory = Factory.define<
 	workflowName: "workflow",
 	workflowVersionId: "1.0.0",
 	options: {},
+	workflowRunOptions: {},
 	spec: { type: "interval", everyMs: 1_000 },
 }));
 
@@ -17,5 +18,6 @@ export const cronScheduleActivateRequestFactory = Factory.define<
 	workflowName: "workflow",
 	workflowVersionId: "1.0.0",
 	options: {},
+	workflowRunOptions: {},
 	spec: { type: "cron", expression: "* * * * *" },
 }));
