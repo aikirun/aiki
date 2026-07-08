@@ -30,7 +30,6 @@ import type {
 	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStateCancelled,
-	WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import type { TaskInfo, TaskQueue, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { monotonicFactory, ulid } from "ulidx";
@@ -501,7 +500,7 @@ export const createWorkflowRunService = ({
 				cancelledRunsMeta.push({
 					namespaceId: context.namespaceId,
 					runId: run.id,
-					shard: (run.options as WorkflowStartOptions | null)?.shard,
+					shard: run.options?.shard,
 				});
 			}
 
@@ -655,7 +654,7 @@ async function getWorkflowRun(
 		stateTransitionId: runRow.latestStateTransitionId,
 		input: runRow.input,
 		inputHash: runRow.inputHash,
-		options: runRow.options as WorkflowStartOptions | undefined,
+		options: runRow.options !== null ? runRow.options : undefined,
 		attempts: runRow.attempts,
 		state: latestTransition.state as WorkflowRunState,
 		taskQueues: tasksByAddress,

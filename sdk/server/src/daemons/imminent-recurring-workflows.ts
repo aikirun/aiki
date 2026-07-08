@@ -12,7 +12,6 @@ import {
 	type WorkflowRunId,
 	type WorkflowRunStateCancelled,
 	type WorkflowRunStateQueued,
-	type WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
@@ -500,7 +499,7 @@ async function fetchActiveRunsBySchedule(
 			if (run.referenceId) {
 				const schedule = schedulesByWorkflowAndReferenceId.get(run.workflowId)?.get(run.referenceId);
 				if (schedule) {
-					const shard = (run.options as WorkflowStartOptions | null)?.shard;
+					const shard = run.options?.shard;
 					activeRunsByScheduleId.set(schedule.id, { id: run.id, attempts: run.attempts, shard });
 				}
 			}

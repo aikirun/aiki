@@ -4,7 +4,7 @@ import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
-import type { WorkflowRunStateQueued, WorkflowStartOptions } from "@aikirun/types/workflow/run";
+import type { WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import { publishPendingOutboxEntries } from "./publish-ready-runs";
@@ -157,7 +157,7 @@ async function processChunk(
 			workflowRunId: run.id,
 			workflowName: workflow.name,
 			workflowVersionId: workflow.versionId,
-			shard: (run.options as WorkflowStartOptions | null)?.shard,
+			shard: run.options?.shard,
 			rank: run.rank,
 			status: "pending",
 		});
