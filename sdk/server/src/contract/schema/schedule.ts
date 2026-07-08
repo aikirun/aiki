@@ -23,7 +23,7 @@ export const scheduleStatusSchema = type("'active' | 'paused' | 'deleted'");
 
 export const scheduleReferenceOptionsSchema = type({
 	id: "string > 0",
-	"conflictPolicy?": "'upsert' | 'error'",
+	"conflictPolicy?": "'error' | 'return_existing'",
 });
 
 export const scheduleActivateOptionsSchema = type({
