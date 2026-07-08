@@ -27,7 +27,7 @@ export interface IntervalScheduleSpec extends ScheduleSpecBase {
 
 export type ScheduleSpec = CronScheduleSpec | IntervalScheduleSpec;
 
-export const SCHEDULE_CONFLICT_POLICIES = ["upsert", "error"] as const;
+export const SCHEDULE_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type ScheduleConflictPolicy = (typeof SCHEDULE_CONFLICT_POLICIES)[number];
 
 export interface ScheduleReferenceOptions {

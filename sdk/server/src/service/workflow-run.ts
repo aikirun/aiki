@@ -555,6 +555,7 @@ async function createWorkflowRunInTx(
 				if (conflictPolicy === "error") {
 					throw new WorkflowRunConflictError(name, versionId, referenceId);
 				}
+				conflictPolicy satisfies "return_existing";
 			}
 
 			context.logger.info("Returning existing run from reference ID", { runId: existingRun.id, referenceId });

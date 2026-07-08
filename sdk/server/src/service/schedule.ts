@@ -117,7 +117,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 			nextRunAt: TimestampMs | null;
 		}>
 	): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, id, updates);
+		const schedule = await repos.schedule.update(namespaceId, { id }, updates);
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
@@ -144,7 +144,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 			})
 		);
 		const referenceId = options?.reference?.id;
-		const conflictPolicy = options?.reference?.conflictPolicy ?? "upsert";
+		const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 		const workflowRunInputHash = await hashInput(input);
 
 		return repos.transaction(async (txRepos) => {
@@ -156,60 +156,90 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 			});
 
 			const workflowInfo = { workflowName, workflowVersionId };
+			const now = Date.now();
+			const nextRunAt = getNextOccurrence(spec, now) as TimestampMs;
 
-			const existingSchedule = referenceId
-				? await txRepos.schedule.getByReferenceId(namespaceId, referenceId)
-				: await txRepos.schedule.getByDefinitionHash(namespaceId, definitionHash);
+			if (!referenceId) {
+				const existingScheduleByDefinition = await txRepos.schedule.get(namespaceId, { definitionHash });
 
-			if (existingSchedule) {
-				if (existingSchedule.definitionHash === definitionHash && existingSchedule.status === "active") {
-					return { schedule: scheduleRowToDomain(existingSchedule, workflowInfo) };
-				}
+				const schedule = existingScheduleByDefinition
+					? existingScheduleByDefinition.status === "active"
+						? existingScheduleByDefinition
+						: await reactivateSchedule(txRepos.schedule, {
+								namespaceId,
+								scheduleId: existingScheduleByDefinition.id as ScheduleId,
+								nextRunAt,
+							})
+					: await createSchedule(txRepos.schedule, {
+							namespaceId,
+							workflowId: workflowRow.id,
+							spec,
+							workflowRunInput: input,
+							workflowRunInputHash,
+							definitionHash,
+							referenceId: undefined,
+							conflictPolicy: options?.reference?.conflictPolicy,
+							nextRunAt,
+						});
 
-				if (referenceId && existingSchedule.definitionHash !== definitionHash && conflictPolicy === "error") {
-					throw new ScheduleConflictError(referenceId);
-				}
-
-				const now = Date.now();
-				const updatedRow = await txRepos.schedule.update(namespaceId, existingSchedule.id, {
-					workflowId: workflowRow.id,
-					status: "active",
-					type: spec.type,
-					cronExpression: spec.type === "cron" ? spec.expression : undefined,
-					intervalMs: spec.type === "interval" ? spec.everyMs : undefined,
-					overlapPolicy: spec.overlapPolicy,
-					workflowRunInput: input,
-					workflowRunInputHash,
-					definitionHash,
-					nextRunAt: getNextOccurrence(spec, now) as TimestampMs,
-				});
-				if (!updatedRow) {
-					throw new NotFoundError(`Schedule not found: ${existingSchedule.id}`);
-				}
-				return { schedule: scheduleRowToDomain(updatedRow, workflowInfo) };
+				return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 			}
 
-			const id = ulid() as ScheduleId;
-			const now = Date.now();
-			const nextRunAt = getNextOccurrence(spec, now);
+			const existingScheduleByReference = await txRepos.schedule.get(namespaceId, { referenceId });
+			if (existingScheduleByReference) {
+				if (existingScheduleByReference.definitionHash !== definitionHash) {
+					if (conflictPolicy === "error") {
+						throw new ScheduleConflictError({ definitionHash, referenceId });
+					}
+					conflictPolicy satisfies "return_existing";
+					return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
+				}
 
-			const createdRow = await txRepos.schedule.create({
-				id,
+				const schedule =
+					existingScheduleByReference.status === "active"
+						? existingScheduleByReference
+						: await reactivateSchedule(txRepos.schedule, {
+								namespaceId,
+								scheduleId: existingScheduleByReference.id as ScheduleId,
+								nextRunAt,
+							});
+
+				return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
+			}
+
+			// Reference id is free, but the definition may already exist.
+			const existingNonReferencedSchedule = await txRepos.schedule.get(namespaceId, {
+				definitionHash,
+				referenceId: null,
+			});
+			if (existingNonReferencedSchedule) {
+				const schedule = await txRepos.schedule.update(
+					namespaceId,
+					{ id: existingNonReferencedSchedule.id, referenceId: null },
+					{
+						referenceId,
+						conflictPolicy: options?.reference?.conflictPolicy ?? null,
+						status: "active",
+						nextRunAt,
+					}
+				);
+				if (schedule) {
+					return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
+				}
+			}
+
+			const schedule = await createSchedule(txRepos.schedule, {
 				namespaceId,
 				workflowId: workflowRow.id,
-				status: "active",
-				type: spec.type,
-				cronExpression: spec.type === "cron" ? spec.expression : null,
-				intervalMs: spec.type === "interval" ? spec.everyMs : null,
-				overlapPolicy: spec.overlapPolicy ?? null,
+				spec,
 				workflowRunInput: input,
 				workflowRunInputHash,
 				definitionHash,
 				referenceId,
-				conflictPolicy: options?.reference?.conflictPolicy ?? null,
-				nextRunAt: nextRunAt as TimestampMs,
+				conflictPolicy: options?.reference?.conflictPolicy,
+				nextRunAt,
 			});
-			return { schedule: scheduleRowToDomain(createdRow, workflowInfo) };
+			return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 		});
 	},
 
@@ -274,21 +304,21 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 	},
 
 	async pauseSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, id, { status: "paused" });
+		const schedule = await repos.schedule.update(namespaceId, { id }, { status: "paused" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
 	},
 
 	async resumeSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, id, { status: "active" });
+		const schedule = await repos.schedule.update(namespaceId, { id }, { status: "active" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
 	},
 
 	async deleteSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, id, { status: "deleted" });
+		const schedule = await repos.schedule.update(namespaceId, { id }, { status: "deleted" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
@@ -296,6 +326,57 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 });
 
 export type ScheduleService = ReturnType<typeof createScheduleService>;
+
+async function reactivateSchedule(
+	repo: Repositories["schedule"],
+	params: { namespaceId: NamespaceId; scheduleId: ScheduleId; nextRunAt: TimestampMs }
+): Promise<ScheduleRow> {
+	const updatedRow = await repo.update(
+		params.namespaceId,
+		{ id: params.scheduleId },
+		{
+			status: "active",
+			nextRunAt: params.nextRunAt,
+		}
+	);
+	if (!updatedRow) {
+		throw new NotFoundError(`Schedule not found: ${params.scheduleId}`);
+	}
+	return updatedRow;
+}
+
+async function createSchedule(
+	repo: Repositories["schedule"],
+	params: {
+		namespaceId: NamespaceId;
+		workflowId: string;
+		spec: ScheduleSpec;
+		workflowRunInput: unknown;
+		workflowRunInputHash: string;
+		definitionHash: string;
+		referenceId: string | undefined;
+		conflictPolicy: ScheduleConflictPolicy | undefined | null;
+		nextRunAt: TimestampMs;
+	}
+): Promise<ScheduleRow> {
+	const { spec } = params;
+	return repo.create({
+		id: ulid(),
+		namespaceId: params.namespaceId,
+		workflowId: params.workflowId,
+		status: "active",
+		type: spec.type,
+		cronExpression: spec.type === "cron" ? spec.expression : null,
+		intervalMs: spec.type === "interval" ? spec.everyMs : null,
+		overlapPolicy: spec.overlapPolicy ?? null,
+		workflowRunInput: params.workflowRunInput,
+		workflowRunInputHash: params.workflowRunInputHash,
+		definitionHash: params.definitionHash,
+		referenceId: params.referenceId,
+		conflictPolicy: params.conflictPolicy,
+		nextRunAt: params.nextRunAt,
+	});
+}
 
 export function scheduleRowToDomain(
 	schedule: ScheduleRow,
