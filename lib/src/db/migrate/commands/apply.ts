@@ -13,7 +13,7 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 
 	switch (dbConfig.provider) {
 		case "pg":
-			await applyPg(dbConfig, params.migrationsDir, params.migrationsTable);
+			await applyPg(dbConfig, params.source.read(), params.migrationsTable);
 			return;
 		case "sqlite":
 		case "mysql":
