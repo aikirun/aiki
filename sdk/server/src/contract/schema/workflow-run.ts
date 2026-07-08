@@ -13,13 +13,13 @@ export const workflowRunStatusSchema = type(
 
 export const terminalWorkflowRunStatusSchema = type("'cancelled' | 'failed' | 'completed'");
 
-const workflowReferenceOptionsSchema = type({
+const workflowReferenceSchema = type({
 	id: "string > 0",
 	"conflictPolicy?": "'error' | 'return_existing' | undefined",
 });
 
 export const workflowOptionsSchema = type({
-	"reference?": workflowReferenceOptionsSchema,
+	"reference?": workflowReferenceSchema,
 	"trigger?": triggerStrategySchema,
 	"shard?": "string | undefined",
 	"retry?": retryStrategySchema,

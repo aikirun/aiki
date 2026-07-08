@@ -1,7 +1,12 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow/run";
+import type {
+	WorkflowRunId,
+	WorkflowRunState,
+	WorkflowRunStatus,
+	WorkflowStartOptions,
+} from "@aikirun/types/workflow/run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
 import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
@@ -28,7 +33,7 @@ export interface WorkflowRunMeta {
 	workflowId: string;
 	revision: number;
 	attempts: number;
-	options: unknown;
+	options: WorkflowStartOptions | null;
 	latestStateTransitionId: string;
 }
 

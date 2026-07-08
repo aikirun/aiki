@@ -1,4 +1,4 @@
-import type { Schedule, ScheduleStatus } from "@aikirun/types/schedule";
+import type { Schedule, ScheduledWorkflowStartOptions, ScheduleStatus } from "@aikirun/types/schedule";
 import { useQueryClient } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
@@ -10,6 +10,7 @@ import { CopyButton } from "../components/common/CopyButton";
 import { WorkflowSearchInput } from "../components/runs/WorkflowSearchInput";
 import { SCHEDULE_STATUS_CONFIG } from "../constants/schedule-status";
 import { useDebounce } from "../hooks/useDebounce";
+import { useElementWidth } from "../hooks/useElementWidth";
 
 const ALL_SCHEDULE_STATUSES: ScheduleStatus[] = ["active", "paused", "deleted"];
 const PAGE_SIZE = 25;
@@ -136,6 +137,30 @@ function fmtMs(ms: number): string {
 	if (ms < 60000) return `${Math.round(ms / 1000)}s`;
 	if (ms < 3600000) return `${Math.round(ms / 60000)}m`;
 	return `${Math.round(ms / 3600000)}h`;
+}
+
+function fmtDelay(ms: number): string {
+	if (ms < 1000) return `${ms}ms`;
+	const seconds = ms / 1000;
+	return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`;
+}
+
+function retrySummary(retry: NonNullable<ScheduledWorkflowStartOptions["retry"]>): string {
+	switch (retry.type) {
+		case "never":
+			return "never";
+		case "fixed":
+			return `fixed · ${retry.maxAttempts}× · ${fmtDelay(retry.delayMs)}`;
+		case "exponential":
+		case "jittered": {
+			const parts = [retry.type, `${retry.maxAttempts}×`, `${fmtDelay(retry.baseDelayMs)} base`];
+			if (retry.factor !== undefined) parts.push(`×${retry.factor}`);
+			if (retry.maxDelayMs !== undefined) parts.push(`≤ ${fmtDelay(retry.maxDelayMs)}`);
+			return parts.join(" · ");
+		}
+		default:
+			return retry satisfies never;
+	}
 }
 
 function fmtDate(ts: number): string {
@@ -452,6 +477,9 @@ function ScheduleRow({
 	onAction: (action: "pause" | "resume" | "delete", id: string) => void;
 }) {
 	const [open, setOpen] = useState(false);
+	const [rowRef, rowWidth] = useElementWidth<HTMLDivElement>();
+	const showRef = rowWidth >= 480;
+	const showOverlap = rowWidth >= 380;
 	const spec = schedule.spec;
 	const isCron = spec.type === "cron";
 	const specLabel = spec.type === "cron" ? spec.expression : `every ${fmtMs(spec.everyMs)}`;
@@ -462,7 +490,7 @@ function ScheduleRow({
 	};
 
 	return (
-		<div className="anim-in" style={{ animationDelay: `${idx * 30}ms` }}>
+		<div ref={rowRef} className="anim-in" style={{ animationDelay: `${idx * 30}ms` }}>
 			{/* Collapsed row */}
 			<button
 				type="button"
@@ -520,38 +548,39 @@ function ScheduleRow({
 							</span>
 						</div>
 
-						{/* Line 2: short ID, ref, run count, overlap */}
+						{/* Line 2: short ID, ref, overlap */}
 						<div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10.5, color: "var(--t3)" }}>
-							<span style={{ display: "flex", alignItems: "center", gap: 2 }}>
-								<span style={{ fontFamily: "monospace", fontSize: 10 }}>{shortId(schedule.id)}</span>
+							<span style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+								<span style={{ fontFamily: "monospace", fontSize: 10, whiteSpace: "nowrap" }}>
+									ID: {shortId(schedule.id)}
+								</span>
 								<CopyButton text={schedule.id} />
 							</span>
-							{schedule.options?.reference?.id && (
-								<span style={{ display: "flex", alignItems: "center", gap: 2 }}>
-									<span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t2)" }}>
-										ref:{schedule.options.reference.id}
+							{showRef && schedule.options?.reference?.id && (
+								<>
+									<span style={{ fontSize: 10, color: "var(--t1)", fontWeight: 700, marginLeft: -2, marginRight: 2 }}>
+										•
 									</span>
-									<CopyButton text={schedule.options.reference.id} />
-								</span>
+									<span style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
+										<span
+											style={{
+												fontFamily: "monospace",
+												fontSize: 10,
+												color: "var(--t3)",
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+												maxWidth: 120,
+											}}
+											title={schedule.options.reference.id}
+										>
+											REF: {schedule.options.reference.id}
+										</span>
+										<CopyButton text={schedule.options.reference.id} />
+									</span>
+								</>
 							)}
-							<button
-								type="button"
-								onClick={viewRuns}
-								style={{
-									color: "var(--accent-sky)",
-									cursor: "pointer",
-									borderBottom: "1px dashed #38BDF8",
-									paddingBottom: 1,
-									background: "none",
-									border: "none",
-									padding: 0,
-									font: "inherit",
-									fontSize: "inherit",
-								}}
-							>
-								{runCount.toLocaleString()} runs →
-							</button>
-							{schedule.spec.overlapPolicy && (
+							{showOverlap && schedule.spec.overlapPolicy && (
 								<span
 									style={{
 										fontFamily: "monospace",
@@ -562,24 +591,54 @@ function ScheduleRow({
 										borderRadius: 3,
 									}}
 								>
-									{schedule.spec.overlapPolicy}
+									OVERLAP: {schedule.spec.overlapPolicy}
 								</span>
 							)}
 						</div>
 					</div>
 
-					{/* Right side: next run + last occurrence */}
-					<div style={{ textAlign: "right", flexShrink: 0 }}>
-						{schedule.status === "active" && schedule.nextRunAt > 0 && (
-							<div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--accent-sky)", fontWeight: 500 }}>
-								next {timeUntil(schedule.nextRunAt)}
-							</div>
-						)}
-						{schedule.lastOccurrence && (
-							<div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>
-								last {timeAgo(schedule.lastOccurrence)} ago
-							</div>
-						)}
+					{/* Right side: next/last occurrence + runs link */}
+					<div
+						style={{
+							display: "flex",
+							flexDirection: "column",
+							alignItems: "flex-end",
+							justifyContent: "space-between",
+							alignSelf: "stretch",
+							flexShrink: 0,
+							gap: 8,
+						}}
+					>
+						<div style={{ textAlign: "right" }}>
+							{schedule.status === "active" && schedule.nextRunAt > 0 && (
+								<div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--accent-sky)", fontWeight: 500 }}>
+									next {timeUntil(schedule.nextRunAt)}
+								</div>
+							)}
+							{schedule.lastOccurrence && (
+								<div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>
+									last {timeAgo(schedule.lastOccurrence)} ago
+								</div>
+							)}
+						</div>
+						<button
+							type="button"
+							onClick={viewRuns}
+							style={{
+								color: "var(--accent-sky)",
+								cursor: "pointer",
+								borderBottom: "1px dashed #38BDF8",
+								paddingBottom: 1,
+								background: "none",
+								border: "none",
+								padding: 0,
+								font: "inherit",
+								fontSize: 11,
+								whiteSpace: "nowrap",
+							}}
+						>
+							{runCount.toLocaleString()} runs →
+						</button>
 					</div>
 				</div>
 			</button>
@@ -599,6 +658,9 @@ function ScheduleRow({
 					{/* Metadata row */}
 					<div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 12 }}>
 						<Meta label="ID" value={schedule.id} copyable />
+						{schedule.options?.reference?.id && (
+							<Meta label="Reference" value={schedule.options.reference.id} copyable />
+						)}
 						<Meta label="Type" value={schedule.spec.type} />
 						{schedule.spec.type === "cron" && <Meta label="Expression" value={schedule.spec.expression} />}
 						{schedule.spec.type === "cron" && schedule.spec.timezone && (
@@ -606,39 +668,44 @@ function ScheduleRow({
 						)}
 						{schedule.spec.type === "interval" && <Meta label="Interval" value={fmtMs(schedule.spec.everyMs)} />}
 						{schedule.spec.overlapPolicy && <Meta label="Overlap" value={schedule.spec.overlapPolicy} />}
+						{schedule.workflowRunOptions?.retry && (
+							<Meta label="Retry" value={retrySummary(schedule.workflowRunOptions.retry)} />
+						)}
+						{schedule.workflowRunOptions?.shard && <Meta label="Shard" value={schedule.workflowRunOptions.shard} />}
 						<Meta label="Total Runs" value={runCount.toLocaleString()} />
 						<Meta label="Created" value={fmtDate(schedule.createdAt)} />
 					</div>
 
 					{/* Input JSON */}
-					{schedule.input != null && Object.keys(schedule.input as Record<string, unknown>).length > 0 && (
-						<div style={{ marginBottom: 12 }}>
-							<div
-								style={{
-									fontSize: 9,
-									fontWeight: 700,
-									textTransform: "uppercase",
-									letterSpacing: "0.07em",
-									color: "var(--t3)",
-									marginBottom: 4,
-								}}
-							>
-								Input
+					{schedule.workflowRunInput != null &&
+						Object.keys(schedule.workflowRunInput as Record<string, unknown>).length > 0 && (
+							<div style={{ marginBottom: 12 }}>
+								<div
+									style={{
+										fontSize: 9,
+										fontWeight: 700,
+										textTransform: "uppercase",
+										letterSpacing: "0.07em",
+										color: "var(--t3)",
+										marginBottom: 4,
+									}}
+								>
+									Input
+								</div>
+								<pre
+									style={{
+										fontFamily: "monospace",
+										fontSize: 11,
+										color: "var(--t1)",
+										lineHeight: 1.5,
+										whiteSpace: "pre-wrap",
+										margin: 0,
+									}}
+								>
+									{JSON.stringify(schedule.workflowRunInput, null, 2)}
+								</pre>
 							</div>
-							<pre
-								style={{
-									fontFamily: "monospace",
-									fontSize: 11,
-									color: "var(--t1)",
-									lineHeight: 1.5,
-									whiteSpace: "pre-wrap",
-									margin: 0,
-								}}
-							>
-								{JSON.stringify(schedule.input, null, 2)}
-							</pre>
-						</div>
-					)}
+						)}
 
 					{/* Action buttons */}
 					<div style={{ display: "flex", gap: 6, alignItems: "center" }}>

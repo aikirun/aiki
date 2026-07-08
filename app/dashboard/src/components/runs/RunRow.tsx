@@ -2,6 +2,7 @@ import type { WorkflowRunListItem } from "@aikirun/types/api/workflow-run";
 import { Link } from "react-router-dom";
 
 import { TaskSummaryBar } from "./TaskSummaryBar";
+import { useElementWidth } from "../../hooks/useElementWidth";
 import { CopyButton } from "../common/CopyButton";
 import { RelativeTime } from "../common/RelativeTime";
 import { StatusBadge } from "../common/StatusBadge";
@@ -11,8 +12,14 @@ interface RunRowProps {
 }
 
 export function RunRow({ run }: RunRowProps) {
+	const [rowRef, rowWidth] = useElementWidth<HTMLAnchorElement>();
+	const showRef = rowWidth >= 400;
+	const showVersion = rowWidth >= 340;
+	const showDate = rowWidth >= 300;
+
 	return (
 		<Link
+			ref={rowRef}
 			to={`/runs/${run.id}`}
 			style={{
 				display: "grid",
@@ -34,9 +41,7 @@ export function RunRow({ run }: RunRowProps) {
 				(e.currentTarget as HTMLElement).style.borderColor = "transparent";
 			}}
 		>
-			{/* Left: 2-line layout */}
 			<div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
-				{/* Line 1: workflow name, version badge, status pill */}
 				<div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
 					<span
 						style={{
@@ -50,66 +55,76 @@ export function RunRow({ run }: RunRowProps) {
 					>
 						{run.name}
 					</span>
-					<span
-						style={{
-							fontFamily: "monospace",
-							fontSize: 10,
-							color: "var(--t3)",
-							backgroundColor: "var(--s3)",
-							padding: "1px 5px",
-							borderRadius: 4,
-							flexShrink: 0,
-						}}
-					>
-						v{run.versionId.slice(0, 8)}
-					</span>
+					{showVersion && (
+						<span
+							style={{
+								fontFamily: "monospace",
+								fontSize: 10,
+								color: "var(--t3)",
+								backgroundColor: "var(--s3)",
+								padding: "1px 5px",
+								borderRadius: 4,
+								flexShrink: 0,
+							}}
+						>
+							v{run.versionId.slice(0, 8)}
+						</span>
+					)}
 					<StatusBadge status={run.status} />
 				</div>
 
-				{/* Line 2: short ID + copy, reference ID + copy, task counts */}
 				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-					<div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-						<span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t3)" }}>{run.id.slice(-6)}</span>
+					<div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+						<span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap" }}>
+							ID: {run.id.slice(-6)}
+						</span>
 						<CopyButton text={run.id} />
 					</div>
 
-					{run.referenceId ? (
-						<div style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
-							<span
-								style={{
-									fontFamily: "monospace",
-									fontSize: 10,
-									color: "var(--t2)",
-									overflow: "hidden",
-									textOverflow: "ellipsis",
-									whiteSpace: "nowrap",
-									maxWidth: 120,
-								}}
-								title={run.referenceId}
-							>
-								{run.referenceId}
+					{showRef && run.referenceId ? (
+						<>
+							<span style={{ color: "var(--t1)", fontSize: 10, fontWeight: 700, marginLeft: -2, marginRight: 2 }}>
+								•
 							</span>
-							<CopyButton text={run.referenceId} />
-						</div>
+							<div style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
+								<span
+									style={{
+										fontFamily: "monospace",
+										fontSize: 10,
+										color: "var(--t3)",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										whiteSpace: "nowrap",
+										maxWidth: 120,
+									}}
+									title={run.referenceId}
+								>
+									REF: {run.referenceId}
+								</span>
+								<CopyButton text={run.referenceId} />
+							</div>
+						</>
 					) : null}
 
 					{run.taskCounts && <TaskSummaryBar taskCounts={run.taskCounts} />}
 				</div>
 			</div>
 
-			{/* Right: relative time */}
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					paddingLeft: 16,
-					fontSize: 10.5,
-					color: "var(--t3)",
-					whiteSpace: "nowrap",
-				}}
-			>
-				<RelativeTime timestamp={run.createdAt} />
-			</div>
+			{/* Hidden on very tiny rows, where it floats between the two lines and looks misaligned */}
+			{showDate && (
+				<div
+					style={{
+						display: "flex",
+						alignItems: "center",
+						paddingLeft: 16,
+						fontSize: 10.5,
+						color: "var(--t3)",
+						whiteSpace: "nowrap",
+					}}
+				>
+					<RelativeTime timestamp={run.createdAt} />
+				</div>
+			)}
 		</Link>
 	);
 }

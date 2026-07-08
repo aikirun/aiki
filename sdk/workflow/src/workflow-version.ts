@@ -18,6 +18,7 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ReplayManifest,
+	WorkflowDefinitionStartOptions,
 	WorkflowRunAddress,
 	WorkflowRunId,
 	WorkflowRunRecord,
@@ -75,6 +76,7 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 	[INTERNAL]: {
 		eventsDefinition: TEvents;
 		handler: (run: WorkflowRun<Input, Context, TEvents>, input: Input) => Promise<void>;
+		definitionStartOptions: () => WorkflowDefinitionStartOptions;
 	};
 }
 
@@ -97,15 +99,16 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		this[INTERNAL] = {
 			eventsDefinition,
 			handler: this.handler.bind(this),
+			definitionStartOptions: this.definitionStartOptions.bind(this),
 		};
 	}
 
-	private definitionStartOptions(): WorkflowStartOptions {
-		return this.params.retry === undefined ? {} : { retry: this.params.retry };
+	private definitionStartOptions(): WorkflowDefinitionStartOptions {
+		return { retry: this.params.retry };
 	}
 
 	public with(): WorkflowBuilder<Input, Output, Context, TEvents> {
-		const startOptionsOverrider = objectOverrider(this.definitionStartOptions());
+		const startOptionsOverrider = objectOverrider<WorkflowStartOptions>(this.definitionStartOptions());
 		return createWorkflowBuilder(this, startOptionsOverrider());
 	}
 

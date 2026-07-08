@@ -13,7 +13,7 @@ export interface EventWaitReceived<Data> extends EventWaitBase {
 	status: "received";
 	data?: Data;
 	receivedAt: number;
-	reference?: EventReferenceOptions;
+	reference?: EventReference;
 }
 
 export interface EventWaitTimeout extends EventWaitBase {
@@ -36,9 +36,9 @@ export type EventWaitResult<Data, Timed extends boolean> = Timed extends false
 	: { timeout: false; data: Data } | { timeout: true };
 
 export interface EventSendOptions {
-	reference?: EventReferenceOptions;
+	reference?: EventReference;
 }
 
-export interface EventReferenceOptions {
+export interface EventReference {
 	id: string;
 }

@@ -45,7 +45,7 @@ export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status i
 export const WORKFLOW_RUN_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type WorkflowRunConflictPolicy = (typeof WORKFLOW_RUN_CONFLICT_POLICIES)[number];
 
-export interface WorkflowReferenceOptions {
+export interface WorkflowReference {
 	id: string;
 	conflictPolicy?: WorkflowRunConflictPolicy;
 }
@@ -53,9 +53,11 @@ export interface WorkflowReferenceOptions {
 export interface WorkflowStartOptions {
 	retry?: RetryStrategy;
 	trigger?: TriggerStrategy;
-	reference?: WorkflowReferenceOptions;
+	reference?: WorkflowReference;
 	shard?: string;
 }
+
+export type WorkflowDefinitionStartOptions = Pick<WorkflowStartOptions, "retry">;
 
 interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;

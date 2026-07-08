@@ -3,6 +3,7 @@ import {
 	SCHEDULE_OVERLAP_POLICIES,
 	SCHEDULE_STATUSES,
 	SCHEDULE_TYPES,
+	type ScheduledWorkflowStartOptions,
 } from "@aikirun/types/schedule";
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
@@ -12,9 +13,10 @@ import {
 	TERMINAL_WORKFLOW_RUN_STATUSES,
 	WORKFLOW_RUN_CONFLICT_POLICIES,
 	WORKFLOW_RUN_STATUSES,
+	type WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition";
-import { TASK_STATUSES } from "@aikirun/types/workflow/task";
+import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
 import { relations, sql } from "drizzle-orm";
 import {
 	check,
@@ -98,6 +100,8 @@ export const schedule = pgTable(
 		referenceId: text("reference_id"),
 		conflictPolicy: scheduleConflictPolicyEnum("conflict_policy"),
 
+		workflowRunOptions: jsonb("workflow_run_options").$type<ScheduledWorkflowStartOptions>(),
+
 		lastOccurrence: timestampMs("last_occurrence"),
 		nextRunAt: timestampMs("next_run_at"),
 
@@ -133,7 +137,7 @@ export const workflowRun = pgTable(
 
 		input: jsonb("input"),
 		inputHash: text("input_hash").notNull(),
-		options: jsonb("options"),
+		options: jsonb("options").$type<WorkflowStartOptions>(),
 
 		referenceId: text("reference_id"),
 		conflictPolicy: workflowRunConflictPolicyEnum("conflict_policy"),
@@ -196,7 +200,7 @@ export const task = pgTable(
 
 		input: jsonb("input"),
 		inputHash: text("input_hash").notNull(),
-		options: jsonb("options"),
+		options: jsonb("options").$type<TaskStartOptions>(),
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
 		nextAttemptAt: timestampMs("next_attempt_at"),

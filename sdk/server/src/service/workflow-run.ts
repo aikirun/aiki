@@ -21,7 +21,7 @@ import type {
 	ChildWorkflowRunInfo,
 	ChildWorkflowRunQueue,
 	ChildWorkflowRunWaitQueue,
-	EventReferenceOptions,
+	EventReference,
 	EventWaitQueue,
 	SleepQueue,
 	TerminalWorkflowRunState,
@@ -30,7 +30,6 @@ import type {
 	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStateCancelled,
-	WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import type { TaskInfo, TaskQueue, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { monotonicFactory, ulid } from "ulidx";
@@ -245,7 +244,7 @@ export const createWorkflowRunService = ({
 		runId: WorkflowRunId,
 		eventName: string,
 		data: unknown,
-		reference: EventReferenceOptions | undefined
+		reference: EventReference | undefined
 	): Promise<void> {
 		return repos.transaction(async (txRepos) => {
 			// TODO: should we use getByIdWithState instead?
@@ -457,7 +456,7 @@ export const createWorkflowRunService = ({
 		});
 		return {
 			runs: childRuns.map((child) => {
-				const shard = (child.options as WorkflowStartOptions | null)?.shard;
+				const shard = child.options?.shard;
 				return {
 					id: child.id,
 					options: shard ? { shard } : undefined,
@@ -501,7 +500,7 @@ export const createWorkflowRunService = ({
 				cancelledRunsMeta.push({
 					namespaceId: context.namespaceId,
 					runId: run.id,
-					shard: (run.options as WorkflowStartOptions | null)?.shard,
+					shard: run.options?.shard,
 				});
 			}
 
@@ -555,6 +554,7 @@ async function createWorkflowRunInTx(
 				if (conflictPolicy === "error") {
 					throw new WorkflowRunConflictError(name, versionId, referenceId);
 				}
+				conflictPolicy satisfies "return_existing";
 			}
 
 			context.logger.info("Returning existing run from reference ID", { runId: existingRun.id, referenceId });
@@ -654,7 +654,7 @@ async function getWorkflowRun(
 		stateTransitionId: runRow.latestStateTransitionId,
 		input: runRow.input,
 		inputHash: runRow.inputHash,
-		options: runRow.options as WorkflowStartOptions | undefined,
+		options: runRow.options !== null ? runRow.options : undefined,
 		attempts: runRow.attempts,
 		state: latestTransition.state as WorkflowRunState,
 		taskQueues: tasksByAddress,

@@ -1,3 +1,5 @@
+import type { WorkflowStartOptions } from "./workflow/run";
+
 export type ScheduleId = string & { _brand: "schedule_id" };
 
 export const SCHEDULE_STATUSES = ["active", "paused", "deleted"] as const;
@@ -27,16 +29,18 @@ export interface IntervalScheduleSpec extends ScheduleSpecBase {
 
 export type ScheduleSpec = CronScheduleSpec | IntervalScheduleSpec;
 
-export const SCHEDULE_CONFLICT_POLICIES = ["upsert", "error"] as const;
+export const SCHEDULE_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type ScheduleConflictPolicy = (typeof SCHEDULE_CONFLICT_POLICIES)[number];
 
-export interface ScheduleReferenceOptions {
+export interface ScheduleReference {
 	id: string;
 	conflictPolicy?: ScheduleConflictPolicy;
 }
 
+export type ScheduledWorkflowStartOptions = Pick<WorkflowStartOptions, "retry" | "shard">;
+
 export interface ScheduleActivateOptions {
-	reference?: ScheduleReferenceOptions;
+	reference?: ScheduleReference;
 }
 
 export interface Schedule {
@@ -45,8 +49,9 @@ export interface Schedule {
 	workflowVersionId: string;
 	status: ScheduleStatus;
 	spec: ScheduleSpec;
-	input?: unknown;
+	workflowRunInput?: unknown;
 	options?: ScheduleActivateOptions;
+	workflowRunOptions?: ScheduledWorkflowStartOptions;
 	createdAt: number;
 	updatedAt: number;
 	lastOccurrence?: number;

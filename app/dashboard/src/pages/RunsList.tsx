@@ -1,5 +1,5 @@
 import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useWorkflowRuns } from "../api/hooks";
@@ -24,6 +24,11 @@ export function RunsList() {
 	});
 
 	const page = Number(searchParams.get("page") ?? "0");
+
+	// Remember the current filtered URL so the run-detail "← Runs" link can return here with filters intact.
+	useEffect(() => {
+		sessionStorage.setItem("runsListSearch", searchParams.toString());
+	}, [searchParams]);
 
 	// Debounced values for API
 	const debouncedId = useDebounce(idFilter, 500);

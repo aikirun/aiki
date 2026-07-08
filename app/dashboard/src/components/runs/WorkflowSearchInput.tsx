@@ -15,9 +15,10 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 	const ref = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 
+	const namePrefix = inputValue === value ? undefined : debouncedInput || undefined;
 	const { data } = useWorkflows({
 		source: "user",
-		namePrefix: debouncedInput || undefined,
+		namePrefix,
 		limit: 20,
 	});
 
@@ -55,10 +56,10 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 			{/* biome-ignore lint/a11y/noStaticElementInteractions: container delegates focus to input child */}
 			<div
 				onClick={() => {
-					if (value) {
-						handleClear();
+					if (!isOpen) {
+						setInputValue(value);
+						setIsOpen(true);
 					}
-					setIsOpen(true);
 				}}
 				style={{
 					display: "flex",

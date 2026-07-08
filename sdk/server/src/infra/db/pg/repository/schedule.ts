@@ -1,9 +1,10 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import { and, count, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
+import { and, count, eq, getTableColumns, inArray, isNull, lte, sql } from "drizzle-orm";
 
 import { timerStreamCursorFilter } from "./lib/timer-stream";
+import { ScheduleConflictError } from "../../../../errors";
 import type { TimerStreamCursor } from "../../../../lib/timer-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
@@ -24,6 +25,7 @@ type ScheduleRowUpdate = Partial<
 		| "definitionHash"
 		| "referenceId"
 		| "conflictPolicy"
+		| "workflowRunOptions"
 		| "lastOccurrence"
 		| "nextRunAt"
 		| "workflowId"
@@ -32,19 +34,38 @@ type ScheduleRowUpdate = Partial<
 
 export const createScheduleRepository = (db: PgDb) => ({
 	async create(input: ScheduleRowInsert): Promise<ScheduleRow> {
-		const result = await db.insert(schedule).values(input).returning();
-		const created = result[0];
+		const [created] = await db.insert(schedule).values(input).onConflictDoNothing().returning();
 		if (!created) {
-			throw new Error("Failed to create schedule - no row returned");
+			throw new ScheduleConflictError({
+				definitionHash: input.definitionHash,
+				referenceId: input.referenceId ?? undefined,
+			});
 		}
 		return created;
 	},
 
-	async update(namespaceId: NamespaceId, id: string, updates: ScheduleRowUpdate): Promise<ScheduleRow | null> {
+	async update(
+		namespaceId: NamespaceId,
+		filter: { id: string; referenceId?: string | null },
+		updates: ScheduleRowUpdate
+	): Promise<ScheduleRow | null> {
+		const conditions = [eq(schedule.namespaceId, namespaceId)];
+
+		if (filter.id) {
+			conditions.push(eq(schedule.id, filter.id));
+		}
+		if (filter.referenceId !== undefined) {
+			if (filter.referenceId === null) {
+				conditions.push(isNull(schedule.referenceId));
+			} else {
+				conditions.push(eq(schedule.referenceId, filter.referenceId));
+			}
+		}
+
 		const result = await db
 			.update(schedule)
 			.set(updates)
-			.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.id, id)))
+			.where(and(...conditions))
 			.returning();
 		return result[0] ?? null;
 	},
@@ -71,20 +92,27 @@ export const createScheduleRepository = (db: PgDb) => ({
 			.where(sql`${schedule.id} = v.id`);
 	},
 
-	async getByReferenceId(namespaceId: NamespaceId, referenceId: string): Promise<ScheduleRow | null> {
-		const result = await db
-			.select()
-			.from(schedule)
-			.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.referenceId, referenceId)))
-			.limit(1);
-		return result[0] ?? null;
-	},
+	async get(
+		namespaceId: NamespaceId,
+		filter: { definitionHash?: string; referenceId?: string | null }
+	): Promise<ScheduleRow | null> {
+		const conditions = [eq(schedule.namespaceId, namespaceId)];
 
-	async getByDefinitionHash(namespaceId: NamespaceId, definitionHash: string): Promise<ScheduleRow | null> {
+		if (filter.definitionHash) {
+			conditions.push(eq(schedule.definitionHash, filter.definitionHash));
+		}
+		if (filter.referenceId !== undefined) {
+			if (filter.referenceId === null) {
+				conditions.push(isNull(schedule.referenceId));
+			} else {
+				conditions.push(eq(schedule.referenceId, filter.referenceId));
+			}
+		}
+
 		const result = await db
 			.select()
 			.from(schedule)
-			.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.definitionHash, definitionHash)))
+			.where(and(...conditions))
 			.limit(1);
 		return result[0] ?? null;
 	},

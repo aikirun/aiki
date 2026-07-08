@@ -1,6 +1,7 @@
 import { type } from "arktype";
 
 import { workflowSourceSchema } from "./workflow";
+import { workflowOptionsSchema } from "./workflow-run";
 
 export const overlapPolicySchema = type("'allow' | 'skip' | 'cancel_previous'");
 
@@ -21,14 +22,16 @@ export const scheduleSpecSchema = cronScheduleSpecSchema.or(intervalScheduleSpec
 
 export const scheduleStatusSchema = type("'active' | 'paused' | 'deleted'");
 
-export const scheduleReferenceOptionsSchema = type({
+export const scheduleReferenceSchema = type({
 	id: "string > 0",
-	"conflictPolicy?": "'upsert' | 'error'",
+	"conflictPolicy?": "'error' | 'return_existing'",
 });
 
 export const scheduleActivateOptionsSchema = type({
-	"reference?": scheduleReferenceOptionsSchema.or("undefined"),
+	"reference?": scheduleReferenceSchema.or("undefined"),
 });
+
+export const scheduledWorkflowStartOptionsSchema = workflowOptionsSchema.pick("retry", "shard");
 
 export const scheduleWorkflowFilterSchema = type({
 	name: "string > 0",
@@ -40,10 +43,11 @@ export const scheduleSchema = type({
 	id: "string > 0",
 	workflowName: "string > 0",
 	workflowVersionId: "string > 0",
-	"input?": "unknown",
+	"workflowRunInput?": "unknown",
 	spec: scheduleSpecSchema,
 	status: scheduleStatusSchema,
 	"options?": scheduleActivateOptionsSchema.or("undefined"),
+	"workflowRunOptions?": scheduledWorkflowStartOptionsSchema.or("undefined"),
 	createdAt: "number > 0",
 	updatedAt: "number > 0",
 	"lastOccurrence?": "number > 0 | undefined",

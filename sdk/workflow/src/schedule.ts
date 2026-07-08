@@ -2,7 +2,14 @@ import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
-import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, ScheduleSpec } from "@aikirun/types/schedule";
+import type {
+	ScheduleActivateOptions,
+	ScheduledWorkflowStartOptions,
+	ScheduleId,
+	ScheduleOverlapPolicy,
+	ScheduleSpec,
+} from "@aikirun/types/schedule";
+import { INTERNAL } from "@aikirun/types/symbols";
 
 import type { EventsDefinition } from "./run/event";
 import type { WorkflowVersion } from "./workflow-version";
@@ -29,10 +36,14 @@ export interface ScheduleHandle {
 	delete(): Promise<void>;
 }
 
+type ScheduleBuilderActivateOptions = ScheduleActivateOptions & {
+	workflowRun?: ScheduledWorkflowStartOptions;
+};
+
 export interface ScheduleBuilder {
-	opt<Path extends PathFromObject<ScheduleActivateOptions>>(
+	opt<Path extends PathFromObject<ScheduleBuilderActivateOptions>>(
 		path: Path,
-		value: TypeOfValueAtPath<ScheduleActivateOptions, Path>
+		value: TypeOfValueAtPath<ScheduleBuilderActivateOptions, Path>
 	): ScheduleBuilder;
 
 	activate<Input, Output, Context, TEvents extends EventsDefinition>(
@@ -56,10 +67,11 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 	async function activateWithOptions<Input, Output, Context, TEvents extends EventsDefinition>(
 		client: Client<Context>,
 		workflow: WorkflowVersion<Input, Output, Context, TEvents>,
-		options: ScheduleActivateOptions,
+		options: ScheduleBuilderActivateOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ScheduleHandle> {
-		const input = args[0];
+		const workflowRunInput = args[0];
+		const { workflowRun: workflowRunOptions, ...scheduleOptions } = options;
 
 		let scheduleSpec: ScheduleSpec;
 		if (params.type === "interval") {
@@ -76,37 +88,48 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 			workflowName: workflow.name,
 			workflowVersionId: workflow.versionId,
 			spec: scheduleSpec,
-			input,
-			options,
+			workflowRunInput,
+			options: scheduleOptions,
+			workflowRunOptions,
 		});
 		client.logger.info("Schedule activated", {
 			scheduleSpec,
 			workflowName: workflow.name,
 			workflowVersionId: workflow.versionId,
-			referenceId: options?.reference?.id,
+			referenceId: scheduleOptions.reference?.id,
 		});
 
 		const scheduleId = schedule.id as ScheduleId;
 
 		return {
 			id: scheduleId,
+
 			pause: async () => {
 				await client.api.schedule.pauseV1({ id: scheduleId });
 			},
+
 			resume: async () => {
 				await client.api.schedule.resumeV1({ id: scheduleId });
 			},
+
 			delete: async () => {
 				await client.api.schedule.deleteV1({ id: scheduleId });
 			},
 		};
 	}
 
-	function createBuilder(optionsBuilder: ObjectBuilder<ScheduleActivateOptions>): ScheduleBuilder {
+	// The builder threads its .opt() calls as a function so they can be applied at activate, once the
+	// workflow (and thus its default run options) is known.
+	function createBuilder(
+		apply: (builder: ObjectBuilder<ScheduleBuilderActivateOptions>) => ObjectBuilder<ScheduleBuilderActivateOptions>
+	): ScheduleBuilder {
 		return {
-			opt: (path, value) => createBuilder(optionsBuilder.with(path, value)),
+			opt: (path, value) => createBuilder((builder) => apply(builder).with(path, value)),
+
 			async activate(client, workflow, ...args) {
-				return activateWithOptions(client, workflow, optionsBuilder.build(), ...args);
+				const base: ScheduleBuilderActivateOptions = { workflowRun: workflow[INTERNAL].definitionStartOptions() };
+				const activateOptions = apply(objectOverrider(base)()).build();
+				return activateWithOptions(client, workflow, activateOptions, ...args);
 			},
 		};
 	}
@@ -115,12 +138,11 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 		...params,
 
 		with(): ScheduleBuilder {
-			const optionsOverrider = objectOverrider<ScheduleActivateOptions>({});
-			return createBuilder(optionsOverrider());
+			return createBuilder((builder) => builder);
 		},
 
 		async activate(client, workflow, ...args) {
-			return activateWithOptions(client, workflow, {}, ...args);
+			return createBuilder((builder) => builder).activate(client, workflow, ...args);
 		},
 	};
 }
