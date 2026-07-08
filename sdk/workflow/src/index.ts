@@ -11,7 +11,7 @@ export type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } 
 export { SchemaValidationError } from "@aikirun/types/validator";
 export type {
 	EventName,
-	EventReferenceOptions,
+	EventReference,
 	EventSendOptions,
 	EventWait,
 	EventWaitOptions,

@@ -21,7 +21,7 @@ import type {
 	ChildWorkflowRunInfo,
 	ChildWorkflowRunQueue,
 	ChildWorkflowRunWaitQueue,
-	EventReferenceOptions,
+	EventReference,
 	EventWaitQueue,
 	SleepQueue,
 	TerminalWorkflowRunState,
@@ -245,7 +245,7 @@ export const createWorkflowRunService = ({
 		runId: WorkflowRunId,
 		eventName: string,
 		data: unknown,
-		reference: EventReferenceOptions | undefined
+		reference: EventReference | undefined
 	): Promise<void> {
 		return repos.transaction(async (txRepos) => {
 			// TODO: should we use getByIdWithState instead?
