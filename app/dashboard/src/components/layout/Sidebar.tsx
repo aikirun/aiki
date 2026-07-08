@@ -70,7 +70,7 @@ export function Sidebar() {
 				style={{
 					display: "flex",
 					alignItems: "center",
-					padding: collapsed ? "14px 0" : "14px 12px",
+					padding: collapsed ? "24px 0 14px" : "24px 12px 14px",
 					minHeight: 52,
 					justifyContent: collapsed ? "center" : "flex-start",
 					gap: 8,
@@ -365,17 +365,10 @@ function CollapseButton({ collapsed, onClick }: { collapsed: boolean; onClick: (
 					strokeLinecap="round"
 					strokeLinejoin="round"
 				>
-					{collapsed ? (
-						<>
-							<polyline points="6 3 11 8 6 13" />
-							<line x1="3" y1="3" x2="3" y2="13" />
-						</>
-					) : (
-						<>
-							<polyline points="10 3 5 8 10 13" />
-							<line x1="13" y1="3" x2="13" y2="13" />
-						</>
-					)}
+					<path d="M6 3 H3.5 Q2 3 2 4.5 V11.5 Q2 13 3.5 13 H6 Z" fill="currentColor" stroke="none" opacity="0.35" />
+					<rect x="2" y="3" width="12" height="10" rx="1.5" />
+					<line x1="6" y1="3" x2="6" y2="13" />
+					{collapsed ? <polyline points="9 5.8 11 8 9 10.2" /> : <polyline points="11 5.8 9 8 11 10.2" />}
 				</svg>
 			</span>
 			{!collapsed && <span>Collapse</span>}
