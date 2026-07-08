@@ -1,3 +1,5 @@
+import type { WorkflowStartOptions } from "./workflow/run";
+
 export type ScheduleId = string & { _brand: "schedule_id" };
 
 export const SCHEDULE_STATUSES = ["active", "paused", "deleted"] as const;
@@ -35,6 +37,8 @@ export interface ScheduleReference {
 	conflictPolicy?: ScheduleConflictPolicy;
 }
 
+export type ScheduledWorkflowStartOptions = Pick<WorkflowStartOptions, "retry" | "shard">;
+
 export interface ScheduleActivateOptions {
 	reference?: ScheduleReference;
 }
@@ -47,6 +51,7 @@ export interface Schedule {
 	spec: ScheduleSpec;
 	workflowRunInput?: unknown;
 	options?: ScheduleActivateOptions;
+	workflowRunOptions?: ScheduledWorkflowStartOptions;
 	createdAt: number;
 	updatedAt: number;
 	lastOccurrence?: number;

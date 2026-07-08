@@ -57,6 +57,8 @@ export interface WorkflowStartOptions {
 	shard?: string;
 }
 
+export type WorkflowDefinitionStartOptions = Pick<WorkflowStartOptions, "retry">;
+
 interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;
 }

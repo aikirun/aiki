@@ -25,6 +25,7 @@ type ScheduleRowUpdate = Partial<
 		| "definitionHash"
 		| "referenceId"
 		| "conflictPolicy"
+		| "workflowRunOptions"
 		| "lastOccurrence"
 		| "nextRunAt"
 		| "workflowId"

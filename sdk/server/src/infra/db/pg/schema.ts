@@ -3,6 +3,7 @@ import {
 	SCHEDULE_OVERLAP_POLICIES,
 	SCHEDULE_STATUSES,
 	SCHEDULE_TYPES,
+	type ScheduledWorkflowStartOptions,
 } from "@aikirun/types/schedule";
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
@@ -97,6 +98,8 @@ export const schedule = pgTable(
 
 		referenceId: text("reference_id"),
 		conflictPolicy: scheduleConflictPolicyEnum("conflict_policy"),
+
+		workflowRunOptions: jsonb("workflow_run_options").$type<ScheduledWorkflowStartOptions>(),
 
 		lastOccurrence: timestampMs("last_occurrence"),
 		nextRunAt: timestampMs("next_run_at"),
