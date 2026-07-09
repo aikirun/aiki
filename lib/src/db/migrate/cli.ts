@@ -9,10 +9,10 @@ import type { MigrationSource } from "./source";
 import { loadDatabaseConfig, loadDatabaseProvider } from "../config";
 import type { DatabaseProvider } from "../provider";
 
-const MIGRATE_SUBCOMMANDS = ["apply", "list"] as const;
-type MigrateSubcommand = (typeof MIGRATE_SUBCOMMANDS)[number];
+export const MIGRATE_SUBCOMMANDS = ["apply", "list"] as const;
+export type MigrateSubcommand = (typeof MIGRATE_SUBCOMMANDS)[number];
 
-function isMigrateSubcommand(value: string): value is MigrateSubcommand {
+export function isMigrateSubcommand(value: string): value is MigrateSubcommand {
 	for (const subcommand of MIGRATE_SUBCOMMANDS) {
 		if (subcommand === value) {
 			return true;
@@ -20,6 +20,11 @@ function isMigrateSubcommand(value: string): value is MigrateSubcommand {
 	}
 	return false;
 }
+
+export const MIGRATE_SUBCOMMAND_HELP: Record<MigrateSubcommand, string> = {
+	apply: "Apply pending migrations to the database",
+	list: "List the migrations this package ships",
+};
 
 export interface MigrateCliParams {
 	name: string;
@@ -70,12 +75,27 @@ export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 			}
 		});
 
-	cli.help();
+	cli.help((sections) => {
+		if (cli.matchedCommand?.name !== "migrate") {
+			return sections;
+		}
+		const longestName = MIGRATE_SUBCOMMANDS.reduce((longest, subcommand) => Math.max(longest, subcommand.length), 0);
+		const body = MIGRATE_SUBCOMMANDS.map(
+			(subcommand) => `  ${subcommand.padEnd(longestName)}  ${MIGRATE_SUBCOMMAND_HELP[subcommand]}`
+		).join("\n");
+		const usageIndex = sections.findIndex((section) => section.title === "Usage");
+		sections.splice(usageIndex + 1, 0, { title: "Commands", body });
+		return sections;
+	});
 	cli.version(params.version);
 
 	try {
 		cli.parse(process.argv, { run: false });
-		await cli.runMatchedCommand();
+		if (cli.matchedCommand) {
+			await cli.runMatchedCommand();
+		} else if (!cli.options.help && !cli.options.version) {
+			cli.outputHelp();
+		}
 	} catch (error) {
 		console.error(error instanceof Error ? error.message : String(error));
 		process.exit(1);

@@ -3,23 +3,12 @@ import process from "node:process";
 import { startAppServer } from "@aikirun/app-server";
 import { loadDatabaseConfig, loadDatabaseProvider } from "@aikirun/lib/db";
 import { migrateApply, migrateList, migrationSource } from "@aikirun/lib/db/migrate";
+import { isMigrateSubcommand, MIGRATE_SUBCOMMAND_HELP, MIGRATE_SUBCOMMANDS } from "@aikirun/lib/db/migrate/cli";
 import { cac } from "cac";
 import { config as loadEnv } from "dotenv";
 
 import { embeddedDataLoader } from "./embedded";
 import packageJson from "../package.json" with { type: "json" };
-
-const MIGRATE_SUBCOMMANDS = ["apply", "list"] as const;
-type MigrateSubcommand = (typeof MIGRATE_SUBCOMMANDS)[number];
-
-function isMigrateSubcommand(value: string): value is MigrateSubcommand {
-	for (const command of MIGRATE_SUBCOMMANDS) {
-		if (command === value) {
-			return true;
-		}
-	}
-	return false;
-}
 
 export const MIGRATION_PACKAGES = ["server", "iam"] as const;
 export type MigrationPackage = (typeof MIGRATION_PACKAGES)[number];
@@ -97,7 +86,7 @@ cli
 
 cli
 	.command("server [subcommand]", "Run the Aiki server (start)")
-	.example((name) => `  $ ${name} server start   start the server in this process`)
+	.example((name) => `  $ ${name} server start   run the server`)
 	.action(async (subcommand: string | undefined) => {
 		if (subcommand === undefined) {
 			cli.outputHelp();
@@ -109,12 +98,36 @@ cli
 		await startAppServer();
 	});
 
-cli.help();
+const SUBCOMMAND_HELP: Record<string, Record<string, string>> = {
+	migrate: MIGRATE_SUBCOMMAND_HELP,
+	server: {
+		start: "Run the server",
+	},
+};
+
+cli.help((sections) => {
+	const subcommands = cli.matchedCommand ? SUBCOMMAND_HELP[cli.matchedCommand.name] : undefined;
+	if (!subcommands) {
+		return sections;
+	}
+	const longestName = Object.keys(subcommands).reduce((longest, subcommand) => Math.max(longest, subcommand.length), 0);
+	const body = Object.entries(subcommands)
+		.map(([subcommand, description]) => `  ${subcommand.padEnd(longestName)}  ${description}`)
+		.join("\n");
+	const usageIndex = sections.findIndex((section) => section.title === "Usage");
+	sections.splice(usageIndex + 1, 0, { title: "Commands", body });
+	return sections;
+});
+
 cli.version(packageJson.version);
 
 try {
 	cli.parse(process.argv, { run: false });
-	await cli.runMatchedCommand();
+	if (cli.matchedCommand) {
+		await cli.runMatchedCommand();
+	} else if (!cli.options.help && !cli.options.version) {
+		cli.outputHelp();
+	}
 } catch (error) {
 	console.error(error instanceof Error ? error.message : String(error));
 	process.exit(1);
