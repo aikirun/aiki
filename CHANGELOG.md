@@ -2,6 +2,71 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.33.0
+
+This release ships a self-contained `aiki` binary for hosting the server without Node, Bun, or Docker, and reshapes schedules around a reference-first identity model — schedules are now identified by reference, with per-run retry and shard options.
+
+### New Features
+
+- **Retry and shard options for scheduled runs.** A schedule can now set the retry policy and shard for every run it fires, via the builder's `workflowRun.*` paths. When you set nothing, each fired run inherits the workflow's declared `retry` default; a schedule-level override replaces it.
+
+  ```typescript
+  await everyFiveSeconds
+    .with()
+    .opt("reference.id", "my-correlation-xxx")
+    .opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
+    .opt("workflowRun.shard", "eu")
+    .activate(client, notify, "This is a reminder");
+  ```
+
+- **Prebuilt `aiki` binary in every release.** A single self-contained executable — its own runtime, no Node, Bun, or Docker — carrying the `migrate` and `server` commands. Download it from the release, put it on `PATH`, and run `aiki migrate apply` then `aiki server start`.
+
+- **Per-package migration bins.** `aiki-server` and `aiki-iam` each ship their own migrate CLI (`aiki-server migrate apply`), replacing the single `aiki migrate apply --package <name>` entrypoint. SDK users no longer need `@aikirun/cli` as a devDependency.
+
+- **`--env-file` for the standalone server.** Both `migrate` and `server` commands read config from the environment; pass `--env-file <path>` to load it from a file instead.
+
+### Web UI
+
+- Reworked the runs list and sidebar layout; polished run and schedule metadata rows and runs-list back navigation.
+- Overhauled the schedules list page.
+
+### Improvements
+
+- **`PathFromObject` treats union-typed properties as atomic leaves.** Builder `.opt()` paths (schedules, etc.) no longer descend into the branches of a union, discriminated union, or optional union — the whole union is set as one value.
+- Migration apply is decoupled from the filesystem via a pluggable migration source, so migrations can be embedded in the `aiki` binary.
+- The app-server boot function was extracted (`startAppServer` now takes config), and a sensible local CORS default was added.
+- The `sha256` helpers are now documented as content-addressing hashes — fingerprints and high-entropy secrets only, never user passwords.
+
+### Bug Fixes
+
+- **Prototype pollution guard** — object merge and overrider now skip own `__proto__` keys.
+- **Open-redirect fix** — the dashboard auth redirect param is resolved against the origin to close a bypass.
+- **LIKE-pattern escaping** — backslashes in the workflow-name prefix filter are now escaped.
+
+### Breaking Changes
+
+- **Schedule `input` renamed to `workflowRunInput`** — in the activate request and the `Schedule` type.
+
+  ```typescript
+  // Before
+  { workflowName, workflowVersionId, input, spec, options }
+  // After
+  { workflowName, workflowVersionId, workflowRunInput, spec, options, workflowRunOptions }
+  ```
+
+- **`ScheduleReferenceOptions` renamed to `ScheduleReference`** — the `Options` suffix was dropped from the reference identity type.
+
+- **Schedule conflict policies changed** from `["upsert", "error"]` to `["error", "return_existing"]` (default `error`). Re-activating with the same reference id now either errors or returns the existing schedule; definitions are immutable (no upsert or redefine). This is the reference-first schedule identity model: reference is identity, definition hash is the idempotency key.
+
+- **CLI and db-script reshape (ops-facing):**
+
+  ```bash
+  # Before                                    # After
+  npx aiki migrate apply --package server  →  npx aiki-server migrate apply
+  bun run db:migrate:server                →  bun run db:migrate:apply:server
+  bun run db:migrate:iam                   →  bun run db:migrate:apply:iam
+  ```
+
 ## 0.32.0
 
 This release makes Aiki self-hostable from published container images — no clone, no local build — and fixes workflow replay to stop re-validating already-persisted outputs.
