@@ -4,10 +4,10 @@
 // Runs as part of the cli build, before the binary is compiled.
 import fs from "node:fs";
 import path from "node:path";
-import { MIGRATIONS_TABLE as IAM_MIGRATIONS_TABLE } from "@aikirun/iam/infra/db/migrate";
+import { MIGRATIONS_TABLE as IAM_MIGRATIONS_TABLE } from "@aikirun/iam/migrate";
 import { DATABASE_PROVIDERS } from "@aikirun/lib/db";
 import { readMigrationsDirectory } from "@aikirun/lib/db/migrate";
-import { MIGRATIONS_TABLE as SERVER_MIGRATIONS_TABLE } from "@aikirun/server/infra/db/migrate";
+import { MIGRATIONS_TABLE as SERVER_MIGRATIONS_TABLE } from "@aikirun/server/migrate";
 import { PACKAGES, type Package } from "cli/src/packages";
 
 import type { EmbeddedData, EmbeddedPackageData } from "../src/embedded";
