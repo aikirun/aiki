@@ -22,16 +22,38 @@ export function isMigrationPackage(value: string): value is MigrationPackage {
 	return false;
 }
 
+function parsePackageList(value: unknown): MigrationPackage[] {
+	const raw = value ?? "server";
+	if (typeof raw !== "string") {
+		throw new Error(`Invalid --package value. Expected a comma-separated list of: ${MIGRATION_PACKAGES.join(", ")}.`);
+	}
+	const names = raw
+		.split(",")
+		.map((name) => name.trim())
+		.filter((name) => name.length > 0);
+	if (names.length === 0) {
+		throw new Error(`No packages specified. Expected one or more of: ${MIGRATION_PACKAGES.join(", ")}.`);
+	}
+	const packages: MigrationPackage[] = [];
+	for (const name of names) {
+		if (!isMigrationPackage(name)) {
+			throw new Error(`Unknown package "${name}". Expected one of: ${MIGRATION_PACKAGES.join(", ")}.`);
+		}
+		packages.push(name);
+	}
+	return packages;
+}
+
 const cli = cac("aiki");
 
 cli
 	.command("migrate [subcommand]", "Database migration commands (apply | list)")
-	.option("--package <name>", `Target package: ${MIGRATION_PACKAGES.join(" | ")} (default: server)`)
+	.option("--package <names>", `Comma-separated packages: ${MIGRATION_PACKAGES.join(", ")} (default: server)`)
 	.option("--env-file <path>", "Path to env file")
-	.example((name) => `  $ ${name} migrate apply                 apply the server's pending migrations`)
-	.example((name) => `  $ ${name} migrate apply --package iam   apply the iam package's migrations`)
-	.example((name) => `  $ ${name} migrate list                  list the migrations the binary ships`)
-	.action(async (subcommand: string | undefined, options: { package?: string; envFile?: string }) => {
+	.example((name) => `  $ ${name} migrate apply                        apply the server's pending migrations`)
+	.example((name) => `  $ ${name} migrate apply --package server,iam   apply server and iam migrations, in order`)
+	.example((name) => `  $ ${name} migrate list                         list the migrations the binary ships`)
+	.action(async (subcommand: string | undefined, options: { package?: unknown; envFile?: string }) => {
 		if (subcommand === undefined) {
 			cli.outputHelp();
 			return;
@@ -42,41 +64,46 @@ cli
 			);
 		}
 
-		const pkg = options.package ?? "server";
-		if (!isMigrationPackage(pkg)) {
-			throw new Error(`Unknown package "${pkg}". Expected one of: ${MIGRATION_PACKAGES.join(", ")}.`);
-		}
+		const packages = parsePackageList(options.package);
 		if (options.envFile) {
 			loadEnv({ path: options.envFile });
 		}
 
 		const embeddedData = (await embeddedDataLoader.load()).data;
-		const packageData = embeddedData[pkg];
-		if (!packageData) {
-			throw new Error(`the binary ships no migrations for ${pkg}`);
-		}
 
 		switch (subcommand) {
 			case "apply": {
 				const dbConfig = loadDatabaseConfig();
-				const migrations = packageData.migrationsByProvider[dbConfig.provider];
-				if (!migrations) {
-					throw new Error(`${pkg} ships no ${dbConfig.provider} migrations`);
+				for (const pkg of packages) {
+					const packageData = embeddedData[pkg];
+					if (!packageData) {
+						throw new Error(`the binary ships no migrations for ${pkg}`);
+					}
+					const migrations = packageData.migrationsByProvider[dbConfig.provider];
+					if (!migrations) {
+						throw new Error(`${pkg} ships no ${dbConfig.provider} migrations`);
+					}
+					await migrateApply({
+						source: migrationSource(migrations),
+						migrationsTable: packageData.migrationsTable,
+						db: dbConfig,
+					});
 				}
-				await migrateApply({
-					source: migrationSource(migrations),
-					migrationsTable: packageData.migrationsTable,
-					db: dbConfig,
-				});
 				return;
 			}
 			case "list": {
 				const dbProvider = loadDatabaseProvider();
-				const migrations = packageData.migrationsByProvider[dbProvider];
-				if (!migrations) {
-					throw new Error(`${pkg} ships no ${dbProvider} migrations`);
+				for (const pkg of packages) {
+					const packageData = embeddedData[pkg];
+					if (!packageData) {
+						throw new Error(`the binary ships no migrations for ${pkg}`);
+					}
+					const migrations = packageData.migrationsByProvider[dbProvider];
+					if (!migrations) {
+						throw new Error(`${pkg} ships no ${dbProvider} migrations`);
+					}
+					migrateList({ source: migrationSource(migrations), dbProvider });
 				}
-				migrateList({ source: migrationSource(migrations), dbProvider });
 				return;
 			}
 			default:
