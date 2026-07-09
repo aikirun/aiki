@@ -32,7 +32,9 @@ COPY app/server/ ./app/server/
 COPY tsconfig.json ./
 
 RUN bunx tsc --noEmit
-RUN bun run build:server
+
+WORKDIR /aiki/app/server
+RUN bun run build
 
 FROM gcr.io/distroless/cc-debian12
 

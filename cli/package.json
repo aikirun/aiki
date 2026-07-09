@@ -1,45 +1,23 @@
 {
 	"name": "@aikirun/cli",
 	"version": "0.32.0",
-	"description": "Aiki CLI — manage Aiki server migrations.",
+	"private": true,
+	"description": "Aiki CLI - apply migrations, start server and dashboard",
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"bin": {
-		"aiki": "./dist/index.js"
-	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
-		"build": "tsup"
+		"build": "bun scripts/generate-embedded-data.ts && bun build src/index.ts --compile --outfile dist/aiki"
 	},
 	"dependencies": {
-		"@aikirun/types": "workspace:*",
-		"arktype": "^2.1.29",
+		"@aikirun/app-server": "workspace:*",
+		"@aikirun/iam": "workspace:*",
+		"@aikirun/server": "workspace:*",
 		"cac": "^6.7.14",
 		"dotenv": "^16.4.5",
 		"drizzle-orm": "^0.45.1",
 		"postgres": "^3.4.8"
 	},
-	"peerDependencies": {
-		"@aikirun/iam": "workspace:^",
-		"@aikirun/server": "workspace:^"
-	},
-	"peerDependenciesMeta": {
-		"@aikirun/iam": {
-			"optional": true
-		},
-		"@aikirun/server": {
-			"optional": true
-		}
-	},
 	"devDependencies": {
-		"@aikirun/lib": "workspace:*",
-		"drizzle-kit": "^0.31.8"
-	},
-	"publishConfig": {
-		"access": "public"
+		"@aikirun/lib": "workspace:*"
 	},
 	"license": "Apache-2.0"
 }

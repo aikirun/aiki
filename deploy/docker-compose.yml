@@ -5,20 +5,13 @@ services:
     image: ghcr.io/aikirun/cli:0.32.0
     container_name: aiki-migrate
     environment:
-      AIKI_MIGRATE_PACKAGES: ${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}
       DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
       DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
       DATABASE_PATH: ${DATABASE_PATH:-:memory:}
       DATABASE_SSL: ${DATABASE_SSL:-false}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >-
-        echo "migrating packages: $$AIKI_MIGRATE_PACKAGES" &&
-        for package in $$(echo "$$AIKI_MIGRATE_PACKAGES" | tr ',' ' ');
-        do aiki migrate apply --package "$$package" || exit 1;
-        done
+    command: ["migrate", "apply", "--package", "${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}"]
 
   server:
     image: ghcr.io/aikirun/server:0.32.0
