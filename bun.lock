@@ -61,12 +61,10 @@
     "cli": {
       "name": "@aikirun/cli",
       "version": "0.32.0",
-      "bin": {
-        "aiki": "./dist/index.js",
-      },
       "dependencies": {
-        "@aikirun/types": "workspace:*",
-        "arktype": "^2.1.29",
+        "@aikirun/app-server": "workspace:*",
+        "@aikirun/iam": "workspace:*",
+        "@aikirun/server": "workspace:*",
         "cac": "^6.7.14",
         "dotenv": "^16.4.5",
         "drizzle-orm": "^0.45.1",
@@ -74,16 +72,7 @@
       },
       "devDependencies": {
         "@aikirun/lib": "workspace:*",
-        "drizzle-kit": "^0.31.8",
       },
-      "peerDependencies": {
-        "@aikirun/iam": "workspace:^",
-        "@aikirun/server": "workspace:^",
-      },
-      "optionalPeers": [
-        "@aikirun/iam",
-        "@aikirun/server",
-      ],
     },
     "examples": {
       "name": "@aikirun/examples",

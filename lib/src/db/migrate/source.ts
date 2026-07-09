@@ -10,7 +10,7 @@ interface MigrationJournalEntry {
 	when: number;
 }
 
-interface MigrationJournal {
+export interface MigrationJournal {
 	entries: MigrationJournalEntry[];
 }
 
@@ -34,38 +34,34 @@ export interface MigrationSource {
 	read(): MigrationMeta[];
 }
 
-// Reads migrations from a package's on-disk migration directory. Used by the
-// npm operator bins, where the files sit beside the installed package.
-export const directoryMigrationSource = (migrationsDir: string): MigrationSource => ({
-	read() {
-		const journalPath = path.join(migrationsDir, "meta", "_journal.json");
-		let journal: MigrationJournal;
-		try {
-			journal = JSON.parse(fs.readFileSync(journalPath, "utf8")) as MigrationJournal;
-		} catch {
-			throw new Error(`no migration journal at ${journalPath}`);
-		}
-		return journal.entries.map((entry) => {
-			const rawSql = fs.readFileSync(path.join(migrationsDir, `${entry.tag}.sql`), "utf8");
-			return buildMigration(entry, rawSql);
-		});
-	},
-});
+export function readMigrationsDirectory(migrationsDir: string): Migrations {
+	const journalPath = path.join(migrationsDir, "meta", "_journal.json");
+	let journal: MigrationJournal;
+	try {
+		journal = JSON.parse(fs.readFileSync(journalPath, "utf8")) as MigrationJournal;
+	} catch {
+		throw new Error(`no migration journal at ${journalPath}`);
+	}
+	const files: Record<string, string> = {};
+	for (const entry of journal.entries) {
+		const rawSql = fs.readFileSync(path.join(migrationsDir, `${entry.tag}.sql`), "utf8");
+		files[entry.tag] = rawSql;
+	}
+	return { journal, files };
+}
 
-// A package's migrations data: the journal plus each migration's raw SQL
-// keyed by tag.
-export interface EmbeddedMigrations {
+// A package's migrations data: the journal plus each migration's raw SQL keyed by tag.
+export interface Migrations {
 	journal: MigrationJournal;
 	files: Record<string, string>;
 }
 
-// Reads migrations from embedded data. Used by the standalone binary.
-export const embeddedMigrationSource = (embedded: EmbeddedMigrations): MigrationSource => ({
+export const migrationSource = (migrations: Migrations): MigrationSource => ({
 	read() {
-		return embedded.journal.entries.map((entry) => {
-			const rawSql = embedded.files[entry.tag];
+		return migrations.journal.entries.map((entry) => {
+			const rawSql = migrations.files[entry.tag];
 			if (rawSql === undefined) {
-				throw new Error(`embedded migrations are missing the SQL for ${entry.tag}`);
+				throw new Error(`migrations are missing the SQL for ${entry.tag}`);
 			}
 			return buildMigration(entry, rawSql);
 		});

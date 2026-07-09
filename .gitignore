@@ -5,11 +5,12 @@
 
 .claude
 
-.env
-.env.prod
+.env*
 
 notes/
 
 **/dist/
 *.tsbuildinfo
 node_modules/
+
+embedded.data

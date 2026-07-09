@@ -1,7 +1,7 @@
 // biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import process from "node:process";
 import { cac } from "cac";
-import { config as dotenvConfig } from "dotenv";
+import { config as loadEnv } from "dotenv";
 
 import { migrateApply } from "./commands/apply";
 import { migrateList } from "./commands/list";
@@ -28,7 +28,7 @@ export interface MigrateCliParams {
 	migrationsTable: string;
 }
 
-export function runMigrateCli(params: MigrateCliParams): void {
+export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 	const cli = cac(params.name);
 
 	cli
@@ -37,50 +37,47 @@ export function runMigrateCli(params: MigrateCliParams): void {
 		.example((name) => `  $ ${name} migrate apply    apply pending migrations to the database`)
 		.example((name) => `  $ ${name} migrate list     list the migrations this package ships`)
 		.action(async (subcommand: string | undefined, options: { envFile?: string }) => {
-			try {
-				if (subcommand === undefined) {
-					cli.outputHelp();
+			if (subcommand === undefined) {
+				cli.outputHelp();
+				return;
+			}
+			if (!isMigrateSubcommand(subcommand)) {
+				throw new Error(
+					`Unknown migrate subcommand "${subcommand}". Expected one of: ${MIGRATE_SUBCOMMANDS.join(", ")}.`
+				);
+			}
+			if (options.envFile) {
+				loadEnv({ path: options.envFile });
+			}
+
+			switch (subcommand) {
+				case "apply": {
+					const dbConfig = loadDatabaseConfig();
+					await migrateApply({
+						source: params.resolveSource(dbConfig.provider),
+						migrationsTable: params.migrationsTable,
+						db: dbConfig,
+					});
 					return;
 				}
-
-				if (!isMigrateSubcommand(subcommand)) {
-					throw new Error(
-						`Unknown migrate subcommand "${subcommand}". Expected one of: ${MIGRATE_SUBCOMMANDS.join(", ")}.`
-					);
+				case "list": {
+					const dbProvider = loadDatabaseProvider();
+					migrateList({ source: params.resolveSource(dbProvider), dbProvider });
+					return;
 				}
-
-				if (options.envFile) {
-					dotenvConfig({ path: options.envFile });
-				}
-
-				switch (subcommand) {
-					case "apply": {
-						const dbConfig = loadDatabaseConfig();
-						await migrateApply({
-							source: params.resolveSource(dbConfig.provider),
-							migrationsTable: params.migrationsTable,
-							db: dbConfig,
-						});
-						return;
-					}
-					case "list": {
-						const dbProvider = loadDatabaseProvider();
-						migrateList({
-							source: params.resolveSource(dbProvider),
-							dbProvider,
-						});
-						return;
-					}
-					default:
-						subcommand satisfies never;
-				}
-			} catch (error) {
-				console.error(error instanceof Error ? error.message : String(error));
-				process.exit(1);
+				default:
+					subcommand satisfies never;
 			}
 		});
 
 	cli.help();
 	cli.version(params.version);
-	cli.parse();
+
+	try {
+		cli.parse(process.argv, { run: false });
+		await cli.runMatchedCommand();
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : String(error));
+		process.exit(1);
+	}
 }
