@@ -1,0 +1,38 @@
+name: Check lockstep version
+description: Verify every workspace package and the compose image pins are at the version in types/package.json
+
+outputs:
+  version:
+    description: The lockstep version read from types/package.json
+    value: ${{ steps.lockstep.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    # types/package.json is the canonical version; every workspace package and
+    # every compose image pin must match it. Pure jq/grep, so this runs as an
+    # early gate before bun is installed.
+    - id: lockstep
+      shell: bash
+      run: |
+        version="$(jq -r .version types/package.json)"
+        for dir in $(jq -r '.workspaces[]' package.json); do
+          v="$(jq -r .version "$dir/package.json")"
+          if [ "$v" != "$version" ]; then
+            echo "$dir is at $v, expected $version — run bun run bump" >&2
+            exit 1
+          fi
+        done
+        pins="$(grep -oE 'aikirun/[a-z]+:[A-Za-z0-9_.-]+' deploy/docker-compose.yml || true)"
+        if [ -z "$pins" ]; then
+          echo "no aikirun image pins found in deploy/docker-compose.yml" >&2
+          exit 1
+        fi
+        escaped_version="$(printf '%s' "$version" | sed 's/[.]/\\./g')"
+        stale="$(echo "$pins" | grep -v ":$escaped_version\$" || true)"
+        if [ -n "$stale" ]; then
+          echo "deploy/docker-compose.yml pins not at $version — run bun run bump:" >&2
+          echo "$stale" >&2
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"

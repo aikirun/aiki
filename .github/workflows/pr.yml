@@ -1,10 +1,15 @@
-name: PR checks
+name: Checks
 
 on:
   pull_request:
+  push:
+    branches: [main]
 
+# Key on head_ref for PRs (so new pushes supersede in-flight runs) but on the
+# sha for main pushes (head_ref is empty there, so each commit is its own group
+# and none cancel each other).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -17,6 +22,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/check-lockstep
 
       - uses: ./.github/actions/setup-workspace
 
