@@ -2,14 +2,16 @@
   <img src="docs/assets/aiki-logo-combo.svg" alt="Aiki" height="80">
 </p>
 
-<p>
+<h3 align="center">A durable execution platform</h3>
+
+<p align="center">
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
   <a href="https://www.npmjs.com/org/aikirun"><img src="https://img.shields.io/npm/v/@aikirun/workflow?label=npm" alt="npm version"></a>
   <a href="https://discord.aiki.run"><img src="https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
-**A durable execution platform.**
+<hr />
 
 Durable execution is a fault-tolerant paradigm for building applications, especially long-running workflows. Some workflows take minutes, others take days, months or years. They wait on humans, survive crashes, retry on failure, and coordinate across systems. Building these with traditional code means wiring together message queues, crons, state machines, and fragile recovery logic.
 
