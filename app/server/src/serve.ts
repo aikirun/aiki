@@ -5,13 +5,12 @@ import { attachConnectionSupervisor, redisCache, redisPublisher, redisTimerPrior
 import { database, server } from "@aikirun/server";
 import { Redis } from "ioredis";
 
-import { loadConfig } from "./config/loader";
+import type { AppServerConfig } from "./config/loader";
 import type { RedisConfig } from "./config/schema";
 import { createCorsHelpers } from "./cors";
 import { createLogger } from "./logger";
 
-export async function startAppServer(): Promise<void> {
-	const config = await loadConfig();
+export async function startAppServer({ config }: { config: AppServerConfig }): Promise<void> {
 	const logger = createLogger(config.logLevel, config.prettyLogs);
 
 	const redis = config.redis && createRedis(config.redis, logger);

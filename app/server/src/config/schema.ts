@@ -29,7 +29,7 @@ export const configSchema = type({
 	host: "string > 0 = '0.0.0.0'",
 	port: "string.integer.parse | number.integer > 0 = 9850",
 	"baseURL?": "string > 0",
-	corsOrigins: uniqueCommaSeparatedToItems.default(""),
+	corsOrigins: uniqueCommaSeparatedToItems.default("http://localhost:9851"),
 	"redis?": redisConfigSchema.or(type("undefined")),
 	"auth?": authConfigSchema.or(type("undefined")),
 	logLevel: type.enumerated(...logLevels).default("info"),

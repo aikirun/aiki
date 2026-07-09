@@ -66,7 +66,9 @@ aiki migrate apply     # migrates the server package; use --package server,iam t
 aiki server start      # serves on :9850
 ```
 
-The dashboard ships separately — serve it as a static site (see [Run the dashboard on its own](#run-the-dashboard-on-its-own)) or from the dashboard image (see [With Docker](#with-docker)). A dashboard on a different origin than the server needs its origin added to the server's `CORS_ORIGINS`.
+Both commands read configuration from the environment; pass `--env-file <path>` to load it from a file instead.
+
+The dashboard ships separately — serve it as a static site (see [Run the dashboard on its own](#run-the-dashboard-on-its-own)) or from a container (see [With Docker](#with-docker)). A dashboard on a different origin than the server needs its origin added to the server's `CORS_ORIGINS` (via `--env-file` or the environment).
 
 ### With Docker
 

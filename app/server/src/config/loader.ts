@@ -1,19 +1,15 @@
-import { dirname, join } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 import { type DatabaseConfig, loadDatabaseConfig } from "@aikirun/lib/db";
 import { omitUndefined } from "@aikirun/lib/object";
 import { type } from "arktype";
-import { config } from "dotenv";
+import { config as loadEnv } from "dotenv";
 
 import { type Config, configSchema } from "./schema";
 
-export async function loadConfig(): Promise<Config & { db: DatabaseConfig }> {
-	const __filename = fileURLToPath(import.meta.url);
-	const __dirname = dirname(__filename);
-	const envPath = join(__dirname, "../../.env");
-
-	config({ path: envPath });
+export async function loadAppServerConfig(params?: { path?: string }): Promise<Config & { db: DatabaseConfig }> {
+	if (params?.path) {
+		loadEnv({ path: params.path });
+	}
 
 	const db = loadDatabaseConfig();
 
@@ -48,3 +44,5 @@ export async function loadConfig(): Promise<Config & { db: DatabaseConfig }> {
 	}
 	return { ...result, db };
 }
+
+export type AppServerConfig = Awaited<ReturnType<typeof loadAppServerConfig>>;
