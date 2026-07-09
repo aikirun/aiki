@@ -102,6 +102,7 @@ cli
 					if (!migrations) {
 						throw new Error(`${pkg} ships no ${dbProvider} migrations`);
 					}
+					console.log(`${pkg}`);
 					migrateList({ source: migrationSource(migrations), dbProvider });
 				}
 				return;
