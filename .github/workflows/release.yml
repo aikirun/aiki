@@ -1,17 +1,19 @@
 name: Release
 
-# Cutting a release: bun run bump <version>, commit, bun run tag, push with
-# --follow-tags. The verify job re-checks everything in CI — tags can be
-# created without the tag script, so CI stays the authority.
+# Cutting a release: bun run bump <version>, commit, get it onto main, then run
+# this workflow (gh workflow run release.yml, or the Run workflow button). The
+# version comes from the committed types/package.json — there is no input.
 #
-# Steps run in a fixed order with npm publish last — it is the only
-# irreversible step, so nothing a user installs ships until everything before
-# it succeeded. deploy-cloud is the hosted deployment's slice of the pipeline;
-# it is the part that would move out if hosting ever gets its own repo.
+# verify runs the full battery first; only when it passes does the tag job
+# create and push v<version>. A failed verify creates no tag, so a bad release
+# leaves nothing to clean up. Steps run in a fixed order with npm publish last —
+# it is the only irreversible step, so nothing a user installs ships until
+# everything before it succeeded. deploy-cloud is the hosted deployment's slice
+# of the pipeline; it is the part that would move out if hosting ever gets its
+# own repo.
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,39 +30,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.lockstep.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-tags: true
 
-      - name: Tag matches the lockstep version
-        id: version
+      - id: lockstep
+        uses: ./.github/actions/check-lockstep
+
+      # If this version was already tagged: 
+      #  The tag is at the current commit - it is a heal re-run, continue
+      #  The tag is at a different commit - commits landed since the release without a bump, fail
+      - name: Guard against re-releasing a version at a different commit
+        env:
+          VERSION: ${{ steps.lockstep.outputs.version }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          package_version="$(jq -r .version types/package.json)"
-          if [ "$version" != "$package_version" ]; then
-            echo "tag $GITHUB_REF_NAME does not match workspace version $package_version — run bun run bump" >&2
-            exit 1
-          fi
-          for dir in $(jq -r '.workspaces[]' package.json); do
-            v="$(jq -r .version "$dir/package.json")"
-            if [ "$v" != "$version" ]; then
-              echo "$dir is at $v, expected $version — run bun run bump" >&2
+          tag="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$tag^{commit}" >/dev/null; then
+            tagged_sha="$(git rev-parse "refs/tags/$tag^{commit}")"
+            if [ "$tagged_sha" != "$GITHUB_SHA" ]; then
+              echo "tag $tag already exists at $tagged_sha, not $GITHUB_SHA — run bun run bump" >&2
               exit 1
             fi
-          done
-          pins="$(grep -oE 'aikirun/[a-z]+:[A-Za-z0-9_.-]+' deploy/docker-compose.yml || true)"
-          if [ -z "$pins" ]; then
-            echo "no aikirun image pins found in deploy/docker-compose.yml" >&2
-            exit 1
           fi
-          escaped_version="$(printf '%s' "$version" | sed 's/[.]/\\./g')"
-          stale="$(echo "$pins" | grep -v ":$escaped_version\$" || true)"
-          if [ -n "$stale" ]; then
-            echo "deploy/docker-compose.yml pins not at $version — run bun run bump:" >&2
-            echo "$stale" >&2
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/setup-workspace
 
@@ -117,8 +110,45 @@ jobs:
           path: cli/dist/aiki-*
           if-no-files-found: error
 
-  images:
+  # The first side effect: the tag records that this commit passed verify. It is
+  # created before any image or package ships, so every downstream artifact
+  # corresponds to a real tag. verify already failed the run if the tag exists at
+  # a different commit, so here a tag that exists is a heal re-run at this same
+  # commit — skip it — and otherwise we create.
+  tag:
     needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      # A GitHub App token, not the default GITHUB_TOKEN: 
+      # The app is the only identity allowed to create tags. 
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-tags: true
+
+      - name: Create and push the release tag
+        run: |
+          tag="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$tag^{commit}" >/dev/null; then
+            echo "tag $tag already present — heal re-run, nothing to do"
+            exit 0
+          fi
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "$tag" "$GITHUB_SHA"
+          git push origin "$tag"
+
+  images:
+    needs: [verify, tag]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -259,7 +289,7 @@ jobs:
 
   # The public artifacts: npm packages and the GitHub release page.
   publish:
-    needs: [verify, deploy-cloud]
+    needs: [verify, tag, deploy-cloud]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: release
@@ -302,9 +332,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          tag="v$VERSION"
           assets="deploy/docker-compose.yml binaries/aiki-linux-x64 binaries/aiki-linux-arm64 binaries/aiki-darwin-arm64"
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" $assets --clobber
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" $assets --clobber
           else
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes $assets
+            gh release create "$tag" --title "$tag" --generate-notes $assets
           fi

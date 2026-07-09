@@ -34,7 +34,6 @@
 		"server:watch": "bun run --cwd app/server start:watch",
 		"dashboard": "bun run --cwd app/dashboard dev",
 		"bump": "bun scripts/bump.ts",
-		"tag": "bun scripts/tag.ts",
 		"clean": "rm -rf lib/dist types/dist app/server/dist app/dashboard/dist cli/dist sdk/*/dist sdk/adapter/*/dist sdk/iam/dist",
 		"build:lib": "bun run --cwd lib build",
 		"build:types": "bun run --cwd types build",
