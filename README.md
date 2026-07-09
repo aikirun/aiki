@@ -122,7 +122,7 @@ docker-compose up -d
 # Server: http://localhost:9850 — Dashboard: http://localhost:9851
 ```
 
-See the [Installation Guide](./docs/getting-started/installation.md) for env vars and configuration.
+That is the container path. You can also run the stack from the standalone `aiki` binary — one downloaded executable with its own runtime, no Node, Bun, or Docker — or from source with Bun. See the [Installation Guide](./docs/getting-started/installation.md) for all three, plus env vars and configuration.
 
 <br>
 <p align="center">

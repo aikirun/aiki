@@ -3,7 +3,7 @@
 How you install Aiki depends on what you're doing:
 
 - **Building workflows** — add the SDK to your TypeScript project and run the server embedded in your app, or point your app at a hosted Aiki server. Follow [Add Aiki to your project](#add-aiki-to-your-project).
-- **Hosting Aiki** — stand up the standalone server and web dashboard as infrastructure, with no SDK install. You need a PostgreSQL database, plus either Docker for the ready-made stack or Bun to run from source. Follow [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard).
+- **Hosting Aiki** — run the standalone server and web dashboard as infrastructure, with no SDK install. You need a PostgreSQL database. Run it from the prebuilt `aiki` binary, the ready-made Docker stack, or from source with Bun. Follow [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard).
 
 ## Add Aiki to your project
 
@@ -17,7 +17,7 @@ npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
 
 ### Apply the schema migration
 
-If your server will be the standalone stack from [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard), skip this step — the Docker Compose path applies migrations itself on `up`, and the from-source instructions include their own migrate step.
+If you will [run the standalone server](#run-the-standalone-server-and-dashboard), skip this step — that section covers migration for each way of running it.
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
@@ -28,21 +28,51 @@ Re-run this command when upgrading Aiki to apply new migrations.
 
 ### Run the server
 
-Mount `aikiServer.handler` in any HTTP framework — in the same process as your app, or in a process dedicated to Aiki. The [Quick Start](./quick-start.md) walks through this end-to-end, including worker and client.
+Mount aiki server handler in any HTTP framework — in the same process as your app, or in a process dedicated to Aiki. The [Quick Start](./quick-start.md) walks through this end-to-end, including worker and client.
 
 Workflow code is identical against an embedded or standalone server, so you can also skip embedding entirely and point your client at a server hosted per [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard).
 
+Want the web dashboard against your embedded server? Serve it separately — see [Run the dashboard on its own](#run-the-dashboard-on-its-own).
+
 ## Run the standalone server and dashboard
 
-The stack is three containers:
+Hosting Aiki as infrastructure means running two components:
 
-- **Migrate** — runs `aiki migrate apply --package server` and exits. Also runs `aiki migrate apply --package iam` if the server will run with auth (`AIKI_SERVER_AUTH_SECRET`). Needs `DATABASE_URL`.
 - **Server** — the Aiki server. Needs `DATABASE_URL`.
-- **Dashboard** — the web UI; proxies browser calls to the server set in `AIKI_SERVER_UPSTREAM_URL`.
 
-Start them in that order: migrate must finish before the server starts. You only need the migrate step on a fresh database or when an upgrade ships new migrations, but it is safe to run every time — already-applied migrations are skipped. Docker Compose is the easy path; one command does all of this.
+However you run the server, applications connect the same way:
+```typescript
+const aikiClient = client({ url: "http://localhost:9850" });
+```
 
-### With Docker Compose
+- **Dashboard** — the web UI, a single-page app that talks to the server.
+
+Before the server starts, apply the schema. This one-off **migration step** applies the server package's migrations, plus the iam package's when the server runs with auth (`AIKI_SERVER_AUTH_SECRET`). It needs `DATABASE_URL`, and is safe to repeat: run it on a fresh database or when an aiki upgrade ships new migrations. Already-applied migrations are skipped.
+
+There are three ways to run this stack:
+
+- **The `aiki` binary** — one downloaded executable with its own runtime, no Node, Bun, or Docker to install.
+- **Docker** — run the published images, brought up together by Compose or on their own. Best if you already run containers.
+- **From source** — clone at a release tag and run with Bun. Best for contributors.
+
+### With the aiki binary
+
+Download the `aiki` binary for your platform from the [latest release](https://github.com/aikirun/aiki/releases/latest) and put it on your `PATH`. It carries the migrate and server commands plus its own runtime.
+
+```bash
+export DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
+
+aiki migrate apply     # migrates the server package; use --package server,iam to include iam
+aiki server start      # serves on :9850
+```
+
+The dashboard ships separately — serve it as a static site (see [Run the dashboard on its own](#run-the-dashboard-on-its-own)) or from the dashboard image (see [With Docker](#with-docker)). A dashboard on a different origin than the server needs its origin added to the server's `CORS_ORIGINS`.
+
+### With Docker
+
+The published images cover the stack: `ghcr.io/aikirun/cli` — the same `aiki` binary — runs the migration, `ghcr.io/aikirun/server` runs the server, and `ghcr.io/aikirun/dashboard` serves the web UI. Compose wires them together; you can also run them yourself.
+
+#### With Docker Compose
 
 Download the standalone compose file from the latest release into an empty directory — it pulls that release's published images, so there is nothing to clone or build:
 
@@ -64,13 +94,27 @@ docker-compose up -d
 - Server: http://localhost:9850
 - Dashboard: http://localhost:9851
 
-The migrate step applies the packages listed in `AIKI_MIGRATE_PACKAGES` — by default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set. Override the list to depart from that, for example to create the iam tables before turning auth on: `AIKI_MIGRATE_PACKAGES=server,iam docker-compose up -d`.
+The migration step applies the packages listed in `AIKI_MIGRATE_PACKAGES` — by default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set. Override the list to depart from that, for example to create the iam tables before turning auth on: `AIKI_MIGRATE_PACKAGES=server,iam docker-compose up -d`.
 
-Applications connect by pointing their client at the server's URL:
+#### Without Docker Compose
 
-```typescript
-const aikiClient = client({ url: "http://localhost:9850" });
+Run the images yourself when you orchestrate containers with your own tooling. Migrate first, then start the server and dashboard against it:
+
+```bash
+# migration
+docker run --rm -e DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+  ghcr.io/aikirun/cli:<version> migrate apply --package server
+
+# server
+docker run -p 9850:9850 -e DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+  ghcr.io/aikirun/server:<version>
+
+# dashboard, proxying browser calls to the server
+docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 \
+  ghcr.io/aikirun/dashboard:<version>
 ```
+
+Add `--package server,iam` to the migration when the server runs with auth. The dashboard image proxies to the server, so it needs no `CORS_ORIGINS`; to serve the dashboard from a static host instead, see [Run the dashboard on its own](#run-the-dashboard-on-its-own). Pick versions from the [releases](https://github.com/aikirun/aiki/releases).
 
 ### From source
 
@@ -83,7 +127,7 @@ bun install
 cp app/server/.env.example app/server/.env
 # Edit app/server/.env with your DATABASE_URL
 
-bun run db:migrate:apply:server   # the migrate step
+bun run db:migrate:apply:server   # the migration step
 bun run server                    # Terminal 1
 bun run dashboard                 # Terminal 2
 ```
@@ -92,11 +136,9 @@ Run `bun run db:migrate:apply:iam` too when the server will run with auth. One p
 
 ## Run the dashboard on its own
 
-If you ran the standalone stack above, the dashboard is already up — skip this section. Run the dashboard separately when your server is embedded in your app or hosted elsewhere. It is a single-page app that calls the server from the browser, and there are two ways to serve it.
+Serve the dashboard by itself when the server is embedded in your app (the [SDK path above](#add-aiki-to-your-project)) or hosted somewhere the bundled stack does not reach. It is a single-page app that calls the server from the browser. Serve it as a static site; to run it as a container instead, use the dashboard image under [With Docker](#with-docker).
 
-### On a static host
-
-The right fit when the server is embedded in your app or hosted on its own. The server's URL is baked in at build time, so the dashboard is built per deployment (the build needs Bun) — from the release tag matching your installed `@aikirun/*` version:
+The server's URL is baked into the bundle at build time, so the dashboard is built per deployment (the build needs Bun) — from the release tag matching your installed `@aikirun/*` version:
 
 ```bash
 git clone --branch v0.32.0 https://github.com/aikirun/aiki.git
@@ -106,15 +148,7 @@ bun run build:types
 VITE_AIKI_SERVER_URL=https://aiki.example.com bun run build:dashboard
 ```
 
-Deploy `app/dashboard/dist/` to any static file host, and add the dashboard's origin to the server's `CORS_ORIGINS`. A build that forgot `VITE_AIKI_SERVER_URL` fails loudly in the browser: the dashboard reaches no server, and its error screen names the variable.
-
-### As a Docker image
-
-The image needs no build-time configuration: nginx inside it serves the dashboard and proxies its server calls to the address in `AIKI_SERVER_UPSTREAM_URL`, read at container start. Browser traffic stays on one origin, so no CORS setup is needed. Pick the version matching your server from the [releases](https://github.com/aikirun/aiki/releases):
-
-```bash
-docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 ghcr.io/aikirun/dashboard:<version>
-```
+Deploy `app/dashboard/dist/` to any static file host. Because the browser calls the server cross-origin, two things must line up: the build sets `VITE_AIKI_SERVER_URL` to the server's URL, and the server's `CORS_ORIGINS` allows the dashboard's origin. Miss either and the dashboard fails loudly in the browser — its error screen names both.
 
 ## Environment Variable Reference
 
@@ -147,7 +181,7 @@ These apply to the standalone server and the dashboard. If you embed the server 
 | `AIKI_DASHBOARD_PORT` | No | `9851` | Port for the dashboard |
 | `VITE_AIKI_SERVER_URL` | If on a static host | — | Build-time server URL for a dashboard served outside the docker image |
 
-Which variable applies depends on the deployment mode — see [Run the dashboard on its own](#run-the-dashboard-on-its-own). The bundled `docker-compose.yml` sets `AIKI_SERVER_UPSTREAM_URL` for you.
+Which variable applies depends on how you serve the dashboard: the docker image reads `AIKI_SERVER_UPSTREAM_URL` (see [With Docker](#with-docker)), and a static-host build reads `VITE_AIKI_SERVER_URL` (see [Run the dashboard on its own](#run-the-dashboard-on-its-own)). The bundled `docker-compose.yml` sets `AIKI_SERVER_UPSTREAM_URL` for you.
 
 ---
 

@@ -55,8 +55,9 @@ function CapabilitiesError({ error }: { error: unknown }) {
 					Could not load server capabilities from <code>{AIKI_SERVER_URL}</code>
 				</p>
 				<p style={{ fontSize: 13, color: "#888", lineHeight: 1.5, marginBottom: 16 }}>
-					If the dashboard is served on a different origin than the server, it must be built with{" "}
-					<code>VITE_AIKI_SERVER_URL</code> set to the server's URL
+					When this dashboard is on a different origin from the server, ensure the dashboard is built with{" "}
+					<code>VITE_AIKI_SERVER_URL</code> set to the server's URL, and the server's <code>CORS_ORIGINS</code> allows
+					this dashboard's origin.
 				</p>
 				<pre
 					style={{
