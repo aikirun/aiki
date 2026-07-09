@@ -17,7 +17,7 @@ Durable execution is a fault-tolerant paradigm for building applications, especi
 
 With Aiki, workflows are plain TypeScript. The platform makes them durable: each workflow is a virtual thread of execution that can be suspended intentionally or due to crashes/intermittent failures, and automatically resumed from where it left off.
 
-Aiki's architecture is a server that orchestrates, and workers or endpoints that execute — shipped as a library. Run everything in a single process, or pull the components apart as you grow. Where each component runs is configuration, not architecture; workflow code never changes.
+Aiki's architecture is a server that orchestrates, and workers or endpoints that execute — all shipped as libraries. Run everything in a single process, or pull the components apart as you grow. Where each component runs is configuration, not architecture; workflow code never changes.
 
 ## Example: Subscription Trial
 
