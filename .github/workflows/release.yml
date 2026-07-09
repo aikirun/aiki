@@ -26,7 +26,7 @@ jobs:
   # with nothing pushed, migrated, or published.
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -94,6 +94,28 @@ jobs:
             done
             rm -rf "$workdir" "$dir/$tarball"
           done
+
+      - name: Compile the aiki binaries
+        working-directory: cli
+        run: |
+          bun scripts/generate-embedded-data.ts
+          for target in bun-linux-x64 bun-linux-arm64 bun-darwin-arm64; do
+            bun build src/index.ts --compile --target="$target" --outfile "dist/aiki-${target#bun-}"
+          done
+
+      - name: Smoke-test the linux-x64 binary
+        env:
+          DATABASE_PROVIDER: pg
+        run: |
+          chmod +x cli/dist/aiki-linux-x64
+          cli/dist/aiki-linux-x64 migrate list --package server,iam
+
+      - name: Upload the aiki binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aiki-binaries
+          path: cli/dist/aiki-*
+          if-no-files-found: error
 
   images:
     needs: verify
@@ -266,15 +288,23 @@ jobs:
             (cd "$dir" && bun publish --access public)
           done
 
-      # The standalone compose file is attached as an asset so
-      # releases/latest/download/docker-compose.yml always serves the newest
-      # release's pins. Safe to re-run: upload replaces the asset.
+      - name: Download the aiki binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: aiki-binaries
+          path: binaries
+
+      # The standalone compose file and the per-platform aiki binaries are
+      # attached as assets so releases/latest/download/ always serves the
+      # newest release's pins and executables. Safe to re-run: upload replaces
+      # the assets.
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          assets="deploy/docker-compose.yml binaries/aiki-linux-x64 binaries/aiki-linux-arm64 binaries/aiki-darwin-arm64"
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" deploy/docker-compose.yml --clobber
+            gh release upload "$GITHUB_REF_NAME" $assets --clobber
           else
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes deploy/docker-compose.yml
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes $assets
           fi

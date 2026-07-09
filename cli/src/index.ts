@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import process from "node:process";
-import { startAppServer } from "@aikirun/app-server";
+import { loadAppServerConfig, startAppServer } from "@aikirun/app-server";
 import { loadDatabaseConfig, loadDatabaseProvider } from "@aikirun/lib/db";
 import { migrateApply, migrateList, migrationSource } from "@aikirun/lib/db/migrate";
 import { isMigrateSubcommand, MIGRATE_SUBCOMMAND_HELP, MIGRATE_SUBCOMMANDS } from "@aikirun/lib/db/migrate/cli";
@@ -102,6 +102,7 @@ cli
 					if (!migrations) {
 						throw new Error(`${pkg} ships no ${dbProvider} migrations`);
 					}
+					console.log(`${pkg}`);
 					migrateList({ source: migrationSource(migrations), dbProvider });
 				}
 				return;
@@ -113,8 +114,9 @@ cli
 
 cli
 	.command("server [subcommand]", "Run the Aiki server (start)")
+	.option("--env-file <path>", "Path to env file")
 	.example((name) => `  $ ${name} server start   run the server`)
-	.action(async (subcommand: string | undefined) => {
+	.action(async (subcommand: string | undefined, options: { envFile?: string }) => {
 		if (subcommand === undefined) {
 			cli.outputHelp();
 			return;
@@ -122,7 +124,8 @@ cli
 		if (subcommand !== "start") {
 			throw new Error(`Unknown server subcommand "${subcommand}". Expected: start.`);
 		}
-		await startAppServer();
+		const config = await loadAppServerConfig({ path: options.envFile });
+		await startAppServer({ config });
 	});
 
 const SUBCOMMAND_HELP: Record<string, Record<string, string>> = {
