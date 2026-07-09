@@ -10,5 +10,5 @@ export type { DashboardSessionIamParams } from "./dashboard-session";
 export { dashboardSessionIam } from "./dashboard-session";
 export type { IamParams } from "./iam";
 export { iam } from "./iam";
-export type { MigrateApplyParams } from "./infra/db/migrate";
-export { migrateApply } from "./infra/db/migrate";
+export type { MigrateApplyParams } from "./migrate";
+export { migrateApply } from "./migrate";

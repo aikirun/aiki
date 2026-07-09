@@ -4,8 +4,8 @@ export type { Logger } from "@aikirun/lib/logger";
 export type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./config";
 export { dynamicRuntimeConfigProvider, staticRuntimeConfigProvider } from "./config";
 export { database } from "./infra/db";
-export type { MigrateApplyParams } from "./infra/db/migrate";
-export { migrateApply } from "./infra/db/migrate";
+export type { MigrateApplyParams } from "./migrate";
+export { migrateApply } from "./migrate";
 export type {
 	Server,
 	ServerParams,
