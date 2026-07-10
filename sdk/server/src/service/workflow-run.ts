@@ -1,8 +1,8 @@
-import { getTaskAddress, getWorkflowRunAddress } from "@aikirun/lib/address";
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { NotFoundError } from "@aikirun/lib/error";
+import { getCompositeId } from "@aikirun/lib/id";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type {
@@ -675,7 +675,7 @@ function buildTaskQueuesByAddressRecord(
 		if (task.status === "discarded") {
 			continue;
 		}
-		const address = getTaskAddress(task.name, task.inputHash);
+		const address = getCompositeId({ name: task.name, referenceId: task.inputHash });
 		const transition = taskTransitionsById.get(task.latestStateTransitionId);
 		if (!transition) {
 			throw new Error(`Task state transition not found: ${task.latestStateTransitionId}`);
@@ -864,11 +864,11 @@ async function buildChildWorkflowRunQueuesByAddressRecord(
 			throw new Error(`Workflow not found for child run: ${childRun.id}`);
 		}
 
-		const childRunAddress = getWorkflowRunAddress(
-			childWorkflow.name,
-			childWorkflow.versionId,
-			childRun.referenceId ?? childRun.inputHash
-		);
+		const childRunAddress = getCompositeId({
+			name: childWorkflow.name,
+			versionId: childWorkflow.versionId,
+			referenceId: childRun.referenceId ?? childRun.inputHash,
+		});
 
 		const childRunInfo: ChildWorkflowRunInfo = {
 			id: childRun.id,

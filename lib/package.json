@@ -5,10 +5,6 @@
 	"description": "Internal utilities library for Aiki - including duration conversion, retry strategies, async helpers, and polling utilities",
 	"type": "module",
 	"exports": {
-		"./address": {
-			"types": "./dist/address/index.d.ts",
-			"import": "./dist/address/index.js"
-		},
 		"./async": {
 			"types": "./dist/async/index.d.ts",
 			"import": "./dist/async/index.js"

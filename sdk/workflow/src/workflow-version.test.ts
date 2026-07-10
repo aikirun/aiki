@@ -1,6 +1,6 @@
-import { getWorkflowRunAddress } from "@aikirun/lib/address";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
+import { getCompositeId } from "@aikirun/lib/id";
 import { withFakeClient } from "@aikirun/testing/client";
 import {
 	baseWorkflowRunRecordFactory,
@@ -855,7 +855,11 @@ describe("creating a workflow run", () => {
 				});
 
 				const inputHash = await hashInput("payload");
-				const address = getWorkflowRunAddress(childWorkflow.name, childWorkflow.versionId, inputHash);
+				const address = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: inputHash,
+				});
 				const recordedChildRun = childWorkflowRunInfoFactory.build({
 					name: childWorkflow.name,
 					versionId: childWorkflow.versionId,
@@ -883,11 +887,11 @@ describe("creating a workflow run", () => {
 					},
 				});
 
-				const mismatchedAddress = getWorkflowRunAddress(
-					childWorkflow.name,
-					childWorkflow.versionId,
-					"different-input-hash"
-				);
+				const mismatchedAddress = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: "different-input-hash",
+				});
 				const parentRunRecord = runningWorkflowRunRecordFactory.build({
 					childWorkflowRunQueues: {
 						[mismatchedAddress]: { childWorkflowRuns: [childWorkflowRunInfoFactory.build()] },

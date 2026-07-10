@@ -2,7 +2,6 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
 	entry: {
-		"address/index": "src/address/index.ts",
 		"async/index": "src/async/index.ts",
 		"collection/array/index": "src/collection/array/index.ts",
 		"collection/heap/index": "src/collection/heap/index.ts",
