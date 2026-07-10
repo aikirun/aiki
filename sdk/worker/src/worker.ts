@@ -173,6 +173,9 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			this.primarySubscriber.heartbeat?.bind(this.primarySubscriber)
 		);
 
+		// Backup subscriber is only created if the user provided a custom subscriber.
+		// When the custom subscriber is present, we know for sure that it is not httpSubscriber
+		// because that pacakge is private
 		if (this.params.subscriber) {
 			const createBackupSubscriber = httpSubscriber({ api: this.client.api });
 			this.backupSubscriber = createBackupSubscriber({
