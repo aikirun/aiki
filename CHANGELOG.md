@@ -2,6 +2,26 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.34.0
+
+This release changes how the database TLS connection is configured: the `DATABASE_SSL` flag is gone, TLS is now driven by the connection URL's `sslmode`, and a new `DATABASE_CA_CERT` lets you verify the server certificate against a private CA.
+
+### Breaking Changes
+
+- **`DATABASE_SSL` removed; TLS now driven by the connection URL's `sslmode`, with `DATABASE_CA_CERT` for private CAs.** The boolean `DATABASE_SSL` flag is gone. Enable TLS via the standard `sslmode` parameter on `DATABASE_URL`, and set `DATABASE_CA_CERT` (PEM contents) when you need to verify the server certificate against a private CA (e.g. DigitalOcean, RDS). When a CA cert is provided, the connection verifies with `rejectUnauthorized: true`.
+
+  ```bash
+  # Before
+  DATABASE_URL=postgresql://user:password@host:5432/aiki
+  DATABASE_SSL=true
+
+  # After — enable TLS via the URL, verify against a private CA if needed
+  DATABASE_URL=postgresql://user:password@host:5432/aiki?sslmode=require
+  DATABASE_CA_CERT="-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+  ```
+
+  This affects the `DATABASE_*` env vars across `.env.example`, both `docker-compose.yml` files, the release workflow, and the installation docs. Update any deployment that set `DATABASE_SSL`.
+
 ## 0.33.0
 
 This release ships a self-contained `aiki` binary for hosting the server without Node, Bun, or Docker, and reshapes schedules around a reference-first identity model — schedules are now identified by reference, with per-run retry and shard options.

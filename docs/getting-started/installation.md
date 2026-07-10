@@ -123,7 +123,7 @@ Add `--package server,iam` to the migration when the server runs with auth. The 
 The same stack runs without Docker (this path needs Bun). Clone at a release tag so you run released code:
 
 ```bash
-git clone --branch v0.33.0 https://github.com/aikirun/aiki.git
+git clone --branch v0.34.0 https://github.com/aikirun/aiki.git
 cd aiki
 bun install
 cp app/server/.env.example app/server/.env
@@ -143,7 +143,7 @@ Serve the dashboard by itself when the server is embedded in your app (the [SDK 
 The server's URL is baked into the bundle at build time, so the dashboard is built per deployment (the build needs Bun) — from the release tag matching your installed `@aikirun/*` version:
 
 ```bash
-git clone --branch v0.33.0 https://github.com/aikirun/aiki.git
+git clone --branch v0.34.0 https://github.com/aikirun/aiki.git
 cd aiki
 bun install
 bun run build:types

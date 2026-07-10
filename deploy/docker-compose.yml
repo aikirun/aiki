@@ -2,7 +2,7 @@
 # Put a .env with your DATABASE_URL next to this file, then: docker compose up -d
 services:
   migrate:
-    image: ghcr.io/aikirun/cli:0.33.0
+    image: ghcr.io/aikirun/cli:0.34.0
     container_name: aiki-migrate
     environment:
       DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
@@ -14,7 +14,7 @@ services:
     command: ["migrate", "apply", "--package", "${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}"]
 
   server:
-    image: ghcr.io/aikirun/server:0.33.0
+    image: ghcr.io/aikirun/server:0.34.0
     container_name: aiki-server
     depends_on:
       migrate:
@@ -42,7 +42,7 @@ services:
     restart: unless-stopped
 
   dashboard:
-    image: ghcr.io/aikirun/dashboard:0.33.0
+    image: ghcr.io/aikirun/dashboard:0.34.0
     container_name: aiki-dashboard
     ports:
       - "${AIKI_DASHBOARD_PORT:-9851}:9851"

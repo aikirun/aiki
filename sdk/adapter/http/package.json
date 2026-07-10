@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/http",
-	"version": "0.33.0",
+	"version": "0.34.0",
 	"private": true,
 	"description": "Internal HTTP polling subscriber for Aiki workers",
 	"type": "module",

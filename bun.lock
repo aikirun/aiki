@@ -16,7 +16,7 @@
     },
     "app/dashboard": {
       "name": "@aikirun/app-dashboard",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
@@ -44,7 +44,7 @@
     },
     "app/server": {
       "name": "@aikirun/app-server",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/iam": "workspace:*",
         "@aikirun/lib": "workspace:*",
@@ -60,7 +60,7 @@
     },
     "cli": {
       "name": "@aikirun/cli",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/app-server": "workspace:*",
         "@aikirun/iam": "workspace:*",
@@ -76,7 +76,7 @@
     },
     "examples": {
       "name": "@aikirun/examples",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/memory": "workspace:*",
         "@aikirun/redis": "workspace:*",
@@ -90,7 +90,7 @@
     },
     "lib": {
       "name": "@aikirun/lib",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "devDependencies": {
         "arktype": "^2.1.29",
         "cac": "^6.7.14",
@@ -101,7 +101,7 @@
     },
     "sdk/adapter/http": {
       "name": "@aikirun/http",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
@@ -111,7 +111,7 @@
     },
     "sdk/adapter/memory": {
       "name": "@aikirun/memory",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
@@ -121,7 +121,7 @@
     },
     "sdk/adapter/redis": {
       "name": "@aikirun/redis",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "ioredis": "^5.4.1",
@@ -132,7 +132,7 @@
     },
     "sdk/client": {
       "name": "@aikirun/client",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.9.3",
@@ -143,7 +143,7 @@
     },
     "sdk/endpoint": {
       "name": "@aikirun/endpoint",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
@@ -154,7 +154,7 @@
     },
     "sdk/iam": {
       "name": "@aikirun/iam",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "bin": {
         "aiki-iam": "./dist/bin.js",
       },
@@ -183,7 +183,7 @@
     },
     "sdk/server": {
       "name": "@aikirun/server",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "bin": {
         "aiki-server": "./dist/bin.js",
       },
@@ -213,7 +213,7 @@
     },
     "sdk/worker": {
       "name": "@aikirun/worker",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
@@ -225,7 +225,7 @@
     },
     "sdk/workflow": {
       "name": "@aikirun/workflow",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@standard-schema/spec": "^1.1.0",
@@ -237,7 +237,7 @@
     },
     "testing": {
       "name": "@aikirun/testing",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "fishery": "^2.4.0",
@@ -245,7 +245,7 @@
     },
     "types": {
       "name": "@aikirun/types",
-      "version": "0.33.0",
+      "version": "0.34.0",
       "devDependencies": {
         "@aikirun/lib": "workspace:*",
       },
@@ -447,7 +447,7 @@
 
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
 
-    "@opentelemetry/semantic-conventions": ["@opentelemetry/semantic-conventions@1.42.0", "", {}, "sha512-icc5xCzndZfhuJMy5oqk5AvloWquR7jtae74qzpkKkhGp8BivK+oCcEXgGnjCdTfp8hA44l+w8gE8yYJbocJJw=="],
+    "@opentelemetry/semantic-conventions": ["@opentelemetry/semantic-conventions@1.43.0", "", {}, "sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg=="],
 
     "@orpc/client": ["@orpc/client@1.14.7", "", { "dependencies": { "@orpc/shared": "1.14.7", "@orpc/standard-server": "1.14.7", "@orpc/standard-server-fetch": "1.14.7", "@orpc/standard-server-peer": "1.14.7" } }, "sha512-/yloM96/6Z3qlmEgW4/VMYUnhxXbCr6lIJiKSHmsvhgKcwrUPOPJrL3p0ZpItz5SKVtQSwXIhT5KcT/3va/Aew=="],
 
@@ -875,7 +875,7 @@
 
     "semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
-    "set-cookie-parser": ["set-cookie-parser@3.1.1", "", {}, "sha512-vM9SUhjsUYs6UeJUmygc5Ofm5eQGe85riob5ju6XCgFGJI5PLV4nrDAQpQjd+LkFBpAkADn5BQQpZ9EUNkyLuA=="],
+    "set-cookie-parser": ["set-cookie-parser@3.1.2", "", {}, "sha512-5/r/lTwbJ3zQ+qwdUFZYeRNqda7P5HD8zQKqlSjdGt1/S0cjLAphHusj4Y58ahDtWn/g32xrIS58/ikOvwl0Lw=="],
 
     "signal-exit": ["signal-exit@4.1.0", "", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
 

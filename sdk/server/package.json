@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/server",
-	"version": "0.33.0",
+	"version": "0.34.0",
 	"description": "Aiki server library — durable execution orchestrator.",
 	"type": "module",
 	"main": "./dist/index.js",
