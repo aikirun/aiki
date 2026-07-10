@@ -1,6 +1,6 @@
-import { getTaskAddress } from "@aikirun/lib/address";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
+import { getCompositeId } from "@aikirun/lib/id";
 import { withFakeClient } from "@aikirun/testing/client";
 import { baseWorkflowRunRecordFactory, runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
 import {
@@ -306,7 +306,7 @@ describe("task", () => {
 				const output = "previously-sent";
 
 				const inputHash = await hashInput(input);
-				const address = getTaskAddress(sendEmail.name, inputHash);
+				const address = getCompositeId({ name: sendEmail.name, referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({ name: sendEmail.name, state: { output } });
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					taskQueues: { [address]: { tasks: [recordedTask] } },
@@ -340,7 +340,7 @@ describe("task", () => {
 				const recordedOutput = "recorded!";
 
 				const inputHash = await hashInput(input);
-				const address = getTaskAddress(sendEmail.name, inputHash);
+				const address = getCompositeId({ name: sendEmail.name, referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: sendEmail.name,
 					state: { output: recordedOutput },
@@ -404,7 +404,7 @@ describe("task", () => {
 
 				const input = { cardId: "card-1" };
 				const inputHash = await hashInput(input);
-				const address = getTaskAddress(chargeCard.name, inputHash);
+				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
 				const failedTask = failedTaskInfoFactory.build({ name: chargeCard.name });
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					taskQueues: { [address]: { tasks: [failedTask] } },

@@ -1,5 +1,5 @@
-import { getWorkflowRunAddress } from "@aikirun/lib/address";
 import { hashInput } from "@aikirun/lib/crypto";
+import { getCompositeId } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
 import {
 	type ObjectBuilder,
@@ -178,7 +178,11 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		const inputHash = await hashInput(input);
 
 		const referenceId = startOptions.reference?.id;
-		const address = getWorkflowRunAddress(this.name, this.versionId, referenceId ?? inputHash) as WorkflowRunAddress;
+		const address = getCompositeId<WorkflowRunAddress>({
+			name: this.name,
+			versionId: this.versionId,
+			referenceId: referenceId ?? inputHash,
+		});
 		const replayManifest = parentRun[INTERNAL].replayManifest;
 
 		if (replayManifest.hasUnconsumedEntries()) {

@@ -1,7 +1,7 @@
-import { getTaskAddress } from "@aikirun/lib/address";
 import { delay } from "@aikirun/lib/async";
 import type { ConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
+import { getCompositeId } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
 import {
 	type ObjectBuilder,
@@ -129,7 +129,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const parseInputResult = inputSchema ? this.parse(handle, inputSchema, inputRaw, run.logger) : (inputRaw as Input);
 		const input = parseInputResult instanceof Promise ? await parseInputResult : parseInputResult;
 		const inputHash = await hashInput(input);
-		const address = getTaskAddress(this.name, inputHash) as TaskAddress;
+		const address = getCompositeId<TaskAddress>({ name: this.name, referenceId: inputHash });
 
 		const replayManifest = run[INTERNAL].replayManifest;
 
