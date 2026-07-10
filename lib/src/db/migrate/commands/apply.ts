@@ -29,7 +29,7 @@ async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], mi
 	const postgres = await importPostgres();
 	const client = postgres(config.url, {
 		max: 1,
-		ssl: config.ssl ? "require" : undefined,
+		ssl: config.caCert ? { ca: config.caCert, rejectUnauthorized: true } : undefined,
 	});
 	const db = drizzle(client);
 

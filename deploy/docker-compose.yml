@@ -8,7 +8,7 @@ services:
       DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
       DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
       DATABASE_PATH: ${DATABASE_PATH:-:memory:}
-      DATABASE_SSL: ${DATABASE_SSL:-false}
+      DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: ["migrate", "apply", "--package", "${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}"]
@@ -31,7 +31,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
       DATABASE_PATH: ${DATABASE_PATH:-:memory:}
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
-      DATABASE_SSL: ${DATABASE_SSL:-false}
+      DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
       REDIS_HOST: ${REDIS_HOST:-}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}

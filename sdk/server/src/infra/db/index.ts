@@ -20,7 +20,7 @@ async function createDatabase(config: PgDatabaseConfig): Promise<Database> {
 	const postgres = await importPostgres();
 	const client = postgres(config.url, {
 		max: config.maxConnections,
-		ssl: config.ssl,
+		ssl: config.caCert ? { ca: config.caCert, rejectUnauthorized: true } : undefined,
 	});
 	return { provider: "pg", [INTERNAL]: { client } };
 }
