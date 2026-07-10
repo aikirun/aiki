@@ -244,38 +244,18 @@ jobs:
           bun sdk/server/src/bin.ts migrate apply
           bun sdk/iam/src/bin.ts migrate apply
 
+      # Redeploy by name and override the server component's image tag to this
+      # release's version. The action waits for the deploy, fails the step if it
+      # errors, and prints the deploy logs.
       - name: Redeploy the hosted server
-        id: redeploy
-        run: |
-          response="$(curl -fsS -G --data-urlencode "imgURL=ghcr.io/aikirun/server:$VERSION" "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")"
-          deploy_id="$(echo "$response" | jq -r '.deploy.id')"
-          if [ -z "$deploy_id" ] || [ "$deploy_id" = "null" ]; then
-            echo "deploy hook did not return a deploy id: $response" >&2
-            exit 1
-          fi
-          echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for the deploy to go live
-        run: |
-          for attempt in $(seq 1 90); do
-            status="$(curl -fsS --max-time 10 \
-              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-              "https://api.render.com/v1/services/${{ vars.RENDER_SERVICE_ID }}/deploys/${{ steps.redeploy.outputs.deploy_id }}" \
-              | jq -r '.status')"
-            case "$status" in
-              live)
-                echo "deploy live after $attempt checks"
-                exit 0
-                ;;
-              build_failed|update_failed|canceled|deactivated)
-                echo "deploy ended in status $status" >&2
-                exit 1
-                ;;
-            esac
-            sleep 10
-          done
-          echo "deploy never went live" >&2
-          exit 1
+        uses: digitalocean/app_action/deploy@0b2a11724d565a7206d1e8aaddcd769cac04c8ec # v2.0.11
+        env:
+          IMAGE_TAG_AIKI_SERVER: ${{ needs.verify.outputs.version }}
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_name: ${{ vars.DIGITALOCEAN_APP_NAME }}
+          print_build_logs: "true"
+          print_deploy_logs: "true"
 
       - name: Confirm the release version is serving
         run: |
