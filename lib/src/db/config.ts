@@ -5,20 +5,18 @@ import { DATABASE_PROVIDERS, type DatabaseProvider, isDatabaseProvider } from ".
 import { omitUndefined } from "../object";
 import type { Equal, ExpectTrue } from "../testing/expect";
 
-const coerceBool = type("'true' | 'false' | '1' | '0'").pipe((v) => v === "true" || v === "1");
-
 const pgDatabaseConfigSchema = type({
 	provider: "'pg'",
 	url: "string > 0",
 	maxConnections: "string.integer.parse | number.integer > 0 = 10",
-	ssl: type("boolean").or(coerceBool).default(false),
+	"caCert?": "string > 0",
 });
 
 const mysqlDatabaseConfigSchema = type({
 	provider: "'mysql'",
 	url: "string > 0",
 	maxConnections: "string.integer.parse | number.integer > 0 = 10",
-	ssl: type("boolean").or(coerceBool).default(false),
+	"caCert?": "string > 0",
 });
 
 const sqliteDatabaseConfigSchema = type({
@@ -57,7 +55,7 @@ export function loadDatabaseConfig(): DatabaseConfig {
 					provider,
 					url: process.env.DATABASE_URL,
 					maxConnections: process.env.DATABASE_MAX_CONNECTIONS,
-					ssl: process.env.DATABASE_SSL,
+					caCert: process.env.DATABASE_CA_CERT || undefined,
 				};
 			default:
 				return provider satisfies never;

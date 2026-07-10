@@ -239,7 +239,7 @@ jobs:
         env:
           DATABASE_PROVIDER: ${{ vars.DATABASE_PROVIDER }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DATABASE_SSL: "true"
+          DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
         run: |
           bun sdk/server/src/bin.ts migrate apply
           bun sdk/iam/src/bin.ts migrate apply

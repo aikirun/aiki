@@ -163,7 +163,7 @@ These apply to the standalone server and the dashboard. If you embed the server 
 | `DATABASE_PROVIDER` | No | `pg` | Database provider; `pg` is supported today, `sqlite` and `mysql` coming soon |
 | `DATABASE_URL` | Yes | — | Postgres connection string |
 | `DATABASE_MAX_CONNECTIONS` | No | `10` | Connection pool size |
-| `DATABASE_SSL` | No | `false` | Enable SSL for Postgres |
+| `DATABASE_CA_CERT` | No | — | PEM contents of a CA certificate used to verify the database's TLS certificate. Needed to verify against a private CA (e.g. DigitalOcean, RDS) |
 | `AIKI_SERVER_HOST` | No | `0.0.0.0` | Bind address |
 | `AIKI_SERVER_PORT` | No | `9850` | Server port |
 | `AIKI_SERVER_BASE_URL` | If IAM is on | — | Public URL of the server; required only when `AIKI_SERVER_AUTH_SECRET` is also set |
