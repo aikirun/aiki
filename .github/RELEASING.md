@@ -21,3 +21,8 @@ Each is also dispatchable on its own — Actions tab → **Deploy server** or
 **Deploy dashboard** → **Run workflow** → enter a `version` (without the `v`
 prefix). Use this to redeploy or roll back the hosted server or dashboard to an
 already-released version without cutting a new release.
+
+`deploy-website` publishes the website the same way — Actions tab →
+**Deploy website** → **Run workflow**. It takes an optional git `ref` instead of
+a version: leave it blank to redeploy the current `main`, or pass a tag like
+`v0.34.1` to republish that release's docs.
