@@ -296,7 +296,11 @@ export interface WorkflowRunClaimReadyRequestV1 {
 	workflows: Array<{ name: string; versionId: string }>;
 	shards?: string[];
 	limit: number;
-	claimMinIdleTimeMs: number;
+	/**
+	 * Steal actively executing runs whose last heartbeat was received more than
+	 * claimMinIdleTimeMs milliseconds ago. Defaults to 90 seconds.
+	 */
+	claimMinIdleTimeMs?: number;
 }
 
 export interface WorkflowRunClaimReadyResponseV1 {

@@ -126,7 +126,6 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 	private readonly availableCapacityLatch = createBinaryLatch();
 	private readonly pendingWorkflowRunIds = new Set<string>();
 	private readonly activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
-	private readonly lastServerHeartbeatByRunId = new Map<string, number>();
 	private stopPromise: Promise<void> | undefined;
 
 	constructor(
@@ -169,9 +168,6 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			logger: this.logger.child({ "aiki.subscriber": "primary" }),
 			signal,
 		});
-		this.primarySubscriber.heartbeat = this.withServerHeartbeatForwarding(
-			this.primarySubscriber.heartbeat?.bind(this.primarySubscriber)
-		);
 
 		// Backup subscriber is only created if the user provided a custom subscriber.
 		// When the custom subscriber is present, we know for sure that it is not httpSubscriber
@@ -185,9 +181,6 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				logger: this.logger.child({ "aiki.subscriber": "backup" }),
 				signal,
 			});
-			this.backupSubscriber.heartbeat = this.withServerHeartbeatForwarding(
-				this.backupSubscriber.heartbeat?.bind(this.backupSubscriber)
-			);
 		}
 
 		this.subscriberLoopPromise = this.subscriberLoop(signal).catch((error) => {
@@ -235,24 +228,6 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 
 		this.pendingWorkflowRunIds.clear();
 		this.activeWorkflowRunsById.clear();
-		this.lastServerHeartbeatByRunId.clear();
-	}
-
-	private withServerHeartbeatForwarding(heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>) {
-		const serverHeartbeatIntervalMs = 30_000;
-
-		return async (workflowRunId: WorkflowRunId) => {
-			if (heartbeat) {
-				await heartbeat(workflowRunId);
-			}
-
-			const now = Date.now();
-			const lastServerHeartbeat = this.lastServerHeartbeatByRunId.get(workflowRunId) ?? 0;
-			if (now - lastServerHeartbeat >= serverHeartbeatIntervalMs) {
-				this.lastServerHeartbeatByRunId.set(workflowRunId, now);
-				await this.client.api.workflowRun.heartbeatV1({ id: workflowRunId });
-			}
-		};
 	}
 
 	private async subscriberLoop(signal: AbortSignal): Promise<void> {
@@ -477,7 +452,6 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			}
 		} finally {
 			this.activeWorkflowRunsById.delete(workflowRunId);
-			this.lastServerHeartbeatByRunId.delete(workflowRunId);
 			this.availableCapacityLatch.signal();
 		}
 	}

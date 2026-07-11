@@ -1,3 +1,4 @@
+export * from "./claim";
 export * from "./error";
 export * from "./event";
 export * from "./replay-manifest";

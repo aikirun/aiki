@@ -1,6 +1,6 @@
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { WorkflowRunClaimReadyRequestV1 } from "@aikirun/types/api/workflow-run";
-import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import { DEFAULT_CLAIM_MIN_IDLE_TIME_MS, type WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
@@ -63,7 +63,7 @@ async function stealStaleClaimed(
 	return repo.stealStaleClaimed(
 		context.namespaceId,
 		{ workflows, shards: request.shards },
-		request.claimMinIdleTimeMs,
+		request.claimMinIdleTimeMs ?? DEFAULT_CLAIM_MIN_IDLE_TIME_MS,
 		request.limit
 	);
 }
