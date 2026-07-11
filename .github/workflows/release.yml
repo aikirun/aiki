@@ -283,3 +283,16 @@ jobs:
           else
             gh release create "$tag" --title "$tag" --generate-notes $assets
           fi
+
+  # Publish the website last — after npm and the GitHub release are live — so
+  # the docs never describe a version that is not yet installable or downloadable.
+  deploy-website:
+    needs: [verify, publish]
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-website.yml
+    with:
+      ref: v${{ needs.verify.outputs.version }}
+    secrets: inherit
