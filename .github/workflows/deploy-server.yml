@@ -1,0 +1,122 @@
+name: Deploy server
+
+# Deploys the hosted server to DigitalOcean App Platform for a given release
+# version: migrates its database, then rolls the App Platform component to the
+# version's image and waits for it to go live.
+#
+# Everything runs from the version's tag, so the migration always matches the image
+# being deployed — on a rollback the older tag's migrate is a no-op against the
+# already-migrated database.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version to deploy, without the v prefix (e.g. 0.34.1)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version to deploy, without the v prefix (e.g. 0.34.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: v${{ inputs.version }}
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Migrate the hosted database
+        env:
+          DATABASE_PROVIDER: ${{ vars.DATABASE_PROVIDER }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
+        run: |
+          bun sdk/server/src/bin.ts migrate apply
+          bun sdk/iam/src/bin.ts migrate apply
+
+      # Pin the app's component to this version by patching only its image tag in the
+      # live spec and PUTting it back. The VPC binding sits beside the spec in the GET
+      # response but must be re-injected into spec.vpc (id only — egress_ips is
+      # read-only) on the PUT, or the update detaches the app from its VPC and it can
+      # no longer reach the database.
+      - name: Deploy the hosted server
+        id: deploy_server
+        env:
+          DO_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          APP_ID: ${{ vars.DIGITALOCEAN_APP_ID }}
+          COMPONENT: ${{ vars.DIGITALOCEAN_APP_COMPONENT }}
+        run: |
+          body="$(curl -fsS -H "Authorization: Bearer $DO_TOKEN" \
+            "https://api.digitalocean.com/v2/apps/$APP_ID" \
+            | jq --arg v "$VERSION" --arg name "$COMPONENT" '
+                (.app.vpc.id) as $vpcid
+                | .app.spec
+                | (.services[] |= (if .name == $name then .image.tag = $v else . end))
+                | (if $vpcid then .vpc = {id: $vpcid} else . end)
+                | {spec: .}
+              ')"
+          response="$(curl -fsS -X PUT \
+            -H "Authorization: Bearer $DO_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$body" \
+            "https://api.digitalocean.com/v2/apps/$APP_ID")"
+          # Take the newly started deployment_id and wait on it.
+          deployment_id="$(echo "$response" | jq -r '.app.in_progress_deployment.id // .app.pending_deployment.id // empty')"
+          if [ -z "$deployment_id" ]; then
+            echo "app update did not start a deployment: $response" >&2
+            exit 1
+          fi
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the deploy to go live
+        env:
+          DO_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          APP_ID: ${{ vars.DIGITALOCEAN_APP_ID }}
+          DEPLOYMENT_ID: ${{ steps.deploy_server.outputs.deployment_id }}
+        run: |
+          for attempt in $(seq 1 90); do
+            phase="$(curl -fsS --max-time 10 \
+              -H "Authorization: Bearer $DO_TOKEN" \
+              "https://api.digitalocean.com/v2/apps/$APP_ID/deployments/$DEPLOYMENT_ID" \
+              | jq -r '.deployment.phase')"
+            case "$phase" in
+              ACTIVE)
+                echo "deploy active after $attempt checks"
+                exit 0
+                ;;
+              ERROR|CANCELED|SUPERSEDED)
+                echo "deploy ended in phase $phase" >&2
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "deploy never became active" >&2
+          exit 1
+
+      - name: Confirm the release version is serving
+        run: |
+          for attempt in $(seq 1 12); do
+            deployed="$(curl -fsS --max-time 5 "${{ vars.AIKI_SERVER_BASE_URL }}/capabilities" | jq -r .version 2>/dev/null || true)"
+            if [ "$deployed" = "$VERSION" ]; then
+              echo "hosted server reports $VERSION"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "hosted server does not report version $VERSION" >&2
+          exit 1

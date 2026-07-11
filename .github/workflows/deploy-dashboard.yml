@@ -1,0 +1,42 @@
+name: Deploy dashboard
+
+# Builds the hosted dashboard for a given release version and deploys it to
+# Cloudflare Pages. The dashboard is built from the version's tag.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version to deploy, without the v prefix (e.g. 0.34.1)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version to deploy, without the v prefix (e.g. 0.34.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: v${{ inputs.version }}
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Deploy the dashboard to Cloudflare Pages
+        env:
+          VITE_AIKI_SERVER_URL: ${{ vars.AIKI_SERVER_BASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          bun run build:dashboard
+          bunx wrangler@4 pages deploy app/dashboard/dist --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}" --branch=main

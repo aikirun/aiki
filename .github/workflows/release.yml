@@ -4,13 +4,10 @@ name: Release
 # this workflow (gh workflow run release.yml, or the Run workflow button). The
 # version comes from the committed types/package.json — there is no input.
 #
-# verify runs the full battery first; only when it passes does the tag job
-# create and push v<version>. A failed verify creates no tag, so a bad release
-# leaves nothing to clean up. Steps run in a fixed order with npm publish last —
-# it is the only irreversible step, so nothing a user installs ships until
-# everything before it succeeded. deploy-cloud is the hosted deployment's slice
-# of the pipeline; it is the part that would move out if hosting ever gets its
-# own repo.
+# verify runs first; only when it passes does the tag job create and push v<version>. 
+# A failed verify creates no tag, so a bad release leaves nothing to clean up. 
+# npm packages are published after the hosted server and dashboard are redeployed,
+# so the user never installs an sdk exepcting features the hosted server doesn't support.
 
 on:
   workflow_dispatch:
@@ -28,7 +25,7 @@ jobs:
   # with nothing pushed, migrated, or published.
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.lockstep.outputs.version }}
     steps:
@@ -128,7 +125,7 @@ jobs:
   tag:
     needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 3
     environment: release
     env:
       VERSION: ${{ needs.verify.outputs.version }}
@@ -162,7 +159,7 @@ jobs:
   images:
     needs: [verify, tag]
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     strategy:
       matrix:
         include:
@@ -220,117 +217,25 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
 
-  # The hosted deployment: migrate its database, roll its server to the new
-  # image, publish its dashboard. Secrets and vars live in the release
-  # environment.
-  deploy-cloud:
+  deploy-server:
     needs: [verify, images]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: release
-    env:
-      VERSION: ${{ needs.verify.outputs.version }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+    uses: ./.github/workflows/deploy-server.yml
+    with:
+      version: ${{ needs.verify.outputs.version }}
+    secrets: inherit
 
-      - uses: ./.github/actions/setup-workspace
-
-      - name: Migrate the hosted database
-        env:
-          DATABASE_PROVIDER: ${{ vars.DATABASE_PROVIDER }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
-        run: |
-          bun sdk/server/src/bin.ts migrate apply
-          bun sdk/iam/src/bin.ts migrate apply
-
-      # Pin the app's component to this release by patching only its image tag in the
-      # live spec and PUTting it back. The VPC binding sits beside the spec in the GET
-      # response but must be re-injected into spec.vpc (id only — egress_ips is
-      # read-only) on the PUT, or the update detaches the app from its VPC and it can
-      # no longer reach the database.
-      - name: Deploy the hosted server
-        id: deploy_server
-        env:
-          DO_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          APP_ID: ${{ vars.DIGITALOCEAN_APP_ID }}
-          COMPONENT: ${{ vars.DIGITALOCEAN_APP_COMPONENT }}
-        run: |
-          body="$(curl -fsS -H "Authorization: Bearer $DO_TOKEN" \
-            "https://api.digitalocean.com/v2/apps/$APP_ID" \
-            | jq --arg v "$VERSION" --arg name "$COMPONENT" '
-                (.app.vpc.id) as $vpcid
-                | .app.spec
-                | (.services[] |= (if .name == $name then .image.tag = $v else . end))
-                | (if $vpcid then .vpc = {id: $vpcid} else . end)
-                | {spec: .}
-              ')"
-          response="$(curl -fsS -X PUT \
-            -H "Authorization: Bearer $DO_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$body" \
-            "https://api.digitalocean.com/v2/apps/$APP_ID")"
-          # Take the newly started deployment_id and wait on it.
-          deployment_id="$(echo "$response" | jq -r '.app.in_progress_deployment.id // .app.pending_deployment.id // empty')"
-          if [ -z "$deployment_id" ]; then
-            echo "app update did not start a deployment: $response" >&2
-            exit 1
-          fi
-          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for the deploy to go live
-        env:
-          DO_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          APP_ID: ${{ vars.DIGITALOCEAN_APP_ID }}
-          DEPLOYMENT_ID: ${{ steps.deploy_server.outputs.deployment_id }}
-        run: |
-          for attempt in $(seq 1 90); do
-            phase="$(curl -fsS --max-time 10 \
-              -H "Authorization: Bearer $DO_TOKEN" \
-              "https://api.digitalocean.com/v2/apps/$APP_ID/deployments/$DEPLOYMENT_ID" \
-              | jq -r '.deployment.phase')"
-            case "$phase" in
-              ACTIVE)
-                echo "deploy active after $attempt checks"
-                exit 0
-                ;;
-              ERROR|CANCELED|SUPERSEDED)
-                echo "deploy ended in phase $phase" >&2
-                exit 1
-                ;;
-            esac
-            sleep 10
-          done
-          echo "deploy never became active" >&2
-          exit 1
-
-      - name: Confirm the release version is serving
-        run: |
-          for attempt in $(seq 1 12); do
-            deployed="$(curl -fsS --max-time 5 "${{ vars.AIKI_SERVER_BASE_URL }}/capabilities" | jq -r .version 2>/dev/null || true)"
-            if [ "$deployed" = "$VERSION" ]; then
-              echo "hosted server reports $VERSION"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "hosted server does not report version $VERSION" >&2
-          exit 1
-
-      - name: Deploy the hosted dashboard to Cloudflare Pages
-        env:
-          VITE_AIKI_SERVER_URL: ${{ vars.AIKI_SERVER_BASE_URL }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          bun run build:dashboard
-          bunx wrangler@4 pages deploy app/dashboard/dist --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}" --branch=main
+  deploy-dashboard:
+    needs: [verify, deploy-server]
+    uses: ./.github/workflows/deploy-dashboard.yml
+    with:
+      version: ${{ needs.verify.outputs.version }}
+    secrets: inherit
 
   # The public artifacts: npm packages and the GitHub release page.
   publish:
-    needs: [verify, tag, deploy-cloud]
+    needs: [verify, tag, deploy-server, deploy-dashboard]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     environment: release
     env:
       VERSION: ${{ needs.verify.outputs.version }}
