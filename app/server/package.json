@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/app-server",
-	"version": "0.34.0",
+	"version": "0.34.1",
 	"private": true,
 	"type": "module",
 	"main": "./src/index.ts",

@@ -2,6 +2,18 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.34.1
+
+This release keeps a worker's server-side run claim alive on its own fixed cadence, independent of `heartbeatIntervalMs`, so a large heartbeat interval no longer lets a still-running claim be reassigned to another worker.
+
+### Bug Fixes
+
+- **Run claims no longer expire under a large `heartbeatIntervalMs`.** A worker keeps its server-side claim on an executing run alive on a fixed 30s cadence, derived from the ~90s reclaim threshold and independent of `heartbeatIntervalMs`. Previously the server keepalive rode on the configurable execution heartbeat and was throttled but never floored — setting `heartbeatIntervalMs` above the reclaim threshold let a still-running claim be treated as abandoned and picked up by a second worker.
+
+### Improvements
+
+- **`claimMinIdleTimeMs` is optional on the claim API.** The server fills the default (90s) when it's omitted.
+
 ## 0.34.0
 
 This release changes how the database TLS connection is configured: the `DATABASE_SSL` flag is gone, TLS is now driven by the connection URL's `sslmode`, and a new `DATABASE_CA_CERT` lets you verify the server certificate against a private CA.

@@ -16,7 +16,7 @@
     },
     "app/dashboard": {
       "name": "@aikirun/app-dashboard",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/lib": "workspace:*",
         "@aikirun/types": "workspace:*",
@@ -44,7 +44,7 @@
     },
     "app/server": {
       "name": "@aikirun/app-server",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/iam": "workspace:*",
         "@aikirun/lib": "workspace:*",
@@ -60,7 +60,7 @@
     },
     "cli": {
       "name": "@aikirun/cli",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/app-server": "workspace:*",
         "@aikirun/iam": "workspace:*",
@@ -76,7 +76,7 @@
     },
     "examples": {
       "name": "@aikirun/examples",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/memory": "workspace:*",
         "@aikirun/redis": "workspace:*",
@@ -90,7 +90,7 @@
     },
     "lib": {
       "name": "@aikirun/lib",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "devDependencies": {
         "arktype": "^2.1.29",
         "cac": "^6.7.14",
@@ -101,7 +101,7 @@
     },
     "sdk/adapter/http": {
       "name": "@aikirun/http",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
@@ -111,7 +111,7 @@
     },
     "sdk/adapter/memory": {
       "name": "@aikirun/memory",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/types": "workspace:*",
       },
@@ -121,7 +121,7 @@
     },
     "sdk/adapter/redis": {
       "name": "@aikirun/redis",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "ioredis": "^5.4.1",
@@ -132,7 +132,7 @@
     },
     "sdk/client": {
       "name": "@aikirun/client",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.9.3",
@@ -143,7 +143,7 @@
     },
     "sdk/endpoint": {
       "name": "@aikirun/endpoint",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
@@ -154,7 +154,7 @@
     },
     "sdk/iam": {
       "name": "@aikirun/iam",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "bin": {
         "aiki-iam": "./dist/bin.js",
       },
@@ -183,7 +183,7 @@
     },
     "sdk/server": {
       "name": "@aikirun/server",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "bin": {
         "aiki-server": "./dist/bin.js",
       },
@@ -213,7 +213,7 @@
     },
     "sdk/worker": {
       "name": "@aikirun/worker",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@aikirun/workflow": "workspace:*",
@@ -225,7 +225,7 @@
     },
     "sdk/workflow": {
       "name": "@aikirun/workflow",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "@standard-schema/spec": "^1.1.0",
@@ -237,7 +237,7 @@
     },
     "testing": {
       "name": "@aikirun/testing",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "dependencies": {
         "@aikirun/types": "workspace:*",
         "fishery": "^2.4.0",
@@ -245,7 +245,7 @@
     },
     "types": {
       "name": "@aikirun/types",
-      "version": "0.34.0",
+      "version": "0.34.1",
       "devDependencies": {
         "@aikirun/lib": "workspace:*",
       },
