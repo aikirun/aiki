@@ -1,14 +1,16 @@
-import { fireAndForget } from "@aikirun/lib/async";
+import { runOnInterval } from "@aikirun/lib/async";
 import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
+	CLAIM_KEEPALIVE_INTERVAL_MS,
 	NonDeterminismError,
 	WorkflowRunFailedError,
+	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
+	type WorkflowRunRecord,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
@@ -44,34 +46,37 @@ export interface WorkflowExecutionConfig {
 
 export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
 	const { client, workflowRun, workflowVersion, logger, configProvider, heartbeat, signal } = params;
+	const workflowRunId = workflowRun.id as WorkflowRunId;
 
-	let heartbeatTimeout: ReturnType<typeof setTimeout> | undefined;
-	let onAbort: (() => void) | undefined;
-
+	const heartbeats: Array<{ stop: () => void }> = [];
 	try {
+		heartbeats.push(
+			runOnInterval(() => client.api.workflowRun.heartbeatV1({ id: workflowRunId }), {
+				intervalMs: CLAIM_KEEPALIVE_INTERVAL_MS,
+				onError: (error: Error): void => {
+					if (!signal?.aborted) {
+						logger.warn("Failed to send heartbeat", {
+							"aiki.error": error.message,
+						});
+					}
+				},
+				signal,
+			})
+		);
 		if (heartbeat) {
-			const scheduleHeartbeat = (): void => {
-				heartbeatTimeout = setTimeout(() => {
-					fireAndForget(heartbeat(), (error) => {
+			heartbeats.push(
+				runOnInterval(heartbeat, {
+					intervalMs: () => configProvider.config.heartbeatIntervalMs,
+					onError: (error: Error): void => {
 						if (!signal?.aborted) {
 							logger.warn("Failed to send heartbeat", {
 								"aiki.error": error.message,
 							});
 						}
-					});
-					scheduleHeartbeat();
-				}, configProvider.config.heartbeatIntervalMs);
-			};
-			scheduleHeartbeat();
-
-			if (signal) {
-				onAbort = () => {
-					if (heartbeatTimeout) {
-						clearTimeout(heartbeatTimeout);
-					}
-				};
-				signal.addEventListener("abort", onAbort, { once: true });
-			}
+					},
+					signal,
+				})
+			);
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
@@ -81,7 +86,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 		await workflowVersion[INTERNAL].handler(
 			{
-				id: workflowRun.id as WorkflowRunId,
+				id: workflowRunId,
 				name: workflowRun.name as WorkflowName,
 				versionId: workflowRun.versionId as WorkflowVersionId,
 				options: workflowRun.options ?? {},
@@ -116,11 +121,8 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		});
 		return false;
 	} finally {
-		if (heartbeatTimeout) {
-			clearTimeout(heartbeatTimeout);
-		}
-		if (onAbort) {
-			signal?.removeEventListener("abort", onAbort);
+		for (const heartbeat of heartbeats) {
+			heartbeat.stop();
 		}
 	}
 }

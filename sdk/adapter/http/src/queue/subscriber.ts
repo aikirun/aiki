@@ -16,14 +16,12 @@ export interface HttpSubscriberParams {
 export interface HttpSubscriberOptions {
 	intervalMs?: number;
 	maxRetryIntervalMs?: number;
-	claimMinIdleTimeMs?: number;
 }
 
 export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 	const { api, options } = params;
 	const intervalMs = options?.intervalMs ?? 1_000;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
-	const claimMinIdleTimeMs = options?.claimMinIdleTimeMs ?? 90_000;
 
 	const getNextDelay = (delayParams: SubscriberDelayParams) => {
 		switch (delayParams.type) {
@@ -55,7 +53,6 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 						workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
 						shards,
 						limit: size,
-						claimMinIdleTimeMs,
 					},
 					{ signal }
 				);

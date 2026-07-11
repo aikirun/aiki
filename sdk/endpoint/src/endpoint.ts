@@ -2,7 +2,7 @@ import { asConfigProvider, type ConfigProvider, type CreatePassiveConfigProvider
 import { merge } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
+import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import { type AnyWorkflowVersion, executeWorkflowRun, getSystemWorkflows, workflowRegistry } from "@aikirun/workflow";
 
 import { defaultEndpointConfig, type EndpointConfig, type EndpointConfigOverrides } from "./config";
@@ -97,7 +97,6 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 			workflowVersion,
 			logger: runLogger,
 			configProvider: configProvider.scope("workflowRun"),
-			heartbeat: () => client.api.workflowRun.heartbeatV1({ id: workflowRun.id as WorkflowRunId }),
 		});
 
 		return jsonResponse(success ? 200 : 500);

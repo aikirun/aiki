@@ -1,4 +1,5 @@
 import type { DeepPartial } from "@aikirun/lib/object";
+import { DEFAULT_CLAIM_MIN_IDLE_TIME_MS } from "@aikirun/types/workflow/run";
 
 interface PollingDaemonConfig {
 	intervalMs: number;
@@ -76,7 +77,7 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 		republishStaleRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			claimMinIdleTimeMs: 90_000,
+			claimMinIdleTimeMs: DEFAULT_CLAIM_MIN_IDLE_TIME_MS,
 		},
 		dueTimersConsumer: {
 			limit: 1_000,
