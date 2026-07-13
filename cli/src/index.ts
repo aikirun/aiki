@@ -7,22 +7,16 @@ import { isMigrateSubcommand, MIGRATE_SUBCOMMAND_HELP, MIGRATE_SUBCOMMANDS } fro
 import { cac } from "cac";
 import { config as loadEnv } from "dotenv";
 
-import { embeddedDataLoader } from "./embedded";
+import { createEmbeddedDataLoader } from "./embedded/loader";
+import {
+	type EmbeddedMigrationData,
+	isMigrationPackage,
+	MIGRATION_PACKAGES,
+	type MigrationPackage,
+} from "./embedded/migration";
 import packageJson from "../package.json" with { type: "json" };
 
-export const MIGRATION_PACKAGES = ["server", "iam"] as const;
-export type MigrationPackage = (typeof MIGRATION_PACKAGES)[number];
-
-export function isMigrationPackage(value: string): value is MigrationPackage {
-	for (const pkg of MIGRATION_PACKAGES) {
-		if (pkg === value) {
-			return true;
-		}
-	}
-	return false;
-}
-
-function parsePackageList(value: unknown): MigrationPackage[] {
+function parseMigrationPackageList(value: unknown): MigrationPackage[] {
 	const raw = value ?? "server";
 	if (typeof raw !== "string") {
 		throw new Error(`Invalid --package value. Expected a comma-separated list of: ${MIGRATION_PACKAGES.join(", ")}.`);
@@ -34,6 +28,7 @@ function parsePackageList(value: unknown): MigrationPackage[] {
 	if (names.length === 0) {
 		throw new Error(`No packages specified. Expected one or more of: ${MIGRATION_PACKAGES.join(", ")}.`);
 	}
+
 	const packages: MigrationPackage[] = [];
 	for (const name of names) {
 		if (!isMigrationPackage(name)) {
@@ -41,6 +36,7 @@ function parsePackageList(value: unknown): MigrationPackage[] {
 		}
 		packages.push(name);
 	}
+
 	return packages;
 }
 
@@ -64,18 +60,23 @@ cli
 			);
 		}
 
-		const packages = parsePackageList(options.package);
+		const packages = parseMigrationPackageList(options.package);
 		if (options.envFile) {
 			loadEnv({ path: options.envFile });
 		}
 
-		const embeddedData = (await embeddedDataLoader.load()).data;
+		const { default: embeddedMigrationDataPath } = await import("./embedded-migration.data", {
+			with: { type: "file" },
+		});
+
+		const embeddedMigrationDataLoader = createEmbeddedDataLoader<EmbeddedMigrationData>(embeddedMigrationDataPath);
+		const embeddedMigrationData = (await embeddedMigrationDataLoader.load()).data;
 
 		switch (subcommand) {
 			case "apply": {
 				const dbConfig = loadDatabaseConfig();
 				for (const pkg of packages) {
-					const packageData = embeddedData[pkg];
+					const packageData = embeddedMigrationData[pkg];
 					if (!packageData) {
 						throw new Error(`the binary ships no migrations for ${pkg}`);
 					}
@@ -94,7 +95,7 @@ cli
 			case "list": {
 				const dbProvider = loadDatabaseProvider();
 				for (const pkg of packages) {
-					const packageData = embeddedData[pkg];
+					const packageData = embeddedMigrationData[pkg];
 					if (!packageData) {
 						throw new Error(`the binary ships no migrations for ${pkg}`);
 					}

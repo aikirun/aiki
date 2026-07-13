@@ -13,4 +13,4 @@ notes/
 *.tsbuildinfo
 node_modules/
 
-embedded.data
+*.data
