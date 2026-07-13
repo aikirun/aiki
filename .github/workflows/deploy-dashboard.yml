@@ -39,4 +39,4 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           bun run build:dashboard
-          bunx wrangler@4 pages deploy app/dashboard/dist --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}" --branch=main
+          bunx wrangler@4 pages deploy app/dashboard/dist --project-name "${{ vars.CLOUDFLARE_DASHBOARD_PAGES_PROJECT }}" --branch=main
