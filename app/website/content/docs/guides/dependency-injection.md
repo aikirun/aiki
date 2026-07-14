@@ -2,11 +2,11 @@
 title: Dependency Injection
 ---
 
-Aiki supports two patterns for injecting dependencies into your tasks and workflows. Choose based on when the dependency should be created.
+Inject dependencies that are created once at startup and shared by every execution — database connections, API clients, services — into tasks and workflows with higher-order functions. For values created fresh per execution, like trace IDs, use [Context](/docs/guides/context) instead.
 
-## Higher-Order Functions (Compile-Time Dependencies)
+## Higher-Order Functions (Startup Dependencies)
 
-Use this pattern for long-lived dependencies like database connections, API clients, or services that should be created once at startup and reused across all executions.
+Use this pattern for dependencies like database connections, API clients, or services that should be created once at startup and reused across all executions.
 
 ### Tasks
 
@@ -66,52 +66,12 @@ const db = createDatabaseConnection(process.env.DATABASE_URL);
 export const orderWorkflowV1 = createOrderWorkflow(db);
 ```
 
-## Context (Per-Execution Context)
-
-Use `Context` for data that should be unique per workflow execution, like trace IDs or request metadata. The `context` function is called before each workflow execution.
-
-Bind the `Context` type once on `workflow()` and `client()`; the handler's `context` parameter is then inferred automatically.
-
-```typescript
-import { workflow } from "@aikirun/workflow";
-import { client } from "@aikirun/client";
-
-interface Context {
-	traceId: string;
-	workflowRunId: string;
-	userId?: string;
-}
-
-// Bind Context at the workflow factory — handler infers `context` for free
-const auditWorkflow = workflow<Context>({ name: "audit" });
-
-const auditWorkflowV1 = auditWorkflow.v("1.0.0", {
-	async handler(run, input: { action: string }, context) {
-		run.logger.info("Processing action", {
-			traceId: context.traceId,
-			userId: context.userId,
-			action: input.action,
-		});
-		// ...
-	},
-});
-
-// Client is typed with the same Context
-const aikiClient = await client<Context>({
-	url: "http://localhost:9850",
-	context: (run) => ({
-		traceId: crypto.randomUUID(),
-		workflowRunId: run.id,
-	}),
-});
-```
-
 ## When to Use Which
 
 | Pattern | Use Case | Lifetime |
 |---------|----------|----------|
 | **Higher-order functions** | Database connections, API clients, services | Created once at startup |
-| **Context** | Trace IDs, request metadata, user context | Created per execution |
+| **[Context](/docs/guides/context)** | Trace IDs, request metadata, user context | Created per execution |
 
 **Higher-order functions** are best for:
 - Dependencies that are expensive to create (DB connections, HTTP clients)
@@ -125,6 +85,7 @@ const aikiClient = await client<Context>({
 
 ## Next Steps
 
+- **[Context](/docs/guides/context)** - Per-execution context for workflow runs
 - **[Tasks](/docs/core-concepts/tasks)** - Task definition and execution
 - **[Workflows](/docs/core-concepts/workflows)** - Workflow orchestration
 - **[Retry Strategies](/docs/guides/retry-strategies)** - Configure automatic retries
