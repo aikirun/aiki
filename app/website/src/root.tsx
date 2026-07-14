@@ -1,5 +1,5 @@
 import { RootProvider } from "fumadocs-ui/provider/react-router";
-import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration, useMatches } from "react-router";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -21,6 +21,14 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+	// The /404 route exists only to be prerendered into the static 404.html
+	// (postbuild renames it), which the static host serves for any unmatched
+	// URL. It must not hydrate: booting the router against a URL that matches a
+	// real route pattern renders the wrong view. Omitting the scripts keeps the
+	// page fully static; its links are plain navigation. (The prerenderer
+	// requests the page at "/404/", so the route is recognized by its id.)
+	const staticNotFound = useMatches().some((match) => match.id === "not-found-404");
+
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
@@ -40,8 +48,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				>
 					{children}
 				</RootProvider>
-				<ScrollRestoration />
-				<Scripts />
+				{!staticNotFound && <ScrollRestoration />}
+				{!staticNotFound && <Scripts />}
 			</body>
 		</html>
 	);
