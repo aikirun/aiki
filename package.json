@@ -35,6 +35,7 @@
 		"server:watch": "bun run --cwd app/server start:watch",
 		"dashboard": "bun run --cwd app/dashboard dev",
 		"website": "bun run --cwd app/website dev",
+		"website:preview": "bun run --cwd app/website preview",
 		"bump": "bun scripts/bump.ts",
 		"clean": "rm -rf lib/dist types/dist app/server/dist app/dashboard/dist cli/dist sdk/*/dist sdk/adapter/*/dist sdk/iam/dist app/website/build app/website/.react-router app/website/.source",
 		"build:lib": "bun run --cwd lib build",
