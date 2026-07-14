@@ -34,11 +34,14 @@ Understand the building blocks:
 Best practices and patterns:
 
 - **[Dependency Injection](/docs/guides/dependency-injection)** - Inject services and dependencies into tasks and workflows
+- **[Context](/docs/guides/context)** - Per-execution context for workflow runs
 - **[Reference IDs](/docs/guides/reference-ids)** - Custom identifiers for workflows and events
 - **[Retry Strategies](/docs/guides/retry-strategies)** - Configure automatic retries for tasks and workflows
 - **[Determinism](/docs/guides/determinism)** - Workflow determinism and task idempotency
 - **[Refactoring Workflows](/docs/guides/refactoring-workflows)** - Safely modify running workflows
 - **[Reliable Hooks](/docs/guides/reliable-hooks)** - Trigger durable follow-up actions on workflow completion/failure/cancellation
+- **[Runtime Configuration](/docs/guides/configuration)** - Tune the server, workers, and endpoints — statically or live
+- **[Logging](/docs/guides/logging)** - Plug in your own logger and log from workflow code
 - **[IAM](/docs/guides/iam)** - Multi-tenancy, API keys, and dashboard auth — optional, off by default
 
 ## 🏗 Architecture
