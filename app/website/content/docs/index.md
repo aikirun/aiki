@@ -1,6 +1,6 @@
 ---
 title: Aiki Documentation
-description: Build durable, reliable workflows in TypeScript.
+description: Build reliable, long-running workflows in TypeScript.
 ---
 
 <p align="center">
