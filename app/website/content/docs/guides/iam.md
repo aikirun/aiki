@@ -46,12 +46,14 @@ const db = database({ provider: "pg", url: databaseUrl });
 
 const aikiServer = server({
 	db,
-	iam: iam({
-		db,
-		secret: "your-auth-secret",
-		baseURL: "http://localhost:9850",
-		trustedOrigins: ["http://localhost:9851"],
-	}),
+	handler: {
+		iam: iam({
+			db,
+			secret: "your-auth-secret",
+			baseURL: "http://localhost:9850",
+			trustedOrigins: ["http://localhost:9851"],
+		}),
+	},
 });
 ```
 
@@ -90,13 +92,15 @@ import type { OrganizationId } from "@aikirun/types/organization";
 
 const aikiServer = server({
 	db,
-	iam: {
-		api: () => async (request) => {
-			const claims = await verifyJwt(request);
-			return {
-				organizationId: claims.orgId as OrganizationId,
-				namespaceId: claims.namespaceId as NamespaceId,
-			};
+	handler: {
+		iam: {
+			api: () => async (request) => {
+				const claims = await verifyJwt(request);
+				return {
+					organizationId: claims.orgId as OrganizationId,
+					namespaceId: claims.namespaceId as NamespaceId,
+				};
+			},
 		},
 	},
 });

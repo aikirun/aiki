@@ -1,6 +1,6 @@
 # @aikirun/client
 
-Client SDK for Aiki durable execution platform.
+Typed connection to the Aiki server — start workflows, send events, and observe runs from your application.
 
 ## Installation
 
@@ -19,30 +19,16 @@ const aikiClient = client({
 	apiKey: "your-api-key",
 });
 
-// Start a workflow
 const handle = await orderWorkflowV1.start(aikiClient, {
 	orderId: "order-123",
 });
 
-// Wait for completion
 const result = await handle.waitForStatus("completed");
 ```
 
-## Features
-
-- **Server Connection** - Connect to the Aiki server via HTTP
-- **Workflow Management** - Start workflows with type-safe inputs
-- **Context Injection** - Pass application context to workflows
-- **Custom Logging** - Plug in your own logger
-
 ## Documentation
 
-For comprehensive documentation including configuration options and context injection, see the [Client Guide](https://aiki.run/docs/core-concepts/client).
-
-## Related Packages
-
-- [@aikirun/workflow](https://www.npmjs.com/package/@aikirun/workflow) - Define workflows and tasks
-- [@aikirun/worker](https://www.npmjs.com/package/@aikirun/worker) - Execute workflows
+See the [Client Guide](https://aiki.run/docs/core-concepts/client).
 
 ## License
 
