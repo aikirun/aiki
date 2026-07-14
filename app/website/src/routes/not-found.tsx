@@ -15,9 +15,11 @@ export default function NotFound() {
 			<p className="font-bold text-5xl text-fd-muted-foreground">404</p>
 			<h1 className="font-semibold text-2xl">Page not found</h1>
 			<div className="flex gap-3">
-				<Link to="/" className="rounded-lg border px-4 py-2 font-medium">
+				{/* Plain <a>: `/` is the static marketing page, outside the router,
+				    so it needs a full document load. */}
+				<a href="/" className="rounded-lg border px-4 py-2 font-medium">
 					Home
-				</Link>
+				</a>
 				<Link to="/docs" className="rounded-lg bg-fd-primary px-4 py-2 font-medium text-fd-primary-foreground">
 					Docs
 				</Link>

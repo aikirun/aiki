@@ -29,10 +29,18 @@ function LinkedInIcon() {
 export function baseOptions(): BaseLayoutProps {
 	return {
 		nav: {
+			// A function title renders our own anchor. It must be a plain <a>, not
+			// the router Link the default title is wrapped in: `/` is the static
+			// marketing page, outside the router, so navigating there needs a full
+			// document load — client navigation renders a blank page.
 			// <img> (not inlined SVG): the combo logo defines linearGradients with
 			// fixed ids, so inlining risks duplicate-id collisions; it is already
 			// served from public/. alt provides the accessible name.
-			title: <img src="/assets/aiki-logo-combo.svg" alt="Aiki" className="h-6 w-auto" />,
+			title: (props) => (
+				<a {...props}>
+					<img src="/assets/aiki-logo-combo.svg" alt="Aiki" className="h-6 w-auto" />
+				</a>
+			),
 		},
 		githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
 		themeSwitch: {
