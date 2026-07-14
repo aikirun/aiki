@@ -7,6 +7,7 @@
 		"determinism",
 		"refactoring-workflows",
 		"reliable-hooks",
+		"configuration",
 		"iam"
 	]
 }
