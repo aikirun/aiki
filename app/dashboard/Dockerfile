@@ -17,6 +17,7 @@ COPY sdk/workflow/package.json ./sdk/workflow/
 COPY cli/package.json ./cli/
 COPY app/server/package.json ./app/server/
 COPY app/dashboard/package.json ./app/dashboard/
+COPY app/website/package.json ./app/website/
 COPY examples/package.json ./examples/
 COPY testing/package.json ./testing/
 

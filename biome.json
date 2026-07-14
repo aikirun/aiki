@@ -55,11 +55,28 @@
 		}
 	},
 	"files": {
-		"includes": ["**", "!*.md", "!!**/npm", "!!**/dist", "!!**/node_modules", "!!**/coverage", "!!notes"]
+		"includes": [
+			"**",
+			"!*.md",
+			"!!**/npm",
+			"!!**/dist",
+			"!!**/node_modules",
+			"!!**/coverage",
+			"!!notes",
+			"!!**/.source",
+			"!!**/build",
+			"!!**/.react-router"
+		]
 	},
 	"overrides": [
 		{
-			"includes": ["app/dashboard/**/*.tsx", "app/dashboard/**/*.ts", "docs/**/*.html"],
+			"includes": [
+				"app/dashboard/**/*.tsx",
+				"app/dashboard/**/*.ts",
+				"app/website/**/*.tsx",
+				"app/website/**/*.ts",
+				"app/website/public/index.html"
+			],
 			"linter": {
 				"rules": {
 					"a11y": {
@@ -79,7 +96,17 @@
 			}
 		},
 		{
-			"includes": ["scripts/**"],
+			"includes": ["app/website/**/*.css"],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noImportantStyles": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["scripts/**", "lib/**", "cli/**", "app/website/scripts/**"],
 			"linter": {
 				"rules": {
 					"suspicious": {

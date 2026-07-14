@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

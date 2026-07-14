@@ -1,6 +1,8 @@
 name: Deploy website
 
-# Deploys the website (the static content in docs/) to GitHub Pages.
+# Builds the marketing and docs website and deploys the static output to
+# Cloudflare Pages. The website is built from the ref this runs against, so a
+# rollback is just running this workflow at an older v* tag.
 
 on:
   workflow_dispatch:
@@ -18,33 +20,28 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Serialize Pages deploys; never cancel a publish already in flight.
+# Serialize website deploys; never cancel a publish already in flight.
 concurrency:
-  group: pages
+  group: deploy-website
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    environment: release
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - uses: ./.github/actions/setup-workspace
 
-      # docs/ is served as-is (it carries its own CNAME and index.html); there is no
-      # build step, so the folder is uploaded verbatim.
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
-        with:
-          path: docs
-
-      - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
-        id: deploy
+      - name: Build and deploy the website to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          bun run build:website
+          bunx wrangler@4 pages deploy app/website/build/client --project-name "${{ vars.CLOUDFLARE_WEBSITE_PAGES_PROJECT }}" --branch=main

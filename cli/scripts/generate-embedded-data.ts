@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: build script — prints build output
 // Packs every migration-bearing package's migrations into cli/src/embedded-migration.data,
 // which the aiki binary embeds at compile time and reads at startup.
 // Runs as part of the cli build, before the binary is compiled.

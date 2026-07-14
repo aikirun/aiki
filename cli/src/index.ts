@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import process from "node:process";
 import { loadAppServerConfig, startAppServer } from "@aikirun/app-server";
 import { loadDatabaseConfig, loadDatabaseProvider } from "@aikirun/lib/db";
