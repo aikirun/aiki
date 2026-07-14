@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthProvider";
 import { useCapabilities } from "../../capabilities/CapabilitiesProvider";
 import { getNamespaceDotColor } from "../../constants/namespace";
-import { useTheme } from "../../hooks/useTheme";
+import { type ThemePreference, useTheme } from "../../hooks/useTheme";
 
 const SIDEBAR_COLLAPSED_KEY = "aiki-sidebar-collapsed";
 
@@ -230,16 +230,27 @@ function NavButton({
 
 // --- Theme Toggle ---
 
+const themeCycle: Record<ThemePreference, ThemePreference> = {
+	system: "light",
+	light: "dark",
+	dark: "system",
+};
+
+const themeLabels: Record<ThemePreference, string> = {
+	system: "System theme",
+	light: "Light mode",
+	dark: "Dark mode",
+};
+
 function ThemeToggle({ collapsed }: { collapsed: boolean }) {
-	const { theme, toggleTheme } = useTheme();
+	const { preference, setPreference } = useTheme();
 	const [hovered, setHovered] = useState(false);
-	const isDark = theme === "dark";
 
 	return (
 		<button
 			type="button"
-			onClick={toggleTheme}
-			title={collapsed ? (isDark ? "Light mode" : "Dark mode") : undefined}
+			onClick={() => setPreference(themeCycle[preference])}
+			title={collapsed ? themeLabels[preference] : undefined}
 			onMouseEnter={() => setHovered(true)}
 			onMouseLeave={() => setHovered(false)}
 			style={{
@@ -272,7 +283,7 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
 					justifyContent: "center",
 				}}
 			>
-				{isDark ? (
+				{preference === "light" ? (
 					<svg
 						width="16"
 						height="16"
@@ -293,7 +304,7 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
 						<line x1="2.4" y1="13.6" x2="3.5" y2="12.5" />
 						<line x1="12.5" y1="3.5" x2="13.6" y2="2.4" />
 					</svg>
-				) : (
+				) : preference === "dark" ? (
 					<svg
 						width="16"
 						height="16"
@@ -306,9 +317,24 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
 					>
 						<path d="M13.5 9.2A5.5 5.5 0 1 1 6.8 2.5 4.3 4.3 0 0 0 13.5 9.2Z" />
 					</svg>
+				) : (
+					<svg
+						width="16"
+						height="16"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.3"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
+						<rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1.5" />
+						<line x1="5.5" y1="14" x2="10.5" y2="14" />
+						<line x1="8" y1="11.25" x2="8" y2="14" />
+					</svg>
 				)}
 			</span>
-			{!collapsed && <span>{isDark ? "Light mode" : "Dark mode"}</span>}
+			{!collapsed && <span>{themeLabels[preference]}</span>}
 		</button>
 	);
 }

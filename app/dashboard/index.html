@@ -7,8 +7,14 @@
 		<title>Aiki Dashboard</title>
 		<script>
 			(() => {
-				var t = localStorage.getItem('aiki-theme');
-				if (t === 'light') document.documentElement.dataset.theme = 'light';
+				var stored = localStorage.getItem('aiki-theme');
+				var resolved =
+					stored === 'light' || stored === 'dark'
+						? stored
+						: matchMedia('(prefers-color-scheme: light)').matches
+							? 'light'
+							: 'dark';
+				document.documentElement.dataset.theme = resolved;
 			})();
 		</script>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
