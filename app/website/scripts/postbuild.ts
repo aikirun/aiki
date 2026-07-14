@@ -25,7 +25,15 @@ if (existsSync(nested404)) {
 	// served for any unmatched URL, including ones under docs/*; with no scripts
 	// there is no hydration, so it renders as-is and its links are plain
 	// navigation. (Bad in-app navigations are handled by the root ErrorBoundary.)
-	writeFileSync(flat404, readFileSync(flat404, "utf8").replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ""));
+	// Case-insensitive, and repeated until stable so overlapping tags cannot
+	// reconstitute a `<script>` after one pass.
+	let html = readFileSync(flat404, "utf8");
+	let previous: string;
+	do {
+		previous = html;
+		html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
+	} while (html !== previous);
+	writeFileSync(flat404, html);
 	console.log("wrote build/client/404.html (static, no hydration)");
 } else if (existsSync(flat404)) {
 	console.log("build/client/404.html already present");
