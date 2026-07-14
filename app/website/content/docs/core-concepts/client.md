@@ -66,7 +66,7 @@ const aikiClient = client<Context>({
 });
 ```
 
-See the [Dependency Injection Guide](/docs/guides/dependency-injection) for more on `context` vs higher-order functions.
+See the [Context Guide](/docs/guides/context) for typing and usage.
 
 ### logger
 
@@ -78,6 +78,8 @@ const aikiClient = client({
 	logger: myCustomLogger, // Must implement Logger interface
 });
 ```
+
+See the [Logging Guide](/docs/guides/logging) for the `Logger` contract, plugging in a structured logger, and logging from workflow code.
 
 ## Starting Workflows
 
