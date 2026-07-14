@@ -1,5 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: this is a console logger
-
 import type { Logger, LogLevel } from "./types";
 
 const colors = {

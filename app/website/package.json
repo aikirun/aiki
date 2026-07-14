@@ -1,0 +1,35 @@
+{
+	"name": "@aikirun/app-website",
+	"private": true,
+	"version": "0.34.1",
+	"type": "module",
+	"scripts": {
+		"check": "react-router typegen && fumadocs-mdx && tsc --noEmit",
+		"build": "react-router build && bun run scripts/postbuild.ts",
+		"dev": "react-router dev",
+		"preview": "bun run build && bunx serve --no-clipboard -l 9852 build/client"
+	},
+	"dependencies": {
+		"@react-router/node": "^8.2.0",
+		"@react-router/serve": "^8.2.0",
+		"fumadocs-core": "16.11.3",
+		"fumadocs-mdx": "15.1.0",
+		"fumadocs-ui": "npm:@fumadocs/base-ui@16.11.3",
+		"isbot": "^5.2.0",
+		"react": "^19.2.7",
+		"react-dom": "^19.2.7",
+		"react-router": "^8.2.0",
+		"takumi-js": "^2.0.1"
+	},
+	"devDependencies": {
+		"@react-router/dev": "^8.2.0",
+		"@tailwindcss/vite": "^4.3.2",
+		"@types/mdx": "^2.0.14",
+		"@types/node": "^26.1.1",
+		"@types/react": "^19.2.17",
+		"@types/react-dom": "^19.2.3",
+		"tailwindcss": "^4.3.2",
+		"typescript": "^6.0.3",
+		"vite": "^8.1.3"
+	}
+}

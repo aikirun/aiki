@@ -37,7 +37,7 @@ const result = await handle.waitForStatus("completed");
 
 ## Documentation
 
-For comprehensive documentation including configuration options and context injection, see the [Client Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/client.md).
+For comprehensive documentation including configuration options and context injection, see the [Client Guide](https://aiki.run/docs/core-concepts/client).
 
 ## Related Packages
 

@@ -13,4 +13,9 @@ notes/
 *.tsbuildinfo
 node_modules/
 
+build/
+.react-router/
+.source/
+.playwright-mcp/
+
 *.data

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/aiki-logo-combo.svg" alt="Aiki" height="80">
+  <img src="app/website/public/assets/aiki-logo-combo.svg" alt="Aiki" height="80">
 </p>
 
 <h3 align="center">A durable execution platform</h3>
@@ -124,11 +124,11 @@ docker-compose up -d
 # Server: http://localhost:9850 — Dashboard: http://localhost:9851
 ```
 
-That is the container path. You can also run the stack from the standalone `aiki` binary — one downloaded executable with its own runtime, no Node, Bun, or Docker — or from source with Bun. See the [Installation Guide](./docs/getting-started/installation.md) for all three, plus env vars and configuration.
+That is the container path. You can also run the stack from the standalone `aiki` binary — one downloaded executable with its own runtime, no Node, Bun, or Docker — or from source with Bun. See the [Installation Guide](https://aiki.run/docs/getting-started/installation) for all three, plus env vars and configuration.
 
 <br>
 <p align="center">
-  <img src="docs/assets/aiki-dashboard-demo.gif" alt="Aiki Dashboard Demo" width="800">
+  <img src="app/website/public/assets/aiki-dashboard-demo.gif" alt="Aiki Dashboard Demo" width="800">
 </p>
 
 ## Features
@@ -176,10 +176,10 @@ You choose where each component runs: everything in one process, a central serve
 
 ## Documentation
 
-- **[Getting Started](./docs/README.md#-getting-started)** — Install, set up, and build your first workflow
-- **[Core Concepts](./docs/README.md#-core-concepts)** — Workflows, tasks, events, schedules, workers, and the client
-- **[Guides](./docs/README.md#-guides)** — Determinism, retries, refactoring, reference IDs, and reliable hooks
-- **[Architecture](./docs/README.md#-architecture)** — How orchestration, state, and work discovery fit together
+- **[Getting Started](https://aiki.run/docs/getting-started/quick-start)** — Install, set up, and build your first workflow
+- **[Core Concepts](https://aiki.run/docs/core-concepts/workflows)** — Workflows, tasks, events, schedules, workers, and the client
+- **[Guides](https://aiki.run/docs/guides/determinism)** — Determinism, retries, refactoring, reference IDs, and reliable hooks
+- **[Architecture](https://aiki.run/docs/architecture/overview)** — How orchestration, state, and work discovery fit together
 - **[Examples](./examples/src/workflows)** — Runnable workflows
 - **[llms.txt](https://aiki.run/llms.txt)** — Docs index for AI agents and LLMs
 
@@ -189,7 +189,7 @@ You choose where each component runs: everything in one process, a central serve
 - **Modules**: ESM only (`import`/`export`); CommonJS is not supported
 - **Database**: PostgreSQL 14+ (SQLite and MySQL coming soon)
 
-See the [Installation Guide](./docs/getting-started/installation.md) for detailed setup instructions including environment variable configuration.
+See the [Installation Guide](https://aiki.run/docs/getting-started/installation) for detailed setup instructions including environment variable configuration.
 
 ## Packages
 

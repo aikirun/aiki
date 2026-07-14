@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import type { DatabaseConfig, PgDatabaseConfig } from "../../config";
 import type { MigrationMeta, MigrationSource } from "../source";
 

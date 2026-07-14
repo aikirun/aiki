@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import type { DatabaseProvider } from "../../provider";
 import type { MigrationSource } from "../source";
 

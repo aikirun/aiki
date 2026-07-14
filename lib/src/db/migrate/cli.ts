@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: this prints command output, not logs
 import process from "node:process";
 import { cac } from "cac";
 import { config as loadEnv } from "dotenv";

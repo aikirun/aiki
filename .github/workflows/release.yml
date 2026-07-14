@@ -74,6 +74,8 @@ jobs:
 
       - run: bun run build:packages
 
+      - run: bun run build:website
+
       # Prove each package's built tarball ships migrations byte-identical to
       # the source, for every provider it has schema sources for, before
       # anything ships anywhere.
@@ -288,10 +290,6 @@ jobs:
   # the docs never describe a version that is not yet installable or downloadable.
   deploy-website:
     needs: [verify, publish]
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
     uses: ./.github/workflows/deploy-website.yml
     with:
       ref: v${{ needs.verify.outputs.version }}

@@ -87,7 +87,7 @@ await dailyReport.activate(aikiClient, onboardingWorkflowV1, { email: "daily@exa
 
 ## Documentation
 
-For comprehensive documentation including retry strategies, schema validation, child workflows, and best practices, see the [Workflows Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/workflows.md) and [Tasks Guide](https://github.com/aikirun/aiki/blob/main/docs/core-concepts/tasks.md).
+For comprehensive documentation including retry strategies, schema validation, child workflows, and best practices, see the [Workflows Guide](https://aiki.run/docs/core-concepts/workflows) and [Tasks Guide](https://aiki.run/docs/core-concepts/tasks).
 
 ## Related Packages
 
