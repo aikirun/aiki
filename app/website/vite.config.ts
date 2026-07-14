@@ -32,6 +32,11 @@ export default defineConfig({
 	server: {
 		port: 9852,
 	},
+	build: {
+		// Keep compiled bundles out of /assets, which is the brand-image
+		// directory copied from public/assets.
+		assetsDir: "_chunks",
+	},
 	optimizeDeps: {
 		// Transitive deps of fumadocs-ui that Vite's scanner cannot see up front
 		// (they sit behind dynamic imports, in bun's isolated store). Without
