@@ -1,0 +1,220 @@
+/* Interactive architecture diagram. Dark mode follows Fumadocs' `.dark` class
+   (the site theme toggle), not the OS `prefers-color-scheme`. */
+
+.aiki-arch {
+	--aiki-edge: #888;
+	max-width: 720px;
+	margin: 1.5rem 0;
+}
+
+.aiki-arch .aiki-nav {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	min-height: 24px;
+	margin-bottom: 12px;
+	font-size: 13px;
+	color: #888;
+}
+.aiki-arch .aiki-crumb {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+}
+.aiki-arch .aiki-nav button {
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.aiki-arch .aiki-nav button:hover {
+	color: #1a1a1a;
+}
+.aiki-arch .aiki-nav .aiki-sep {
+	opacity: 0.35;
+}
+.aiki-arch .aiki-nav .aiki-cur {
+	color: #1a1a1a;
+	font-weight: 500;
+}
+
+.aiki-arch svg {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+.aiki-arch svg text {
+	font-family: inherit;
+}
+.aiki-arch svg .th {
+	font-size: 14px;
+	font-weight: 500;
+	fill: #1a1a1a;
+}
+.aiki-arch svg .ts {
+	font-size: 12px;
+	fill: #888;
+}
+.aiki-arch svg .node {
+	cursor: pointer;
+}
+.aiki-arch svg .node:hover {
+	opacity: 0.8;
+}
+.aiki-arch svg .node:focus-visible {
+	outline: 2px solid var(--aiki-edge);
+	outline-offset: 2px;
+	border-radius: 8px;
+}
+.aiki-arch svg .e {
+	stroke: var(--aiki-edge);
+}
+
+.aiki-arch .box {
+	fill: #f5f5f0;
+	stroke: #ccc;
+}
+.aiki-arch .c-purple > rect {
+	fill: #eeedfe;
+	stroke: #534ab7;
+}
+.aiki-arch .c-purple .th {
+	fill: #3c3489;
+}
+.aiki-arch .c-purple .ts {
+	fill: #534ab7;
+}
+.aiki-arch .c-teal > rect {
+	fill: #e1f5ee;
+	stroke: #0f6e56;
+}
+.aiki-arch .c-teal .th {
+	fill: #085041;
+}
+.aiki-arch .c-teal .ts {
+	fill: #0f6e56;
+}
+.aiki-arch .c-coral > rect {
+	fill: #faece7;
+	stroke: #993c1d;
+}
+.aiki-arch .c-coral .th {
+	fill: #712b13;
+}
+.aiki-arch .c-coral .ts {
+	fill: #993c1d;
+}
+.aiki-arch .c-pink > rect {
+	fill: #fbeaf0;
+	stroke: #993556;
+}
+.aiki-arch .c-pink .th {
+	fill: #72243e;
+}
+.aiki-arch .c-pink .ts {
+	fill: #993556;
+}
+.aiki-arch .c-gray > rect {
+	fill: #f1efe8;
+	stroke: #5f5e5a;
+}
+.aiki-arch .c-gray .th {
+	fill: #444441;
+}
+.aiki-arch .c-gray .ts {
+	fill: #5f5e5a;
+}
+.aiki-arch .c-blue > rect {
+	fill: #e6f1fb;
+	stroke: #185fa5;
+}
+.aiki-arch .c-blue .th {
+	fill: #0c447c;
+}
+.aiki-arch .c-blue .ts {
+	fill: #185fa5;
+}
+
+.dark .aiki-arch {
+	--aiki-edge: #999;
+}
+.dark .aiki-arch .aiki-nav button:hover {
+	color: #e5e5e5;
+}
+.dark .aiki-arch .aiki-nav .aiki-cur {
+	color: #e5e5e5;
+}
+.dark .aiki-arch svg .th {
+	fill: #e5e5e5;
+}
+.dark .aiki-arch svg .ts {
+	fill: #999;
+}
+.dark .aiki-arch .box {
+	fill: #2a2a2a;
+	stroke: #555;
+}
+.dark .aiki-arch .c-purple > rect {
+	fill: #3c3489;
+	stroke: #afa9ec;
+}
+.dark .aiki-arch .c-purple .th {
+	fill: #cecbf6;
+}
+.dark .aiki-arch .c-purple .ts {
+	fill: #afa9ec;
+}
+.dark .aiki-arch .c-teal > rect {
+	fill: #085041;
+	stroke: #5dcaa5;
+}
+.dark .aiki-arch .c-teal .th {
+	fill: #9fe1cb;
+}
+.dark .aiki-arch .c-teal .ts {
+	fill: #5dcaa5;
+}
+.dark .aiki-arch .c-coral > rect {
+	fill: #712b13;
+	stroke: #f0997b;
+}
+.dark .aiki-arch .c-coral .th {
+	fill: #f5c4b3;
+}
+.dark .aiki-arch .c-coral .ts {
+	fill: #f0997b;
+}
+.dark .aiki-arch .c-pink > rect {
+	fill: #72243e;
+	stroke: #ed93b1;
+}
+.dark .aiki-arch .c-pink .th {
+	fill: #f4c0d1;
+}
+.dark .aiki-arch .c-pink .ts {
+	fill: #ed93b1;
+}
+.dark .aiki-arch .c-gray > rect {
+	fill: #444441;
+	stroke: #b4b2a9;
+}
+.dark .aiki-arch .c-gray .th {
+	fill: #d3d1c7;
+}
+.dark .aiki-arch .c-gray .ts {
+	fill: #b4b2a9;
+}
+.dark .aiki-arch .c-blue > rect {
+	fill: #0c447c;
+	stroke: #85b7eb;
+}
+.dark .aiki-arch .c-blue .th {
+	fill: #b5d4f4;
+}
+.dark .aiki-arch .c-blue .ts {
+	fill: #85b7eb;
+}
