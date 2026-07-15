@@ -28,12 +28,12 @@ import { event, task, workflow } from "@aikirun/workflow";
 
 const activateTrial = task({
   name: "activate-trial",
-  async handler(userId: string) { /**/ },
+  async handler(userId: string) { /* your code */ },
 });
 
 const downgradeToFree = task({
   name: "downgrade-to-free",
-  async handler(userId: string) { /**/ },
+  async handler(userId: string) { /* your code */ },
 });
 
 export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
