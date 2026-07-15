@@ -15,11 +15,7 @@ import type {
 	EventWaitResult,
 	WorkflowRunId,
 } from "@aikirun/types/workflow/run";
-import {
-	WorkflowRunFailedError,
-	WorkflowRunRevisionConflictError,
-	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow/run";
+import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunHandle } from "./handle";
@@ -136,11 +132,10 @@ export function createEventWaiters<TEvents extends EventsDefinition>(
 ): EventWaiters<TEvents> {
 	const waiters = {} as EventWaiters<TEvents>;
 
-	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
+	for (const eventName of Object.keys(eventsDefinition)) {
 		const waiter = createEventWaiter(
 			handle,
 			eventName as EventName,
-			eventDefinition.schema,
 			logger.child({ "aiki.eventName": eventName })
 		) as EventWaiter<EventData<TEvents[keyof TEvents]>>;
 		waiters[eventName as keyof TEvents] = waiter;
@@ -152,7 +147,6 @@ export function createEventWaiters<TEvents extends EventsDefinition>(
 function createEventWaiter<TEvents extends EventsDefinition, Data>(
 	handle: WorkflowRunHandle<unknown, unknown, unknown, TEvents>,
 	eventName: EventName,
-	schema: StandardSchemaV1<Data> | undefined,
 	logger: Logger
 ): EventWaiter<Data> {
 	let nextIndex = 0;
@@ -173,28 +167,8 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 				return { timeout: true };
 			}
 
-			let data = existingEventWait.data;
-			if (schema) {
-				const schemaValidation = schema["~standard"].validate(existingEventWait.data);
-				const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
-				if (!schemaValidationResult.issues) {
-					data = schemaValidationResult.value;
-				} else {
-					logger.error("Invalid event data", { "aiki.issues": schemaValidationResult.issues });
-					await handle[INTERNAL].transitionState({
-						status: "failed",
-						cause: "self",
-						error: {
-							name: "SchemaValidationError",
-							message: JSON.stringify(schemaValidationResult.issues),
-						},
-					});
-					throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
-				}
-			}
-
 			logger.debug("Event received");
-			return { timeout: false, data: data as Data };
+			return { timeout: false, data: existingEventWait.data as Data };
 		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
