@@ -149,7 +149,7 @@ export function createEventWaiters<TEvents extends EventsDefinition>(
 	return waiters;
 }
 
-export function createEventWaiter<TEvents extends EventsDefinition, Data>(
+function createEventWaiter<TEvents extends EventsDefinition, Data>(
 	handle: WorkflowRunHandle<unknown, unknown, unknown, TEvents>,
 	eventName: EventName,
 	schema: StandardSchemaV1<Data> | undefined,
