@@ -89,6 +89,20 @@ describe("workflowRunHandle", () => {
 					WorkflowRunRevisionConflictError
 				);
 			}));
+
+		test("propagates a non-conflict error without mapping it", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build({ revision: 3 });
+				const handle = workflowRunHandle(client, record);
+				const nonConflictError = { code: "SOME_OTHER_ERROR" };
+
+				client.api.workflowRun.transitionStateV1.rejectsOnce(
+					{ type: "optimistic", id: record.id, state: { status: "running" }, expectedRevision: 3 },
+					nonConflictError
+				);
+
+				expect(handle[INTERNAL].transitionState({ status: "running" })).rejects.toBe(nonConflictError);
+			}));
 	});
 
 	describe("transitionTaskState", () => {
@@ -131,6 +145,25 @@ describe("workflowRunHandle", () => {
 				);
 
 				expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBeInstanceOf(WorkflowRunRevisionConflictError);
+			}));
+
+		test("propagates a non-conflict error without mapping it", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
+				const handle = workflowRunHandle(client, record);
+				const nonConflictError = { code: "SOME_OTHER_ERROR" };
+				const request: Omit<TransitionTaskStateToRunningCreate, "id" | "expectedWorkflowRunRevision"> = {
+					type: "create",
+					taskName: "reserve-seat",
+					options: {},
+					taskState: { status: "running", attempts: 1, input: undefined },
+				};
+				client.api.workflowRun.transitionTaskStateV1.rejectsOnce(
+					{ ...request, id: record.id, expectedWorkflowRunRevision: 5 },
+					nonConflictError
+				);
+
+				expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBe(nonConflictError);
 			}));
 	});
 
