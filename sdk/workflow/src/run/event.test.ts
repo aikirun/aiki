@@ -2,7 +2,7 @@ import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/workflow/run";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import { WorkflowRunFailedError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import { createEventMulticasters, createEventSenders, createEventWaiters, event } from "./event";
@@ -66,7 +66,7 @@ describe("createEventWaiters", () => {
 			expect(await waiters.orderShipped.wait({ timeout: { seconds: 1 } })).toEqual({ timeout: true });
 		}));
 
-	test("returns the schema-parsed value when a schema is provided", () =>
+	test("returns recorded data as-is, without applying the event schema", () =>
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({
 				eventWaitQueues: { orderShipped: { eventWaits: [{ status: "received", data: "raw", receivedAt: 0 }] } },
@@ -77,31 +77,7 @@ describe("createEventWaiters", () => {
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
-			expect((await waiters.orderShipped.wait()).data).toBe("raw!");
-		}));
-
-	test("fails the run and throws WorkflowRunFailedError when the received data fails the schema", () =>
-		withFakeClient((client) => {
-			const record = runningWorkflowRunRecordFactory.build({
-				revision: 0,
-				eventWaitQueues: { orderShipped: { eventWaits: [{ status: "received", data: "bad", receivedAt: 0 }] } },
-			});
-			const definition = { orderShipped: event({ schema: alwaysInvalidSchema }) };
-			const handle = workflowRunHandle(client, record, definition);
-			client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: record });
-			client.api.workflowRun.transitionStateV1.once(
-				{
-					type: "optimistic",
-					id: record.id,
-					state: { status: "failed", cause: "self", error: expect.objectContaining({ name: "SchemaValidationError" }) },
-					expectedRevision: 0,
-				},
-				{ revision: 1, state: workflowRunStateByStatus.failed, attempts: record.attempts }
-			);
-
-			const waiters = createEventWaiters(handle, definition, client.logger);
-
-			expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			expect((await waiters.orderShipped.wait()).data).toBe("raw");
 		}));
 
 	test("transitions to awaiting_event and suspends when no wait is recorded", () =>
