@@ -1,0 +1,194 @@
+---
+title: Quick Start
+---
+
+This example starts a 14-day free trial, then suspends the workflow waiting for a payment event — holding no worker, no thread, no database connection — for up to two weeks. When the payment arrives (or the server restarts mid-wait), the run resumes exactly where it left off. You'll run the server, worker, and workflow in one process and watch it finish in seconds.
+
+## Prerequisites
+
+You need Node.js 18+ (or Bun 1.0+) and a PostgreSQL database. Install the SDK and apply the db migrations — the two commands below, covered in full in [Installation](/docs/getting-started/installation).
+
+```bash
+npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
+```
+
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
+  npx aiki-server migrate apply
+```
+
+Build the app in three pieces. They live in one file, `app.ts` — the complete listing is at the end.
+
+## 1. The workflow
+
+This is the part you write for your business: two tasks and a workflow that ties them together.
+
+```typescript
+import { event, task, workflow } from "@aikirun/workflow";
+
+const activateTrial = task({
+  name: "activate-trial",
+  async handler(userId: string) {
+    console.log(`Activated 14-day trial for ${userId}`);
+  },
+});
+
+const downgradeToFree = task({
+  name: "downgrade-to-free",
+  async handler(userId: string) {
+    console.log(`Downgraded ${userId} to the free plan`);
+  },
+});
+
+const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
+  async handler(run, input: { userId: string }) {
+    await activateTrial.start(run, input.userId);
+
+    // Wait until payment is received or the 14-day trial expires
+    const result = await run.events.paymentReceived.wait({ timeout: { days: 14 } });
+    if (result.timeout) {
+      await downgradeToFree.start(run, input.userId);
+    }
+  },
+  events: {
+    paymentReceived: event(),
+  },
+});
+```
+
+`activateTrial` runs, then `paymentReceived.wait()` suspends the run — nothing is held while it waits. A payment resumes it; if 14 days pass first, the user is downgraded instead.
+
+## 2. Wire it up
+
+Infrastructure you write once: a server, a worker, and a client connecting them. Here they share this process.
+
+```typescript
+import { client } from "@aikirun/client";
+import { database, server } from "@aikirun/server";
+import { worker } from "@aikirun/worker";
+
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
+
+const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+const runtimeHandle = aikiServer.runtime.start();
+
+const aikiClient = client({ handler: aikiServer.handler });
+const workerHandle = worker({ workflows: [trialV1] }).spawn(aikiClient);
+```
+
+`runtime.start()` runs the server's background loops. The worker claims ready runs and executes them. The client is the in-process connection between your code and the server.
+
+## 3. Run it
+
+Start the workflow, then simulate the payment so the run completes without the full 14-day wait.
+
+```typescript
+const handle = await trialV1.start(aikiClient, { userId: "user-123" });
+
+await handle.events.paymentReceived.send();
+await handle.waitForStatus("completed");
+
+console.log("Run completed");
+
+await workerHandle.stop();
+await runtimeHandle.stop();
+```
+
+> **Tip:** `waitForStatus` waits indefinitely by default. To bound it, pass a timeout: `await handle.waitForStatus("completed", { timeout: { seconds: 60 } })`.
+
+## Run
+
+```bash
+npx tsx app.ts   # or: bun run app.ts
+```
+
+You'll see:
+
+```
+Activated 14-day trial for user-123
+Run completed
+```
+
+Aiki logs its own lifecycle around these lines — the task and workflow starting and completing. The payment event ended the 14-day wait early, so `downgradeToFree` never ran.
+
+## The complete `app.ts`
+
+<Accordions>
+<Accordion title="Show the full listing — all three pieces in one file">
+
+```typescript
+import { client } from "@aikirun/client";
+import { database, server } from "@aikirun/server";
+import { worker } from "@aikirun/worker";
+import { event, task, workflow } from "@aikirun/workflow";
+
+const activateTrial = task({
+  name: "activate-trial",
+  async handler(userId: string) {
+    console.log(`Activated 14-day trial for ${userId}`);
+  },
+});
+
+const downgradeToFree = task({
+  name: "downgrade-to-free",
+  async handler(userId: string) {
+    console.log(`Downgraded ${userId} to the free plan`);
+  },
+});
+
+const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
+  async handler(run, input: { userId: string }) {
+    await activateTrial.start(run, input.userId);
+
+    // Wait until payment is received or the 14-day trial expires
+    const result = await run.events.paymentReceived.wait({ timeout: { days: 14 } });
+    if (result.timeout) {
+      await downgradeToFree.start(run, input.userId);
+    }
+  },
+  events: {
+    paymentReceived: event(),
+  },
+});
+
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
+
+// Server and worker, both running in this process
+const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+const runtimeHandle = aikiServer.runtime.start();
+
+const aikiClient = client({ handler: aikiServer.handler });
+const workerHandle = worker({ workflows: [trialV1] }).spawn(aikiClient);
+
+// Start the workflow
+const handle = await trialV1.start(aikiClient, { userId: "user-123" });
+
+// Simulate the payment arriving
+await handle.events.paymentReceived.send();
+await handle.waitForStatus("completed");
+
+console.log("Run completed");
+
+await workerHandle.stop();
+await runtimeHandle.stop();
+```
+
+</Accordion>
+</Accordions>
+
+## What you just used
+
+- **Task** — `activateTrial` / `downgradeToFree`: a unit of work whose result is persisted, so a restart never redoes it. → [Tasks](/docs/core-concepts/tasks)
+- **Workflow** — `trialV1`: orchestrates tasks and events, tracked at every step. → [Workflows](/docs/core-concepts/workflows)
+- **Event** — `paymentReceived`: `wait()` suspends with nothing held; `send()` or the 14-day timeout resumes it. → [Events](/docs/core-concepts/events)
+- **Server** — `server({ db })` + `runtime.start()`: the orchestrator and its background loops. → [Server](/docs/architecture/server)
+- **Client** — `client({ handler })`: the in-process connection; workers and your app both attach. → [Client](/docs/core-concepts/client)
+- **Worker** — `worker({...}).spawn(client)`: claims ready runs and executes them. → [Workers](/docs/core-concepts/workers)
+
+Everything here runs in one process. The same workflow code runs against a separately deployed server — swap `client({ handler: aikiServer.handler })` for `client({ url: "..." })`.
+
+## Next Steps
+
+- **[Your First Workflow](/docs/getting-started/first-workflow)** — Build a multi-step workflow with events, child workflows, and durable sleep
+- **[Workflows](/docs/core-concepts/workflows)** — Deep dive into workflow concepts
+- **[Determinism](/docs/guides/determinism)** — Writing deterministic workflows
