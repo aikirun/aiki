@@ -15,7 +15,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 
 	return async (name: string, duration: Duration): Promise<SleepResult> => {
 		const sleepName = name as SleepName;
-		let durationMs = toMilliseconds(duration);
+		const durationMs = toMilliseconds(duration);
 
 		if (durationMs > MAX_SLEEP_MS) {
 			throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years`);
@@ -71,22 +71,21 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 			return { cancelled: false };
 		}
 
-		if (durationMs > existingSleep.durationMs) {
-			logger.warn("Higher sleep duration encountered during replay. Sleeping for remaining duration", {
-				"aiki.sleepName": sleepName,
-				"aiki.historicDurationMs": existingSleep.durationMs,
-				"aiki.latestDurationMs": durationMs,
-			});
-			durationMs -= existingSleep.durationMs;
-		} else {
+		if (durationMs < existingSleep.durationMs) {
 			return { cancelled: false };
 		}
 
+		logger.warn("Higher sleep duration encountered during replay. Sleeping for remaining duration", {
+			"aiki.sleepName": sleepName,
+			"aiki.historicDurationMs": existingSleep.durationMs,
+			"aiki.latestDurationMs": durationMs,
+		});
+		const durationLeftMs = durationMs - existingSleep.durationMs;
 		try {
-			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
+			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs: durationLeftMs });
 			logger.info("Sleeping", {
 				"aiki.sleepName": sleepName,
-				"aiki.durationMs": durationMs,
+				"aiki.durationMs": durationLeftMs,
 			});
 		} catch (err) {
 			if (err instanceof WorkflowRunRevisionConflictError) {
