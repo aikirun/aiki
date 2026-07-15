@@ -2,7 +2,11 @@ import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
 import { withFakeClient } from "@aikirun/testing/client";
-import { baseWorkflowRunRecordFactory, runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
+import {
+	baseWorkflowRunRecordFactory,
+	runningWorkflowRunRecordFactory,
+	workflowRunStateByStatus,
+} from "@aikirun/testing/workflow/run";
 import {
 	completedTaskInfoFactory,
 	failedTaskInfoFactory,
@@ -11,12 +15,7 @@ import {
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type {
-	WorkflowRunId,
-	WorkflowRunRecord,
-	WorkflowRunState,
-	WorkflowRunStatus,
-} from "@aikirun/types/workflow/run";
+import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
@@ -61,35 +60,12 @@ function createTestWorkflowRun(
 	};
 }
 
-const stateByStatus: { [Status in WorkflowRunStatus]: Extract<WorkflowRunState, { status: Status }> } = {
-	scheduled: { status: "scheduled", scheduledAt: 0, reason: "new" },
-	queued: { status: "queued", reason: "new" },
-	running: { status: "running" },
-	paused: { status: "paused" },
-	sleeping: { status: "sleeping", sleepName: "nap", awakeAt: 0 },
-	awaiting_event: { status: "awaiting_event", eventName: "order-shipped" },
-	awaiting_retry: {
-		status: "awaiting_retry",
-		cause: "self",
-		nextAttemptAt: 0,
-		error: { name: "Error", message: "boom" },
-	},
-	awaiting_child_workflow: {
-		status: "awaiting_child_workflow",
-		childWorkflowRunId: "child-1",
-		childWorkflowRunStatus: "completed",
-	},
-	cancelled: { status: "cancelled" },
-	completed: { status: "completed", output: undefined },
-	failed: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
-};
-
 describe("task", () => {
 	describe("start", () => {
 		for (const status of ["queued", "running"] as const) {
 			test(`creates the task, then completes it with the handler output when the run is ${status}`, () =>
 				withFakeClient(async (client) => {
-					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: stateByStatus[status] };
+					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
 					const run = createTestWorkflowRun(client, runRecord);
 
 					const sendEmail = task({
@@ -459,7 +435,7 @@ describe("task", () => {
 
 			test(`throws WorkflowRunNotExecutableError when the run is ${status}`, () =>
 				withFakeClient(async (client) => {
-					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: stateByStatus[status] };
+					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
 					const run = createTestWorkflowRun(client, runRecord);
 
 					let handlerCalls = 0;

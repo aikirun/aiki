@@ -1,10 +1,37 @@
 import type {
 	ChildWorkflowRunInfo,
 	WorkflowRunRecord,
+	WorkflowRunState,
 	WorkflowRunStatePaused,
 	WorkflowRunStateRunning,
+	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
 import { Factory } from "fishery";
+
+export const workflowRunStateByStatus: {
+	[Status in WorkflowRunStatus]: Extract<WorkflowRunState, { status: Status }>;
+} = {
+	scheduled: { status: "scheduled", scheduledAt: 0, reason: "new" },
+	queued: { status: "queued", reason: "new" },
+	running: { status: "running" },
+	paused: { status: "paused" },
+	sleeping: { status: "sleeping", sleepName: "nap", awakeAt: 0 },
+	awaiting_event: { status: "awaiting_event", eventName: "order-shipped" },
+	awaiting_retry: {
+		status: "awaiting_retry",
+		cause: "self",
+		nextAttemptAt: 0,
+		error: { name: "Error", message: "boom" },
+	},
+	awaiting_child_workflow: {
+		status: "awaiting_child_workflow",
+		childWorkflowRunId: "child-1",
+		childWorkflowRunStatus: "completed",
+	},
+	cancelled: { status: "cancelled" },
+	completed: { status: "completed", output: undefined },
+	failed: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+};
 
 export const childWorkflowRunInfoFactory = Factory.define<ChildWorkflowRunInfo>(({ sequence }) => ({
 	id: `child-run-${sequence}`,

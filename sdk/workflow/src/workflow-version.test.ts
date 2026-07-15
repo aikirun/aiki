@@ -7,18 +7,14 @@ import {
 	childWorkflowRunInfoFactory,
 	pausedWorkflowRunRecordFactory,
 	runningWorkflowRunRecordFactory,
+	workflowRunStateByStatus,
 } from "@aikirun/testing/workflow/run";
 import { runningTaskInfoFactory } from "@aikirun/testing/workflow/task";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type {
-	WorkflowRunId,
-	WorkflowRunRecord,
-	WorkflowRunState,
-	WorkflowRunStatus,
-} from "@aikirun/types/workflow/run";
+import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
@@ -59,29 +55,6 @@ function createTestWorkflowRun(
 		},
 	};
 }
-
-const stateByStatus: { [Status in WorkflowRunStatus]: Extract<WorkflowRunState, { status: Status }> } = {
-	scheduled: { status: "scheduled", scheduledAt: 0, reason: "new" },
-	queued: { status: "queued", reason: "new" },
-	running: { status: "running" },
-	paused: { status: "paused" },
-	sleeping: { status: "sleeping", sleepName: "nap", awakeAt: 0 },
-	awaiting_event: { status: "awaiting_event", eventName: "order-shipped" },
-	awaiting_retry: {
-		status: "awaiting_retry",
-		cause: "self",
-		nextAttemptAt: 0,
-		error: { name: "Error", message: "boom" },
-	},
-	awaiting_child_workflow: {
-		status: "awaiting_child_workflow",
-		childWorkflowRunId: "child-1",
-		childWorkflowRunStatus: "completed",
-	},
-	cancelled: { status: "cancelled" },
-	completed: { status: "completed", output: undefined },
-	failed: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
-};
 
 describe("workflow version execution", () => {
 	describe("retry strategy precedence", () => {
@@ -244,7 +217,7 @@ describe("workflow version execution", () => {
 							return "done";
 						},
 					});
-					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: stateByStatus[status] };
+					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
 					const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
 
 					client.api.workflowRun.transitionStateV1
@@ -597,7 +570,7 @@ describe("workflow version execution", () => {
 							return "should not run";
 						},
 					});
-					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: stateByStatus[status] };
+					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
 					const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
 
 					let error: unknown;
