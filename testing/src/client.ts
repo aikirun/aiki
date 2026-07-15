@@ -22,6 +22,13 @@ type MockEndpoint<Args extends unknown[], Return> = Mock<(...args: Args) => Retu
 		request: Args[0],
 		...response: Awaited<Return> extends void ? [] : [response: Awaited<Return>]
 	): MockEndpoint<Args, Return>;
+
+	/**
+	 * Queues a single expected call that rejects: the next call to this endpoint asserts its
+	 * request `toEqual`s `request`, then throws `error`. Request matching and `verify()`
+	 * accounting are identical to {@link once}; only the outcome differs.
+	 */
+	rejectsOnce(request: Args[0], error: unknown): MockEndpoint<Args, Return>;
 };
 
 /** Every API method becomes a `MockEndpoint` of its own signature. */
@@ -37,9 +44,11 @@ export interface FakeClient<Context = null> extends Client<Context> {
 	verify(): void;
 }
 
+type QueuedCallResult = { type: "resolve"; response: unknown } | { type: "reject"; error: unknown };
+
 interface QueuedCall {
 	request: unknown;
-	response: unknown;
+	result: QueuedCallResult;
 }
 
 interface RegisteredEndpoint {
@@ -66,13 +75,21 @@ function fakeClient<Context = null>(): FakeClient<Context> {
 				throw new Error(`Fake client: unexpected call to ${endpointName}(${Bun.inspect(actual)})`);
 			}
 			expect(actual).toEqual(call.request);
-			return call.response;
+			if (call.result.type === "reject") {
+				throw call.result.error;
+			}
+			return call.result.response;
 		};
 		const endpoint = mock(handler) as Mock<typeof handler> & {
 			once: (request: unknown, response?: unknown) => unknown;
+			rejectsOnce: (request: unknown, error: unknown) => unknown;
 		};
 		endpoint.once = (request, response) => {
-			queuedCalls.push({ request, response });
+			queuedCalls.push({ request, result: { type: "resolve", response } });
+			return endpoint;
+		};
+		endpoint.rejectsOnce = (request, error) => {
+			queuedCalls.push({ request, result: { type: "reject", error } });
 			return endpoint;
 		};
 
