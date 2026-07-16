@@ -15,7 +15,6 @@ New to Aiki? Start here:
 
 - **[Quick Start](/docs/getting-started/quick-start)** - Get up and running
 - **[Installation](/docs/getting-started/installation)** - Detailed setup instructions
-- **[Your First Workflow](/docs/getting-started/first-workflow)** - Build a complete workflow from scratch
 
 ## 📚 Core Concepts
 
@@ -57,5 +56,5 @@ Deep dive into system design:
 
 - [GitHub Repository](https://github.com/aikirun/aiki)
 - [Discord](https://discord.aiki.run)
-- [Examples](https://github.com/aikirun/aiki/tree/main/examples/src/workflows)
+- [Example workflows on GitHub](https://github.com/aikirun/aiki/tree/main/examples/src/workflows)
 - [License](https://github.com/aikirun/aiki/blob/main/LICENSE)
