@@ -2,7 +2,7 @@
 title: Dependency Injection
 ---
 
-Inject dependencies that are created once at startup and shared by every execution — database connections, API clients, services — into tasks and workflows with higher-order functions. For values created fresh per execution, like trace IDs, use [Context](/docs/guides/context) instead.
+Inject dependencies that are created once at startup and shared by every execution — database connections, API clients, services — into tasks and workflows with higher-order functions. For values created fresh per execution, like trace IDs, use [Context](./context.md) instead.
 
 ## Higher-Order Functions (Startup Dependencies)
 
@@ -71,7 +71,7 @@ export const orderWorkflowV1 = createOrderWorkflow(db);
 | Pattern | Use Case | Lifetime |
 |---------|----------|----------|
 | **Higher-order functions** | Database connections, API clients, services | Created once at startup |
-| **[Context](/docs/guides/context)** | Trace IDs, request metadata, user context | Created per execution |
+| **[Context](./context.md)** | Trace IDs, request metadata, user context | Created per execution |
 
 **Higher-order functions** are best for:
 - Dependencies that are expensive to create (DB connections, HTTP clients)
@@ -85,7 +85,7 @@ export const orderWorkflowV1 = createOrderWorkflow(db);
 
 ## Next Steps
 
-- **[Context](/docs/guides/context)** - Per-execution context for workflow runs
-- **[Tasks](/docs/core-concepts/tasks)** - Task definition and execution
-- **[Workflows](/docs/core-concepts/workflows)** - Workflow orchestration
-- **[Retry Strategies](/docs/guides/retry-strategies)** - Configure automatic retries
+- **[Context](./context.md)** - Per-execution context for workflow runs
+- **[Tasks](../core-concepts/tasks.md)** - Task definition and execution
+- **[Workflows](../core-concepts/workflows.md)** - Workflow orchestration
+- **[Retry Strategies](./retry-strategies.md)** - Configure automatic retries

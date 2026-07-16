@@ -104,10 +104,10 @@ const aikiWorker = worker({
 });
 ```
 
-You can also implement your own subscriber by providing a function that matches the `CreateSubscriber` type from `@aikirun/types/infra/queue`. See [Subscribers](/docs/architecture/subscribers) for how the implementations work and what custom subscribers must provide.
+You can also implement your own subscriber by providing a function that matches the `CreateSubscriber` type from `@aikirun/types/infra/queue`. See [Subscribers](../architecture/subscribers.md) for how the implementations work and what custom subscribers must provide.
 
 ## Next Steps
 
-- **[Client](/docs/core-concepts/client)** — Connect to Aiki server
-- **[Workflows](/docs/core-concepts/workflows)** — Define workflow logic
-- **[Tasks](/docs/core-concepts/tasks)** — Create reusable task units
+- **[Client](./client.md)** — Connect to Aiki server
+- **[Workflows](./workflows.md)** — Define workflow logic
+- **[Tasks](./tasks.md)** — Create reusable task units

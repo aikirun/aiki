@@ -79,12 +79,12 @@ const onboardingWorker = worker({
 ### How Runs Resolve to a Version
 
 - **A run is pinned to its version when it is created.** A run started against `1.0.0` always executes and replays against `1.0.0`, even after `2.0.0` is deployed. The version is never reselected mid-run.
-- **Each version has its own queue.** A worker subscribes only to the versions in its registry, so a `1.0.0` run reaches only workers that register `1.0.0`. See [Subscribers](/docs/architecture/subscribers) for the queue model.
+- **Each version has its own queue.** A worker subscribes only to the versions in its registry, so a `1.0.0` run reaches only workers that register `1.0.0`. See [Subscribers](../architecture/subscribers.md) for the queue model.
 - **An unregistered version is never silently upgraded.** Stop registering `1.0.0` and its in-flight runs are no longer delivered. Aiki never reroutes them to `2.0.0`. A run that reaches a worker without its version in the registry is rejected, not coerced onto another version.
 
 A version bump is therefore the safe way to ship a breaking change. Publish the new version for new runs, keep the old version registered until its in-flight runs drain, then retire it. Because old runs stay on the handler that created them, the new version's handler can change shape freely.
 
-To change a single version's handler in place instead of publishing a new one, follow the determinism rules. See [Refactoring Workflows](/docs/guides/refactoring-workflows) and [Determinism](/docs/guides/determinism).
+To change a single version's handler in place instead of publishing a new one, follow the determinism rules. See [Refactoring Workflows](../guides/refactoring-workflows.md) and [Determinism](../guides/determinism.md).
 
 ## Workflow Retry
 
@@ -105,7 +105,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 When a workflow fails (due to an unhandled error or task failure), Aiki will automatically retry it based on your retry strategy. Between retries, the workflow enters an `awaiting_retry` state.
 
-For detailed guidance on retry strategies, see the **[Retry Strategies Guide](/docs/guides/retry-strategies)**.
+For detailed guidance on retry strategies, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
 
 ## Schema Validation
 
@@ -134,7 +134,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 Schemas work with any validation library that implements [Standard Schema](https://standardschema.dev/) (Zod, Valibot, ArkType, etc.).
 
-**Why use output schemas?** For child workflows, cached outputs are validated against the schema. If the cached shape doesn't match, the parent workflow fails immediately. See [Refactoring Workflows](/docs/guides/refactoring-workflows#changing-task-or-child-workflow-output-shapes).
+**Why use output schemas?** For child workflows, cached outputs are validated against the schema. If the cached shape doesn't match, the parent workflow fails immediately. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
 
 ## Sharding
 
@@ -147,7 +147,7 @@ const handle = await orderWorkflowV1
 	.start(client, { orderId: "123" });
 ```
 
-Workers must be configured to listen to the same shard. A workflow routed to `"us-east"` will only be picked up by workers with `shards: ["us-east"]` in their configuration. See **[Workers](/docs/core-concepts/workers)** for worker-side setup.
+Workers must be configured to listen to the same shard. A workflow routed to `"us-east"` will only be picked up by workers with `shards: ["us-east"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
 
 ## Starting Workflows
 
@@ -181,7 +181,7 @@ const handle = await orderWorkflowV1
 	.start(client, { orderId: "123" });
 ```
 
-With a reference ID, calling `start()` again with the same input returns the existing run. If the input differs, the default behavior throws an error. Use `conflictPolicy: "return_existing"` to return the existing run regardless of input differences. See the [Reference IDs guide](/docs/guides/reference-ids) for more details.
+With a reference ID, calling `start()` again with the same input returns the existing run. If the input differs, the default behavior throws an error. Use `conflictPolicy: "return_existing"` to return the existing run regardless of input differences. See the [Reference IDs guide](../guides/reference-ids.md) for more details.
 
 ## Workflow Runs
 
@@ -367,6 +367,6 @@ const childHandle = await childWorkflowV1
 
 ## Next Steps
 
-- **[Tasks](/docs/core-concepts/tasks)** - Learn about task execution
-- **[Workers](/docs/core-concepts/workers)** - Understand worker configuration
-- **[Determinism](/docs/guides/determinism)** - Write reliable workflows
+- **[Tasks](./tasks.md)** - Learn about task execution
+- **[Workers](./workers.md)** - Understand worker configuration
+- **[Determinism](../guides/determinism.md)** - Write reliable workflows

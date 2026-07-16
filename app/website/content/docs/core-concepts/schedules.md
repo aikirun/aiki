@@ -142,7 +142,7 @@ const handle = await dailyReport
 
 With `"upsert"`, calling `activate()` with the same reference ID but different input or timing will update the existing schedule. With `"error"`, it throws a `ScheduleConflictError` if the parameters don't match.
 
-For more on reference IDs in workflows and events, see the [Reference IDs guide](/docs/guides/reference-ids).
+For more on reference IDs in workflows and events, see the [Reference IDs guide](../guides/reference-ids.md).
 
 ## Managing Schedules
 
@@ -185,5 +185,5 @@ await dailyReport.activate(client, reportWorkflowV1, { tenantId: "globex" });
 
 ## Next Steps
 
-- **[Workflows](/docs/core-concepts/workflows)** - Define the workflows your schedules trigger
-- **[Workers](/docs/core-concepts/workers)** - Run workers to execute scheduled workflows
+- **[Workflows](./workflows.md)** - Define the workflows your schedules trigger
+- **[Workers](./workers.md)** - Run workers to execute scheduled workflows

@@ -66,7 +66,7 @@ const aikiClient = client<Context>({
 });
 ```
 
-See the [Context Guide](/docs/guides/context) for typing and usage.
+See the [Context Guide](../guides/context.md) for typing and usage.
 
 ### logger
 
@@ -79,7 +79,7 @@ const aikiClient = client({
 });
 ```
 
-See the [Logging Guide](/docs/guides/logging) for the `Logger` contract, plugging in a structured logger, and logging from workflow code.
+See the [Logging Guide](../guides/logging.md) for the `Logger` contract, plugging in a structured logger, and logging from workflow code.
 
 ## Starting Workflows
 
@@ -94,7 +94,7 @@ const handle = await workflowVersion.start(aikiClient, {
 console.log("Started workflow:", handle.run.id);
 ```
 
-The method returns a handle for monitoring and controlling the workflow. See [Workflows](/docs/core-concepts/workflows) for handle methods.
+The method returns a handle for monitoring and controlling the workflow. See [Workflows](./workflows.md) for handle methods.
 
 ### With Reference ID
 
@@ -107,10 +107,10 @@ const handle = await workflowVersion
 	.start(aikiClient, { orderId: "order-123" });
 ```
 
-See the [Reference IDs Guide](/docs/guides/reference-ids) for more details.
+See the [Reference IDs Guide](../guides/reference-ids.md) for more details.
 
 ## Next Steps
 
-- **[Workflows](/docs/core-concepts/workflows)** - Learn about workflow definition and handles
-- **[Tasks](/docs/core-concepts/tasks)** - Understand task execution
-- **[Reference IDs](/docs/guides/reference-ids)** - Deep dive into reference IDs
+- **[Workflows](./workflows.md)** - Learn about workflow definition and handles
+- **[Tasks](./tasks.md)** - Understand task execution
+- **[Reference IDs](../guides/reference-ids.md)** - Deep dive into reference IDs

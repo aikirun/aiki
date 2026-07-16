@@ -6,7 +6,7 @@ This example starts a 14-day free trial, then suspends the workflow waiting for 
 
 ## Prerequisites
 
-You need Node.js 18+ (or Bun 1.0+) and a PostgreSQL database. Install the SDK and apply the db migrations — the two commands below, covered in full in [Installation](/docs/getting-started/installation).
+You need Node.js 18+ (or Bun 1.0+) and a PostgreSQL database. Install the SDK and apply the db migrations — the two commands below, covered in full in [Installation](./installation.md).
 
 ```bash
 npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
@@ -178,17 +178,17 @@ await runtimeHandle.stop();
 
 ## What you just used
 
-- **Task** — `activateTrial` / `downgradeToFree`: a unit of work whose result is persisted, so a restart never redoes it. → [Tasks](/docs/core-concepts/tasks)
-- **Workflow** — `trialV1`: orchestrates tasks and events, tracked at every step. → [Workflows](/docs/core-concepts/workflows)
-- **Event** — `paymentReceived`: `wait()` suspends with nothing held; `send()` or the 14-day timeout resumes it. → [Events](/docs/core-concepts/events)
-- **Server** — `server({ db })` + `runtime.start()`: the orchestrator and its background loops. → [Server](/docs/architecture/server)
-- **Client** — `client({ handler })`: the in-process connection; workers and your app both attach. → [Client](/docs/core-concepts/client)
-- **Worker** — `worker({...}).spawn(client)`: claims ready runs and executes them. → [Workers](/docs/core-concepts/workers)
+- **Task** — `activateTrial` / `downgradeToFree`: a unit of work whose result is persisted, so a restart never redoes it. → [Tasks](../core-concepts/tasks.md)
+- **Workflow** — `trialV1`: orchestrates tasks and events, tracked at every step. → [Workflows](../core-concepts/workflows.md)
+- **Event** — `paymentReceived`: `wait()` suspends with nothing held; `send()` or the 14-day timeout resumes it. → [Events](../core-concepts/events.md)
+- **Server** — `server({ db })` + `runtime.start()`: the orchestrator and its background loops. → [Server](../architecture/server.md)
+- **Client** — `client({ handler })`: the in-process connection; workers and your app both attach. → [Client](../core-concepts/client.md)
+- **Worker** — `worker({...}).spawn(client)`: claims ready runs and executes them. → [Workers](../core-concepts/workers.md)
 
 Everything here runs in one process. The same workflow code runs against a separately deployed server — swap `client({ handler: aikiServer.handler })` for `client({ url: "..." })`.
 
 ## Next Steps
 
-- **[Workflows](/docs/core-concepts/workflows)** — Deep dive into workflow concepts
-- **[Determinism](/docs/guides/determinism)** — Writing deterministic workflows
+- **[Workflows](../core-concepts/workflows.md)** — Deep dive into workflow concepts
+- **[Determinism](../guides/determinism.md)** — Writing deterministic workflows
 - **[Example workflows on GitHub](https://github.com/aikirun/aiki/tree/main/examples/src/workflows)** — Runnable end-to-end examples

@@ -1,0 +1,58 @@
+---
+title: Aiki Documentation
+description: Build reliable, long-running workflows in TypeScript.
+---
+
+<img src="../../public/assets/aiki-logo-combo.svg" alt="Aiki" width="200" />
+
+Welcome to the Aiki documentation! This guide will help you build durable, reliable workflows in TypeScript.
+
+## 🚀 Getting Started
+
+New to Aiki? Start here:
+
+- **[Quick Start](./getting-started/quick-start.mdx)** - Get up and running
+- **[Installation](./getting-started/installation.md)** - Detailed setup instructions
+
+## 📚 Core Concepts
+
+Understand the building blocks:
+
+- **[Workflows](./core-concepts/workflows.md)** - Define long-running business processes
+- **[Tasks](./core-concepts/tasks.md)** - Individual units of work
+- **[Events](./core-concepts/events.md)** - Let external systems signal running workflows
+- **[Sleeps](./core-concepts/sleeps.md)** - Durable timers that survive restarts
+- **[Schedules](./core-concepts/schedules.md)** - Trigger workflows on a recurring basis
+- **[Workers](./core-concepts/workers.md)** - Execute workflows in your infrastructure
+- **[Client](./core-concepts/client.md)** - Connect to the Aiki server, embedded or remote
+
+## 🎯 Guides
+
+Best practices and patterns:
+
+- **[Dependency Injection](./guides/dependency-injection.md)** - Inject services and dependencies into tasks and workflows
+- **[Context](./guides/context.md)** - Per-execution context for workflow runs
+- **[Reference IDs](./guides/reference-ids.md)** - Custom identifiers for workflows and events
+- **[Retry Strategies](./guides/retry-strategies.md)** - Configure automatic retries for tasks and workflows
+- **[Determinism](./guides/determinism.md)** - Workflow determinism and task idempotency
+- **[Refactoring Workflows](./guides/refactoring-workflows.md)** - Safely modify running workflows
+- **[Reliable Hooks](./guides/reliable-hooks.md)** - Trigger durable follow-up actions on workflow completion/failure/cancellation
+- **[Runtime Configuration](./guides/configuration.md)** - Tune the server, workers, and endpoints — statically or live
+- **[Logging](./guides/logging.md)** - Plug in your own logger and log from workflow code
+- **[IAM](./guides/iam.md)** - Multi-tenancy, API keys, and dashboard auth — optional, off by default
+
+## 🏗 Architecture
+
+Deep dive into system design:
+
+- **[Overview](./architecture/overview.mdx)** - High-level architecture and design principles
+- **[Server](./architecture/server.md)** - Workflow orchestration and state management
+- **[Subscribers](./architecture/subscribers.md)** - Work discovery and fault tolerance
+- **[Crash recovery](./architecture/cam.md)** - Underlying replay-based crash recovery mechanism
+
+## 🔗 Quick Links
+
+- [GitHub Repository](https://github.com/aikirun/aiki)
+- [Discord](https://discord.aiki.run)
+- [Example workflows on GitHub](https://github.com/aikirun/aiki/tree/main/examples/src/workflows)
+- [License](https://github.com/aikirun/aiki/blob/main/LICENSE)

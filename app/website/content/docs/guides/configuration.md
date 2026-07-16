@@ -120,6 +120,6 @@ Configure endpoints with a static overrides object, or bring a provider whose li
 
 ## Next Steps
 
-- **[Workers](/docs/core-concepts/workers)** - How workers claim and execute runs
-- **[Server](/docs/architecture/server)** - The runtime's daemons and what they poll
-- **[Reliable Hooks](/docs/guides/reliable-hooks)** - Durable follow-up actions on workflow completion
+- **[Workers](../core-concepts/workers.md)** - How workers claim and execute runs
+- **[Server](../architecture/server.md)** - The runtime's daemons and what they poll
+- **[Reliable Hooks](./reliable-hooks.md)** - Durable follow-up actions on workflow completion

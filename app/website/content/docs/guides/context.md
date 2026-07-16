@@ -39,10 +39,10 @@ const aikiClient = client<Context>({
 });
 ```
 
-Context is for values created fresh per execution. For dependencies created once at startup and shared by every execution — database connections, API clients, services — use higher-order functions instead; see [Dependency Injection](/docs/guides/dependency-injection).
+Context is for values created fresh per execution. For dependencies created once at startup and shared by every execution — database connections, API clients, services — use higher-order functions instead; see [Dependency Injection](./dependency-injection.md).
 
 ## Next Steps
 
-- **[Dependency Injection](/docs/guides/dependency-injection)** - Inject startup dependencies into workflows and tasks
-- **[Logging](/docs/guides/logging)** - Log from workflow code with run-scoped metadata
-- **[Client](/docs/core-concepts/client)** - Client configuration, including `context`
+- **[Dependency Injection](./dependency-injection.md)** - Inject startup dependencies into workflows and tasks
+- **[Logging](./logging.md)** - Log from workflow code with run-scoped metadata
+- **[Client](../core-concepts/client.md)** - Client configuration, including `context`

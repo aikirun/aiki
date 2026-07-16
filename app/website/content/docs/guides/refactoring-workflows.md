@@ -18,7 +18,7 @@ Traditional durable execution systems like Temporal require strict determinism; 
 - **New tasks can be appended** after all previously-recorded entries have been consumed
 - **Non-determinism detection** catches unsafe changes before new tasks execute
 
-This gives you flexibility to evolve your workflows without breaking running executions. For the full technical details, see [Content-Addressed Memoization](/docs/architecture/cam).
+This gives you flexibility to evolve your workflows without breaking running executions. For the full technical details, see [Content-Addressed Memoization](../architecture/cam.md).
 
 ## The Non-Determinism Rule
 
@@ -273,7 +273,7 @@ Non-determinism detection prevents accidental re-execution from input or name ch
 - Write to external databases
 - Call third-party APIs
 
-Use [idempotency patterns](/docs/guides/determinism#task-idempotency) to protect against this.
+Use [idempotency patterns](./determinism.md#task-idempotency) to protect against this.
 
 ### Changing Task or Child-Workflow Output Shapes
 
@@ -479,6 +479,6 @@ When in doubt, create a new workflow version.
 
 ## Next Steps
 
-- **[Determinism and Idempotency](/docs/guides/determinism)** - Best practices for reliable workflows
-- **[Reference IDs](/docs/guides/reference-ids)** - Custom identifiers for workflows and events
-- **[Retry Strategies](/docs/guides/retry-strategies)** - Configure automatic retries
+- **[Determinism and Idempotency](./determinism.md)** - Best practices for reliable workflows
+- **[Reference IDs](./reference-ids.md)** - Custom identifiers for workflows and events
+- **[Retry Strategies](./retry-strategies.md)** - Configure automatic retries

@@ -100,7 +100,7 @@ await handle.events.paymentReceived
 	.send({ transactionId: "txn_abc123", amount: 99.99 });
 ```
 
-See the [Reference IDs Guide](/docs/guides/reference-ids) for details.
+See the [Reference IDs Guide](../guides/reference-ids.md) for details.
 
 ## Waiting for Multiple Events (AND)
 
@@ -185,7 +185,7 @@ await handle.events.paymentReceived
 	.send({ transactionId: "txn_abc" });
 ```
 
-This is useful when event sources may retry (webhooks, message queues). See the [Reference IDs Guide](/docs/guides/reference-ids) for more patterns.
+This is useful when event sources may retry (webhooks, message queues). See the [Reference IDs Guide](../guides/reference-ids.md) for more patterns.
 
 ## Event Queues
 
@@ -221,6 +221,6 @@ This is a design principle, not just a refactoring concern. Different event type
 
 ## Next Steps
 
-- **[Workflows](/docs/core-concepts/workflows)** - Workflow orchestration
-- **[Sleeps](/docs/core-concepts/sleeps)** - Durable timers
-- **[Reference IDs](/docs/guides/reference-ids)** - Deduplication patterns
+- **[Workflows](./workflows.md)** - Workflow orchestration
+- **[Sleeps](./sleeps.md)** - Durable timers
+- **[Reference IDs](../guides/reference-ids.md)** - Deduplication patterns

@@ -80,7 +80,7 @@ const processPayment = task({
 });
 ```
 
-For available strategies and best practices, see the **[Retry Strategies Guide](/docs/guides/retry-strategies)**.
+For available strategies and best practices, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
 
 ## Schema Validation
 
@@ -109,7 +109,7 @@ const processPayment = task({
 
 Schemas work with any validation library that implements [Standard Schema](https://standardschema.dev/) (Zod, Valibot, ArkType, etc.).
 
-**Why use output schemas?** When task results are cached, the schema validates cached data on replay. If the cached shape doesn't match (e.g., after refactoring), the workflow fails immediately rather than silently returning mismatched data. See [Refactoring Workflows](/docs/guides/refactoring-workflows#changing-task-or-child-workflow-output-shapes).
+**Why use output schemas?** When task results are cached, the schema validates cached data on replay. If the cached shape doesn't match (e.g., after refactoring), the workflow fails immediately rather than silently returning mismatched data. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
 
 ## Task Input
 
@@ -136,7 +136,7 @@ const exampleTask = task({
 
 ## Next Steps
 
-- **[Workflows](/docs/core-concepts/workflows)** - Learn about workflow orchestration
-- **[Determinism](/docs/guides/determinism)** - Workflow determinism and task idempotency
-- **[Reference IDs](/docs/guides/reference-ids)** - Custom identifiers for workflows and events
-- **[Dependency Injection](/docs/guides/dependency-injection)** - Inject dependencies into tasks
+- **[Workflows](./workflows.md)** - Learn about workflow orchestration
+- **[Determinism](../guides/determinism.md)** - Workflow determinism and task idempotency
+- **[Reference IDs](../guides/reference-ids.md)** - Custom identifiers for workflows and events
+- **[Dependency Injection](../guides/dependency-injection.md)** - Inject dependencies into tasks

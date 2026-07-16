@@ -7,7 +7,7 @@ The Aiki server coordinates workflow execution — and it's a library. `server({
 - **`handler`** — a fetch-style HTTP handler `(Request) => Promise<Response>` serving the RPC API that clients call. Mount it in any HTTP framework.
 - **`runtime`** — background daemons that drive workflow state transitions. Start it with `runtime.start()`.
 
-The bundled standalone server (`app/server`) is a thin composition of this same library — see [Installation](/docs/getting-started/installation).
+The bundled standalone server (`app/server`) is a thin composition of this same library — see [Installation](../getting-started/installation.md).
 
 ## Request Handling
 
@@ -28,7 +28,7 @@ When a workflow run becomes ready, the server records it in an **outbox** — th
 - **With a publisher configured** (e.g. `@aikirun/redis`) — the runtime also pushes ready runs to per-workflow queues the moment they're due, for sub-second delivery. The outbox remains the recovery path: anything lost in transit is re-published.
 - **Endpoints (push)** — the server sends a signed HTTP request to your endpoint handler; no subscriber involved.
 
-See [Subscribers](/docs/architecture/subscribers) for the worker side of this.
+See [Subscribers](./subscribers.md) for the worker side of this.
 
 ## Background Jobs
 
@@ -82,9 +82,9 @@ const aikiServer = server({
 });
 ```
 
-For the bundled standalone server's environment variables, see the [Installation Guide](/docs/getting-started/installation).
+For the bundled standalone server's environment variables, see the [Installation Guide](../getting-started/installation.md).
 
 ## Next Steps
 
-- **[Subscribers](/docs/architecture/subscribers)** - How workers discover work
-- **[Overview](/docs/architecture/overview)** - High-level architecture
+- **[Subscribers](./subscribers.md)** - How workers discover work
+- **[Overview](./overview.mdx)** - High-level architecture

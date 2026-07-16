@@ -14,7 +14,7 @@ A reference ID is a custom identifier you provide when starting a workflow, send
 
 Reference IDs are unique per workflow version (workflow name + version ID). The same reference ID can be used across different workflow versions without conflict.
 
-> **Note:** Tasks do not support reference IDs. Tasks are content-addressed by `name + hash(input)` — see [Content-Addressed Memoization](/docs/architecture/cam) for how this works.
+> **Note:** Tasks do not support reference IDs. Tasks are content-addressed by `name + hash(input)` — see [Content-Addressed Memoization](../architecture/cam.md) for how this works.
 
 ## Workflow Reference IDs
 
@@ -97,7 +97,7 @@ Schedule conflict policies differ from workflows:
 
 With `"upsert"`, re-activating a schedule with different timing or input updates it. With `"error"`, it throws a `ScheduleConflictError` if the parameters don't match.
 
-See the [Schedules documentation](/docs/core-concepts/schedules#reference-ids) for more details.
+See the [Schedules documentation](../core-concepts/schedules.md#reference-ids) for more details.
 
 ## How It Works
 

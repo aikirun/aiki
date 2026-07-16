@@ -30,7 +30,7 @@ Re-run this command when upgrading Aiki to apply new migrations.
 
 ### Run the server
 
-Mount aiki server handler in any HTTP framework — in the same process as your app, or in a process dedicated to Aiki. The [Quick Start](/docs/getting-started/quick-start) walks through this end-to-end, including worker and client.
+Mount aiki server handler in any HTTP framework — in the same process as your app, or in a process dedicated to Aiki. The [Quick Start](./quick-start.mdx) walks through this end-to-end, including worker and client.
 
 Workflow code is identical against an embedded or standalone server, so you can also skip embedding entirely and point your client at a server hosted per [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard).
 
@@ -191,5 +191,5 @@ Which variable applies depends on how you serve the dashboard: the docker image 
 
 ## Next Steps
 
-- [Quick Start](/docs/getting-started/quick-start) — Create your first workflow
-- **[Workflows](/docs/core-concepts/workflows)** — Deep dive into workflow concepts
+- [Quick Start](./quick-start.mdx) — Create your first workflow
+- **[Workflows](../core-concepts/workflows.md)** — Deep dive into workflow concepts

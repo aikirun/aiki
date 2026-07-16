@@ -44,7 +44,7 @@ const paymentWorkflowV1 = paymentWorkflow.v("1.0.0", {
 });
 ```
 
-Task handlers are plain functions and receive no logger. If a task needs one, inject it the way you inject any dependency — see [Dependency Injection](/docs/guides/dependency-injection).
+Task handlers are plain functions and receive no logger. If a task needs one, inject it the way you inject any dependency — see [Dependency Injection](./dependency-injection.md).
 
 ## What Aiki Logs
 
@@ -52,6 +52,6 @@ The SDK logs run lifecycle (claims, execution, retries, heartbeats etc.) and com
 
 ## Next Steps
 
-- **[Context](/docs/guides/context)** - Per-execution context for workflow runs
-- **[Dependency Injection](/docs/guides/dependency-injection)** - Inject services into workflows and tasks
-- **[Client](/docs/core-concepts/client)** - Client configuration, including `logger` and `context`
+- **[Context](./context.md)** - Per-execution context for workflow runs
+- **[Dependency Injection](./dependency-injection.md)** - Inject services into workflows and tasks
+- **[Client](../core-concepts/client.md)** - Client configuration, including `logger` and `context`

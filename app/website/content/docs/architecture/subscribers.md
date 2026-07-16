@@ -47,7 +47,7 @@ const aikiWorker = worker({
 });
 ```
 
-It pairs with the server's Redis publisher — work flows through Redis only if the server is configured to publish there. See [Server](/docs/architecture/server).
+It pairs with the server's Redis publisher — work flows through Redis only if the server is configured to publish there. See [Server](./server.md).
 
 ### Queue Per Workflow
 
@@ -177,5 +177,5 @@ When you provide a custom subscriber (including the Redis subscriber), the worke
 
 ## Next Steps
 
-- **[Workers](/docs/core-concepts/workers)** - Worker configuration
-- **[Overview](/docs/architecture/overview)** - High-level architecture
+- **[Workers](../core-concepts/workers.md)** - Worker configuration
+- **[Overview](./overview.mdx)** - High-level architecture

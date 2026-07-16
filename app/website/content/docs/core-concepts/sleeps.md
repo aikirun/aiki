@@ -94,5 +94,5 @@ During replay, the 1st `"retry-delay"` call matches the 1st recorded sleep, the 
 
 ## Next Steps
 
-- **[Workflows](/docs/core-concepts/workflows)** - Workflow orchestration
-- **[Refactoring Workflows](/docs/guides/refactoring-workflows)** - How sleep duration changes are handled
+- **[Workflows](./workflows.md)** - Workflow orchestration
+- **[Refactoring Workflows](../guides/refactoring-workflows.md)** - How sleep duration changes are handled

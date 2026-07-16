@@ -42,13 +42,13 @@ retrieve results.
 The Aiki Server orchestrates workflows and manages state through three key functions: workflow orchestration manages the
 workflow lifecycle, task management tracks task execution, and the storage layer persists state and history.
 
-The server ships as a library — `server({ db })` returns an HTTP handler and a background runtime — so it runs embedded in your process or as a standalone service. See [Server](/docs/architecture/server).
+The server ships as a library — `server({ db })` returns an HTTP handler and a background runtime — so it runs embedded in your process or as a standalone service. See [Server](./server.md).
 
 ### 3. Work Delivery
 
 Aiki supports two models for delivering workflow runs to your code:
 
-- **Pull (Workers)** - Long-lived processes that discover ready work through pluggable [subscribers](/docs/architecture/subscribers) — claiming from the server's API by default, or receiving from Redis queues. Scale by running multiple instances.
+- **Pull (Workers)** - Long-lived processes that discover ready work through pluggable [subscribers](./subscribers.md) — claiming from the server's API by default, or receiving from Redis queues. Scale by running multiple instances.
 
 - **Push (Endpoints)** - The server pushes workflow runs via HTTP to a request handler you expose. Designed for serverless platforms (Cloudflare Workers, AWS Lambda, Vercel) where long-lived polling isn't possible.
 
@@ -114,6 +114,6 @@ Worker/Endpoint → Server → Storage
 
 ## Next Steps
 
-- **[Server](/docs/architecture/server)** - Server component details
-- **[Workers](/docs/core-concepts/workers)** - Worker configuration and execution
-- **[Subscribers](/docs/architecture/subscribers)** - Work discovery implementations
+- **[Server](./server.md)** - Server component details
+- **[Workers](../core-concepts/workers.md)** - Worker configuration and execution
+- **[Subscribers](./subscribers.md)** - Work discovery implementations

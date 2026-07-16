@@ -7,7 +7,7 @@ Aiki has two guiding principles for reliable workflows:
 1. **Wrap non-deterministic operations in tasks** - operations like generating random numbers or fetching the current time should happen inside tasks, not in workflow code
 2. **Tasks should be idempotent** - running a task multiple times should produce the same side effects
 
-Unlike platforms that enforce strict determinism, Aiki's content-addressable design provides flexibility for real-world code changes. See [Refactoring Workflows](/docs/guides/refactoring-workflows) for what's safe to change.
+Unlike platforms that enforce strict determinism, Aiki's content-addressable design provides flexibility for real-world code changes. See [Refactoring Workflows](./refactoring-workflows.md) for what's safe to change.
 
 ## Why Wrap Non-Deterministic Operations?
 
@@ -160,7 +160,7 @@ Following these principles makes your workflows easier to debug, test, and reaso
 
 ## Next Steps
 
-- **[Refactoring Workflows](/docs/guides/refactoring-workflows)** - Learn what's safe to change in running workflows
-- **[Tasks](/docs/core-concepts/tasks)** - Task definition and execution
-- **[Workflows](/docs/core-concepts/workflows)** - Workflow orchestration
-- **[Retry Strategies](/docs/guides/retry-strategies)** - Configure automatic retries
+- **[Refactoring Workflows](./refactoring-workflows.md)** - Learn what's safe to change in running workflows
+- **[Tasks](../core-concepts/tasks.md)** - Task definition and execution
+- **[Workflows](../core-concepts/workflows.md)** - Workflow orchestration
+- **[Retry Strategies](./retry-strategies.md)** - Configure automatic retries

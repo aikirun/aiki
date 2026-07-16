@@ -76,7 +76,7 @@ const aikiClient = client({
 
 ### Bundled standalone server
 
-The bundled `app/server` composes IAM for you when `AIKI_SERVER_AUTH_SECRET` and `AIKI_SERVER_BASE_URL` are both set — see the [Installation Guide](/docs/getting-started/installation#environment-variable-reference).
+The bundled `app/server` composes IAM for you when `AIKI_SERVER_AUTH_SECRET` and `AIKI_SERVER_BASE_URL` are both set — see the [Installation Guide](../getting-started/installation.md#environment-variable-reference).
 
 ## Runs created before IAM
 
@@ -110,5 +110,5 @@ Whatever IDs your authorizer returns are the tenant IDs the server tags workflow
 
 ## Next Steps
 
-- **[Installation](/docs/getting-started/installation)** - Environment variables for the bundled server
-- **[Client](/docs/core-concepts/client)** - Client configuration, including `apiKey`
+- **[Installation](../getting-started/installation.md)** - Environment variables for the bundled server
+- **[Client](../core-concepts/client.md)** - Client configuration, including `apiKey`

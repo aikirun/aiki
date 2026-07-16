@@ -33,4 +33,4 @@ This way you're guaranteed that the hook will be called on workflow completion, 
 
 ## Next Steps
 
-- **[Workflows](/docs/core-concepts/workflows)** - Child workflows
+- **[Workflows](../core-concepts/workflows.md)** - Child workflows
