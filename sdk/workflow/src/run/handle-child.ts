@@ -5,7 +5,6 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
 	type ChildWorkflowRunWaitQueue,
-	isTerminalWorkflowRunStatus,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRunId,
 	type WorkflowRunRecord,
@@ -144,9 +143,9 @@ function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefini
 					cause: "timeout",
 				};
 			}
+			existingChildWorkflowRunWait.status satisfies "completed";
 
 			const childWorkflowRunStatus = existingChildWorkflowRunWait.childWorkflowRunState.status;
-
 			if (childWorkflowRunStatus === expectedStatus) {
 				return {
 					success: true,
@@ -154,17 +153,15 @@ function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefini
 				};
 			}
 
-			if (isTerminalWorkflowRunStatus(childWorkflowRunStatus)) {
-				logger.debug("Child workflow run reached termnial state", {
-					"aiki.childWorkflowTerminalStatus": childWorkflowRunStatus,
-				});
-				return {
-					success: false,
-					cause: "run_terminated",
-				};
-			}
+			childWorkflowRunStatus satisfies TerminalWorkflowRunStatus;
 
-			childWorkflowRunStatus satisfies never;
+			logger.debug("Child workflow run reached termnial state", {
+				"aiki.childWorkflowTerminalStatus": childWorkflowRunStatus,
+			});
+			return {
+				success: false,
+				cause: "run_terminated",
+			};
 		}
 
 		// TODO: if the child workflow is already in the expectedStatus or a terminal status,
