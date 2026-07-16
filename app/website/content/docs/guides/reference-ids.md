@@ -88,14 +88,14 @@ const handle = await dailyReport
 	.activate(client, reportWorkflowV1, { tenantId: "acme" });
 ```
 
-Schedule conflict policies differ from workflows:
+Schedules use the same conflict policies as workflows:
 
 | Policy | Behavior |
 |--------|----------|
-| `"upsert"` (default) | Update existing schedule if parameters differ |
-| `"error"` | Throw error if parameters differ from existing |
+| `"error"` (default) | Throw a `ScheduleConflictError` if the reference ID already identifies a schedule with a different definition |
+| `"return_existing"` | Return the existing schedule unchanged |
 
-With `"upsert"`, re-activating a schedule with different timing or input updates it. With `"error"`, it throws a `ScheduleConflictError` if the parameters don't match.
+A schedule's definition is immutable, so a reference ID that already points at a different definition is a conflict, never an update. `"error"` throws a `ScheduleConflictError`; `"return_existing"` hands back the existing schedule as-is.
 
 See the [Schedules documentation](../core-concepts/schedules.md#reference-ids) for more details.
 

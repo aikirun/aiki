@@ -30,7 +30,7 @@ const handle = await dailyReport.activate(
 
 The `schedule()` function defines a timing configuration. Call `activate()` to bind it to a workflow - the workflow will then trigger automatically based on the schedule. The third argument is the input passed to the workflow on each run.
 
-Each `activate()` call creates a unique schedule instance. The instance is referenced by the workflow name, version, timing spec, and input. Activating the same schedule with different inputs creates independent instances, each with their own overlap tracking.
+Each `activate()` call creates a unique schedule instance, identified by the workflow name, version, timing spec, input, and [run options](#run-options). Activating the same schedule with different inputs creates independent instances, each with their own overlap tracking.
 
 The same schedule spec can be bound to different workflows:
 
@@ -102,15 +102,34 @@ const syncSchedule = schedule({
 
 Overlap policies are evaluated per schedule instance, not globally. If you activate the same schedule for multiple tenants with different inputs, each tenant has independent overlap handling.
 
+## Run Options
+
+A workflow definition can declare default start options, such as its `retry` strategy. A schedule sets the start options for the runs it fires:
+
+```typescript
+const hourlySync = schedule({
+	type: "interval",
+	every: { hours: 1 },
+});
+
+await hourlySync
+	.with()
+	.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 })
+	.opt("workflowRun.shard", "eu")
+	.activate(client, inventorySyncV1);
+```
+
+Only `retry` and `shard` can be set: a scheduled run's reference ID and trigger are the schedule's to control, not the caller's. Run options are part of a schedule's identity, so changing them is a different schedule — or, with a [reference ID](#reference-ids), a conflict.
+
 ## Idempotent Activation
 
 Calling `activate()` is idempotent. If a schedule already exists with the same parameters, the existing schedule is returned unchanged.
 
-If you call `activate()` with a **different input or timing configuration** (such as a new cron expression or interval), that is a different schedule identity: you are activating a new schedule, not modifying the first. To change a schedule in place, give it a [reference ID](#reference-ids) — activating with the same reference ID and different parameters updates the existing schedule.
+If you call `activate()` with a **different input or timing configuration** (such as a new cron expression or interval), that is a different schedule identity: you are activating a new schedule, not modifying the first. A schedule's definition is immutable — there is no in-place edit. To change the timing or input, activate the new definition (a new schedule) and [delete](#managing-schedules) the old one. A [reference ID](#reference-ids) gives a schedule a stable identity for lookups.
 
 ## Reference IDs
 
-By default, schedule identity is derived from a hash of the workflow name, version, timing spec, and input. You can provide an explicit reference ID instead:
+By default, schedule identity is derived from a hash of the workflow name, version, timing spec, input, and [run options](#run-options). You can provide an explicit reference ID instead:
 
 ```typescript
 const handle = await dailyReport
@@ -123,7 +142,7 @@ Reference IDs are useful when you need a stable, predictable identifier for look
 
 ### Conflict Policy
 
-When activating a schedule with a reference ID that already exists, the conflict policy determines what happens:
+When activating a schedule with a reference ID that already identifies a schedule with a different definition, the conflict policy determines what happens:
 
 ```typescript
 const handle = await dailyReport
@@ -137,10 +156,10 @@ const handle = await dailyReport
 
 | Policy | Behavior |
 |--------|----------|
-| `"upsert"` (default) | Update the existing schedule if parameters differ |
-| `"error"` | Throw an error if parameters differ from existing schedule |
+| `"error"` (default) | Throw a `ScheduleConflictError` if the reference ID already identifies a schedule with a different definition |
+| `"return_existing"` | Return the existing schedule unchanged |
 
-With `"upsert"`, calling `activate()` with the same reference ID but different input or timing will update the existing schedule. With `"error"`, it throws a `ScheduleConflictError` if the parameters don't match.
+The definition is immutable, so a reference ID that already points at a different definition is a conflict, not an update. With `"error"` the activation throws a `ScheduleConflictError`; with `"return_existing"` it returns the existing schedule as-is. Re-activating with the *same* definition is idempotent, and reactivates the schedule if it was paused.
 
 For more on reference IDs in workflows and events, see the [Reference IDs guide](../guides/reference-ids.md).
 
