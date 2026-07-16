@@ -1,5 +1,6 @@
 import type { AuthedRequestContextBase, ContextBase, PublicRequestContext } from "@aikirun/lib/context";
 import type { Logger } from "@aikirun/lib/logger";
+import type { RequiredProp } from "@aikirun/lib/object";
 import type { ApiAuthorizer } from "@aikirun/types/iam";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
@@ -13,7 +14,7 @@ export interface NamespaceRequestContext extends AuthedRequestContextBase {
 
 export type RequestContext = PublicRequestContext | NamespaceRequestContext;
 
-export interface DaemonContext extends ContextBase {
+export interface DaemonContext extends RequiredProp<ContextBase, "signal"> {
 	type: "daemon";
 	name: string;
 }
@@ -73,7 +74,7 @@ export async function createNamespaceRequestContext(params: {
 	};
 }
 
-export function createDaemonContext(params: { name: string; logger: Logger; signal?: AbortSignal }): DaemonContext {
+export function createDaemonContext(params: { name: string; logger: Logger; signal: AbortSignal }): DaemonContext {
 	const { name, logger, signal } = params;
 	const traceId = ulid();
 	const spanId = ulid();
