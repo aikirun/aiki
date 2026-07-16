@@ -6,7 +6,12 @@ The Aiki client is the typed connection to the server. Workers, schedules, and y
 
 ## Creating a Client
 
-Two transports are supported. **Remote** connects to a server over HTTP:
+Two transports are supported. Switching between them is a config-only change; workers and workflow code are unaffected.
+
+<Tabs groupId="transport" persist items={["Remote", "Embedded"]}>
+<Tab value="Remote">
+
+Connects to a server over HTTP:
 
 ```typescript
 import { client } from "@aikirun/client";
@@ -16,7 +21,10 @@ const aikiClient = client({
 });
 ```
 
-**Embedded** invokes an in-process server's handler directly — no network hop:
+</Tab>
+<Tab value="Embedded">
+
+Invokes an in-process server's handler directly — no network hop:
 
 ```typescript
 const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
@@ -24,7 +32,8 @@ const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) }
 const aikiClient = client({ handler: aikiServer.handler });
 ```
 
-Switching transports is a config-only change; workers and workflow code are unaffected.
+</Tab>
+</Tabs>
 
 ## Configuration Options
 

@@ -91,8 +91,8 @@ Worker configuration is split between **params** (identity) and **options** (tun
 
 By default, workers claim work from the server over HTTP, which requires no setup beyond the Aiki server connection. For sub-second work discovery, install `@aikirun/redis`:
 
-```bash
-npm install @aikirun/redis
+```package-install
+@aikirun/redis
 ```
 
 ```typescript
@@ -108,6 +108,6 @@ You can also implement your own subscriber by providing a function that matches 
 
 ## Next Steps
 
-- **[Client](./client.md)** — Connect to Aiki server
+- **[Client](./client.mdx)** — Connect to Aiki server
 - **[Workflows](./workflows.md)** — Define workflow logic
 - **[Tasks](./tasks.md)** — Create reusable task units

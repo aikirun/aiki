@@ -31,8 +31,8 @@ The claim endpoint atomically fetches and claims ready runs. It also recovers or
 
 For sub-second work discovery, install the Redis subscriber:
 
-```bash
-npm install @aikirun/redis
+```package-install
+@aikirun/redis
 ```
 
 ```typescript

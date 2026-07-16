@@ -8,14 +8,28 @@ This example starts a 14-day free trial, then suspends the workflow waiting for 
 
 You need Node.js 18+ (or Bun 1.0+) and a PostgreSQL database. Install the SDK and apply the db migrations — the two commands below, covered in full in [Installation](./installation.md).
 
-```bash
-npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
+```package-install
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
 ```
+
+<Tabs groupId="runtime" persist items={["Node", "Bun"]}>
+<Tab value="Node">
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
   npx aiki-server migrate apply
 ```
+
+</Tab>
+<Tab value="Bun">
+
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
+  bunx aiki-server migrate apply
+```
+
+</Tab>
+</Tabs>
 
 Build the app in three pieces. They live in one file, `app.ts` — the complete listing is at the end.
 
@@ -98,9 +112,22 @@ await runtimeHandle.stop();
 
 ## Run
 
+<Tabs groupId="runtime" persist items={["Node", "Bun"]}>
+<Tab value="Node">
+
 ```bash
-npx tsx app.ts   # or: bun run app.ts
+npx tsx app.ts
 ```
+
+</Tab>
+<Tab value="Bun">
+
+```bash
+bun run app.ts
+```
+
+</Tab>
+</Tabs>
 
 You'll see:
 
@@ -182,7 +209,7 @@ await runtimeHandle.stop();
 - **Workflow** — `trialV1`: orchestrates tasks and events, tracked at every step. → [Workflows](../core-concepts/workflows.md)
 - **Event** — `paymentReceived`: `wait()` suspends with nothing held; `send()` or the 14-day timeout resumes it. → [Events](../core-concepts/events.md)
 - **Server** — `server({ db })` + `runtime.start()`: the orchestrator and its background loops. → [Server](../architecture/server.md)
-- **Client** — `client({ handler })`: the in-process connection; workers and your app both attach. → [Client](../core-concepts/client.md)
+- **Client** — `client({ handler })`: the in-process connection; workers and your app both attach. → [Client](../core-concepts/client.mdx)
 - **Worker** — `worker({...}).spawn(client)`: claims ready runs and executes them. → [Workers](../core-concepts/workers.md)
 
 Everything here runs in one process. The same workflow code runs against a separately deployed server — swap `client({ handler: aikiServer.handler })` for `client({ url: "..." })`.

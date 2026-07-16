@@ -21,8 +21,8 @@ This is the right shape when the server isn't reachable by anyone you don't trus
 
 ### 1. Install the package
 
-```bash
-npm install @aikirun/iam
+```package-install
+@aikirun/iam
 ```
 
 ### 2. Apply its schema migration
@@ -111,4 +111,4 @@ Whatever IDs your authorizer returns are the tenant IDs the server tags workflow
 ## Next Steps
 
 - **[Installation](../getting-started/installation.md)** - Environment variables for the bundled server
-- **[Client](../core-concepts/client.md)** - Client configuration, including `apiKey`
+- **[Client](../core-concepts/client.mdx)** - Client configuration, including `apiKey`

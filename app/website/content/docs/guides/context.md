@@ -45,4 +45,4 @@ Context is for values created fresh per execution. For dependencies created once
 
 - **[Dependency Injection](./dependency-injection.md)** - Inject startup dependencies into workflows and tasks
 - **[Logging](./logging.md)** - Log from workflow code with run-scoped metadata
-- **[Client](../core-concepts/client.md)** - Client configuration, including `context`
+- **[Client](../core-concepts/client.mdx)** - Client configuration, including `context`

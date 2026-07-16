@@ -54,4 +54,4 @@ The SDK logs run lifecycle (claims, execution, retries, heartbeats etc.) and com
 
 - **[Context](./context.md)** - Per-execution context for workflow runs
 - **[Dependency Injection](./dependency-injection.md)** - Inject services into workflows and tasks
-- **[Client](../core-concepts/client.md)** - Client configuration, including `logger` and `context`
+- **[Client](../core-concepts/client.mdx)** - Client configuration, including `logger` and `context`

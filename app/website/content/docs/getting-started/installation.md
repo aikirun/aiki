@@ -13,8 +13,8 @@ You need Node.js 18+ or Bun 1.0+, and a PostgreSQL 14+ database (SQLite and MySQ
 
 ### Install the SDK packages
 
-```bash
-npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
+```package-install
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
 ```
 
 ### Apply the schema migration
