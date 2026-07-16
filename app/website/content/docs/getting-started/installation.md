@@ -192,4 +192,4 @@ Which variable applies depends on how you serve the dashboard: the docker image 
 ## Next Steps
 
 - [Quick Start](/docs/getting-started/quick-start) — Create your first workflow
-- **[Your First Workflow](/docs/getting-started/first-workflow)** — A multi-step workflow with events, child workflows, and durable sleep
+- **[Workflows](/docs/core-concepts/workflows)** — Deep dive into workflow concepts
