@@ -58,8 +58,7 @@ export async function* streamTimers<Item extends Timer>(
 		until: options?.until,
 		partition: (timer) => {
 			const dueAtMs = timer.dueAt;
-			const rank = computeRank(dueAtMs);
-			return { meetsCondition: dueAtMs <= now, item: { ...timer, rank } };
+			return { meetsCondition: dueAtMs <= now, item: { ...timer, rank: computeRank(dueAtMs) } };
 		},
 	})) {
 		yield { dueNow: whenTrue, dueSoon: whenFalse };
