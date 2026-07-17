@@ -343,7 +343,7 @@ const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRu
 				.atLeastLength(1),
 			"shards?": type("string > 0").array().or("undefined"),
 			limit: "number.integer > 0",
-			"claimMinIdleTimeMs?": "number.integer > 0",
+			"previousClaimMinIdleTimeMs?": "number.integer > 0",
 		})
 	)
 	.output(

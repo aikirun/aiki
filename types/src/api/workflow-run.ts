@@ -298,9 +298,9 @@ export interface WorkflowRunClaimReadyRequestV1 {
 	limit: number;
 	/**
 	 * Steal actively executing runs whose last claim refresh was received more than
-	 * claimMinIdleTimeMs milliseconds ago. Defaults to 90 seconds.
+	 * previousClaimMinIdleTimeMs milliseconds ago. Defaults to 90 seconds.
 	 */
-	claimMinIdleTimeMs?: number;
+	previousClaimMinIdleTimeMs?: number;
 }
 
 export interface WorkflowRunClaimReadyResponseV1 {

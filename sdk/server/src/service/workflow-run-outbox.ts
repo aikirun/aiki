@@ -63,7 +63,7 @@ async function stealStaleClaimed(
 	return repo.stealStaleClaimed(
 		context.namespaceId,
 		{ workflows, shards: request.shards },
-		request.claimMinIdleTimeMs ?? DEFAULT_CLAIM_MIN_IDLE_TIME_MS,
+		request.previousClaimMinIdleTimeMs ?? DEFAULT_CLAIM_MIN_IDLE_TIME_MS,
 		request.limit
 	);
 }
