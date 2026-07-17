@@ -17,7 +17,7 @@ const aikiWorker = worker({
 });
 ```
 
-The claim endpoint atomically fetches and claims ready runs. It also recovers orphaned work by claiming runs that have been idle longer than `claimMinIdleTimeMs` (see [Fault Tolerance](#fault-tolerance)).
+The claim endpoint atomically fetches and claims ready runs. It also recovers orphaned work by stealing runs whose previous claim has been idle longer than `claimMinIdleTimeMs` (see [Workflow Run Claims](./workflow-run-claims.md)).
 
 ### HTTP Subscriber Configuration
 
@@ -25,7 +25,6 @@ The claim endpoint atomically fetches and claims ready runs. It also recovers or
 |--------|---------|-------------|
 | `intervalMs` | 1,000 | Poll interval when no work is found (ms) |
 | `maxRetryIntervalMs` | 30,000 | Max backoff on errors (ms) |
-| `claimMinIdleTimeMs` | 90,000 | Claim runs idle longer than this (ms) |
 
 ## Redis Subscriber (Optional)
 
@@ -95,9 +94,11 @@ const mySubscriber: CreateSubscriber = (context) => {
       return [];
     },
     // Optional:
-    heartbeat: async (workflowRunId) => { /* ... */ },
+    heartbeat: {
+      send: async (workflowRunId) => { /* ... */ },
+      intervalMs: 30_000,
+    },
     acknowledge: async (workflowRunId) => { /* ... */ },
-    close: async () => { /* ... */ },
   };
 };
 
@@ -113,69 +114,19 @@ The `Subscriber` interface:
 |--------|----------|-------------|
 | `getReadyRuns(limit)` | Yes | Fetch up to `limit` ready workflow runs; may block until work arrives |
 | `getNextDelay(params)` | Yes | Return milliseconds to wait before the next call (`no_work` or `retry`) |
-| `heartbeat(workflowRunId)` | No | Keep an in-flight run's claim alive in your transport (e.g. extending an SQS visibility timeout) |
+| `heartbeat` | No | `{ send, intervalMs }` — `send(workflowRunId)` renews an in-flight run in your transport (e.g. extending an SQS visibility timeout), called every `intervalMs` |
 | `acknowledge(workflowRunId)` | No | Mark a workflow run as processed in your transport |
-| `close()` | No | Cleanup when the worker shuts down |
 
 If your subscriber blocks inside `getReadyRuns` until work arrives — as the Redis subscriber does — return `0` from `getNextDelay` for `no_work`; the delay between calls only matters for polling subscribers. Give the `retry` variant a real backoff either way: it's applied when `getReadyRuns` fails, and a zero delay there means hammering a failing dependency.
 
-## Fault Tolerance
+There is no `close` hook. The factory receives a `context` whose `signal` is an `AbortSignal` that fires on worker shutdown; release resources by listening for its `abort` event, as the Redis subscriber does to disconnect.
 
-Crashed or stuck workers don't strand workflow runs. Recovery is driven by the server and works the same regardless of subscriber.
-
-### Heartbeats
-
-While executing a workflow run, the worker sends periodic heartbeats to the server to keep its claim alive. If the worker crashes, heartbeats stop and the claim eventually goes stale.
-
-Heartbeat interval is configured in worker options:
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `workflowRun.heartbeatIntervalMs` | 30,000 | How often workers refresh their claim |
-
-If a custom subscriber provides its own `heartbeat` method, the worker calls both — the server's and the subscriber's.
-
-### Work Stealing
-
-When a worker crashes mid-execution:
-
-1. The workflow run's claim goes stale (no heartbeats)
-2. After `claimMinIdleTimeMs`, the run is up for grabs again — the claim API hands it to the next claiming worker, and when a publisher is configured, the server's republish daemon also puts it back on the queue
-3. A healthy worker picks up the orphaned run
-4. The workflow re-executes from its last checkpoint
-
-### Zombie Worker Prevention
-
-Work stealing assumes the original worker is dead, but what if it's just slow? A worker that was presumed dead might wake up and try to continue executing a workflow run that another worker has already claimed.
-
-Aiki handles this through **revision-based optimistic locking**. Every workflow run has a `revision` counter that increments on each state transition. When a worker transitions a workflow run to running, the revision increments. Every subsequent operation the worker performs — state transitions, task updates — includes the `expectedRevision` it last saw. The server atomically checks that the current revision matches before applying the update.
-
-When Worker B steals a run from Worker A:
-
-1. Worker A holds the run at `revision: 5`
-2. Worker B claims the run and transitions it to running, incrementing to `revision: 6`
-3. Worker A wakes up and tries to report a task result with `expectedRevision: 5`
-4. The server rejects the update — the revision is now `6`
-5. Worker A receives a revision conflict error and stops execution cleanly
-
-This check happens at the database level in a single atomic operation (check revision + increment revision + apply update), so there's no race condition window.
-
-### Safe Re-execution
-
-When a claimed workflow re-executes:
-
-- **Tasks return cached results** - Already-completed tasks don't run again
-- **State is preserved** - The workflow resumes from its persisted state
-
-Work stealing is safe. Re-executing a workflow doesn't cause duplicate side effects for properly designed tasks.
-
-**Choosing `claimMinIdleTimeMs`**: Set this higher than the heartbeat interval. Workers refresh their claim every heartbeat, so a run only becomes "idle" when a worker stops heartbeating (crashes or hangs). The default of 90 seconds with 30-second heartbeats gives plenty of margin.
-
-### Backup Subscriber
+## Backup Subscriber
 
 When you provide a custom subscriber (including the Redis subscriber), the worker also creates a backup HTTP subscriber. If the primary subscriber fails, the worker switches to the backup to maintain availability. This ensures workflow execution continues even if an external dependency like Redis goes down.
 
 ## Next Steps
 
+- **[Workflow Run Claims](./workflow-run-claims.md)** - How runs are owned and recovered
 - **[Workers](../core-concepts/workers.md)** - Worker configuration
 - **[Overview](./overview.mdx)** - High-level architecture

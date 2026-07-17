@@ -5,6 +5,7 @@ import type {
 	WorkflowRunCancelByIdsResponseV1,
 	WorkflowRunClaimReadyRequestV1,
 	WorkflowRunClaimReadyResponseV1,
+	WorkflowRunClaimRefreshRequestV1,
 	WorkflowRunCreateRequestV1,
 	WorkflowRunCreateResponseV1,
 	WorkflowRunGetByIdRequestV1,
@@ -15,7 +16,6 @@ import type {
 	WorkflowRunGetStateResponseV1,
 	WorkflowRunHasTerminatedRequestV1,
 	WorkflowRunHasTerminatedResponseV1,
-	WorkflowRunHeartbeatRequestV1,
 	WorkflowRunListChildRunsRequestV1,
 	WorkflowRunListChildRunsResponseV1,
 	WorkflowRunListRequestV1,
@@ -343,7 +343,7 @@ const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRu
 				.atLeastLength(1),
 			"shards?": type("string > 0").array().or("undefined"),
 			limit: "number.integer > 0",
-			"claimMinIdleTimeMs?": "number.integer > 0",
+			"previousClaimMinIdleTimeMs?": "number.integer > 0",
 		})
 	)
 	.output(
@@ -352,7 +352,7 @@ const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRu
 		})
 	);
 
-const heartbeatV1: ContractProcedure<WorkflowRunHeartbeatRequestV1, void> = oc
+const claimRefreshV1: ContractProcedure<WorkflowRunClaimRefreshRequestV1, void> = oc
 	.input(
 		type({
 			id: "string > 0",
@@ -390,7 +390,7 @@ export const workflowRunContract = {
 	listChildRunsV1,
 	cancelByIdsV1,
 	claimReadyV1,
-	heartbeatV1,
+	claimRefreshV1,
 	hasTerminatedV1,
 };
 

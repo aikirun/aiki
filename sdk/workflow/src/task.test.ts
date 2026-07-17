@@ -53,8 +53,8 @@ function createTestWorkflowRun(
 			handle,
 			replayManifest: createReplayManifest(record),
 			configProvider: asConfigProvider(() => ({
+				claimRefreshIntervalMs: 30_000,
 				spinThresholdMs: options.spinThresholdMs ?? 10,
-				heartbeatIntervalMs: 30_000,
 			})),
 		},
 	};

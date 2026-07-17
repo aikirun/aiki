@@ -5,7 +5,6 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	CLAIM_KEEPALIVE_INTERVAL_MS,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -26,13 +25,19 @@ export interface ExecuteWorkflowParams<Context> {
 	workflowRun: WorkflowRunRecord;
 	workflowVersion: AnyWorkflowVersion;
 	logger: Logger;
-	configProvider: ConfigProvider<Required<WorkflowExecutionConfig>>;
-	heartbeat?: () => Promise<void>;
+	configProvider: ConfigProvider<WorkflowExecutionConfig>;
+	heartbeat?: {
+		send: () => Promise<void>;
+		intervalMs: number | (() => number);
+	};
 	signal?: AbortSignal;
 }
 
 export interface WorkflowExecutionConfig {
-	heartbeatIntervalMs?: number;
+	/**
+	 * Interval at which a worker refreshes its claim on a workflow run it is executing.
+	 */
+	claimRefreshIntervalMs: number;
 	/**
 	 * Threshold for spinning vs persisting task retry delays (default: 10ms).
 	 *
@@ -41,21 +46,21 @@ export interface WorkflowExecutionConfig {
 	 *
 	 * Set to 0 to record all task delays in transition history.
 	 */
-	spinThresholdMs?: number;
+	spinThresholdMs: number;
 }
 
 export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
 	const { client, workflowRun, workflowVersion, logger, configProvider, heartbeat, signal } = params;
 	const workflowRunId = workflowRun.id as WorkflowRunId;
 
-	const heartbeats: Array<{ stop: () => void }> = [];
+	const intervals: Array<{ stop: () => void }> = [];
 	try {
-		heartbeats.push(
-			runOnInterval(() => client.api.workflowRun.heartbeatV1({ id: workflowRunId }), {
-				intervalMs: CLAIM_KEEPALIVE_INTERVAL_MS,
+		intervals.push(
+			runOnInterval(() => client.api.workflowRun.claimRefreshV1({ id: workflowRunId }), {
+				intervalMs: () => configProvider.config.claimRefreshIntervalMs,
 				onError: (error: Error): void => {
 					if (!signal?.aborted) {
-						logger.warn("Failed to send heartbeat to keep claim alive", {
+						logger.warn("Failed to refresh claim", {
 							"aiki.error": error.message,
 						});
 					}
@@ -64,9 +69,9 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 			})
 		);
 		if (heartbeat) {
-			heartbeats.push(
-				runOnInterval(heartbeat, {
-					intervalMs: () => configProvider.config.heartbeatIntervalMs,
+			intervals.push(
+				runOnInterval(heartbeat.send, {
+					intervalMs: heartbeat.intervalMs,
 					onError: (error: Error): void => {
 						if (!signal?.aborted) {
 							logger.warn("Failed to send heartbeat", {
@@ -82,7 +87,8 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
 		const handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
 
-		const context = client[INTERNAL].context ? client[INTERNAL].context(workflowRun) : null;
+		const createContext = client[INTERNAL].context;
+		const context = createContext ? createContext(workflowRun) : null;
 
 		await workflowVersion[INTERNAL].handler(
 			{
@@ -121,8 +127,8 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		});
 		return false;
 	} finally {
-		for (const heartbeat of heartbeats) {
-			heartbeat.stop();
+		for (const interval of intervals) {
+			interval.stop();
 		}
 	}
 }

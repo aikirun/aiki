@@ -106,7 +106,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 			return { runs: await workflowRunOutboxService.claimReady(context, request) };
 		}),
 
-		heartbeatV1: os.heartbeatV1.handler(async ({ input: request, context }) => {
+		claimRefreshV1: os.claimRefreshV1.handler(async ({ input: request, context }) => {
 			await workflowRunOutboxService.reclaim(context, request.id as WorkflowRunId);
 		}),
 

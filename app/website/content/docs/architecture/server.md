@@ -30,7 +30,7 @@ When a workflow run becomes ready, the server records it in an **outbox** — th
 
 See [Subscribers](./subscribers.md) for the worker side of this.
 
-## Background Jobs
+## Background Daemons
 
 The runtime's daemons drive workflow state transitions:
 
@@ -44,10 +44,10 @@ The runtime's daemons drive workflow state transitions:
 | Child wait timeouts | Resume workflows that timed out waiting for child workflows |
 | Recurring schedules | Create new runs for cron and interval schedules |
 | Publish ready runs | Publish pending outbox entries to the work queue |
-| Republish stale runs | Re-publish runs whose worker stopped heartbeating |
+| Republish stale runs | Re-publish runs whose worker stopped refreshing its claim |
 | Due-timers consumer | Fire near-term timers from the timer priority queue (when configured) |
 
-The two publishing daemons run only when a publisher is configured. Without one, workers claim work directly from the outbox, and stale claims are recovered by the claim API itself.
+The two publishing daemons run only when a publisher is configured. Without one, workers claim work directly from the outbox, and stale claims are recovered by the claim API itself (see [Workflow Run Claims](./workflow-run-claims.md)).
 
 By default, due work is detected by periodic database scans. Configuring a **timer priority queue** (`@aikirun/redis`) promotes near-term timers into a sorted queue that fires them with sub-second precision.
 
@@ -87,4 +87,5 @@ For the bundled standalone server's environment variables, see the [Installation
 ## Next Steps
 
 - **[Subscribers](./subscribers.md)** - How workers discover work
+- **[Runtime Configuration](../guides/configuration.md)** - Tune the runtime's, statically or live
 - **[Overview](./overview.mdx)** - High-level architecture

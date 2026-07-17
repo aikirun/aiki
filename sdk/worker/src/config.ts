@@ -1,13 +1,12 @@
 import { asConfigProvider, type CreateConfigProvider, dynamicConfigProvider } from "@aikirun/lib/config";
 import { type DeepPartial, merge } from "@aikirun/lib/object";
+import { CLAIM_REFRESH_INTERVAL_MS } from "@aikirun/types/workflow";
+import type { WorkflowExecutionConfig } from "@aikirun/workflow";
 
 export interface WorkerConfig {
 	maxConcurrentWorkflowRuns: number;
 	gracefulShutdownTimeoutMs: number;
-	workflowRun: {
-		heartbeatIntervalMs: number;
-		spinThresholdMs: number;
-	};
+	workflowRun: WorkflowExecutionConfig;
 }
 
 export type WorkerConfigOverrides = DeepPartial<WorkerConfig>;
@@ -16,7 +15,7 @@ export const defaultWorkerConfig: WorkerConfig = {
 	maxConcurrentWorkflowRuns: 1,
 	gracefulShutdownTimeoutMs: 5_000,
 	workflowRun: {
-		heartbeatIntervalMs: 30_000,
+		claimRefreshIntervalMs: CLAIM_REFRESH_INTERVAL_MS,
 		spinThresholdMs: 10,
 	},
 };

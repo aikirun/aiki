@@ -32,7 +32,7 @@ Worker definitions are static and reusable. The `worker()` function creates a de
 
 When you call `spawn()`, the worker begins discovering ready workflow runs through its subscriber — claiming them from the server by default. When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
 
-During execution, the worker sends periodic heartbeats to maintain its claim on the run. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the claim expires after a configurable idle time (default: 90 seconds) and the run is handed to a healthy worker. The workflow then re-executes from its last checkpoint.
+During execution, the worker periodically refreshes its claim on the run. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the claim expires after a configurable idle time (default: 90 seconds) and the run is handed to a healthy worker. The workflow then re-executes from its last checkpoint. [Workflow Run Claims](../architecture/workflow-run-claims.md) covers this ownership and recovery in full.
 
 When execution completes or fails, the worker reports the terminal state to the server.
 
@@ -84,7 +84,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 |--------|---------|-------------|
 | `maxConcurrentWorkflowRuns` | 1 | Max parallel executions |
 | `gracefulShutdownTimeoutMs` | 5,000 | Shutdown wait time (ms) |
-| `workflowRun.heartbeatIntervalMs` | 30,000 | Heartbeat frequency (ms) |
+| `workflowRun.claimRefreshIntervalMs` | 30,000 | How often the worker refreshes its run claim (ms) |
 | `shards` | — | Shards to process |
 
 ## Pluggable Subscribers
@@ -111,3 +111,4 @@ You can also implement your own subscriber by providing a function that matches 
 - **[Client](./client.mdx)** — Connect to Aiki server
 - **[Workflows](./workflows.md)** — Define workflow logic
 - **[Tasks](./tasks.md)** — Create reusable task units
+- **[Workflow Run Claims](../architecture/workflow-run-claims.md)** — How runs are owned and recovered

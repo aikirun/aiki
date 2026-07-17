@@ -290,18 +290,18 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 	private async handler(run: WorkflowRun<Input, Context, TEvents>, input: Input): Promise<void> {
 		const { logger } = run;
-		const { handle } = run[INTERNAL];
+		const { assertExecutionAllowed, transitionState } = run[INTERNAL].handle[INTERNAL];
 
-		handle[INTERNAL].assertExecutionAllowed();
+		assertExecutionAllowed();
 
 		const retryStrategy = run.options.retry ?? this.params.retry ?? { type: "never" };
 
 		logger.info("Starting workflow");
-		await handle[INTERNAL].transitionState({ status: "running" });
+		await transitionState({ status: "running" });
 
 		const output = await this.tryExecuteWorkflow(input, run, retryStrategy);
 
-		await handle[INTERNAL].transitionState({ status: "completed", output });
+		await transitionState({ status: "completed", output });
 		logger.info("Workflow complete");
 	}
 
