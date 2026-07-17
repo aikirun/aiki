@@ -43,7 +43,7 @@
 		"build:dashboard": "bun run --cwd app/dashboard build",
 		"build:website": "bun run --cwd app/website build",
 		"build:cli": "bun run --cwd cli build",
-		"build:all": "bun run --filter='*' build",
+		"build": "bun run --filter='*' build",
 		"docker:build": "docker compose build",
 		"docker:up": "docker compose up -d",
 		"docker:down": "docker compose down",

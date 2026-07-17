@@ -39,4 +39,4 @@ jobs:
       - uses: ./.github/actions/check-migrations
 
       - name: Build
-        run: bun run build:all
+        run: bun run build
