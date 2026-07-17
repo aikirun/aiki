@@ -85,7 +85,9 @@ bun run check && bun run lint && bun test
 ```
 
 A Husky pre-commit hook auto-formats staged files with Biome, so formatting is
-handled for you on commit.
+handled for you on commit. A pre-push hook runs `bun run check` (type checking)
+before your changes leave your machine; commits stay fast so you can freely save
+work in progress.
 
 ## TODO — planned additions to this guide
 

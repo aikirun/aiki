@@ -15,6 +15,7 @@
 		"esModuleInterop": true,
 		"verbatimModuleSyntax": true,
 		"noEmit": true,
+		"incremental": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"strict": true
