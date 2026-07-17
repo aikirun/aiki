@@ -57,13 +57,13 @@
 		]
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.9",
-		"@types/node": "^22.10.2",
+		"@biomejs/biome": "2.5.4",
+		"@types/node": "^26.1.1",
 		"bun-types": "^1.1.38",
 		"husky": "^9.1.7",
-		"lint-staged": "^16.2.7",
+		"lint-staged": "^17.0.8",
 		"tsup": "^8.5.1",
-		"typescript": "^5.7.2"
+		"typescript": "^7.0.2"
 	},
 	"overrides": {
 		"better-auth": "1.6.11"
