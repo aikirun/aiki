@@ -5,7 +5,7 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	CLAIM_KEEPALIVE_INTERVAL_MS,
+	CLAIM_REFRESH_INTERVAL_MS,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -52,7 +52,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 	try {
 		heartbeats.push(
 			runOnInterval(() => client.api.workflowRun.heartbeatV1({ id: workflowRunId }), {
-				intervalMs: CLAIM_KEEPALIVE_INTERVAL_MS,
+				intervalMs: CLAIM_REFRESH_INTERVAL_MS,
 				onError: (error: Error): void => {
 					if (!signal?.aborted) {
 						logger.warn("Failed to send heartbeat to keep claim alive", {
