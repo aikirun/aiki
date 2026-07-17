@@ -56,7 +56,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 	const intervals: Array<{ stop: () => void }> = [];
 	try {
 		intervals.push(
-			runOnInterval(() => client.api.workflowRun.heartbeatV1({ id: workflowRunId }), {
+			runOnInterval(() => client.api.workflowRun.claimRefreshV1({ id: workflowRunId }), {
 				intervalMs: () => configProvider.config.claimRefreshIntervalMs,
 				onError: (error: Error): void => {
 					if (!signal?.aborted) {

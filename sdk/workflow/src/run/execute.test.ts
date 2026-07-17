@@ -196,8 +196,8 @@ describe("executeWorkflowRun", () => {
 				const firstClaimRefresh = new Promise<void>((resolve) => {
 					resolveFirstClaimRefresh = resolve;
 				});
-				client.api.workflowRun.heartbeatV1.onNextCall(resolveFirstClaimRefresh);
-				client.api.workflowRun.heartbeatV1.once({ id: workflowRun.id });
+				client.api.workflowRun.claimRefreshV1.onNextCall(resolveFirstClaimRefresh);
+				client.api.workflowRun.claimRefreshV1.once({ id: workflowRun.id });
 
 				// The handler blocks until the first claim refresh fires.
 				const workflowVersion = fakeWorkflowVersion(async () => {

@@ -47,7 +47,7 @@ export interface WorkflowRunApi {
 	listChildRunsV1: (_: WorkflowRunListChildRunsRequestV1) => Promise<WorkflowRunListChildRunsResponseV1>;
 	cancelByIdsV1: (_: WorkflowRunCancelByIdsRequestV1) => Promise<WorkflowRunCancelByIdsResponseV1>;
 	claimReadyV1: (_: WorkflowRunClaimReadyRequestV1) => Promise<WorkflowRunClaimReadyResponseV1>;
-	heartbeatV1: (_: WorkflowRunHeartbeatRequestV1) => Promise<void>;
+	claimRefreshV1: (_: WorkflowRunClaimRefreshRequestV1) => Promise<void>;
 	hasTerminatedV1: (_: WorkflowRunHasTerminatedRequestV1) => Promise<WorkflowRunHasTerminatedResponseV1>;
 }
 
@@ -297,7 +297,7 @@ export interface WorkflowRunClaimReadyRequestV1 {
 	shards?: string[];
 	limit: number;
 	/**
-	 * Steal actively executing runs whose last heartbeat was received more than
+	 * Steal actively executing runs whose last claim refresh was received more than
 	 * claimMinIdleTimeMs milliseconds ago. Defaults to 90 seconds.
 	 */
 	claimMinIdleTimeMs?: number;
@@ -307,7 +307,7 @@ export interface WorkflowRunClaimReadyResponseV1 {
 	runs: Array<{ id: string }>;
 }
 
-export interface WorkflowRunHeartbeatRequestV1 {
+export interface WorkflowRunClaimRefreshRequestV1 {
 	id: string;
 }
 
