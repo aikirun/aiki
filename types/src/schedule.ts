@@ -2,7 +2,7 @@ import type { WorkflowStartOptions } from "./workflow/run";
 
 export type ScheduleId = string & { _brand: "schedule_id" };
 
-export const SCHEDULE_STATUSES = ["active", "paused", "deleted"] as const;
+export const SCHEDULE_STATUSES = ["active", "paused", "inactive"] as const;
 export type ScheduleStatus = (typeof SCHEDULE_STATUSES)[number];
 
 export const SCHEDULE_TYPES = ["cron", "interval"] as const;

@@ -1,4 +1,9 @@
-import type { Schedule, ScheduledWorkflowStartOptions, ScheduleStatus } from "@aikirun/types/schedule";
+import {
+	SCHEDULE_STATUSES,
+	type Schedule,
+	type ScheduledWorkflowStartOptions,
+	type ScheduleStatus,
+} from "@aikirun/types/schedule";
 import { useQueryClient } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
@@ -12,7 +17,6 @@ import { SCHEDULE_STATUS_CONFIG } from "../constants/schedule-status";
 import { useDebounce } from "../hooks/useDebounce";
 import { useElementWidth } from "../hooks/useElementWidth";
 
-const ALL_SCHEDULE_STATUSES: ScheduleStatus[] = ["active", "paused", "deleted"];
 const PAGE_SIZE = 25;
 
 // --- Shared styles ---
@@ -260,10 +264,10 @@ export function SchedulesList() {
 		});
 	};
 
-	const handleAction = async (action: "pause" | "resume" | "delete", id: string) => {
+	const handleAction = async (action: "pause" | "resume" | "deactivate", id: string) => {
 		if (action === "pause") await namespaceAuthedClient.schedule.pauseV1({ id });
 		else if (action === "resume") await namespaceAuthedClient.schedule.resumeV1({ id });
-		else if (action === "delete") await namespaceAuthedClient.schedule.deleteV1({ id });
+		else if (action === "deactivate") await namespaceAuthedClient.schedule.deactivateV1({ id });
 		queryClient.invalidateQueries({ queryKey: ["schedules"] });
 	};
 
@@ -325,7 +329,7 @@ export function SchedulesList() {
 
 				{/* Status chips */}
 				<div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-					{ALL_SCHEDULE_STATUSES.map((status) => {
+					{SCHEDULE_STATUSES.map((status) => {
 						const config = SCHEDULE_STATUS_CONFIG[status];
 						const isActive = selectedStatuses.includes(status);
 						return (
@@ -474,7 +478,7 @@ function ScheduleRow({
 	runCount: number;
 	idx: number;
 	onViewRuns: (id: string) => void;
-	onAction: (action: "pause" | "resume" | "delete", id: string) => void;
+	onAction: (action: "pause" | "resume" | "deactivate", id: string) => void;
 }) {
 	const [open, setOpen] = useState(false);
 	const [rowRef, rowWidth] = useElementWidth<HTMLDivElement>();
@@ -725,12 +729,12 @@ function ScheduleRow({
 								onClick={() => onAction("resume", schedule.id)}
 							/>
 						)}
-						{schedule.status !== "deleted" && (
+						{schedule.status !== "inactive" && (
 							<ActionBtn
-								label="Delete"
+								label="Deactivate"
 								color="#F87171"
 								textColor="var(--accent-red)"
-								onClick={() => onAction("delete", schedule.id)}
+								onClick={() => onAction("deactivate", schedule.id)}
 							/>
 						)}
 						<div style={{ flex: 1 }} />

@@ -43,6 +43,13 @@
 			"when": 1783488137230,
 			"tag": "0005_special_stark_industries",
 			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1784323806032,
+			"tag": "0006_curved_giant_man",
+			"breakpoints": true
 		}
 	]
 }

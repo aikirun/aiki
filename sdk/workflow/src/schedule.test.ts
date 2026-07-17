@@ -182,19 +182,19 @@ describe("schedule", () => {
 				await handle.resume();
 			}));
 
-		test("delete calls deleteV1 with the schedule id", () =>
+		test("deactivate calls deactivateV1 with the schedule id", () =>
 			withFakeClient(async (client) => {
 				const activatedSchedule = intervalScheduleFactory.build();
 
 				client.api.schedule.activateV1.once(expect.anything(), { schedule: activatedSchedule });
-				client.api.schedule.deleteV1.once({ id: activatedSchedule.id });
+				client.api.schedule.deactivateV1.once({ id: activatedSchedule.id });
 
 				const handle = await schedule({ type: "interval", every: { seconds: 1 } }).activate(
 					client,
 					syncInventoryWorkflow,
 					{ warehouseId: "wh-1" }
 				);
-				await handle.delete();
+				await handle.deactivate();
 			}));
 	});
 });

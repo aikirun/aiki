@@ -18,9 +18,9 @@ export const SCHEDULE_STATUS_CONFIG: Record<
 		textColor: "var(--accent-amber)",
 		glyph: "❙❙",
 	},
-	deleted: {
-		label: "Deleted",
-		color: SCHEDULE_STATUS_COLORS.deleted,
+	inactive: {
+		label: "Inactive",
+		color: SCHEDULE_STATUS_COLORS.inactive,
 		textColor: "var(--accent-gray)",
 		glyph: "⊘",
 	},

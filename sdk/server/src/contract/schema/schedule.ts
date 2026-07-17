@@ -20,7 +20,7 @@ export const intervalScheduleSpecSchema = type({
 
 export const scheduleSpecSchema = cronScheduleSpecSchema.or(intervalScheduleSpecSchema);
 
-export const scheduleStatusSchema = type("'active' | 'paused' | 'deleted'");
+export const scheduleStatusSchema = type("'active' | 'paused' | 'inactive'");
 
 export const scheduleReferenceSchema = type({
 	id: "string > 0",

@@ -30,8 +30,8 @@ export function createScheduleRouter(scheduleService: ScheduleService) {
 			await scheduleService.resumeSchedule(context.namespaceId, request.id);
 		}),
 
-		deleteV1: os.deleteV1.handler(async ({ input: request, context }) => {
-			await scheduleService.deleteSchedule(context.namespaceId, request.id);
+		deactivateV1: os.deactivateV1.handler(async ({ input: request, context }) => {
+			await scheduleService.deactivateSchedule(context.namespaceId, request.id);
 		}),
 	});
 }
