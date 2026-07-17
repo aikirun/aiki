@@ -1,6 +1,7 @@
 import { createConsoleLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
+import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
 
 import { expect, type Mock, mock } from "bun:test";
 
@@ -62,7 +63,7 @@ interface RegisteredEndpoint {
  *
  * Use it through {@link withFakeClient}, which calls `verify()` for you on success:
  */
-function fakeClient<Context = null>(): FakeClient<Context> {
+function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): FakeClient<Context> {
 	const endpoints: RegisteredEndpoint[] = [];
 
 	const createEndpoint = (endpointName: string): unknown => {
@@ -149,10 +150,17 @@ function fakeClient<Context = null>(): FakeClient<Context> {
 	return {
 		api,
 		logger: createConsoleLogger({ level: "DEBUG" }),
-		[INTERNAL]: {},
+		[INTERNAL]: options.context ? { context: options.context } : {},
 		verify,
 	};
 }
+
+/** Configures a fake client. `context` supplies the per-run context factory the SDK reads from the client. */
+export interface FakeClientOptions<Context> {
+	context?: (run: WorkflowRunRecord) => Context | Promise<Context>;
+}
+
+type FakeClientFn<Context> = (client: Omit<FakeClient<Context>, "verify">) => Promise<void> | void;
 
 /**
  * Runs `fn` with a fresh fake client, then asserts every queued call was made.
@@ -167,10 +175,20 @@ function fakeClient<Context = null>(): FakeClient<Context> {
  *     await schedule(params).activate(client, workflow, input);
  *   }));
  */
-export async function withFakeClient<Context = null>(
-	fn: (client: Omit<FakeClient<Context>, "verify">) => Promise<void> | void
+export async function withFakeClient<Context = null>(fn: FakeClientFn<Context>): Promise<void>;
+export async function withFakeClient<Context>(
+	options: FakeClientOptions<Context>,
+	fn: FakeClientFn<Context>
+): Promise<void>;
+export async function withFakeClient<Context>(
+	optionsOrFn: FakeClientOptions<Context> | FakeClientFn<Context>,
+	maybeFn?: FakeClientFn<Context>
 ): Promise<void> {
-	const client = fakeClient<Context>();
-	await fn(client);
+	const options = typeof optionsOrFn === "function" ? {} : optionsOrFn;
+	const fn = typeof optionsOrFn === "function" ? optionsOrFn : maybeFn;
+	const client = fakeClient<Context>(options);
+	if (fn) {
+		await fn(client);
+	}
 	client.verify();
 }

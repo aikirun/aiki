@@ -82,7 +82,8 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
 		const handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
 
-		const context = client[INTERNAL].context ? client[INTERNAL].context(workflowRun) : null;
+		const createContext = client[INTERNAL].context;
+		const context = createContext ? createContext(workflowRun) : null;
 
 		await workflowVersion[INTERNAL].handler(
 			{
