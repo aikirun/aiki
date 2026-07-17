@@ -315,8 +315,8 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 		}
 	},
 
-	async deleteSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, { id }, { status: "deleted" });
+	async deactivateSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
+		const schedule = await repos.schedule.update(namespaceId, { id }, { status: "inactive" });
 		if (!schedule) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}

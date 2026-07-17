@@ -3,7 +3,7 @@ import type {
 	ScheduleActivateRequestV1,
 	ScheduleActivateResponseV1,
 	ScheduleApi,
-	ScheduleDeleteRequestV1,
+	ScheduleDeactivateRequestV1,
 	ScheduleGetByIdRequestV1,
 	ScheduleGetByIdResponseV1,
 	ScheduleGetByReferenceIdRequestV1,
@@ -79,7 +79,7 @@ const resumeV1: ContractProcedure<ScheduleResumeRequestV1, void> = oc
 	.input(type({ id: "string > 0" }))
 	.output(type("undefined"));
 
-const deleteV1: ContractProcedure<ScheduleDeleteRequestV1, void> = oc
+const deactivateV1: ContractProcedure<ScheduleDeactivateRequestV1, void> = oc
 	.input(type({ id: "string > 0" }))
 	.output(type("undefined"));
 
@@ -90,7 +90,7 @@ export const scheduleContract = {
 	listV1,
 	pauseV1,
 	resumeV1,
-	deleteV1,
+	deactivateV1,
 };
 
 export type ScheduleContract = typeof scheduleContract;

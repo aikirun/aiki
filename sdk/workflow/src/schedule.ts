@@ -33,7 +33,7 @@ export interface ScheduleHandle {
 	id: ScheduleId;
 	pause(): Promise<void>;
 	resume(): Promise<void>;
-	delete(): Promise<void>;
+	deactivate(): Promise<void>;
 }
 
 type ScheduleBuilderActivateOptions = ScheduleActivateOptions & {
@@ -112,8 +112,8 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 				await client.api.schedule.resumeV1({ id: scheduleId });
 			},
 
-			delete: async () => {
-				await client.api.schedule.deleteV1({ id: scheduleId });
+			deactivate: async () => {
+				await client.api.schedule.deactivateV1({ id: scheduleId });
 			},
 		};
 	}

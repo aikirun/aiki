@@ -35,7 +35,7 @@ export const TASK_STATUS_GLYPHS: Record<TaskStatus, string> = {
 export const SCHEDULE_STATUS_COLORS: Record<ScheduleStatus, string> = {
 	active: "#10B981",
 	paused: "#F59E0B",
-	deleted: "#6B7280",
+	inactive: "#6B7280",
 };
 
 export const API_KEY_STATUS_COLORS: Record<string, string> = {

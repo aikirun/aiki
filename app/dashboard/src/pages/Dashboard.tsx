@@ -384,12 +384,12 @@ function ScheduleRow({ schedule, runCount }: { schedule: Schedule; runCount: num
 		}
 	};
 
-	const handleDelete = async (e: React.MouseEvent) => {
+	const handleDeactivate = async (e: React.MouseEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
 		setIsActioning(true);
 		try {
-			await namespaceAuthedClient.schedule.deleteV1({ id: schedule.id });
+			await namespaceAuthedClient.schedule.deactivateV1({ id: schedule.id });
 			queryClient.invalidateQueries({ queryKey: ["schedules"] });
 		} finally {
 			setIsActioning(false);
@@ -398,7 +398,7 @@ function ScheduleRow({ schedule, runCount }: { schedule: Schedule; runCount: num
 
 	const canPause = schedule.status === "active";
 	const canResume = schedule.status === "paused";
-	const canDelete = schedule.status !== "deleted";
+	const canDeactivate = schedule.status !== "inactive";
 
 	const referenceId = schedule.options?.reference?.id;
 
@@ -465,14 +465,14 @@ function ScheduleRow({ schedule, runCount }: { schedule: Schedule; runCount: num
 							Resume
 						</button>
 					)}
-					{canDelete && (
+					{canDeactivate && (
 						<button
 							type="button"
-							onClick={handleDelete}
+							onClick={handleDeactivate}
 							disabled={isActioning}
 							className="px-2 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
 						>
-							Delete
+							Deactivate
 						</button>
 					)}
 				</div>
