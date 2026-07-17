@@ -19,7 +19,7 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"@orpc/client": "^1.9.3"
+		"@orpc/client": "^1.14.8"
 	},
 	"devDependencies": {
 		"@aikirun/lib": "workspace:*"
