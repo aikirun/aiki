@@ -48,9 +48,9 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 	const { client, workflowRun, workflowVersion, logger, configProvider, heartbeat, signal } = params;
 	const workflowRunId = workflowRun.id as WorkflowRunId;
 
-	const heartbeats: Array<{ stop: () => void }> = [];
+	const intervals: Array<{ stop: () => void }> = [];
 	try {
-		heartbeats.push(
+		intervals.push(
 			runOnInterval(() => client.api.workflowRun.heartbeatV1({ id: workflowRunId }), {
 				intervalMs: CLAIM_REFRESH_INTERVAL_MS,
 				onError: (error: Error): void => {
@@ -64,7 +64,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 			})
 		);
 		if (heartbeat) {
-			heartbeats.push(
+			intervals.push(
 				runOnInterval(heartbeat, {
 					intervalMs: () => configProvider.config.heartbeatIntervalMs,
 					onError: (error: Error): void => {
@@ -122,8 +122,8 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		});
 		return false;
 	} finally {
-		for (const heartbeat of heartbeats) {
-			heartbeat.stop();
+		for (const interval of intervals) {
+			interval.stop();
 		}
 	}
 }
