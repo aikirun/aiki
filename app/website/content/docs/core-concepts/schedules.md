@@ -125,7 +125,7 @@ Only `retry` and `shard` can be set: a scheduled run's reference ID and trigger 
 
 Calling `activate()` is idempotent. If a schedule already exists with the same parameters, the existing schedule is returned unchanged.
 
-If you call `activate()` with a **different input or timing configuration** (such as a new cron expression or interval), that is a different schedule identity: you are activating a new schedule, not modifying the first. A schedule's definition is immutable — there is no in-place edit. To change the timing or input, activate the new definition (a new schedule) and [delete](#managing-schedules) the old one. A [reference ID](#reference-ids) gives a schedule a stable identity for lookups.
+If you call `activate()` with a **different input or timing configuration** (such as a new cron expression or interval), that is a different schedule identity: you are activating a new schedule, not modifying the first. A schedule's definition is immutable — there is no in-place edit. To change the timing or input, activate the new definition (a new schedule) and [deactivate](#managing-schedules) the old one. A [reference ID](#reference-ids) gives a schedule a stable identity for lookups.
 
 ## Reference IDs
 
@@ -170,9 +170,9 @@ The handle returned from `activate()` lets you manage the schedule:
 ```typescript
 const handle = await mySchedule.activate(aikiClient, workflowV1);
 
-await handle.pause();  // Stop triggering
-await handle.resume(); // Resume triggering
-await handle.delete(); // Remove schedule
+await handle.pause();      // Stop triggering
+await handle.resume();     // Resume triggering
+await handle.deactivate(); // Deactivate schedule
 ```
 
 | Property/Method | Description |
@@ -180,7 +180,7 @@ await handle.delete(); // Remove schedule
 | `id` | Unique identifier for this schedule |
 | `pause()` | Stop triggering |
 | `resume()` | Resume triggering |
-| `delete()` | Remove schedule |
+| `deactivate()` | Deactivate schedule |
 
 ## Multi-Tenant Schedules
 
