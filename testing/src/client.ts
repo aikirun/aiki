@@ -7,15 +7,16 @@ import { expect, type Mock, mock } from "bun:test";
 
 type MockEndpoint<Args extends unknown[], Return> = Mock<(...args: Args) => Return> & {
 	/**
-	 * Queues a single expected call: the next call to this endpoint asserts its request
-	 * `toEqual`s `request` and resolves with `response`. Each `once` covers exactly one call;
-	 * queue several to expect several calls, matched in order.
+	 * Queues a single expected call: the Nth call to this endpoint is paired with the
+	 * Nth `once` and resolves with `response`. Queue several to expect several calls.
 	 *
 	 * The match is EXACT by default — every field must be accounted for. For a partial match,
 	 * pass an asymmetric matcher, e.g. `expect.objectContaining({ ... })` or `expect.anything()`.
 	 *
-	 * A queued `once` that is never called fails `verify()`.
-	 * A call with no queued expectation throws.
+	 * A call with no expectation throws immediately. Separately, `verify()` compares the
+	 * expected calls against the calls actually made — position by position — and reports any that
+	 * were missing, unexpected, or sent with the wrong request. So a mismatch is caught even for a
+	 * fire-and-forget call whose inline throw is swallowed by the caller.
 	 *
 	 * The `response` argument is omitted for endpoints that resolve to `void`.
 	 */
@@ -25,9 +26,8 @@ type MockEndpoint<Args extends unknown[], Return> = Mock<(...args: Args) => Retu
 	): MockEndpoint<Args, Return>;
 
 	/**
-	 * Queues a single expected call that rejects: the next call to this endpoint asserts its
-	 * request `toEqual`s `request`, then throws `error`. Request matching and `verify()`
-	 * accounting are identical to {@link once}; only the outcome differs.
+	 * Queues a single expected call that rejects: matched like {@link once}, but throws `error`
+	 * instead of resolving.
 	 */
 	rejectsOnce(request: Args[0], error: unknown): MockEndpoint<Args, Return>;
 };
@@ -40,25 +40,31 @@ type MockApi<T> = {
 export interface FakeClient<Context = null> extends Client<Context> {
 	api: MockApi<ApiClient>;
 	/**
-	 * Throws if any call queued via `once` was never made.
+	 * Throws unless the calls made match the expected calls via `once`/`rejectsOnce`, in order —
+	 * reporting any that were missing, unexpected, or sent with the wrong request.
 	 */
 	verify(): void;
 }
 
-type QueuedCallResult = { type: "resolve"; response: unknown } | { type: "reject"; error: unknown };
+type ExpectedCallResult = { type: "resolve"; response: unknown } | { type: "reject"; error: unknown };
 
-interface QueuedCall {
+interface ExpectedCall {
 	request: unknown;
-	result: QueuedCallResult;
+	result: ExpectedCallResult;
+}
+
+interface ActualCall {
+	request: unknown;
 }
 
 interface RegisteredEndpoint {
 	name: string;
-	queuedCalls: QueuedCall[];
+	expectedCalls: ExpectedCall[];
+	actualCalls: ActualCall[];
 }
 
 /**
- * A `Client` whose every API endpoint is an auto-created mock augmented with `once`.
+ * A `Client` whose every API endpoint is an auto-created mock augmented with `once` and `rejectsOnce`.
  * Queue the calls a test expects; any call with no queued expectation throws.
  *
  * Use it through {@link withFakeClient}, which calls `verify()` for you on success:
@@ -67,30 +73,33 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 	const endpoints: RegisteredEndpoint[] = [];
 
 	const createEndpoint = (endpointName: string): unknown => {
-		const queuedCalls: QueuedCall[] = [];
-		endpoints.push({ name: endpointName, queuedCalls });
+		const expectedCalls: ExpectedCall[] = [];
+		const actualCalls: ActualCall[] = [];
+		endpoints.push({ name: endpointName, expectedCalls, actualCalls });
 
-		const handler = async (actual: unknown) => {
-			const call = queuedCalls.shift();
-			if (call === undefined) {
-				throw new Error(`Fake client: unexpected call to ${endpointName}(${Bun.inspect(actual)})`);
+		const handler = async (actualRequest: unknown) => {
+			actualCalls.push({ request: actualRequest });
+
+			const expectedCall = expectedCalls[actualCalls.length - 1];
+			if (expectedCall === undefined) {
+				throw new Error(`Fake client: unexpected call to ${endpointName}(${Bun.inspect(actualRequest)})`);
 			}
-			expect(actual).toEqual(call.request);
-			if (call.result.type === "reject") {
-				throw call.result.error;
+			expect(actualRequest).toEqual(expectedCall.request);
+			if (expectedCall.result.type === "reject") {
+				throw expectedCall.result.error;
 			}
-			return call.result.response;
+			return expectedCall.result.response;
 		};
 		const endpoint = mock(handler) as Mock<typeof handler> & {
 			once: (request: unknown, response?: unknown) => unknown;
 			rejectsOnce: (request: unknown, error: unknown) => unknown;
 		};
 		endpoint.once = (request, response) => {
-			queuedCalls.push({ request, result: { type: "resolve", response } });
+			expectedCalls.push({ request, result: { type: "resolve", response } });
 			return endpoint;
 		};
 		endpoint.rejectsOnce = (request, error) => {
-			queuedCalls.push({ request, result: { type: "reject", error } });
+			expectedCalls.push({ request, result: { type: "reject", error } });
 			return endpoint;
 		};
 
@@ -139,11 +148,30 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 	) as MockApi<ApiClient>;
 
 	const verify = () => {
-		const unconsumed = endpoints
-			.filter((endpoint) => endpoint.queuedCalls.length > 0)
-			.flatMap((endpoint) => endpoint.queuedCalls.map((call) => `${endpoint.name}(${Bun.inspect(call.request)})`));
-		if (unconsumed.length > 0) {
-			throw new Error(`Fake client: expected calls were never made: ${unconsumed.join(", ")}`);
+		const problems: string[] = [];
+		for (const { name, expectedCalls, actualCalls } of endpoints) {
+			const count = Math.max(expectedCalls.length, actualCalls.length);
+			for (let i = 0; i < count; i++) {
+				const expectedCall = expectedCalls[i];
+				const actualCall = actualCalls[i];
+
+				if (expectedCall === undefined) {
+					problems.push(`unexpected call to ${name}(${Bun.inspect(actualCall?.request)})`);
+				} else if (actualCall === undefined) {
+					problems.push(`expected call to ${name}(${Bun.inspect(expectedCall.request)}) was never made`);
+				} else {
+					try {
+						expect(actualCall.request).toEqual(expectedCall.request);
+					} catch {
+						problems.push(
+							`call to ${name} expected ${Bun.inspect(expectedCall.request)} but received ${Bun.inspect(actualCall.request)}`
+						);
+					}
+				}
+			}
+		}
+		if (problems.length > 0) {
+			throw new Error(`Fake client: ${problems.join("; ")}`);
 		}
 	};
 
