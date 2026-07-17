@@ -49,7 +49,7 @@
 		"docker:up": "docker compose up -d",
 		"docker:down": "docker compose down",
 		"docker:logs": "docker compose logs -f",
-		"prepare": "husky && bun run website:generate"
+		"prepare": "husky && if [ -f app/website/src/root.tsx ]; then bun run website:generate; fi"
 	},
 	"lint-staged": {
 		"*.{ts,tsx,js,jsx,json}": [
