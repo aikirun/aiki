@@ -21,7 +21,7 @@ export const defaultWorkerConfig: WorkerConfig = {
 };
 
 /**
- * Worker config fixed at spawn. Pass `overrides` to change any setting; omit them
+ * Worker config fixed at start. Pass `overrides` to change any setting; omit them
  * for the defaults.
  */
 export function staticWorkerConfigProvider(overrides?: WorkerConfigOverrides): CreateConfigProvider<WorkerConfig> {

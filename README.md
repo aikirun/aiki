@@ -87,7 +87,7 @@ const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) }
 const runtimeHandle = aikiServer.runtime.start();
 
 const aikiClient = client({ handler: aikiServer.handler });
-const workerHandle = worker({ workflows: [trialV1] }).spawn(aikiClient);
+const workerHandle = worker({ workflows: [trialV1] }).start(aikiClient);
 
 // Start the workflow
 const handle = await trialV1.start(aikiClient, { userId: "user-123" });

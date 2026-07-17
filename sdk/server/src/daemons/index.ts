@@ -5,7 +5,7 @@ import { withRetry } from "@aikirun/lib/retry";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 
-import { spawnDueTimersConsumer } from "./due-timers-consumer";
+import { startDueTimersConsumer } from "./due-timers-consumer";
 import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { processImminentRecurringWorkflows } from "./imminent-recurring-workflows";
@@ -21,7 +21,7 @@ import type { DaemonContext } from "../middleware/context";
 import { createDaemonContext } from "../middleware/context";
 import type { ChildRunCanceller } from "../service/cancel-child-runs";
 
-export interface SpawnDaemonsDeps {
+export interface StartDaemonsDeps {
 	repos: Repositories;
 	signal: AbortSignal;
 	configProvider: ConfigProvider<ServerRuntimeConfig>;
@@ -35,7 +35,7 @@ const pollingDaemon = (
 	signal: AbortSignal,
 	configProvider: ConfigProvider<ServerRuntimeConfig["daemons"]>
 ) => ({
-	spawn<Deps, DaemonOptions>(
+	start<Deps, DaemonOptions>(
 		getConfig: (config: ServerRuntimeConfig["daemons"]) => DaemonOptions & { intervalMs: number },
 		fn: (context: DaemonContext, deps: Deps, options: DaemonOptions) => Promise<void>,
 		deps: Deps
@@ -73,43 +73,43 @@ const pollingDaemon = (
 	},
 });
 
-export async function spawnDaemons(logger: Logger, deps: SpawnDaemonsDeps): Promise<void> {
+export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Promise<void> {
 	const { repos, signal, configProvider, workflowRunPublisher, timerPriorityQueue, childRunCanceller } = deps;
 
-	const { spawn: spawnPollingDaemon } = pollingDaemon(logger, signal, configProvider.scope("daemons"));
+	const { start: startPollingDaemon } = pollingDaemon(logger, signal, configProvider.scope("daemons"));
 
 	const daemonPromises: Promise<void>[] = [
-		spawnPollingDaemon((config) => config.imminentScheduledRuns, processImminentScheduledRuns, {
+		startPollingDaemon((config) => config.imminentScheduledRuns, processImminentScheduledRuns, {
 			repos,
 			workflowRunPublisher,
 			timerPriorityQueue,
 		}),
-		spawnPollingDaemon((config) => config.imminentSleepElapsedRuns, processImminentSleepElapsedRuns, {
+		startPollingDaemon((config) => config.imminentSleepElapsedRuns, processImminentSleepElapsedRuns, {
 			repos,
 			workflowRunPublisher,
 			timerPriorityQueue,
 		}),
-		spawnPollingDaemon((config) => config.imminentRetryableRuns, processImminentRetryableRuns, {
+		startPollingDaemon((config) => config.imminentRetryableRuns, processImminentRetryableRuns, {
 			repos,
 			workflowRunPublisher,
 			timerPriorityQueue,
 		}),
-		spawnPollingDaemon((config) => config.imminentRetryableTaskRuns, processImminentRetryableTaskRuns, {
+		startPollingDaemon((config) => config.imminentRetryableTaskRuns, processImminentRetryableTaskRuns, {
 			repos,
 			workflowRunPublisher,
 			timerPriorityQueue,
 		}),
-		spawnPollingDaemon((config) => config.imminentEventWaitTimedOutRuns, processImminentEventWaitTimedOutRuns, {
+		startPollingDaemon((config) => config.imminentEventWaitTimedOutRuns, processImminentEventWaitTimedOutRuns, {
 			repos,
 			workflowRunPublisher,
 			timerPriorityQueue,
 		}),
-		spawnPollingDaemon((config) => config.imminentChildRunWaitTimedOutRuns, processImminentChildRunWaitTimedOutRuns, {
+		startPollingDaemon((config) => config.imminentChildRunWaitTimedOutRuns, processImminentChildRunWaitTimedOutRuns, {
 			repos,
 			workflowRunPublisher,
 			timerPriorityQueue,
 		}),
-		spawnPollingDaemon((config) => config.imminentRecurringWorkflows, processImminentRecurringWorkflows, {
+		startPollingDaemon((config) => config.imminentRecurringWorkflows, processImminentRecurringWorkflows, {
 			repos,
 			childRunCanceller,
 			workflowRunPublisher,
@@ -119,11 +119,11 @@ export async function spawnDaemons(logger: Logger, deps: SpawnDaemonsDeps): Prom
 
 	if (workflowRunPublisher) {
 		daemonPromises.push(
-			spawnPollingDaemon((config) => config.publishReadyRuns, publishReadyRuns, {
+			startPollingDaemon((config) => config.publishReadyRuns, publishReadyRuns, {
 				repos,
 				workflowRunPublisher,
 			}),
-			spawnPollingDaemon((config) => config.republishStaleRuns, republishStaleRuns, {
+			startPollingDaemon((config) => config.republishStaleRuns, republishStaleRuns, {
 				repos,
 				workflowRunPublisher,
 			})
@@ -132,7 +132,7 @@ export async function spawnDaemons(logger: Logger, deps: SpawnDaemonsDeps): Prom
 
 	if (timerPriorityQueue) {
 		daemonPromises.push(
-			spawnDueTimersConsumer(logger, {
+			startDueTimersConsumer(logger, {
 				repos,
 				signal,
 				timerPriorityQueue,

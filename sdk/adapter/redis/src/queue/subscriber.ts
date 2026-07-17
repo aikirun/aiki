@@ -62,7 +62,7 @@ return results
  *    settings can only be applied at construction time, so the factory owns
  *    client creation to guarantee them.
  *
- * 2. Each spawned worker gets its own connection. The subscriber uses
+ * 2. Each started worker gets its own connection. The subscriber uses
  *    `BZPOPMIN`, a blocking command that ties up the underlying connection
  *    while it waits, so connections cannot be shared across concurrent
  *    workers.

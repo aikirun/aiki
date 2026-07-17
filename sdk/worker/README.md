@@ -20,7 +20,7 @@ const aikiClient = client({
 	apiKey: "your-api-key",
 });
 
-const handle = worker({ workflows: [orderWorkflowV1] }).spawn(aikiClient);
+const handle = worker({ workflows: [orderWorkflowV1] }).start(aikiClient);
 
 process.on("SIGTERM", async () => {
 	await handle.stop();

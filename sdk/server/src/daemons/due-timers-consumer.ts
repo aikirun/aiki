@@ -33,7 +33,7 @@ export interface DueTimersConsumerDeps {
 	configProvider: ConfigProvider<ServerRuntimeConfig["daemons"]["dueTimersConsumer"]>;
 }
 
-export async function spawnDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): Promise<void> {
+export async function startDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): Promise<void> {
 	const timerSignalWaiter = deps.timerPriorityQueue.createSignalWaiter();
 	deps.signal.addEventListener("abort", () => void timerSignalWaiter.close(), { once: true });
 

@@ -23,14 +23,14 @@ const aikiWorker = worker({
   },
 });
 
-const handle = aikiWorker.spawn(aikiClient);
+const handle = aikiWorker.start(aikiClient);
 ```
 
-Worker definitions are static and reusable. The `worker()` function creates a definition with a `workflows` array specifying which workflow versions it can execute. Call `spawn(client)` to begin execution; it returns a handle for controlling the running worker.
+Worker definitions are static and reusable. The `worker()` function creates a definition with a `workflows` array specifying which workflow versions it can execute. Call `start(client)` to begin execution; it returns a handle for controlling the running worker.
 
 ## How Workers Operate
 
-When you call `spawn()`, the worker begins discovering ready workflow runs through its subscriber — claiming them from the server by default. When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
+When you call `start()`, the worker begins discovering ready workflow runs through its subscriber — claiming them from the server by default. When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
 
 During execution, the worker periodically refreshes its claim on the run. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the claim expires after a configurable idle time (default: 90 seconds) and the run is handed to a healthy worker. The workflow then re-executes from its last checkpoint. [Workflow Run Claims](../architecture/workflow-run-claims.md) covers this ownership and recovery in full.
 
@@ -46,8 +46,8 @@ Workers scale naturally. You can add capacity in several ways:
 const worker1 = worker({ workflows: [orderWorkflowV1] });
 const worker2 = worker({ workflows: [orderWorkflowV1] });
 
-const handle1 = worker1.spawn(aikiClient);
-const handle2 = worker2.spawn(aikiClient);
+const handle1 = worker1.start(aikiClient);
+const handle2 = worker2.start(aikiClient);
 ```
 
 **Specialize workers** by registering different workflows on different workers. Each worker only handles the workflows it knows about.
