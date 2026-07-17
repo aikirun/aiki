@@ -475,7 +475,7 @@ function workersView() {
 				markerEnd="url(#arrow)"
 			/>
 			<text className="ts" x="340" y="74" textAnchor="middle">
-				Heartbeat
+				Refresh claim
 			</text>
 			<path
 				d="M512 138L490 138L490 198L152 198"
@@ -540,7 +540,7 @@ function endpointsView() {
 				markerEnd="url(#arrow)"
 			/>
 			<text className="ts" x="385" y="149" textAnchor="middle">
-				Heartbeat
+				Refresh claim
 			</text>
 			<path
 				d="M560 155L560 195L172 195"
