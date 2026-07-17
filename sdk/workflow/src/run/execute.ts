@@ -55,7 +55,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				intervalMs: CLAIM_REFRESH_INTERVAL_MS,
 				onError: (error: Error): void => {
 					if (!signal?.aborted) {
-						logger.warn("Failed to send heartbeat to keep claim alive", {
+						logger.warn("Failed to refresh claim", {
 							"aiki.error": error.message,
 						});
 					}
