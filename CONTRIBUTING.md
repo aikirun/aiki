@@ -78,6 +78,35 @@ cp examples/.env.example examples/.env          # defaults to embedded mode
 bun run examples/src/scenarios/echo.ts          # or any other scenario
 ```
 
+## Changing the database schema
+
+Schemas are defined in TypeScript with Drizzle, one per service:
+
+- Server: [`sdk/server/src/infra/db/pg/schema.ts`](sdk/server/src/infra/db/pg/schema.ts)
+- IAM: [`sdk/iam/src/infra/db/pg/schema.ts`](sdk/iam/src/infra/db/pg/schema.ts)
+
+After editing a schema, generate a migration:
+
+```bash
+bun run db:migrate:generate                    # both services
+bun run --cwd sdk/server db:migrate:generate   # or a single service
+```
+
+This diffs the schema against the stored snapshot and writes a new numbered
+`.sql` file into that service's `src/infra/db/pg/migration/`, updating the
+`meta/` snapshot. No database is needed — it's a pure schema diff. Commit the
+generated `.sql` and `meta/` files together with the schema change.
+
+For changes Drizzle can't infer (data backfills, hand-written SQL), generate an
+empty migration to fill in yourself:
+
+```bash
+bun run --cwd sdk/server db:migrate:generate:custom
+```
+
+To apply and test them against your local database, use the **Run the server +
+dashboard locally** step above (`bun run --cwd app/server db:migrate:apply`).
+
 ## Before you open a PR
 
 ```bash
