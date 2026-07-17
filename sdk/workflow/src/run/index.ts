@@ -21,6 +21,6 @@ export interface WorkflowRun<Input, Context, TEvents extends EventsDefinition = 
 	[INTERNAL]: {
 		handle: WorkflowRunHandle<Input, unknown, Context, TEvents>;
 		replayManifest: ReplayManifest;
-		configProvider: ConfigProvider<Required<WorkflowExecutionConfig>>;
+		configProvider: ConfigProvider<WorkflowExecutionConfig>;
 	};
 }

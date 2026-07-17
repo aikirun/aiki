@@ -430,7 +430,9 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				workflowVersion,
 				logger,
 				configProvider: this.configProvider.scope("workflowRun"),
-				heartbeat: heartbeat ? () => heartbeat(workflowRunId) : undefined,
+				heartbeat: heartbeat
+					? { send: () => heartbeat.send(workflowRunId), intervalMs: heartbeat.intervalMs }
+					: undefined,
 				signal,
 			});
 

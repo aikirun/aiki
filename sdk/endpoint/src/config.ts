@@ -1,12 +1,11 @@
 import { asConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
 import { type DeepPartial, merge } from "@aikirun/lib/object";
+import { CLAIM_REFRESH_INTERVAL_MS } from "@aikirun/types/workflow";
+import type { WorkflowExecutionConfig } from "@aikirun/workflow";
 
 export interface EndpointConfig {
 	signatureMaxAgeMs: number;
-	workflowRun: {
-		heartbeatIntervalMs: number;
-		spinThresholdMs: number;
-	};
+	workflowRun: WorkflowExecutionConfig;
 }
 
 export type EndpointConfigOverrides = DeepPartial<EndpointConfig>;
@@ -14,7 +13,7 @@ export type EndpointConfigOverrides = DeepPartial<EndpointConfig>;
 export const defaultEndpointConfig: EndpointConfig = {
 	signatureMaxAgeMs: 30_000,
 	workflowRun: {
-		heartbeatIntervalMs: 30_000,
+		claimRefreshIntervalMs: CLAIM_REFRESH_INTERVAL_MS,
 		spinThresholdMs: 10,
 	},
 };

@@ -5,7 +5,6 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	CLAIM_REFRESH_INTERVAL_MS,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -26,13 +25,19 @@ export interface ExecuteWorkflowParams<Context> {
 	workflowRun: WorkflowRunRecord;
 	workflowVersion: AnyWorkflowVersion;
 	logger: Logger;
-	configProvider: ConfigProvider<Required<WorkflowExecutionConfig>>;
-	heartbeat?: () => Promise<void>;
+	configProvider: ConfigProvider<WorkflowExecutionConfig>;
+	heartbeat?: {
+		send: () => Promise<void>;
+		intervalMs: number | (() => number);
+	};
 	signal?: AbortSignal;
 }
 
 export interface WorkflowExecutionConfig {
-	heartbeatIntervalMs?: number;
+	/**
+	 * Interval at which a worker refreshes its claim on a workflow run it is executing.
+	 */
+	claimRefreshIntervalMs: number;
 	/**
 	 * Threshold for spinning vs persisting task retry delays (default: 10ms).
 	 *
@@ -41,7 +46,7 @@ export interface WorkflowExecutionConfig {
 	 *
 	 * Set to 0 to record all task delays in transition history.
 	 */
-	spinThresholdMs?: number;
+	spinThresholdMs: number;
 }
 
 export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
@@ -52,7 +57,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 	try {
 		intervals.push(
 			runOnInterval(() => client.api.workflowRun.heartbeatV1({ id: workflowRunId }), {
-				intervalMs: CLAIM_REFRESH_INTERVAL_MS,
+				intervalMs: () => configProvider.config.claimRefreshIntervalMs,
 				onError: (error: Error): void => {
 					if (!signal?.aborted) {
 						logger.warn("Failed to refresh claim", {
@@ -65,8 +70,8 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		);
 		if (heartbeat) {
 			intervals.push(
-				runOnInterval(heartbeat, {
-					intervalMs: () => configProvider.config.heartbeatIntervalMs,
+				runOnInterval(heartbeat.send, {
+					intervalMs: heartbeat.intervalMs,
 					onError: (error: Error): void => {
 						if (!signal?.aborted) {
 							logger.warn("Failed to send heartbeat", {

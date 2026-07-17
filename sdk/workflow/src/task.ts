@@ -284,7 +284,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		taskId: TaskId,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
-		configProvider: ConfigProvider<Required<WorkflowExecutionConfig>>,
+		configProvider: ConfigProvider<WorkflowExecutionConfig>,
 		logger: Logger
 	): Promise<{ output: Output; lastAttempt: number }> {
 		let attempts = currentAttempt;

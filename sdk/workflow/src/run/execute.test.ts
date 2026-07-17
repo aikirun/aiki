@@ -1,3 +1,4 @@
+import { delay } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
@@ -5,7 +6,6 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
-	CLAIM_KEEPALIVE_INTERVAL_MS,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
@@ -16,10 +16,13 @@ import {
 import type { EventsDefinition } from "./event";
 import { executeWorkflowRun } from "./execute";
 import type { WorkflowRun } from "./index";
-import { describe, expect, jest, spyOn, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import type { AnyWorkflowVersion } from "../workflow-version";
 
-const configProvider = asConfigProvider(() => ({ heartbeatIntervalMs: 30_000, spinThresholdMs: 10 }));
+const configProvider = asConfigProvider(() => ({
+	claimRefreshIntervalMs: 30_000,
+	spinThresholdMs: 10,
+}));
 
 function fakeWorkflowVersion(
 	handler: (run: WorkflowRun<unknown, unknown, EventsDefinition>, input: unknown) => Promise<void>
@@ -185,39 +188,71 @@ describe("executeWorkflowRun", () => {
 			expect(capturedInput).toEqual({ orderId: "o1" });
 		}));
 
-	describe("heartbeats", () => {
-		test("keeps the claim alive by heartbeating while the handler runs", () =>
+	describe("claim refresh", () => {
+		test("keeps the claim alive by refreshing it while the handler runs", () =>
 			withFakeClient(async (client) => {
-				jest.useFakeTimers();
-				try {
-					const workflowRun = runningWorkflowRunRecordFactory.build();
-					let release = () => {};
-					const blocked = new Promise<void>((resolve) => {
-						release = resolve;
-					});
-					const workflowVersion = fakeWorkflowVersion(async () => {
-						await blocked;
-					});
-					client.api.workflowRun.heartbeatV1.once({ id: workflowRun.id });
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				let resolveFirstClaimRefresh = () => {};
+				const firstClaimRefresh = new Promise<void>((resolve) => {
+					resolveFirstClaimRefresh = resolve;
+				});
+				client.api.workflowRun.heartbeatV1.onNextCall(resolveFirstClaimRefresh);
+				client.api.workflowRun.heartbeatV1.once({ id: workflowRun.id });
 
-					const runPromise = executeWorkflowRun({
-						client,
-						workflowRun,
-						workflowVersion,
-						logger: client.logger,
-						configProvider,
-					});
+				// The handler blocks until the first claim refresh fires.
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					await firstClaimRefresh;
+				});
 
-					jest.advanceTimersByTime(CLAIM_KEEPALIVE_INTERVAL_MS);
-					expect(client.api.workflowRun.heartbeatV1).toHaveBeenCalledWith({ id: workflowRun.id });
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider: asConfigProvider(() => ({
+						...configProvider.config,
+						claimRefreshIntervalMs: 10,
+					})),
+				});
 
-					release();
-					expect(await runPromise).toBe(true);
-				} finally {
-					jest.useRealTimers();
-				}
+				expect(result).toBe(true);
 			}));
 
+		test("stops refreshing the claim once the signal is aborted", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const controller = new AbortController();
+				let resolveHandler = () => {};
+				const handler = new Promise<void>((resolve) => {
+					resolveHandler = resolve;
+				});
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					await handler;
+				});
+
+				controller.abort();
+
+				const executionPromise = executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider: asConfigProvider(() => ({
+						...configProvider.config,
+						claimRefreshIntervalMs: 1,
+					})),
+					signal: controller.signal,
+				});
+
+				// Absence check: a 1ms claimRefreshIntervalMs would fire within this window had abort not torn it down.
+				await delay(20);
+
+				resolveHandler();
+				expect(await executionPromise).toBe(true);
+			}));
+	});
+
+	describe("heartbeats", () => {
 		test("fires the provided heartbeat on its configured interval", () =>
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
@@ -226,7 +261,7 @@ describe("executeWorkflowRun", () => {
 				const firstHeartbeat = new Promise<void>((resolve) => {
 					resolveFirstHeartbeat = resolve;
 				});
-				const heartbeat = async () => {
+				const heartbeatFn = async () => {
 					heartbeatCalls++;
 					resolveFirstHeartbeat();
 				};
@@ -234,19 +269,58 @@ describe("executeWorkflowRun", () => {
 				const workflowVersion = fakeWorkflowVersion(async () => {
 					await firstHeartbeat;
 				});
-				const config = asConfigProvider(() => ({ heartbeatIntervalMs: 1, spinThresholdMs: 10 }));
 
 				const result = await executeWorkflowRun({
 					client,
 					workflowRun,
 					workflowVersion,
 					logger: client.logger,
-					configProvider: config,
-					heartbeat,
+					configProvider: asConfigProvider(() => ({
+						...configProvider.config,
+						// Claim refresh is never fired because claimRefreshIntervalMs >> heartbeat.intervalMs
+						claimRefreshIntervalMs: 30_000,
+					})),
+					heartbeat: { send: heartbeatFn, intervalMs: 1 },
 				});
 
 				expect(result).toBe(true);
 				expect(heartbeatCalls).toBeGreaterThanOrEqual(1);
+			}));
+
+		test("stops firing the heartbeat once the signal is aborted", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const controller = new AbortController();
+				let resolveHandler = () => {};
+				const handler = new Promise<void>((resolve) => {
+					resolveHandler = resolve;
+				});
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					await handler;
+				});
+				let heartbeatCalls = 0;
+				const heartbeatFn = async () => {
+					heartbeatCalls++;
+				};
+
+				controller.abort();
+
+				const executionPromise = executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+					heartbeat: { send: heartbeatFn, intervalMs: 1 },
+					signal: controller.signal,
+				});
+
+				// Absence check: a 1ms heartbeat would fire within this window had abort not torn it down.
+				await delay(20);
+				expect(heartbeatCalls).toBe(0);
+
+				resolveHandler();
+				expect(await executionPromise).toBe(true);
 			}));
 	});
 });

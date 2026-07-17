@@ -13,7 +13,10 @@ export type SubscriberDelayParams = { type: "no_work" } | { type: "retry"; attem
 export interface Subscriber {
 	getNextDelay: (params: SubscriberDelayParams) => number;
 	getReadyRuns: (limit: number) => Promise<WorkflowRunMessage[]>;
-	heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>;
+	heartbeat?: {
+		send: (workflowRunId: WorkflowRunId) => Promise<void>;
+		intervalMs: number | (() => number);
+	};
 	acknowledge?: (workflowRunId: WorkflowRunId) => Promise<void>;
 }
 
