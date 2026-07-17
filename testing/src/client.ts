@@ -30,6 +30,12 @@ type MockEndpoint<Args extends unknown[], Return> = Mock<(...args: Args) => Retu
 	 * instead of resolving.
 	 */
 	rejectsOnce(request: Args[0], error: unknown): MockEndpoint<Args, Return>;
+
+	/**
+	 * Registers `callback` that is invoked once the next time this endpoint is called — regardless of
+	 * whether that call matches an expectation.
+	 */
+	onNextCall(callback: () => void): void;
 };
 
 /** Every API method becomes a `MockEndpoint` of its own signature. */
@@ -75,10 +81,14 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 	const createEndpoint = (endpointName: string): unknown => {
 		const expectedCalls: ExpectedCall[] = [];
 		const actualCalls: ActualCall[] = [];
+		const callbacks: Array<() => void> = [];
 		endpoints.push({ name: endpointName, expectedCalls, actualCalls });
 
 		const handler = async (actualRequest: unknown) => {
 			actualCalls.push({ request: actualRequest });
+			for (const callback of callbacks.splice(0)) {
+				callback();
+			}
 
 			const expectedCall = expectedCalls[actualCalls.length - 1];
 			if (expectedCall === undefined) {
@@ -93,6 +103,7 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 		const endpoint = mock(handler) as Mock<typeof handler> & {
 			once: (request: unknown, response?: unknown) => unknown;
 			rejectsOnce: (request: unknown, error: unknown) => unknown;
+			onNextCall: (callback: () => void) => void;
 		};
 		endpoint.once = (request, response) => {
 			expectedCalls.push({ request, result: { type: "resolve", response } });
@@ -101,6 +112,9 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 		endpoint.rejectsOnce = (request, error) => {
 			expectedCalls.push({ request, result: { type: "reject", error } });
 			return endpoint;
+		};
+		endpoint.onNextCall = (callback) => {
+			callbacks.push(callback);
 		};
 
 		return endpoint;
