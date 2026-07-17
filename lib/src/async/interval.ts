@@ -10,6 +10,10 @@ export function runOnInterval(
 ): { stop: () => void } {
 	const { intervalMs, onError, signal } = options;
 
+	if (signal?.aborted) {
+		return { stop: () => {} };
+	}
+
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	const tick = (): void => {
 		timeout = setTimeout(

@@ -61,6 +61,23 @@ describe("runOnInterval", () => {
 		expect(calls).toBe(callsAtStop);
 	});
 
+	test("an already aborted signal prevents any invocations", async () => {
+		const controller = new AbortController();
+		controller.abort();
+
+		let calls = 0;
+
+		runOnInterval(
+			async () => {
+				calls += 1;
+			},
+			{ intervalMs: 1, onError: () => {}, signal: controller.signal }
+		);
+
+		await delay(20);
+		expect(calls).toBe(0);
+	});
+
 	test("aborting the signal stops further invocations", async () => {
 		const controller = new AbortController();
 		let calls = 0;
