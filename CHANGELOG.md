@@ -2,6 +2,73 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.35.0
+
+This release renames a few worker and schedule APIs for clarity, makes the worker's claim-refresh cadence runtime-configurable, and adds a system theme picker to the dashboard. Workers now reclaim a freed slot immediately instead of waiting out the next poll.
+
+### Breaking Changes
+
+- **`worker.spawn()` renamed to `worker.start()`.** "spawn" wrongly suggested a child process; the call just begins execution and returns a handle. `WorkerSpawnOptions` is now `WorkerStartOptions`.
+
+  ```typescript
+  // Before
+  const handle = myWorker.spawn(client);
+
+  // After
+  const handle = myWorker.start(client);
+  ```
+
+- **`schedule.delete()` renamed to `schedule.deactivate()`.** Deactivating a schedule stops it firing without erasing it. The `"deleted"` schedule status is now `"inactive"`, and the API method `schedule.deleteV1` is now `schedule.deactivateV1`.
+
+  ```typescript
+  // Before
+  await handle.delete();
+  await client.api.schedule.deleteV1({ id });
+
+  // After
+  await handle.deactivate();
+  await client.api.schedule.deactivateV1({ id });
+  ```
+
+- **Worker config `workflowRun.heartbeatIntervalMs` renamed to `workflowRun.claimRefreshIntervalMs`.** The interval controls how often a worker refreshes its server-side claim on an executing run, so it now reads as a claim refresh rather than a heartbeat.
+
+  ```typescript
+  // Before
+  worker({ workflows, config: { workflowRun: { heartbeatIntervalMs: 30_000 } } });
+
+  // After
+  worker({ workflows, config: { workflowRun: { claimRefreshIntervalMs: 30_000 } } });
+  ```
+
+- **Client and subscriber contracts renamed** — only relevant if you implement a custom transport or subscriber. `WorkflowRunApi.heartbeatV1` is now `claimRefreshV1`, and `WorkflowRunClaimReadyRequestV1.claimMinIdleTimeMs` is now `previousClaimMinIdleTimeMs`. A `Subscriber`'s `heartbeat` is now an object `{ send, intervalMs }` instead of a bare function.
+
+  ```typescript
+  // Before
+  heartbeat?: (workflowRunId) => Promise<void>;
+
+  // After
+  heartbeat?: { send: (workflowRunId) => Promise<void>; intervalMs: number | (() => number) };
+  ```
+
+### Web UI
+
+- **System theme picker in the dashboard.** Choose light, dark, or system. With no stored choice the dashboard follows the OS preference and tracks OS changes live. The schedules list reflects the rename above: the status reads **Inactive** and its action button is **Deactivate**.
+
+### Improvements
+
+- **Workers reclaim a freed slot immediately.** When a run finishes and capacity opens up, the worker re-polls for work right away instead of waiting out the next poll delay.
+- **The claim-refresh interval is now runtime-configurable** through `claimRefreshIntervalMs` and read live from the config provider, rather than being a fixed constant.
+- **New exports from `@aikirun/worker`:** `defaultWorkerConfig`, `asConfigProvider`, and the config-provider types (`ConfigProvider`, `ConfigProviderContext`, `CreateConfigProvider`).
+
+### Bug Fixes
+
+- **Replay no longer re-validates event data against its schema.** Event waiters return the recorded data directly. Previously a run could be forced to `failed` with a `SchemaValidationError` during replay; validating a producer's output on the consumer side was the wrong place to do it.
+- **`runOnInterval` no longer schedules a timer when its abort signal is already aborted.**
+
+### Documentation
+
+- New docs site at **aiki.run**: a rewritten quick start, tab switchers for install / runtime / client transport, corrected schedule conflict-policy and identity docs, documented run options, a `CONTRIBUTING` guide, and an architecture diagram that now distinguishes claim refresh from subscriber heartbeats.
+
 ## 0.34.1
 
 This release keeps a worker's server-side run claim alive on its own fixed cadence, independent of `heartbeatIntervalMs`, so a large heartbeat interval no longer lets a still-running claim be reassigned to another worker.

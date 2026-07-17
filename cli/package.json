@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/cli",
-	"version": "0.34.1",
+	"version": "0.35.0",
 	"private": true,
 	"description": "Aiki CLI - apply migrations, start server and dashboard",
 	"type": "module",
