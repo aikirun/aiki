@@ -22,7 +22,7 @@
 		"types"
 	],
 	"scripts": {
-		"check": "tsc --noEmit && tsc --noEmit -p app/dashboard/tsconfig.json && bun run --cwd app/website check",
+		"check": "tsc --noEmit -p tsconfig.check.json && tsc --noEmit -p app/dashboard/tsconfig.json && bun run --cwd app/website check",
 		"lint": "bunx @biomejs/biome check .",
 		"lint:fix": "bunx @biomejs/biome check --write .",
 		"test:watch": "bun test --watch",
