@@ -64,6 +64,8 @@ jobs:
 
       - uses: ./.github/actions/setup-workspace
 
+      - run: bun run website:generate
+
       - run: bun run check
 
       - run: bun run lint

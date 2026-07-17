@@ -4,7 +4,8 @@
 	"version": "0.34.1",
 	"type": "module",
 	"scripts": {
-		"check": "react-router typegen && fumadocs-mdx && tsc --noEmit",
+		"generate": "react-router typegen && fumadocs-mdx",
+		"check": "tsc --noEmit",
 		"build": "react-router build && bun run scripts/postbuild.ts",
 		"dev": "react-router dev",
 		"preview": "bun run build && bunx serve --no-clipboard -l 9852 build/client"

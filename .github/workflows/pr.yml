@@ -27,6 +27,9 @@ jobs:
 
       - uses: ./.github/actions/setup-workspace
 
+      - name: Generate website types
+        run: bun run website:generate
+
       - name: Typecheck
         run: bun run check
 

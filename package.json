@@ -32,6 +32,7 @@
 		"server:watch": "bun run --cwd app/server start:watch",
 		"dashboard": "bun run --cwd app/dashboard dev",
 		"website": "bun run --cwd app/website dev",
+		"website:generate": "bun run --cwd app/website generate",
 		"website:preview": "bun run --cwd app/website preview",
 		"bump": "bun scripts/bump.ts",
 		"clean": "rm -rf lib/dist types/dist app/server/dist app/dashboard/dist cli/dist sdk/*/dist sdk/adapter/*/dist sdk/iam/dist app/website/build app/website/.react-router app/website/.source",
@@ -48,7 +49,7 @@
 		"docker:up": "docker compose up -d",
 		"docker:down": "docker compose down",
 		"docker:logs": "docker compose logs -f",
-		"prepare": "husky"
+		"prepare": "husky && bun run website:generate"
 	},
 	"lint-staged": {
 		"*.{ts,tsx,js,jsx,json}": [
