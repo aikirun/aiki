@@ -87,5 +87,5 @@ For the bundled standalone server's environment variables, see the [Installation
 ## Next Steps
 
 - **[Subscribers](./subscribers.md)** - How workers discover work
-- **[Runtime Configuration](../guides/configuration.md)** - Tune the runtime's, statically or live
+- **[Runtime Configuration](../guides/configuration.md)** - Tune the server statically or live
 - **[Overview](./overview.mdx)** - High-level architecture
