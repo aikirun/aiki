@@ -248,6 +248,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				maxConcurrentWorkflowRuns - this.pendingWorkflowRunIds.size - this.activeWorkflowRunsById.size;
 			if (availableCapacity <= 0) {
 				await this.availableCapacityLatch.wait();
+				nextDelayMs = 0;
 				continue;
 			}
 
