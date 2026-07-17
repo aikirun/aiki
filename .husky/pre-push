@@ -1,1 +1,31 @@
+# Determine whether the pushed commits touch the docs site. Read git's pre-push
+# stdin (one line per ref: <local ref> <local sha> <remote ref> <remote sha>)
+# up front so nothing else consumes it.
+zero_sha="0000000000000000000000000000000000000000"
+website_changed=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+	if [ "$local_sha" = "$zero_sha" ]; then
+		# Branch deletion — nothing to check.
+		continue
+	fi
+
+	if [ "$remote_sha" = "$zero_sha" ]; then
+		# New branch the remote hasn't seen — diff against the default branch.
+		range="origin/main...$local_sha"
+	else
+		range="$remote_sha..$local_sha"
+	fi
+
+	if [ -n "$(git diff --name-only "$range" -- app/website 2>/dev/null)" ]; then
+		website_changed=1
+	fi
+done
+
+# Regenerate the docs types only when the push touches app/website (or the
+# generated output is missing), then type-check everything.
+if [ "$website_changed" = "1" ] || [ ! -d app/website/.source ]; then
+	bun run website:generate
+fi
+
 bun run check

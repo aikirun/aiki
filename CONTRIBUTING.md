@@ -13,7 +13,7 @@ environment running. For cutting releases, see [`.github/RELEASING.md`](.github/
 
 ## Prerequisites
 
-- **[Bun](https://bun.sh) 1.1+** — Aiki is a Bun workspace. `npm` and `pnpm`
+- **[Bun](https://bun.sh) 1.0+** — Aiki is a Bun workspace. `npm` and `pnpm`
   won't work at the repo root (the internal packages link via the `workspace:*`
   protocol, which only Bun/pnpm/Yarn understand — `npm install` here fails with
   `EUNSUPPORTEDPROTOCOL`).
@@ -85,8 +85,9 @@ bun run check && bun run lint && bun test
 ```
 
 A Husky pre-commit hook auto-formats staged files with Biome, so formatting is
-handled for you on commit. A pre-push hook runs `bun run check` (type checking)
-before your changes leave your machine; commits stay fast so you can freely save
+handled for you on commit. A pre-push hook type-checks your changes with
+`bun run check` before they leave your machine; if the push touches `app/website`
+it first regenerates the docs types. Commits stay fast so you can freely save
 work in progress.
 
 ## TODO — planned additions to this guide
