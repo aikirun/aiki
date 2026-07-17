@@ -261,7 +261,7 @@ describe("executeWorkflowRun", () => {
 				const firstHeartbeat = new Promise<void>((resolve) => {
 					resolveFirstHeartbeat = resolve;
 				});
-				const heartbeatFn = async () => {
+				const sendHeartbeat = async () => {
 					heartbeatCalls++;
 					resolveFirstHeartbeat();
 				};
@@ -280,7 +280,7 @@ describe("executeWorkflowRun", () => {
 						// Claim refresh is never fired because claimRefreshIntervalMs >> heartbeat.intervalMs
 						claimRefreshIntervalMs: 30_000,
 					})),
-					heartbeat: { send: heartbeatFn, intervalMs: 1 },
+					heartbeat: { send: sendHeartbeat, intervalMs: 1 },
 				});
 
 				expect(result).toBe(true);
@@ -299,7 +299,7 @@ describe("executeWorkflowRun", () => {
 					await handler;
 				});
 				let heartbeatCalls = 0;
-				const heartbeatFn = async () => {
+				const sendHeartbeat = async () => {
 					heartbeatCalls++;
 				};
 
@@ -311,7 +311,7 @@ describe("executeWorkflowRun", () => {
 					workflowVersion,
 					logger: client.logger,
 					configProvider,
-					heartbeat: { send: heartbeatFn, intervalMs: 1 },
+					heartbeat: { send: sendHeartbeat, intervalMs: 1 },
 					signal: controller.signal,
 				});
 
