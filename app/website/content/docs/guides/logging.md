@@ -48,7 +48,7 @@ Task handlers are plain functions and receive no logger. If a task needs one, in
 
 ## What Aiki Logs
 
-The SDK logs run lifecycle (claims, execution, retries, heartbeats etc.) and component activity at `info` and below, with problems at `warn` and `error`. Aiki's metadata keys are namespaced under `aiki.*` (for example `aiki.workflowRunId`), so they do not collide with your fields, and errors are attached under the `err` key.
+The SDK logs run lifecycle (claims, execution, retries, claim refreshes etc.) and component activity at `info` and below, with problems at `warn` and `error`. Aiki's metadata keys are namespaced under `aiki.*` (for example `aiki.workflowRunId`), so they do not collide with your fields, and errors are attached under the `err` key.
 
 ## Next Steps
 
