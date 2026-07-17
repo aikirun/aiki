@@ -30,14 +30,14 @@ import { defaultWorkerConfig, type WorkerConfig, type WorkerConfigOverrides } fr
 /**
  * Creates an Aiki worker definition for executing workflows.
  *
- * Worker definitions are static and reusable. Call `spawn(client)` to begin
+ * Worker definitions are static and reusable. Call `start(client)` to begin
  * execution, which returns a handle for controlling the running worker.
  *
  * @param params - Worker configuration parameters
  * @param params.workflows - Array of workflow versions this worker can execute
  * @param params.subscriber - Optional subscriber factory for work discovery (default: claims work from the server over HTTP)
  * @param params.config - Optional runtime tunables: a plain overrides object, or a config provider (e.g. `dynamicWorkerConfigProvider`) for live reloads
- * @returns Worker definition, call spawn(client) to begin execution
+ * @returns Worker definition, call start(client) to begin execution
  *
  * @example
  * ```typescript
@@ -46,7 +46,7 @@ import { defaultWorkerConfig, type WorkerConfig, type WorkerConfigOverrides } fr
  *   config: { maxConcurrentWorkflowRuns: 10 },
  * });
  *
- * const handle = myWorker.spawn(client);
+ * const handle = myWorker.start(client);
  *
  * process.on("SIGINT", async () => {
  *   await handle.stop();
@@ -63,7 +63,7 @@ export interface WorkerParams {
 	config?: WorkerConfigOverrides | CreateConfigProvider<WorkerConfig>;
 }
 
-export interface WorkerSpawnOptions {
+export interface WorkerStartOptions {
 	/**
 	 * Optional array of shards this worker should process.
 	 * When provided, the worker will only subscribe to registered workflows within that shard.
@@ -81,7 +81,7 @@ export interface WorkerSpawnOptions {
 
 export interface Worker {
 	with(): WorkerBuilder;
-	spawn: <Context>(client: Client<Context>) => WorkerHandle;
+	start: <Context>(client: Client<Context>) => WorkerHandle;
 }
 
 export interface WorkerHandle {
@@ -93,16 +93,16 @@ class WorkerImpl implements Worker {
 	constructor(private readonly params: WorkerParams) {}
 
 	public with(): WorkerBuilder {
-		const spawnOptionsOverrider = objectOverrider<WorkerSpawnOptions>({});
-		return createWorkerBuilder(this, spawnOptionsOverrider());
+		const startOptionsOverrider = objectOverrider<WorkerStartOptions>({});
+		return createWorkerBuilder(this, startOptionsOverrider());
 	}
 
-	public spawn<Context>(client: Client<Context>): WorkerHandle {
-		return this.spawnWithOptions(client, {});
+	public start<Context>(client: Client<Context>): WorkerHandle {
+		return this.startWithOptions(client, {});
 	}
 
-	public spawnWithOptions<Context>(client: Client<Context>, spawnOptions: WorkerSpawnOptions): WorkerHandle {
-		return new WorkerHandleImpl(client, this.params, spawnOptions);
+	public startWithOptions<Context>(client: Client<Context>, startOptions: WorkerStartOptions): WorkerHandle {
+		return new WorkerHandleImpl(client, this.params, startOptions);
 	}
 }
 
@@ -131,7 +131,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 	constructor(
 		private readonly client: Client<Context>,
 		private readonly params: WorkerParams,
-		private readonly spawnOptions: WorkerSpawnOptions
+		private readonly startOptions: WorkerStartOptions
 	) {
 		this.id = ulid() as WorkerId;
 		this.registry = workflowRegistry().addMany(getSystemWorkflows(this.client.api)).addMany(this.params.workflows);
@@ -140,7 +140,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			throw new Error("No workflow registered");
 		}
 
-		const reference = this.spawnOptions.reference;
+		const reference = this.startOptions.reference;
 		this.logger = this.client.logger.child({
 			"aiki.component": "worker",
 			"aiki.workerId": this.id,
@@ -164,7 +164,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		this.primarySubscriber = createPrimarySubscriber({
 			workerId: this.id,
 			workflows,
-			shards: this.spawnOptions.shards,
+			shards: this.startOptions.shards,
 			logger: this.logger.child({ "aiki.subscriber": "primary" }),
 			signal,
 		});
@@ -177,7 +177,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			this.backupSubscriber = createBackupSubscriber({
 				workerId: this.id,
 				workflows,
-				shards: this.spawnOptions.shards,
+				shards: this.startOptions.shards,
 				logger: this.logger.child({ "aiki.subscriber": "backup" }),
 				signal,
 			});
@@ -461,24 +461,24 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 }
 
 export interface WorkerBuilder {
-	opt<Path extends PathFromObject<WorkerSpawnOptions>>(
+	opt<Path extends PathFromObject<WorkerStartOptions>>(
 		path: Path,
-		value: TypeOfValueAtPath<WorkerSpawnOptions, Path>
+		value: TypeOfValueAtPath<WorkerStartOptions, Path>
 	): WorkerBuilder;
-	spawn: Worker["spawn"];
+	start: Worker["start"];
 }
 
 function createWorkerBuilder(
 	worker: WorkerImpl,
-	spawnOptionsBuilder: ObjectBuilder<WorkerSpawnOptions>
+	startOptionsBuilder: ObjectBuilder<WorkerStartOptions>
 ): WorkerBuilder {
 	return {
 		opt(path, value) {
-			return createWorkerBuilder(worker, spawnOptionsBuilder.with(path, value));
+			return createWorkerBuilder(worker, startOptionsBuilder.with(path, value));
 		},
 
-		spawn(client) {
-			return worker.spawnWithOptions(client, spawnOptionsBuilder.build());
+		start(client) {
+			return worker.startWithOptions(client, startOptionsBuilder.build());
 		},
 	};
 }

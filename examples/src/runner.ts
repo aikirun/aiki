@@ -21,7 +21,7 @@ interface Setup {
 }
 
 /**
- * Spawns two workers that listen for the given workflows, runs the callback,
+ * Starts two workers that listen for the given workflows, runs the callback,
  * then shuts down.
  *
  * Two workers demonstrate the distributed nature of workflows.
@@ -50,8 +50,8 @@ export async function runWithWorker(
 		config: { maxConcurrentWorkflowRuns: 10 },
 	});
 
-	const handleA = workerA.spawn(aikiClient);
-	const handleB = workerB.spawn(aikiClient);
+	const handleA = workerA.start(aikiClient);
+	const handleB = workerB.start(aikiClient);
 
 	const shutdown = async (exitCode: number) => {
 		await Promise.all([handleA.stop(), handleB.stop()]);

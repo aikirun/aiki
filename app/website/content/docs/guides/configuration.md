@@ -57,7 +57,7 @@ interface ConfigProviderContext {
 }
 ```
 
-The factory runs once, when the component starts — a worker at `spawn`, the server runtime at `start`. The context's `signal` aborts when that same component shuts down (the worker handle's `stop()`, the server runtime handle's `stop()`), so register any teardown your provider needs on it. The `logger` is the component's own logger; the bundled helpers use it to report failed refreshes, and a custom provider can log through it the same way.
+The factory runs once, when the component starts — the worker's `start()` or the server runtime's `start()`. The context's `signal` aborts when that same component shuts down (the worker handle's `stop()`, the server runtime handle's `stop()`), so register any teardown your provider needs on it. The `logger` is the component's own logger; the bundled helpers use it to report failed refreshes, and a custom provider can log through it the same way.
 
 From then on, the component reads values where it uses them: the worker checks its concurrency limit on each claim iteration, the server's daemons read their cadence each tick, the endpoint reads per request, and workflow-execution settings are read live even by runs already in flight. A new snapshot simply takes effect at the next read.
 

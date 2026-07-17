@@ -6,7 +6,7 @@ import type { CreatePublisher } from "@aikirun/types/infra/queue/publisher";
 import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 
 import { defaultServerRuntimeConfig, type ServerRuntimeConfig, type ServerRuntimeConfigOverrides } from "./config";
-import { spawnDaemons } from "./daemons";
+import { startDaemons } from "./daemons";
 import { createRepos } from "./infra/db/repo";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 
@@ -38,7 +38,7 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 
 	const repos = await createRepos(db);
 
-	const daemonsPromise = spawnDaemons(logger, {
+	const daemonsPromise = startDaemons(logger, {
 		repos,
 		configProvider,
 		signal,
