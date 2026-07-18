@@ -220,7 +220,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			const stillActiveRuns = Array.from(this.activeWorkflowRunsById.values());
 			if (stillActiveRuns.length > 0) {
 				const ids = stillActiveRuns.map((w) => w.run.id).join(", ");
-				this.logger.warn("Worker shutdown with active workflows", {
+				this.logger.warn("Worker stopped while some workflows were active", {
 					"aiki.activeWorkflowRunIds": ids,
 				});
 			}
