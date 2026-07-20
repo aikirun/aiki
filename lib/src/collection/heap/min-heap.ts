@@ -20,10 +20,13 @@ export function createMinHeap<T>(compare: (a: T, b: T) => number): MinHeap<T> {
 	function siftUp(start: number): void {
 		let i = start;
 		while (i > 0) {
-			const parentIndex = (i - 1) >> 1;
 			const current = items[i];
+			if (current === undefined) {
+				return;
+			}
+			const parentIndex = (i - 1) >> 1;
 			const parent = items[parentIndex];
-			if (current === undefined || parent === undefined) {
+			if (parent === undefined) {
 				return;
 			}
 			if (compare(current, parent) < 0) {
