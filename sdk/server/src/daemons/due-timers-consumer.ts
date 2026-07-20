@@ -38,7 +38,7 @@ export async function startDueTimersConsumer(logger: Logger, deps: DueTimersCons
 	deps.signal.addEventListener("abort", () => void timerSignalWaiter.close(), { once: true });
 
 	try {
-		await dueTimersConsumerLoop(logger, deps, timerSignalWaiter, deps.signal);
+		await dueTimersConsumerLoop(logger, deps, timerSignalWaiter);
 	} finally {
 		await timerSignalWaiter.close();
 	}
@@ -47,9 +47,10 @@ export async function startDueTimersConsumer(logger: Logger, deps: DueTimersCons
 async function dueTimersConsumerLoop(
 	logger: Logger,
 	deps: DueTimersConsumerDeps,
-	timerSignalWaiter: TimerSignalWaiter,
-	abortSignal: AbortSignal
+	timerSignalWaiter: TimerSignalWaiter
 ): Promise<void> {
+	const { timerPriorityQueue, signal: abortSignal, configProvider } = deps;
+
 	const retryStrategy: RetryStrategy = {
 		type: "jittered",
 		maxAttempts: Number.POSITIVE_INFINITY,
@@ -59,7 +60,7 @@ async function dueTimersConsumerLoop(
 
 	// Peek on startup to discover entries left over from a previous consumer's lifecycle: they have
 	// no pending signal, so without this the first wait could block indefinitely.
-	const nextTimerRankResponse = await withRetry(() => deps.timerPriorityQueue.peekNextRank(), retryStrategy, {
+	const nextTimerRankResponse = await withRetry(() => timerPriorityQueue.peekNextRank(), retryStrategy, {
 		signal: abortSignal,
 		onError: (err: unknown) => {
 			if (abortSignal.aborted) {
@@ -76,13 +77,12 @@ async function dueTimersConsumerLoop(
 	while (!abortSignal.aborted) {
 		await withRetry(
 			async () => {
-				const { limit, overshootMs } = deps.configProvider.config;
 				let timerSignal = 0;
 
 				if (nextTimerDueAtMs === null) {
 					timerSignal = await timerSignalWaiter.wait(0);
 				} else {
-					const waitMs = nextTimerDueAtMs - Date.now() + overshootMs;
+					const waitMs = nextTimerDueAtMs - Date.now() + configProvider.config.overshootMs;
 					if (waitMs > 0) {
 						timerSignal = await timerSignalWaiter.wait(waitMs / 1_000);
 					}
@@ -100,9 +100,11 @@ async function dueTimersConsumerLoop(
 				}
 
 				const context = createDaemonContext({ name: "dueTimersConsumer", logger, signal: abortSignal });
-				const next = () => deps.timerPriorityQueue.popDue(computeRank(Date.now()), limit);
+				const next = () => timerPriorityQueue.popDue(computeRank(Date.now()), configProvider.config.limit);
 
-				for await (const dueTimers of streamChunks(next, { until: (chunk) => chunk.length < limit })) {
+				for await (const dueTimers of streamChunks(next, {
+					until: (chunk) => chunk.length < configProvider.config.limit,
+				})) {
 					try {
 						await processDueTimers(context, deps, dueTimers);
 					} catch (err) {
@@ -110,7 +112,7 @@ async function dueTimersConsumerLoop(
 					}
 				}
 
-				const nextTimerRank = await deps.timerPriorityQueue.peekNextRank();
+				const nextTimerRank = await timerPriorityQueue.peekNextRank();
 				nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
 			},
 			retryStrategy,
@@ -132,6 +134,8 @@ async function processDueTimers(
 	deps: DueTimersConsumerDeps,
 	dueTimers: NonEmptyArray<DueTimer>
 ): Promise<void> {
+	const { repos, workflowRunPublisher } = deps;
+
 	const timersByType = groupBy(dueTimers, (timer) => [timer.type, timer]);
 
 	const promises: Promise<void>[] = [];
@@ -139,7 +143,7 @@ async function processDueTimers(
 	for (const [timerType, timers] of timersByType) {
 		if (timerType === "recurring") {
 			const ids = timers.map((timer) => timer.id) as NonEmptyArray<string>;
-			const rows = await deps.repos.schedule.listActiveByIds(context, ids);
+			const rows = await repos.schedule.listActiveByIds(context, ids);
 			const schedules: DueSchedule[] = rows.map(({ schedule, workflow }) => ({
 				...scheduleRowToDomain(schedule, workflow),
 				workflowId: schedule.workflowId,
@@ -159,7 +163,7 @@ async function processDueTimers(
 			}
 
 			const runStatus = timerTypeToWorkflowRunStatus[timerType];
-			const runs: WorkflowRunMeta[] = await deps.repos.workflowRun.listByIdsAndStatus(
+			const runs: WorkflowRunMeta[] = await repos.workflowRun.listByIdsAndStatus(
 				context,
 				ids as NonEmptyArray<string>,
 				runStatus
@@ -178,27 +182,27 @@ async function processDueTimers(
 
 			switch (timerType) {
 				case "sleep": {
-					promises.push(queueSleepElapsedRuns(context, deps.repos, deps.workflowRunPublisher, rankedRuns));
+					promises.push(queueSleepElapsedRuns(context, repos, workflowRunPublisher, rankedRuns));
 					break;
 				}
 				case "retry": {
-					promises.push(queueRetryableRuns(context, deps.repos, deps.workflowRunPublisher, rankedRuns));
+					promises.push(queueRetryableRuns(context, repos, workflowRunPublisher, rankedRuns));
 					break;
 				}
 				case "task_retry": {
-					promises.push(queueRetryableTaskRuns(context, deps.repos, deps.workflowRunPublisher, rankedRuns));
+					promises.push(queueRetryableTaskRuns(context, repos, workflowRunPublisher, rankedRuns));
 					break;
 				}
 				case "event_wait_timeout": {
-					promises.push(queueEventWaitTimedOutRuns(context, deps.repos, deps.workflowRunPublisher, rankedRuns));
+					promises.push(queueEventWaitTimedOutRuns(context, repos, workflowRunPublisher, rankedRuns));
 					break;
 				}
 				case "child_wait_timeout": {
-					promises.push(queueChildRunWaitTimedOutRuns(context, deps.repos, deps.workflowRunPublisher, rankedRuns));
+					promises.push(queueChildRunWaitTimedOutRuns(context, repos, workflowRunPublisher, rankedRuns));
 					break;
 				}
 				case "scheduled": {
-					promises.push(queueScheduledRuns(context, deps.repos, deps.workflowRunPublisher, rankedRuns));
+					promises.push(queueScheduledRuns(context, repos, workflowRunPublisher, rankedRuns));
 					break;
 				}
 				default: {
