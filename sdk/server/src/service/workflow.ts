@@ -63,6 +63,7 @@ export const createWorkflowService = ({ repos }: WorkflowServiceDeps) => ({
 			awaiting_event: 0,
 			awaiting_retry: 0,
 			awaiting_child_workflow: 0,
+			stalled: 0,
 			cancelled: 0,
 			completed: 0,
 			failed: 0,

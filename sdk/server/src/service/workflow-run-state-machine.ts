@@ -35,7 +35,7 @@ const workflowRunStateTransitionValidator: Record<
 	})(),
 
 	queued: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["running", "paused", "cancelled", "failed"];
+		const allowedDestinations: WorkflowRunStatus[] = ["running", "paused", "cancelled", "failed", "stalled"];
 		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
 	})(),
 
@@ -135,6 +135,11 @@ const workflowRunStateTransitionValidator: Record<
 			}
 			return { allowed: true };
 		};
+	})(),
+
+	stalled: (() => {
+		const allowedDestinations: WorkflowRunStatus[] = ["queued", "cancelled"];
+		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
 	})(),
 
 	cancelled: (() => {

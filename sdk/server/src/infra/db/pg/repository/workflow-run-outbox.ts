@@ -177,8 +177,8 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 				and(
 					eq(workflowRunOutbox.namespaceId, namespaceId),
 					eq(workflowRunOutbox.status, "claimed"),
-					lt(workflowRunOutbox.claimedAt, staleThreshold),
-					buildClaimFilterPredicate(filters)
+					buildClaimFilterPredicate(filters),
+					lt(workflowRunOutbox.claimedAt, staleThreshold)
 				)
 			)
 			.orderBy(workflowRunOutbox.claimedAt, workflowRunOutbox.rank, workflowRunOutbox.id)

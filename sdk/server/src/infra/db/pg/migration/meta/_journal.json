@@ -50,6 +50,13 @@
 			"when": 1784323806032,
 			"tag": "0006_curved_giant_man",
 			"breakpoints": true
+		},
+		{
+			"idx": 7,
+			"version": "7",
+			"when": 1784630904567,
+			"tag": "0007_brown_warhawk",
+			"breakpoints": true
 		}
 	]
 }

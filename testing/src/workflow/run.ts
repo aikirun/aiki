@@ -28,6 +28,7 @@ export const workflowRunStateByStatus: {
 		childWorkflowRunId: "child-1",
 		childWorkflowRunStatus: "completed",
 	},
+	stalled: { status: "stalled" },
 	cancelled: { status: "cancelled" },
 	completed: { status: "completed", output: undefined },
 	failed: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
