@@ -8,7 +8,7 @@ import { taskQueueSchema } from "./task";
 import { triggerStrategySchema } from "./trigger";
 
 export const workflowRunStatusSchema = type(
-	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_child_workflow' | 'cancelled' | 'failed' | 'completed'"
+	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_child_workflow' | 'stalled' | 'cancelled' | 'failed' | 'completed'"
 );
 
 export const terminalWorkflowRunStatusSchema = type("'cancelled' | 'failed' | 'completed'");
@@ -93,6 +93,10 @@ export const workflowRunStateAwaitingChildWorkflowSchema = type({
 	"timeoutAt?": "number > 0 | undefined",
 });
 
+export const workflowRunStateStalledSchema = type({
+	status: "'stalled'",
+});
+
 export const workflowRunStateCancelledSchema = type({
 	status: "'cancelled'",
 	"reason?": "string > 0 | undefined",
@@ -127,6 +131,7 @@ export const workflowRunStateSchema = workflowRunStateScheduledSchema
 	.or(workflowRunStateAwaitingEventSchema)
 	.or(workflowRunStateAwaitingRetrySchema)
 	.or(workflowRunStateAwaitingChildWorkflowSchema)
+	.or(workflowRunStateStalledSchema)
 	.or(workflowRunStateCancelledSchema)
 	.or(workflowRunStateCompletedSchema)
 	.or(workflowRunStateFailedSchema);

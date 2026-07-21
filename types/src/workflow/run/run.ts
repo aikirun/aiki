@@ -18,6 +18,7 @@ export const WORKFLOW_RUN_STATUSES = [
 	"awaiting_event",
 	"awaiting_retry",
 	"awaiting_child_workflow",
+	"stalled",
 	"cancelled",
 	"completed",
 	"failed",
@@ -184,6 +185,10 @@ export interface WorkflowRunStateAwaitingChildWorkflow extends WorkflowRunStateB
 	timeoutAt?: number;
 }
 
+export interface WorkflowRunStateStalled extends WorkflowRunStateBase {
+	status: "stalled";
+}
+
 export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
 	status: "cancelled";
 	reason?: string;
@@ -228,6 +233,7 @@ export type WorkflowRunStateInComplete =
 	| WorkflowRunStateAwaitingEvent
 	| WorkflowRunStateAwaitingRetry
 	| WorkflowRunStateAwaitingChildWorkflow
+	| WorkflowRunStateStalled
 	| WorkflowRunStateCancelled
 	| WorkflowRunStateFailed;
 

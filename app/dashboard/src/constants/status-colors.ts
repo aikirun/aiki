@@ -11,6 +11,7 @@ export const WORKFLOW_RUN_STATUS_COLORS: Record<WorkflowRunStatus, { tint: strin
 	awaiting_event: { tint: "#F472B6", text: "var(--accent-pink)" },
 	awaiting_retry: { tint: "#FB923C", text: "var(--accent-orange)" },
 	awaiting_child_workflow: { tint: "#C084FC", text: "var(--accent-purple)" },
+	stalled: { tint: "#94A3B8", text: "var(--accent-gray)" },
 	cancelled: { tint: "#6B7280", text: "var(--accent-gray)" },
 	completed: { tint: "#34D399", text: "var(--accent-green)" },
 	failed: { tint: "#F87171", text: "var(--accent-red)" },

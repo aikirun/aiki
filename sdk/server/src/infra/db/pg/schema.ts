@@ -386,33 +386,43 @@ export const workflowRunOutbox = pgTable(
 		publishedAt: timestampMs("published_at"),
 		claimedAt: timestampMs("claimed_at"),
 
+		nextPublishAt: timestampMs("next_publish_at"),
+		attempts: integer("attempts").notNull().default(0),
+
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		uniqueIndex("uqidx_workflow_run_outbox_workflow_run_id").on(table.workflowRunId),
-		index("idx_workflow_run_outbox_status_workflow_rank_id").on(
-			table.namespaceId,
-			table.status,
-			table.workflowName,
-			table.workflowVersionId,
-			table.shard,
-			table.rank,
-			table.id
-		),
-		index("idx_workflow_run_outbox_status_workflow_claimed_rank_id").on(
-			table.namespaceId,
-			table.status,
-			table.workflowName,
-			table.workflowVersionId,
-			table.shard,
-			table.claimedAt,
-			table.rank,
-			table.id
-		),
-		index("idx_workflow_run_outbox_status_rank_id").on(table.status, table.rank, table.id),
-		index("idx_workflow_run_outbox_status_published_id").on(table.status, table.publishedAt, table.id),
-		index("idx_workflow_run_outbox_status_claimed_id").on(table.status, table.claimedAt, table.id),
+
+		// Claim paths: worker pulls pending or published rows filtered by workflow identity and shard.
+		index("idx_workflow_run_outbox_claim_pending")
+			.on(table.namespaceId, table.workflowName, table.workflowVersionId, table.shard, table.rank, table.id)
+			.where(sql`${table.status} = 'pending'`),
+		index("idx_workflow_run_outbox_claim_published")
+			.on(table.namespaceId, table.workflowName, table.workflowVersionId, table.shard, table.rank, table.id)
+			.where(sql`${table.status} = 'published'`),
+
+		// Stale-claim steal path: identifies claimed rows whose last refresh is older than a threshold.
+		index("idx_workflow_run_outbox_steal_claim")
+			.on(
+				table.namespaceId,
+				table.workflowName,
+				table.workflowVersionId,
+				table.shard,
+				table.claimedAt,
+				table.rank,
+				table.id
+			)
+			.where(sql`${table.status} = 'claimed'`),
+
+		// Daemon list paths: broad scans over one status to feed broker delivery or monitoring.
+		index("idx_workflow_run_outbox_list_pending").on(table.rank, table.id).where(sql`${table.status} = 'pending'`),
+		index("idx_workflow_run_outbox_list_published")
+			.on(table.publishedAt, table.id)
+			.where(sql`${table.status} = 'published'`),
+		index("idx_workflow_run_outbox_list_claimed").on(table.claimedAt, table.id).where(sql`${table.status} = 'claimed'`),
+
 		check(
 			"chk_workflow_run_outbox_published_requires_published_at",
 			sql`${table.status} != 'published' OR ${table.publishedAt} IS NOT NULL`

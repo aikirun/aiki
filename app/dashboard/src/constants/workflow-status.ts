@@ -55,6 +55,12 @@ export const WORKFLOW_STATUS_CONFIG: Record<
 		textColor: WORKFLOW_RUN_STATUS_COLORS.awaiting_child_workflow.text,
 		glyph: "⑂",
 	},
+	stalled: {
+		label: "Stalled",
+		color: WORKFLOW_RUN_STATUS_COLORS.stalled.tint,
+		textColor: WORKFLOW_RUN_STATUS_COLORS.stalled.text,
+		glyph: "⊡",
+	},
 	cancelled: {
 		label: "Cancelled",
 		color: WORKFLOW_RUN_STATUS_COLORS.cancelled.tint,
