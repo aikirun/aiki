@@ -93,10 +93,10 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 			workflowRunOptions,
 		});
 		client.logger.info("Schedule activated", {
-			scheduleSpec,
-			workflowName: workflow.name,
-			workflowVersionId: workflow.versionId,
-			referenceId: scheduleOptions.reference?.id,
+			"aiki.scheduleSpec": scheduleSpec,
+			"aiki.workflowName": workflow.name,
+			"aiki.workflowVersionId": workflow.versionId,
+			"aiki.scheduleReferenceId": scheduleOptions.reference?.id,
 		});
 
 		const scheduleId = schedule.id as ScheduleId;

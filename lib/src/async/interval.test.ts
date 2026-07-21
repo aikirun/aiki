@@ -146,8 +146,8 @@ describe("runOnInterval", () => {
 			},
 			{
 				intervalMs: 1,
-				onError: (error) => {
-					errors.push(error);
+				onError: (err) => {
+					errors.push(err);
 					if (errors.length === 2) {
 						resolveSecondError();
 					}

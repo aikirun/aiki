@@ -260,13 +260,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		}
 		parentRun.logger.error("Replay divergence", logMeta);
 
-		const error = new NonDeterminismError(parentRun.id, parentRunHandle.run.attempts, unconsumedManifestEntries);
+		const err = new NonDeterminismError(parentRun.id, parentRunHandle.run.attempts, unconsumedManifestEntries);
 		await parentRunHandle[INTERNAL].transitionState({
 			status: "failed",
 			cause: "self",
-			error: createSerializableError(error),
+			error: createSerializableError(err),
 		});
-		throw error;
+		throw err;
 	}
 
 	public async getHandleById(
@@ -414,29 +414,29 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 	}
 
-	private createFailedState(error: unknown): WorkflowRunStateFailed {
-		if (error instanceof TaskFailedError) {
+	private createFailedState(err: unknown): WorkflowRunStateFailed {
+		if (err instanceof TaskFailedError) {
 			return {
 				status: "failed",
 				cause: "task",
-				taskId: error.taskId,
+				taskId: err.taskId,
 			};
 		}
 
 		return {
 			status: "failed",
 			cause: "self",
-			error: createSerializableError(error),
+			error: createSerializableError(err),
 		};
 	}
 
-	private createAwaitingRetryState(error: unknown, nextAttemptInMs: number): WorkflowRunStateAwaitingRetryRequest {
-		if (error instanceof TaskFailedError) {
+	private createAwaitingRetryState(err: unknown, nextAttemptInMs: number): WorkflowRunStateAwaitingRetryRequest {
+		if (err instanceof TaskFailedError) {
 			return {
 				status: "awaiting_retry",
 				cause: "task",
 				nextAttemptInMs,
-				taskId: error.taskId,
+				taskId: err.taskId,
 			};
 		}
 
@@ -444,7 +444,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			status: "awaiting_retry",
 			cause: "self",
 			nextAttemptInMs,
-			error: createSerializableError(error),
+			error: createSerializableError(err),
 		};
 	}
 }

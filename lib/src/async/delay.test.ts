@@ -22,8 +22,8 @@ describe("delay", () => {
 		let reason: unknown;
 		try {
 			await delay(1_000, { signal: controller.signal });
-		} catch (error) {
-			reason = error;
+		} catch (err) {
+			reason = err;
 		}
 		expect(reason).toBe("cancelled");
 	});
@@ -36,8 +36,8 @@ describe("delay", () => {
 		let reason: unknown;
 		try {
 			await promise;
-		} catch (error) {
-			reason = error;
+		} catch (err) {
+			reason = err;
 		}
 		expect(reason).toBe("stopped");
 	});

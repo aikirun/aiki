@@ -30,10 +30,10 @@ export function createPublicRequestContext(params: { request: Request; logger: L
 		traceId,
 		spanId,
 		logger: logger.child({
-			method: request.method,
-			url: request.url,
-			traceId,
-			spanId,
+			"aiki.method": request.method,
+			"aiki.url": request.url,
+			"aiki.traceId": traceId,
+			"aiki.spanId": spanId,
 		}),
 		requestType: "public",
 		headers: request.headers,
@@ -59,10 +59,10 @@ export async function createNamespaceRequestContext(params: {
 		traceId,
 		spanId,
 		logger: logger.child({
-			method: request.method,
-			url: request.url,
-			traceId,
-			spanId,
+			"aiki.method": request.method,
+			"aiki.url": request.url,
+			"aiki.traceId": traceId,
+			"aiki.spanId": spanId,
 		}),
 		requestType: "authed",
 		headers: request.headers,
@@ -82,7 +82,7 @@ export function createDaemonContext(params: { name: string; logger: Logger; sign
 		type: "daemon",
 		traceId,
 		spanId,
-		logger: logger.child({ daemonName: name, traceId, spanId }),
+		logger: logger.child({ "aiki.daemonName": name, "aiki.traceId": traceId, "aiki.spanId": spanId }),
 		name,
 		signal,
 	};
@@ -93,6 +93,6 @@ export function forkContext<TContext extends Context>(context: TContext): TConte
 	return {
 		...context,
 		spanId,
-		logger: context.logger.child({ spanId }),
+		logger: context.logger.child({ "aiki.spanId": spanId }),
 	};
 }

@@ -30,8 +30,8 @@ export type RetryStrategy = NeverRetryStrategy | FixedRetryStrategy | Exponentia
 
 export type RetryOptions<Result, Abortable extends boolean> = {
 	shouldRetryOnResult?: (previousResult: Result) => boolean | Promise<boolean>;
-	shouldNotRetryOnError?: (error: unknown) => boolean | Promise<boolean>;
-	onError?: (error: unknown) => void | Promise<void>;
+	shouldNotRetryOnError?: (err: unknown) => boolean | Promise<boolean>;
+	onError?: (err: unknown) => void | Promise<void>;
 } & (Abortable extends true ? { signal: AbortSignal } : { signal?: never });
 
 type CompletedResult<Result> = {

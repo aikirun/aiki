@@ -366,7 +366,11 @@ export const createWorkflowRunService = ({
 				const runningStateTransitionId = monotonic();
 				const finalStateTransitionId = monotonic();
 
-				context.logger.info("Setting task state (new task)", { runId, taskId, state: request.state });
+				context.logger.info("Setting task state (new task)", {
+					"aiki.runId": runId,
+					"aiki.taskId": taskId,
+					"aiki.state": request.state,
+				});
 
 				const runningState: TaskState = {
 					status: "running",
@@ -418,9 +422,9 @@ export const createWorkflowRunService = ({
 			}
 
 			context.logger.info("Setting task state (existing task)", {
-				runId,
-				taskId: request.taskId,
-				state: request.state,
+				"aiki.runId": runId,
+				"aiki.taskId": request.taskId,
+				"aiki.state": request.state,
 			});
 
 			const attempts = existingTaskRow.attempts;
@@ -557,7 +561,10 @@ async function createWorkflowRunInTx(
 				conflictPolicy satisfies "return_existing";
 			}
 
-			context.logger.info("Returning existing run from reference ID", { runId: existingRun.id, referenceId });
+			context.logger.info("Returning existing run from reference ID", {
+				"aiki.runId": existingRun.id,
+				"aiki.referenceId": referenceId,
+			});
 			return existingRun.id as WorkflowRunId;
 		}
 	}
@@ -603,7 +610,13 @@ async function createWorkflowRunInTx(
 		state,
 	});
 
-	context.logger.info("Created workflow run", { workflowName: name, versionId, runId, referenceId, options });
+	context.logger.info("Created workflow run", {
+		"aiki.workflowName": name,
+		"aiki.versionId": versionId,
+		"aiki.runId": runId,
+		"aiki.referenceId": referenceId,
+		"aiki.options": options,
+	});
 
 	return runId;
 }

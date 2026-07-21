@@ -120,7 +120,11 @@ async function transitionStateInTx(
 			state: taskState,
 		});
 
-		context.logger.info("Created new task", { runId, taskId, taskState });
+		context.logger.info("Created new task", {
+			"aiki.runId": runId,
+			"aiki.taskId": taskId,
+			"aiki.taskState": taskState,
+		});
 
 		return { id: taskId, name: taskName, state: taskState, inputHash };
 	}
@@ -185,7 +189,11 @@ async function transitionStateInTx(
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
 	}
 
-	context.logger.info("Transitioning task state", { runId, taskId, taskState });
+	context.logger.info("Transitioning task state", {
+		"aiki.runId": runId,
+		"aiki.taskId": taskId,
+		"aiki.taskState": taskState,
+	});
 
 	return { id: taskId, name: taskName, state: taskState, inputHash };
 }

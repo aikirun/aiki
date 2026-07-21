@@ -183,11 +183,9 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			});
 		}
 
-		this.subscriberLoopPromise = this.subscriberLoop(signal).catch((error) => {
+		this.subscriberLoopPromise = this.subscriberLoop(signal).catch((err) => {
 			if (!signal.aborted) {
-				this.logger.error("Unexpected error", {
-					"aiki.error": error.message,
-				});
+				this.logger.error("Unexpected error", { err });
 			}
 		});
 	}
@@ -300,7 +298,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 
 				this.logger.error("Subscriber failed", {
 					"aiki.subscriber": "primary",
-					"aiki.error": err instanceof Error ? err.message : String(err),
+					err,
 				});
 
 				this.primarySubscriberFailedAttempts++;
@@ -330,7 +328,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 
 			this.logger.error("Subscriber failed", {
 				"aiki.subscriber": "backup",
-				"aiki.error": err instanceof Error ? err.message : String(err),
+				err,
 			});
 
 			this.backupSubscriberFailedAttempts++;
@@ -364,7 +362,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				} catch (err) {
 					this.logger.warn("Failed to fetch workflow run", {
 						"aiki.workflowRunId": workflowRunId,
-						"aiki.error": err instanceof Error ? err.message : String(err),
+						err,
 					});
 					this.pendingWorkflowRunIds.delete(workflowRunId);
 					this.availableCapacityLatch.signal();
@@ -399,11 +397,9 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			}
 		};
 
-		enqueue().catch((error) => {
+		enqueue().catch((err) => {
 			if (!signal.aborted) {
-				this.logger.error("Error enqueuing workflow run batch", {
-					"aiki.error": error instanceof Error ? error.message : String(error),
-				});
+				this.logger.error("Error enqueuing workflow run batch", { err });
 			}
 		});
 	}
@@ -445,7 +441,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 						if (!signal.aborted) {
 							logger.error("Failed to acknowledge message, it may be reprocessed", {
 								"aiki.errorType": "MESSAGE_ACK_FAILED",
-								"aiki.error": err instanceof Error ? err.message : String(err),
+								err,
 							});
 						}
 					}

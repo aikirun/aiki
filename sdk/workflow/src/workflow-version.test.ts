@@ -97,13 +97,13 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await workflowVersion[INTERNAL].handler(run);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunFailedError);
+				expect(err).toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
 		test("falls back to the workflow definition retry strategy when the run has none", () =>
@@ -151,13 +151,13 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await workflowVersion[INTERNAL].handler(run);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunSuspendedError);
+				expect(err).toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("falls back to no retries when neither the run nor the workflow defines a strategy", () =>
@@ -198,13 +198,13 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await workflowVersion[INTERNAL].handler(run);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunFailedError);
+				expect(err).toBeInstanceOf(WorkflowRunFailedError);
 			}));
 	});
 
@@ -344,13 +344,13 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await workflowVersion[INTERNAL].handler(run);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunFailedError);
+				expect(err).toBeInstanceOf(WorkflowRunFailedError);
 			}));
 	});
 
@@ -424,13 +424,13 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await workflowVersion[INTERNAL].handler(run);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunFailedError);
+				expect(err).toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
 		test("awaits retry with cause 'task' when retries remain", () =>
@@ -502,13 +502,13 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await workflowVersion[INTERNAL].handler(run);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunSuspendedError);
+				expect(err).toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 	});
 
@@ -546,13 +546,13 @@ describe("workflow version execution", () => {
 						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
 					);
 
-					let error: unknown;
+					let err: unknown;
 					try {
 						await workflowVersion[INTERNAL].handler(run);
 					} catch (caught) {
-						error = caught;
+						err = caught;
 					}
-					expect(error).toBe(thrownError);
+					expect(err).toBe(thrownError);
 				}));
 		}
 	});
@@ -573,13 +573,13 @@ describe("workflow version execution", () => {
 					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
 					const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
 
-					let error: unknown;
+					let err: unknown;
 					try {
 						await workflowVersion[INTERNAL].handler(run);
 					} catch (caught) {
-						error = caught;
+						err = caught;
 					}
-					expect(error).toBeInstanceOf(WorkflowRunNotExecutableError);
+					expect(err).toBeInstanceOf(WorkflowRunNotExecutableError);
 				}));
 		}
 	});
@@ -651,13 +651,13 @@ describe("creating a workflow run", () => {
 					schema: { input: alwaysInvalid },
 				});
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await workflowVersion.start(client, "world");
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(SchemaValidationError);
+				expect(err).toBeInstanceOf(SchemaValidationError);
 			}));
 
 		test("passes the definition retry strategy as start options", () =>
@@ -890,13 +890,13 @@ describe("creating a workflow run", () => {
 					}
 				);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await childWorkflow.startAsChild(parentRun, "payload");
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(NonDeterminismError);
+				expect(err).toBeInstanceOf(NonDeterminismError);
 			}));
 
 		test("throws WorkflowRunNotExecutableError when the parent is not executable", () =>
@@ -908,13 +908,13 @@ describe("creating a workflow run", () => {
 				});
 				const parentRun = createTestWorkflowRun(client, pausedWorkflowRunRecordFactory.build());
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await childWorkflow.startAsChild(parentRun, "payload");
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunNotExecutableError);
+				expect(err).toBeInstanceOf(WorkflowRunNotExecutableError);
 			}));
 
 		test("forwards the schema-parsed input to createV1", () =>
@@ -993,13 +993,13 @@ describe("creating a workflow run", () => {
 					}
 				);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await childWorkflow.startAsChild(parentRun, "payload");
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunFailedError);
+				expect(err).toBeInstanceOf(WorkflowRunFailedError);
 			}));
 	});
 });

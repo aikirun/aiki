@@ -226,7 +226,11 @@ async function transitionStateInTx(
 	const now = Date.now();
 	let toState = convertDurationsToTimestamps(request.state, now);
 
-	context.logger.info("Workflow state transition", { runId, state: toState, attempts: run.attempts });
+	context.logger.info("Workflow state transition", {
+		"aiki.runId": runId,
+		"aiki.state": toState,
+		"aiki.attempts": run.attempts,
+	});
 
 	if (fromState.status === "sleeping" && toState.status === "scheduled") {
 		await finalizeSleep(runId, fromState.sleepName, toState, now, txRepos);
@@ -357,9 +361,9 @@ async function childWorkflowRunWaitNotNeeded(
 		});
 
 		context.logger.info("Child already at status, scheduling immediately", {
-			runId,
-			childRunId,
-			childRunStatus: childRun.status,
+			"aiki.runId": runId,
+			"aiki.childRunId": childRunId,
+			"aiki.childRunStatus": childRun.status,
 		});
 
 		return true;
@@ -444,9 +448,9 @@ async function notifyParentOfStateChangeIfNecessary(
 		parentRunState.childWorkflowRunStatus === childRun.status
 	) {
 		context.logger.info("Notifying parent of child state change", {
-			parentRunId: parentRun.id,
-			childRunId: childRun.id,
-			status: childRun.status,
+			"aiki.parentRunId": parentRun.id,
+			"aiki.childRunId": childRun.id,
+			"aiki.status": childRun.status,
 		});
 
 		await txRepos.childWorkflowRunWaitQueue.insert({

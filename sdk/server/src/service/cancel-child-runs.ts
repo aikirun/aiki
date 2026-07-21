@@ -47,7 +47,7 @@ export const createChildRunCanceller = () => ({
 			return;
 		}
 
-		logger.info("Scheduling cancel-child-runs workflows", { parentRunIds: parentRunIdsHavingChildren });
+		logger.info("Scheduling cancel-child-runs workflows", { "aiki.parentRunIds": parentRunIdsHavingChildren });
 
 		const workflowEntries: WorkflowRowInsert[] = [];
 		const inputHashPromises: Array<Promise<string>> = [];

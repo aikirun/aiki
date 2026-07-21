@@ -35,7 +35,7 @@ export async function republishStaleRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		context.logger.debug("Releasing stale outbox claims", { count: staleEntries.length });
+		context.logger.debug("Releasing stale outbox claims", { "aiki.count": staleEntries.length });
 		const publishedEntryIds = await publishOutboxEntries(context, deps.workflowRunPublisher, staleEntries);
 		if (isNonEmptyArray(publishedEntryIds)) {
 			await deps.repos.workflowRunOutbox.releaseStaleClaim(publishedEntryIds);
@@ -49,7 +49,7 @@ export async function republishStaleRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		context.logger.debug("Republishing stale published outbox entries", { count: staleEntries.length });
+		context.logger.debug("Republishing stale published outbox entries", { "aiki.count": staleEntries.length });
 		const publishedEntryIds = await publishOutboxEntries(context, deps.workflowRunPublisher, staleEntries);
 		if (isNonEmptyArray(publishedEntryIds)) {
 			await deps.repos.workflowRunOutbox.markRepublished(publishedEntryIds);

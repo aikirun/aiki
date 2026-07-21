@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 
 describe("createSerializableError", () => {
 	test("extracts message, name, and stack from an Error", () => {
-		const error = new Error("something broke");
-		const result = createSerializableError(error);
+		const err = new Error("something broke");
+		const result = createSerializableError(err);
 		expect(result.message).toBe("something broke");
 		expect(result.name).toBe("Error");
 		expect(result.stack).toBeDefined();
@@ -12,8 +12,8 @@ describe("createSerializableError", () => {
 	});
 
 	test("preserves custom error name", () => {
-		const error = new TypeError("bad type");
-		const result = createSerializableError(error);
+		const err = new TypeError("bad type");
+		const result = createSerializableError(err);
 		expect(result.name).toBe("TypeError");
 	});
 
@@ -35,8 +35,8 @@ describe("createSerializableError", () => {
 	});
 
 	test("has no cause when error has no cause", () => {
-		const error = new Error("no cause");
-		const result = createSerializableError(error);
+		const err = new Error("no cause");
+		const result = createSerializableError(err);
 		expect(result.cause).toBeUndefined();
 	});
 

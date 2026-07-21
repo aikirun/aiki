@@ -58,11 +58,9 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		intervals.push(
 			runOnInterval(() => client.api.workflowRun.claimRefreshV1({ id: workflowRunId }), {
 				intervalMs: () => configProvider.config.claimRefreshIntervalMs,
-				onError: (error: Error): void => {
+				onError: (err: Error): void => {
 					if (!signal?.aborted) {
-						logger.warn("Failed to refresh claim", {
-							"aiki.error": error.message,
-						});
+						logger.warn("Failed to refresh claim", { err });
 					}
 				},
 				signal,
@@ -72,11 +70,9 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 			intervals.push(
 				runOnInterval(heartbeat.send, {
 					intervalMs: heartbeat.intervalMs,
-					onError: (error: Error): void => {
+					onError: (err: Error): void => {
 						if (!signal?.aborted) {
-							logger.warn("Failed to send heartbeat", {
-								"aiki.error": error.message,
-							});
+							logger.warn("Failed to send heartbeat", { err });
 						}
 					},
 					signal,
@@ -121,10 +117,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 			return true;
 		}
 
-		logger.error("Unexpected error during workflow execution", {
-			"aiki.error": err instanceof Error ? err.message : String(err),
-			"aiki.stack": err instanceof Error ? err.stack : undefined,
-		});
+		logger.error("Unexpected error during workflow execution", { err });
 		return false;
 	} finally {
 		for (const interval of intervals) {

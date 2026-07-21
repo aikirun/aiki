@@ -86,7 +86,7 @@ export async function processImminentRecurringWorkflows(
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
 			if (result.status === "failed") {
-				context.logger.debug("Failed to add timers to priority queue", { count: timers.length });
+				context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
 			}
 		}
 	}

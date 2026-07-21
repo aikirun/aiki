@@ -95,8 +95,8 @@ export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 		} else if (!cli.options.help && !cli.options.version) {
 			cli.outputHelp();
 		}
-	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error));
+	} catch (err) {
+		console.error(err instanceof Error ? err.message : String(err));
 		process.exit(1);
 	}
 }

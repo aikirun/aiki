@@ -208,13 +208,13 @@ describe("task", () => {
 						{ taskInfo: runningTaskInfo }
 					);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await chargeCard.start(run, input);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunSuspendedError);
+				expect(err).toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("fails the task and throws TaskFailedError when there is no retry budget", () =>
@@ -258,13 +258,13 @@ describe("task", () => {
 						{ taskInfo: runningTaskInfo }
 					);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await chargeCard.start(run, input);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(TaskFailedError);
+				expect(err).toBeInstanceOf(TaskFailedError);
 			}));
 
 		test("replays a completed task from history without touching the client", () =>
@@ -358,13 +358,13 @@ describe("task", () => {
 					{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
 				);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await validateInput.start(run, "anything");
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(WorkflowRunFailedError);
+				expect(err).toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
 		test("replays a failed task from history as TaskFailedError without touching the client", () =>
@@ -387,13 +387,13 @@ describe("task", () => {
 				});
 				const run = createTestWorkflowRun(client, runRecord);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await chargeCard.start(run, input);
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(TaskFailedError);
+				expect(err).toBeInstanceOf(TaskFailedError);
 				expect(handlerCalls).toBe(0);
 			}));
 
@@ -419,13 +419,13 @@ describe("task", () => {
 					{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
 				);
 
-				let error: unknown;
+				let err: unknown;
 				try {
 					await chargeCard.start(run, { cardId: "card-1" });
 				} catch (caught) {
-					error = caught;
+					err = caught;
 				}
-				expect(error).toBeInstanceOf(NonDeterminismError);
+				expect(err).toBeInstanceOf(NonDeterminismError);
 			}));
 
 		for (const status of WORKFLOW_RUN_STATUSES) {
@@ -447,13 +447,13 @@ describe("task", () => {
 						},
 					});
 
-					let error: unknown;
+					let err: unknown;
 					try {
 						await sendEmail.start(run, { to: "info@aiki.run" });
 					} catch (caught) {
-						error = caught;
+						err = caught;
 					}
-					expect(error).toBeInstanceOf(WorkflowRunNotExecutableError);
+					expect(err).toBeInstanceOf(WorkflowRunNotExecutableError);
 					expect(handlerCalls).toBe(0);
 				}));
 		}

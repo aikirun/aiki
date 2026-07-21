@@ -4,7 +4,7 @@ export function runOnInterval(
 	fn: () => Promise<void>,
 	options: {
 		intervalMs: number | (() => number);
-		onError: (error: Error) => void;
+		onError: (err: Error) => void;
 		signal?: AbortSignal;
 	}
 ): { stop: () => void } {

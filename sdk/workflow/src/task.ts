@@ -226,13 +226,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			"aiki.inputHash": inputHash,
 			"aiki.unconsumedManifestEntries": unconsumedManifestEntries,
 		});
-		const error = new NonDeterminismError(run.id, handle.run.attempts, unconsumedManifestEntries);
+		const err = new NonDeterminismError(run.id, handle.run.attempts, unconsumedManifestEntries);
 		await handle[INTERNAL].transitionState({
 			status: "failed",
 			cause: "self",
-			error: createSerializableError(error),
+			error: createSerializableError(err),
 		});
-		throw error;
+		throw err;
 	}
 
 	private async retryAndExecute(

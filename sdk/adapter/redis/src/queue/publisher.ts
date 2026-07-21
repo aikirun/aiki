@@ -42,19 +42,19 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 				const results = await redisPipeline.exec();
 				if (results === null) {
 					logger.warn("Publish pipeline returned no results, treating runs as failed", {
-						count: runs.length,
+						"aiki.count": runs.length,
 					});
 					return { published: [], deferred: [], failed: runs, declined: [] };
 				}
 
 				const published: ReadyWorkflowRun[] = [];
 				const failed: ReadyWorkflowRun[] = [];
-				let error: Error | undefined;
+				let err: Error | undefined;
 				for (const [i, queueData] of queueDataBatch.entries()) {
 					const result = results[i];
 					const commandError = result === undefined ? new Error("Pipeline returned no result for command") : result[0];
 					if (commandError !== null) {
-						error ??= commandError;
+						err ??= commandError;
 						for (const run of queueData.runs) {
 							failed.push(run);
 						}
@@ -65,10 +65,10 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 					}
 				}
 
-				if (error) {
+				if (err) {
 					logger.warn("Publish command failed, treating its runs as failed", {
-						err: error,
-						count: failed.length,
+						err,
+						"aiki.count": failed.length,
 					});
 				}
 

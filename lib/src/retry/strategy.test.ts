@@ -196,13 +196,13 @@ describe("withRetry", () => {
 
 	describe("shouldNotRetryOnError", () => {
 		test("re-throws when callback returns true", async () => {
-			const error = new Error("fatal");
+			const err = new Error("fatal");
 
 			let reason: unknown;
 			try {
 				await withRetry(
 					async () => {
-						throw error;
+						throw err;
 					},
 					strategy,
 					{ shouldNotRetryOnError: () => true }
@@ -210,7 +210,7 @@ describe("withRetry", () => {
 			} catch (caught) {
 				reason = caught;
 			}
-			expect(reason).toBe(error);
+			expect(reason).toBe(err);
 		});
 
 		test("continues retrying when callback returns false", async () => {
@@ -260,8 +260,8 @@ describe("withRetry", () => {
 			).run();
 
 			expect(errors).toHaveLength(3);
-			for (const error of errors) {
-				expect(error).toBeInstanceOf(Error);
+			for (const err of errors) {
+				expect(err).toBeInstanceOf(Error);
 			}
 		});
 
@@ -280,8 +280,8 @@ describe("withRetry", () => {
 			).run();
 
 			expect(errors).toHaveLength(3);
-			for (const error of errors) {
-				expect(error).toBeInstanceOf(Error);
+			for (const err of errors) {
+				expect(err).toBeInstanceOf(Error);
 			}
 		});
 

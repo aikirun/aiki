@@ -71,7 +71,7 @@ export async function publishOutboxEntries(
 
 	const publishedEntryIds: string[] = [];
 	if (isNonEmptyArray(result.published)) {
-		context.logger.debug("Published ready workflow runs", { count: result.published.length });
+		context.logger.debug("Published ready workflow runs", { "aiki.count": result.published.length });
 		for (const run of result.published) {
 			const entryId = entryIdByRunId.get(run.id);
 			if (entryId !== undefined) {
@@ -81,15 +81,15 @@ export async function publishOutboxEntries(
 	}
 
 	if (isNonEmptyArray(result.deferred)) {
-		context.logger.debug("Deferred publishing workflow runs", { count: result.deferred.length });
+		context.logger.debug("Deferred publishing workflow runs", { "aiki.count": result.deferred.length });
 	}
 
 	if (isNonEmptyArray(result.failed)) {
-		context.logger.debug("Failed to publish workflow runs", { count: result.failed.length });
+		context.logger.debug("Failed to publish workflow runs", { "aiki.count": result.failed.length });
 	}
 
 	if (isNonEmptyArray(result.declined)) {
-		context.logger.warn("Declined to publish workflow runs", { count: result.declined.length });
+		context.logger.warn("Declined to publish workflow runs", { "aiki.count": result.declined.length });
 	}
 
 	return publishedEntryIds;

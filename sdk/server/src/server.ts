@@ -89,8 +89,8 @@ function createRuntimeHandle(params: {
 				timerPriorityQueue: params.runtime?.timerPriorityQueue,
 				config: params.runtime?.config,
 			});
-		} catch (error) {
-			logger.error("Server runtime failed to start", { err: error });
+		} catch (err) {
+			logger.error("Server runtime failed to start", { err });
 			return undefined;
 		}
 	})();

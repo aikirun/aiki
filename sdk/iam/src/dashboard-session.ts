@@ -149,7 +149,12 @@ function createOrganizationHandler(
 						type: "request",
 						traceId,
 						spanId,
-						logger: context.logger.child({ method: request.method, url: request.url, traceId, spanId }),
+						logger: context.logger.child({
+							"aiki.method": request.method,
+							"aiki.url": request.url,
+							"aiki.traceId": traceId,
+							"aiki.spanId": spanId,
+						}),
 						requestType: "authed",
 						headers: request.headers,
 						method: request.method,

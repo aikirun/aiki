@@ -49,7 +49,7 @@ export async function processImminentScheduledRuns(
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
 			if (result.status === "failed") {
-				context.logger.debug("Failed to add timers to priority queue", { count: timers.length });
+				context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
 			}
 		}
 	}
@@ -83,7 +83,7 @@ export async function queueScheduledRuns(
 		try {
 			await processChunk(spanCtx, repos, workflowRunPublisher, chunk, stateTransitionsById, workflowsById);
 		} catch (err) {
-			spanCtx.logger.warn("Failed to process chunk, will retry next tick", { err, chunkSize: chunk.length });
+			spanCtx.logger.warn("Failed to process chunk, will retry next tick", { err, "aiki.chunkSize": chunk.length });
 		}
 	});
 }

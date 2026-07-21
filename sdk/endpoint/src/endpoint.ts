@@ -74,7 +74,7 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 		} catch (err) {
 			logger.warn("Failed to fetch workflow run", {
 				"aiki.workflowRunId": workflowRunId,
-				"aiki.error": err instanceof Error ? err.message : String(err),
+				err,
 			});
 			return jsonResponse(404);
 		}

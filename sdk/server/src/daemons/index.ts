@@ -51,7 +51,7 @@ const pollingDaemon = (
 						const config = getConfig(configProvider.config);
 						await fn(context, deps, config);
 						const durationMs = Math.round(performance.now() - start);
-						context.logger.debug("Completed", { durationMs });
+						context.logger.debug("Completed", { "aiki.durationMs": durationMs });
 						const delayMs = config.intervalMs - durationMs;
 						if (delayMs > 0) {
 							await delay(delayMs, { signal });

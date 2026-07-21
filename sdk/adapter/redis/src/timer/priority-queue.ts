@@ -96,7 +96,7 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 				try {
 					await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minDueAt, ...args);
 				} catch (err) {
-					logger.warn("Timer add command failed", { err, count: timers.length });
+					logger.warn("Timer add command failed", { err, "aiki.count": timers.length });
 					return { status: "failed" };
 				}
 				return { status: "added" };
