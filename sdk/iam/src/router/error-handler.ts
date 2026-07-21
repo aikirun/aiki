@@ -25,8 +25,6 @@ export function handleError<T extends ContextBase>(context: T, err: unknown) {
 
 	const cause = err instanceof Error && "cause" in err ? err.cause : undefined;
 	context.logger.error("Request error occurred", {
-		"aiki.errorName": err instanceof Error ? err.name : "Unknown",
-		"aiki.errorMessage": err instanceof Error ? err.message : String(err),
 		err,
 		...(cause && typeof cause === "object" && "issues" in cause
 			? { "aiki.validationIssues": (cause as { issues: unknown }).issues }
