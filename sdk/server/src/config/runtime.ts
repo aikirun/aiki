@@ -23,6 +23,9 @@ export interface ServerRuntimeConfig {
 		republishStaleRuns: PollingDaemonConfig & {
 			claimMinIdleTimeMs: number;
 		};
+		stallUndeliverableRuns: PollingDaemonConfig & {
+			maxAgeMs: number;
+		};
 		dueTimersConsumer: {
 			limit: number;
 			overshootMs: number;
@@ -78,6 +81,11 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 			intervalMs: 1_000,
 			limit: 1_000,
 			claimMinIdleTimeMs: DEFAULT_CLAIM_MIN_IDLE_TIME_MS,
+		},
+		stallUndeliverableRuns: {
+			intervalMs: 60_000,
+			limit: 1_000,
+			maxAgeMs: 24 * 60 * 60 * 1_000, // 24 hours
 		},
 		dueTimersConsumer: {
 			limit: 1_000,

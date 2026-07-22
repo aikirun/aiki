@@ -1,0 +1,1 @@
+CREATE INDEX "idx_workflow_run_outbox_stall_undeliverable" ON "workflow_run_outbox" USING btree ("id") WHERE "workflow_run_outbox"."status" IN ('pending', 'published');

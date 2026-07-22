@@ -15,6 +15,7 @@ import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { publishReadyRuns } from "./publish-ready-runs";
 import { republishStaleRuns } from "./republish-stale-runs";
+import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import type { ServerRuntimeConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
 import type { DaemonContext } from "../middleware/context";
@@ -115,6 +116,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			workflowRunPublisher,
 			timerPriorityQueue,
 		}),
+		startPollingDaemon((config) => config.stallUndeliverableRuns, stallUndeliverableRuns, { repos }),
 	];
 
 	if (workflowRunPublisher) {

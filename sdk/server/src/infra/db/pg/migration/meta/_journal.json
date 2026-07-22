@@ -57,6 +57,13 @@
 			"when": 1784630904567,
 			"tag": "0007_brown_warhawk",
 			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "7",
+			"when": 1784753308790,
+			"tag": "0008_redundant_changeling",
+			"breakpoints": true
 		}
 	]
 }

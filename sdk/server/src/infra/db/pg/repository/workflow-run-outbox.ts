@@ -2,7 +2,7 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
-import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { rankStreamCursorFilter } from "./lib/rank-stream";
 import { timerStreamCursorFilter } from "./lib/timer-stream";
@@ -158,6 +158,23 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.limit(limit);
 
 		return rows as WorkflowRunOutboxRowClaimed[];
+	},
+
+	async listUndeliverable(_context: DaemonContext, maxId: string, limit: number, cursorId?: string) {
+		const conditions = [inArray(workflowRunOutbox.status, ["pending", "published"]), lte(workflowRunOutbox.id, maxId)];
+		if (cursorId !== undefined) {
+			conditions.push(sql`${workflowRunOutbox.id} > ${cursorId}`);
+		}
+
+		return db
+			.select({
+				id: workflowRunOutbox.id,
+				workflowRunId: workflowRunOutbox.workflowRunId,
+			})
+			.from(workflowRunOutbox)
+			.where(and(...conditions))
+			.orderBy(workflowRunOutbox.id)
+			.limit(limit);
 	},
 
 	async deleteByWorkflowRunId(namespaceId: string, workflowRunId: string): Promise<void> {
