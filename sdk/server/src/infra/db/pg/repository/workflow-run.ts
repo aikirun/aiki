@@ -100,6 +100,10 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.where(and(eq(workflowRun.namespaceId, namespaceId), inArray(workflowRun.id, ids)));
 	},
 
+	async getByIdsGlobal(_context: DaemonContext, ids: NonEmptyArray<string>): Promise<WorkflowRunRow[]> {
+		return db.select().from(workflowRun).where(inArray(workflowRun.id, ids));
+	},
+
 	async getByIdWithState(namespaceId: NamespaceId, id: string, options?: { forUpdate?: boolean }) {
 		const query = db
 			.select({
@@ -496,6 +500,23 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				nextAttemptAt: null,
 			})
 			.where(and(inArray(workflowRun.id, runIds), inArray(workflowRun.status, NON_TERMINAL_WORKFLOW_RUN_STATUSES)))
+			.returning({ id: workflowRun.id });
+
+		return result.map((row) => row.id);
+	},
+
+	async bulkTransitionToStalled(runIds: NonEmptyArray<string>): Promise<string[]> {
+		const result = await db
+			.update(workflowRun)
+			.set({
+				status: "stalled",
+				revision: sql`${workflowRun.revision} + 1`,
+				scheduledAt: null,
+				awakeAt: null,
+				timeoutAt: null,
+				nextAttemptAt: null,
+			})
+			.where(and(inArray(workflowRun.id, runIds), eq(workflowRun.status, "queued")))
 			.returning({ id: workflowRun.id });
 
 		return result.map((row) => row.id);

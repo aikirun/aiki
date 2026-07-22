@@ -403,7 +403,7 @@ export const workflowRunOutbox = pgTable(
 			.on(table.namespaceId, table.workflowName, table.workflowVersionId, table.shard, table.rank, table.id)
 			.where(sql`${table.status} = 'published'`),
 
-		// Stale-claim steal path: identifies claimed rows whose last refresh is older than a threshold.
+		// Steal stale-claim path: identifies claimed rows whose last refresh is older than a threshold.
 		index("idx_workflow_run_outbox_steal_claim")
 			.on(
 				table.namespaceId,
@@ -422,6 +422,11 @@ export const workflowRunOutbox = pgTable(
 			.on(table.publishedAt, table.id)
 			.where(sql`${table.status} = 'published'`),
 		index("idx_workflow_run_outbox_list_claimed").on(table.claimedAt, table.id).where(sql`${table.status} = 'claimed'`),
+
+		// Age sweep: id-range scan over undeliverable rows to stall those past maxAgeMs.
+		index("idx_workflow_run_outbox_stall_undeliverable")
+			.on(table.id)
+			.where(sql`${table.status} IN ('pending', 'published')`),
 
 		check(
 			"chk_workflow_run_outbox_published_requires_published_at",
