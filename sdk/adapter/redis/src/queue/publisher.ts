@@ -1,5 +1,11 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import type { CreatePublisher, Publisher, PublishResult, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
+import type {
+	CreatePublisher,
+	Publisher,
+	PublishResult,
+	PublishResultBucket,
+	ReadyWorkflowRun,
+} from "@aikirun/types/infra/queue";
 import type { Redis } from "ioredis";
 
 import { getWorkflowQueueName } from "./key";
@@ -17,7 +23,7 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 		return {
 			async publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishResult> {
 				if (!redisTracker.isAvailable()) {
-					return { published: [], deferred: [], failed: runs, declined: [] };
+					return { failed: runs.map((run) => ({ run })) };
 				}
 
 				const dataByQueueName = new Map<string, QueueData>();
@@ -44,11 +50,11 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 					logger.warn("Publish pipeline returned no results, treating runs as failed", {
 						"aiki.count": runs.length,
 					});
-					return { published: [], deferred: [], failed: runs, declined: [] };
+					return { failed: runs.map((run) => ({ run })) };
 				}
 
-				const published: ReadyWorkflowRun[] = [];
-				const failed: ReadyWorkflowRun[] = [];
+				const published: PublishResultBucket = [];
+				const failed: PublishResultBucket = [];
 				let err: Error | undefined;
 				for (const [i, queueData] of queueDataBatch.entries()) {
 					const result = results[i];
@@ -56,11 +62,11 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 					if (commandError !== null) {
 						err ??= commandError;
 						for (const run of queueData.runs) {
-							failed.push(run);
+							failed.push({ run });
 						}
 					} else {
 						for (const run of queueData.runs) {
-							published.push(run);
+							published.push({ run });
 						}
 					}
 				}
@@ -72,7 +78,14 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 					});
 				}
 
-				return { published, deferred: [], failed, declined: [] };
+				const result: PublishResult = {};
+				if (published.length > 0) {
+					result.published = published;
+				}
+				if (failed.length > 0) {
+					result.failed = failed;
+				}
+				return result;
 			},
 		};
 	};
