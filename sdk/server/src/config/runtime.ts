@@ -18,7 +18,7 @@ export interface ServerRuntimeConfig {
 		imminentRetryableTaskRuns: ImminentPollingDaemonConfig;
 		imminentEventWaitTimedOutRuns: ImminentPollingDaemonConfig;
 		imminentChildRunWaitTimedOutRuns: ImminentPollingDaemonConfig;
-		imminentRecurringWorkflows: ImminentPollingDaemonConfig;
+		imminentRecurringRuns: ImminentPollingDaemonConfig;
 		publishReadyRuns: PollingDaemonConfig;
 		republishStaleRuns: PollingDaemonConfig & {
 			claimMinIdleTimeMs: number;
@@ -65,7 +65,7 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 			limit: 1_000,
 			imminenceThresholdMs: 3_000,
 		},
-		imminentRecurringWorkflows: {
+		imminentRecurringRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
 			imminenceThresholdMs: 3_000,

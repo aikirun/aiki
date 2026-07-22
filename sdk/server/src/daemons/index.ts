@@ -8,7 +8,7 @@ import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import { startDueTimersConsumer } from "./due-timers-consumer";
 import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
-import { processImminentRecurringWorkflows } from "./imminent-recurring-workflows";
+import { processImminentRecurringRuns } from "./imminent-recurring-runs";
 import { processImminentRetryableRuns } from "./imminent-retryable-runs";
 import { processImminentRetryableTaskRuns } from "./imminent-retryable-task-runs";
 import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
@@ -109,7 +109,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			workflowRunPublisher,
 			timerPriorityQueue,
 		}),
-		startPollingDaemon((config) => config.imminentRecurringWorkflows, processImminentRecurringWorkflows, {
+		startPollingDaemon((config) => config.imminentRecurringRuns, processImminentRecurringRuns, {
 			repos,
 			childRunCanceller,
 			workflowRunPublisher,

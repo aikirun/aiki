@@ -27,7 +27,7 @@ import type { CancelledParentRun, ChildRunCanceller } from "../service/cancel-ch
 import { discardStaleTasks } from "../service/discard-stale-tasks";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "../service/schedule";
 
-export interface ProcessImminentRecurringWorkflowsDeps {
+export interface ProcessImminentRecurringRunsDeps {
 	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "schedule" | "workflowRunOutbox" | "transaction">;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunPublisher?: Publisher;
@@ -45,9 +45,9 @@ const advanceScheduleCursor = createTimerStreamCursorAdvancer<{ schedule: { id: 
 	getId: (row) => row.schedule.id,
 });
 
-export async function processImminentRecurringWorkflows(
+export async function processImminentRecurringRuns(
 	context: DaemonContext,
-	deps: ProcessImminentRecurringWorkflowsDeps,
+	deps: ProcessImminentRecurringRunsDeps,
 	{ limit, imminenceThresholdMs }: { limit: number; imminenceThresholdMs: number }
 ) {
 	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
@@ -73,7 +73,7 @@ export async function processImminentRecurringWorkflows(
 		}));
 
 		if (isNonEmptyArray(schedulesDueNow)) {
-			await queueRecurringWorkflows(context, deps, schedulesDueNow);
+			await queueRecurringRuns(context, deps, schedulesDueNow);
 		}
 
 		const { timerPriorityQueue } = deps;
@@ -92,9 +92,9 @@ export async function processImminentRecurringWorkflows(
 	}
 }
 
-export async function queueRecurringWorkflows(
+export async function queueRecurringRuns(
 	context: DaemonContext,
-	deps: ProcessImminentRecurringWorkflowsDeps,
+	deps: ProcessImminentRecurringRunsDeps,
 	schedules: NonEmptyArray<DueSchedule>
 ) {
 	const now = Date.now();
@@ -136,7 +136,7 @@ export async function queueRecurringWorkflows(
 
 async function processOverlapAllowSchedules(
 	context: DaemonContext,
-	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringRunsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
 	workflowRunPublisher?: Publisher
@@ -221,7 +221,7 @@ async function processOverlapAllowSchedules(
 
 async function processOverlapSkipSchedules(
 	context: DaemonContext,
-	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringRunsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
 	workflowRunPublisher?: Publisher
@@ -313,7 +313,7 @@ async function processOverlapSkipSchedules(
 
 async function processOverlapCancelPreviousSchedules(
 	context: DaemonContext,
-	deps: ProcessImminentRecurringWorkflowsDeps,
+	deps: ProcessImminentRecurringRunsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number
 ) {
@@ -466,7 +466,7 @@ function scheduledRunOptions(
 }
 
 async function fetchActiveRunsBySchedule(
-	repos: ProcessImminentRecurringWorkflowsDeps["repos"],
+	repos: ProcessImminentRecurringRunsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>
 ) {
 	const workflowAndReferenceIdPairs: { workflowId: string; referenceId: string }[] = [];

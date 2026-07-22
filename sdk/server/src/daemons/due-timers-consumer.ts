@@ -10,7 +10,7 @@ import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 
 import { queueChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
 import { queueEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
-import { type DueSchedule, queueRecurringWorkflows } from "./imminent-recurring-workflows";
+import { type DueSchedule, queueRecurringRuns } from "./imminent-recurring-runs";
 import { queueRetryableRuns } from "./imminent-retryable-runs";
 import { queueRetryableTaskRuns } from "./imminent-retryable-task-runs";
 import { queueScheduledRuns } from "./imminent-scheduled-runs";
@@ -153,7 +153,7 @@ async function processDueTimers(
 			if (!isNonEmptyArray(schedules)) {
 				continue;
 			}
-			promises.push(queueRecurringWorkflows(context, deps, schedules));
+			promises.push(queueRecurringRuns(context, deps, schedules));
 		} else {
 			const ids: string[] = [];
 			const rankById = new Map<string, number>();
