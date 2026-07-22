@@ -64,6 +64,13 @@
 			"when": 1784753308790,
 			"tag": "0008_redundant_changeling",
 			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "7",
+			"when": 1784756645279,
+			"tag": "0009_simple_the_anarchist",
+			"breakpoints": true
 		}
 	]
 }
