@@ -43,7 +43,14 @@ export async function* streamChunks<Item, Cursor, ItemWhenTrue = Item, ItemWhenF
 			return;
 		}
 
-		if (partition) {
+		if (!partition) {
+			if (advanceCursor) {
+				for (const item of chunk) {
+					cursor = advanceCursor(cursor, item);
+				}
+			}
+			yield chunk;
+		} else {
 			const whenTrue: ItemWhenTrue[] = [];
 			const whenFalse: ItemWhenFalse[] = [];
 			for (const item of chunk) {
@@ -58,13 +65,6 @@ export async function* streamChunks<Item, Cursor, ItemWhenTrue = Item, ItemWhenF
 				}
 			}
 			yield { whenTrue, whenFalse };
-		} else {
-			if (advanceCursor) {
-				for (const item of chunk) {
-					cursor = advanceCursor(cursor, item);
-				}
-			}
-			yield chunk;
 		}
 
 		if (until?.(chunk)) {
