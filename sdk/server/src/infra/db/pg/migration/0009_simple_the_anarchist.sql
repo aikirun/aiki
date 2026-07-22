@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_run_outbox" RENAME COLUMN "next_publish_at" TO "next_publish_attempt_at";
