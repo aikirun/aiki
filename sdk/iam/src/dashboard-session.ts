@@ -107,7 +107,7 @@ function authenticator(params: DashboardSessionIamParams): CreateDashboardAuthen
 
 function createOrganizationHandler(
 	params: DashboardSessionIamParams,
-	context: IamContext,
+	{ logger }: IamContext,
 	getAuthService: GetAuthService
 ): OrganizationDashboardHandler {
 	let handler: OrganizationDashboardHandler | undefined;
@@ -123,7 +123,7 @@ function createOrganizationHandler(
 				const repos = await createRepos(db);
 				const authService = await getAuthService();
 				const apiKeyCache = params.cache?.<ApiKeyAuthorizationInfo>({
-					logger: context.logger.child({ "aiki.component": "cache.apiKeyAuth" }),
+					logger: logger.child({ "aiki.component": "cache.apiKeyAuth" }),
 					keyPrefix: "api_key:",
 				});
 				const apiKeyService = createApiKeyService({ repos, cache: apiKeyCache });
@@ -139,7 +139,7 @@ function createOrganizationHandler(
 						if (err instanceof UnauthorizedError) {
 							return new Response(err.message, { status: 401 });
 						}
-						context.logger.error("Unhandled error", { err });
+						logger.error("Unhandled error", { err });
 						return new Response("Internal Server Error", { status: 500 });
 					}
 
@@ -149,7 +149,7 @@ function createOrganizationHandler(
 						type: "request",
 						traceId,
 						spanId,
-						logger: context.logger.child({
+						logger: logger.child({
 							"aiki.method": request.method,
 							"aiki.url": request.url,
 							"aiki.traceId": traceId,

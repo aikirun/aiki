@@ -51,7 +51,7 @@ export async function publishPendingOutboxEntries(
 }
 
 export async function publishOutboxEntries(
-	context: DaemonContext,
+	{ logger }: DaemonContext,
 	workflowRunPublisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsert>
 ): Promise<string[]> {
@@ -81,7 +81,7 @@ export async function publishOutboxEntries(
 
 		switch (outcome) {
 			case "published":
-				context.logger.debug("Published ready workflow runs", { "aiki.count": bucket.length });
+				logger.debug("Published ready workflow runs", { "aiki.count": bucket.length });
 				for (const { run } of bucket) {
 					const entryId = entryIdByRunId.get(run.id);
 					if (entryId !== undefined) {
@@ -90,13 +90,13 @@ export async function publishOutboxEntries(
 				}
 				break;
 			case "deferred":
-				context.logger.debug("Deferred publishing workflow runs", { "aiki.count": bucket.length });
+				logger.debug("Deferred publishing workflow runs", { "aiki.count": bucket.length });
 				break;
 			case "failed":
-				context.logger.debug("Failed to publish workflow runs", { "aiki.count": bucket.length });
+				logger.debug("Failed to publish workflow runs", { "aiki.count": bucket.length });
 				break;
 			case "declined":
-				context.logger.warn("Declined to publish workflow runs", { "aiki.count": bucket.length });
+				logger.warn("Declined to publish workflow runs", { "aiki.count": bucket.length });
 				break;
 			default:
 				outcome satisfies never;

@@ -39,7 +39,7 @@ function extractBearerToken(headers: Headers): string | null {
 	return null;
 }
 
-function createApiKeyAuthorizer(params: ApiAuthorizerKeyParams, context: IamContext): ApiAuthorizer {
+function createApiKeyAuthorizer(params: ApiAuthorizerKeyParams, { logger }: IamContext): ApiAuthorizer {
 	let authorizer: ApiAuthorizer | undefined;
 	let createAuthorizerPromise: Promise<ApiAuthorizer> | undefined;
 
@@ -54,7 +54,7 @@ function createApiKeyAuthorizer(params: ApiAuthorizerKeyParams, context: IamCont
 				const apiKeyService = createApiKeyService({
 					repos,
 					cache: params.cache?.<ApiKeyAuthorizationInfo>({
-						logger: context.logger.child({ "aiki.component": "cache.apiKeyAuth" }),
+						logger: logger.child({ "aiki.component": "cache.apiKeyAuth" }),
 						keyPrefix: "api_key:",
 					}),
 				});

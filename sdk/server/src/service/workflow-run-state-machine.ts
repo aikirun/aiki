@@ -342,14 +342,14 @@ async function finalizeSleep(
 }
 
 async function childWorkflowRunWaitNotNeeded(
-	context: NamespaceRequestContext,
+	{ namespaceId, logger }: NamespaceRequestContext,
 	runId: WorkflowRunId,
 	toState: WorkflowRunStateAwaitingChildWorkflow,
 	now: number,
 	txRepos: TxRepos
 ) {
 	const childRunId = toState.childWorkflowRunId as WorkflowRunId;
-	const childRun = await txRepos.workflowRun.getByIdWithState(context.namespaceId, childRunId);
+	const childRun = await txRepos.workflowRun.getByIdWithState(namespaceId, childRunId);
 	if (!childRun) {
 		throw new NotFoundError(`Workflow run not found: ${childRunId}`);
 	}
@@ -365,7 +365,7 @@ async function childWorkflowRunWaitNotNeeded(
 			childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
 		});
 
-		context.logger.info("Child already at status, scheduling immediately", {
+		logger.info("Child already at status, scheduling immediately", {
 			"aiki.runId": runId,
 			"aiki.childRunId": childRunId,
 			"aiki.childRunStatus": childRun.status,

@@ -10,7 +10,7 @@ import {
 } from "../errors";
 import type { RequestContext } from "../middleware/context";
 
-export function handleError<T extends RequestContext>(context: T, err: unknown) {
+export function handleError<T extends RequestContext>({ logger }: T, err: unknown) {
 	if (err instanceof NotFoundError) {
 		throw new ORPCError("NOT_FOUND", { message: err.message });
 	}
@@ -52,7 +52,7 @@ export function handleError<T extends RequestContext>(context: T, err: unknown) 
 	}
 
 	const cause = err instanceof Error && "cause" in err ? err.cause : undefined;
-	context.logger.error("Request error occurred", {
+	logger.error("Request error occurred", {
 		err,
 		...(cause && typeof cause === "object" && "issues" in cause
 			? { "aiki.validationIssues": (cause as { issues: unknown }).issues }

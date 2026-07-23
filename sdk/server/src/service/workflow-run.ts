@@ -351,10 +351,11 @@ export const createWorkflowRunService = ({
 	},
 
 	async setTaskState(context: NamespaceRequestContext, request: WorkflowRunSetTaskStateRequestV1): Promise<void> {
+		const { namespaceId, logger } = context;
 		const runId = request.id as WorkflowRunId;
 
 		return repos.transaction(async (txRepos) => {
-			const run = await txRepos.workflowRun.getById(context.namespaceId, runId);
+			const run = await txRepos.workflowRun.getById(namespaceId, runId);
 			if (!run) {
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
 			}
@@ -366,7 +367,7 @@ export const createWorkflowRunService = ({
 				const runningStateTransitionId = monotonic();
 				const finalStateTransitionId = monotonic();
 
-				context.logger.info("Setting task state (new task)", {
+				logger.info("Setting task state (new task)", {
 					"aiki.runId": runId,
 					"aiki.taskId": taskId,
 					"aiki.state": request.state,
@@ -421,7 +422,7 @@ export const createWorkflowRunService = ({
 				throw new NotFoundError(`Task not found: ${request.taskId}`);
 			}
 
-			context.logger.info("Setting task state (existing task)", {
+			logger.info("Setting task state (existing task)", {
 				"aiki.runId": runId,
 				"aiki.taskId": request.taskId,
 				"aiki.state": request.state,
@@ -469,7 +470,7 @@ export const createWorkflowRunService = ({
 		};
 	},
 
-	async cancelByIds(context: NamespaceRequestContext, request: WorkflowRunCancelByIdsRequestV1) {
+	async cancelByIds({ namespaceId, logger }: NamespaceRequestContext, request: WorkflowRunCancelByIdsRequestV1) {
 		const ids = request.ids;
 		if (!isNonEmptyArray(ids)) {
 			return { cancelledIds: [] };
@@ -484,7 +485,7 @@ export const createWorkflowRunService = ({
 			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
 			await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
-			const cancelledRuns = await txRepos.workflowRun.getByIds(context.namespaceId, cancelledRunIds);
+			const cancelledRuns = await txRepos.workflowRun.getByIds(namespaceId, cancelledRunIds);
 
 			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
 			const cancelledRunStateTransitionUpdates: { id: string; stateTransitionId: string }[] = [];
@@ -502,7 +503,7 @@ export const createWorkflowRunService = ({
 				});
 				cancelledRunStateTransitionUpdates.push({ id: run.id, stateTransitionId });
 				cancelledRunsMeta.push({
-					namespaceId: context.namespaceId,
+					namespaceId,
 					runId: run.id,
 					shard: run.options?.shard,
 				});
@@ -514,7 +515,7 @@ export const createWorkflowRunService = ({
 			}
 
 			if (isNonEmptyArray(cancelledRunsMeta)) {
-				await childRunCanceller.cancel(cancelledRunsMeta, txRepos, context.logger);
+				await childRunCanceller.cancel(cancelledRunsMeta, txRepos, logger);
 			}
 
 			return { cancelledIds: cancelledRunIds };
@@ -536,12 +537,11 @@ export const createWorkflowRunService = ({
 export type WorkflowRunService = ReturnType<typeof createWorkflowRunService>;
 
 async function createWorkflowRunInTx(
-	context: NamespaceRequestContext,
+	{ namespaceId, logger }: NamespaceRequestContext,
 	request: WorkflowRunCreateRequestV1,
 	inputHash: string,
 	txRepos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">
 ): Promise<WorkflowRunId> {
-	const namespaceId = context.namespaceId;
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
 	const parentWorkflowRunId = request.parentWorkflowRunId as WorkflowRunId | undefined;
@@ -561,7 +561,7 @@ async function createWorkflowRunInTx(
 				conflictPolicy satisfies "return_existing";
 			}
 
-			context.logger.info("Returning existing run from reference ID", {
+			logger.info("Returning existing run from reference ID", {
 				"aiki.runId": existingRun.id,
 				"aiki.referenceId": referenceId,
 			});
@@ -610,7 +610,7 @@ async function createWorkflowRunInTx(
 		state,
 	});
 
-	context.logger.info("Created workflow run", {
+	logger.info("Created workflow run", {
 		"aiki.workflowName": name,
 		"aiki.versionId": versionId,
 		"aiki.runId": runId,

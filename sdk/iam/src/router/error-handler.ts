@@ -2,7 +2,7 @@ import type { ContextBase } from "@aikirun/lib/context";
 import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@aikirun/lib/error";
 import { ORPCError } from "@orpc/server";
 
-export function handleError<T extends ContextBase>(context: T, err: unknown) {
+export function handleError<T extends ContextBase>({ logger }: T, err: unknown) {
 	if (err instanceof NotFoundError) {
 		throw new ORPCError("NOT_FOUND", { message: err.message });
 	}
@@ -24,7 +24,7 @@ export function handleError<T extends ContextBase>(context: T, err: unknown) {
 	}
 
 	const cause = err instanceof Error && "cause" in err ? err.cause : undefined;
-	context.logger.error("Request error occurred", {
+	logger.error("Request error occurred", {
 		err,
 		...(cause && typeof cause === "object" && "issues" in cause
 			? { "aiki.validationIssues": (cause as { issues: unknown }).issues }

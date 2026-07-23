@@ -68,11 +68,10 @@ export const createTaskStateMachineService = ({ repos }: TaskStateMachineService
 export type TaskStateMachineService = ReturnType<typeof createTaskStateMachineService>;
 
 async function transitionStateInTx(
-	context: NamespaceRequestContext,
+	{ namespaceId, logger }: NamespaceRequestContext,
 	request: WorkflowRunTransitionTaskStateRequestV1,
 	txRepos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
 ): Promise<TaskInfo> {
-	const namespaceId = context.namespaceId;
 	const runId = request.id as WorkflowRunId;
 
 	const run = await txRepos.workflowRun.getById(namespaceId, runId);
@@ -120,7 +119,7 @@ async function transitionStateInTx(
 			state: taskState,
 		});
 
-		context.logger.info("Created new task", {
+		logger.info("Created new task", {
 			"aiki.runId": runId,
 			"aiki.taskId": taskId,
 			"aiki.taskState": taskState,
@@ -189,7 +188,7 @@ async function transitionStateInTx(
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
 	}
 
-	context.logger.info("Transitioning task state", {
+	logger.info("Transitioning task state", {
 		"aiki.runId": runId,
 		"aiki.taskId": taskId,
 		"aiki.taskState": taskState,
