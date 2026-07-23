@@ -3,9 +3,9 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, count, eq, getTableColumns, inArray, isNull, lte, sql } from "drizzle-orm";
 
-import { timerStreamCursorFilter } from "./lib/timer-stream";
+import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import { ScheduleConflictError } from "../../../../errors";
-import type { TimerStreamCursor } from "../../../../lib/timer-stream";
+import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { schedule, workflow } from "../schema";
@@ -174,7 +174,7 @@ export const createScheduleRepository = (db: PgDb) => ({
 			.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
 	},
 
-	async listDueSchedules(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: TimerStreamCursor) {
+	async listDueSchedules(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: KeysetStreamCursor) {
 		return db
 			.select({
 				schedule: {
@@ -189,7 +189,7 @@ export const createScheduleRepository = (db: PgDb) => ({
 				and(
 					eq(schedule.status, "active"),
 					lte(schedule.nextRunAt, before),
-					timerStreamCursorFilter(schedule.nextRunAt, schedule.id, cursor)
+					keysetStreamCursorFilter(schedule.nextRunAt, schedule.id, cursor)
 				)
 			)
 			.orderBy(schedule.nextRunAt, schedule.id)

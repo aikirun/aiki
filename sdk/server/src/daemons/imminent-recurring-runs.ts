@@ -20,8 +20,8 @@ import type { Repositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
+import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import { computeRank } from "../lib/rank";
-import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "../service/cancel-child-runs";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
@@ -40,8 +40,8 @@ export type DueSchedule = Schedule & {
 	workflowRunInputHash: string;
 };
 
-const advanceScheduleCursor = createTimerStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: TimestampMs } }>({
-	getDueAt: (row) => row.schedule.nextRunAt,
+const advanceScheduleCursor = createKeysetStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: TimestampMs } }>({
+	getOrder: (row) => row.schedule.nextRunAt,
 	getId: (row) => row.schedule.id,
 });
 

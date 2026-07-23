@@ -7,7 +7,7 @@ import type {
 	WorkflowRunOutboxRowInsert,
 	WorkflowRunOutboxRowInsertPending,
 } from "../infra/db/types/workflow-run-outbox";
-import { advanceRankedStreamCursor } from "../lib/ranked-stream";
+import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import type { DaemonContext } from "../middleware/context";
 
 export interface PublishReadyRunsDeps {
@@ -17,6 +17,11 @@ export interface PublishReadyRunsDeps {
 
 const PUBLISH_OUTCOMES = ["published", "deferred", "failed", "declined"] as const;
 
+const advanceOutboxCursor = createKeysetStreamCursorAdvancer<{ rank: number; id: string }>({
+	getOrder: (entry) => entry.rank,
+	getId: (entry) => entry.id,
+});
+
 export async function publishReadyRuns(
 	context: DaemonContext,
 	{ repos, workflowRunPublisher }: PublishReadyRunsDeps,
@@ -25,7 +30,7 @@ export async function publishReadyRuns(
 	for await (const pendingEntries of streamChunks(
 		(cursor) => repos.workflowRunOutbox.listPending(context, limit, cursor),
 		{
-			advanceCursor: advanceRankedStreamCursor,
+			advanceCursor: advanceOutboxCursor,
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {

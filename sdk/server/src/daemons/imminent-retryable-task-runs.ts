@@ -14,8 +14,8 @@ import type { WorkflowRow } from "../infra/db/types/workflow";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
 import { runConcurrently } from "../lib/concurrency";
+import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import { computeRank, type Ranked } from "../lib/rank";
-import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 
 type Repos = Pick<
@@ -29,8 +29,8 @@ export interface ProcessImminentRetryableTaskRunsDeps {
 	timerPriorityQueue?: TimerPriorityQueue;
 }
 
-const advanceTaskCursor = createTimerStreamCursorAdvancer<{ workflowRunId: string; dueAt: TimestampMs }>({
-	getDueAt: (entry) => entry.dueAt,
+const advanceTaskCursor = createKeysetStreamCursorAdvancer<{ workflowRunId: string; dueAt: TimestampMs }>({
+	getOrder: (entry) => entry.dueAt,
 	getId: (entry) => entry.workflowRunId,
 });
 

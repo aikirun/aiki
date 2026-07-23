@@ -5,7 +5,7 @@ import type { Publisher } from "@aikirun/types/infra/queue";
 
 import { publishOutboxEntries } from "./publish-ready-runs";
 import type { Repositories } from "../infra/db/types";
-import { createTimerStreamCursorAdvancer } from "../lib/timer-stream";
+import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import type { DaemonContext } from "../middleware/context";
 
 export interface RepublishStaleRuns {
@@ -13,13 +13,13 @@ export interface RepublishStaleRuns {
 	workflowRunPublisher: Publisher;
 }
 
-const advanceClaimedCursor = createTimerStreamCursorAdvancer<{ id: string; claimedAt: TimestampMs }>({
-	getDueAt: (entry) => entry.claimedAt,
+const advanceClaimedCursor = createKeysetStreamCursorAdvancer<{ id: string; claimedAt: TimestampMs }>({
+	getOrder: (entry) => entry.claimedAt,
 	getId: (entry) => entry.id,
 });
 
-const advancePublishedCursor = createTimerStreamCursorAdvancer<{ id: string; publishedAt: TimestampMs }>({
-	getDueAt: (entry) => entry.publishedAt,
+const advancePublishedCursor = createKeysetStreamCursorAdvancer<{ id: string; publishedAt: TimestampMs }>({
+	getOrder: (entry) => entry.publishedAt,
 	getId: (entry) => entry.id,
 });
 

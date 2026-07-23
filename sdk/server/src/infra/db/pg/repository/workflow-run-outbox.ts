@@ -4,10 +4,8 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
-import { rankedStreamCursorFilter } from "./lib/ranked-stream";
-import { timerStreamCursorFilter } from "./lib/timer-stream";
-import type { RankedStreamCursor } from "../../../../lib/ranked-stream";
-import type { TimerStreamCursor } from "../../../../lib/timer-stream";
+import { keysetStreamCursorFilter } from "./lib/keyset-stream";
+import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { workflowRunOutbox } from "../schema";
@@ -52,7 +50,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 	async listPending(
 		_context: DaemonContext,
 		limit: number,
-		cursor?: RankedStreamCursor
+		cursor?: KeysetStreamCursor
 	): Promise<WorkflowRunOutboxRowPending[]> {
 		const rows = await db
 			.select()
@@ -60,7 +58,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.where(
 				and(
 					eq(workflowRunOutbox.status, "pending"),
-					rankedStreamCursorFilter(workflowRunOutbox.rank, workflowRunOutbox.id, cursor)
+					keysetStreamCursorFilter(workflowRunOutbox.rank, workflowRunOutbox.id, cursor)
 				)
 			)
 			.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
@@ -114,7 +112,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 		_context: DaemonContext,
 		claimMinIdleTimeMs: number,
 		limit: number,
-		cursor?: TimerStreamCursor
+		cursor?: KeysetStreamCursor
 	): Promise<WorkflowRunOutboxRowPublished[]> {
 		const now = Date.now();
 		const staleThreshold = (now - claimMinIdleTimeMs) as TimestampMs;
@@ -126,7 +124,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 				and(
 					eq(workflowRunOutbox.status, "published"),
 					lt(workflowRunOutbox.publishedAt, staleThreshold),
-					timerStreamCursorFilter(workflowRunOutbox.publishedAt, workflowRunOutbox.id, cursor)
+					keysetStreamCursorFilter(workflowRunOutbox.publishedAt, workflowRunOutbox.id, cursor)
 				)
 			)
 			.orderBy(workflowRunOutbox.publishedAt, workflowRunOutbox.id)
@@ -139,7 +137,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 		_context: DaemonContext,
 		claimMinIdleTimeMs: number,
 		limit: number,
-		cursor?: TimerStreamCursor
+		cursor?: KeysetStreamCursor
 	): Promise<WorkflowRunOutboxRowClaimed[]> {
 		const now = Date.now();
 		const staleThreshold = (now - claimMinIdleTimeMs) as TimestampMs;
@@ -151,7 +149,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 				and(
 					eq(workflowRunOutbox.status, "claimed"),
 					lt(workflowRunOutbox.claimedAt, staleThreshold),
-					timerStreamCursorFilter(workflowRunOutbox.claimedAt, workflowRunOutbox.id, cursor)
+					keysetStreamCursorFilter(workflowRunOutbox.claimedAt, workflowRunOutbox.id, cursor)
 				)
 			)
 			.orderBy(workflowRunOutbox.claimedAt, workflowRunOutbox.id)

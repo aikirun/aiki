@@ -3,8 +3,8 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 
-import { timerStreamCursorFilter } from "./lib/timer-stream";
-import type { TimerStreamCursor } from "../../../../lib/timer-stream";
+import { keysetStreamCursorFilter } from "./lib/keyset-stream";
+import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { task } from "../schema";
@@ -43,7 +43,7 @@ export const createTaskRepository = (db: PgDb) => ({
 			.limit(10_000);
 	},
 
-	async listRetryableTasks(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: TimerStreamCursor) {
+	async listRetryableTasks(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: KeysetStreamCursor) {
 		const dueAtExpr = min(task.nextAttemptAt);
 
 		return db
@@ -54,7 +54,7 @@ export const createTaskRepository = (db: PgDb) => ({
 			.from(task)
 			.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, before)))
 			.groupBy(task.workflowRunId)
-			.having(timerStreamCursorFilter(dueAtExpr, task.workflowRunId, cursor))
+			.having(keysetStreamCursorFilter(dueAtExpr, task.workflowRunId, cursor))
 			.orderBy(dueAtExpr, task.workflowRunId)
 			.limit(limit);
 	},

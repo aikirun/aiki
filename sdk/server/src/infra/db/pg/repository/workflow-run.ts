@@ -11,9 +11,9 @@ import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run"
 import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
-import { timerStreamCursorFilter } from "./lib/timer-stream";
+import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import { toWorkflowRunState } from "./state-transition";
-import type { TimerStreamCursor } from "../../../../lib/timer-stream";
+import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { stateTransition, task, workflow, workflowRun } from "../schema";
@@ -310,7 +310,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		_context: DaemonContext,
 		before: TimestampMs,
 		limit: number,
-		cursor?: TimerStreamCursor
+		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
 		return db
 			.select({
@@ -328,7 +328,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				and(
 					eq(workflowRun.status, "scheduled"),
 					lte(workflowRun.scheduledAt, before),
-					timerStreamCursorFilter(workflowRun.scheduledAt, workflowRun.id, cursor)
+					keysetStreamCursorFilter(workflowRun.scheduledAt, workflowRun.id, cursor)
 				)
 			)
 			.orderBy(workflowRun.scheduledAt, workflowRun.id)
@@ -339,7 +339,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		_context: DaemonContext,
 		before: TimestampMs,
 		limit: number,
-		cursor?: TimerStreamCursor
+		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
 		return db
 			.select({
@@ -357,7 +357,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				and(
 					eq(workflowRun.status, "sleeping"),
 					lte(workflowRun.awakeAt, before),
-					timerStreamCursorFilter(workflowRun.awakeAt, workflowRun.id, cursor)
+					keysetStreamCursorFilter(workflowRun.awakeAt, workflowRun.id, cursor)
 				)
 			)
 			.orderBy(workflowRun.awakeAt, workflowRun.id)
@@ -368,7 +368,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		_context: DaemonContext,
 		before: TimestampMs,
 		limit: number,
-		cursor?: TimerStreamCursor
+		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
 		return db
 			.select({
@@ -386,7 +386,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				and(
 					eq(workflowRun.status, "awaiting_retry"),
 					lte(workflowRun.nextAttemptAt, before),
-					timerStreamCursorFilter(workflowRun.nextAttemptAt, workflowRun.id, cursor)
+					keysetStreamCursorFilter(workflowRun.nextAttemptAt, workflowRun.id, cursor)
 				)
 			)
 			.orderBy(workflowRun.nextAttemptAt, workflowRun.id)
@@ -397,7 +397,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		_context: DaemonContext,
 		before: TimestampMs,
 		limit: number,
-		cursor?: TimerStreamCursor
+		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
 		return db
 			.select({
@@ -415,7 +415,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				and(
 					eq(workflowRun.status, "awaiting_event"),
 					lte(workflowRun.timeoutAt, before),
-					timerStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
+					keysetStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
 				)
 			)
 			.orderBy(workflowRun.timeoutAt, workflowRun.id)
@@ -426,7 +426,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		_context: DaemonContext,
 		before: TimestampMs,
 		limit: number,
-		cursor?: TimerStreamCursor
+		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
 		return db
 			.select({
@@ -444,7 +444,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				and(
 					eq(workflowRun.status, "awaiting_child_workflow"),
 					lte(workflowRun.timeoutAt, before),
-					timerStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
+					keysetStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
 				)
 			)
 			.orderBy(workflowRun.timeoutAt, workflowRun.id)
