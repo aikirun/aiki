@@ -3,6 +3,16 @@ import type { PgColumn } from "drizzle-orm/pg-core";
 
 import type { RankStreamCursor } from "../../../../../lib/rank-stream";
 
+/**
+ * Builds the WHERE clause that pages through a (rank, id)-ordered stream.
+ *
+ * The first two clauses are ordinary keyset paging: take every row that sorts after
+ * the frontier (cursor.rank, cursor.id) — a larger rank value, or the same rank with
+ * a larger id. The third clause takes rows that sort before the frontier (a smaller
+ * rank value) whose id is larger than any we have seen. Because ids are ULIDs and only
+ * grow over time, a larger id means the row was inserted after the walk had already
+ * passed its rank, so it would otherwise be missed until the next full pass.
+ */
 export function rankStreamCursorFilter(
 	rankCol: PgColumn,
 	idCol: PgColumn,
@@ -14,6 +24,6 @@ export function rankStreamCursorFilter(
 	return or(
 		sql`${rankCol} > ${cursor.rank}`,
 		and(sql`${rankCol} = ${cursor.rank}`, gt(idCol, cursor.id)),
-		and(sql`${rankCol} < ${cursor.rank}`, gt(idCol, cursor.maxId))
+		and(sql`${rankCol} < ${cursor.rank}`, gt(idCol, cursor.maxSeenId))
 	);
 }

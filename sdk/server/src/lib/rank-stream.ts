@@ -1,30 +1,40 @@
 export interface RankStreamCursor {
 	rank: number;
 	id: string;
-	maxId: string;
+	maxSeenId: string;
 }
 
-export function createRankStreamCursorAdvancer<Item>(options: {
-	getRank: (item: Item) => number;
-	getId: (item: Item) => string;
-}): (cursor: RankStreamCursor | undefined, item: Item) => RankStreamCursor {
-	const { getRank, getId } = options;
+/**
+ * Updates the cursor as we walk a stream ordered by (rank, id).
+ *
+ * The cursor holds two things:
+ * - `(rank, id)` — the frontier: where the last row the walk settled on sits.
+ * - `maxSeenId` — the largest id seen in any row so far. The filter's third clause
+ *   uses it to pick up rows that sort before the frontier but were inserted after
+ *   the walk passed them.
+ *
+ * Rows arrive in (rank, id) order. When a row sits at or after the frontier
+ * (rank >= cursor.rank) it is the next step of the walk, so the frontier moves onto
+ * it. A row that sorts before the frontier can only be one of those late inserts the
+ * third clause pulled in, so the frontier stays where it is and only maxSeenId grows.
+ * Moving the frontier backwards would make the next query re-read a rank we finished.
+ */
+export function advanceRankStreamCursor(
+	cursor: RankStreamCursor | undefined,
+	item: { rank: number; id: string }
+): RankStreamCursor {
+	const { rank, id } = item;
 
-	return (cursor, item) => {
-		const rank = getRank(item);
-		const id = getId(item);
+	if (!cursor) {
+		return { rank, id, maxSeenId: id };
+	}
 
-		if (!cursor) {
-			return { rank, id, maxId: id };
-		}
+	const { maxSeenId: cursorMaxSeenId } = cursor;
+	const maxSeenId = id > cursorMaxSeenId ? id : cursorMaxSeenId;
 
-		const { maxId: cursorMaxId } = cursor;
-		const maxId = id > cursorMaxId ? id : cursorMaxId;
-
-		if (rank >= cursor.rank) {
-			return { rank, id, maxId };
-		} else {
-			return { rank: cursor.rank, id: cursor.id, maxId };
-		}
-	};
+	if (rank >= cursor.rank) {
+		return { rank, id, maxSeenId };
+	} else {
+		return { rank: cursor.rank, id: cursor.id, maxSeenId };
+	}
 }

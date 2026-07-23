@@ -7,7 +7,7 @@ import type {
 	WorkflowRunOutboxRowInsert,
 	WorkflowRunOutboxRowInsertPending,
 } from "../infra/db/types/workflow-run-outbox";
-import { createRankStreamCursorAdvancer } from "../lib/rank-stream";
+import { advanceRankStreamCursor } from "../lib/rank-stream";
 import type { DaemonContext } from "../middleware/context";
 
 export interface PublishReadyRunsDeps {
@@ -16,11 +16,6 @@ export interface PublishReadyRunsDeps {
 }
 
 const PUBLISH_OUTCOMES = ["published", "deferred", "failed", "declined"] as const;
-
-const advanceRankStreamCursor = createRankStreamCursorAdvancer<{ id: string; rank: number }>({
-	getRank: (entry) => entry.rank,
-	getId: (entry) => entry.id,
-});
 
 export async function publishReadyRuns(
 	context: DaemonContext,
