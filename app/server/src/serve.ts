@@ -11,11 +11,9 @@ import { createCorsHelpers } from "./cors";
 import { createLogger } from "./logger";
 
 export async function startAppServer({ config }: { config: AppServerConfig }): Promise<void> {
-	const logger = createLogger(config.logLevel, config.prettyLogs);
-
-	const redis = config.redis && createRedis(config.redis, logger);
-
 	const db = database(config.db);
+	const logger = createLogger(config.logLevel, config.prettyLogs);
+	const redis = config.redis && createRedis(config.redis, logger);
 	const cache = redis && redisCache(redis.client);
 
 	const aiki = server({
