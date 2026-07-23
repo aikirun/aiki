@@ -10,26 +10,32 @@ type MockEndpoint<Args extends unknown[], Return> = Mock<(...args: Args) => Retu
 	 * Queues a single expected call: the Nth call to this endpoint is paired with the
 	 * Nth `once` and resolves with `response`. Queue several to expect several calls.
 	 *
-	 * The match is EXACT by default — every field must be accounted for. For a partial match,
-	 * pass an asymmetric matcher, e.g. `expect.objectContaining({ ... })` or `expect.anything()`.
+	 * The match is EXACT by default — every field must be accounted for.
+	 * For a partial match, pass an asymmetric matcher,
+	 * e.g. `expect.objectContaining({ ... })` or `expect.anything()`.
 	 *
 	 * A call with no expectation throws immediately. Separately, `verify()` compares the
 	 * expected calls against the calls actually made — position by position — and reports any that
 	 * were missing, unexpected, or sent with the wrong request. So a mismatch is caught even for a
 	 * fire-and-forget call whose inline throw is swallowed by the caller.
 	 *
-	 * The `response` argument is omitted for endpoints that resolve to `void`.
+	 * `response` is either a value or a function that receives the actual request and returns the value.
+	 * Use the function form when the response derives from the request, such as echoing parts of the
+	 * request back in the result. The `response` argument is omitted entirely for endpoints that
+	 * resolve to `void`.
 	 */
 	once(
-		request: Args[0],
-		...response: Awaited<Return> extends void ? [] : [response: Awaited<Return>]
+		expectedRequest: Args[0],
+		...response: Awaited<Return> extends void
+			? []
+			: [response: Awaited<Return> | ((actualRequest: Args[0]) => Awaited<Return>)]
 	): MockEndpoint<Args, Return>;
 
 	/**
 	 * Queues a single expected call that rejects: matched like {@link once}, but throws `error`
 	 * instead of resolving.
 	 */
-	rejectsOnce(request: Args[0], error: unknown): MockEndpoint<Args, Return>;
+	rejectsOnce(expectedRequest: Args[0], error: unknown): MockEndpoint<Args, Return>;
 
 	/**
 	 * Registers `callback` that is invoked once the next time this endpoint is called — regardless of
@@ -95,22 +101,28 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 				throw new Error(`Fake client: unexpected call to ${endpointName}(${Bun.inspect(actualRequest)})`);
 			}
 			expect(actualRequest).toEqual(expectedCall.request);
-			if (expectedCall.result.type === "reject") {
-				throw expectedCall.result.error;
+
+			const result = expectedCall.result;
+			if (result.type === "reject") {
+				throw result.error;
 			}
-			return expectedCall.result.response;
+			if (typeof result.response === "function") {
+				return result.response(actualRequest);
+			}
+			return result.response;
 		};
+
 		const endpoint = mock(handler) as Mock<typeof handler> & {
-			once: (request: unknown, response?: unknown) => unknown;
-			rejectsOnce: (request: unknown, error: unknown) => unknown;
+			once: (expectedRequest: unknown, response?: unknown) => unknown;
+			rejectsOnce: (expectedRequest: unknown, error: unknown) => unknown;
 			onNextCall: (callback: () => void) => void;
 		};
-		endpoint.once = (request, response) => {
-			expectedCalls.push({ request, result: { type: "resolve", response } });
+		endpoint.once = (expectedRequest, response) => {
+			expectedCalls.push({ request: expectedRequest, result: { type: "resolve", response } });
 			return endpoint;
 		};
-		endpoint.rejectsOnce = (request, error) => {
-			expectedCalls.push({ request, result: { type: "reject", error } });
+		endpoint.rejectsOnce = (expectedRequest, error) => {
+			expectedCalls.push({ request: expectedRequest, result: { type: "reject", error } });
 			return endpoint;
 		};
 		endpoint.onNextCall = (callback) => {
@@ -213,7 +225,7 @@ type FakeClientFn<Context> = (client: Omit<FakeClient<Context>, "verify">) => Pr
  * @example
  * test("activates a schedule", () =>
  *   withFakeClient(async (client) => {
- *     client.api.schedule.activateV1.once(request, response);
+ *     client.api.schedule.activateV1.once(expectedRequest, response);
  *     await schedule(params).activate(client, workflow, input);
  *   }));
  */
