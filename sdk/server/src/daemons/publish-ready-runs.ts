@@ -7,7 +7,7 @@ import type {
 	WorkflowRunOutboxRowInsert,
 	WorkflowRunOutboxRowInsertPending,
 } from "../infra/db/types/workflow-run-outbox";
-import { advanceRankStreamCursor } from "../lib/rank-stream";
+import { advanceRankedStreamCursor } from "../lib/ranked-stream";
 import type { DaemonContext } from "../middleware/context";
 
 export interface PublishReadyRunsDeps {
@@ -25,7 +25,7 @@ export async function publishReadyRuns(
 	for await (const pendingEntries of streamChunks(
 		(cursor) => repos.workflowRunOutbox.listPending(context, limit, cursor),
 		{
-			advanceCursor: advanceRankStreamCursor,
+			advanceCursor: advanceRankedStreamCursor,
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {

@@ -1,7 +1,7 @@
 import { and, gt, or, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
-import type { RankStreamCursor } from "../../../../../lib/rank-stream";
+import type { RankedStreamCursor } from "../../../../../lib/ranked-stream";
 
 /**
  * Builds the WHERE clause that pages through a (rank, id)-ordered stream.
@@ -13,10 +13,10 @@ import type { RankStreamCursor } from "../../../../../lib/rank-stream";
  * grow over time, a larger id means the row was inserted after the walk had already
  * passed its rank, so it would otherwise be missed until the next full pass.
  */
-export function rankStreamCursorFilter(
+export function rankedStreamCursorFilter(
 	rankCol: PgColumn,
 	idCol: PgColumn,
-	cursor: RankStreamCursor | undefined
+	cursor: RankedStreamCursor | undefined
 ): SQL | undefined {
 	if (!cursor) {
 		return undefined;

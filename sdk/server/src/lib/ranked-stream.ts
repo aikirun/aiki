@@ -1,4 +1,4 @@
-export interface RankStreamCursor {
+export interface RankedStreamCursor {
 	rank: number;
 	id: string;
 	maxSeenId: string;
@@ -19,10 +19,10 @@ export interface RankStreamCursor {
  * third clause pulled in, so the frontier stays where it is and only maxSeenId grows.
  * Moving the frontier backwards would make the next query re-read a rank we finished.
  */
-export function advanceRankStreamCursor(
-	cursor: RankStreamCursor | undefined,
+export function advanceRankedStreamCursor(
+	cursor: RankedStreamCursor | undefined,
 	item: { rank: number; id: string }
-): RankStreamCursor {
+): RankedStreamCursor {
 	const { rank, id } = item;
 
 	if (!cursor) {

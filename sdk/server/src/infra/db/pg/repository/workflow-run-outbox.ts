@@ -4,9 +4,9 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
-import { rankStreamCursorFilter } from "./lib/rank-stream";
+import { rankedStreamCursorFilter } from "./lib/ranked-stream";
 import { timerStreamCursorFilter } from "./lib/timer-stream";
-import type { RankStreamCursor } from "../../../../lib/rank-stream";
+import type { RankedStreamCursor } from "../../../../lib/ranked-stream";
 import type { TimerStreamCursor } from "../../../../lib/timer-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
@@ -52,7 +52,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 	async listPending(
 		_context: DaemonContext,
 		limit: number,
-		cursor?: RankStreamCursor
+		cursor?: RankedStreamCursor
 	): Promise<WorkflowRunOutboxRowPending[]> {
 		const rows = await db
 			.select()
@@ -60,7 +60,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.where(
 				and(
 					eq(workflowRunOutbox.status, "pending"),
-					rankStreamCursorFilter(workflowRunOutbox.rank, workflowRunOutbox.id, cursor)
+					rankedStreamCursorFilter(workflowRunOutbox.rank, workflowRunOutbox.id, cursor)
 				)
 			)
 			.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
