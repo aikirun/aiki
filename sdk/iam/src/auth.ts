@@ -39,10 +39,10 @@ async function createDrizzleAdapter(db: Database) {
 			const handle = drizzle(client, { schema: betterAuthSchema });
 			return drizzleAdapter(handle, { provider: db.provider, schema: betterAuthSchema });
 		}
-		case "mysql":
-			throw new Error("MySQL support not yet implemented");
-		case "sqlite":
-			throw new Error("SQLite support not yet implemented");
+		// case "mysql":
+		// 	throw new Error("MySQL support not yet implemented");
+		// case "sqlite":
+		// 	throw new Error("SQLite support not yet implemented");
 		default:
 			return db.provider satisfies never;
 	}

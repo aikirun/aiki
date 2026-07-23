@@ -6,8 +6,8 @@ import { DATABASE_PROVIDERS, type DatabaseProvider } from "../../provider";
 
 const providerDialects: Record<DatabaseProvider, string> = {
 	pg: "postgresql",
-	sqlite: "sqlite",
-	mysql: "mysql",
+	// sqlite: "sqlite",
+	// mysql: "mysql",
 };
 
 interface MigrateGenerateParams {
@@ -19,12 +19,10 @@ interface MigrateGenerateParams {
 }
 
 export async function migrateGenerate(params: MigrateGenerateParams): Promise<void> {
-	let generated = 0;
-
 	for (const provider of DATABASE_PROVIDERS) {
 		const schemaDir = params.resolveSchemaDir(provider);
 		if (!fs.existsSync(schemaDir)) {
-			continue;
+			throw new Error(`no schema sources found for ${provider} database`);
 		}
 
 		console.log(`generating ${provider} migrations`);
@@ -44,11 +42,6 @@ export async function migrateGenerate(params: MigrateGenerateParams): Promise<vo
 		}
 
 		await spawnDrizzle(args, params.packageRoot);
-		generated += 1;
-	}
-
-	if (generated === 0) {
-		throw new Error("no schema sources found for any database provider");
 	}
 }
 

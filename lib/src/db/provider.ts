@@ -1,4 +1,4 @@
-export const DATABASE_PROVIDERS = ["pg", "sqlite", "mysql"] as const;
+export const DATABASE_PROVIDERS = ["pg" /*, "sqlite", "mysql"*/] as const;
 export type DatabaseProvider = (typeof DATABASE_PROVIDERS)[number];
 
 export function isDatabaseProvider(provider: string): provider is DatabaseProvider {

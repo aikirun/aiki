@@ -14,11 +14,11 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 		case "pg":
 			await applyPg(dbConfig, params.source.read(), params.migrationsTable);
 			return;
-		case "sqlite":
-		case "mysql":
-			throw new Error(`DATABASE_PROVIDER=${dbConfig.provider} is not yet supported.`);
+		// case "sqlite":
+		// case "mysql":
+		// 	throw new Error(`DATABASE_PROVIDER=${dbConfig.provider} is not yet supported.`);
 		default:
-			dbConfig satisfies never;
+			dbConfig.provider satisfies never;
 	}
 }
 

@@ -19,10 +19,10 @@ export async function createRepos(db: Database): Promise<Repositories> {
 			const client = extractDbClient(db) as PgClient;
 			return createPgRepos(client);
 		}
-		case "mysql":
-			throw new Error("MySQL support not yet implemented");
-		case "sqlite":
-			throw new Error("SQLite support not yet implemented");
+		// case "mysql":
+		// 	throw new Error("MySQL support not yet implemented");
+		// case "sqlite":
+		// 	throw new Error("SQLite support not yet implemented");
 		default:
 			return db.provider satisfies never;
 	}
