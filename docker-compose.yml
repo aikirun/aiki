@@ -8,7 +8,6 @@ services:
     environment:
       DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
       DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
-      DATABASE_PATH: ${DATABASE_PATH:-:memory:}
       DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -35,7 +34,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
       DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
-      DATABASE_PATH: ${DATABASE_PATH:-:memory:}
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
       DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
       REDIS_HOST: ${REDIS_HOST:-}

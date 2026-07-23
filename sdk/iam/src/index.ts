@@ -1,4 +1,7 @@
-export type { DatabaseConfig, MysqlDatabaseConfig, PgDatabaseConfig, SqliteDatabaseConfig } from "@aikirun/lib/db";
+export type {
+	DatabaseConfig /*, MysqlDatabaseConfig*/,
+	PgDatabaseConfig /*, SqliteDatabaseConfig*/,
+} from "@aikirun/lib/db";
 
 export type {
 	ApiAuthorizerKeyParams,

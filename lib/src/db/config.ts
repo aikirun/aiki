@@ -12,23 +12,23 @@ const pgDatabaseConfigSchema = type({
 	"caCert?": "string > 0",
 });
 
-const mysqlDatabaseConfigSchema = type({
-	provider: "'mysql'",
-	url: "string > 0",
-	maxConnections: "string.integer.parse | number.integer > 0 = 10",
-	"caCert?": "string > 0",
-});
+// const mysqlDatabaseConfigSchema = type({
+// 	provider: "'mysql'",
+// 	url: "string > 0",
+// 	maxConnections: "string.integer.parse | number.integer > 0 = 10",
+// 	"caCert?": "string > 0",
+// });
 
-const sqliteDatabaseConfigSchema = type({
-	provider: "'sqlite'",
-	path: "string > 0 = ':memory:'",
-});
+// const sqliteDatabaseConfigSchema = type({
+// 	provider: "'sqlite'",
+// 	path: "string > 0 = ':memory:'",
+// });
 
-const databaseConfigSchema = pgDatabaseConfigSchema.or(mysqlDatabaseConfigSchema).or(sqliteDatabaseConfigSchema);
+const databaseConfigSchema = pgDatabaseConfigSchema /*.or(mysqlDatabaseConfigSchema).or(sqliteDatabaseConfigSchema)*/;
 
 export type PgDatabaseConfig = typeof pgDatabaseConfigSchema.infer;
-export type MysqlDatabaseConfig = typeof mysqlDatabaseConfigSchema.infer;
-export type SqliteDatabaseConfig = typeof sqliteDatabaseConfigSchema.infer;
+// export type MysqlDatabaseConfig = typeof mysqlDatabaseConfigSchema.infer;
+// export type SqliteDatabaseConfig = typeof sqliteDatabaseConfigSchema.infer;
 export type DatabaseConfig = typeof databaseConfigSchema.infer;
 
 type _DbOptionsSatisfiesDbProviders = ExpectTrue<Equal<DatabaseConfig["provider"], DatabaseProvider>>;
@@ -47,10 +47,10 @@ export function loadDatabaseConfig(): DatabaseConfig {
 
 	const raw = (() => {
 		switch (provider) {
-			case "sqlite":
-				return { provider, path: process.env.DATABASE_PATH };
+			// case "sqlite":
+			// 	return { provider, path: process.env.DATABASE_PATH };
 			case "pg":
-			case "mysql":
+				// case "mysql":
 				return {
 					provider,
 					url: process.env.DATABASE_URL,
