@@ -111,25 +111,21 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 			return typeof response === "function" ? response(actualRequest) : response;
 		};
 
-		const endpoint = mock(handler) as Mock<typeof handler> & {
-			once: (expectedRequest: unknown, response?: unknown) => unknown;
-			rejectsOnce: (expectedRequest: unknown, error: unknown) => unknown;
-			onNextCall: (callback: () => void) => void;
-		};
+		const endpoint = Object.assign(mock(handler), {
+			once: (expectedRequest: unknown, response?: unknown) => {
+				expectedCalls.push({ request: expectedRequest, result: { type: "resolve", response } });
+				return endpoint;
+			},
 
-		endpoint.once = (expectedRequest, response) => {
-			expectedCalls.push({ request: expectedRequest, result: { type: "resolve", response } });
-			return endpoint;
-		};
+			rejectsOnce: (expectedRequest: unknown, error: unknown) => {
+				expectedCalls.push({ request: expectedRequest, result: { type: "reject", error } });
+				return endpoint;
+			},
 
-		endpoint.rejectsOnce = (expectedRequest, error) => {
-			expectedCalls.push({ request: expectedRequest, result: { type: "reject", error } });
-			return endpoint;
-		};
-
-		endpoint.onNextCall = (callback) => {
-			callbacks.push(callback);
-		};
+			onNextCall: (callback: () => void) => {
+				callbacks.push(callback);
+			},
+		});
 
 		return endpoint;
 	};

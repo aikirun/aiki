@@ -51,7 +51,7 @@ interface ExpectedCall {
 export function fakePublisher(): FakePublisher {
 	const expectedCalls: ExpectedCall[] = [];
 
-	const publishReadyRuns = (async (actualRequest: PublishRunsRequest): Promise<PublishRunsResult> => {
+	const publishReadyRunsFn = async (actualRequest: PublishRunsRequest): Promise<PublishRunsResult> => {
 		const expectedCall = expectedCalls.shift();
 		if (expectedCall === undefined) {
 			return { published: actualRequest.map((run) => ({ run })) };
@@ -65,17 +65,19 @@ export function fakePublisher(): FakePublisher {
 
 		const { response } = result;
 		return typeof response === "function" ? response(actualRequest) : response;
-	}) as FakePublishReadyRuns;
-
-	publishReadyRuns.once = (expectedRequest, response) => {
-		expectedCalls.push({ request: expectedRequest, result: { type: "resolve", response } });
-		return publishReadyRuns;
 	};
 
-	publishReadyRuns.rejectsOnce = (expectedRequest, error) => {
-		expectedCalls.push({ request: expectedRequest, result: { type: "reject", error } });
-		return publishReadyRuns;
-	};
+	const publishReadyRuns = Object.assign(publishReadyRunsFn, {
+		once: (expectedRequest: PublishRunsRequest, response: PublishRunsResponse) => {
+			expectedCalls.push({ request: expectedRequest, result: { type: "resolve", response } });
+			return publishReadyRuns;
+		},
+
+		rejectsOnce: (expectedRequest: PublishRunsRequest, error: unknown) => {
+			expectedCalls.push({ request: expectedRequest, result: { type: "reject", error } });
+			return publishReadyRuns;
+		},
+	});
 
 	return { publishReadyRuns };
 }
