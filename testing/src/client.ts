@@ -106,10 +106,9 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 			if (result.type === "reject") {
 				throw result.error;
 			}
-			if (typeof result.response === "function") {
-				return result.response(actualRequest);
-			}
-			return result.response;
+
+			const { response } = result;
+			return typeof response === "function" ? response(actualRequest) : response;
 		};
 
 		const endpoint = mock(handler) as Mock<typeof handler> & {
@@ -117,14 +116,17 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 			rejectsOnce: (expectedRequest: unknown, error: unknown) => unknown;
 			onNextCall: (callback: () => void) => void;
 		};
+
 		endpoint.once = (expectedRequest, response) => {
 			expectedCalls.push({ request: expectedRequest, result: { type: "resolve", response } });
 			return endpoint;
 		};
+
 		endpoint.rejectsOnce = (expectedRequest, error) => {
 			expectedCalls.push({ request: expectedRequest, result: { type: "reject", error } });
 			return endpoint;
 		};
+
 		endpoint.onNextCall = (callback) => {
 			callbacks.push(callback);
 		};
