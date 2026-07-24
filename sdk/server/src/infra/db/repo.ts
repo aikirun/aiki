@@ -5,11 +5,11 @@ import type { PgClient } from "./pg/provider";
 import type { Repositories } from "./types";
 
 function extractDbClient(db: Database): unknown {
-	const internal = db[INTERNAL];
-	if (!internal || internal.client === undefined) {
+	const { client } = db[INTERNAL];
+	if (client === undefined) {
 		throw new Error("Database must be created via database().");
 	}
-	return internal.client;
+	return client;
 }
 
 export async function createRepos(db: Database): Promise<Repositories> {
