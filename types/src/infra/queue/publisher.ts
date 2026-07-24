@@ -10,22 +10,22 @@ export interface ReadyWorkflowRun {
 	shard?: string;
 }
 
-export type PublishResultBucket = Array<{ run: ReadyWorkflowRun }>;
-export type TimedPublishResultBucket = Array<{ run: ReadyWorkflowRun; nextPublishAttemptAt: number }>;
+export type PublishRunsResultBucket = Array<{ run: ReadyWorkflowRun }>;
+export type TimedPublishRunsResultBucket = Array<{ run: ReadyWorkflowRun; nextPublishAttemptAt: number }>;
 
-export interface PublishResult {
+export interface PublishRunsResult {
 	/** Handoff to broker confirmed. */
-	published?: PublishResultBucket;
+	published?: PublishRunsResultBucket;
 	/** Deliverable, but withheld by policy (admission, fairness, throttling). */
-	deferred?: TimedPublishResultBucket;
+	deferred?: TimedPublishRunsResultBucket;
 	/** Delivery failure. */
-	failed?: PublishResultBucket;
+	failed?: PublishRunsResultBucket;
 	/** Not handled. */
-	declined?: PublishResultBucket;
+	declined?: PublishRunsResultBucket;
 }
 
 export interface Publisher {
-	publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishResult>;
+	publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult>;
 }
 
 export interface PublisherContext {

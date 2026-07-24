@@ -2,8 +2,8 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type {
 	CreatePublisher,
 	Publisher,
-	PublishResult,
-	PublishResultBucket,
+	PublishRunsResult,
+	PublishRunsResultBucket,
 	ReadyWorkflowRun,
 } from "@aikirun/types/infra/queue";
 import type { Redis } from "ioredis";
@@ -21,7 +21,7 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 		const redisTracker = connectionTracker(redis);
 
 		return {
-			async publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishResult> {
+			async publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
 				if (!redisTracker.isAvailable()) {
 					return { failed: runs.map((run) => ({ run })) };
 				}
@@ -53,8 +53,8 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 					return { failed: runs.map((run) => ({ run })) };
 				}
 
-				const published: PublishResultBucket = [];
-				const failed: PublishResultBucket = [];
+				const published: PublishRunsResultBucket = [];
+				const failed: PublishRunsResultBucket = [];
 				let err: Error | undefined;
 				for (const [i, queueData] of queueDataBatch.entries()) {
 					const result = results[i];
@@ -78,7 +78,7 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 					});
 				}
 
-				const result: PublishResult = {};
+				const result: PublishRunsResult = {};
 				if (published.length > 0) {
 					result.published = published;
 				}
