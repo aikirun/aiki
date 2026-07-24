@@ -229,6 +229,7 @@
       "devDependencies": {
         "@aikirun/lib": "workspace:*",
         "@aikirun/memory": "workspace:*",
+        "@aikirun/testing": "workspace:*",
         "drizzle-kit": "^0.31.8",
         "postgres": "^3.4.8",
       },
