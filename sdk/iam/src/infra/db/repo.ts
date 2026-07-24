@@ -4,19 +4,11 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { PgClient } from "./pg/provider";
 import type { Repositories } from "./types";
 
-export function extractDbClient(db: Database): unknown {
-	const internal = db[INTERNAL];
-	if (!internal || internal.client === undefined) {
-		throw new Error("Database must be created via database().");
-	}
-	return internal.client;
-}
-
 export async function createRepos(db: Database): Promise<Repositories> {
 	switch (db.provider) {
 		case "pg": {
 			const { createPgRepos } = await import("./pg");
-			const client = extractDbClient(db) as PgClient;
+			const client = db[INTERNAL].client as PgClient;
 			return createPgRepos(client);
 		}
 		// case "mysql":

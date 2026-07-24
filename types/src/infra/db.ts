@@ -7,4 +7,7 @@ export interface Database {
 	readonly [INTERNAL]: { client: unknown };
 }
 
-export type CreateDatabase = () => Promise<Database>;
+export interface CreateDatabase {
+	(): Promise<Database>;
+	close(): Promise<void>;
+}

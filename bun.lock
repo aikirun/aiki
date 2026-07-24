@@ -144,6 +144,7 @@
       },
       "devDependencies": {
         "@aikirun/lib": "workspace:*",
+        "@aikirun/testing": "workspace:*",
       },
     },
     "sdk/adapter/redis": {
@@ -228,7 +229,9 @@
       "devDependencies": {
         "@aikirun/lib": "workspace:*",
         "@aikirun/memory": "workspace:*",
+        "@aikirun/testing": "workspace:*",
         "drizzle-kit": "^0.31.8",
+        "fishery": "^2.4.0",
         "postgres": "^3.4.8",
       },
       "peerDependencies": {

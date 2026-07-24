@@ -14,6 +14,7 @@ export interface Queue {
 
 	push(item: QueueItem): void;
 	popMin(): QueueItem | undefined;
+	clear(): void;
 }
 
 export interface Store {
@@ -30,6 +31,8 @@ export interface Store {
 		startQueueIndex: number;
 		limit: number;
 	}): WorkflowRunMessage[];
+
+	clear(): void;
 }
 
 // Ascending by rank.
@@ -63,6 +66,10 @@ function createQueue(): Queue {
 
 		popMin(): QueueItem | undefined {
 			return heap.popMin();
+		},
+
+		clear(): void {
+			while (heap.popMin() !== undefined) {}
 		},
 	};
 }
@@ -115,6 +122,12 @@ export function createStore(): Store {
 			}
 
 			return runs;
+		},
+
+		clear(): void {
+			for (const queue of queuesByName.values()) {
+				queue.clear();
+			}
 		},
 	};
 }
