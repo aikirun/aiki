@@ -1,10 +1,10 @@
 import type { Database } from "@aikirun/types/infra/db";
+import { INTERNAL } from "@aikirun/types/symbols";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
 
 import type { PgClient } from "./infra/db/pg/provider";
-import { extractDbClient } from "./infra/db/repo";
 
 type BetterAuthSchema = Record<
 	| "user"
@@ -34,7 +34,7 @@ async function createDrizzleAdapter(db: Database) {
 				namespace: schema.namespace,
 				namespace_member: schema.namespaceMember,
 			} satisfies BetterAuthSchema;
-			const client = extractDbClient(db) as PgClient;
+			const client = db[INTERNAL].client as PgClient;
 			const { drizzle } = await import("drizzle-orm/postgres-js");
 			const handle = drizzle(client, { schema: betterAuthSchema });
 			return drizzleAdapter(handle, { provider: db.provider, schema: betterAuthSchema });
