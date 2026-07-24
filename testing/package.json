@@ -7,8 +7,7 @@
 	"exports": {
 		"./api/schedule": "./src/api/schedule.ts",
 		"./client": "./src/client.ts",
-		"./infra/queue": "./src/infra/queue.ts",
-		"./publisher": "./src/publisher.ts",
+		"./infra/queue": "./src/infra/queue/index.ts",
 		"./schedule": "./src/schedule.ts",
 		"./workflow/task": "./src/workflow/task.ts",
 		"./workflow/run": "./src/workflow/run.ts"
