@@ -64,6 +64,7 @@ export async function startAppServer({ config }: { config: AppServerConfig }): P
 					redis.close();
 				}
 				await runtimeHandle.stop();
+				await db.close();
 				process.exit(0);
 			})();
 		}
