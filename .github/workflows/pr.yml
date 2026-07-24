@@ -44,5 +44,5 @@ jobs:
       - name: Build
         run: bun run build
 
-  integration:
-    uses: ./.github/workflows/integration.yml
+  integration-test:
+    uses: ./.github/workflows/integration-test.yml
