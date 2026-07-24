@@ -36,7 +36,7 @@ jobs:
       - name: Lint
         run: bun run lint
 
-      - name: Test
+      - name: Unit Test
         run: bun run test:unit
 
       - uses: ./.github/actions/check-migrations

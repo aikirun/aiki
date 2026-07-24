@@ -1,12 +1,12 @@
-name: Integration Tests
+name: Integration Test
 
 # Stands up a throwaway Postgres and runs integration tests against it
 on:
   workflow_call:
 
 jobs:
-  integration:
-    name: Integration
+  integration-test:
+    name: Integration Test
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -34,5 +34,5 @@ jobs:
       - name: Migrate test database
         run: bun run db:migrate:test:apply
 
-      - name: Integration tests
+      - name: Run test
         run: bun run test:integration
