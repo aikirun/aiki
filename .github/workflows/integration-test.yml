@@ -1,0 +1,38 @@
+name: Integration Tests
+
+# Stands up a throwaway Postgres and runs integration tests against it
+on:
+  workflow_call:
+
+jobs:
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: aiki_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_PROVIDER: pg
+      DATABASE_URL: postgresql://user:password@localhost:5432/aiki_test
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Migrate test database
+        run: bun run db:migrate:test:apply
+
+      - name: Integration tests
+        run: bun run test:integration

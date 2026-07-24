@@ -22,7 +22,8 @@
 		"@aikirun/types": "workspace:*"
 	},
 	"devDependencies": {
-		"@aikirun/lib": "workspace:*"
+		"@aikirun/lib": "workspace:*",
+		"@aikirun/testing": "workspace:*"
 	},
 	"license": "Apache-2.0"
 }

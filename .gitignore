@@ -5,7 +5,9 @@
 
 .claude
 
-.env*
+.env
+.env.test
+.env.prod
 
 notes/
 

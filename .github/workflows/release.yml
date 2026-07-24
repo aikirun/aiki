@@ -70,7 +70,7 @@ jobs:
 
       - run: bun run lint
 
-      - run: bun test
+      - run: bun run test:unit
 
       - uses: ./.github/actions/check-migrations
 
@@ -121,13 +121,16 @@ jobs:
           path: cli/dist/aiki-*
           if-no-files-found: error
 
+  integration-test:
+    uses: ./.github/workflows/integration-test.yml
+
   # The first side effect: the tag records that this commit passed verify. It is
   # created before any image or package ships, so every downstream artifact
   # corresponds to a real tag. verify already failed the run if the tag exists at
   # a different commit, so here a tag that exists is a heal re-run at this same
   # commit — skip it — and otherwise we create.
   tag:
-    needs: verify
+    needs: [verify, integration-test]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     environment: release

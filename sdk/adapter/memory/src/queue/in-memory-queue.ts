@@ -7,6 +7,7 @@ import { createInMemorySubscriber } from "./subscriber";
 export interface InMemoryQueue {
 	publisher: CreatePublisher;
 	subscriber: CreateSubscriber;
+	clear(): void;
 }
 
 /**
@@ -18,5 +19,6 @@ export function inMemoryQueue(): InMemoryQueue {
 	return {
 		publisher: createInMemoryPublisher(store),
 		subscriber: createInMemorySubscriber(store),
+		clear: () => store.clear(),
 	};
 }
