@@ -18,8 +18,9 @@ environment running. For cutting releases, see [`.github/RELEASING.md`](.github/
   protocol, which only Bun/pnpm/Yarn understand — `npm install` here fails with
   `EUNSUPPORTEDPROTOCOL`).
 - **Git**
-- **PostgreSQL** — only needed to run the server or examples end-to-end. The
-  test suite does not require a database.
+- **PostgreSQL** — needed to run the server or examples end-to-end, and to run
+  the integration tests (`bun run test:integration`). 
+  The unit tests (`bun run test:unit`) need no database.
 
 ## Set up
 
@@ -37,7 +38,8 @@ Run these from the repo root:
 
 | Command | What it does |
 | --- | --- |
-| `bun test` | Run the test suite (no database needed) |
+| `bun run test:unit` | Run the unit test suite (no database needed) |
+| `bun run test:integration` | Run the integration tests (needs a Postgres test database — see below) |
 | `bun run check` | Type-check every package with `tsc` |
 | `bun run lint` | Lint & format check with Biome |
 | `bun run lint:fix` | Auto-fix lint/format issues |
@@ -107,10 +109,26 @@ bun run --cwd sdk/server db:migrate:generate:custom
 To apply and test them against your local database, use the **Run the server +
 dashboard locally** step above (`bun run --cwd app/server db:migrate:apply`).
 
+## Integration tests
+
+Unit tests (`bun run test:unit`) need no database. Integration tests
+(`bun run test:integration`) run against a real Postgres and truncate every table
+between tests, so they need a **dedicated** test database — never a real one.
+
+```bash
+cp .env.test.example .env.test   # then set DATABASE_URL to a test-only database
+bun run db:migrate:test:apply    # apply the server + iam migrations to it
+bun run test:integration
+```
+
+CI runs these automatically against a throwaway Postgres, so opening a PR does not
+require a local test database — but run them locally when your change touches the
+database layer.
+
 ## Before you open a PR
 
 ```bash
-bun run check && bun run lint && bun test
+bun run check && bun run lint && bun run test:unit
 ```
 
 A Husky pre-commit hook auto-formats staged files with Biome, so formatting is

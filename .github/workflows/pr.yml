@@ -37,9 +37,12 @@ jobs:
         run: bun run lint
 
       - name: Test
-        run: bun test
+        run: bun run test:unit
 
       - uses: ./.github/actions/check-migrations
 
       - name: Build
         run: bun run build
+
+  integration:
+    uses: ./.github/workflows/integration.yml
