@@ -19,13 +19,13 @@ describe("delay", () => {
 		const controller = new AbortController();
 		controller.abort("cancelled");
 
-		let reason: unknown;
+		let err: unknown;
 		try {
 			await delay(1_000, { signal: controller.signal });
-		} catch (err) {
-			reason = err;
+		} catch (caught) {
+			err = caught;
 		}
-		expect(reason).toBe("cancelled");
+		expect(err).toBe("cancelled");
 	});
 
 	test("rejects when abort signal fires during delay", async () => {
@@ -33,12 +33,12 @@ describe("delay", () => {
 		const promise = delay(5_000, { signal: controller.signal });
 		controller.abort("stopped");
 
-		let reason: unknown;
+		let err: unknown;
 		try {
 			await promise;
-		} catch (err) {
-			reason = err;
+		} catch (caught) {
+			err = caught;
 		}
-		expect(reason).toBe("stopped");
+		expect(err).toBe("stopped");
 	});
 });
