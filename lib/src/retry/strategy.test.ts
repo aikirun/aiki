@@ -195,22 +195,18 @@ describe("withRetry", () => {
 	});
 
 	describe("shouldNotRetryOnError", () => {
-		test("re-throws when callback returns true", async () => {
+		test("re-throws when callback returns true", () => {
 			const thrownError = new Error("fatal");
 
-			let err: unknown;
-			try {
-				await withRetry(
+			expect(
+				withRetry(
 					async () => {
 						throw thrownError;
 					},
 					strategy,
 					{ shouldNotRetryOnError: () => true }
-				).run();
-			} catch (caught) {
-				err = caught;
-			}
-			expect(err).toBe(thrownError);
+				).run()
+			).rejects.toBe(thrownError);
 		});
 
 		test("continues retrying when callback returns false", async () => {
@@ -225,22 +221,18 @@ describe("withRetry", () => {
 			expect(result).toEqual({ state: "timeout" });
 		});
 
-		test("supports async callback", async () => {
+		test("supports async callback", () => {
 			const fatal = new Error("fatal");
 
-			let err: unknown;
-			try {
-				await withRetry(
+			expect(
+				withRetry(
 					async () => {
 						throw fatal;
 					},
 					strategy,
 					{ shouldNotRetryOnError: async () => true }
-				).run();
-			} catch (caught) {
-				err = caught;
-			}
-			expect(err).toBe(fatal);
+				).run()
+			).rejects.toBe(fatal);
 		});
 	});
 

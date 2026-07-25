@@ -165,7 +165,7 @@ describe("task", () => {
 			}));
 
 		test("persists awaiting_retry and suspends when the delay exceeds the spin threshold", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord, { spinThresholdMs: 0 });
 
@@ -208,17 +208,11 @@ describe("task", () => {
 						{ taskInfo: runningTaskInfo }
 					);
 
-				let err: unknown;
-				try {
-					await chargeCard.start(run, input);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunSuspendedError);
+				expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("fails the task and throws TaskFailedError when there is no retry budget", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord);
 
@@ -258,13 +252,7 @@ describe("task", () => {
 						{ taskInfo: runningTaskInfo }
 					);
 
-				let err: unknown;
-				try {
-					await chargeCard.start(run, input);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(TaskFailedError);
+				expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
 			}));
 
 		test("replays a completed task from history without touching the client", () =>
@@ -331,7 +319,7 @@ describe("task", () => {
 			}));
 
 		test("fails the run and throws WorkflowRunFailedError when the input schema rejects", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord);
 
@@ -358,13 +346,7 @@ describe("task", () => {
 					{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
 				);
 
-				let err: unknown;
-				try {
-					await validateInput.start(run, "anything");
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunFailedError);
+				expect(validateInput.start(run, "anything")).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
 		test("replays a failed task from history as TaskFailedError without touching the client", () =>
@@ -387,18 +369,12 @@ describe("task", () => {
 				});
 				const run = createTestWorkflowRun(client, runRecord);
 
-				let err: unknown;
-				try {
-					await chargeCard.start(run, input);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(TaskFailedError);
+				expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
 				expect(handlerCalls).toBe(0);
 			}));
 
 		test("fails the run with NonDeterminismError when the replay history diverges", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const chargeCard = task<{ cardId: string }, string>({
 					name: "charge-card",
 					handler: async () => "charged",
@@ -419,13 +395,7 @@ describe("task", () => {
 					{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
 				);
 
-				let err: unknown;
-				try {
-					await chargeCard.start(run, { cardId: "card-1" });
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(NonDeterminismError);
+				expect(chargeCard.start(run, { cardId: "card-1" })).rejects.toBeInstanceOf(NonDeterminismError);
 			}));
 
 		for (const status of WORKFLOW_RUN_STATUSES) {
@@ -434,7 +404,7 @@ describe("task", () => {
 			}
 
 			test(`throws WorkflowRunNotExecutableError when the run is ${status}`, () =>
-				withFakeClient(async (client) => {
+				withFakeClient((client) => {
 					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
 					const run = createTestWorkflowRun(client, runRecord);
 
@@ -447,13 +417,7 @@ describe("task", () => {
 						},
 					});
 
-					let err: unknown;
-					try {
-						await sendEmail.start(run, { to: "info@aiki.run" });
-					} catch (caught) {
-						err = caught;
-					}
-					expect(err).toBeInstanceOf(WorkflowRunNotExecutableError);
+					expect(sendEmail.start(run, { to: "info@aiki.run" })).rejects.toBeInstanceOf(WorkflowRunNotExecutableError);
 					expect(handlerCalls).toBe(0);
 				}));
 		}

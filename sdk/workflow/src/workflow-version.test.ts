@@ -59,7 +59,7 @@ function createTestWorkflowRun(
 describe("workflow version execution", () => {
 	describe("retry strategy precedence", () => {
 		test("uses the run's persisted strategy over the workflow definition strategy", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
 					async handler() {
 						throw new Error("boom");
@@ -97,17 +97,11 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let err: unknown;
-				try {
-					await workflowVersion[INTERNAL].handler(run);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunFailedError);
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
 		test("falls back to the workflow definition retry strategy when the run has none", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
 					async handler() {
 						throw new Error("boom");
@@ -151,17 +145,11 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let err: unknown;
-				try {
-					await workflowVersion[INTERNAL].handler(run);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunSuspendedError);
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("falls back to no retries when neither the run nor the workflow defines a strategy", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
 					async handler() {
 						throw new Error("boom");
@@ -198,13 +186,7 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let err: unknown;
-				try {
-					await workflowVersion[INTERNAL].handler(run);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunFailedError);
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 	});
 
@@ -294,7 +276,7 @@ describe("workflow version execution", () => {
 			}));
 
 		test("fails without retrying when the output schema rejects, even with a retry strategy", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const alwaysInvalid: StandardSchemaV1<string> = {
 					"~standard": {
 						version: 1,
@@ -344,19 +326,13 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let err: unknown;
-				try {
-					await workflowVersion[INTERNAL].handler(run);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunFailedError);
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 	});
 
 	describe("task failures", () => {
 		test("fails with cause 'task' when retries are exhausted", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const chargeCard = task({
 					name: "charge-card",
 					handler: async () => {
@@ -424,17 +400,11 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let err: unknown;
-				try {
-					await workflowVersion[INTERNAL].handler(run);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunFailedError);
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
 		test("awaits retry with cause 'task' when retries remain", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const chargeCard = task({
 					name: "charge-card",
 					handler: async () => {
@@ -502,13 +472,7 @@ describe("workflow version execution", () => {
 						}
 					);
 
-				let err: unknown;
-				try {
-					await workflowVersion[INTERNAL].handler(run);
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunSuspendedError);
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 	});
 
@@ -525,7 +489,7 @@ describe("workflow version execution", () => {
 
 		for (const errorCase of controlFlowErrorCases) {
 			test(`rethrows ${errorCase.name} as-is without an additional state transition`, () =>
-				withFakeClient(async (client) => {
+				withFakeClient((client) => {
 					const runRecord = runningWorkflowRunRecordFactory.build();
 					const thrownError = errorCase.create(runRecord.id as WorkflowRunId, runRecord.attempts);
 					const workflowVersion = workflow({ name: "control-flow-workflow" }).v("1.0.0", {
@@ -546,13 +510,7 @@ describe("workflow version execution", () => {
 						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
 					);
 
-					let err: unknown;
-					try {
-						await workflowVersion[INTERNAL].handler(run);
-					} catch (caught) {
-						err = caught;
-					}
-					expect(err).toBe(thrownError);
+					expect(workflowVersion[INTERNAL].handler(run)).rejects.toBe(thrownError);
 				}));
 		}
 	});
@@ -564,7 +522,7 @@ describe("workflow version execution", () => {
 			}
 
 			test(`throws WorkflowRunNotExecutableError and performs no transition when the run is ${status}`, () =>
-				withFakeClient(async (client) => {
+				withFakeClient((client) => {
 					const workflowVersion = workflow({ name: "guarded-workflow" }).v("1.0.0", {
 						async handler() {
 							return "should not run";
@@ -573,13 +531,7 @@ describe("workflow version execution", () => {
 					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
 					const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
 
-					let err: unknown;
-					try {
-						await workflowVersion[INTERNAL].handler(run);
-					} catch (caught) {
-						err = caught;
-					}
-					expect(err).toBeInstanceOf(WorkflowRunNotExecutableError);
+					expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunNotExecutableError);
 				}));
 		}
 	});
@@ -636,7 +588,7 @@ describe("creating a workflow run", () => {
 			}));
 
 		test("throws SchemaValidationError and does not create a run when the input schema rejects", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const alwaysInvalid: StandardSchemaV1<string> = {
 					"~standard": {
 						version: 1,
@@ -651,13 +603,7 @@ describe("creating a workflow run", () => {
 					schema: { input: alwaysInvalid },
 				});
 
-				let err: unknown;
-				try {
-					await workflowVersion.start(client, "world");
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(SchemaValidationError);
+				expect(workflowVersion.start(client, "world")).rejects.toBeInstanceOf(SchemaValidationError);
 			}));
 
 		test("passes the definition retry strategy as start options", () =>
@@ -853,7 +799,7 @@ describe("creating a workflow run", () => {
 			}));
 
 		test("fails the parent with a non-determinism error when no recorded child matches", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
 					async handler(_run, payload: string) {
 						return payload;
@@ -890,17 +836,11 @@ describe("creating a workflow run", () => {
 					}
 				);
 
-				let err: unknown;
-				try {
-					await childWorkflow.startAsChild(parentRun, "payload");
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(NonDeterminismError);
+				expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(NonDeterminismError);
 			}));
 
 		test("throws WorkflowRunNotExecutableError when the parent is not executable", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
 					async handler(_run, payload: string) {
 						return payload;
@@ -908,13 +848,7 @@ describe("creating a workflow run", () => {
 				});
 				const parentRun = createTestWorkflowRun(client, pausedWorkflowRunRecordFactory.build());
 
-				let err: unknown;
-				try {
-					await childWorkflow.startAsChild(parentRun, "payload");
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunNotExecutableError);
+				expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(WorkflowRunNotExecutableError);
 			}));
 
 		test("forwards the schema-parsed input to createV1", () =>
@@ -954,7 +888,7 @@ describe("creating a workflow run", () => {
 			}));
 
 		test("fails the parent when the input schema rejects", () =>
-			withFakeClient(async (client) => {
+			withFakeClient((client) => {
 				const alwaysInvalid: StandardSchemaV1<string> = {
 					"~standard": {
 						version: 1,
@@ -993,13 +927,7 @@ describe("creating a workflow run", () => {
 					}
 				);
 
-				let err: unknown;
-				try {
-					await childWorkflow.startAsChild(parentRun, "payload");
-				} catch (caught) {
-					err = caught;
-				}
-				expect(err).toBeInstanceOf(WorkflowRunFailedError);
+				expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 	});
 });
