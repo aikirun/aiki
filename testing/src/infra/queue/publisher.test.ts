@@ -72,4 +72,20 @@ describe("fakePublisher", () => {
 			published: [{ run: readyRun3 }],
 		});
 	});
+
+	test("verify passes once every scripted call has been made", async () => {
+		const publisher = fakePublisher();
+		publisher.publishReadyRuns.once(expect.anything(), { published: [] });
+
+		await publisher.publishReadyRuns([readyWorkflowRunFactory.build()]);
+
+		expect(() => publisher.verify()).not.toThrow();
+	});
+
+	test("verify throws when a scripted call was never made", () => {
+		const publisher = fakePublisher();
+		publisher.publishReadyRuns.once(expect.anything(), { published: [] });
+
+		expect(() => publisher.verify()).toThrow();
+	});
 });

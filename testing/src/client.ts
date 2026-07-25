@@ -195,7 +195,7 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 			}
 		}
 		if (problems.length > 0) {
-			throw new Error(`Fake client: ${problems.join("; ")}`);
+			throw new Error(`fakeClient: ${problems.join("; ")}`);
 		}
 	};
 

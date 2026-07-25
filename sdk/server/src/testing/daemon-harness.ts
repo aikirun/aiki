@@ -52,20 +52,22 @@ export function createDaemonHarness() {
 		await createDb?.close();
 	});
 
-	return (fn: (deps: DaemonHarnessDeps) => Promise<void>) => {
+	return async (fn: (deps: DaemonHarnessDeps) => Promise<void>) => {
 		if (!repos) {
 			throw new Error(
 				`${createDaemonHarness.name} deps are only available inside a test — call the returned function in a test body.`
 			);
 		}
-		return fn({
+		const publisher = fakePublisher();
+		await fn({
 			context: createDaemonContext({
 				name: "test",
 				logger: createConsoleLogger({ level: "ERROR" }),
 				signal: new AbortController().signal,
 			}),
 			repos,
-			publisher: fakePublisher(),
+			publisher,
 		});
+		publisher.verify();
 	};
 }
