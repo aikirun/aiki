@@ -1,7 +1,8 @@
 # Database and Migrations
 
 - Postgres is required for running server/examples end-to-end.
-- Tests do not require a database.
+- Unit tests (`bun run test:unit`) are hermetic and do not require a database.
+- Integration tests (`bun run test:integration`) require a database. Credentials should be in `.env.test` at the repo root (see [`.env.test.example`](https://github.com/aikirun/aiki/blob/main/.env.test.example)).
 - Schema sources:
     - `sdk/server/src/infra/db/pg/schema.ts`
     - `sdk/iam/src/infra/db/pg/schema.ts`
@@ -26,5 +27,4 @@ Apply migrations locally (server app):
 bun run --cwd app/server db:migrate:apply
 ```
 
-When schema changes, commit generated migration SQL and `meta/` snapshot files
-together with schema edits.
+When schema changes, commit generated migration SQL and `meta/` snapshot files together with schema edits.

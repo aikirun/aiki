@@ -23,7 +23,7 @@ Each package in the monorepo is a separate Bun workspace. The root `package.json
 ### Components
 
 - app folder contains the follwoing web applications:
-    - server: the API server
+    - server: a pre-composed `sdk/server` for hosting the aiki server easily; handles API requests and starts the runtime
     - dashboard: the web dashboard
     - website: the documentation site
 
@@ -36,24 +36,18 @@ Each package in the monorepo is a separate Bun workspace. The root `package.json
     - worker: long-lived worker processes that claim ready runs and execute workflow code
     - workflow: workflow/task primitives for durable, versioned, retried, and resumable execution
 
-## Code standards
+## Task-specific quidance
 
-### TypeScript style
+| Task                    | Guidance                                   |
+| ----------------------- | ------------------------------------------ |
+| TypeScript conventions  | [typescript](.agents/skills/TYPESCRIPT.md) |
+| Local end-to-end run    | [local](.agents/skills/LOCAL.md)           |
+| Database and migrations | [db](.agents/skills/DB.md)                 |
 
-For TypeScript conventions, see docs/TYPESCRIPT.md
-
-### Naming Conventions
+## Naming Conventions
 
 - Use `kebab-case` for file names and directories.
 - Prefer clarity over brevity; avoid vague names like "item", "manager", "data", "handle".
-
-## Database and Migrations
-
-For database and migration conventions, see docs/DB.md
-
-## Local End-to-End Run (Server + Dashboard)
-
-For local end-to-end runs, see docs/LOCAL.md.
 
 ## Common Commands
 
