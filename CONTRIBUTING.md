@@ -19,7 +19,7 @@ environment running. For cutting releases, see [`.github/RELEASING.md`](.github/
   `EUNSUPPORTEDPROTOCOL`).
 - **Git**
 - **PostgreSQL** — needed to run the server or examples end-to-end, and to run
-  the integration tests (`bun run test:integration`). 
+  the integration tests (`bun run test:integration`).
   The unit tests (`bun run test:unit`) need no database.
 
 ## Set up
@@ -36,39 +36,39 @@ Always use `bun install`, never `npm install` — see the note above.
 
 Run these from the repo root:
 
-| Command | What it does |
-| --- | --- |
-| `bun run test:unit` | Run the unit test suite (no database needed) |
+| Command                    | What it does                                                           |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `bun run test:unit`        | Run the unit test suite (no database needed)                           |
 | `bun run test:integration` | Run the integration tests (needs a Postgres test database — see below) |
-| `bun run check` | Type-check every package with `tsc` |
-| `bun run lint` | Lint & format check with Biome |
-| `bun run lint:fix` | Auto-fix lint/format issues |
-| `bun run build:packages` | Build the publishable SDK packages |
+| `bun run check`            | Type-check every package with `tsc`                                    |
+| `bun run lint`             | Lint & format check with Biome                                         |
+| `bun run lint:fix`         | Auto-fix lint/format issues                                            |
+| `bun run build:packages`   | Build the publishable SDK packages                                     |
 
 ## Run the server + dashboard locally
 
 1. Start a Postgres matching the default connection string:
 
-   ```bash
-   docker run --name aiki-pg -p 5432:5432 \
-     -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=aiki \
-     -d postgres:16
-   ```
+    ```bash
+    docker run --name aiki-pg -p 5432:5432 \
+      -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=aiki \
+      -d postgres:16
+    ```
 
 2. Create the server env file and apply migrations:
 
-   ```bash
-   cp app/server/.env.example app/server/.env
-   bun run --cwd app/server db:migrate:apply
-   ```
+    ```bash
+    cp app/server/.env.example app/server/.env
+    bun run --cwd app/server db:migrate:apply
+    ```
 
 3. Run the pieces (each in its own terminal):
 
-   ```bash
-   bun run server      # API server on http://localhost:9850
-   bun run dashboard   # dashboard on http://localhost:9851
-   bun run website     # docs site
-   ```
+    ```bash
+    bun run server      # API server on http://localhost:9850
+    bun run dashboard   # dashboard on http://localhost:9851
+    bun run website     # docs site
+    ```
 
 ## Run an example
 
@@ -143,8 +143,3 @@ work in progress.
   (summary, linked issue, test plan, and a check/lint/test checklist) plus a
   short "Opening a PR" section here covering branch naming, keeping PRs focused,
   and the commit-message convention.
-- **AI agent guidance & skills.** Add a root `AGENTS.md` (and/or `CLAUDE.md`)
-  documenting the build/test commands, repo conventions, and the Bun-not-npm
-  rule so coding agents get it right. Optionally add reusable Claude Code
-  **skills** under `.claude/skills/` for repeatable chores (e.g. generating a DB
-  migration, running the release). None of this is covered by `.github` today.
