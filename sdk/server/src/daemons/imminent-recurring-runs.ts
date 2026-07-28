@@ -15,7 +15,7 @@ import {
 } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import { publishPendingOutboxEntries } from "./publish-ready-runs";
+import { publishPendingOutboxEntries, type RepublishBackoff } from "./publish-ready-runs";
 import type { Repositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
@@ -48,8 +48,9 @@ const advanceScheduleCursor = createKeysetStreamCursorAdvancer<{ schedule: { id:
 export async function processImminentRecurringRuns(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringRunsDeps,
-	{ limit, imminenceThresholdMs }: { limit: number; imminenceThresholdMs: number }
+	config: { limit: number; imminenceThresholdMs: number; republishBackoff: RepublishBackoff }
 ) {
+	const { limit, imminenceThresholdMs, republishBackoff } = config;
 	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	for await (const rows of streamChunks(
@@ -73,7 +74,7 @@ export async function processImminentRecurringRuns(
 		}));
 
 		if (isNonEmptyArray(schedulesDueNow)) {
-			await queueRecurringRuns(context, deps, schedulesDueNow);
+			await queueRecurringRuns(context, deps, schedulesDueNow, republishBackoff);
 		}
 
 		const { timerPriorityQueue } = deps;
@@ -95,7 +96,8 @@ export async function processImminentRecurringRuns(
 export async function queueRecurringRuns(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringRunsDeps,
-	schedules: NonEmptyArray<DueSchedule>
+	schedules: NonEmptyArray<DueSchedule>,
+	republishBackoff: RepublishBackoff
 ) {
 	const now = Date.now();
 
@@ -117,13 +119,27 @@ export async function queueRecurringRuns(
 
 	const results = await Promise.allSettled([
 		isNonEmptyArray(allowSchedules)
-			? processOverlapAllowSchedules(context, deps.repos, allowSchedules, now, deps.workflowRunPublisher)
+			? processOverlapAllowSchedules(
+					context,
+					deps.repos,
+					allowSchedules,
+					now,
+					deps.workflowRunPublisher,
+					republishBackoff
+				)
 			: undefined,
 		isNonEmptyArray(skipSchedules)
-			? processOverlapSkipSchedules(context, deps.repos, skipSchedules, now, deps.workflowRunPublisher)
+			? processOverlapSkipSchedules(
+					context,
+					deps.repos,
+					skipSchedules,
+					now,
+					deps.workflowRunPublisher,
+					republishBackoff
+				)
 			: undefined,
 		isNonEmptyArray(cancelPreviousSchedules)
-			? processOverlapCancelPreviousSchedules(context, deps, cancelPreviousSchedules, now)
+			? processOverlapCancelPreviousSchedules(context, deps, cancelPreviousSchedules, now, republishBackoff)
 			: undefined,
 	]);
 
@@ -139,7 +155,8 @@ async function processOverlapAllowSchedules(
 	repos: ProcessImminentRecurringRunsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
-	workflowRunPublisher?: Publisher
+	workflowRunPublisher: Publisher | undefined,
+	republishBackoff: RepublishBackoff
 ) {
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -215,7 +232,7 @@ async function processOverlapAllowSchedules(
 	});
 
 	if (workflowRunPublisher) {
-		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, outboxEntries);
+		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, outboxEntries, republishBackoff);
 	}
 }
 
@@ -224,7 +241,8 @@ async function processOverlapSkipSchedules(
 	repos: ProcessImminentRecurringRunsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
-	workflowRunPublisher?: Publisher
+	workflowRunPublisher: Publisher | undefined,
+	republishBackoff: RepublishBackoff
 ) {
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(repos, schedules);
 
@@ -307,7 +325,7 @@ async function processOverlapSkipSchedules(
 	});
 
 	if (workflowRunPublisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, insertedOutboxEntries);
+		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, insertedOutboxEntries, republishBackoff);
 	}
 }
 
@@ -315,7 +333,8 @@ async function processOverlapCancelPreviousSchedules(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringRunsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
-	now: number
+	now: number,
+	republishBackoff: RepublishBackoff
 ) {
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(deps.repos, schedules);
 
@@ -450,7 +469,13 @@ async function processOverlapCancelPreviousSchedules(
 	});
 
 	if (deps.workflowRunPublisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishPendingOutboxEntries(context, deps.repos, deps.workflowRunPublisher, insertedOutboxEntries);
+		await publishPendingOutboxEntries(
+			context,
+			deps.repos,
+			deps.workflowRunPublisher,
+			insertedOutboxEntries,
+			republishBackoff
+		);
 	}
 }
 

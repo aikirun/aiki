@@ -25,10 +25,6 @@ export const workflowOptionsSchema = type({
 	"retry?": retryStrategySchema,
 });
 
-const workflowRunScheduledReasonSchema = type(
-	"'new' | 'retry' | 'task_retry' | 'awake' | 'awake_early' | 'resume' | 'event' | 'child_workflow'"
-);
-
 export const workflowRunStateScheduledSchema = type({
 	status: "'scheduled'",
 	scheduledAt: "number > 0",
@@ -42,9 +38,13 @@ export const workflowRunStateScheduledSchema = type({
 	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'event'" })
 	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'child_workflow'" });
 
+const workflowRunQueuedReasonSchema = type(
+	"'new' | 'retry' | 'task_retry' | 'awake' | 'awake_early' | 'resume' | 'event' | 'child_workflow' | 'recovered'"
+);
+
 export const workflowRunStateQueuedSchema = type({
 	status: "'queued'",
-	reason: workflowRunScheduledReasonSchema,
+	reason: workflowRunQueuedReasonSchema,
 });
 
 export const workflowRunStateRunningSchema = type({

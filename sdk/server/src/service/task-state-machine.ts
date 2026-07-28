@@ -6,7 +6,7 @@ import type {
 	WorkflowRunTransitionTaskStateRequestV1,
 } from "@aikirun/types/api/workflow-run";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
-import type { TaskId, TaskInfo, TaskName, TaskState, TaskStatus } from "@aikirun/types/workflow/task";
+import type { TaskId, TaskInfo, TaskName, TaskState, TaskStateFailed, TaskStatus } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
 import { InvalidTaskStateTransitionError, WorkflowRunRevisionConflictError } from "../errors";
@@ -73,27 +73,27 @@ async function transitionStateInTx(
 	txRepos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
 ): Promise<TaskInfo> {
 	const runId = request.id as WorkflowRunId;
-
 	const run = await txRepos.workflowRun.getById(namespaceId, runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
-	if (run.revision !== request.expectedWorkflowRunRevision) {
-		throw new WorkflowRunRevisionConflictError(runId, request.expectedWorkflowRunRevision);
+
+	const { expectedWorkflowRunRevision } = request;
+	if (run.revision !== expectedWorkflowRunRevision) {
+		throw new WorkflowRunRevisionConflictError(runId, expectedWorkflowRunRevision);
 	}
 
-	const now = Date.now();
-
 	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
-		const inputHash = await hashInput(request.taskState.input);
+		const toTaskState = request.taskState;
+		const inputHash = await hashInput(toTaskState.input);
 		const taskName = request.taskName as TaskName;
 		const taskId = ulid() as TaskId;
 		const stateTransitionId = ulid();
 
 		const taskState: TaskState = {
 			status: "running",
-			attempts: request.taskState.attempts,
-			input: request.taskState.input,
+			attempts: toTaskState.attempts,
+			input: toTaskState.input,
 		};
 
 		assertIsValidTaskStateTransition(runId, taskName, taskId, undefined, taskState.status);
@@ -104,7 +104,7 @@ async function transitionStateInTx(
 			workflowRunId: runId,
 			status: taskState.status,
 			attempts: taskState.attempts,
-			input: request.taskState.input,
+			input: toTaskState.input,
 			inputHash,
 			options: request.options,
 			latestStateTransitionId: stateTransitionId,
@@ -128,36 +128,38 @@ async function transitionStateInTx(
 		return { id: taskId, name: taskName, state: taskState, inputHash };
 	}
 
-	const existingTask = await txRepos.task.getById(request.taskId);
+	const taskId = request.taskId as TaskId;
+	const existingTask = await txRepos.task.getById(taskId);
 	if (!existingTask) {
-		throw new NotFoundError(`Task not found: ${request.taskId}`);
+		throw new NotFoundError(`Task not found: ${taskId}`);
 	}
 
 	const inputHash = existingTask.inputHash;
 	const taskName = existingTask.name as TaskName;
-	const taskId = existingTask.id as TaskId;
+
+	const requestTaskState = request.taskState;
 
 	const taskState: TaskState =
-		request.taskState.status === "running"
+		requestTaskState.status === "running"
 			? {
-					status: "running",
-					attempts: request.taskState.attempts,
-					input: request.taskState.input,
+					status: requestTaskState.status,
+					attempts: requestTaskState.attempts,
+					input: requestTaskState.input,
 				}
-			: request.taskState.status === "completed"
+			: requestTaskState.status === "completed"
 				? {
-						status: "completed",
-						attempts: request.taskState.attempts,
-						output: request.taskState.output,
+						status: requestTaskState.status,
+						attempts: requestTaskState.attempts,
+						output: requestTaskState.output,
 					}
-				: request.taskState.status === "awaiting_retry"
+				: requestTaskState.status === "awaiting_retry"
 					? {
-							status: "awaiting_retry",
-							attempts: request.taskState.attempts,
-							error: request.taskState.error,
-							nextAttemptAt: now + request.taskState.nextAttemptInMs,
+							status: requestTaskState.status,
+							attempts: requestTaskState.attempts,
+							error: requestTaskState.error,
+							nextAttemptAt: Date.now() + requestTaskState.nextAttemptInMs,
 						}
-					: request.taskState;
+					: (requestTaskState satisfies TaskStateFailed);
 
 	assertIsValidTaskStateTransition(runId, taskName, taskId, existingTask.status, taskState.status);
 
@@ -181,10 +183,12 @@ async function transitionStateInTx(
 
 	if (taskState.status === "awaiting_retry") {
 		// The workflow run stays in `running` while the task waits for its retry, so the outbox row
-		// is not cleared by the workflow state machine. Delete it here so `republish-stale-runs`
+		// is not cleared by the workflow state machine. Delete it here so `recoverStaleOutboxEntries`
 		// cannot re-dispatch the run before `imminent-retryable-task-runs` requeues it at the
-		// task's nextAttemptAt. The retry-tasks daemon will reinsert a fresh outbox row when it
-		// transitions the workflow to `queued`.
+		// task's nextAttemptAt. `processImminentRetryableTaskRuns` daemon will reinsert a fresh outbox
+		// row when it transitions the workflow to `queued`.
+		// Also note that if the entry is not deleted, `processImminentRetryableTaskRuns` will
+		// fail on insert due to duplicate key
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
 	}
 

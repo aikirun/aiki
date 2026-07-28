@@ -13,7 +13,11 @@ describe("publishReadyRuns", () => {
 				pendingWorkflowRunOutboxRowFactory.build(),
 			]);
 
-			await publishReadyRuns(context, { repos, workflowRunPublisher: publisher }, { limit: 100 });
+			await publishReadyRuns(
+				context,
+				{ repos, workflowRunPublisher: publisher },
+				{ limit: 100, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
+			);
 
 			expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
 		}));
@@ -25,9 +29,13 @@ describe("publishReadyRuns", () => {
 
 			publisher.publishReadyRuns.rejectsOnce(expect.anything(), new Error("broker down"));
 
-			expect(publishReadyRuns(context, { repos, workflowRunPublisher: publisher }, { limit: 100 })).rejects.toThrow(
-				"broker down"
-			);
+			expect(
+				publishReadyRuns(
+					context,
+					{ repos, workflowRunPublisher: publisher },
+					{ limit: 100, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
+				)
+			).rejects.toThrow("broker down");
 
 			const stillPendingRows = await repos.workflowRunOutbox.listPending(context, 100);
 			expect(stillPendingRows).toEqual([expect.objectContaining(pendingOutboxRow)]);

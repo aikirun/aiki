@@ -14,7 +14,12 @@ export type WorkflowRunOutboxRow = typeof workflowRunOutbox.$inferSelect;
 export type WorkflowRunOutboxRowInsert = typeof workflowRunOutbox.$inferInsert;
 export type WorkflowRunOutboxRowInsertPending = WorkflowRunOutboxRowInsert & { status: "pending" };
 export type WorkflowRunOutboxRowPending = WorkflowRunOutboxRow & { status: "pending" };
-export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & { status: "published"; publishedAt: TimestampMs };
+export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & {
+	status: "published";
+	firstPublishedAt: TimestampMs;
+	lastPublishedAt: TimestampMs;
+	nextPublishAttemptAt: TimestampMs;
+};
 export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "claimed"; claimedAt: TimestampMs };
 
 interface ClaimFilter {
@@ -67,25 +72,35 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 		return rows as WorkflowRunOutboxRowPending[];
 	},
 
-	async markPublished(ids: NonEmptyArray<string>): Promise<void> {
+	async markPublished(entries: NonEmptyArray<{ id: string; nextPublishAttemptAt: TimestampMs }>): Promise<void> {
+		const now = Date.now() as TimestampMs;
+
+		const valueRows = entries.map((entry, index) => {
+			if (index === 0) {
+				return sql`(${entry.id}::text, ${new Date(entry.nextPublishAttemptAt).toISOString()}::timestamptz)`;
+			}
+			return sql`(${entry.id}, ${new Date(entry.nextPublishAttemptAt).toISOString()})`;
+		});
+
 		await db
 			.update(workflowRunOutbox)
-			.set({ status: "published", publishedAt: Date.now() as TimestampMs })
-			.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, ids)));
+			.set({
+				status: "published",
+				firstPublishedAt: sql`COALESCE(${workflowRunOutbox.firstPublishedAt}, ${new Date(now).toISOString()}::timestamptz)`,
+				lastPublishedAt: now,
+				nextPublishAttemptAt: sql`v.next_publish_attempt_at`,
+			})
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, next_publish_attempt_at)`)
+			.where(and(eq(workflowRunOutbox.status, "pending"), sql`${workflowRunOutbox.id} = v.id`));
 	},
 
-	async markRepublished(ids: NonEmptyArray<string>): Promise<void> {
+	// Returns rows in claimed or published status back to pending.
+	// firstPublishedAt and lastPublishedAt are not cleared so that backoff anchors survive recovery churn.
+	async returnToPending(ids: NonEmptyArray<string>): Promise<void> {
 		await db
 			.update(workflowRunOutbox)
-			.set({ publishedAt: Date.now() as TimestampMs })
-			.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, ids)));
-	},
-
-	async releaseStaleClaim(ids: NonEmptyArray<string>): Promise<void> {
-		await db
-			.update(workflowRunOutbox)
-			.set({ status: "published", claimedAt: null, publishedAt: Date.now() as TimestampMs })
-			.where(and(eq(workflowRunOutbox.status, "claimed"), inArray(workflowRunOutbox.id, ids)));
+			.set({ status: "pending", claimedAt: null, nextPublishAttemptAt: null })
+			.where(and(inArray(workflowRunOutbox.status, ["claimed", "published"]), inArray(workflowRunOutbox.id, ids)));
 	},
 
 	async markClaimed(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
@@ -110,12 +125,10 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 
 	async listStalePublished(
 		_context: DaemonContext,
-		claimMinIdleTimeMs: number,
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<WorkflowRunOutboxRowPublished[]> {
-		const now = Date.now();
-		const staleThreshold = (now - claimMinIdleTimeMs) as TimestampMs;
+		const now = Date.now() as TimestampMs;
 
 		const rows = await db
 			.select()
@@ -123,11 +136,11 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.where(
 				and(
 					eq(workflowRunOutbox.status, "published"),
-					lt(workflowRunOutbox.publishedAt, staleThreshold),
-					keysetStreamCursorFilter(workflowRunOutbox.publishedAt, workflowRunOutbox.id, cursor)
+					lte(workflowRunOutbox.nextPublishAttemptAt, now),
+					keysetStreamCursorFilter(workflowRunOutbox.nextPublishAttemptAt, workflowRunOutbox.id, cursor)
 				)
 			)
-			.orderBy(workflowRunOutbox.publishedAt, workflowRunOutbox.id)
+			.orderBy(workflowRunOutbox.nextPublishAttemptAt, workflowRunOutbox.id)
 			.limit(limit);
 
 		return rows as WorkflowRunOutboxRowPublished[];

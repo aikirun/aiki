@@ -6,7 +6,7 @@ import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer"
 import type { WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import { publishPendingOutboxEntries } from "./publish-ready-runs";
+import { publishPendingOutboxEntries, type RepublishBackoff } from "./publish-ready-runs";
 import type { Repositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRow } from "../infra/db/types/workflow";
@@ -32,8 +32,9 @@ export interface ProcessImminentRetryableRunsDeps {
 export async function processImminentRetryableRuns(
 	context: DaemonContext,
 	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentRetryableRunsDeps,
-	{ limit, imminenceThresholdMs }: { limit: number; imminenceThresholdMs: number }
+	config: { limit: number; imminenceThresholdMs: number; republishBackoff: RepublishBackoff }
 ) {
+	const { limit, imminenceThresholdMs, republishBackoff } = config;
 	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
@@ -41,7 +42,7 @@ export async function processImminentRetryableRuns(
 		{ until: (chunk) => chunk.length < limit }
 	)) {
 		if (isNonEmptyArray(runsDueNow)) {
-			await queueRetryableRuns(context, repos, workflowRunPublisher, runsDueNow);
+			await queueRetryableRuns(context, repos, workflowRunPublisher, republishBackoff, runsDueNow);
 		}
 
 		if (timerPriorityQueue && isNonEmptyArray(runsDueSoon)) {
@@ -63,6 +64,7 @@ export async function queueRetryableRuns(
 	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: Publisher | undefined,
+	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	options?: { chunkSize?: number }
 ) {
@@ -74,7 +76,7 @@ export async function queueRetryableRuns(
 
 	await runConcurrently(context, chunkLazy(runs, chunkSize), async (chunk, spanCtx) => {
 		try {
-			await processChunk(spanCtx, repos, workflowRunPublisher, chunk, workflowsById);
+			await processChunk(spanCtx, repos, workflowRunPublisher, republishBackoff, chunk, workflowsById);
 		} catch (err) {
 			spanCtx.logger.warn("Failed to process chunk, will retry next tick", { err, "aiki.chunkSize": chunk.length });
 		}
@@ -85,6 +87,7 @@ async function processChunk(
 	context: DaemonContext,
 	repos: Repos,
 	workflowRunPublisher: Publisher | undefined,
+	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
@@ -165,6 +168,6 @@ async function processChunk(
 	});
 
 	if (workflowRunPublisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, insertedOutboxEntries);
+		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, insertedOutboxEntries, republishBackoff);
 	}
 }

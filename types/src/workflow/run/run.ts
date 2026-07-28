@@ -124,9 +124,22 @@ export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByEvent
 	| WorkflowRunStateScheduledByChildWorkflow;
 
+export const WORKFLOW_RUN_QUEUED_REASON = [
+	"new",
+	"retry",
+	"task_retry",
+	"awake",
+	"awake_early",
+	"resume",
+	"event",
+	"child_workflow",
+	"recovered",
+] as const;
+export type WorkflowRunQueuedReason = (typeof WORKFLOW_RUN_QUEUED_REASON)[number];
+
 export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
 	status: "queued";
-	reason: WorkflowRunScheduledReason;
+	reason: WorkflowRunQueuedReason;
 }
 
 export interface WorkflowRunStateRunning extends WorkflowRunStateBase {

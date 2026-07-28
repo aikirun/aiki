@@ -15,7 +15,11 @@ describe("startDueTimersConsumer", () => {
 		const logger = createConsoleLogger({ level: "ERROR" });
 
 		const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger, signal });
-		const configProvider = asConfigProvider(() => ({ limit: 1, overshootMs: 10 }));
+		const configProvider = asConfigProvider(() => ({
+			limit: 1,
+			overshootMs: 10,
+			republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 },
+		}));
 
 		let resolved = false;
 		const consumer = startDueTimersConsumer(logger, {
