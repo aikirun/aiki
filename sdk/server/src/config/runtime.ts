@@ -19,8 +19,13 @@ export interface ServerRuntimeConfig {
 		imminentEventWaitTimedOutRuns: ImminentPollingDaemonConfig;
 		imminentChildRunWaitTimedOutRuns: ImminentPollingDaemonConfig;
 		imminentRecurringRuns: ImminentPollingDaemonConfig;
-		publishReadyRuns: PollingDaemonConfig;
-		republishStaleRuns: PollingDaemonConfig & {
+		publishReadyRuns: PollingDaemonConfig & {
+			republishBackoff: {
+				baseDelayMs: number;
+				maxDelayMs: number;
+			};
+		};
+		recoverStaleOutboxEntries: PollingDaemonConfig & {
 			claimMinIdleTimeMs: number;
 		};
 		stallUndeliverableRuns: PollingDaemonConfig & {
@@ -76,8 +81,12 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 		publishReadyRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
+			republishBackoff: {
+				baseDelayMs: 5_000,
+				maxDelayMs: 300_000,
+			},
 		},
-		republishStaleRuns: {
+		recoverStaleOutboxEntries: {
 			intervalMs: 1_000,
 			limit: 1_000,
 			claimMinIdleTimeMs: DEFAULT_CLAIM_MIN_IDLE_TIME_MS,

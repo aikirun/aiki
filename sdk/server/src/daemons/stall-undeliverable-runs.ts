@@ -20,7 +20,7 @@ const advanceStreamCursor = (_cursor: string | undefined, item: { id: string }) 
 export async function stallUndeliverableRuns(
 	context: DaemonContext,
 	{ repos }: StallUndeliverableRunsDeps,
-	{ maxAgeMs, limit }: { maxAgeMs: number; limit: number }
+	{ limit, maxAgeMs }: { limit: number; maxAgeMs: number }
 ): Promise<void> {
 	const maxId = ulidUpperBound(Date.now() - maxAgeMs);
 

@@ -261,7 +261,15 @@ async function transitionStateInTx(
 				}
 				break;
 			default:
-				toState.reason satisfies "new" | "task_retry" | "awake" | "awake_early" | "resume" | "event" | "child_workflow";
+				toState.reason satisfies
+					| "new"
+					| "task_retry"
+					| "awake"
+					| "awake_early"
+					| "resume"
+					| "event"
+					| "child_workflow"
+					| "recovered";
 		}
 	}
 

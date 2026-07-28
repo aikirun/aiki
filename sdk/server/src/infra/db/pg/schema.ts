@@ -383,10 +383,11 @@ export const workflowRunOutbox = pgTable(
 
 		status: workflowRunOutboxStatusEnum("status").notNull(),
 
-		publishedAt: timestampMs("published_at"),
 		claimedAt: timestampMs("claimed_at"),
-
+		firstPublishedAt: timestampMs("first_published_at"),
+		lastPublishedAt: timestampMs("last_published_at"),
 		nextPublishAttemptAt: timestampMs("next_publish_attempt_at"),
+
 		attempts: integer("attempts").notNull().default(0),
 
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
@@ -416,21 +417,22 @@ export const workflowRunOutbox = pgTable(
 			)
 			.where(sql`${table.status} = 'claimed'`),
 
-		// Daemon list paths: broad scans over one status to feed broker delivery or monitoring.
+		// Daemon list paths: broad scans over one status to feed broker.
 		index("idx_workflow_run_outbox_list_pending").on(table.rank, table.id).where(sql`${table.status} = 'pending'`),
 		index("idx_workflow_run_outbox_list_published")
-			.on(table.publishedAt, table.id)
+			.on(table.nextPublishAttemptAt, table.id)
 			.where(sql`${table.status} = 'published'`),
 		index("idx_workflow_run_outbox_list_claimed").on(table.claimedAt, table.id).where(sql`${table.status} = 'claimed'`),
 
-		// Age sweep: id-range scan over undeliverable rows to stall those past maxAgeMs.
+		// Stall path: id-range scan over pending and published rows to stall those past maxAgeMs.
+		// claimed rows are exempt — they are executing, not waiting for delivery.
 		index("idx_workflow_run_outbox_stall_undeliverable")
 			.on(table.id)
 			.where(sql`${table.status} IN ('pending', 'published')`),
 
 		check(
-			"chk_workflow_run_outbox_published_requires_published_at",
-			sql`${table.status} != 'published' OR ${table.publishedAt} IS NOT NULL`
+			"chk_workflow_run_outbox_published_requires_first_published_at",
+			sql`${table.status} != 'published' OR (${table.firstPublishedAt} IS NOT NULL AND ${table.nextPublishAttemptAt} IS NOT NULL)`
 		),
 		check(
 			"chk_workflow_run_outbox_claimed_requires_claimed_at",

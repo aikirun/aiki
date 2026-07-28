@@ -522,6 +522,23 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result.map((row) => row.id);
 	},
 
+	async bulkReleaseToQueued(runIds: NonEmptyArray<string>): Promise<{ id: string; attempts: number }[]> {
+		const result = await db
+			.update(workflowRun)
+			.set({
+				status: "queued",
+				revision: sql`${workflowRun.revision} + 1`,
+				scheduledAt: null,
+				awakeAt: null,
+				timeoutAt: null,
+				nextAttemptAt: null,
+			})
+			.where(and(inArray(workflowRun.id, runIds), eq(workflowRun.status, "running")))
+			.returning({ id: workflowRun.id, attempts: workflowRun.attempts });
+
+		return result;
+	},
+
 	async bulkSetLatestStateTransitionId(runs: NonEmptyArray<{ id: string; stateTransitionId: string }>): Promise<void> {
 		const valueRows = runs.map((run, index) => {
 			if (index === 0) {

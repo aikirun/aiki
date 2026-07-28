@@ -1,5 +1,5 @@
 import { delay } from "@aikirun/lib/async";
-import type { ConfigProvider } from "@aikirun/lib/config";
+import { asConfigProvider, type ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import { withRetry } from "@aikirun/lib/retry";
 import type { Publisher } from "@aikirun/types/infra/queue";
@@ -14,7 +14,7 @@ import { processImminentRetryableTaskRuns } from "./imminent-retryable-task-runs
 import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { publishReadyRuns } from "./publish-ready-runs";
-import { republishStaleRuns } from "./republish-stale-runs";
+import { recoverStaleOutboxEntries } from "./recover-stale-outbox-entries";
 import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import type { ServerRuntimeConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
@@ -80,52 +80,54 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 	const { start: startPollingDaemon } = pollingDaemon(logger, signal, configProvider.scope("daemons"));
 
 	const daemonPromises: Promise<void>[] = [
-		startPollingDaemon((config) => config.imminentScheduledRuns, processImminentScheduledRuns, {
-			repos,
-			workflowRunPublisher,
-			timerPriorityQueue,
-		}),
-		startPollingDaemon((config) => config.imminentSleepElapsedRuns, processImminentSleepElapsedRuns, {
-			repos,
-			workflowRunPublisher,
-			timerPriorityQueue,
-		}),
-		startPollingDaemon((config) => config.imminentRetryableRuns, processImminentRetryableRuns, {
-			repos,
-			workflowRunPublisher,
-			timerPriorityQueue,
-		}),
-		startPollingDaemon((config) => config.imminentRetryableTaskRuns, processImminentRetryableTaskRuns, {
-			repos,
-			workflowRunPublisher,
-			timerPriorityQueue,
-		}),
-		startPollingDaemon((config) => config.imminentEventWaitTimedOutRuns, processImminentEventWaitTimedOutRuns, {
-			repos,
-			workflowRunPublisher,
-			timerPriorityQueue,
-		}),
-		startPollingDaemon((config) => config.imminentChildRunWaitTimedOutRuns, processImminentChildRunWaitTimedOutRuns, {
-			repos,
-			workflowRunPublisher,
-			timerPriorityQueue,
-		}),
-		startPollingDaemon((config) => config.imminentRecurringRuns, processImminentRecurringRuns, {
-			repos,
-			childRunCanceller,
-			workflowRunPublisher,
-			timerPriorityQueue,
-		}),
+		startPollingDaemon(
+			(config) => ({ ...config.imminentScheduledRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			processImminentScheduledRuns,
+			{ repos, workflowRunPublisher, timerPriorityQueue }
+		),
+		startPollingDaemon(
+			(config) => ({ ...config.imminentSleepElapsedRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			processImminentSleepElapsedRuns,
+			{ repos, workflowRunPublisher, timerPriorityQueue }
+		),
+		startPollingDaemon(
+			(config) => ({ ...config.imminentRetryableRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			processImminentRetryableRuns,
+			{ repos, workflowRunPublisher, timerPriorityQueue }
+		),
+		startPollingDaemon(
+			(config) => ({ ...config.imminentRetryableTaskRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			processImminentRetryableTaskRuns,
+			{ repos, workflowRunPublisher, timerPriorityQueue }
+		),
+		startPollingDaemon(
+			(config) => ({
+				...config.imminentEventWaitTimedOutRuns,
+				republishBackoff: config.publishReadyRuns.republishBackoff,
+			}),
+			processImminentEventWaitTimedOutRuns,
+			{ repos, workflowRunPublisher, timerPriorityQueue }
+		),
+		startPollingDaemon(
+			(config) => ({
+				...config.imminentChildRunWaitTimedOutRuns,
+				republishBackoff: config.publishReadyRuns.republishBackoff,
+			}),
+			processImminentChildRunWaitTimedOutRuns,
+			{ repos, workflowRunPublisher, timerPriorityQueue }
+		),
+		startPollingDaemon(
+			(config) => ({ ...config.imminentRecurringRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			processImminentRecurringRuns,
+			{ repos, childRunCanceller, workflowRunPublisher, timerPriorityQueue }
+		),
+		startPollingDaemon((config) => config.recoverStaleOutboxEntries, recoverStaleOutboxEntries, { repos }),
 		startPollingDaemon((config) => config.stallUndeliverableRuns, stallUndeliverableRuns, { repos }),
 	];
 
 	if (workflowRunPublisher) {
 		daemonPromises.push(
 			startPollingDaemon((config) => config.publishReadyRuns, publishReadyRuns, {
-				repos,
-				workflowRunPublisher,
-			}),
-			startPollingDaemon((config) => config.republishStaleRuns, republishStaleRuns, {
 				repos,
 				workflowRunPublisher,
 			})
@@ -140,7 +142,13 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 				timerPriorityQueue,
 				childRunCanceller,
 				workflowRunPublisher,
-				configProvider: configProvider.scope("daemons").scope("dueTimersConsumer"),
+				configProvider: asConfigProvider(() => {
+					const config = configProvider.config.daemons;
+					return {
+						...config.dueTimersConsumer,
+						republishBackoff: config.publishReadyRuns.republishBackoff,
+					};
+				}),
 			})
 		);
 	}

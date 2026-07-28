@@ -71,6 +71,13 @@
 			"when": 1784756645279,
 			"tag": "0009_simple_the_anarchist",
 			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1785023789368,
+			"tag": "0010_wise_young_avengers",
+			"breakpoints": true
 		}
 	]
 }
