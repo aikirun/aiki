@@ -8,6 +8,11 @@ Follow these repository-wide rules when changing the AIKI repository.
 - Prefer root scripts in `package.json` unless there is a clear reason to run a package-local command.
 - Keep changes focused; avoid unrelated refactors.
 - Run relevant verification before finishing (at minimum: check + lint + tests impacted by your change).
+- Never `git commit`, `git push`, or amend history unless explicitly asked. Never bypass the pre-commit hook with `--no-verify`.
+- Use `git mv` when relocating tracked files so history follows the rename.
+- Generating database migration files is fine; never apply migrations to a database unless explicitly asked — the operator runs them.
+- When renaming directories/packages or adding a workspace dependency, grep the Dockerfiles: `COPY` paths are not checked by tsc or Biome and go stale silently.
+- Before writing the first artifact of a kind (a test file, a migration, a daemon), read two or three existing ones of the same kind and match their idioms.
 
 ## Architecture & Structure
 
@@ -17,12 +22,13 @@ Each package in the monorepo is a separate Bun workspace. The root `package.json
 
 - Monorepo name: `aiki`
 - Package manager/runtime: **Bun**
-- Workspace model: Bun workspaces (`workspace:*` links)
-- Prefer small, focused `tsconfig.json` files: one per feature or bootstrap component, referenced by a root config with `include: []`. A single `main/tsconfig.json` is acceptable for small systems.
+- Workspace model: Bun workspaces (`workspace:*` links). Every package shares one version and bumps in lockstep (`bun run bump` sets them all from the root); scaffold a new package at the current version, not `0.0.0`.
+- Publishable SDK packages list `@aikirun/lib` under `devDependencies`, never `dependencies` — tsup inlines its types into the shipped `.d.ts`, so a declared runtime dependency on it breaks the dts build. Private apps (for example `app/server`) are exempt.
+- Prefer small, focused `tsconfig.json` files: one per feature or bootstrap component, referenced by a root config with `include: []`. A single `main/tsconfig.json` is acceptable for small systems. Keep `incremental` in `tsconfig.check.json` only — a root `tsconfig.json` (which every package extends) carrying `incremental` breaks the tsup `.d.ts` build with TS5074.
 
 ### Components
 
-- app folder contains the follwoing web applications:
+- app folder contains the following web applications:
     - server: a pre-composed `sdk/server` for hosting the aiki server easily; handles API requests and starts the runtime
     - dashboard: the web dashboard
     - website: the documentation site
@@ -36,11 +42,12 @@ Each package in the monorepo is a separate Bun workspace. The root `package.json
     - worker: long-lived worker processes that claim ready runs and execute workflow code
     - workflow: workflow/task primitives for durable, versioned, retried, and resumable execution
 
-## Task-specific quidance
+## Task-specific guidance
 
 | Task                    | Guidance                                   |
 | ----------------------- | ------------------------------------------ |
 | TypeScript conventions  | [typescript](.agents/skills/TYPESCRIPT.md) |
+| Writing tests           | [testing](.agents/skills/TESTING.md)       |
 | Local end-to-end run    | [local](.agents/skills/LOCAL.md)           |
 | Database and migrations | [db](.agents/skills/DB.md)                 |
 
@@ -52,6 +59,8 @@ Each package in the monorepo is a separate Bun workspace. The root `package.json
 ## Common Commands
 
 - Need full type safety across repo: `bun run check`
+- Need hermetic unit tests (no database): `bun run test:unit`
+- Need integration tests (live Postgres, `.env.test`): `bun run test:integration`
 - Need style/format validation: `bun run lint`
 - Need automatic formatting/lint fixes: `bun run lint:fix`
 - Need package artifacts for publishable libs: `bun run build:packages`
