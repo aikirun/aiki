@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/iam",
-	"version": "0.35.0",
+	"version": "0.36.0",
 	"description": "Aiki IAM library — pluggable identity & access management",
 	"type": "module",
 	"main": "./dist/index.js",

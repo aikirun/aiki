@@ -2,6 +2,85 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.36.0
+
+This release reworks how the server delivers ready runs to workers and how it gives up on runs it cannot deliver. Delivery now flows through a single claimable state: a recovery daemon returns in-flight outbox rows to the claimable pool and releases a dead worker's run back to `queued`, while a run that stays undelivered past a configurable age moves to a new `stalled` state instead of being re-offered on a timer without end. Broker re-publishing now backs off by the run's age rather than retrying on every poll. The release also renames several server daemons and worker config keys for clarity, and closes a database connection that leaked on shutdown.
+
+### Breaking Changes
+
+- **Worker config `workflowRun.spinThresholdMs` renamed to `workflowRun.maxInlineWaitMs`.** This is the retry delay below which a task waits inline rather than transitioning to `awaiting_retry`; the new name states the bound directly.
+
+  ```typescript
+  // Before
+  worker({ workflows, config: { workflowRun: { spinThresholdMs: 10 } } });
+
+  // After
+  worker({ workflows, config: { workflowRun: { maxInlineWaitMs: 10 } } });
+  ```
+
+- **Server runtime config: daemons renamed and the outbox sweep split in two.** Only relevant if you override `ServerRuntimeConfig`. The imminent daemons' `imminenceThresholdMs` is now `lookaheadWindowMs`; `imminentRetryableTaskRuns` is now `imminentRetryableTasks`; `imminentRecurringWorkflows` is now `imminentRecurringRuns`. The old `republishStaleRuns` daemon is replaced by two daemons, and `publishReadyRuns` gains a `republishBackoff`.
+
+  ```typescript
+  // Before
+  {
+    imminentScheduledRuns: { imminenceThresholdMs: 3_000, /* ... */ },
+    imminentRetryableTaskRuns: { /* ... */ },
+    imminentRecurringWorkflows: { /* ... */ },
+    publishReadyRuns: { intervalMs: 1_000, limit: 1_000 },
+    republishStaleRuns: { claimMinIdleTimeMs: 90_000, /* ... */ },
+  }
+
+  // After
+  {
+    imminentScheduledRuns: { lookaheadWindowMs: 3_000, /* ... */ },
+    imminentRetryableTasks: { /* ... */ },
+    imminentRecurringRuns: { /* ... */ },
+    publishReadyRuns: {
+      intervalMs: 1_000,
+      limit: 1_000,
+      republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 },
+    },
+    recoverOverdueOutboxEntries: { claimIdleTimeoutMs: 90_000, /* ... */ },
+    stallUndeliverableRuns: { maxAgeMs: 24 * 60 * 60 * 1_000, /* ... */ },
+  }
+  ```
+
+- **Exported constant `DEFAULT_CLAIM_MIN_IDLE_TIME_MS` renamed to `DEFAULT_CLAIM_IDLE_TIMEOUT_MS`.** It names the idle time after which the server treats a claimed run as abandoned and makes it claimable again.
+
+- **`Publisher` contract changed** — only relevant if you implement a custom queue adapter. `publishReadyRuns` now returns `PublishRunsResult` (was `PublishResult`). Each bucket is now an array of `{ run }` objects rather than bare runs, `deferred` entries carry a `nextPublishAttemptAt`, and every bucket is optional.
+
+  ```typescript
+  // Before — PublishResult, all buckets required, bare runs
+  { published: ReadyWorkflowRun[], deferred: ReadyWorkflowRun[], failed: ReadyWorkflowRun[], declined: ReadyWorkflowRun[] }
+
+  // After — PublishRunsResult, all buckets optional, wrapped runs
+  {
+    published?: Array<{ run: ReadyWorkflowRun }>,
+    deferred?: Array<{ run: ReadyWorkflowRun; nextPublishAttemptAt: number }>,
+    failed?: Array<{ run: ReadyWorkflowRun }>,
+    declined?: Array<{ run: ReadyWorkflowRun }>,
+  }
+  ```
+
+- **`WorkflowRunClaimReadyRequestV1.previousClaimMinIdleTimeMs` removed** — only relevant if you implement a custom transport. The claim idle timeout is now a server setting (`recoverOverdueOutboxEntries.claimIdleTimeoutMs`) rather than a per-request field.
+
+### New Features
+
+- **New `stalled` run status for runs that cannot be delivered.** A run that sits undelivered past `maxAgeMs` (default 24 hours) — for example a `queued` run whose workflow has no worker to claim it — now moves to `stalled` instead of being re-offered without end. `stalled` is non-terminal and recoverable, not a failure: the run made no progress rather than failing, so it is kept distinct from `failed` and `cancelled` and holds no outbox row. The new `stallUndeliverableRuns` daemon performs the transition and discards the run's in-flight tasks.
+
+### Web UI
+
+- **New "Stalled" run-status chip** in the dashboard status filter, with its own gray tint and `⊡` glyph. The filter list is now derived from the shared `WORKFLOW_RUN_STATUSES` set rather than a hardcoded array, so future statuses appear automatically.
+
+### Improvements
+
+- **Broker re-publishing now backs off.** When a run is published but no worker claims it, the server re-offers it to the broker on an age-derived schedule — the wait grows with how long the run has been trying to get through, clamped to `[baseDelayMs, maxDelayMs]` (defaults 5s–300s) — rather than re-publishing on every poll. Configure it under `publishReadyRuns.republishBackoff`.
+- **A dead worker's run is recovered through `queued`, and the claim path is a single scan.** When a worker holding a run goes silent past `claimIdleTimeoutMs`, the `recoverOverdueOutboxEntries` daemon returns the run to `queued` (reason `recovered`) for another worker to claim, so a run with no live executor reports as `queued` rather than a phantom `running`. The claim API now scans only the single claimable state, dropping the previous multi-state stale-claim stealing.
+
+### Bug Fixes
+
+- **The database connection is now closed on server shutdown.** Previously it was never closed when the app stopped, leaking the connection. `CreateDatabase` now exposes a `close()` that the shutdown path calls.
+
 ## 0.35.0
 
 This release renames a few worker and schedule APIs for clarity, makes the worker's claim-refresh cadence runtime-configurable, and adds a system theme picker to the dashboard. Workers now reclaim a freed slot immediately instead of waiting out the next poll.
