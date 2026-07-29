@@ -15,7 +15,7 @@ export interface ServerRuntimeConfig {
 		imminentScheduledRuns: ImminentPollingDaemonConfig;
 		imminentSleepElapsedRuns: ImminentPollingDaemonConfig;
 		imminentRetryableRuns: ImminentPollingDaemonConfig;
-		imminentRetryableTaskRuns: ImminentPollingDaemonConfig;
+		imminentRetryableTasks: ImminentPollingDaemonConfig;
 		imminentEventWaitTimedOutRuns: ImminentPollingDaemonConfig;
 		imminentChildRunWaitTimedOutRuns: ImminentPollingDaemonConfig;
 		imminentRecurringRuns: ImminentPollingDaemonConfig;
@@ -58,7 +58,7 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 			limit: 1_000,
 			imminenceThresholdMs: 3_000,
 		},
-		imminentRetryableTaskRuns: {
+		imminentRetryableTasks: {
 			intervalMs: 1_000,
 			limit: 1_000,
 			imminenceThresholdMs: 3_000,

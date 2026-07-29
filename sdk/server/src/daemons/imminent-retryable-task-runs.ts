@@ -23,7 +23,7 @@ type Repos = Pick<
 	"task" | "workflowRun" | "stateTransition" | "workflow" | "workflowRunOutbox" | "transaction"
 >;
 
-export interface ProcessImminentRetryableTaskRunsDeps {
+export interface ProcessImminentRetryableTasksDeps {
 	repos: Repos;
 	workflowRunPublisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
@@ -34,9 +34,9 @@ const advanceTaskCursor = createKeysetStreamCursorAdvancer<{ workflowRunId: stri
 	getId: (entry) => entry.workflowRunId,
 });
 
-export async function processImminentRetryableTaskRuns(
+export async function processImminentRetryableTasks(
 	context: DaemonContext,
-	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentRetryableTaskRunsDeps,
+	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentRetryableTasksDeps,
 	config: { limit: number; imminenceThresholdMs: number; republishBackoff: RepublishBackoff }
 ) {
 	const { limit, imminenceThresholdMs, republishBackoff } = config;

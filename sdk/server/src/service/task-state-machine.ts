@@ -185,9 +185,9 @@ async function transitionStateInTx(
 		// The workflow run stays in `running` while the task waits for its retry, so the outbox row
 		// is not cleared by the workflow state machine. Delete it here so `recoverOverdueOutboxEntries`
 		// cannot re-dispatch the run before `imminent-retryable-task-runs` requeues it at the
-		// task's nextAttemptAt. `processImminentRetryableTaskRuns` daemon will reinsert a fresh outbox
+		// task's nextAttemptAt. `processImminentRetryableTasks` daemon will reinsert a fresh outbox
 		// row when it transitions the workflow to `queued`.
-		// Also note that if the entry is not deleted, `processImminentRetryableTaskRuns` will
+		// Also note that if the entry is not deleted, `processImminentRetryableTasks` will
 		// fail on insert due to duplicate key
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
 	}

@@ -10,7 +10,7 @@ import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wa
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { processImminentRecurringRuns } from "./imminent-recurring-runs";
 import { processImminentRetryableRuns } from "./imminent-retryable-runs";
-import { processImminentRetryableTaskRuns } from "./imminent-retryable-task-runs";
+import { processImminentRetryableTasks } from "./imminent-retryable-task-runs";
 import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { publishReadyRuns } from "./publish-ready-runs";
@@ -96,8 +96,8 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			{ repos, workflowRunPublisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
-			(config) => ({ ...config.imminentRetryableTaskRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
-			processImminentRetryableTaskRuns,
+			(config) => ({ ...config.imminentRetryableTasks, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			processImminentRetryableTasks,
 			{ repos, workflowRunPublisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
