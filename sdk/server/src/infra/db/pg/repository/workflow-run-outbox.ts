@@ -27,22 +27,6 @@ interface ClaimFilter {
 	shards?: string[];
 }
 
-function buildClaimFilterPredicate(filters: ClaimFilter) {
-	const workflowsPredicate = or(
-		...filters.workflows.map((workflow) =>
-			and(
-				eq(workflowRunOutbox.workflowName, workflow.name),
-				eq(workflowRunOutbox.workflowVersionId, workflow.versionId)
-			)
-		)
-	);
-	const shardsPredicate = isNonEmptyArray(filters.shards)
-		? inArray(workflowRunOutbox.shard, filters.shards)
-		: isNull(workflowRunOutbox.shard);
-
-	return and(workflowsPredicate, shardsPredicate);
-}
-
 export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 	async createBatch(rows: NonEmptyArray<WorkflowRunOutboxRowInsert>): Promise<void> {
 		await db.insert(workflowRunOutbox).values(rows);
@@ -94,13 +78,12 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.where(and(eq(workflowRunOutbox.status, "pending"), sql`${workflowRunOutbox.id} = v.id`));
 	},
 
-	// Returns rows in claimed or published status back to pending.
 	// firstPublishedAt and lastPublishedAt are not cleared so that backoff anchors survive recovery churn.
-	async returnToPending(ids: NonEmptyArray<string>): Promise<void> {
+	async returnToPending(ids: NonEmptyArray<string>, fromStatus: "claimed" | "published"): Promise<void> {
 		await db
 			.update(workflowRunOutbox)
 			.set({ status: "pending", claimedAt: null, nextPublishAttemptAt: null })
-			.where(and(inArray(workflowRunOutbox.status, ["claimed", "published"]), inArray(workflowRunOutbox.id, ids)));
+			.where(and(inArray(workflowRunOutbox.id, ids), eq(workflowRunOutbox.status, fromStatus)));
 	},
 
 	async markClaimed(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
@@ -110,7 +93,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
 	},
 
-	async reclaim(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
+	async refreshClaim(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
 		await db
 			.update(workflowRunOutbox)
 			.set({ claimedAt: Date.now() as TimestampMs })
@@ -123,7 +106,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			);
 	},
 
-	async listStalePublished(
+	async listPublishable(
 		_context: DaemonContext,
 		limit: number,
 		cursor?: KeysetStreamCursor
@@ -188,97 +171,50 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.limit(limit);
 	},
 
+	async getByWorkflowRunId(namespaceId: string, workflowRunId: string): Promise<WorkflowRunOutboxRow | null> {
+		const result = await db
+			.select()
+			.from(workflowRunOutbox)
+			.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)))
+			.limit(1);
+
+		return result[0] ?? null;
+	},
+
 	async deleteByWorkflowRunId(namespaceId: string, workflowRunId: string): Promise<void> {
 		await db
 			.delete(workflowRunOutbox)
 			.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
 	},
 
-	async stealStaleClaimed(namespaceId: string, filters: ClaimFilter, claimMinIdleTimeMs: number, limit: number) {
-		const now = Date.now();
-		const staleThreshold = (now - claimMinIdleTimeMs) as TimestampMs;
-
-		const staleEntries = await db
-			.select({ id: workflowRunOutbox.id })
-			.from(workflowRunOutbox)
-			.where(
-				and(
-					eq(workflowRunOutbox.namespaceId, namespaceId),
-					eq(workflowRunOutbox.status, "claimed"),
-					buildClaimFilterPredicate(filters),
-					lt(workflowRunOutbox.claimedAt, staleThreshold)
-				)
-			)
-			.orderBy(workflowRunOutbox.claimedAt, workflowRunOutbox.rank, workflowRunOutbox.id)
-			.limit(limit);
-
-		const staleEntryIds = staleEntries.map(({ id }) => id);
-		if (!isNonEmptyArray(staleEntryIds)) {
-			return [];
-		}
-
-		return db
-			.update(workflowRunOutbox)
-			.set({ claimedAt: now as TimestampMs })
-			.where(
-				and(
-					eq(workflowRunOutbox.status, "claimed"),
-					inArray(workflowRunOutbox.id, staleEntryIds),
-					lt(workflowRunOutbox.claimedAt, staleThreshold)
-				)
-			)
-			.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
-	},
-
-	async claimPublished(namespaceId: string, filters: ClaimFilter, limit: number) {
-		const entries = await db
-			.select({ id: workflowRunOutbox.id })
-			.from(workflowRunOutbox)
-			.where(
-				and(
-					eq(workflowRunOutbox.namespaceId, namespaceId),
-					eq(workflowRunOutbox.status, "published"),
-					buildClaimFilterPredicate(filters)
-				)
-			)
-			.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
-			.limit(limit);
-
-		const entryIds = entries.map(({ id }) => id);
-		if (!isNonEmptyArray(entryIds)) {
-			return [];
-		}
-
-		return db
-			.update(workflowRunOutbox)
-			.set({ status: "claimed", claimedAt: Date.now() as TimestampMs })
-			.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, entryIds)))
-			.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
-	},
-
 	async claimPending(namespaceId: string, filters: ClaimFilter, limit: number) {
-		const pendingEntries = await db
+		const claimableEntryIds = db
 			.select({ id: workflowRunOutbox.id })
 			.from(workflowRunOutbox)
 			.where(
 				and(
 					eq(workflowRunOutbox.namespaceId, namespaceId),
 					eq(workflowRunOutbox.status, "pending"),
-					buildClaimFilterPredicate(filters)
+					or(
+						...filters.workflows.map((workflow) =>
+							and(
+								eq(workflowRunOutbox.workflowName, workflow.name),
+								eq(workflowRunOutbox.workflowVersionId, workflow.versionId)
+							)
+						)
+					),
+					isNonEmptyArray(filters.shards)
+						? inArray(workflowRunOutbox.shard, filters.shards)
+						: isNull(workflowRunOutbox.shard)
 				)
 			)
 			.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
 			.limit(limit);
 
-		const pendingEntryIds = pendingEntries.map(({ id }) => id);
-		if (!isNonEmptyArray(pendingEntryIds)) {
-			return [];
-		}
-
 		return db
 			.update(workflowRunOutbox)
 			.set({ status: "claimed", claimedAt: Date.now() as TimestampMs })
-			.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, pendingEntryIds)))
+			.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, claimableEntryIds)))
 			.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
 	},
 });

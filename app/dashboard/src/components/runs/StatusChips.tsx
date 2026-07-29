@@ -1,21 +1,7 @@
-import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
+import { WORKFLOW_RUN_STATUSES, type WorkflowRunStatus } from "@aikirun/types/workflow/run";
 
 import { WORKFLOW_RUN_STATUS_COLORS } from "../../constants/status-colors";
 import { WORKFLOW_STATUS_CONFIG } from "../../constants/workflow-status";
-
-const ALL_STATUSES: WorkflowRunStatus[] = [
-	"scheduled",
-	"queued",
-	"running",
-	"paused",
-	"sleeping",
-	"awaiting_event",
-	"awaiting_retry",
-	"awaiting_child_workflow",
-	"cancelled",
-	"completed",
-	"failed",
-];
 
 interface StatusChipsProps {
 	selected: WorkflowRunStatus[];
@@ -35,7 +21,7 @@ export function StatusChips({ selected, onChange }: StatusChipsProps) {
 
 	return (
 		<div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-			{ALL_STATUSES.map((status) => {
+			{WORKFLOW_RUN_STATUSES.map((status) => {
 				const config = WORKFLOW_STATUS_CONFIG[status];
 				const color = WORKFLOW_RUN_STATUS_COLORS[status].tint;
 				const isActive = selected.includes(status);
