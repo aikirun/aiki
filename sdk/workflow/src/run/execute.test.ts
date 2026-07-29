@@ -21,7 +21,7 @@ import type { AnyWorkflowVersion } from "../workflow-version";
 
 const configProvider = asConfigProvider(() => ({
 	claimRefreshIntervalMs: 30_000,
-	spinThresholdMs: 10,
+	maxInlineWaitMs: 10,
 }));
 
 function fakeWorkflowVersion(

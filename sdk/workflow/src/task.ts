@@ -334,7 +334,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					"aiki.reason": serializableError.message,
 				});
 
-				if (retryParams.delayMs <= configProvider.config.spinThresholdMs) {
+				if (retryParams.delayMs <= configProvider.config.maxInlineWaitMs) {
 					await delay(retryParams.delayMs);
 					attempts++;
 					continue;

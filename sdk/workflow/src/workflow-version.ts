@@ -361,8 +361,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					...logMeta,
 				});
 
-				// TODO: if delay is small enough, it might be more profitable to spin
-				// Spinning should not reload workflow state or transition to awaiting retry
+				// TODO: if delay is small enough, it might be more profitable to wait inline
+				// An inline-wait should not reload workflow state or transition to awaiting retry
 				// If the workflow failed
 				throw new WorkflowRunSuspendedError(run.id);
 			}

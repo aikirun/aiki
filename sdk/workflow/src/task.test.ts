@@ -35,7 +35,7 @@ import { describe, expect, test } from "bun:test";
 function createTestWorkflowRun(
 	client: Client,
 	record: WorkflowRunRecord,
-	options: { spinThresholdMs?: number } = {}
+	options: { maxInlineWaitMs?: number } = {}
 ): WorkflowRun<unknown, null, Record<string, never>> {
 	const handle = workflowRunHandle(client, record);
 	return {
@@ -54,7 +54,7 @@ function createTestWorkflowRun(
 			replayManifest: createReplayManifest(record),
 			configProvider: asConfigProvider(() => ({
 				claimRefreshIntervalMs: 30_000,
-				spinThresholdMs: options.spinThresholdMs ?? 10,
+				maxInlineWaitMs: options.maxInlineWaitMs ?? 10,
 			})),
 		},
 	};
@@ -109,10 +109,10 @@ describe("task", () => {
 				}));
 		}
 
-		test("retries in-memory when the delay is within the spin threshold, recording no extra transition", () =>
+		test("retries in-memory when the delay is within the max inline wait, recording no extra transition", () =>
 			withFakeClient(async (client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord, { spinThresholdMs: 10 });
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: 10 });
 
 				const retry = { type: "fixed", maxAttempts: 2, delayMs: 1 } as const;
 				let handlerCalls = 0;
@@ -164,10 +164,10 @@ describe("task", () => {
 				expect(handlerCalls).toBe(2);
 			}));
 
-		test("persists awaiting_retry and suspends when the delay exceeds the spin threshold", () =>
+		test("persists awaiting_retry and suspends when the delay exceeds the max inline wait", () =>
 			withFakeClient((client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord, { spinThresholdMs: 0 });
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: 0 });
 
 				const retry = { type: "fixed", maxAttempts: 2, delayMs: 1_000 } as const;
 				const chargeCard = task<{ cardId: string }, string>({
