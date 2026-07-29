@@ -65,7 +65,7 @@ process.on("SIGTERM", async () => {
 });
 ```
 
-The `stop()` method on the handle signals the worker to stop accepting new work, waits for active executions to finish (up to `gracefulShutdownTimeoutMs`), then returns. Any workflows that don't complete in time keep their state in the database; once their claims go stale, other workers pick them up.
+The `stop()` method on the handle signals the worker to stop accepting new work, waits for active executions to finish (up to `gracefulShutdownTimeoutMs`), then returns. Any workflows that don't complete in time keep their state in the database; once their claims go stale, the server recovers them and other workers pick them up.
 
 ## Configuration Reference
 

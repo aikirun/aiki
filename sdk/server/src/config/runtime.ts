@@ -1,5 +1,5 @@
 import type { DeepPartial } from "@aikirun/lib/object";
-import { DEFAULT_CLAIM_MIN_IDLE_TIME_MS } from "@aikirun/types/workflow/run";
+import { DEFAULT_CLAIM_IDLE_TIMEOUT_MS } from "@aikirun/types/workflow/run";
 
 interface PollingDaemonConfig {
 	intervalMs: number;
@@ -26,7 +26,7 @@ export interface ServerRuntimeConfig {
 			};
 		};
 		recoverOverdueOutboxEntries: PollingDaemonConfig & {
-			claimMinIdleTimeMs: number;
+			claimIdleTimeoutMs: number;
 		};
 		stallUndeliverableRuns: PollingDaemonConfig & {
 			maxAgeMs: number;
@@ -89,7 +89,7 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 		recoverOverdueOutboxEntries: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			claimMinIdleTimeMs: DEFAULT_CLAIM_MIN_IDLE_TIME_MS,
+			claimIdleTimeoutMs: DEFAULT_CLAIM_IDLE_TIMEOUT_MS,
 		},
 		stallUndeliverableRuns: {
 			intervalMs: 60_000,

@@ -165,7 +165,7 @@ describe("claimReady visibility after recovery", () => {
 			await recoverOverdueOutboxEntries(
 				context,
 				{ repos },
-				{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+				{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 			);
 
 			// Both runs are now visible to claimReady.

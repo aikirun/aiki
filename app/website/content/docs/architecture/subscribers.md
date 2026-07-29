@@ -17,7 +17,7 @@ const aikiWorker = worker({
 });
 ```
 
-The claim endpoint atomically fetches and claims ready runs. It also recovers orphaned work by stealing runs whose previous claim has been idle longer than `claimMinIdleTimeMs` (see [Workflow Run Claims](./workflow-run-claims.md)).
+The claim endpoint atomically fetches and claims ready runs. Abandoned claims are recovered server-side: after `claimIdleTimeoutMs` without a refresh, the recovery daemon returns the run to the claimable pool (see [Workflow Run Claims](./workflow-run-claims.md)).
 
 ### HTTP Subscriber Configuration
 

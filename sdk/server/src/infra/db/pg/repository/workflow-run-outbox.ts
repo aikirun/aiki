@@ -131,12 +131,12 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 
 	async listStaleClaimed(
 		_context: DaemonContext,
-		claimMinIdleTimeMs: number,
+		claimIdleTimeoutMs: number,
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<WorkflowRunOutboxRowClaimed[]> {
 		const now = Date.now();
-		const staleThreshold = (now - claimMinIdleTimeMs) as TimestampMs;
+		const staleThreshold = (now - claimIdleTimeoutMs) as TimestampMs;
 
 		const rows = await db
 			.select()

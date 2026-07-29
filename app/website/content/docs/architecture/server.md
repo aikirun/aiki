@@ -44,10 +44,10 @@ The runtime's daemons drive workflow state transitions:
 | Child wait timeouts | Resume workflows that timed out waiting for child workflows |
 | Recurring schedules | Create new runs for cron and interval schedules |
 | Publish ready runs | Publish pending outbox entries to the work queue |
-| Republish stale runs | Re-publish runs whose worker stopped refreshing its claim |
+| Recover overdue outbox entries | Release abandoned claims and re-pool published entries whose republish time arrived |
 | Due-timers consumer | Fire near-term timers from the timer priority queue (when configured) |
 
-The two publishing daemons run only when a publisher is configured. Without one, workers claim work directly from the outbox, and stale claims are recovered by the claim API itself (see [Workflow Run Claims](./workflow-run-claims.md)).
+The publish daemon runs only when a publisher is configured; without one, workers claim work directly from the outbox. Recovery runs unconditionally — a crashed worker's claim is released after `claimIdleTimeoutMs` either way (see [Workflow Run Claims](./workflow-run-claims.md)).
 
 By default, due work is detected by periodic database scans. Configuring a **timer priority queue** (`@aikirun/redis`) promotes near-term timers into a sorted queue that fires them with sub-second precision.
 

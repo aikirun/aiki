@@ -27,7 +27,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
@@ -53,7 +53,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
@@ -69,7 +69,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
 				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
@@ -90,7 +90,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
 				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
@@ -106,7 +106,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
 				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
@@ -118,7 +118,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				const { context, repos } = deps;
 				const { runId, outboxRowId } = await seedClaimedRun(deps);
 
-				await recoverOverdueOutboxEntries(context, { repos }, { claimMinIdleTimeMs: ONE_HOUR_MS, limit: 100 });
+				await recoverOverdueOutboxEntries(context, { repos }, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 });
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
 				expect(await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100)).toEqual([
@@ -139,7 +139,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				const outboxService = createWorkflowRunOutboxService({ repos });
 				await outboxService.refreshClaim(namespaceContext, runId);
 
-				await recoverOverdueOutboxEntries(context, { repos }, { claimMinIdleTimeMs: ONE_HOUR_MS, limit: 100 });
+				await recoverOverdueOutboxEntries(context, { repos }, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 });
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
 				expect(await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100)).toEqual([
@@ -162,7 +162,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
