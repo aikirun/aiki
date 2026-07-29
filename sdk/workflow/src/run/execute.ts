@@ -41,8 +41,8 @@ export interface WorkflowExecutionConfig {
 	/**
 	 * Longest wait the executor absorbs in process (default: 10ms).
 	 *
-	 * Delays <= threshold: In-memory wait (fast, no task history entry)
-	 * Delays > threshold: Server state transition (recorded in task history)
+	 * Delays <= maxInlineWaitMs: In-memory wait (fast, no task history entry)
+	 * Delays > maxInlineWaitMs: Server state transition (recorded in task history)
 	 *
 	 * Set to 0 to record all task delays in transition history.
 	 */
