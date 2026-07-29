@@ -32,7 +32,7 @@ jobs:
       - uses: ./.github/actions/setup-workspace
 
       - name: Migrate test database
-        run: bun run db:migrate:test:apply
+        run: bun run test:db:migrate:apply
 
       - name: Run test
         run: bun run test:integration

@@ -117,7 +117,7 @@ between tests, so they need a **dedicated** test database — never a real one.
 
 ```bash
 cp .env.test.example .env.test   # then set DATABASE_URL to a test-only database
-bun run db:migrate:test:apply    # apply the server + iam migrations to it
+bun run test:db:migrate:apply    # apply the server + iam migrations to it
 bun run test:integration
 ```
 
