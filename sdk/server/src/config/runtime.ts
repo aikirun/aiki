@@ -7,7 +7,7 @@ interface PollingDaemonConfig {
 }
 
 interface ImminentPollingDaemonConfig extends PollingDaemonConfig {
-	imminenceThresholdMs: number;
+	lookaheadWindowMs: number;
 }
 
 export interface ServerRuntimeConfig {
@@ -46,37 +46,37 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 		imminentScheduledRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			imminenceThresholdMs: 3_000,
+			lookaheadWindowMs: 3_000,
 		},
 		imminentSleepElapsedRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			imminenceThresholdMs: 3_000,
+			lookaheadWindowMs: 3_000,
 		},
 		imminentRetryableRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			imminenceThresholdMs: 3_000,
+			lookaheadWindowMs: 3_000,
 		},
 		imminentRetryableTasks: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			imminenceThresholdMs: 3_000,
+			lookaheadWindowMs: 3_000,
 		},
 		imminentEventWaitTimedOutRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			imminenceThresholdMs: 3_000,
+			lookaheadWindowMs: 3_000,
 		},
 		imminentChildRunWaitTimedOutRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			imminenceThresholdMs: 3_000,
+			lookaheadWindowMs: 3_000,
 		},
 		imminentRecurringRuns: {
 			intervalMs: 1_000,
 			limit: 1_000,
-			imminenceThresholdMs: 3_000,
+			lookaheadWindowMs: 3_000,
 		},
 		publishReadyRuns: {
 			intervalMs: 1_000,

@@ -37,10 +37,10 @@ const advanceTaskCursor = createKeysetStreamCursorAdvancer<{ workflowRunId: stri
 export async function processImminentRetryableTasks(
 	context: DaemonContext,
 	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentRetryableTasksDeps,
-	config: { limit: number; imminenceThresholdMs: number; republishBackoff: RepublishBackoff }
+	config: { limit: number; lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
-	const { limit, imminenceThresholdMs, republishBackoff } = config;
-	const dueBefore = (Date.now() + imminenceThresholdMs) as TimestampMs;
+	const { limit, lookaheadWindowMs, republishBackoff } = config;
+	const dueBefore = (Date.now() + lookaheadWindowMs) as TimestampMs;
 
 	let now = Date.now();
 	for await (const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } of streamChunks(

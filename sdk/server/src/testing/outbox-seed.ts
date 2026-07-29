@@ -44,7 +44,7 @@ async function _seedQueuedRun({ context, repos }: DaemonHarnessDeps, shard: stri
 		options: shard ? { shard } : undefined,
 	});
 
-	await processImminentScheduledRuns(context, { repos }, { limit: 100, imminenceThresholdMs: 0, republishBackoff });
+	await processImminentScheduledRuns(context, { repos }, { limit: 100, lookaheadWindowMs: 0, republishBackoff });
 
 	const outboxRow = await repos.workflowRunOutbox.getByWorkflowRunId(namespaceContext.namespaceId, runId);
 	if (!outboxRow) {

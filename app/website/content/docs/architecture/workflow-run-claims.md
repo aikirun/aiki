@@ -27,7 +27,7 @@ When an executor crashes mid-execution:
 3. A healthy executor picks up the released run
 4. The workflow re-executes from its last checkpoint
 
-**`claimIdleTimeoutMs`** is a server-side threshold, 90 seconds by default. It's how long the server waits after the last claim refresh before treating a run as abandoned. Keep it above the claim refresh interval, so a run only goes idle when an executor actually stops refreshing. The default 90 seconds against 30-second refreshes leaves ample margin. The recovery daemon reads it from the server runtime config under `daemons.recoverOverdueOutboxEntries`. See [Runtime Configuration](../guides/configuration.md).
+**`claimIdleTimeoutMs`** is a server-side config, 90 seconds by default. It's how long the server waits after the last claim refresh before treating a run as abandoned. Keep it above the claim refresh interval, so a run only goes idle when an executor actually stops refreshing. The default 90 seconds against 30-second refreshes leaves ample margin. The recovery daemon reads it from the server runtime config under `daemons.recoverOverdueOutboxEntries`. See [Runtime Configuration](../guides/configuration.md).
 
 ## Zombie Executor Prevention
 
