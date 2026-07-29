@@ -388,7 +388,7 @@ export const workflowRunOutbox = pgTable(
 		lastPublishedAt: timestampMs("last_published_at"),
 		nextPublishAttemptAt: timestampMs("next_publish_attempt_at"),
 
-		attempts: integer("attempts").notNull().default(0),
+		dispatchAttempts: integer("dispatch_attempts").notNull().default(0),
 
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
