@@ -183,7 +183,7 @@ async function transitionStateInTx(
 
 	if (taskState.status === "awaiting_retry") {
 		// The workflow run stays in `running` while the task waits for its retry, so the outbox row
-		// is not cleared by the workflow state machine. Delete it here so `recoverStaleOutboxEntries`
+		// is not cleared by the workflow state machine. Delete it here so `recoverOverdueOutboxEntries`
 		// cannot re-dispatch the run before `imminent-retryable-task-runs` requeues it at the
 		// task's nextAttemptAt. `processImminentRetryableTaskRuns` daemon will reinsert a fresh outbox
 		// row when it transitions the workflow to `queued`.

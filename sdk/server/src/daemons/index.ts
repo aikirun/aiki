@@ -14,7 +14,7 @@ import { processImminentRetryableTaskRuns } from "./imminent-retryable-task-runs
 import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { publishReadyRuns } from "./publish-ready-runs";
-import { recoverStaleOutboxEntries } from "./recover-stale-outbox-entries";
+import { recoverOverdueOutboxEntries } from "./recover-overdue-outbox-entries";
 import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import type { ServerRuntimeConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
@@ -121,7 +121,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			processImminentRecurringRuns,
 			{ repos, childRunCanceller, workflowRunPublisher, timerPriorityQueue }
 		),
-		startPollingDaemon((config) => config.recoverStaleOutboxEntries, recoverStaleOutboxEntries, { repos }),
+		startPollingDaemon((config) => config.recoverOverdueOutboxEntries, recoverOverdueOutboxEntries, { repos }),
 		startPollingDaemon((config) => config.stallUndeliverableRuns, stallUndeliverableRuns, { repos }),
 	];
 

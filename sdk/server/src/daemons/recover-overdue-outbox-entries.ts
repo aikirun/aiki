@@ -11,7 +11,7 @@ import type { DaemonContext } from "../middleware/context";
 
 type Repos = Pick<Repositories, "workflowRunOutbox" | "workflowRun" | "stateTransition" | "transaction">;
 
-export interface RecoverStaleOutboxEntriesDeps {
+export interface RecoverOverdueOutboxEntriesDeps {
 	repos: Repos;
 }
 
@@ -28,9 +28,9 @@ const advancePublishedCursor = createKeysetStreamCursorAdvancer<{
 	getId: (entry) => entry.id,
 });
 
-export async function recoverStaleOutboxEntries(
+export async function recoverOverdueOutboxEntries(
 	context: DaemonContext,
-	{ repos }: RecoverStaleOutboxEntriesDeps,
+	{ repos }: RecoverOverdueOutboxEntriesDeps,
 	{ claimMinIdleTimeMs, limit }: { claimMinIdleTimeMs: number; limit: number }
 ): Promise<void> {
 	for await (const staleEntries of streamChunks(

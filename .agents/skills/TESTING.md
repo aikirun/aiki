@@ -7,7 +7,7 @@ Two tiers: `*.test.ts` are hermetic unit tests (`bun run test:unit`, no database
 Before writing any test, study the exemplars for its tier and match their idioms:
 
 - `sdk/server/src/daemons/publish-ready-runs.integration.test.ts` — minimal integration shape.
-- `sdk/server/src/daemons/recover-stale-outbox-entries.integration.test.ts` — service-path
+- `sdk/server/src/daemons/recover-overdue-outbox-entries.integration.test.ts` — service-path
   seeding, fake clock, assertion shapes.
 - `sdk/workflow/src/run/sleeper.test.ts` — timestamps as authored data.
 - `sdk/workflow/src/task.test.ts` — boundary-value config knobs, file-local helpers.

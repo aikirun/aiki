@@ -1,6 +1,6 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 
-import { recoverStaleOutboxEntries } from "./recover-stale-outbox-entries";
+import { recoverOverdueOutboxEntries } from "./recover-overdue-outbox-entries";
 import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import { describe, expect, test } from "bun:test";
 import { withFakeClock } from "../testing/clock";
@@ -17,14 +17,14 @@ const NO_CLAIM_GOES_STALE_MS = 1 * 60 * 60 * 1000;
 
 const EPOCH_MS = 1 as TimestampMs;
 
-describe("recoverStaleOutboxEntries", () => {
+describe("recoverOverdueOutboxEntries", () => {
 	describe("stale claimed rows", () => {
 		test("returns the stale claimed outbox row to pending with its delivery holds cleared", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
 				const { runId, outboxRowId } = await seedClaimedRun(deps);
 
-				await recoverStaleOutboxEntries(
+				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
 					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
@@ -50,7 +50,7 @@ describe("recoverStaleOutboxEntries", () => {
 				const firstPublishedAt = claimedRows[0]?.firstPublishedAt;
 				expect(firstPublishedAt).toBeGreaterThan(0);
 
-				await recoverStaleOutboxEntries(
+				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
 					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
@@ -66,7 +66,7 @@ describe("recoverStaleOutboxEntries", () => {
 				const { context, repos } = deps;
 				const { runId } = await seedClaimedRun(deps);
 
-				await recoverStaleOutboxEntries(
+				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
 					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
@@ -87,7 +87,7 @@ describe("recoverStaleOutboxEntries", () => {
 				const { context, repos } = deps;
 				const { runId, revisionWhenClaimed } = await seedClaimedRun(deps);
 
-				await recoverStaleOutboxEntries(
+				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
 					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
@@ -103,7 +103,7 @@ describe("recoverStaleOutboxEntries", () => {
 				const { context, repos } = deps;
 				const { runId, attemptsWhenClaimed } = await seedClaimedRun(deps);
 
-				await recoverStaleOutboxEntries(
+				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
 					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
@@ -118,7 +118,11 @@ describe("recoverStaleOutboxEntries", () => {
 				const { context, repos } = deps;
 				const { runId, outboxRowId } = await seedClaimedRun(deps);
 
-				await recoverStaleOutboxEntries(context, { repos }, { claimMinIdleTimeMs: NO_CLAIM_GOES_STALE_MS, limit: 100 });
+				await recoverOverdueOutboxEntries(
+					context,
+					{ repos },
+					{ claimMinIdleTimeMs: NO_CLAIM_GOES_STALE_MS, limit: 100 }
+				);
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
 				expect(await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100)).toEqual([
@@ -138,7 +142,7 @@ describe("recoverStaleOutboxEntries", () => {
 				const firstPublishedAt = publishableRows[0]?.firstPublishedAt;
 				expect(firstPublishedAt).toBeGreaterThan(0);
 
-				await recoverStaleOutboxEntries(
+				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
 					{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }

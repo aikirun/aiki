@@ -25,7 +25,7 @@ export interface ServerRuntimeConfig {
 				maxDelayMs: number;
 			};
 		};
-		recoverStaleOutboxEntries: PollingDaemonConfig & {
+		recoverOverdueOutboxEntries: PollingDaemonConfig & {
 			claimMinIdleTimeMs: number;
 		};
 		stallUndeliverableRuns: PollingDaemonConfig & {
@@ -86,7 +86,7 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 				maxDelayMs: 300_000,
 			},
 		},
-		recoverStaleOutboxEntries: {
+		recoverOverdueOutboxEntries: {
 			intervalMs: 1_000,
 			limit: 1_000,
 			claimMinIdleTimeMs: DEFAULT_CLAIM_MIN_IDLE_TIME_MS,

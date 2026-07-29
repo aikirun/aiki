@@ -1,7 +1,7 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 
 import { describe, expect, test } from "bun:test";
-import { recoverStaleOutboxEntries } from "../daemons/recover-stale-outbox-entries";
+import { recoverOverdueOutboxEntries } from "../daemons/recover-overdue-outbox-entries";
 import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
 import { createDaemonHarness } from "../testing/daemon-harness";
@@ -161,7 +161,11 @@ describe("claimReady visibility after recovery", () => {
 			expect(beforeRecovery).toHaveLength(0);
 
 			// Recovery returns the stale claimed row and the publishable row to pending.
-			await recoverStaleOutboxEntries(context, { repos }, { claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 });
+			await recoverOverdueOutboxEntries(
+				context,
+				{ repos },
+				{ claimMinIdleTimeMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+			);
 
 			// Both runs are now visible to claimReady.
 			const afterRecovery = await outboxService.claimReady(namespaceContext, claimRequest);
