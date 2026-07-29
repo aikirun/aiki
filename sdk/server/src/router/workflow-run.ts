@@ -107,7 +107,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		}),
 
 		claimRefreshV1: os.claimRefreshV1.handler(async ({ input: request, context }) => {
-			await workflowRunOutboxService.reclaim(context, request.id as WorkflowRunId);
+			await workflowRunOutboxService.refreshClaim(context, request.id as WorkflowRunId);
 		}),
 
 		hasTerminatedV1: os.hasTerminatedV1.handler(async ({ input: request, context }) => {

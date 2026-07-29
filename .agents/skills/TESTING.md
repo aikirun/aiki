@@ -25,6 +25,10 @@ Before writing any test, study the exemplars for its tier and match their idioms
   - **`withFakeClock(seedTimestampMs, fn)`** (`sdk/server/src/testing/clock.ts`): freezes the JS
     clock so aged state is minted through the real code paths. Callers wrap seeds; seed helpers
     stay clock-neutral. Integration-only (test files run sequentially in one process).
+- Use these tools only where the test's semantics need them. The fake clock earns its place
+  where state must look stale or aged (a recovery threshold, an age cap keyed on a row id's
+  mint time), not where mere status suffices. Derive each piece of harness machinery from what
+  the test asserts; don't inherit it from the neighboring test.
 - Waits ride event-signaled promises (see `lib/src/async/latch.ts`), never polling loops or
   sized sleeps. The one legitimate fixed wait is an absence check: wait a window, assert nothing
   changed.
@@ -42,8 +46,8 @@ Before writing any test, study the exemplars for its tier and match their idioms
   assertion reads only.
 - The daemon harness (`createDaemonHarness` in `sdk/server/src/testing/`) provisions what needs
   lifecycle and reset: the database connection, a scriptable fake publisher (verified on
-  teardown), and a daemon context. Compose services file-locally in the test; take pure filler
-  data (request contexts, rows) from the factories in `sdk/server/src/testing/`.
+  teardown), and a daemon context. Take pure filler data (request contexts, rows) from the
+  factories in `sdk/server/src/testing/`.
 
 ## Assertions
 

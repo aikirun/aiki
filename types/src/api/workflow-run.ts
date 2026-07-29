@@ -296,11 +296,6 @@ export interface WorkflowRunClaimReadyRequestV1 {
 	workflows: Array<{ name: string; versionId: string }>;
 	shards?: string[];
 	limit: number;
-	/**
-	 * Steal actively executing runs whose last claim refresh was received more than
-	 * previousClaimMinIdleTimeMs milliseconds ago. Defaults to 90 seconds.
-	 */
-	previousClaimMinIdleTimeMs?: number;
 }
 
 export interface WorkflowRunClaimReadyResponseV1 {

@@ -6,6 +6,7 @@
 - Schema sources:
     - `sdk/server/src/infra/db/pg/schema.ts`
     - `sdk/iam/src/infra/db/pg/schema.ts`
+- Repository get-by-key methods return `T | null`, never `T | undefined` — coalesce drizzle's row access (`rows[0] ?? null`).
 
 Generate migrations:
 

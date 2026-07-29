@@ -53,6 +53,8 @@ No AI-style explanatory comments. Don't document the framework default. Don't pa
 
 Comments describe the current design in present tense — the constraint the code can't show. Never chronicle bugs fixed, reference prior approaches ("no longer", "instead of the old X"), or contrast with alternatives that were never shipped.
 
+Write for the package's audience. A comment's vocabulary must not exceed what a reader of that package can see: `types/` is read by SDK consumers, so its doc comments describe the contract as visible from the package boundary (workers, claims, refreshes), never internals of another package (server daemons, outbox rows, database statuses). Put mechanism detail in a comment in the package that implements the mechanism.
+
 ## 6. Security
 
 - Input Sanitization: Assume all external inputs (user-provided, API requests) are untrusted. Sanitize/validate thoroughly.

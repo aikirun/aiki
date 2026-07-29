@@ -396,26 +396,10 @@ export const workflowRunOutbox = pgTable(
 	(table) => [
 		uniqueIndex("uqidx_workflow_run_outbox_workflow_run_id").on(table.workflowRunId),
 
-		// Claim paths: worker pulls pending or published rows filtered by workflow identity and shard.
+		// Claim path: worker claims rank ordered pending rows by workflow identity and shard.
 		index("idx_workflow_run_outbox_claim_pending")
 			.on(table.namespaceId, table.workflowName, table.workflowVersionId, table.shard, table.rank, table.id)
 			.where(sql`${table.status} = 'pending'`),
-		index("idx_workflow_run_outbox_claim_published")
-			.on(table.namespaceId, table.workflowName, table.workflowVersionId, table.shard, table.rank, table.id)
-			.where(sql`${table.status} = 'published'`),
-
-		// Steal stale-claim path: identifies claimed rows whose last refresh is older than a threshold.
-		index("idx_workflow_run_outbox_steal_claim")
-			.on(
-				table.namespaceId,
-				table.workflowName,
-				table.workflowVersionId,
-				table.shard,
-				table.claimedAt,
-				table.rank,
-				table.id
-			)
-			.where(sql`${table.status} = 'claimed'`),
 
 		// Daemon list paths: broad scans over one status to feed broker.
 		index("idx_workflow_run_outbox_list_pending").on(table.rank, table.id).where(sql`${table.status} = 'pending'`),

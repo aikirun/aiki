@@ -1,17 +1,11 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 
-import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
-import { publishReadyRuns } from "./publish-ready-runs";
 import { recoverStaleOutboxEntries } from "./recover-stale-outbox-entries";
 import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import { describe, expect, test } from "bun:test";
-import type { Repositories } from "../infra/db/types";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
-import { createWorkflowRunService } from "../service/workflow-run";
-import { createWorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
 import { withFakeClock } from "../testing/clock";
-import { createDaemonHarness, type DaemonHarnessDeps } from "../testing/daemon-harness";
-import { namespaceRequestContextFactory } from "../testing/middleware/context";
+import { createDaemonHarness } from "../testing/daemon-harness";
+import { claimRun, namespaceContext, seedClaimedRun, seedPublishedRun, seedQueuedRun } from "../testing/outbox-seed";
 
 const withHarness = createDaemonHarness();
 
@@ -22,8 +16,6 @@ const EVERY_CLAIM_IS_STALE_MS = -1;
 const NO_CLAIM_GOES_STALE_MS = 1 * 60 * 60 * 1000;
 
 const EPOCH_MS = 1 as TimestampMs;
-
-const namespaceContext = namespaceRequestContextFactory.build();
 
 describe("recoverStaleOutboxEntries", () => {
 	describe("stale claimed rows", () => {
@@ -135,15 +127,15 @@ describe("recoverStaleOutboxEntries", () => {
 			}));
 	});
 
-	describe("stale published rows", () => {
-		test("returns a stale published row to pending with firstPublishedAt preserved", () =>
+	describe("publishable rows", () => {
+		test("returns a publishable row to pending with firstPublishedAt preserved", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
 				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () => seedPublishedRun(deps));
 
-				const publishedRows = await repos.workflowRunOutbox.listStalePublished(context, 100);
-				expect(publishedRows).toHaveLength(1);
-				const firstPublishedAt = publishedRows[0]?.firstPublishedAt;
+				const publishableRows = await repos.workflowRunOutbox.listPublishable(context, 100);
+				expect(publishableRows).toHaveLength(1);
+				const firstPublishedAt = publishableRows[0]?.firstPublishedAt;
 				expect(firstPublishedAt).toBeGreaterThan(0);
 
 				await recoverStaleOutboxEntries(
@@ -195,7 +187,7 @@ describe("recoverStaleOutboxEntries", () => {
 						status: "stalled",
 					})
 				);
-				expect(await repos.workflowRunOutbox.listStalePublished(context, 100)).toHaveLength(0);
+				expect(await repos.workflowRunOutbox.listPublishable(context, 100)).toHaveLength(0);
 			}));
 
 		test("does not stall a claimed row regardless of age", () =>
@@ -218,82 +210,3 @@ describe("recoverStaleOutboxEntries", () => {
 			}));
 	});
 });
-
-function createServices(repos: Repositories) {
-	const childRunCanceller = createChildRunCanceller();
-	const workflowRunStateMachine = createWorkflowRunStateMachineService({ repos, childRunCanceller });
-	const workflowRun = createWorkflowRunService({
-		repos,
-		childRunCanceller,
-		workflowRunStateMachineService: workflowRunStateMachine,
-	});
-	return { workflowRun, workflowRunStateMachine };
-}
-
-async function seedQueuedRun({ context, repos }: DaemonHarnessDeps) {
-	const services = createServices(repos);
-
-	const runId = await services.workflowRun.createWorkflowRun(namespaceContext, {
-		name: "ship-orders",
-		versionId: "v2",
-		input: { orderId: "order-7" },
-	});
-
-	await processImminentScheduledRuns(
-		context,
-		{ repos },
-		{ limit: 100, imminenceThresholdMs: 0, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
-	);
-
-	const outboxRows = await repos.workflowRunOutbox.listPending(context, 100);
-	expect(outboxRows).toHaveLength(1);
-	// biome-ignore lint/style/noNonNullAssertion: the length has already been asserted
-	const outboxRow = outboxRows[0]!;
-
-	return { runId, outboxRowId: outboxRow.id };
-}
-
-async function claimRun(repos: Repositories, runId: string) {
-	const services = createServices(repos);
-
-	const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
-	if (!run) {
-		throw new Error(`Run not found: ${runId}`);
-	}
-
-	const claim = await services.workflowRunStateMachine.transitionState(namespaceContext, {
-		type: "optimistic",
-		id: runId,
-		state: { status: "running" },
-		expectedRevision: run.revision,
-	});
-
-	return { revisionWhenClaimed: claim.revision, attemptsWhenClaimed: claim.attempts };
-}
-
-async function seedClaimedRun(deps: DaemonHarnessDeps) {
-	const { context, repos, publisher } = deps;
-	const { runId, outboxRowId } = await seedQueuedRun(deps);
-
-	await publishReadyRuns(
-		context,
-		{ repos, workflowRunPublisher: publisher },
-		{ limit: 100, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
-	);
-
-	const claim = await claimRun(repos, runId);
-	return { runId, outboxRowId, ...claim };
-}
-
-async function seedPublishedRun(deps: DaemonHarnessDeps) {
-	const { context, repos, publisher } = deps;
-	const seeded = await seedQueuedRun(deps);
-
-	await publishReadyRuns(
-		context,
-		{ repos, workflowRunPublisher: publisher },
-		{ limit: 100, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
-	);
-
-	return seeded;
-}

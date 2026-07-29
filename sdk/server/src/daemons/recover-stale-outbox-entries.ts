@@ -77,25 +77,25 @@ export async function recoverStaleOutboxEntries(
 				}
 			}
 
-			await txRepos.workflowRunOutbox.returnToPending(entryIds);
+			await txRepos.workflowRunOutbox.returnToPending(entryIds, "claimed");
 		});
 
 		context.logger.debug("Recovered stale claimed outbox entries", { "aiki.count": staleEntries.length });
 	}
 
-	for await (const staleEntries of streamChunks(
-		(cursor) => repos.workflowRunOutbox.listStalePublished(context, limit, cursor),
+	for await (const publishableEntries of streamChunks(
+		(cursor) => repos.workflowRunOutbox.listPublishable(context, limit, cursor),
 		{
 			advanceCursor: advancePublishedCursor,
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		const entryIds = staleEntries.map((entry) => entry.id);
+		const entryIds = publishableEntries.map((entry) => entry.id);
 		if (!isNonEmptyArray(entryIds)) {
 			continue;
 		}
 
-		await repos.workflowRunOutbox.returnToPending(entryIds);
-		context.logger.debug("Recovered stale published outbox entries", { "aiki.count": staleEntries.length });
+		await repos.workflowRunOutbox.returnToPending(entryIds, "published");
+		context.logger.debug("Recovered publishable outbox entries", { "aiki.count": publishableEntries.length });
 	}
 }
