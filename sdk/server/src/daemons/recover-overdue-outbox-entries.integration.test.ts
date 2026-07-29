@@ -3,6 +3,7 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { recoverOverdueOutboxEntries } from "./recover-overdue-outbox-entries";
 import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import { describe, expect, test } from "bun:test";
+import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
 import { createDaemonHarness } from "../testing/daemon-harness";
 import { claimRun, namespaceContext, seedClaimedRun, seedPublishedRun, seedQueuedRun } from "../testing/outbox-seed";
@@ -12,8 +13,7 @@ const withHarness = createDaemonHarness();
 // -1 makes every claimed row stale by arithmetic (claimedAt < now + 1 always holds), so tests
 // never depend on real time elapsing between the claim and the daemon run.
 const EVERY_CLAIM_IS_STALE_MS = -1;
-// Has the opposite effeft of EVERY_CLAIM_IS_STALE_MS; skip recovery for claims younger than 1 hour
-const NO_CLAIM_GOES_STALE_MS = 1 * 60 * 60 * 1000;
+const ONE_HOUR_MS = 1 * 60 * 60 * 1000;
 
 const EPOCH_MS = 1 as TimestampMs;
 
@@ -118,11 +118,28 @@ describe("recoverOverdueOutboxEntries", () => {
 				const { context, repos } = deps;
 				const { runId, outboxRowId } = await seedClaimedRun(deps);
 
-				await recoverOverdueOutboxEntries(
-					context,
-					{ repos },
-					{ claimMinIdleTimeMs: NO_CLAIM_GOES_STALE_MS, limit: 100 }
-				);
+				await recoverOverdueOutboxEntries(context, { repos }, { claimMinIdleTimeMs: ONE_HOUR_MS, limit: 100 });
+
+				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
+				expect(await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100)).toEqual([
+					expect.objectContaining({ id: outboxRowId, workflowRunId: runId }),
+				]);
+			}));
+
+		test("leaves a refreshed claim untouched", () =>
+			withHarness(async (deps) => {
+				const { context, repos } = deps;
+				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () => seedClaimedRun(deps));
+
+				// The epoch-old claim is initially recoverable.
+				expect(await repos.workflowRunOutbox.listStaleClaimed(context, ONE_HOUR_MS, 100)).toEqual([
+					expect.objectContaining({ id: outboxRowId, workflowRunId: runId }),
+				]);
+
+				const outboxService = createWorkflowRunOutboxService({ repos });
+				await outboxService.refreshClaim(namespaceContext, runId);
+
+				await recoverOverdueOutboxEntries(context, { repos }, { claimMinIdleTimeMs: ONE_HOUR_MS, limit: 100 });
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
 				expect(await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100)).toEqual([

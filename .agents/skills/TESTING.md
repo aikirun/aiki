@@ -60,11 +60,18 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Merge related equality fields into one `objectContaining` (include ids). An ordered comparison
   (`toBeGreaterThan`) gets its own assertion line — no asymmetric ordering matcher exists.
 - An absence assertion must be a read that would have shown the row if it existed.
+- When a test claims "X prevents Y", first prove Y was actually going to happen: assert the
+  seeded state is one Y would hit (the claim is old enough to be recovered), then do X, then
+  assert Y didn't happen. Without that first assertion the test can pass for a reason other
+  than X — a threshold that spares every claim, say — and nothing in the test shows which.
 
 ## Shape
 
 - One behavior per test. The name is one honest sentence — it must not claim anything the body
   doesn't assert.
+- Test a behavior in the suite of the component that owns it: what a service writes is the
+  service suite's contract; how a daemon reads it belongs to the daemon's suite. Don't place a
+  test by where you happen to be working.
 - Pick fixture data semantically orthogonal to the subject: don't give a time-based test
   time-shaped input.
 - Capture baselines from operation responses (a transition's returned revision, attempts) rather
@@ -72,3 +79,9 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Mutation-test your assertions: if the behavior under test were deleted, would this test fail?
   Baselines captured before an intermediate step, or comparisons that hold vacuously (0 === 0),
   are the common failure.
+- When a behavior applies only to one status (a guard like `status = 'claimed'`), test every
+  excluded status, not one representative. Build the case table as an object keyed by the
+  excluded statuses and pin it with
+  `satisfies Record<Exclude<StatusUnion, "claimed">, unknown>`, then `Object.entries(...)` into
+  a test per key. The `Record` over `Exclude` makes the table complete by construction: a new
+  union member fails the build until it gets an entry, and a typo'd key never compiles.

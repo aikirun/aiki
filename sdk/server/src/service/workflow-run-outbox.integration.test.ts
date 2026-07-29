@@ -2,6 +2,7 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 
 import { describe, expect, test } from "bun:test";
 import { recoverOverdueOutboxEntries } from "../daemons/recover-overdue-outbox-entries";
+import type { WorkflowRunOutboxStatus } from "../infra/db/constants/workflow-run-outbox";
 import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
 import { createDaemonHarness } from "../testing/daemon-harness";
@@ -177,4 +178,36 @@ describe("claimReady visibility after recovery", () => {
 				])
 			);
 		}));
+});
+
+describe("WorkflowRunOutboxService.refreshClaim", () => {
+	test("stamps a fresh claimedAt on a claimed row", () =>
+		withHarness(async (deps) => {
+			const { repos } = deps;
+			const { runId } = await withFakeClock(EPOCH_MS, () => seedClaimedRun(deps));
+
+			const outboxService = createWorkflowRunOutboxService({ repos });
+			await outboxService.refreshClaim(namespaceContext, runId);
+
+			const row = await repos.workflowRunOutbox.getByWorkflowRunId(namespaceContext.namespaceId, runId);
+			expect(row).toEqual(expect.objectContaining({ workflowRunId: runId, status: "claimed" }));
+			expect(row?.claimedAt).toBeGreaterThan(EPOCH_MS);
+		}));
+
+	Object.entries({
+		pending: seedQueuedRun,
+		published: seedPublishedRun,
+	} satisfies Record<Exclude<WorkflowRunOutboxStatus, "claimed">, unknown>).forEach(([status, seedRun]) => {
+		test(`does not refresh a ${status} row`, () =>
+			withHarness(async (deps) => {
+				const { repos } = deps;
+				const { runId } = await seedRun(deps);
+
+				const outboxService = createWorkflowRunOutboxService({ repos });
+				await outboxService.refreshClaim(namespaceContext, runId);
+
+				const row = await repos.workflowRunOutbox.getByWorkflowRunId(namespaceContext.namespaceId, runId);
+				expect(row).toEqual(expect.objectContaining({ workflowRunId: runId, status, claimedAt: null }));
+			}));
+	});
 });
