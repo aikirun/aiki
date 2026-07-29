@@ -151,14 +151,12 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		const signal = this.abortController.signal;
 
 		const configParam = this.params.config;
-		let configProvider: ConfigProvider<WorkerConfig>;
 		if (typeof configParam === "function") {
-			configProvider = configParam({ logger: this.logger.child({ "aiki.component": "config-provider" }), signal });
+			this.configProvider = configParam({ logger: this.logger.child({ "aiki.component": "config-provider" }), signal });
 		} else {
 			const config = merge(defaultWorkerConfig, configParam);
-			configProvider = asConfigProvider(() => config);
+			this.configProvider = asConfigProvider(() => config);
 		}
-		this.configProvider = configProvider;
 
 		const createPrimarySubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
 		this.primarySubscriber = createPrimarySubscriber({
@@ -217,9 +215,9 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 
 			const stillActiveRuns = Array.from(this.activeWorkflowRunsById.values());
 			if (stillActiveRuns.length > 0) {
-				const ids = stillActiveRuns.map((w) => w.run.id).join(", ");
+				const runIds = stillActiveRuns.map(({ run }) => run.id).join(", ");
 				this.logger.warn("Worker stopped while some workflows were active", {
-					"aiki.activeWorkflowRunIds": ids,
+					"aiki.activeWorkflowRunIds": runIds,
 				});
 			}
 		}
@@ -230,7 +228,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 
 	private async subscriberLoop(signal: AbortSignal): Promise<void> {
 		this.logger.info("Worker started", {
-			"aiki.registeredWorkflows": this.params.workflows.map((w) => `${w.name}:${w.versionId}`),
+			"aiki.registeredWorkflows": this.params.workflows.map(({ name, versionId }) => `${name}:${versionId}`),
 		});
 
 		let activeSubscriber: Subscriber = this.primarySubscriber;
