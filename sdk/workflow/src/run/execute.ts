@@ -39,14 +39,14 @@ export interface WorkflowExecutionConfig {
 	 */
 	claimRefreshIntervalMs: number;
 	/**
-	 * Threshold for spinning vs persisting task retry delays (default: 10ms).
+	 * Longest wait the executor absorbs in process (default: 10ms).
 	 *
 	 * Delays <= threshold: In-memory wait (fast, no task history entry)
 	 * Delays > threshold: Server state transition (recorded in task history)
 	 *
 	 * Set to 0 to record all task delays in transition history.
 	 */
-	spinThresholdMs: number;
+	maxInlineWaitMs: number;
 }
 
 export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {

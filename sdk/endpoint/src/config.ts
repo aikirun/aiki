@@ -14,7 +14,7 @@ export const defaultEndpointConfig: EndpointConfig = {
 	signatureMaxAgeMs: 30_000,
 	workflowRun: {
 		claimRefreshIntervalMs: CLAIM_REFRESH_INTERVAL_MS,
-		spinThresholdMs: 10,
+		maxInlineWaitMs: 10,
 	},
 };
 

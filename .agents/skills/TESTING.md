@@ -19,7 +19,7 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Make time-dependent behavior deterministic three ways:
   - **Boundary-value config**: choose knob values that decide the branch by arithmetic, not by
     timing — a `-1` idle threshold makes every claim stale; `Number.MAX_SAFE_INTEGER` makes none
-    ever stale; `spinThresholdMs: 0` forces the park branch.
+    ever stale; `maxInlineWaitMs: 0` forces the suspend branch.
   - **Timestamps as authored data**: write sentinel absolutes (`awakeAt: 0`, an epoch constant)
     into rows; a value at the epoch is due/aged for any threshold.
   - **`withFakeClock(seedTimestampMs, fn)`** (`sdk/server/src/testing/clock.ts`): freezes the JS
