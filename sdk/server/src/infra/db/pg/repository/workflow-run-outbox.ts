@@ -135,16 +135,13 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<WorkflowRunOutboxRowClaimed[]> {
-		const now = Date.now();
-		const staleThreshold = (now - claimIdleTimeoutMs) as TimestampMs;
-
 		const rows = await db
 			.select()
 			.from(workflowRunOutbox)
 			.where(
 				and(
 					eq(workflowRunOutbox.status, "claimed"),
-					lt(workflowRunOutbox.claimedAt, staleThreshold),
+					lt(workflowRunOutbox.claimedAt, (Date.now() - claimIdleTimeoutMs) as TimestampMs),
 					keysetStreamCursorFilter(workflowRunOutbox.claimedAt, workflowRunOutbox.id, cursor)
 				)
 			)
