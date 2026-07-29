@@ -25,6 +25,7 @@ RUN bun install --frozen-lockfile
 
 COPY lib/ ./lib/
 COPY types/ ./types/
+COPY testing/ ./testing/
 COPY sdk/adapter/memory/ ./sdk/adapter/memory/
 COPY sdk/adapter/redis/ ./sdk/adapter/redis/
 COPY sdk/iam/ ./sdk/iam/
