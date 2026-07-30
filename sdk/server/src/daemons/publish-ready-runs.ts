@@ -54,29 +54,31 @@ export async function publishPendingOutboxEntries(
 	{ baseDelayMs, maxDelayMs }: RepublishBackoff
 ): Promise<void> {
 	const publishedEntryIds = await publishOutboxEntries(context, workflowRunPublisher, entries);
-	if (isNonEmptyArray(publishedEntryIds)) {
-		const now = Date.now();
-		const initialBackoffMs = now + Math.min(baseDelayMs, maxDelayMs);
-		const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
-
-		const entriesToMarkPublished = publishedEntryIds.map((id) => {
-			const firstPublishedAt = entriesById.get(id)?.firstPublishedAt;
-			if (firstPublishedAt === null || firstPublishedAt === undefined) {
-				return { id, nextPublishAttemptAt: initialBackoffMs };
-			}
-			return {
-				id,
-				nextPublishAttemptAt: computeRepublishBackoff({ now, firstPublishedAt, baseDelayMs, maxDelayMs }),
-			};
-		}) as NonEmptyArray<{ id: string; nextPublishAttemptAt: TimestampMs }>;
-
-		await repos.workflowRunOutbox.markPublished(entriesToMarkPublished);
+	if (!isNonEmptyArray(publishedEntryIds)) {
+		return;
 	}
+
+	const now = Date.now();
+	const initialBackoffMs = now + Math.min(baseDelayMs, maxDelayMs);
+	const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
+
+	const entriesToMarkPublished = publishedEntryIds.map((id) => {
+		const firstPublishedAt = entriesById.get(id)?.firstPublishedAt;
+		if (!firstPublishedAt) {
+			return { id, nextPublishAttemptAt: initialBackoffMs };
+		}
+		return {
+			id,
+			nextPublishAttemptAt: computeRepublishBackoff({ now, firstPublishedAt, baseDelayMs, maxDelayMs }),
+		};
+	}) as NonEmptyArray<{ id: string; nextPublishAttemptAt: TimestampMs }>;
+
+	await repos.workflowRunOutbox.markPublished(entriesToMarkPublished);
 }
 
 /**
  * Backoff interval before the next republish attempt.
- * backoff = now + age; this doubles the waiting period on each attempt.
+ * backoff = now + durationSinceFirstPublishMs; this doubles the waiting period on each attempt.
  * The backoff is clamped to [baseDelayMs, maxDelayMs].
  */
 export function computeRepublishBackoff(params: {
@@ -86,8 +88,8 @@ export function computeRepublishBackoff(params: {
 	maxDelayMs: number;
 }): number {
 	const { now, firstPublishedAt, baseDelayMs, maxDelayMs } = params;
-	const ageMs = now - firstPublishedAt;
-	const backoffMs = Math.min(Math.max(ageMs, baseDelayMs), maxDelayMs);
+	const durationSinceFirstPublishMs = now - firstPublishedAt;
+	const backoffMs = Math.min(Math.max(durationSinceFirstPublishMs, baseDelayMs), maxDelayMs);
 	return now + backoffMs;
 }
 

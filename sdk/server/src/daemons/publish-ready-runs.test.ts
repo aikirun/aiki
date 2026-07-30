@@ -2,7 +2,7 @@ import { computeRepublishBackoff } from "./publish-ready-runs";
 import { describe, expect, test } from "bun:test";
 
 describe("computeRepublishBackoff", () => {
-	test("waits the elapsed broker-age when within bounds", () => {
+	test("waits the elapsed durationSinceFirstPublish when within bounds", () => {
 		const baseDelayMs = 5_000;
 		const maxDelayMs = 300_000;
 		const firstPublishedAt = 990_000;
@@ -13,7 +13,7 @@ describe("computeRepublishBackoff", () => {
 		expect(result).toBe(now + (now - firstPublishedAt));
 	});
 
-	test("clamps to baseDelayMs when the elapsed age is below it", () => {
+	test("clamps to baseDelayMs when the elapsed durationSinceFirstPublish is below it", () => {
 		const baseDelayMs = 5_000;
 		const maxDelayMs = 300_000;
 		const firstPublishedAt = 999_000;
@@ -24,7 +24,7 @@ describe("computeRepublishBackoff", () => {
 		expect(result).toBe(now + baseDelayMs);
 	});
 
-	test("clamps to maxDelayMs when the elapsed age exceeds it", () => {
+	test("clamps to maxDelayMs when the elapsed durationSinceFirstPublish exceeds it", () => {
 		const baseDelayMs = 5_000;
 		const maxDelayMs = 300_000;
 		const firstPublishedAt = 600_000;
@@ -35,7 +35,7 @@ describe("computeRepublishBackoff", () => {
 		expect(result).toBe(now + maxDelayMs);
 	});
 
-	test("returns exactly now + maxDelayMs when the elapsed age equals the max", () => {
+	test("returns exactly now + maxDelayMs when the elapsed durationSinceFirstPublish equals the max", () => {
 		const baseDelayMs = 5_000;
 		const maxDelayMs = 300_000;
 		const now = 1_000_000;
