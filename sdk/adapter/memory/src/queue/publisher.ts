@@ -12,7 +12,7 @@ import type { Queue, Store } from "./store";
 
 export function createInMemoryPublisher(store: Store): CreatePublisher {
 	return (_context: PublisherContext): Publisher => ({
-		async publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
+		async publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
 			const touchedQueues = new Map<string, Queue>();
 			for (const { id, name, versionId, rank, shard } of runs) {
 				const queueName = getWorkflowQueueName(name, versionId, shard);

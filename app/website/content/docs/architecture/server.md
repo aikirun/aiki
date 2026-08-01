@@ -43,7 +43,7 @@ The runtime's daemons drive workflow state transitions:
 | Event wait timeouts | Resume workflows that timed out waiting for events |
 | Child wait timeouts | Resume workflows that timed out waiting for child workflows |
 | Recurring schedules | Create new runs for cron and interval schedules |
-| Publish ready runs | Publish pending outbox entries to the work queue |
+| Publish pending outbox entries | Publish pending outbox entries to the work queue |
 | Recover overdue outbox entries | Release abandoned claims and re-pool published entries whose republish time arrived |
 | Stall undeliverable runs | Give up on runs undelivered past the retention cap, moving them to `stalled` (see [Stalled Runs](./stalled-runs.md)) |
 | Due-timers consumer | Fire near-term timers from the timer priority queue (when configured) |

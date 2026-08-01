@@ -27,7 +27,7 @@ describe("publishPendingOutboxEntries", () => {
 			const pendingOutboxRow = pendingWorkflowRunOutboxRowFactory.build();
 			await repos.workflowRunOutbox.createBatch([pendingOutboxRow]);
 
-			publisher.publishReadyRuns.rejectsOnce(expect.anything(), new Error("broker down"));
+			publisher.publishRuns.rejectsOnce(expect.anything(), new Error("broker down"));
 
 			expect(
 				publishPendingOutboxEntries(

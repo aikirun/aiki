@@ -37,7 +37,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 		const queue = inMemoryQueue();
 		const publisher = queue.publisher(publisherContext());
 
-		await publisher.publishReadyRuns([readyWorkflowRunFactory.build({ id: "run-1" })]);
+		await publisher.publishRuns([readyWorkflowRunFactory.build({ id: "run-1" })]);
 
 		const subscriber = queue.subscriber(subscriberContext());
 		expect<string[]>((await subscriber.getReadyRuns(10)).map(({ data }) => data.id)).toEqual(["run-1"]);
@@ -47,7 +47,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 		const queue = inMemoryQueue();
 		const publisher = queue.publisher(publisherContext());
 
-		await publisher.publishReadyRuns([
+		await publisher.publishRuns([
 			readyWorkflowRunFactory.build({ id: "third", rank: 3 }),
 			readyWorkflowRunFactory.build({ id: "first", rank: 1 }),
 			readyWorkflowRunFactory.build({ id: "second", rank: 2 }),
@@ -65,7 +65,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 		const queue = inMemoryQueue();
 		const publisher = queue.publisher(publisherContext());
 
-		await publisher.publishReadyRuns([
+		await publisher.publishRuns([
 			readyWorkflowRunFactory.build({ id: "run-b", rank: 1 }),
 			readyWorkflowRunFactory.build({ id: "run-a", rank: 1 }),
 			readyWorkflowRunFactory.build({ id: "run-c", rank: 1 }),
@@ -83,7 +83,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 		const queue = inMemoryQueue();
 		const publisher = queue.publisher(publisherContext());
 
-		await publisher.publishReadyRuns([
+		await publisher.publishRuns([
 			readyWorkflowRunFactory.build({ id: "a1", rank: 1 }),
 			readyWorkflowRunFactory.build({ id: "a2", rank: 2 }),
 			readyWorkflowRunFactory.build({
@@ -109,7 +109,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 		const publisher = queue.publisher(publisherContext());
 		const subscriber = queue.subscriber(subscriberContext());
 
-		await publisher.publishReadyRuns([
+		await publisher.publishRuns([
 			readyWorkflowRunFactory.build({ id: "run-1", rank: 1 }),
 			readyWorkflowRunFactory.build({ id: "run-2", rank: 2 }),
 			readyWorkflowRunFactory.build({ id: "run-3", rank: 3 }),
@@ -124,7 +124,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 		const publisher = queue.publisher(publisherContext());
 
 		const [readyRun1, readyRun2] = [readyWorkflowRunFactory.build(), readyWorkflowRunFactory.build()];
-		const result = await publisher.publishReadyRuns([readyRun1, readyRun2]);
+		const result = await publisher.publishRuns([readyRun1, readyRun2]);
 
 		expect(result.published).toEqual([{ run: readyRun1 }, { run: readyRun2 }]);
 	});
@@ -137,7 +137,7 @@ describe("inMemoryQueue waiters", () => {
 		const subscriber = queue.subscriber(subscriberContext());
 
 		const parked = subscriber.getReadyRuns(10);
-		await publisher.publishReadyRuns([readyWorkflowRunFactory.build({ id: "run-1" })]);
+		await publisher.publishRuns([readyWorkflowRunFactory.build({ id: "run-1" })]);
 
 		expect<string[]>((await parked).map(({ data }) => data.id)).toEqual(["run-1"]);
 	});
@@ -171,7 +171,7 @@ describe("inMemoryQueue.clear", () => {
 
 		const parked = subscriber.getReadyRuns(10);
 		queue.clear();
-		await publisher.publishReadyRuns([readyWorkflowRunFactory.build({ id: "run-after-clear" })]);
+		await publisher.publishRuns([readyWorkflowRunFactory.build({ id: "run-after-clear" })]);
 
 		expect(await parked).toEqual([{ data: { id: "run-after-clear" as WorkflowRunId } }]);
 	});
@@ -180,9 +180,9 @@ describe("inMemoryQueue.clear", () => {
 		const queue = inMemoryQueue();
 		const publisher = queue.publisher(publisherContext());
 
-		await publisher.publishReadyRuns([readyWorkflowRunFactory.build({ id: "run-cleared" })]);
+		await publisher.publishRuns([readyWorkflowRunFactory.build({ id: "run-cleared" })]);
 		queue.clear();
-		await publisher.publishReadyRuns([readyWorkflowRunFactory.build({ id: "run-kept" })]);
+		await publisher.publishRuns([readyWorkflowRunFactory.build({ id: "run-kept" })]);
 
 		const subscriber = queue.subscriber(subscriberContext());
 		const runs = await subscriber.getReadyRuns(10);

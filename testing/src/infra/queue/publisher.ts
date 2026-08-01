@@ -7,11 +7,11 @@ type PublishRunsRequest = NonEmptyArray<ReadyWorkflowRun>;
 type PublishRunsResponse = PublishRunsResult | ((request: PublishRunsRequest) => PublishRunsResult);
 
 /**
- * `Publisher.publishReadyRuns` augmented with one-off scripting. Unscripted calls take the success
+ * `Publisher.publishRuns` augmented with one-off scripting. Unscripted calls take the success
  * path — every run reported as `published`. A queued `once`/`rejectsOnce` overrides the next call in
  * FIFO order, asserting its request first.
  */
-export interface FakePublishReadyRuns {
+export interface FakePublishRuns {
 	(request: PublishRunsRequest): Promise<PublishRunsResult>;
 
 	/**
@@ -19,14 +19,14 @@ export interface FakePublishReadyRuns {
 	 * `response` — a value, or a function that receives the actual request and returns the value.
 	 * Pass `expect.anything()` to match any request.
 	 */
-	once(expectedRequest: PublishRunsRequest, response: PublishRunsResponse): FakePublishReadyRuns;
+	once(expectedRequest: PublishRunsRequest, response: PublishRunsResponse): FakePublishRuns;
 
 	/** Overrides the next call: asserts its request against `expectedRequest`, then throws `error`. */
-	rejectsOnce(expectedRequest: PublishRunsRequest, error: unknown): FakePublishReadyRuns;
+	rejectsOnce(expectedRequest: PublishRunsRequest, error: unknown): FakePublishRuns;
 }
 
 export interface FakePublisher extends Publisher {
-	publishReadyRuns: FakePublishReadyRuns;
+	publishRuns: FakePublishRuns;
 	/** Throws unless every queued `once`/`rejectsOnce` was consumed by a call. */
 	verify(): void;
 }
@@ -69,8 +69,8 @@ export function fakePublisher(): FakePublisher {
 		};
 	})();
 
-	const publishReadyRunsFn = async (actualRequest: PublishRunsRequest): Promise<PublishRunsResult> => {
-		const expectedCalls = expectations.getCalls(publishReadyRunsFn.name);
+	const publishRunsFn = async (actualRequest: PublishRunsRequest): Promise<PublishRunsResult> => {
+		const expectedCalls = expectations.getCalls(publishRunsFn.name);
 		const expectedCall = expectedCalls.shift();
 		if (expectedCall === undefined) {
 			return { published: actualRequest.map((run) => ({ run })) };
@@ -86,22 +86,22 @@ export function fakePublisher(): FakePublisher {
 		return typeof response === "function" ? response(actualRequest) : (response as PublishRunsResult);
 	};
 
-	const publishReadyRuns = Object.assign(publishReadyRunsFn, {
+	const publishRuns = Object.assign(publishRunsFn, {
 		once: (expectedRequest: PublishRunsRequest, response: PublishRunsResponse) => {
-			const expectedCalls = expectations.getCalls(publishReadyRunsFn.name);
+			const expectedCalls = expectations.getCalls(publishRunsFn.name);
 			expectedCalls.push({ request: expectedRequest, result: { type: "resolve", response } });
-			return publishReadyRuns;
+			return publishRuns;
 		},
 
 		rejectsOnce: (expectedRequest: PublishRunsRequest, error: unknown) => {
-			const expectedCalls = expectations.getCalls(publishReadyRunsFn.name);
+			const expectedCalls = expectations.getCalls(publishRunsFn.name);
 			expectedCalls.push({ request: expectedRequest, result: { type: "reject", error } });
-			return publishReadyRuns;
+			return publishRuns;
 		},
 	});
 
 	return {
-		publishReadyRuns,
+		publishRuns,
 		verify: () => expectations.verify(),
 	};
 }

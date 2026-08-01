@@ -21,7 +21,7 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 		const redisTracker = connectionTracker(redis);
 
 		return {
-			async publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
+			async publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
 				if (!redisTracker.isAvailable()) {
 					return { failed: runs.map((run) => ({ run })) };
 				}

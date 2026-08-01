@@ -95,7 +95,7 @@ async function publish(
 		});
 	}
 
-	const result = await publisher.publishReadyRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
+	const result = await publisher.publishRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
 
 	const publishedEntryIds: string[] = [];
 

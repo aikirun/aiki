@@ -25,7 +25,7 @@ export interface PublishRunsResult {
 }
 
 export interface Publisher {
-	publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult>;
+	publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult>;
 }
 
 export interface PublisherContext {
