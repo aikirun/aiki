@@ -95,7 +95,7 @@ describe("recoverOverdueOutboxEntries", () => {
 					expect.objectContaining({
 						id: runId,
 						status: "queued",
-						state: { status: "queued", reason: "recovered" },
+						state: { status: "queued", reason: "recovery" },
 					})
 				);
 			}));

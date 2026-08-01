@@ -66,7 +66,7 @@ export async function recoverOverdueOutboxEntries(
 						type: "workflow_run",
 						status: "queued",
 						attempt: run.attempts,
-						state: { status: "queued", reason: "recovered" } satisfies WorkflowRunStateQueued,
+						state: { status: "queued", reason: "recovery" } satisfies WorkflowRunStateQueued,
 					});
 					stateTransitionUpdates.push({ id: run.id, stateTransitionId });
 				}

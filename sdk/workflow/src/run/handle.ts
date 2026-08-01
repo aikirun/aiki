@@ -320,7 +320,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 	}
 
 	public async resume(): Promise<void> {
-		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resume" });
+		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resumption" });
 		this.logger.info("Workflow resumed");
 	}
 
@@ -335,7 +335,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 			if (
 				(targetState.status === "scheduled" &&
 					(targetState.reason === "new" ||
-						targetState.reason === "resume" ||
+						targetState.reason === "resumption" ||
 						targetState.reason === "awake_early" ||
 						targetState.reason === "redelivery")) ||
 				targetState.status === "paused" ||

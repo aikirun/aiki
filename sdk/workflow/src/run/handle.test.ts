@@ -231,10 +231,14 @@ describe("workflowRunHandle", () => {
 				const handle = workflowRunHandle(client, record);
 
 				client.api.workflowRun.transitionStateV1.once(
-					{ type: "pessimistic", id: record.id, state: { status: "scheduled", scheduledInMs: 0, reason: "resume" } },
+					{
+						type: "pessimistic",
+						id: record.id,
+						state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" },
+					},
 					{
 						revision: record.revision + 1,
-						state: { status: "scheduled", scheduledAt: 0, reason: "resume" },
+						state: { status: "scheduled", scheduledAt: 0, reason: "resumption" },
 						attempts: record.attempts,
 					}
 				);

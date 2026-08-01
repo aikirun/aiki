@@ -69,8 +69,8 @@ const workflowRunStateTransitionValidator: Record<
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
-			if (to.status === "scheduled" && to.reason !== "resume") {
-				return { allowed: false, reason: "Only resume run allowed" };
+			if (to.status === "scheduled" && to.reason !== "resumption") {
+				return { allowed: false, reason: "Only resumption run allowed" };
 			}
 			return { allowed: true };
 		};
@@ -274,10 +274,10 @@ async function transitionStateInTx(
 					| "task_retry"
 					| "awake"
 					| "awake_early"
-					| "resume"
+					| "resumption"
 					| "event"
 					| "child_workflow"
-					| "recovered"
+					| "recovery"
 					| "redelivery";
 		}
 	}

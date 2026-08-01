@@ -342,7 +342,7 @@ export function RunDetail() {
 											namespaceAuthedClient.workflowRun.transitionStateV1({
 												type: "pessimistic",
 												id: currentRun.id,
-												state: { status: "scheduled", scheduledInMs: 0, reason: "resume" },
+												state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" },
 											})
 										)
 									}

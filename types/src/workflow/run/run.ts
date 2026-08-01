@@ -70,7 +70,7 @@ export const WORKFLOW_RUN_SCHEDULED_REASON = [
 	"task_retry",
 	"awake",
 	"awake_early",
-	"resume",
+	"resumption",
 	"event",
 	"child_workflow",
 	"redelivery",
@@ -104,7 +104,7 @@ export interface WorkflowRunStateScheduledByAwakeEarly extends WorkflowRunStateS
 }
 
 export interface WorkflowRunStateScheduledByResume extends WorkflowRunStateScheduledBase {
-	reason: "resume";
+	reason: "resumption";
 }
 
 export interface WorkflowRunStateScheduledByEvent extends WorkflowRunStateScheduledBase {
@@ -136,10 +136,10 @@ export const WORKFLOW_RUN_QUEUED_REASON = [
 	"task_retry",
 	"awake",
 	"awake_early",
-	"resume",
+	"resumption",
 	"event",
 	"child_workflow",
-	"recovered",
+	"recovery",
 	"redelivery",
 ] as const;
 export type WorkflowRunQueuedReason = (typeof WORKFLOW_RUN_QUEUED_REASON)[number];
