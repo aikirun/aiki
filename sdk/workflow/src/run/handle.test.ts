@@ -3,8 +3,8 @@ import {
 	baseWorkflowRunRecordFactory,
 	runningWorkflowRunRecordFactory,
 	workflowRunStateByStatus,
-} from "@aikirun/testing/workflow/run";
-import { runningTaskInfoFactory } from "@aikirun/testing/workflow/task";
+} from "@aikirun/testing/data-factory/workflow/run";
+import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {

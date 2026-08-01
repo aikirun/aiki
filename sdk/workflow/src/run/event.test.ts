@@ -1,5 +1,5 @@
 import { withFakeClient } from "@aikirun/testing/client";
-import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/workflow/run";
+import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";

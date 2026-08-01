@@ -1,7 +1,8 @@
 import type { PublishRunsResult } from "@aikirun/types/infra/queue";
 
-import { fakePublisher, readyWorkflowRunFactory } from "./publisher";
+import { fakePublisher } from "./publisher";
 import { describe, expect, test } from "bun:test";
+import { readyWorkflowRunFactory } from "../../data-factory/infra/queue";
 
 describe("fakePublisher", () => {
 	test("reports every run as published by default", async () => {

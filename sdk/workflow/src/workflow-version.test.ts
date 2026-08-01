@@ -8,8 +8,8 @@ import {
 	pausedWorkflowRunRecordFactory,
 	runningWorkflowRunRecordFactory,
 	workflowRunStateByStatus,
-} from "@aikirun/testing/workflow/run";
-import { runningTaskInfoFactory } from "@aikirun/testing/workflow/task";
+} from "@aikirun/testing/data-factory/workflow/run";
+import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";

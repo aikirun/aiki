@@ -1,9 +1,9 @@
+import { withFakeClient } from "@aikirun/testing/client";
 import {
 	cronScheduleActivateRequestFactory,
 	intervalScheduleActivateRequestFactory,
-} from "@aikirun/testing/api/schedule";
-import { withFakeClient } from "@aikirun/testing/client";
-import { cronScheduleFactory, intervalScheduleFactory } from "@aikirun/testing/schedule";
+} from "@aikirun/testing/data-factory/api/schedule";
+import { cronScheduleFactory, intervalScheduleFactory } from "@aikirun/testing/data-factory/schedule";
 import type { ScheduleId } from "@aikirun/types/schedule";
 
 import { schedule } from "./schedule";

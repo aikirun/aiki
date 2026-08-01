@@ -1,7 +1,7 @@
 import { delay } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { withFakeClient } from "@aikirun/testing/client";
-import { runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
+import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";

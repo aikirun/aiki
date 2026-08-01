@@ -1,6 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { createConsoleLogger } from "@aikirun/lib/logger";
-import { readyWorkflowRunFactory } from "@aikirun/testing/infra/queue";
+import { readyWorkflowRunFactory } from "@aikirun/testing/data-factory/infra/queue";
 import type { PublisherContext, SubscriberContext } from "@aikirun/types/infra/queue";
 import type { WorkflowMeta, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";

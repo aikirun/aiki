@@ -53,7 +53,12 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Seeds (`sdk/server/src/testing/run-seed.ts`) take
   `{ repos, daemonContext?, namespaceRequestContext?, publisher }`: always feed the context your
   harness injected; the other may be omitted (factory default). Take pure filler data (contexts,
-  rows) from the factories in `sdk/server/src/testing/`.
+  rows) from the fishery factories under `sdk/server/src/testing/data-factory/`, at the path
+  mirroring the type each one builds.
+- Data factories (fishery `Factory.define`) live under a `data-factory/` subtree, kept apart from
+  fakes and harnesses. The same split holds in the `@aikirun/testing` package: factory exports are
+  namespaced `@aikirun/testing/data-factory/*`, while the fakes stay at `@aikirun/testing/client`
+  and `@aikirun/testing/infra/queue`.
 
 ## Assertions
 

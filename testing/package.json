@@ -5,12 +5,13 @@
 	"description": "Testing utilities for Aiki - a fake client and fishery data factories for testing SDK code (in-repo; not yet published)",
 	"type": "module",
 	"exports": {
-		"./api/schedule": "./src/api/schedule.ts",
 		"./client": "./src/client.ts",
 		"./infra/queue": "./src/infra/queue/index.ts",
-		"./schedule": "./src/schedule.ts",
-		"./workflow/task": "./src/workflow/task.ts",
-		"./workflow/run": "./src/workflow/run.ts"
+		"./data-factory/api/schedule": "./src/data-factory/api/schedule.ts",
+		"./data-factory/schedule": "./src/data-factory/schedule.ts",
+		"./data-factory/infra/queue": "./src/data-factory/infra/queue.ts",
+		"./data-factory/workflow/run": "./src/data-factory/workflow/run.ts",
+		"./data-factory/workflow/task": "./src/data-factory/workflow/task.ts"
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",

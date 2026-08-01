@@ -1,7 +1,7 @@
 import { asConfigProvider } from "@aikirun/lib/config";
 import { withFakeClient } from "@aikirun/testing/client";
-import { runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
-import { completedTaskInfoFactory, runningTaskInfoFactory } from "@aikirun/testing/workflow/task";
+import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
+import { completedTaskInfoFactory, runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";

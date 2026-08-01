@@ -1,6 +1,6 @@
 import type { FakeClient } from "@aikirun/testing/client";
 import { withFakeClient } from "@aikirun/testing/client";
-import { runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
+import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 

@@ -1,5 +1,8 @@
-import { childWorkflowRunInfoFactory, runningWorkflowRunRecordFactory } from "@aikirun/testing/workflow/run";
-import { completedTaskInfoFactory } from "@aikirun/testing/workflow/task";
+import {
+	childWorkflowRunInfoFactory,
+	runningWorkflowRunRecordFactory,
+} from "@aikirun/testing/data-factory/workflow/run";
+import { completedTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import type { WorkflowRunAddress } from "@aikirun/types/workflow/run";
 import type { TaskAddress } from "@aikirun/types/workflow/task";
 

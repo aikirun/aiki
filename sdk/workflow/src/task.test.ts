@@ -6,12 +6,12 @@ import {
 	baseWorkflowRunRecordFactory,
 	runningWorkflowRunRecordFactory,
 	workflowRunStateByStatus,
-} from "@aikirun/testing/workflow/run";
+} from "@aikirun/testing/data-factory/workflow/run";
 import {
 	completedTaskInfoFactory,
 	failedTaskInfoFactory,
 	runningTaskInfoFactory,
-} from "@aikirun/testing/workflow/task";
+} from "@aikirun/testing/data-factory/workflow/task";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
