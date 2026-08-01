@@ -23,7 +23,7 @@ export type WorkflowRunRowInsert = typeof workflowRun.$inferInsert;
 type WorkflowRunRowUpdate = Partial<
 	Pick<
 		WorkflowRunRowInsert,
-		"status" | "attempts" | "latestStateTransitionId" | "scheduledAt" | "awakeAt" | "timeoutAt" | "nextAttemptAt"
+		"status" | "attempts" | "latestStateTransitionId" | "scheduledAt" | "wakeupAt" | "timeoutAt" | "nextAttemptAt"
 	>
 >;
 
@@ -350,17 +350,17 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				attempts: workflowRun.attempts,
 				options: workflowRun.options,
 				latestStateTransitionId: workflowRun.latestStateTransitionId,
-				dueAt: sql<TimestampMs>`${workflowRun.awakeAt}`.mapWith(workflowRun.awakeAt),
+				dueAt: sql<TimestampMs>`${workflowRun.wakeupAt}`.mapWith(workflowRun.wakeupAt),
 			})
 			.from(workflowRun)
 			.where(
 				and(
 					eq(workflowRun.status, "sleeping"),
-					lte(workflowRun.awakeAt, before),
-					keysetStreamCursorFilter(workflowRun.awakeAt, workflowRun.id, cursor)
+					lte(workflowRun.wakeupAt, before),
+					keysetStreamCursorFilter(workflowRun.wakeupAt, workflowRun.id, cursor)
 				)
 			)
-			.orderBy(workflowRun.awakeAt, workflowRun.id)
+			.orderBy(workflowRun.wakeupAt, workflowRun.id)
 			.limit(limit);
 	},
 
@@ -470,7 +470,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				revision: sql`${workflowRun.revision} + 1`,
 				attempts: options?.incrementAttempts ? sql`${workflowRun.attempts} + 1` : workflowRun.attempts,
 				scheduledAt: null,
-				awakeAt: null,
+				wakeupAt: null,
 				timeoutAt: null,
 				nextAttemptAt: null,
 				latestStateTransitionId: sql`v.state_transition_id`,
@@ -495,7 +495,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				status: "cancelled",
 				revision: sql`${workflowRun.revision} + 1`,
 				scheduledAt: null,
-				awakeAt: null,
+				wakeupAt: null,
 				timeoutAt: null,
 				nextAttemptAt: null,
 			})
@@ -512,7 +512,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				status: "stalled",
 				revision: sql`${workflowRun.revision} + 1`,
 				scheduledAt: null,
-				awakeAt: null,
+				wakeupAt: null,
 				timeoutAt: null,
 				nextAttemptAt: null,
 			})
@@ -529,7 +529,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				status: "queued",
 				revision: sql`${workflowRun.revision} + 1`,
 				scheduledAt: null,
-				awakeAt: null,
+				wakeupAt: null,
 				timeoutAt: null,
 				nextAttemptAt: null,
 			})

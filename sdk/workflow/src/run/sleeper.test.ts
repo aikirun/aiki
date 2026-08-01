@@ -26,7 +26,7 @@ describe("createSleeper", () => {
 						state: { status: "sleeping", sleepName: "nap", durationMs: 60_000 },
 						expectedRevision: 0,
 					},
-					{ revision: 1, state: { status: "sleeping", sleepName: "nap", awakeAt: 0 }, attempts: 1 }
+					{ revision: 1, state: { status: "sleeping", sleepName: "nap", wakeupAt: 0 }, attempts: 1 }
 				);
 
 				expect(sleep("nap", { seconds: 60 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
@@ -74,7 +74,7 @@ describe("createSleeper", () => {
 		test("suspends again without a transition when the recorded sleep is still sleeping", () =>
 			withFakeClient((client) => {
 				const record = runningWorkflowRunRecordFactory.build({
-					sleepQueues: { nap: { sleeps: [{ status: "sleeping", awakeAt: 0 }] } },
+					sleepQueues: { nap: { sleeps: [{ status: "sleeping", wakeupAt: 0 }] } },
 				});
 				const sleep = createTestSleeper(client, record);
 
@@ -126,7 +126,7 @@ describe("createSleeper", () => {
 						state: { status: "sleeping", sleepName: "nap", durationMs: 30_000 },
 						expectedRevision: 4,
 					},
-					{ revision: 5, state: { status: "sleeping", sleepName: "nap", awakeAt: 0 }, attempts: 1 }
+					{ revision: 5, state: { status: "sleeping", sleepName: "nap", wakeupAt: 0 }, attempts: 1 }
 				);
 
 				expect(sleep("nap", { seconds: 90 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);

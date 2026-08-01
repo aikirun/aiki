@@ -129,7 +129,7 @@ export type WorkflowRunStateScheduledRequest = DistributiveOmit<WorkflowRunState
 	scheduledInMs: number;
 };
 
-export type WorkflowRunStateSleepingRequest = DistributiveOmit<WorkflowRunStateSleeping, "awakeAt"> & {
+export type WorkflowRunStateSleepingRequest = DistributiveOmit<WorkflowRunStateSleeping, "wakeupAt"> & {
 	durationMs: number;
 };
 
@@ -178,12 +178,12 @@ interface WorkflowRunTransitionStateRequestBase {
 
 export type WorkflowRunStateScheduledRequestOptimistic = Extract<
 	WorkflowRunStateScheduledRequest,
-	{ reason: "retry" | "task_retry" | "awake" | "event" | "child_workflow" }
+	{ reason: "retry" | "task_retry" | "wakeup" | "event" | "child_workflow" }
 >;
 
 export type WorkflowRunStateScheduledRequestPessimistic = Extract<
 	WorkflowRunStateScheduledRequest,
-	{ reason: "new" | "awake_early" | "resumption" | "redelivery" }
+	{ reason: "new" | "wakeup_early" | "resumption" | "redelivery" }
 >;
 
 export interface WorkflowRunTransitionStateRequestOptimistic extends WorkflowRunTransitionStateRequestBase {

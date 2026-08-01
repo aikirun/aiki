@@ -46,7 +46,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 		if (existingSleep.status === "sleeping") {
 			logger.debug("Already sleeping", {
 				"aiki.sleepName": sleepName,
-				"aiki.awakeAt": existingSleep.awakeAt,
+				"aiki.wakeupAt": existingSleep.wakeupAt,
 			});
 			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 		}

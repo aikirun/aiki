@@ -246,7 +246,7 @@ describe("workflowRunHandle", () => {
 				await handle.resume();
 			}));
 
-		test("awake schedules the run immediately with reason 'awake_early'", () =>
+		test("wakeup schedules the run immediately with reason 'wakeup_early'", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build();
 				const handle = workflowRunHandle(client, record);
@@ -255,7 +255,7 @@ describe("workflowRunHandle", () => {
 					{
 						type: "pessimistic",
 						id: record.id,
-						state: { status: "scheduled", scheduledInMs: 0, reason: "awake_early" },
+						state: { status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" },
 					},
 					{
 						revision: record.revision + 1,
@@ -264,7 +264,7 @@ describe("workflowRunHandle", () => {
 					}
 				);
 
-				await handle.awake();
+				await handle.wakeup();
 			}));
 	});
 

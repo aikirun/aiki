@@ -2,7 +2,7 @@ import { type } from "arktype";
 
 export const sleepSchema = type({
 	status: "'sleeping'",
-	awakeAt: "number > 0",
+	wakeupAt: "number > 0",
 })
 	.or({
 		status: "'completed'",

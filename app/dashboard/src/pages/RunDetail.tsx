@@ -461,7 +461,7 @@ export function RunDetail() {
 					{/* Contextual: sleeping */}
 					{currentRun.state.status === "sleeping" && (
 						<Meta label="Awakes">
-							<span style={{ color: "var(--accent-indigo)" }}>{timeUntil(currentRun.state.awakeAt)}</span>
+							<span style={{ color: "var(--accent-indigo)" }}>{timeUntil(currentRun.state.wakeupAt)}</span>
 						</Meta>
 					)}
 

@@ -721,7 +721,7 @@ function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<s
 
 		switch (row.status) {
 			case "sleeping":
-				queue.sleeps.push({ status: row.status, awakeAt: row.awakeAt });
+				queue.sleeps.push({ status: row.status, wakeupAt: row.wakeupAt });
 				break;
 			case "completed": {
 				const { completedAt } = row;

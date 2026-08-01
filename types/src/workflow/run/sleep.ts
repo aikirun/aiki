@@ -9,7 +9,7 @@ interface SleepBase {
 
 export interface SleepSleeping extends SleepBase {
 	status: "sleeping";
-	awakeAt: number;
+	wakeupAt: number;
 }
 
 export interface SleepCompleted extends SleepBase {

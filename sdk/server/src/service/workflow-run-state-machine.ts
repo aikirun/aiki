@@ -82,11 +82,11 @@ const workflowRunStateTransitionValidator: Record<
 			if (!allowedDestinations.includes(to.status)) {
 				return { allowed: false };
 			}
-			if (to.status === "scheduled" && to.reason !== "awake_early") {
-				return { allowed: false, reason: "Only awake_early run allowed" };
+			if (to.status === "scheduled" && to.reason !== "wakeup_early") {
+				return { allowed: false, reason: "Only wakeup_early run allowed" };
 			}
-			if (to.status === "queued" && to.reason !== "awake") {
-				return { allowed: false, reason: "Only awake run allowed" };
+			if (to.status === "queued" && to.reason !== "wakeup") {
+				return { allowed: false, reason: "Only wakeup run allowed" };
 			}
 			return { allowed: true };
 		};
@@ -255,7 +255,7 @@ async function transitionStateInTx(
 			workflowRunId: runId,
 			name: toState.sleepName,
 			status: "sleeping",
-			awakeAt: toState.awakeAt as TimestampMs,
+			wakeupAt: toState.wakeupAt as TimestampMs,
 		});
 	}
 
@@ -272,8 +272,8 @@ async function transitionStateInTx(
 				toState.reason satisfies
 					| "new"
 					| "task_retry"
-					| "awake"
-					| "awake_early"
+					| "wakeup"
+					| "wakeup_early"
 					| "resumption"
 					| "event"
 					| "child_workflow"
@@ -345,7 +345,7 @@ async function finalizeSleep(
 		return;
 	}
 
-	if (toState.reason === "awake") {
+	if (toState.reason === "wakeup") {
 		await txRepos.sleepQueue.update(activeSleep.id, {
 			status: "completed",
 			completedAt: now as TimestampMs,
@@ -407,14 +407,14 @@ async function updateWorkflowRun(
 		attempts,
 		latestStateTransitionId: stateTransitionId,
 		scheduledAt: null,
-		awakeAt: null,
+		wakeupAt: null,
 		timeoutAt: null,
 		nextAttemptAt: null,
 	};
 	if (toState.status === "scheduled") {
 		updates.scheduledAt = toState.scheduledAt as TimestampMs;
 	} else if (toState.status === "sleeping") {
-		updates.awakeAt = toState.awakeAt as TimestampMs;
+		updates.wakeupAt = toState.wakeupAt as TimestampMs;
 	} else if (
 		(toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") &&
 		toState.timeoutAt !== undefined
@@ -512,7 +512,7 @@ function convertDurationsToTimestamps(request: WorkflowRunStateRequest, now: num
 		return {
 			status: request.status,
 			sleepName: request.sleepName,
-			awakeAt: now + request.durationMs,
+			wakeupAt: now + request.durationMs,
 		};
 	}
 

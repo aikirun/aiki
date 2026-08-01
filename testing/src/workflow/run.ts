@@ -15,7 +15,7 @@ export const workflowRunStateByStatus: {
 	queued: { status: "queued", reason: "new" },
 	running: { status: "running" },
 	paused: { status: "paused" },
-	sleeping: { status: "sleeping", sleepName: "nap", awakeAt: 0 },
+	sleeping: { status: "sleeping", sleepName: "nap", wakeupAt: 0 },
 	awaiting_event: { status: "awaiting_event", eventName: "order-shipped" },
 	awaiting_retry: {
 		status: "awaiting_retry",
