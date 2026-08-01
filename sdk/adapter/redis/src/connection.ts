@@ -74,6 +74,29 @@ export const connectionTracker = (() => {
 })();
 
 /**
+ * Resolves when the connection's connect → ready handshake completes, rejecting
+ * if the connection closes first.
+ */
+export function untilReadyHandshake(redis: Redis): Promise<void> {
+	if (redis.status === "ready") {
+		return Promise.resolve();
+	}
+
+	return new Promise((resolve, reject) => {
+		const onReady = () => {
+			redis.off("close", onClose);
+			resolve();
+		};
+		const onClose = () => {
+			redis.off("ready", onReady);
+			reject(new Error("Redis connection closed before completing the ready handshake"));
+		};
+		redis.once("ready", onReady);
+		redis.once("close", onClose);
+	});
+}
+
+/**
  * Attaches connection-lifecycle supervision to an existing Redis client: a
  * watchdog over the "connect → ready" handshake that forces a reconnect if the
  * handshake stalls. ioredis's connectTimeout only covers the TCP connect; a

@@ -10,7 +10,7 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { Redis } from "ioredis";
 
 import { getWorkflowQueueNames } from "./key";
-import { attachConnectionSupervisor, type RedisConnectionParams } from "../connection";
+import { attachConnectionSupervisor, type RedisConnectionParams, untilReadyHandshake } from "../connection";
 
 export interface RedisSubscriberOptions {
 	maxRetryIntervalMs?: number;
@@ -116,12 +116,18 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 			{ once: true }
 		);
 
+		let completedReadyHandshake = false;
 		const queueNames = getWorkflowQueueNames(workflows, pools);
 
 		return {
 			getNextDelay,
 
 			async getReadyRuns(limit: number): Promise<WorkflowRunMessage[]> {
+				if (!completedReadyHandshake) {
+					await untilReadyHandshake(redis);
+					completedReadyHandshake = true;
+				}
+
 				const shuffledQueueNames = shuffleArray(queueNames);
 				const firstItem = (await redis.bzpopmin(...shuffledQueueNames, 0)) as
 					| [key: string, member: WorkflowRunId, score: string]

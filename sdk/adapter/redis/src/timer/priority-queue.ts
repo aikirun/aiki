@@ -10,7 +10,7 @@ import type {
 } from "@aikirun/types/infra/timer";
 import type { Redis } from "ioredis";
 
-import { attachConnectionSupervisor, connectionTracker } from "../connection";
+import { attachConnectionSupervisor, connectionTracker, untilReadyHandshake } from "../connection";
 
 function encodeMember(type: TimerType, id: string): string {
 	return `${type}:${id}`;
@@ -132,6 +132,8 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 					maxRetriesPerRequest: 0,
 					enableOfflineQueue: false,
 				});
+
+				let completedReadyHandshake = false;
 				const connectionSupervisor = attachConnectionSupervisor(redisDuplicate, { logger });
 				let closed = false;
 
@@ -143,6 +145,11 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 					 * peek-after-pop will rediscover them.
 					 */
 					async wait(timeoutSeconds: number): Promise<number> {
+						if (!completedReadyHandshake) {
+							await untilReadyHandshake(redisDuplicate);
+							completedReadyHandshake = true;
+						}
+
 						const result = await redisDuplicate.brpop(signalKey, timeoutSeconds);
 						if (result === null) {
 							await redisDuplicate.del(signalKey);
