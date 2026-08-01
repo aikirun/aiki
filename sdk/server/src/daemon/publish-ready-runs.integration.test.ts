@@ -15,7 +15,7 @@ describe("publishReadyRuns", () => {
 
 			await publishReadyRuns(
 				context,
-				{ repos, workflowRunPublisher: publisher },
+				{ repos, publisher },
 				{ limit: 100, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
 			);
 
@@ -32,7 +32,7 @@ describe("publishReadyRuns", () => {
 			expect(
 				publishReadyRuns(
 					context,
-					{ repos, workflowRunPublisher: publisher },
+					{ repos, publisher },
 					{ limit: 100, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
 				)
 			).rejects.toThrow("broker down");

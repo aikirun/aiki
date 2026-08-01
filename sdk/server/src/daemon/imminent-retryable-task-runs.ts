@@ -25,7 +25,7 @@ type Repos = Pick<
 
 export interface ProcessImminentRetryableTasksDeps {
 	repos: Repos;
-	workflowRunPublisher?: Publisher;
+	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
 }
 
@@ -36,7 +36,7 @@ const advanceTaskCursor = createKeysetStreamCursorAdvancer<{ workflowRunId: stri
 
 export async function processImminentRetryableTasks(
 	context: DaemonContext,
-	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentRetryableTasksDeps,
+	{ repos, publisher, timerPriorityQueue }: ProcessImminentRetryableTasksDeps,
 	config: { limit: number; lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
 	const { limit, lookaheadWindowMs, republishBackoff } = config;
@@ -71,7 +71,7 @@ export async function processImminentRetryableTasks(
 				}
 			}
 			if (isNonEmptyArray(rankedRuns)) {
-				await queueRetryableTaskRuns(context, repos, workflowRunPublisher, republishBackoff, rankedRuns);
+				await queueRetryableTaskRuns(context, repos, publisher, republishBackoff, rankedRuns);
 			}
 		}
 
@@ -95,7 +95,7 @@ export async function processImminentRetryableTasks(
 export async function queueRetryableTaskRuns(
 	context: DaemonContext,
 	repos: Repos,
-	workflowRunPublisher: Publisher | undefined,
+	publisher: Publisher | undefined,
 	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	options?: { chunkSize?: number }
@@ -108,7 +108,7 @@ export async function queueRetryableTaskRuns(
 
 	await runConcurrently(context, chunkLazy(runs, chunkSize), async (chunk, spanCtx) => {
 		try {
-			await processChunk(spanCtx, repos, workflowRunPublisher, republishBackoff, chunk, workflowsById);
+			await processChunk(spanCtx, repos, publisher, republishBackoff, chunk, workflowsById);
 		} catch (err) {
 			spanCtx.logger.warn("Failed to process chunk, will retry next tick", { err, "aiki.chunkSize": chunk.length });
 		}
@@ -118,7 +118,7 @@ export async function queueRetryableTaskRuns(
 async function processChunk(
 	context: DaemonContext,
 	repos: Repos,
-	workflowRunPublisher: Publisher | undefined,
+	publisher: Publisher | undefined,
 	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	workflowsById: Map<string, WorkflowRow>
@@ -195,7 +195,7 @@ async function processChunk(
 		return outboxEntriesToInsert;
 	});
 
-	if (workflowRunPublisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, insertedOutboxEntries, republishBackoff);
+	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
+		await publishPendingOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
 	}
 }

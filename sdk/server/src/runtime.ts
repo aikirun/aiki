@@ -25,7 +25,7 @@ export interface StartedRuntime {
 }
 
 export async function startRuntime(params: StartRuntimeParams): Promise<StartedRuntime> {
-	const { db, logger, signal, publisher, timerPriorityQueue, config: configParam } = params;
+	const { logger, signal, config: configParam } = params;
 	const childRunCanceller = createChildRunCanceller();
 
 	let configProvider: ConfigProvider<ServerRuntimeConfig>;
@@ -36,18 +36,18 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 		configProvider = asConfigProvider(() => config);
 	}
 
-	const repos = await createRepos(db);
+	const repos = await createRepos(params.db);
 
 	const daemonsPromise = startDaemons(logger, {
 		repos,
 		configProvider,
 		signal,
-		workflowRunPublisher: publisher?.({
-			logger: logger.child({ "aiki.component": "workflow-run-publisher" }),
+		publisher: params.publisher?.({
+			logger: logger.child({ "aiki.component": "publisher" }),
 			signal,
 		}),
-		timerPriorityQueue: timerPriorityQueue?.({
-			logger: logger.child({ "aiki.component": "timer-sorted-set" }),
+		timerPriorityQueue: params.timerPriorityQueue?.({
+			logger: logger.child({ "aiki.component": "timer-priority-queue" }),
 			signal,
 		}),
 		childRunCanceller,

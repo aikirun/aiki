@@ -35,7 +35,7 @@ export interface DueTimersConsumerDeps {
 	signal: AbortSignal;
 	timerPriorityQueue: TimerPriorityQueue;
 	childRunCanceller: ChildRunCanceller;
-	workflowRunPublisher?: Publisher;
+	publisher?: Publisher;
 	configProvider: ConfigProvider<DueTimerConsumerConfig>;
 }
 
@@ -140,7 +140,7 @@ async function processDueTimers(
 	deps: DueTimersConsumerDeps,
 	dueTimers: NonEmptyArray<DueTimer>
 ): Promise<void> {
-	const { repos, workflowRunPublisher, configProvider } = deps;
+	const { repos, publisher, configProvider } = deps;
 
 	const timersByType = groupBy(dueTimers, (timer) => [timer.type, timer]);
 
@@ -189,61 +189,37 @@ async function processDueTimers(
 			switch (timerType) {
 				case "sleep": {
 					promises.push(
-						queueSleepElapsedRuns(
-							context,
-							repos,
-							workflowRunPublisher,
-							configProvider.config.republishBackoff,
-							rankedRuns
-						)
+						queueSleepElapsedRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
 					);
 					break;
 				}
 				case "retry": {
 					promises.push(
-						queueRetryableRuns(context, repos, workflowRunPublisher, configProvider.config.republishBackoff, rankedRuns)
+						queueRetryableRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
 					);
 					break;
 				}
 				case "task_retry": {
 					promises.push(
-						queueRetryableTaskRuns(
-							context,
-							repos,
-							workflowRunPublisher,
-							configProvider.config.republishBackoff,
-							rankedRuns
-						)
+						queueRetryableTaskRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
 					);
 					break;
 				}
 				case "event_wait_timeout": {
 					promises.push(
-						queueEventWaitTimedOutRuns(
-							context,
-							repos,
-							workflowRunPublisher,
-							configProvider.config.republishBackoff,
-							rankedRuns
-						)
+						queueEventWaitTimedOutRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
 					);
 					break;
 				}
 				case "child_wait_timeout": {
 					promises.push(
-						queueChildRunWaitTimedOutRuns(
-							context,
-							repos,
-							workflowRunPublisher,
-							configProvider.config.republishBackoff,
-							rankedRuns
-						)
+						queueChildRunWaitTimedOutRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
 					);
 					break;
 				}
 				case "scheduled": {
 					promises.push(
-						queueScheduledRuns(context, repos, workflowRunPublisher, configProvider.config.republishBackoff, rankedRuns)
+						queueScheduledRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
 					);
 					break;
 				}

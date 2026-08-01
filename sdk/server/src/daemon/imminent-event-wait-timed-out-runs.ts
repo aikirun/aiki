@@ -25,13 +25,13 @@ type Repos = Pick<
 
 export interface ProcessImminentEventWaitTimedOutRunsDeps {
 	repos: Repos;
-	workflowRunPublisher?: Publisher;
+	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
 }
 
 export async function processImminentEventWaitTimedOutRuns(
 	context: DaemonContext,
-	{ repos, workflowRunPublisher, timerPriorityQueue }: ProcessImminentEventWaitTimedOutRunsDeps,
+	{ repos, publisher, timerPriorityQueue }: ProcessImminentEventWaitTimedOutRunsDeps,
 	config: { limit: number; lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
 	const { limit, lookaheadWindowMs, republishBackoff } = config;
@@ -42,7 +42,7 @@ export async function processImminentEventWaitTimedOutRuns(
 		{ until: (chunk) => chunk.length < limit }
 	)) {
 		if (isNonEmptyArray(runsDueNow)) {
-			await queueEventWaitTimedOutRuns(context, repos, workflowRunPublisher, republishBackoff, runsDueNow);
+			await queueEventWaitTimedOutRuns(context, repos, publisher, republishBackoff, runsDueNow);
 		}
 
 		if (timerPriorityQueue && isNonEmptyArray(runsDueSoon)) {
@@ -63,7 +63,7 @@ export async function processImminentEventWaitTimedOutRuns(
 export async function queueEventWaitTimedOutRuns(
 	context: DaemonContext,
 	repos: Repos,
-	workflowRunPublisher: Publisher | undefined,
+	publisher: Publisher | undefined,
 	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	options?: { chunkSize?: number }
@@ -87,15 +87,7 @@ export async function queueEventWaitTimedOutRuns(
 
 	await runConcurrently(context, chunkLazy(runs, chunkSize), async (chunk, spanCtx) => {
 		try {
-			await processChunk(
-				spanCtx,
-				repos,
-				workflowRunPublisher,
-				republishBackoff,
-				chunk,
-				stateTransitionsById,
-				workflowsById
-			);
+			await processChunk(spanCtx, repos, publisher, republishBackoff, chunk, stateTransitionsById, workflowsById);
 		} catch (err) {
 			spanCtx.logger.warn("Failed to process chunk, will retry next tick", { err, "aiki.chunkSize": chunk.length });
 		}
@@ -105,7 +97,7 @@ export async function queueEventWaitTimedOutRuns(
 async function processChunk(
 	context: DaemonContext,
 	repos: Repos,
-	workflowRunPublisher: Publisher | undefined,
+	publisher: Publisher | undefined,
 	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	stateTransitionsById: Map<string, { id: string; state: unknown }>,
@@ -210,7 +202,7 @@ async function processChunk(
 		return outboxEntriesToInsert;
 	});
 
-	if (workflowRunPublisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, insertedOutboxEntries, republishBackoff);
+	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
+		await publishPendingOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
 	}
 }

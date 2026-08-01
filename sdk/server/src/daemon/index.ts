@@ -26,7 +26,7 @@ export interface StartDaemonsDeps {
 	repos: Repositories;
 	signal: AbortSignal;
 	configProvider: ConfigProvider<ServerRuntimeConfig>;
-	workflowRunPublisher?: Publisher;
+	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
 	childRunCanceller: ChildRunCanceller;
 }
@@ -75,7 +75,7 @@ const pollingDaemon = (
 });
 
 export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Promise<void> {
-	const { repos, signal, configProvider, workflowRunPublisher, timerPriorityQueue, childRunCanceller } = deps;
+	const { repos, signal, configProvider, publisher, timerPriorityQueue, childRunCanceller } = deps;
 
 	const { start: startPollingDaemon } = pollingDaemon(logger, signal, configProvider.scope("daemons"));
 
@@ -83,22 +83,22 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 		startPollingDaemon(
 			(config) => ({ ...config.imminentScheduledRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
 			processImminentScheduledRuns,
-			{ repos, workflowRunPublisher, timerPriorityQueue }
+			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
 			(config) => ({ ...config.imminentSleepElapsedRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
 			processImminentSleepElapsedRuns,
-			{ repos, workflowRunPublisher, timerPriorityQueue }
+			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
 			(config) => ({ ...config.imminentRetryableRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
 			processImminentRetryableRuns,
-			{ repos, workflowRunPublisher, timerPriorityQueue }
+			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
 			(config) => ({ ...config.imminentRetryableTasks, republishBackoff: config.publishReadyRuns.republishBackoff }),
 			processImminentRetryableTasks,
-			{ repos, workflowRunPublisher, timerPriorityQueue }
+			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
 			(config) => ({
@@ -106,7 +106,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 				republishBackoff: config.publishReadyRuns.republishBackoff,
 			}),
 			processImminentEventWaitTimedOutRuns,
-			{ repos, workflowRunPublisher, timerPriorityQueue }
+			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
 			(config) => ({
@@ -114,22 +114,22 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 				republishBackoff: config.publishReadyRuns.republishBackoff,
 			}),
 			processImminentChildRunWaitTimedOutRuns,
-			{ repos, workflowRunPublisher, timerPriorityQueue }
+			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
 			(config) => ({ ...config.imminentRecurringRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
 			processImminentRecurringRuns,
-			{ repos, childRunCanceller, workflowRunPublisher, timerPriorityQueue }
+			{ repos, childRunCanceller, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon((config) => config.recoverOverdueOutboxEntries, recoverOverdueOutboxEntries, { repos }),
 		startPollingDaemon((config) => config.stallUndeliverableRuns, stallUndeliverableRuns, { repos }),
 	];
 
-	if (workflowRunPublisher) {
+	if (publisher) {
 		daemonPromises.push(
 			startPollingDaemon((config) => config.publishReadyRuns, publishReadyRuns, {
 				repos,
-				workflowRunPublisher,
+				publisher,
 			})
 		);
 	}
@@ -141,7 +141,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 				signal,
 				timerPriorityQueue,
 				childRunCanceller,
-				workflowRunPublisher,
+				publisher,
 				configProvider: asConfigProvider(() => {
 					const config = configProvider.config.daemons;
 					return {

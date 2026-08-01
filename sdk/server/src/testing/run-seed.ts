@@ -96,7 +96,7 @@ export async function seedClaimedRun(deps: SeedQueuedRunDeps & { publisher: Fake
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedQueuedRun(deps);
 
-	await publishReadyRuns(daemonContext, { repos, workflowRunPublisher: publisher }, { limit: 100, republishBackoff });
+	await publishReadyRuns(daemonContext, { repos, publisher }, { limit: 100, republishBackoff });
 
 	const claim = await claimRun({ context: namespaceRequestContext, repos, runId: seeded.runId });
 	return { ...seeded, ...claim };
@@ -107,7 +107,7 @@ export async function seedPublishedRun(deps: SeedQueuedRunDeps & { publisher: Fa
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const seeded = await seedQueuedRun(deps);
 
-	await publishReadyRuns(daemonContext, { repos, workflowRunPublisher: publisher }, { limit: 100, republishBackoff });
+	await publishReadyRuns(daemonContext, { repos, publisher }, { limit: 100, republishBackoff });
 
 	return seeded;
 }

@@ -10,7 +10,7 @@ import type { DaemonContext } from "../middleware/context";
 
 export interface PublishReadyRunsDeps {
 	repos: Pick<Repositories, "workflowRunOutbox">;
-	workflowRunPublisher: Publisher;
+	publisher: Publisher;
 }
 
 export interface RepublishBackoff {
@@ -32,7 +32,7 @@ const advanceOutboxCursor = createKeysetStreamCursorAdvancer<{ rank: number; id:
 
 export async function publishReadyRuns(
 	context: DaemonContext,
-	{ repos, workflowRunPublisher }: PublishReadyRunsDeps,
+	{ repos, publisher }: PublishReadyRunsDeps,
 	{ limit, republishBackoff }: PublishReadyRunsConfig
 ) {
 	for await (const pendingEntries of streamChunks(
@@ -42,18 +42,18 @@ export async function publishReadyRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		await publishPendingOutboxEntries(context, repos, workflowRunPublisher, pendingEntries, republishBackoff);
+		await publishPendingOutboxEntries(context, repos, publisher, pendingEntries, republishBackoff);
 	}
 }
 
 export async function publishPendingOutboxEntries(
 	context: DaemonContext,
 	repos: Pick<Repositories, "workflowRunOutbox">,
-	workflowRunPublisher: Publisher,
+	publisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>,
 	{ baseDelayMs, maxDelayMs }: RepublishBackoff
 ): Promise<void> {
-	const publishedEntryIds = await publishOutboxEntries(context, workflowRunPublisher, entries);
+	const publishedEntryIds = await publishOutboxEntries(context, publisher, entries);
 	if (!isNonEmptyArray(publishedEntryIds)) {
 		return;
 	}
@@ -95,7 +95,7 @@ export function computeRepublishBackoff(params: {
 
 async function publishOutboxEntries(
 	{ logger }: DaemonContext,
-	workflowRunPublisher: Publisher,
+	publisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>
 ): Promise<string[]> {
 	const entryIdByRunId = new Map<string, string>();
@@ -112,7 +112,7 @@ async function publishOutboxEntries(
 		});
 	}
 
-	const result = await workflowRunPublisher.publishReadyRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
+	const result = await publisher.publishReadyRuns(runs as NonEmptyArray<ReadyWorkflowRun>);
 
 	const publishedEntryIds: string[] = [];
 
