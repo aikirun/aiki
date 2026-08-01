@@ -4,18 +4,17 @@ import { schedule } from "@aikirun/workflow";
 import { runWithWorker } from "../runner";
 import { notify } from "../workflows/notify";
 
-const everyFiveSeconds = schedule({
+const everyTenSeconds = schedule({
 	type: "interval",
-	every: { seconds: 5 },
+	every: { seconds: 10 },
 	overlapPolicy: "skip",
 });
 
 await runWithWorker([notify], async (client) => {
-	const scheduleHandle = await everyFiveSeconds
+	const scheduleHandle = await everyTenSeconds
 		.with()
-		.opt("reference.id", "my-correlation-xxx")
+		.opt("reference.id", "my-correlation-rgwee")
 		.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
-		.opt("workflowRun.pool", "heavy-duty")
 		.activate(client, notify, "This is a reminder");
 	await delay(20_000);
 	await scheduleHandle.pause();

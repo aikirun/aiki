@@ -22,9 +22,11 @@ export const scheduleSpecSchema = cronScheduleSpecSchema.or(intervalScheduleSpec
 
 export const scheduleStatusSchema = type("'active' | 'paused' | 'inactive'");
 
+export const scheduleConflictPolicySchema = type("'error' | 'return_existing'");
+
 export const scheduleReferenceSchema = type({
 	id: "string > 0",
-	"conflictPolicy?": "'error' | 'return_existing'",
+	"conflictPolicy?": scheduleConflictPolicySchema.or("undefined"),
 });
 
 export const scheduleActivateOptionsSchema = type({
