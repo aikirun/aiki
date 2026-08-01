@@ -45,6 +45,7 @@ The runtime's daemons drive workflow state transitions:
 | Recurring schedules | Create new runs for cron and interval schedules |
 | Publish ready runs | Publish pending outbox entries to the work queue |
 | Recover overdue outbox entries | Release abandoned claims and re-pool published entries whose republish time arrived |
+| Stall undeliverable runs | Give up on runs undelivered past the retention cap, moving them to `stalled` (see [Stalled Runs](./stalled-runs.md)) |
 | Due-timers consumer | Fire near-term timers from the timer priority queue (when configured) |
 
 The publish daemon runs only when a publisher is configured; without one, workers claim work directly from the outbox. Recovery runs unconditionally — a crashed worker's claim is released after `claimIdleTimeoutMs` either way (see [Workflow Run Claims](./workflow-run-claims.md)).

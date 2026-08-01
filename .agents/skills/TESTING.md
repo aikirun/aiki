@@ -23,8 +23,10 @@ Before writing any test, study the exemplars for its tier and match their idioms
   - **Timestamps as authored data**: write sentinel absolutes (`awakeAt: 0`, an epoch constant)
     into rows; a value at the epoch is due/aged for any threshold.
   - **`withFakeClock(seedTimestampMs, fn)`** (`sdk/server/src/testing/clock.ts`): freezes the JS
-    clock so aged state is minted through the real code paths. Callers wrap seeds; seed helpers
-    stay clock-neutral. Integration-only (test files run sequentially in one process).
+    clock so aged state is minted through the real code paths. Clock placement follows
+    necessity: wrap at the call site when aging is the test's own policy; a seed that
+    constitutively requires aged state (a stalled run) owns its clock internally.
+    Integration-only (test files run sequentially in one process).
 - Use these tools only where the test's semantics need them. The fake clock earns its place
   where state must look stale or aged (a recovery threshold, an age cap keyed on a row id's
   mint time), not where mere status suffices. Derive each piece of harness machinery from what
@@ -44,10 +46,14 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Layering: routers are not a seeding layer (they add auth/serialization noise and have their
   own tests); services and daemons are the invariant-enforcing seams; repositories are for
   assertion reads only.
-- The daemon harness (`createDaemonHarness` in `sdk/server/src/testing/`) provisions what needs
-  lifecycle and reset: the database connection, a scriptable fake publisher (verified on
-  teardown), and a daemon context. Take pure filler data (request contexts, rows) from the
-  factories in `sdk/server/src/testing/`.
+- Two harnesses in `sdk/server/src/testing/harness.ts` share one lifecycle (the database
+  connection, per-test reset, a scriptable fake publisher verified on teardown) and differ only
+  in the injected context: `createDaemonHarness` injects a `DaemonContext`,
+  `createServiceHarness` a `NamespaceRequestContext`. Pick by the SUT's seam.
+- Seeds (`sdk/server/src/testing/run-seed.ts`) take
+  `{ repos, daemonContext?, namespaceRequestContext?, publisher }`: always feed the context your
+  harness injected; the other may be omitted (factory default). Take pure filler data (contexts,
+  rows) from the factories in `sdk/server/src/testing/`.
 
 ## Assertions
 

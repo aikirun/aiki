@@ -183,7 +183,7 @@ export type WorkflowRunStateScheduledRequestOptimistic = Extract<
 
 export type WorkflowRunStateScheduledRequestPessimistic = Extract<
 	WorkflowRunStateScheduledRequest,
-	{ reason: "new" | "awake_early" | "resume" }
+	{ reason: "new" | "awake_early" | "resume" | "redelivery" }
 >;
 
 export interface WorkflowRunTransitionStateRequestOptimistic extends WorkflowRunTransitionStateRequestBase {

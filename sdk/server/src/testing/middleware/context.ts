@@ -4,7 +4,7 @@ import type { OrganizationId } from "@aikirun/types/organization";
 import { Factory } from "fishery";
 import { ulid } from "ulidx";
 
-import type { NamespaceRequestContext } from "../../middleware/context";
+import type { DaemonContext, NamespaceRequestContext } from "../../middleware/context";
 
 export const namespaceRequestContextFactory = Factory.define<NamespaceRequestContext>(() => ({
 	type: "request",
@@ -17,4 +17,13 @@ export const namespaceRequestContextFactory = Factory.define<NamespaceRequestCon
 	url: "test://request",
 	organizationId: "org" as OrganizationId,
 	namespaceId: "ns" as NamespaceId,
+}));
+
+export const daemonContextFactory = Factory.define<DaemonContext>(() => ({
+	type: "daemon",
+	traceId: ulid(),
+	spanId: ulid(),
+	logger: createConsoleLogger({ level: "ERROR" }),
+	name: "test",
+	signal: new AbortController().signal,
 }));

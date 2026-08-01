@@ -215,6 +215,7 @@ export function RunDetail() {
 	const canCancel = !isTerminal;
 	const canPause = ["scheduled", "queued", "running"].includes(status);
 	const canResume = status === "paused";
+	const canRequeue = status === "stalled";
 
 	const executionCount = tasks.length + childRunCount;
 
@@ -359,6 +360,23 @@ export function RunDetail() {
 												type: "pessimistic",
 												id: currentRun.id,
 												state: { status: "paused" },
+											})
+										)
+									}
+								/>
+							)}
+							{canRequeue && (
+								<ActionBtn
+									label="Requeue"
+									color="#38BDF8"
+									textColor="var(--accent-sky)"
+									loading={actionLoading === "requeue"}
+									onClick={() =>
+										handleAction("requeue", () =>
+											namespaceAuthedClient.workflowRun.transitionStateV1({
+												type: "pessimistic",
+												id: currentRun.id,
+												state: { status: "scheduled", scheduledInMs: 0, reason: "redelivery" },
 											})
 										)
 									}

@@ -1,0 +1,86 @@
+import { loadDatabaseConfig } from "@aikirun/lib/db";
+import { type FakePublisher, fakePublisher } from "@aikirun/testing/infra/queue";
+import type { CreateDatabase, Database } from "@aikirun/types/infra/db";
+
+import { resetDatabase } from "./infra/db/reset";
+import { daemonContextFactory, namespaceRequestContextFactory } from "./middleware/context";
+import { afterAll, beforeAll, beforeEach } from "bun:test";
+import { database } from "../infra/db";
+import { createRepos } from "../infra/db/repo";
+import type { Repositories } from "../infra/db/types";
+import type { DaemonContext, NamespaceRequestContext } from "../middleware/context";
+
+interface HarnessDeps<Context> {
+	repos: Repositories;
+	publisher: FakePublisher;
+	context: Context;
+}
+
+export type DaemonHarnessDeps = HarnessDeps<DaemonContext>;
+export type ServiceHarnessDeps = HarnessDeps<NamespaceRequestContext>;
+
+/**
+ * Stands up one pooled connection against the database, resets every table before each test,
+ * and closes the connection afterwards.
+ * The returned function runs a test body with fresh per-test deps: the shared `repos`, a
+ * `fakePublisher` (verified on teardown), and the context built for the suite's seam.
+ *
+ * It is provider-blind — it works against whatever `DATABASE_PROVIDER` points to, going through
+ * the same `Database` seam as production repos.
+ */
+function createHarness<Context>(buildContext: () => Context) {
+	let createDb: CreateDatabase | undefined;
+	let db: Database | undefined;
+	let repos: Repositories | undefined;
+
+	beforeAll(async () => {
+		const dbConfig = loadDatabaseConfig();
+		createDb = database(dbConfig);
+		db = await createDb();
+		repos = await createRepos(db);
+	});
+
+	beforeEach(async () => {
+		if (db) {
+			await resetDatabase(db);
+		}
+	});
+
+	afterAll(async () => {
+		await createDb?.close();
+	});
+
+	return async (fn: (deps: HarnessDeps<Context>) => Promise<void>) => {
+		if (!repos) {
+			throw new Error("Harness deps are only available inside a test — call the returned function in a test body.");
+		}
+		const publisher = fakePublisher();
+		await fn({ context: buildContext(), repos, publisher });
+		publisher.verify();
+	};
+}
+
+/**
+ * Harness for daemon suites: the injected context is a `DaemonContext`.
+ *
+ * @example
+ * const withHarness = createDaemonHarness();
+ * test("marks rows published", () =>
+ *   withHarness(async ({ repos, publisher, context }) => { ... }));
+ */
+export function createDaemonHarness() {
+	return createHarness(() => daemonContextFactory.build());
+}
+
+/**
+ * Harness for service suites: the injected context is a `NamespaceRequestContext`, the seam a
+ * request handler calls the service with.
+ *
+ * @example
+ * const withHarness = createServiceHarness();
+ * test("claims a pending row", () =>
+ *   withHarness(async ({ repos, context }) => { ... }));
+ */
+export function createServiceHarness() {
+	return createHarness(() => namespaceRequestContextFactory.build());
+}

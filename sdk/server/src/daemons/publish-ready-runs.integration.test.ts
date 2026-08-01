@@ -1,6 +1,6 @@
 import { publishReadyRuns } from "./publish-ready-runs";
 import { describe, expect, test } from "bun:test";
-import { createDaemonHarness } from "../testing/daemon-harness";
+import { createDaemonHarness } from "../testing/harness";
 import { pendingWorkflowRunOutboxRowFactory } from "../testing/infra/db/types/workflow-run-outbox";
 
 const withHarness = createDaemonHarness();

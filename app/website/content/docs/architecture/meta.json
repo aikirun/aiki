@@ -1,4 +1,4 @@
 {
 	"title": "Architecture",
-	"pages": ["overview", "server", "subscribers", "workflow-run-claims", "cam"]
+	"pages": ["overview", "server", "subscribers", "workflow-run-claims", "stalled-runs", "cam"]
 }
