@@ -57,11 +57,11 @@ aiki:workflow:order-processing:1.0.0
 aiki:workflow:user-onboarding:1.0.0
 ```
 
-With sharding enabled:
+With worker pools in use:
 
 ```
-aiki:workflow:order-processing:1.0.0:us-east
-aiki:workflow:order-processing:1.0.0:eu-west
+aiki:workflow:order-processing:1.0.0:tenant-acme
+aiki:workflow:order-processing:1.0.0:tenant-globex
 ```
 
 ### Work Distribution

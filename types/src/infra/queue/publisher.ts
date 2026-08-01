@@ -7,7 +7,7 @@ export interface ReadyWorkflowRun {
 	name: string;
 	versionId: string;
 	rank: number;
-	shard?: string;
+	pool?: string;
 }
 
 export type PublishRunsResultBucket = Array<{ run: ReadyWorkflowRun }>;

@@ -91,7 +91,7 @@ async function publish(
 			name: entry.workflowName,
 			versionId: entry.workflowVersionId,
 			rank: entry.rank,
-			shard: entry.shard ?? undefined,
+			pool: entry.pool ?? undefined,
 		});
 	}
 

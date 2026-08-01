@@ -20,7 +20,7 @@ import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 export interface CancelledParentRun {
 	namespaceId: NamespaceId;
 	runId: string;
-	shard: string | undefined;
+	pool: string | undefined;
 }
 
 export const createChildRunCanceller = () => ({
@@ -96,7 +96,7 @@ export const createChildRunCanceller = () => ({
 				input: parentRun.runId,
 				inputHash,
 				options: {
-					shard: parentRun.shard,
+					pool: parentRun.pool,
 					retry: {
 						type: "exponential",
 						maxAttempts: Number.MAX_SAFE_INTEGER,

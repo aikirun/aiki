@@ -31,7 +31,7 @@ export const scheduleActivateOptionsSchema = type({
 	"reference?": scheduleReferenceSchema.or("undefined"),
 });
 
-export const scheduledWorkflowStartOptionsSchema = workflowOptionsSchema.pick("retry", "shard");
+export const scheduledWorkflowStartOptionsSchema = workflowOptionsSchema.pick("retry", "pool");
 
 export const scheduleWorkflowFilterSchema = type({
 	name: "string > 0",

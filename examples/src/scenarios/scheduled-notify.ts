@@ -15,7 +15,7 @@ await runWithWorker([notify], async (client) => {
 		.with()
 		.opt("reference.id", "my-correlation-xxx")
 		.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
-		.opt("workflowRun.shard", "eu")
+		.opt("workflowRun.pool", "heavy-duty")
 		.activate(client, notify, "This is a reminder");
 	await delay(20_000);
 	await scheduleHandle.pause();

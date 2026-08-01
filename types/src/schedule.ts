@@ -37,7 +37,7 @@ export interface ScheduleReference {
 	conflictPolicy?: ScheduleConflictPolicy;
 }
 
-export type ScheduledWorkflowStartOptions = Pick<WorkflowStartOptions, "retry" | "shard">;
+export type ScheduledWorkflowStartOptions = Pick<WorkflowStartOptions, "retry" | "pool">;
 
 export interface ScheduleActivateOptions {
 	reference?: ScheduleReference;

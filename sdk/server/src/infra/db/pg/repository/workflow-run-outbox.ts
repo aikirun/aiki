@@ -24,7 +24,7 @@ export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "clai
 
 interface ClaimFilter {
 	workflows: NonEmptyArray<{ name: string; versionId: string }>;
-	shards?: string[];
+	pools?: string[];
 }
 
 export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
@@ -200,9 +200,9 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 							)
 						)
 					),
-					isNonEmptyArray(filters.shards)
-						? inArray(workflowRunOutbox.shard, filters.shards)
-						: isNull(workflowRunOutbox.shard)
+					isNonEmptyArray(filters.pools)
+						? inArray(workflowRunOutbox.pool, filters.pools)
+						: isNull(workflowRunOutbox.pool)
 				)
 			)
 			.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)

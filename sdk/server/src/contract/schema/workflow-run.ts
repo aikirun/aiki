@@ -21,7 +21,7 @@ const workflowReferenceSchema = type({
 export const workflowOptionsSchema = type({
 	"reference?": workflowReferenceSchema,
 	"trigger?": triggerStrategySchema,
-	"shard?": "string | undefined",
+	"pool?": "string | undefined",
 	"retry?": retryStrategySchema,
 });
 
@@ -256,7 +256,7 @@ export const listChildRunsResponseSchema = type({
 	runs: type({
 		id: "string > 0",
 		"options?": type({
-			"shard?": "string | undefined",
+			"pool?": "string | undefined",
 		}).or("undefined"),
 	}).array(),
 });

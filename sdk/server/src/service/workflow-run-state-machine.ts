@@ -312,7 +312,7 @@ async function transitionStateInTx(
 
 	if (toState.status === "cancelled") {
 		await discardStaleTasks(runId, ["running", "awaiting_retry"], txRepos);
-		await childRunCanceller.cancel([{ namespaceId, runId, shard: run.options?.shard }], txRepos, context.logger);
+		await childRunCanceller.cancel([{ namespaceId, runId, pool: run.options?.pool }], txRepos, context.logger);
 	}
 
 	if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {

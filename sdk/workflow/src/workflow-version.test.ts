@@ -696,13 +696,13 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: "world",
-						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, shard: "eu-west" },
+						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, pool: "eu-west" },
 					},
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
 
-				const handle = await workflowVersion.with().opt("shard", "eu-west").start(client, "world");
+				const handle = await workflowVersion.with().opt("pool", "eu-west").start(client, "world");
 
 				expect(handle.run.id).toBe(newRunRecord.id);
 			}));
@@ -737,14 +737,14 @@ describe("creating a workflow run", () => {
 				expect(childHandle.run.id).toBe(childRunRecord.id);
 			}));
 
-		test("propagates the parent's shard to the child run", () =>
+		test("propagates the parent's pool to the child run", () =>
 			withFakeClient(async (client) => {
 				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
 					async handler(_run, payload: string) {
 						return payload;
 					},
 				});
-				const parentRunRecord = runningWorkflowRunRecordFactory.build({ options: { shard: "eu-west" } });
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ options: { pool: "eu-west" } });
 				const parentRun = createTestWorkflowRun(client, parentRunRecord);
 				const childRunRecord = runningWorkflowRunRecordFactory.build();
 
@@ -754,7 +754,7 @@ describe("creating a workflow run", () => {
 						versionId: "1.0.0",
 						input: "payload",
 						parentWorkflowRunId: parentRunRecord.id,
-						options: { shard: "eu-west" },
+						options: { pool: "eu-west" },
 					},
 					{ id: childRunRecord.id }
 				);

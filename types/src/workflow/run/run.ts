@@ -55,7 +55,7 @@ export interface WorkflowStartOptions {
 	retry?: RetryStrategy;
 	trigger?: TriggerStrategy;
 	reference?: WorkflowReference;
-	shard?: string;
+	pool?: string;
 }
 
 export type WorkflowDefinitionStartOptions = Pick<WorkflowStartOptions, "retry">;
