@@ -237,7 +237,7 @@ async function transitionStateInTx(
 	}
 
 	const now = Date.now();
-	let toState = convertDurationsToTimestamps(request.state, now);
+	let toState = convertDurationToTimestamp(request.state, now);
 
 	context.logger.info("Workflow state transition", {
 		"aiki.runId": runId,
@@ -499,7 +499,7 @@ async function notifyParentOfStateChangeIfNecessary(
 	}
 }
 
-function convertDurationsToTimestamps(request: WorkflowRunStateRequest, now: number): WorkflowRunState {
+export function convertDurationToTimestamp(request: WorkflowRunStateRequest, now: number): WorkflowRunState {
 	if (request.status === "scheduled") {
 		return {
 			status: "scheduled",
