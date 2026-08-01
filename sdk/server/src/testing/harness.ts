@@ -2,8 +2,8 @@ import { loadDatabaseConfig } from "@aikirun/lib/db";
 import { type FakePublisher, fakePublisher } from "@aikirun/testing/infra/queue";
 import type { CreateDatabase, Database } from "@aikirun/types/infra/db";
 
+import { daemonContextFactory, namespaceRequestContextFactory } from "./data-factory/middleware/context";
 import { resetDatabase } from "./infra/db/reset";
-import { daemonContextFactory, namespaceRequestContextFactory } from "./middleware/context";
 import { afterAll, beforeAll, beforeEach } from "bun:test";
 import { database } from "../infra/db";
 import { createRepos } from "../infra/db/repo";

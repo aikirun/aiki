@@ -5,8 +5,8 @@ import { recoverOverdueOutboxEntries } from "../daemon/recover-overdue-outbox-en
 import type { WorkflowRunOutboxStatus } from "../infra/db/constants/workflow-run-outbox";
 import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
+import { daemonContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { daemonContextFactory } from "../testing/middleware/context";
 import { claimRun, seedClaimedRun, seedPublishedRun, seedQueuedRun, seedShardedQueuedRun } from "../testing/run-seed";
 
 const withHarness = createServiceHarness();

@@ -5,8 +5,8 @@ import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import { describe, expect, test } from "bun:test";
 import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
+import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createDaemonHarness } from "../testing/harness";
-import { namespaceRequestContextFactory } from "../testing/middleware/context";
 import { claimRun, seedClaimedRun, seedPublishedRun, seedQueuedRun } from "../testing/run-seed";
 
 const withHarness = createDaemonHarness();

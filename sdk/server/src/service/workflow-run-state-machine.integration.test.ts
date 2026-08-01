@@ -4,8 +4,8 @@ import { InvalidWorkflowRunStateTransitionError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createWorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
+import { daemonContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { daemonContextFactory } from "../testing/middleware/context";
 import { seedStalledRun } from "../testing/run-seed";
 
 const withHarness = createServiceHarness();

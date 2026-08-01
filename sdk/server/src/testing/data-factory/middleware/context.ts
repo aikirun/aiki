@@ -4,7 +4,7 @@ import type { OrganizationId } from "@aikirun/types/organization";
 import { Factory } from "fishery";
 import { ulid } from "ulidx";
 
-import type { DaemonContext, NamespaceRequestContext } from "../../middleware/context";
+import type { DaemonContext, NamespaceRequestContext } from "../../../middleware/context";
 
 export const namespaceRequestContextFactory = Factory.define<NamespaceRequestContext>(() => ({
 	type: "request",

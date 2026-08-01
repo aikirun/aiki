@@ -2,7 +2,7 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
 import { withFakeClock } from "./clock";
-import { daemonContextFactory, namespaceRequestContextFactory } from "./middleware/context";
+import { daemonContextFactory, namespaceRequestContextFactory } from "./data-factory/middleware/context";
 import { processImminentScheduledRuns } from "../daemon/imminent-scheduled-runs";
 import { publishReadyRuns } from "../daemon/publish-ready-runs";
 import { stallUndeliverableRuns } from "../daemon/stall-undeliverable-runs";

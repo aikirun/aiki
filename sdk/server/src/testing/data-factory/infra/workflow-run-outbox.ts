@@ -1,7 +1,7 @@
 import { Factory } from "fishery";
 import { ulid } from "ulidx";
 
-import type { WorkflowRunOutboxRowInsertPending } from "../../../../infra/db/types/workflow-run-outbox";
+import type { WorkflowRunOutboxRowInsertPending } from "../../../infra/db/types/workflow-run-outbox";
 
 export const pendingWorkflowRunOutboxRowFactory = Factory.define<WorkflowRunOutboxRowInsertPending>(() => ({
 	id: ulid(),
