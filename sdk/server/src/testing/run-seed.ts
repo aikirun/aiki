@@ -3,9 +3,9 @@ import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
 import { withFakeClock } from "./clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "./middleware/context";
-import { processImminentScheduledRuns } from "../daemons/imminent-scheduled-runs";
-import { publishReadyRuns } from "../daemons/publish-ready-runs";
-import { stallUndeliverableRuns } from "../daemons/stall-undeliverable-runs";
+import { processImminentScheduledRuns } from "../daemon/imminent-scheduled-runs";
+import { publishReadyRuns } from "../daemon/publish-ready-runs";
+import { stallUndeliverableRuns } from "../daemon/stall-undeliverable-runs";
 import type { Repositories } from "../infra/db/types";
 import type { DaemonContext, NamespaceRequestContext } from "../middleware/context";
 import { createChildRunCanceller } from "../service/cancel-child-runs";

@@ -6,7 +6,7 @@ import type { CreatePublisher } from "@aikirun/types/infra/queue/publisher";
 import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 
 import { defaultServerRuntimeConfig, type ServerRuntimeConfig, type ServerRuntimeConfigOverrides } from "./config";
-import { startDaemons } from "./daemons";
+import { startDaemons } from "./daemon";
 import { createRepos } from "./infra/db/repo";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 

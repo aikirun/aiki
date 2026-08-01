@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { processImminentScheduledRuns } from "../daemons/imminent-scheduled-runs";
+import { processImminentScheduledRuns } from "../daemon/imminent-scheduled-runs";
 import { InvalidWorkflowRunStateTransitionError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
