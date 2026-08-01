@@ -15,7 +15,7 @@ import { queueRetryableRuns } from "./imminent-retryable-runs";
 import { queueRetryableTaskRuns } from "./imminent-retryable-task-runs";
 import { queueScheduledRuns } from "./imminent-scheduled-runs";
 import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
-import type { RepublishBackoff } from "./publish-ready-runs";
+import type { RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import { computeRank, type Ranked, rankDueAtMs } from "../lib/rank";

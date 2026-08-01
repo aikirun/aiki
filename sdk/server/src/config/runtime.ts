@@ -19,7 +19,7 @@ export interface ServerRuntimeConfig {
 		imminentEventWaitTimedOutRuns: ImminentPollingDaemonConfig;
 		imminentChildRunWaitTimedOutRuns: ImminentPollingDaemonConfig;
 		imminentRecurringRuns: ImminentPollingDaemonConfig;
-		publishReadyRuns: PollingDaemonConfig & {
+		publishPendingOutboxEntries: PollingDaemonConfig & {
 			republishBackoff: {
 				baseDelayMs: number;
 				maxDelayMs: number;
@@ -78,7 +78,7 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 			limit: 1_000,
 			lookaheadWindowMs: 3_000,
 		},
-		publishReadyRuns: {
+		publishPendingOutboxEntries: {
 			intervalMs: 1_000,
 			limit: 1_000,
 			republishBackoff: {

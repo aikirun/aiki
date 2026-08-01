@@ -1,4 +1,4 @@
-import { computeRepublishBackoff } from "./publish-ready-runs";
+import { computeRepublishBackoff } from "./publish-pending-outbox-entries";
 import { describe, expect, test } from "bun:test";
 
 describe("computeRepublishBackoff", () => {

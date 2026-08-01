@@ -8,7 +8,7 @@ import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workfl
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import type { DaemonContext } from "../middleware/context";
 
-export interface PublishReadyRunsDeps {
+export interface PublishPendingOutboxEntriesDeps {
 	repos: Pick<Repositories, "workflowRunOutbox">;
 	publisher: Publisher;
 }
@@ -18,7 +18,7 @@ export interface RepublishBackoff {
 	maxDelayMs: number;
 }
 
-export interface PublishReadyRunsConfig {
+export interface PublishPendingOutboxEntriesConfig {
 	limit: number;
 	republishBackoff: RepublishBackoff;
 }
@@ -30,10 +30,10 @@ const advanceOutboxCursor = createKeysetStreamCursorAdvancer<{ rank: number; id:
 	getId: (entry) => entry.id,
 });
 
-export async function publishReadyRuns(
+export async function publishPendingOutboxEntries(
 	context: DaemonContext,
-	{ repos, publisher }: PublishReadyRunsDeps,
-	{ limit, republishBackoff }: PublishReadyRunsConfig
+	{ repos, publisher }: PublishPendingOutboxEntriesDeps,
+	{ limit, republishBackoff }: PublishPendingOutboxEntriesConfig
 ) {
 	for await (const pendingEntries of streamChunks(
 		(cursor) => repos.workflowRunOutbox.listPending(context, limit, cursor),
@@ -42,18 +42,18 @@ export async function publishReadyRuns(
 			until: (chunk) => chunk.length < limit,
 		}
 	)) {
-		await publishPendingOutboxEntries(context, repos, publisher, pendingEntries, republishBackoff);
+		await publishOutboxEntries(context, repos, publisher, pendingEntries, republishBackoff);
 	}
 }
 
-export async function publishPendingOutboxEntries(
+export async function publishOutboxEntries(
 	context: DaemonContext,
 	repos: Pick<Repositories, "workflowRunOutbox">,
 	publisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>,
 	{ baseDelayMs, maxDelayMs }: RepublishBackoff
-): Promise<void> {
-	const publishedEntryIds = await publishOutboxEntries(context, publisher, entries);
+) {
+	const publishedEntryIds = await publishRuns(context, publisher, entries);
 	if (!isNonEmptyArray(publishedEntryIds)) {
 		return;
 	}
@@ -76,32 +76,15 @@ export async function publishPendingOutboxEntries(
 	await repos.workflowRunOutbox.markPublished(entriesToMarkPublished);
 }
 
-/**
- * Backoff interval before the next republish attempt.
- * backoff = now + durationSinceFirstPublishMs; this doubles the waiting period on each attempt.
- * The backoff is clamped to [baseDelayMs, maxDelayMs].
- */
-export function computeRepublishBackoff(params: {
-	now: number;
-	firstPublishedAt: number;
-	baseDelayMs: number;
-	maxDelayMs: number;
-}): number {
-	const { now, firstPublishedAt, baseDelayMs, maxDelayMs } = params;
-	const durationSinceFirstPublishMs = now - firstPublishedAt;
-	const backoffMs = Math.min(Math.max(durationSinceFirstPublishMs, baseDelayMs), maxDelayMs);
-	return now + backoffMs;
-}
-
-async function publishOutboxEntries(
+async function publishRuns(
 	{ logger }: DaemonContext,
 	publisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>
 ): Promise<string[]> {
-	const entryIdByRunId = new Map<string, string>();
+	const entryByRunId = new Map<string, WorkflowRunOutboxRowInsertPending>();
 	const runs: ReadyWorkflowRun[] = [];
 	for (const entry of entries) {
-		entryIdByRunId.set(entry.workflowRunId, entry.id);
+		entryByRunId.set(entry.workflowRunId, entry);
 		runs.push({
 			namespaceId: entry.namespaceId,
 			id: entry.workflowRunId,
@@ -126,9 +109,9 @@ async function publishOutboxEntries(
 			case "published":
 				logger.debug("Published ready workflow runs", { "aiki.count": bucket.length });
 				for (const { run } of bucket) {
-					const entryId = entryIdByRunId.get(run.id);
-					if (entryId !== undefined) {
-						publishedEntryIds.push(entryId);
+					const entry = entryByRunId.get(run.id);
+					if (entry) {
+						publishedEntryIds.push(entry.id);
 					}
 				}
 				break;
@@ -147,4 +130,21 @@ async function publishOutboxEntries(
 	}
 
 	return publishedEntryIds;
+}
+
+/**
+ * Backoff interval before the next republish attempt.
+ * backoff = now + durationSinceFirstPublishMs; this doubles the waiting period on each attempt.
+ * The backoff is clamped to [baseDelayMs, maxDelayMs].
+ */
+export function computeRepublishBackoff(params: {
+	now: number;
+	firstPublishedAt: number;
+	baseDelayMs: number;
+	maxDelayMs: number;
+}): number {
+	const { now, firstPublishedAt, baseDelayMs, maxDelayMs } = params;
+	const durationSinceFirstPublishMs = now - firstPublishedAt;
+	const backoffMs = Math.min(Math.max(durationSinceFirstPublishMs, baseDelayMs), maxDelayMs);
+	return now + backoffMs;
 }

@@ -15,7 +15,7 @@ import {
 } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import { publishPendingOutboxEntries, type RepublishBackoff } from "./publish-ready-runs";
+import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { Repositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
@@ -218,7 +218,7 @@ async function processOverlapAllowSchedules(
 	});
 
 	if (publisher) {
-		await publishPendingOutboxEntries(context, repos, publisher, outboxEntries, republishBackoff);
+		await publishOutboxEntries(context, repos, publisher, outboxEntries, republishBackoff);
 	}
 }
 
@@ -311,7 +311,7 @@ async function processOverlapSkipSchedules(
 	});
 
 	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishPendingOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
+		await publishOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
 	}
 }
 
@@ -455,7 +455,7 @@ async function processOverlapCancelPreviousSchedules(
 	});
 
 	if (deps.publisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishPendingOutboxEntries(context, deps.repos, deps.publisher, insertedOutboxEntries, republishBackoff);
+		await publishOutboxEntries(context, deps.repos, deps.publisher, insertedOutboxEntries, republishBackoff);
 	}
 }
 

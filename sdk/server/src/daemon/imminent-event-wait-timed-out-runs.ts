@@ -6,7 +6,7 @@ import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer"
 import type { WorkflowRunState, WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import { publishPendingOutboxEntries, type RepublishBackoff } from "./publish-ready-runs";
+import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { Repositories } from "../infra/db/types";
 import type { EventWaitQueueRowInsert } from "../infra/db/types/event-wait-queue";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
@@ -203,6 +203,6 @@ async function processChunk(
 	});
 
 	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishPendingOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
+		await publishOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
 	}
 }

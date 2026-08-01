@@ -4,7 +4,7 @@ import type { FakePublisher } from "@aikirun/testing/infra/queue";
 import { withFakeClock } from "./clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "./data-factory/middleware/context";
 import { processImminentScheduledRuns } from "../daemon/imminent-scheduled-runs";
-import { publishReadyRuns } from "../daemon/publish-ready-runs";
+import { publishPendingOutboxEntries } from "../daemon/publish-pending-outbox-entries";
 import { stallUndeliverableRuns } from "../daemon/stall-undeliverable-runs";
 import type { Repositories } from "../infra/db/types";
 import type { DaemonContext, NamespaceRequestContext } from "../middleware/context";
@@ -96,7 +96,7 @@ export async function seedClaimedRun(deps: SeedQueuedRunDeps & { publisher: Fake
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedQueuedRun(deps);
 
-	await publishReadyRuns(daemonContext, { repos, publisher }, { limit: 100, republishBackoff });
+	await publishPendingOutboxEntries(daemonContext, { repos, publisher }, { limit: 100, republishBackoff });
 
 	const claim = await claimRun({ context: namespaceRequestContext, repos, runId: seeded.runId });
 	return { ...seeded, ...claim };
@@ -107,7 +107,7 @@ export async function seedPublishedRun(deps: SeedQueuedRunDeps & { publisher: Fa
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const seeded = await seedQueuedRun(deps);
 
-	await publishReadyRuns(daemonContext, { repos, publisher }, { limit: 100, republishBackoff });
+	await publishPendingOutboxEntries(daemonContext, { repos, publisher }, { limit: 100, republishBackoff });
 
 	return seeded;
 }

@@ -1,11 +1,11 @@
-import { publishReadyRuns } from "./publish-ready-runs";
+import { publishPendingOutboxEntries } from "./publish-pending-outbox-entries";
 import { describe, expect, test } from "bun:test";
 import { pendingWorkflowRunOutboxRowFactory } from "../testing/data-factory/infra/workflow-run-outbox";
 import { createDaemonHarness } from "../testing/harness";
 
 const withHarness = createDaemonHarness();
 
-describe("publishReadyRuns", () => {
+describe("publishPendingOutboxEntries", () => {
 	test("marks pending rows published once the broker accepts them", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			await repos.workflowRunOutbox.createBatch([
@@ -13,7 +13,7 @@ describe("publishReadyRuns", () => {
 				pendingWorkflowRunOutboxRowFactory.build(),
 			]);
 
-			await publishReadyRuns(
+			await publishPendingOutboxEntries(
 				context,
 				{ repos, publisher },
 				{ limit: 100, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
@@ -30,7 +30,7 @@ describe("publishReadyRuns", () => {
 			publisher.publishReadyRuns.rejectsOnce(expect.anything(), new Error("broker down"));
 
 			expect(
-				publishReadyRuns(
+				publishPendingOutboxEntries(
 					context,
 					{ repos, publisher },
 					{ limit: 100, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }

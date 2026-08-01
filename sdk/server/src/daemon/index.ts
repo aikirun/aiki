@@ -13,7 +13,7 @@ import { processImminentRetryableRuns } from "./imminent-retryable-runs";
 import { processImminentRetryableTasks } from "./imminent-retryable-task-runs";
 import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
-import { publishReadyRuns } from "./publish-ready-runs";
+import { publishPendingOutboxEntries } from "./publish-pending-outbox-entries";
 import { recoverOverdueOutboxEntries } from "./recover-overdue-outbox-entries";
 import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import type { ServerRuntimeConfig } from "../config";
@@ -81,29 +81,41 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 
 	const daemonPromises: Promise<void>[] = [
 		startPollingDaemon(
-			(config) => ({ ...config.imminentScheduledRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			(config) => ({
+				...config.imminentScheduledRuns,
+				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+			}),
 			processImminentScheduledRuns,
 			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
-			(config) => ({ ...config.imminentSleepElapsedRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			(config) => ({
+				...config.imminentSleepElapsedRuns,
+				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+			}),
 			processImminentSleepElapsedRuns,
 			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
-			(config) => ({ ...config.imminentRetryableRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			(config) => ({
+				...config.imminentRetryableRuns,
+				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+			}),
 			processImminentRetryableRuns,
 			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
-			(config) => ({ ...config.imminentRetryableTasks, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			(config) => ({
+				...config.imminentRetryableTasks,
+				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+			}),
 			processImminentRetryableTasks,
 			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
 			(config) => ({
 				...config.imminentEventWaitTimedOutRuns,
-				republishBackoff: config.publishReadyRuns.republishBackoff,
+				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
 			}),
 			processImminentEventWaitTimedOutRuns,
 			{ repos, publisher, timerPriorityQueue }
@@ -111,13 +123,16 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 		startPollingDaemon(
 			(config) => ({
 				...config.imminentChildRunWaitTimedOutRuns,
-				republishBackoff: config.publishReadyRuns.republishBackoff,
+				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
 			}),
 			processImminentChildRunWaitTimedOutRuns,
 			{ repos, publisher, timerPriorityQueue }
 		),
 		startPollingDaemon(
-			(config) => ({ ...config.imminentRecurringRuns, republishBackoff: config.publishReadyRuns.republishBackoff }),
+			(config) => ({
+				...config.imminentRecurringRuns,
+				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+			}),
 			processImminentRecurringRuns,
 			{ repos, childRunCanceller, publisher, timerPriorityQueue }
 		),
@@ -127,7 +142,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 
 	if (publisher) {
 		daemonPromises.push(
-			startPollingDaemon((config) => config.publishReadyRuns, publishReadyRuns, {
+			startPollingDaemon((config) => config.publishPendingOutboxEntries, publishPendingOutboxEntries, {
 				repos,
 				publisher,
 			})
@@ -146,7 +161,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 					const config = configProvider.config.daemons;
 					return {
 						...config.dueTimersConsumer,
-						republishBackoff: config.publishReadyRuns.republishBackoff,
+						republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
 					};
 				}),
 			})
