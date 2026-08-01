@@ -1,3 +1,4 @@
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Publisher, PublishRunsResult, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 import { Factory } from "fishery";
 
@@ -11,7 +12,7 @@ export const readyWorkflowRunFactory = Factory.define<ReadyWorkflowRun>(({ seque
 	rank: 1,
 }));
 
-type PublishRunsRequest = Parameters<Publisher["publishReadyRuns"]>[0];
+type PublishRunsRequest = NonEmptyArray<ReadyWorkflowRun>;
 type PublishRunsResponse = PublishRunsResult | ((request: PublishRunsRequest) => PublishRunsResult);
 
 /**
