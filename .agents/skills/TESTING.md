@@ -20,7 +20,7 @@ Before writing any test, study the exemplars for its tier and match their idioms
   - **Boundary-value config**: choose knob values that decide the branch by arithmetic, not by
     timing — a `-1` idle threshold makes every claim stale; `Number.MAX_SAFE_INTEGER` makes none
     ever stale; `maxInlineWaitMs: 0` forces the suspend branch.
-  - **Timestamps as authored data**: write sentinel absolutes (`awakeAt: 0`, an epoch constant)
+  - **Timestamps as authored data**: write sentinel absolutes (`wakeupAt: 0`, an epoch constant)
     into rows; a value at the epoch is due/aged for any threshold.
   - **`withFakeClock(seedTimestampMs, fn)`** (`sdk/server/src/testing/clock.ts`): freezes the JS
     clock so aged state is minted through the real code paths. Clock placement follows

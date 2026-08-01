@@ -38,7 +38,7 @@ export function childWorkflowRunHandle<Input, Output, Context, TEvents extends E
 		cancel: handle.cancel.bind(handle),
 		pause: handle.pause.bind(handle),
 		resume: handle.resume.bind(handle),
-		awake: handle.awake.bind(handle),
+		wakeup: handle.wakeup.bind(handle),
 		[INTERNAL]: handle[INTERNAL],
 	};
 }

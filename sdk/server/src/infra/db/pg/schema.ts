@@ -144,7 +144,7 @@ export const workflowRun = pgTable(
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
 		scheduledAt: timestampMs("scheduled_at"),
-		awakeAt: timestampMs("awake_at"),
+		wakeupAt: timestampMs("wakeup_at"),
 		timeoutAt: timestampMs("timeout_at"),
 		nextAttemptAt: timestampMs("next_attempt_at"),
 
@@ -182,7 +182,7 @@ export const workflowRun = pgTable(
 		// TODO: will adding an index on input hash make conflict resolution faster?
 
 		index("idx_workflow_run_status_scheduled_at_id").on(table.status, table.scheduledAt, table.id),
-		index("idx_workflow_run_status_awake_at_id").on(table.status, table.awakeAt, table.id),
+		index("idx_workflow_run_status_wakeup_at_id").on(table.status, table.wakeupAt, table.id),
 		index("idx_workflow_run_status_timeout_at_id").on(table.status, table.timeoutAt, table.id),
 		index("idx_workflow_run_status_next_attempt_at_id").on(table.status, table.nextAttemptAt, table.id),
 	]
@@ -264,7 +264,7 @@ export const sleepQueue = pgTable(
 		name: text("name").notNull(),
 		status: sleepStatusEnum("status").notNull(),
 
-		awakeAt: timestampMs("awake_at").notNull(),
+		wakeupAt: timestampMs("wakeup_at").notNull(),
 		completedAt: timestampMs("completed_at"),
 		cancelledAt: timestampMs("cancelled_at"),
 

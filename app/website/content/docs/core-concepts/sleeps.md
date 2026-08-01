@@ -53,7 +53,7 @@ You can wake a sleeping workflow before its duration elapses using the handle:
 
 ```typescript
 // From outside the workflow
-await handle.awake();
+await handle.wakeup();
 ```
 
 Inside the workflow, check if the sleep was cancelled:

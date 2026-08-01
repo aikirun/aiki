@@ -513,7 +513,7 @@ function ChildWorkflowResolvedPre({ wait }: { wait: ChildWorkflowRunWaitComplete
 
 function SleepRow({ name, queue }: { name: string; queue: SleepQueue }) {
 	const activeSleep = queue.sleeps.find((s) => s.status === "sleeping");
-	const awakeAt = activeSleep?.status === "sleeping" ? activeSleep.awakeAt : undefined;
+	const wakeupAt = activeSleep?.status === "sleeping" ? activeSleep.wakeupAt : undefined;
 
 	return (
 		<div
@@ -542,17 +542,17 @@ function SleepRow({ name, queue }: { name: string; queue: SleepQueue }) {
 			</svg>
 			<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 600, color: "var(--t0)" }}>{name}</span>
 			<span style={{ flex: 1 }} />
-			{awakeAt !== undefined && <SleepCountdown awakeAt={awakeAt} />}
+			{wakeupAt !== undefined && <SleepCountdown wakeupAt={wakeupAt} />}
 		</div>
 	);
 }
 
-function SleepCountdown({ awakeAt }: { awakeAt: number }) {
-	const [remaining, setRemaining] = useState(() => timeUntil(awakeAt));
+function SleepCountdown({ wakeupAt }: { wakeupAt: number }) {
+	const [remaining, setRemaining] = useState(() => timeUntil(wakeupAt));
 	useEffect(() => {
-		const interval = setInterval(() => setRemaining(timeUntil(awakeAt)), 1000);
+		const interval = setInterval(() => setRemaining(timeUntil(wakeupAt)), 1000);
 		return () => clearInterval(interval);
-	}, [awakeAt]);
+	}, [wakeupAt]);
 	return <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "#818CF8" }}>{remaining}</span>;
 }
 

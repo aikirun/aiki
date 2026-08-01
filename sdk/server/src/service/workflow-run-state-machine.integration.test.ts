@@ -74,7 +74,7 @@ describe("WorkflowRunStateMachineService redelivery", () => {
 				stateMachine.transitionState(context, {
 					type: "pessimistic",
 					id: runId,
-					state: { status: "scheduled", scheduledInMs: 0, reason: "resume" },
+					state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" },
 				})
 			).rejects.toThrow(InvalidWorkflowRunStateTransitionError);
 		}));

@@ -342,7 +342,7 @@ export function RunDetail() {
 											namespaceAuthedClient.workflowRun.transitionStateV1({
 												type: "pessimistic",
 												id: currentRun.id,
-												state: { status: "scheduled", scheduledInMs: 0, reason: "resume" },
+												state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" },
 											})
 										)
 									}
@@ -461,7 +461,7 @@ export function RunDetail() {
 					{/* Contextual: sleeping */}
 					{currentRun.state.status === "sleeping" && (
 						<Meta label="Awakes">
-							<span style={{ color: "var(--accent-indigo)" }}>{timeUntil(currentRun.state.awakeAt)}</span>
+							<span style={{ color: "var(--accent-indigo)" }}>{timeUntil(currentRun.state.wakeupAt)}</span>
 						</Meta>
 					)}
 

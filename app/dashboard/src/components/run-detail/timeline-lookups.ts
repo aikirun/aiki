@@ -52,8 +52,8 @@ export function buildTimelineLookups(
 			const reason = state.reason;
 			const context: ScheduledContext = {};
 
-			// Handle awake/awake_early - look up the previous sleeping transition
-			if (reason === "awake" || reason === "awake_early") {
+			// Handle wakeup/wakeup_early - look up the previous sleeping transition
+			if (reason === "wakeup" || reason === "wakeup_early") {
 				for (let j = i - 1; j >= 0; j--) {
 					const prev = transitions[j];
 					if (prev.type === "workflow_run" && prev.state.status === "sleeping") {

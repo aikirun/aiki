@@ -149,7 +149,7 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 
 	resume: () => Promise<void>;
 
-	awake: () => Promise<void>;
+	wakeup: () => Promise<void>;
 
 	[INTERNAL]: {
 		client: Client<Context>;
@@ -320,13 +320,13 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 	}
 
 	public async resume(): Promise<void> {
-		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resume" });
+		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resumption" });
 		this.logger.info("Workflow resumed");
 	}
 
-	public async awake(): Promise<void> {
-		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "awake_early" });
-		this.logger.info("Workflow awoken");
+	public async wakeup(): Promise<void> {
+		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" });
+		this.logger.info("Workflow woken up");
 	}
 
 	private async transitionState(targetState: WorkflowRunStateRequest): Promise<void> {
@@ -335,8 +335,8 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 			if (
 				(targetState.status === "scheduled" &&
 					(targetState.reason === "new" ||
-						targetState.reason === "resume" ||
-						targetState.reason === "awake_early" ||
+						targetState.reason === "resumption" ||
+						targetState.reason === "wakeup_early" ||
 						targetState.reason === "redelivery")) ||
 				targetState.status === "paused" ||
 				targetState.status === "cancelled"

@@ -103,7 +103,7 @@ async function processChunk(
 		}
 
 		const stateTransitionId = ulid();
-		const state: WorkflowRunStateQueued = { status: "queued", reason: "awake" };
+		const state: WorkflowRunStateQueued = { status: "queued", reason: "wakeup" };
 		stateTransitionEntries.push({
 			id: stateTransitionId,
 			workflowRunId: run.id,

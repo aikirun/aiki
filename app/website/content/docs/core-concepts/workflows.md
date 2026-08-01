@@ -217,7 +217,7 @@ The handle returned from `.start()` provides:
 | `cancel(reason?)` | Cancel the workflow run |
 | `pause()` | Pause the workflow |
 | `resume()` | Resume a paused workflow |
-| `awake()` | Wake a sleeping workflow |
+| `wakeup()` | Wake a sleeping workflow |
 
 #### Waiting for Status
 

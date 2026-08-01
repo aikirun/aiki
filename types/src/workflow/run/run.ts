@@ -68,9 +68,9 @@ export const WORKFLOW_RUN_SCHEDULED_REASON = [
 	"new",
 	"retry",
 	"task_retry",
-	"awake",
-	"awake_early",
-	"resume",
+	"wakeup",
+	"wakeup_early",
+	"resumption",
 	"event",
 	"child_workflow",
 	"redelivery",
@@ -95,16 +95,16 @@ export interface WorkflowRunStateScheduledByTaskRetry extends WorkflowRunStateSc
 	reason: "task_retry";
 }
 
-export interface WorkflowRunStateScheduledByAwake extends WorkflowRunStateScheduledBase {
-	reason: "awake";
+export interface WorkflowRunStateScheduledByWakeup extends WorkflowRunStateScheduledBase {
+	reason: "wakeup";
 }
 
-export interface WorkflowRunStateScheduledByAwakeEarly extends WorkflowRunStateScheduledBase {
-	reason: "awake_early";
+export interface WorkflowRunStateScheduledByWakeupEarly extends WorkflowRunStateScheduledBase {
+	reason: "wakeup_early";
 }
 
 export interface WorkflowRunStateScheduledByResume extends WorkflowRunStateScheduledBase {
-	reason: "resume";
+	reason: "resumption";
 }
 
 export interface WorkflowRunStateScheduledByEvent extends WorkflowRunStateScheduledBase {
@@ -123,8 +123,8 @@ export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByNew
 	| WorkflowRunStateScheduledByRetry
 	| WorkflowRunStateScheduledByTaskRetry
-	| WorkflowRunStateScheduledByAwake
-	| WorkflowRunStateScheduledByAwakeEarly
+	| WorkflowRunStateScheduledByWakeup
+	| WorkflowRunStateScheduledByWakeupEarly
 	| WorkflowRunStateScheduledByResume
 	| WorkflowRunStateScheduledByEvent
 	| WorkflowRunStateScheduledByChildWorkflow
@@ -134,12 +134,12 @@ export const WORKFLOW_RUN_QUEUED_REASON = [
 	"new",
 	"retry",
 	"task_retry",
-	"awake",
-	"awake_early",
-	"resume",
+	"wakeup",
+	"wakeup_early",
+	"resumption",
 	"event",
 	"child_workflow",
-	"recovered",
+	"recovery",
 	"redelivery",
 ] as const;
 export type WorkflowRunQueuedReason = (typeof WORKFLOW_RUN_QUEUED_REASON)[number];
@@ -160,7 +160,7 @@ export interface WorkflowRunStatePaused extends WorkflowRunStateBase {
 export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
 	status: "sleeping";
 	sleepName: string;
-	awakeAt: number;
+	wakeupAt: number;
 }
 
 export interface WorkflowRunStateAwaitingEvent extends WorkflowRunStateBase {
