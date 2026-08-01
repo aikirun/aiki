@@ -73,6 +73,7 @@ export const WORKFLOW_RUN_SCHEDULED_REASON = [
 	"resume",
 	"event",
 	"child_workflow",
+	"redelivery",
 ] as const;
 export type WorkflowRunScheduledReason = (typeof WORKFLOW_RUN_SCHEDULED_REASON)[number];
 
@@ -114,6 +115,10 @@ export interface WorkflowRunStateScheduledByChildWorkflow extends WorkflowRunSta
 	reason: "child_workflow";
 }
 
+export interface WorkflowRunStateScheduledByRedelivery extends WorkflowRunStateScheduledBase {
+	reason: "redelivery";
+}
+
 export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByNew
 	| WorkflowRunStateScheduledByRetry
@@ -122,7 +127,8 @@ export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByAwakeEarly
 	| WorkflowRunStateScheduledByResume
 	| WorkflowRunStateScheduledByEvent
-	| WorkflowRunStateScheduledByChildWorkflow;
+	| WorkflowRunStateScheduledByChildWorkflow
+	| WorkflowRunStateScheduledByRedelivery;
 
 export const WORKFLOW_RUN_QUEUED_REASON = [
 	"new",
@@ -134,6 +140,7 @@ export const WORKFLOW_RUN_QUEUED_REASON = [
 	"event",
 	"child_workflow",
 	"recovered",
+	"redelivery",
 ] as const;
 export type WorkflowRunQueuedReason = (typeof WORKFLOW_RUN_QUEUED_REASON)[number];
 

@@ -60,4 +60,5 @@ Claim recovery is safe. Re-executing a workflow doesn't cause duplicate side eff
 - **[Workers](../core-concepts/workers.md)** — Worker configuration
 - **[Subscribers](./subscribers.md)** — Work discovery and delivery
 - **[Server](./server.md)** — Orchestration and recovery daemons
+- **[Stalled Runs](./stalled-runs.md)** — When the server gives up delivering a run, and how to requeue
 - **[Crash Recovery](./cam.md)** — The replay mechanism behind safe re-execution

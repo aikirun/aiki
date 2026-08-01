@@ -197,6 +197,7 @@ A workflow run is an instance of a workflow execution. It has:
 - `awaiting_event` - Waiting for an external event
 - `awaiting_retry` - Waiting to retry after failure
 - `awaiting_child_workflow` - Waiting for a child workflow to complete
+- `stalled` - Given up after sitting undelivered too long; recoverable by requeue (see [Stalled Runs](../architecture/stalled-runs.md))
 - `completed` - Finished successfully
 - `failed` - Encountered a non-retryable error or exhausted all retries
 - `cancelled` - Cancelled by user

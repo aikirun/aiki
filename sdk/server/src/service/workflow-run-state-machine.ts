@@ -138,8 +138,16 @@ const workflowRunStateTransitionValidator: Record<
 	})(),
 
 	stalled: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["queued", "cancelled"];
-		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
+		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
+		return (to) => {
+			if (!allowedDestinations.includes(to.status)) {
+				return { allowed: false };
+			}
+			if (to.status === "scheduled" && to.reason !== "redelivery") {
+				return { allowed: false, reason: "Only redelivery allowed" };
+			}
+			return { allowed: true };
+		};
 	})(),
 
 	cancelled: (() => {
@@ -269,7 +277,8 @@ async function transitionStateInTx(
 					| "resume"
 					| "event"
 					| "child_workflow"
-					| "recovered";
+					| "recovered"
+					| "redelivery";
 		}
 	}
 

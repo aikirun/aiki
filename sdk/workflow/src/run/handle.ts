@@ -334,7 +334,10 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 			let response: WorkflowRunTransitionStateResponseV1;
 			if (
 				(targetState.status === "scheduled" &&
-					(targetState.reason === "new" || targetState.reason === "resume" || targetState.reason === "awake_early")) ||
+					(targetState.reason === "new" ||
+						targetState.reason === "resume" ||
+						targetState.reason === "awake_early" ||
+						targetState.reason === "redelivery")) ||
 				targetState.status === "paused" ||
 				targetState.status === "cancelled"
 			) {

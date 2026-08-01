@@ -5,10 +5,13 @@ import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import { describe, expect, test } from "bun:test";
 import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
-import { createDaemonHarness } from "../testing/daemon-harness";
-import { claimRun, namespaceContext, seedClaimedRun, seedPublishedRun, seedQueuedRun } from "../testing/outbox-seed";
+import { createDaemonHarness } from "../testing/harness";
+import { namespaceRequestContextFactory } from "../testing/middleware/context";
+import { claimRun, seedClaimedRun, seedPublishedRun, seedQueuedRun } from "../testing/run-seed";
 
 const withHarness = createDaemonHarness();
+
+const namespaceRequestContext = namespaceRequestContextFactory.build();
 
 // -1 makes every claimed row stale by arithmetic (claimedAt < now + 1 always holds), so tests
 // never depend on real time elapsing between the claim and the daemon run.
@@ -22,7 +25,12 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("returns the stale claimed outbox row to pending with its delivery holds cleared", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId, outboxRowId } = await seedClaimedRun(deps);
+				const { runId, outboxRowId } = await seedClaimedRun({
+					daemonContext: deps.context,
+					namespaceRequestContext,
+					publisher: deps.publisher,
+					repos: deps.repos,
+				});
 
 				await recoverOverdueOutboxEntries(
 					context,
@@ -43,7 +51,12 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("preserves firstPublishedAt so the republish backoff curve survives recovery", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId, outboxRowId } = await seedClaimedRun(deps);
+				const { runId, outboxRowId } = await seedClaimedRun({
+					daemonContext: deps.context,
+					namespaceRequestContext,
+					publisher: deps.publisher,
+					repos: deps.repos,
+				});
 
 				const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100);
 				expect(claimedRows).toHaveLength(1);
@@ -64,7 +77,12 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("releases the abandoned run to queued with reason recovered", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId } = await seedClaimedRun(deps);
+				const { runId } = await seedClaimedRun({
+					daemonContext: deps.context,
+					namespaceRequestContext,
+					publisher: deps.publisher,
+					repos: deps.repos,
+				});
 
 				await recoverOverdueOutboxEntries(
 					context,
@@ -72,7 +90,7 @@ describe("recoverOverdueOutboxEntries", () => {
 					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
 				expect(run).toEqual(
 					expect.objectContaining({
 						id: runId,
@@ -85,7 +103,12 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("bumps the run revision so a lost worker's next write is fenced", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId, revisionWhenClaimed } = await seedClaimedRun(deps);
+				const { runId, revisionWhenClaimed } = await seedClaimedRun({
+					daemonContext: deps.context,
+					namespaceRequestContext,
+					publisher: deps.publisher,
+					repos: deps.repos,
+				});
 
 				await recoverOverdueOutboxEntries(
 					context,
@@ -93,7 +116,7 @@ describe("recoverOverdueOutboxEntries", () => {
 					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
 				expect(run).toEqual(expect.objectContaining({ id: runId, status: "queued" }));
 				expect(run?.revision).toBeGreaterThan(revisionWhenClaimed);
 			}));
@@ -101,7 +124,12 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("charges no execution attempt for the lost claim", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId, attemptsWhenClaimed } = await seedClaimedRun(deps);
+				const { runId, attemptsWhenClaimed } = await seedClaimedRun({
+					daemonContext: deps.context,
+					namespaceRequestContext,
+					publisher: deps.publisher,
+					repos: deps.repos,
+				});
 
 				await recoverOverdueOutboxEntries(
 					context,
@@ -109,14 +137,19 @@ describe("recoverOverdueOutboxEntries", () => {
 					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
 				expect(run).toEqual(expect.objectContaining({ id: runId, attempts: attemptsWhenClaimed }));
 			}));
 
 		test("leaves a fresh claim untouched", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId, outboxRowId } = await seedClaimedRun(deps);
+				const { runId, outboxRowId } = await seedClaimedRun({
+					daemonContext: deps.context,
+					namespaceRequestContext,
+					publisher: deps.publisher,
+					repos: deps.repos,
+				});
 
 				await recoverOverdueOutboxEntries(context, { repos }, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 });
 
@@ -129,7 +162,14 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("leaves a refreshed claim untouched", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () => seedClaimedRun(deps));
+				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () =>
+					seedClaimedRun({
+						daemonContext: deps.context,
+						namespaceRequestContext,
+						publisher: deps.publisher,
+						repos: deps.repos,
+					})
+				);
 
 				// The epoch-old claim is initially recoverable.
 				expect(await repos.workflowRunOutbox.listStaleClaimed(context, ONE_HOUR_MS, 100)).toEqual([
@@ -137,7 +177,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				]);
 
 				const outboxService = createWorkflowRunOutboxService({ repos });
-				await outboxService.refreshClaim(namespaceContext, runId);
+				await outboxService.refreshClaim(namespaceRequestContext, runId);
 
 				await recoverOverdueOutboxEntries(context, { repos }, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 });
 
@@ -152,7 +192,14 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("returns a publishable row to pending with firstPublishedAt preserved", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () => seedPublishedRun(deps));
+				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () =>
+					seedPublishedRun({
+						daemonContext: deps.context,
+						namespaceRequestContext,
+						publisher: deps.publisher,
+						repos: deps.repos,
+					})
+				);
 
 				const publishableRows = await repos.workflowRunOutbox.listPublishable(context, 100);
 				expect(publishableRows).toHaveLength(1);
@@ -180,11 +227,13 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("stalls an aged pending row", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId } = await withFakeClock(EPOCH_MS, () => seedQueuedRun(deps));
+				const { runId } = await withFakeClock(EPOCH_MS, () =>
+					seedQueuedRun({ daemonContext: deps.context, namespaceRequestContext, repos: deps.repos })
+				);
 
 				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
 				expect(run).toEqual(
 					expect.objectContaining({
 						id: runId,
@@ -197,11 +246,18 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("stalls an aged published row", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId } = await withFakeClock(EPOCH_MS, () => seedPublishedRun(deps));
+				const { runId } = await withFakeClock(EPOCH_MS, () =>
+					seedPublishedRun({
+						daemonContext: deps.context,
+						namespaceRequestContext,
+						publisher: deps.publisher,
+						repos: deps.repos,
+					})
+				);
 
 				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
 				expect(run).toEqual(
 					expect.objectContaining({
 						id: runId,
@@ -214,12 +270,19 @@ describe("recoverOverdueOutboxEntries", () => {
 		test("does not stall a claimed row regardless of age", () =>
 			withHarness(async (deps) => {
 				const { context, repos } = deps;
-				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () => seedPublishedRun(deps));
-				await claimRun(repos, runId);
+				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () =>
+					seedPublishedRun({
+						daemonContext: deps.context,
+						namespaceRequestContext,
+						publisher: deps.publisher,
+						repos: deps.repos,
+					})
+				);
+				await claimRun({ context: namespaceRequestContext, repos, runId });
 
 				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
 				expect(run).toEqual(
 					expect.objectContaining({
 						id: runId,
