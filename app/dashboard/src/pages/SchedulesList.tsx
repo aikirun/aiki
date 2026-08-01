@@ -675,7 +675,7 @@ function ScheduleRow({
 						{schedule.workflowRunOptions?.retry && (
 							<Meta label="Retry" value={retrySummary(schedule.workflowRunOptions.retry)} />
 						)}
-						{schedule.workflowRunOptions?.shard && <Meta label="Shard" value={schedule.workflowRunOptions.shard} />}
+						{schedule.workflowRunOptions?.pool && <Meta label="Pool" value={schedule.workflowRunOptions.pool} />}
 						<Meta label="Total Runs" value={runCount.toLocaleString()} />
 						<Meta label="Created" value={fmtDate(schedule.createdAt)} />
 					</div>

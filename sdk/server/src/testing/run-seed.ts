@@ -37,13 +37,13 @@ export async function seedQueuedRun(deps: SeedQueuedRunDeps) {
 	return _seedQueuedRun(deps, undefined);
 }
 
-export async function seedShardedQueuedRun(deps: SeedQueuedRunDeps) {
-	const shard = "warehouse-eu";
-	const seeded = await _seedQueuedRun(deps, shard);
-	return { ...seeded, shard };
+export async function seedPooledQueuedRun(deps: SeedQueuedRunDeps) {
+	const pool = "warehouse-eu";
+	const seeded = await _seedQueuedRun(deps, pool);
+	return { ...seeded, pool };
 }
 
-async function _seedQueuedRun(deps: SeedQueuedRunDeps, shard: string | undefined) {
+async function _seedQueuedRun(deps: SeedQueuedRunDeps, pool: string | undefined) {
 	const { repos } = deps;
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
@@ -53,7 +53,7 @@ async function _seedQueuedRun(deps: SeedQueuedRunDeps, shard: string | undefined
 		name: seededWorkflow.name,
 		versionId: seededWorkflow.versionId,
 		input: { orderId: "order-7" },
-		options: shard ? { shard } : undefined,
+		options: pool ? { pool } : undefined,
 	});
 
 	await processImminentScheduledRuns(daemonContext, { repos }, { limit: 100, lookaheadWindowMs: 0, republishBackoff });

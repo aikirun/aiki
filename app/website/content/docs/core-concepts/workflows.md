@@ -136,18 +136,18 @@ Schemas work with any validation library that implements [Standard Schema](https
 
 **Why use output schemas?** For child workflows, cached outputs are validated against the schema. If the cached shape doesn't match, the parent workflow fails immediately. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
 
-## Sharding
+## Worker Pools
 
-Route workflows to specific shards for distributed processing, multi-region deployments, or tenant isolation:
+Route workflows to a named worker pool when only part of your fleet should execute them — a fleet with special hardware, a fleet dedicated to one tenant, or a regional deployment:
 
 ```typescript
 const handle = await orderWorkflowV1
 	.with()
-	.opt("shard", "us-east")
+	.opt("pool", "gpu")
 	.start(client, { orderId: "123" });
 ```
 
-Workers must be configured to listen to the same shard. A workflow routed to `"us-east"` will only be picked up by workers with `shards: ["us-east"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
+Workers must be configured to serve the same pool. A workflow routed to `"gpu"` will only be picked up by workers with `pools: ["gpu"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
 
 ## Starting Workflows
 

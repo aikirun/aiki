@@ -52,7 +52,7 @@ const handle2 = worker2.start(aikiClient);
 
 **Specialize workers** by registering different workflows on different workers. Each worker only handles the workflows it knows about.
 
-**Shard by region or tenant** using `shards`. A worker with `shards: ["us-east"]` only processes workflow runs routed to that shard.
+**Split fleets by capability, tenant, or region** using `pools`. A worker with `pools: ["gpu"]` only processes workflow runs routed to that pool.
 
 ## Graceful Shutdown
 
@@ -85,7 +85,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 | `maxConcurrentWorkflowRuns` | 1 | Max parallel executions |
 | `gracefulShutdownTimeoutMs` | 5,000 | Shutdown wait time (ms) |
 | `workflowRun.claimRefreshIntervalMs` | 30,000 | How often the worker refreshes its run claim (ms) |
-| `shards` | — | Shards to process |
+| `pools` | — | Worker pools to process |
 
 ## Pluggable Subscribers
 

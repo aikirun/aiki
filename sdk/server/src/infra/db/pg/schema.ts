@@ -378,7 +378,7 @@ export const workflowRunOutbox = pgTable(
 		workflowRunId: text("workflow_run_id").notNull(),
 		workflowName: text("workflow_name").notNull(),
 		workflowVersionId: text("workflow_version_id").notNull(),
-		shard: text("shard"),
+		pool: text("pool"),
 		rank: doublePrecision("rank").notNull(),
 
 		status: workflowRunOutboxStatusEnum("status").notNull(),
@@ -396,9 +396,9 @@ export const workflowRunOutbox = pgTable(
 	(table) => [
 		uniqueIndex("uqidx_workflow_run_outbox_workflow_run_id").on(table.workflowRunId),
 
-		// Claim path: worker claims rank ordered pending rows by workflow identity and shard.
+		// Claim path: worker claims rank ordered pending rows by workflow identity and pool.
 		index("idx_workflow_run_outbox_claim_pending")
-			.on(table.namespaceId, table.workflowName, table.workflowVersionId, table.shard, table.rank, table.id)
+			.on(table.namespaceId, table.workflowName, table.workflowVersionId, table.pool, table.rank, table.id)
 			.where(sql`${table.status} = 'pending'`),
 
 		// Daemon list paths: broad scans over one status to feed broker.

@@ -281,7 +281,7 @@ export interface WorkflowRunListChildRunsRequestV1 {
 }
 
 export interface WorkflowRunListChildRunsResponseV1 {
-	runs: Array<{ id: string; options?: { shard?: string } }>;
+	runs: Array<{ id: string; options?: { pool?: string } }>;
 }
 
 export interface WorkflowRunCancelByIdsRequestV1 {
@@ -294,7 +294,7 @@ export interface WorkflowRunCancelByIdsResponseV1 {
 
 export interface WorkflowRunClaimReadyRequestV1 {
 	workflows: Array<{ name: string; versionId: string }>;
-	shards?: string[];
+	pools?: string[];
 	limit: number;
 }
 

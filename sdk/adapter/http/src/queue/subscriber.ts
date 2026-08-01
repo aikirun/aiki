@@ -44,14 +44,14 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 		}
 	};
 
-	return ({ workflows, shards, signal }): Subscriber => {
+	return ({ workflows, pools, signal }): Subscriber => {
 		return {
 			getNextDelay,
 			async getReadyRuns(size: number): Promise<WorkflowRunMessage[]> {
 				const response = await api.workflowRun.claimReadyV1(
 					{
 						workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
-						shards,
+						pools,
 						limit: size,
 					},
 					{ signal }

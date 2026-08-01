@@ -128,7 +128,7 @@ async function processChunk(
 			workflowRunId: run.id,
 			workflowName: workflow.name,
 			workflowVersionId: workflow.versionId,
-			shard: run.options?.shard,
+			pool: run.options?.pool,
 			status: "pending",
 			rank: run.rank,
 		});

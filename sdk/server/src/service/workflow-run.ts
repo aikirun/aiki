@@ -461,10 +461,10 @@ export const createWorkflowRunService = ({
 		});
 		return {
 			runs: childRuns.map((child) => {
-				const shard = child.options?.shard;
+				const pool = child.options?.pool;
 				return {
 					id: child.id,
-					options: shard ? { shard } : undefined,
+					options: pool ? { pool } : undefined,
 				};
 			}),
 		};
@@ -505,7 +505,7 @@ export const createWorkflowRunService = ({
 				cancelledRunsMeta.push({
 					namespaceId,
 					runId: run.id,
-					shard: run.options?.shard,
+					pool: run.options?.pool,
 				});
 			}
 

@@ -92,7 +92,7 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 		}
 	};
 
-	return ({ workflows, shards, logger, signal }): Subscriber => {
+	return ({ workflows, pools, logger, signal }): Subscriber => {
 		const connectTimeoutMs = params.connectTimeoutMs ?? 5_000;
 
 		const redis = new Redis({
@@ -116,7 +116,7 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 			{ once: true }
 		);
 
-		const queueNames = getWorkflowQueueNames(workflows, shards);
+		const queueNames = getWorkflowQueueNames(workflows, pools);
 
 		return {
 			getNextDelay,

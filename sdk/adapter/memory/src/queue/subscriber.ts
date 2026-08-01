@@ -21,8 +21,8 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 		}
 	};
 
-	return ({ workflows, shards, signal }): Subscriber => {
-		const queueNames = getWorkflowQueueNames(workflows, shards) as NonEmptyArray<string>;
+	return ({ workflows, pools, signal }): Subscriber => {
+		const queueNames = getWorkflowQueueNames(workflows, pools) as NonEmptyArray<string>;
 		const queueNamesByIndex = new Map<string, number>();
 		for (const [queueIndex, queueName] of queueNames.entries()) {
 			queueNamesByIndex.set(queueName, queueIndex);

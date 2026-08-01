@@ -115,11 +115,11 @@ const hourlySync = schedule({
 await hourlySync
 	.with()
 	.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 })
-	.opt("workflowRun.shard", "eu")
+	.opt("workflowRun.pool", "foo-bar")
 	.activate(client, inventorySyncV1);
 ```
 
-Only `retry` and `shard` can be set: a scheduled run's reference ID and trigger are the schedule's to control, not the caller's. Run options are part of a schedule's identity, so changing them is a different schedule — or, with a [reference ID](#reference-ids), a conflict.
+Only `retry` and `pool` can be set: a scheduled run's reference ID and trigger are the schedule's to control, not the caller's. Run options are part of a schedule's identity, so changing them is a different schedule — or, with a [reference ID](#reference-ids), a conflict.
 
 ## Idempotent Activation
 

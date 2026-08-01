@@ -187,7 +187,7 @@ async function processOverlapAllowSchedules(
 				workflowName: schedule.workflowName,
 				workflowVersionId: schedule.workflowVersionId,
 				rank: computeRank(occurrence),
-				shard: schedule.workflowRunOptions?.shard ?? null,
+				pool: schedule.workflowRunOptions?.pool ?? null,
 				status: "pending",
 			});
 		}
@@ -283,7 +283,7 @@ async function processOverlapSkipSchedules(
 			workflowName: schedule.workflowName,
 			workflowVersionId: schedule.workflowVersionId,
 			rank: computeRank(occurrence),
-			shard: schedule.workflowRunOptions?.shard ?? null,
+			pool: schedule.workflowRunOptions?.pool ?? null,
 			status: "pending",
 		});
 		scheduleUpdates.push({
@@ -325,7 +325,7 @@ async function processOverlapCancelPreviousSchedules(
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(deps.repos, schedules);
 
 	const runIdsToCancel: string[] = [];
-	const runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; shard?: string }> = [];
+	const runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; pool?: string }> = [];
 
 	const newWorkflowRunEntries: WorkflowRunRowInsert[] = [];
 	const newRunStateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -379,7 +379,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowName: schedule.workflowName,
 			workflowVersionId: schedule.workflowVersionId,
 			rank: computeRank(occurrence),
-			shard: schedule.workflowRunOptions?.shard ?? null,
+			pool: schedule.workflowRunOptions?.pool ?? null,
 			status: "pending",
 		});
 		scheduleUpdates.push({
@@ -431,7 +431,7 @@ async function processOverlapCancelPreviousSchedules(
 					state: { status: "cancelled", reason: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
 				});
 				cancelledRunStateTransitionIdUpdates.push({ id: run.id, stateTransitionId });
-				cancelledRuns.push({ namespaceId: run.namespaceId, runId: run.id, shard: run.shard });
+				cancelledRuns.push({ namespaceId: run.namespaceId, runId: run.id, pool: run.pool });
 			}
 
 			if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionIdUpdates)) {
@@ -466,7 +466,7 @@ function scheduledRunOptions(
 	return {
 		reference: { id: referenceId },
 		retry: schedule.workflowRunOptions?.retry,
-		shard: schedule.workflowRunOptions?.shard,
+		pool: schedule.workflowRunOptions?.pool,
 	};
 }
 
@@ -492,7 +492,7 @@ async function fetchActiveRunsBySchedule(
 		schedulesByReferenceId.set(referenceId, schedule);
 	}
 
-	const activeRunsByScheduleId = new Map<string, { id: string; attempts: number; shard?: string }>();
+	const activeRunsByScheduleId = new Map<string, { id: string; attempts: number; pool?: string }>();
 
 	if (isNonEmptyArray(workflowAndReferenceIdPairs) && isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
 		const activeRuns = await repos.workflowRun.listByWorkflowAndReferenceIdPairs({
@@ -504,8 +504,8 @@ async function fetchActiveRunsBySchedule(
 			if (run.referenceId) {
 				const schedule = schedulesByWorkflowAndReferenceId.get(run.workflowId)?.get(run.referenceId);
 				if (schedule) {
-					const shard = run.options?.shard;
-					activeRunsByScheduleId.set(schedule.id, { id: run.id, attempts: run.attempts, shard });
+					const pool = run.options?.pool;
+					activeRunsByScheduleId.set(schedule.id, { id: run.id, attempts: run.attempts, pool });
 				}
 			}
 		}

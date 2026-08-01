@@ -98,13 +98,13 @@ describe("schedule", () => {
 			retry: { type: "fixed", maxAttempts: 5, delayMs: 300 },
 		});
 
-		test("opt carries retry and shard to every fired run", () =>
+		test("opt carries retry and pool to every fired run", () =>
 			withFakeClient(async (client) => {
 				client.api.schedule.activateV1.once(
 					intervalScheduleActivateRequest.build({
 						workflowRunOptions: {
 							retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 },
-							shard: "eu",
+							pool: "eu",
 						},
 					}),
 					{ schedule: intervalScheduleFactory.build() }
@@ -113,7 +113,7 @@ describe("schedule", () => {
 				await schedule({ type: "interval", every: { seconds: 1 } })
 					.with()
 					.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
-					.opt("workflowRun.shard", "eu")
+					.opt("workflowRun.pool", "eu")
 					.activate(client, syncInventoryWorkflow, { warehouseId: "wh-1" });
 			}));
 
@@ -137,7 +137,7 @@ describe("schedule", () => {
 					intervalScheduleActivateRequest.build({
 						workflowRunOptions: {
 							retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 },
-							shard: "eu",
+							pool: "eu",
 						},
 					}),
 					{ schedule: intervalScheduleFactory.build() }
@@ -146,7 +146,7 @@ describe("schedule", () => {
 				await schedule({ type: "interval", every: { seconds: 1 } })
 					.with()
 					.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
-					.opt("workflowRun.shard", "eu")
+					.opt("workflowRun.pool", "eu")
 					.activate(client, retryingSyncInventoryWorkflow, { warehouseId: "wh-1" });
 			}));
 	});

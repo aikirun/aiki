@@ -23,7 +23,7 @@ export interface Subscriber {
 export interface SubscriberContext {
 	workerId: string;
 	workflows: NonEmptyArray<WorkflowMeta>;
-	shards?: string[];
+	pools?: string[];
 	logger: Logger;
 	signal: AbortSignal;
 }

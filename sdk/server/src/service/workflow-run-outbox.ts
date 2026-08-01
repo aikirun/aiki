@@ -32,5 +32,5 @@ async function claimPending(
 		return [];
 	}
 
-	return repo.claimPending(context.namespaceId, { workflows, shards: request.shards }, request.limit);
+	return repo.claimPending(context.namespaceId, { workflows, pools: request.pools }, request.limit);
 }

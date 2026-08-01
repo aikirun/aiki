@@ -65,11 +65,11 @@ export interface WorkerParams {
 
 export interface WorkerStartOptions {
 	/**
-	 * Optional array of shards this worker should process.
-	 * When provided, the worker will only subscribe to registered workflows within that shard.
-	 * When omitted, the worker subscribes to unsharded registered workflows.
+	 * Optional array of pools this worker should process.
+	 * When provided, the worker will only subscribe to registered workflows within those pools.
+	 * When omitted, the worker subscribes to registered workflows not assigned to a pool.
 	 */
-	shards?: string[];
+	pools?: string[];
 	/**
 	 * Optional reference for external correlation.
 	 * Use this to associate the worker with external identifiers.
@@ -162,7 +162,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		this.primarySubscriber = createPrimarySubscriber({
 			workerId: this.id,
 			workflows,
-			shards: this.startOptions.shards,
+			pools: this.startOptions.pools,
 			logger: this.logger.child({ "aiki.subscriber": "primary" }),
 			signal,
 		});
@@ -175,7 +175,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			this.backupSubscriber = createBackupSubscriber({
 				workerId: this.id,
 				workflows,
-				shards: this.startOptions.shards,
+				pools: this.startOptions.pools,
 				logger: this.logger.child({ "aiki.subscriber": "backup" }),
 				signal,
 			});

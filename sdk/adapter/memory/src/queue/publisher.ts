@@ -14,8 +14,8 @@ export function createInMemoryPublisher(store: Store): CreatePublisher {
 	return (_context: PublisherContext): Publisher => ({
 		async publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
 			const touchedQueues = new Map<string, Queue>();
-			for (const { id, name, versionId, rank, shard } of runs) {
-				const queueName = getWorkflowQueueName(name, versionId, shard);
+			for (const { id, name, versionId, rank, pool } of runs) {
+				const queueName = getWorkflowQueueName(name, versionId, pool);
 				const queue = store.getOrCreateQueue(queueName);
 				queue.push({ rank, id });
 				touchedQueues.set(queueName, queue);

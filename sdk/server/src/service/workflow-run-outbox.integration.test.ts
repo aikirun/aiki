@@ -7,7 +7,7 @@ import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
 import { daemonContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { claimRun, seedClaimedRun, seedPublishedRun, seedQueuedRun, seedShardedQueuedRun } from "../testing/run-seed";
+import { claimRun, seedClaimedRun, seedPooledQueuedRun, seedPublishedRun, seedQueuedRun } from "../testing/run-seed";
 
 const withHarness = createServiceHarness();
 
@@ -56,9 +56,9 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 			expect(result).toHaveLength(0);
 		}));
 
-	test("does not return a pending row outside the requested shards", () =>
+	test("does not return a pending row outside the requested pools", () =>
 		withHarness(async ({ context, repos }) => {
-			// The seeded run has no shard; requesting a specific shard excludes it.
+			// The seeded run has no pool; requesting a specific pool excludes it.
 			const { workflowName, workflowVersionId } = await seedQueuedRun({
 				namespaceRequestContext: context,
 				repos,
@@ -67,16 +67,16 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
 				workflows: [{ name: workflowName, versionId: workflowVersionId }],
-				shards: ["eu-east"],
+				pools: ["eu-east"],
 				limit: 10,
 			});
 
 			expect(result).toHaveLength(0);
 		}));
 
-	test("claims a pending row in the requested shard", () =>
+	test("claims a pending row in the requested pool", () =>
 		withHarness(async ({ context, repos }) => {
-			const { runId, workflowName, workflowVersionId, shard } = await seedShardedQueuedRun({
+			const { runId, workflowName, workflowVersionId, pool } = await seedPooledQueuedRun({
 				namespaceRequestContext: context,
 				repos,
 			});
@@ -84,16 +84,16 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
 				workflows: [{ name: workflowName, versionId: workflowVersionId }],
-				shards: [shard],
+				pools: [pool],
 				limit: 10,
 			});
 
 			expect(result).toEqual([expect.objectContaining({ id: runId })]);
 		}));
 
-	test("does not return a sharded row when the request has no shards", () =>
+	test("does not return a pooled row when the request has no pools", () =>
 		withHarness(async ({ context, repos }) => {
-			const { workflowName, workflowVersionId } = await seedShardedQueuedRun({
+			const { workflowName, workflowVersionId } = await seedPooledQueuedRun({
 				namespaceRequestContext: context,
 				repos,
 			});
