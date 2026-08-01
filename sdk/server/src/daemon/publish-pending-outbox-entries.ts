@@ -53,7 +53,7 @@ export async function publishOutboxEntries(
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>,
 	{ baseDelayMs, maxDelayMs }: RepublishBackoff
 ) {
-	const publishedEntryIds = await publishRuns(context, publisher, entries);
+	const publishedEntryIds = await publish(context, publisher, entries);
 	if (!isNonEmptyArray(publishedEntryIds)) {
 		return;
 	}
@@ -76,7 +76,7 @@ export async function publishOutboxEntries(
 	await repos.workflowRunOutbox.markPublished(entriesToMarkPublished);
 }
 
-async function publishRuns(
+async function publish(
 	{ logger }: DaemonContext,
 	publisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>
