@@ -14,8 +14,8 @@ interface RedisConnectionSupervisorOptions {
 }
 
 interface RedisConnectionTracker {
-	isAvailable(): boolean;
-	assertIsAvailable(): void;
+	isAvailable(now?: number): boolean;
+	assertIsAvailable(now?: number): void;
 }
 
 /**
@@ -29,6 +29,8 @@ interface RedisConnectionTracker {
  * the connection's own connect timeout, stop assuming it is fine.
  *
  * The listeners only observe — the connection is never configured or acted on.
+ *
+ * The time predicates take the current time as a parameter, defaulting to Date.now().
  */
 function createConnectionTracker(redis: Redis): RedisConnectionTracker {
 	const readyGraceMs = redis.options.connectTimeout ?? 10_000;
@@ -44,8 +46,8 @@ function createConnectionTracker(redis: Redis): RedisConnectionTracker {
 		available = false;
 	});
 
-	const isAvailable = () => {
-		if (available && redis.status !== "ready" && Date.now() - lastReadyObservedAt > readyGraceMs) {
+	const isAvailable = (now = Date.now()) => {
+		if (available && redis.status !== "ready" && now - lastReadyObservedAt > readyGraceMs) {
 			available = false;
 		}
 		return available;
@@ -53,8 +55,8 @@ function createConnectionTracker(redis: Redis): RedisConnectionTracker {
 
 	return {
 		isAvailable,
-		assertIsAvailable() {
-			if (!isAvailable()) {
+		assertIsAvailable(now = Date.now()) {
+			if (!isAvailable(now)) {
 				throw new Error("Redis connection unavailable");
 			}
 		},
