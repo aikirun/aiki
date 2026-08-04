@@ -30,6 +30,7 @@ import type {
 	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStateCancelled,
+	WorkflowRunStateScheduledByNew,
 } from "@aikirun/types/workflow/run";
 import type { TaskInfo, TaskQueue, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { monotonicFactory, ulid } from "ulidx";
@@ -595,11 +596,11 @@ async function createWorkflowRunInTx(
 		scheduledAt: scheduledAt as TimestampMs,
 	});
 
-	const state = {
+	const state: WorkflowRunStateScheduledByNew = {
 		status: "scheduled",
 		scheduledAt,
 		reason: "new",
-	} as const;
+	};
 
 	await txRepos.stateTransition.append({
 		id: transitionId,
