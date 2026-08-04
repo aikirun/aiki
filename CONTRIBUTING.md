@@ -3,13 +3,11 @@
 Thanks for helping build Aiki! This is a short guide to getting a local dev
 environment running. For cutting releases, see [`.github/RELEASING.md`](.github/RELEASING.md).
 
-## Docs & design
+## Docs
 
 - **User documentation:** <https://aiki.run/docs>. The source lives in this repo
   under [`app/website/content/docs`](app/website/content/docs) — edit it there
   and run `bun run website` to preview.
-- **Design docs** (deeper architecture & design discussion) live in a separate
-  repo: <https://github.com/aikirun/design-docs>.
 
 ## Prerequisites
 
