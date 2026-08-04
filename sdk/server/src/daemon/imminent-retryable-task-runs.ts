@@ -40,7 +40,7 @@ export async function processImminentRetryableTasks(
 	config: { limit: number; lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
 	const { limit, lookaheadWindowMs, republishBackoff } = config;
-	const dueBefore = (Date.now() + lookaheadWindowMs) as TimestampMs;
+	const dueBefore = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	let now = Date.now();
 	for await (const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } of streamChunks(

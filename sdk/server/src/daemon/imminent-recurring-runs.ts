@@ -51,7 +51,7 @@ export async function processImminentRecurringRuns(
 	config: { limit: number; lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
 	const { limit, lookaheadWindowMs, republishBackoff } = config;
-	const dueBefore = (Date.now() + lookaheadWindowMs) as TimestampMs;
+	const dueBefore = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	for await (const rows of streamChunks(
 		(cursor) => deps.repos.schedule.listDueSchedules(context, dueBefore, limit, cursor),

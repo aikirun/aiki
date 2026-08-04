@@ -33,7 +33,7 @@ export async function processImminentSleepElapsedRuns(
 	config: { limit: number; lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
 	const { limit, lookaheadWindowMs, republishBackoff } = config;
-	const dueBefore = (Date.now() + lookaheadWindowMs) as TimestampMs;
+	const dueBefore = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
 		(cursor) => repos.workflowRun.listSleepElapsedRuns(context, dueBefore, limit, cursor),
