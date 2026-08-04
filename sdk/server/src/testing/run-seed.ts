@@ -27,25 +27,27 @@ function createServices(repos: Repositories) {
 	return { workflowRun, workflowRunStateMachine };
 }
 
-interface SeedQueuedRunDeps {
+interface SeedRunDeps {
 	repos: Repositories;
 	daemonContext?: DaemonContext;
 	namespaceRequestContext?: NamespaceRequestContext;
 }
 
-export async function seedQueuedRun(deps: SeedQueuedRunDeps) {
-	return _seedQueuedRun(deps, undefined);
+export async function seedScheduledRun(deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">) {
+	return _seedScheduledRun(deps, undefined);
 }
 
-export async function seedPooledQueuedRun(deps: SeedQueuedRunDeps) {
+export async function seedPooledScheduledRun(deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">) {
 	const pool = "warehouse-eu";
-	const seeded = await _seedQueuedRun(deps, pool);
+	const seeded = await _seedScheduledRun(deps, pool);
 	return { ...seeded, pool };
 }
 
-async function _seedQueuedRun(deps: SeedQueuedRunDeps, pool: string | undefined) {
+async function _seedScheduledRun(
+	deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">,
+	pool: string | undefined
+) {
 	const { repos } = deps;
-	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const services = createServices(repos);
 
@@ -55,6 +57,27 @@ async function _seedQueuedRun(deps: SeedQueuedRunDeps, pool: string | undefined)
 		input: { orderId: "order-7" },
 		options: pool ? { pool } : undefined,
 	});
+
+	return { runId, revisionWhenScheduled: 0, attemptsWhenScheduled: 1 };
+}
+
+export async function seedQueuedRun(deps: SeedRunDeps) {
+	return _seedQueuedRun(deps, undefined);
+}
+
+export async function seedPooledQueuedRun(deps: SeedRunDeps) {
+	const pool = "warehouse-eu";
+	const seeded = await _seedQueuedRun(deps, pool);
+	return { ...seeded, pool };
+}
+
+async function _seedQueuedRun(deps: SeedRunDeps, pool: string | undefined) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+
+	const { runId } = await _seedScheduledRun({ repos, namespaceRequestContext }, pool);
+
+	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 
 	await processImminentScheduledRuns(daemonContext, { repos }, { limit: 100, lookaheadWindowMs: 0, republishBackoff });
 
@@ -90,7 +113,7 @@ export async function claimRun(deps: { context: NamespaceRequestContext; repos: 
 	return { revisionWhenClaimed: claim.revision, attemptsWhenClaimed: claim.attempts };
 }
 
-export async function seedClaimedRun(deps: SeedQueuedRunDeps & { publisher: FakePublisher }) {
+export async function seedClaimedRun(deps: SeedRunDeps & { publisher: FakePublisher }) {
 	const { repos, publisher } = deps;
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
@@ -102,7 +125,7 @@ export async function seedClaimedRun(deps: SeedQueuedRunDeps & { publisher: Fake
 	return { ...seeded, ...claim };
 }
 
-export async function seedPublishedRun(deps: SeedQueuedRunDeps & { publisher: FakePublisher }) {
+export async function seedPublishedRun(deps: SeedRunDeps & { publisher: FakePublisher }) {
 	const { repos, publisher } = deps;
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const seeded = await seedQueuedRun(deps);
@@ -112,7 +135,7 @@ export async function seedPublishedRun(deps: SeedQueuedRunDeps & { publisher: Fa
 	return seeded;
 }
 
-export async function seedStalledRun(deps: SeedQueuedRunDeps) {
+export async function seedStalledRun(deps: SeedRunDeps) {
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const seeded = await withFakeClock(1 as TimestampMs, () => seedQueuedRun(deps));
 
