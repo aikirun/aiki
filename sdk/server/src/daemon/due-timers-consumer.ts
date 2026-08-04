@@ -148,8 +148,8 @@ async function processDueTimers(
 
 	for (const [timerType, timers] of timersByType) {
 		if (timerType === "recurring") {
-			const ids = timers.map((timer) => timer.id) as NonEmptyArray<string>;
-			const rows = await repos.schedule.listActiveByIds(context, ids);
+			const idSet = new Set(timers.map((timer) => timer.id));
+			const rows = await repos.schedule.listActiveByIds(context, Array.from(idSet) as NonEmptyArray<string>);
 			const schedules: DueSchedule[] = rows.map(({ schedule, workflow }) => ({
 				...scheduleRowToDomain(schedule, workflow),
 				workflowId: schedule.workflowId,
@@ -161,17 +161,11 @@ async function processDueTimers(
 			}
 			promises.push(queueRecurringRuns(context, deps, schedules, configProvider.config.republishBackoff));
 		} else {
-			const ids: string[] = [];
-			const rankById = new Map<string, number>();
-			for (const { id, rank } of timers) {
-				ids.push(id);
-				rankById.set(id, rank);
-			}
-
+			const rankById = new Map(timers.map((timer) => [timer.id, timer.rank]));
 			const runStatus = timerTypeToWorkflowRunStatus[timerType];
 			const runs: WorkflowRunMeta[] = await repos.workflowRun.listByIdsAndStatus(
 				context,
-				ids as NonEmptyArray<string>,
+				Array.from(rankById.keys()) as NonEmptyArray<string>,
 				runStatus
 			);
 
