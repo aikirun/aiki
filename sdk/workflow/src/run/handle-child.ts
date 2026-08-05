@@ -155,7 +155,7 @@ function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefini
 
 			childWorkflowRunStatus satisfies TerminalWorkflowRunStatus;
 
-			logger.debug("Child workflow run reached termnial state", {
+			logger.debug("Child workflow run reached terminal state", {
 				"aiki.childWorkflowTerminalStatus": childWorkflowRunStatus,
 			});
 			return {

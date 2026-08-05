@@ -82,7 +82,7 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 	refresh: () => Promise<void>;
 
 	/**
-	 *  Waits for the child workflow run to reach a terminal status by polling.
+	 * Waits for the workflow run to reach a terminal status by polling.
 	 *
 	 * Returns a result object:
 	 * - `{ success: true, state }` - workflow reached the expected status
@@ -90,7 +90,8 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 	 *
 	 * Possible failure causes:
 	 * - `"run_terminated"` - workflow reached a terminal state other than expected
-	 * - `"timeout"` - timeout elapsed (only when timeout option provided)
+	 * - `"timeout"` - the wall-clock timeout elapsed (only when timeout option provided);
+	 *   a final poll happens at the deadline before the wait gives up
 	 * - `"aborted"` - abort signal triggered (only when signal option provided)
 	 *
 	 * @param status - The target status to wait for

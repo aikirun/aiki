@@ -49,6 +49,15 @@ export interface WorkflowExecutionConfig {
 	maxInlineWaitMs: number;
 }
 
+/**
+ * Executes a workflow run: replays recorded progress, then advances the handler until the
+ * run completes, suspends, or fails.
+ *
+ * Returns true when the segment reached a recorded outcome (completed, suspended, failed,
+ * or the run was not executable), so the caller can settle the delivery.
+ * Returns false on an unexpected error, so the caller can leave the delivery eligible for
+ * redelivery.
+ */
 export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
 	const { client, workflowRun, workflowVersion, logger, configProvider, heartbeat, signal } = params;
 	const workflowRunId = workflowRun.id as WorkflowRunId;
