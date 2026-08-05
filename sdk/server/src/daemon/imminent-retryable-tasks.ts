@@ -71,7 +71,7 @@ export async function processImminentRetryableTasks(
 				}
 			}
 			if (isNonEmptyArray(rankedRuns)) {
-				await queueRetryableTaskRuns(context, repos, publisher, republishBackoff, rankedRuns);
+				await queueRetryableTasks(context, repos, publisher, republishBackoff, rankedRuns);
 			}
 		}
 
@@ -92,7 +92,7 @@ export async function processImminentRetryableTasks(
 	}
 }
 
-export async function queueRetryableTaskRuns(
+export async function queueRetryableTasks(
 	context: DaemonContext,
 	repos: Repos,
 	publisher: Publisher | undefined,

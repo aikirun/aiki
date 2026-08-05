@@ -12,7 +12,7 @@ import { queueChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-o
 import { queueEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { type DueSchedule, queueRecurringRuns } from "./imminent-recurring-runs";
 import { queueRetryableRuns } from "./imminent-retryable-runs";
-import { queueRetryableTaskRuns } from "./imminent-retryable-task-runs";
+import { queueRetryableTasks } from "./imminent-retryable-tasks";
 import { queueScheduledRuns } from "./imminent-scheduled-runs";
 import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import type { RepublishBackoff } from "./publish-pending-outbox-entries";
@@ -195,7 +195,7 @@ async function processDueTimers(
 				}
 				case "task_retry": {
 					promises.push(
-						queueRetryableTaskRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
+						queueRetryableTasks(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
 					);
 					break;
 				}

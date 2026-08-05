@@ -10,7 +10,7 @@ import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wa
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { processImminentRecurringRuns } from "./imminent-recurring-runs";
 import { processImminentRetryableRuns } from "./imminent-retryable-runs";
-import { processImminentRetryableTasks } from "./imminent-retryable-task-runs";
+import { processImminentRetryableTasks } from "./imminent-retryable-tasks";
 import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { publishPendingOutboxEntries } from "./publish-pending-outbox-entries";
