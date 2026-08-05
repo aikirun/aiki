@@ -128,3 +128,8 @@ Before writing any test, study the exemplars for its tier and match their idioms
   cell is the illegal case, `{}` is legal-unguarded, and `NonEmptyArray` forbids the empty guard
   list a plain `string[]` would accept — `{ reasons: [] }` would generate zero accepts tests and
   silently decline every reason.
+- A case-table cell is data only while every case is exercised identically. When cases differ
+  in how the action is performed (a different transition variant, a different seed), the cell
+  is a function that performs the action and the loop just calls it — the refreshClaim guard
+  table's cells are the seed functions themselves. A data cell that forces the loop to branch
+  on the case puts per-case knowledge in the wrong place.

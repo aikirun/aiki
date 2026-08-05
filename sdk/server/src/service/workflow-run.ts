@@ -477,7 +477,7 @@ export const createWorkflowRunService = ({
 		}
 
 		return repos.transaction(async (txRepos) => {
-			const cancelledRunIds = await txRepos.workflowRun.bulkTransitionToCancelled(ids);
+			const cancelledRunIds = await txRepos.workflowRun.bulkTransitionToCancelled(namespaceId, ids);
 			if (!isNonEmptyArray(cancelledRunIds)) {
 				return { cancelledIds: [] };
 			}
