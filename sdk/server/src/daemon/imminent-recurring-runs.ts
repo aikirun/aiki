@@ -403,7 +403,7 @@ async function processOverlapCancelPreviousSchedules(
 
 		// Step 1: Cancel active runs (without setting latestStateTransitionId)
 		const cancelledRunIds = isNonEmptyArray(runIdsToCancel)
-			? await txRepos.workflowRun.bulkTransitionToCancelled(runIdsToCancel)
+			? await txRepos.workflowRun.bulkTransitionToCancelledGlobal(context, runIdsToCancel)
 			: [];
 
 		// Step 2: Discard in-flight tasks and outbox entries for the cancelled runs, then insert

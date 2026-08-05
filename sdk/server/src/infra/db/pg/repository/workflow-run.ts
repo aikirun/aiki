@@ -488,7 +488,30 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result.map((row) => row.id);
 	},
 
-	async bulkTransitionToCancelled(runIds: NonEmptyArray<string>): Promise<string[]> {
+	async bulkTransitionToCancelled(namespaceId: NamespaceId, runIds: NonEmptyArray<string>): Promise<string[]> {
+		const result = await db
+			.update(workflowRun)
+			.set({
+				status: "cancelled",
+				revision: sql`${workflowRun.revision} + 1`,
+				scheduledAt: null,
+				wakeupAt: null,
+				timeoutAt: null,
+				nextAttemptAt: null,
+			})
+			.where(
+				and(
+					eq(workflowRun.namespaceId, namespaceId),
+					inArray(workflowRun.id, runIds),
+					inArray(workflowRun.status, NON_TERMINAL_WORKFLOW_RUN_STATUSES)
+				)
+			)
+			.returning({ id: workflowRun.id });
+
+		return result.map((row) => row.id);
+	},
+
+	async bulkTransitionToCancelledGlobal(_context: DaemonContext, runIds: NonEmptyArray<string>): Promise<string[]> {
 		const result = await db
 			.update(workflowRun)
 			.set({
