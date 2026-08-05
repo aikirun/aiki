@@ -15,7 +15,6 @@ export type {
 	EventSendOptions,
 	EventWait,
 	EventWaitOptions,
-	EventWaitQueue,
 	EventWaitResult,
 	ReplayManifest,
 	TriggerStrategy,

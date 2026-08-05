@@ -25,10 +25,6 @@ export interface SleepCancelled extends SleepBase {
 
 export type Sleep = SleepSleeping | SleepCompleted | SleepCancelled;
 
-export interface SleepQueue {
-	sleeps: Sleep[];
-}
-
 export interface SleepResult {
 	cancelled: boolean;
 }

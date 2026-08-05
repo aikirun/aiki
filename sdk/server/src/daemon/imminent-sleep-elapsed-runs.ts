@@ -18,7 +18,7 @@ import type { DaemonContext } from "../middleware/context";
 
 type Repos = Pick<
 	Repositories,
-	"workflowRun" | "stateTransition" | "sleepQueue" | "workflow" | "workflowRunOutbox" | "transaction"
+	"workflowRun" | "stateTransition" | "sleep" | "workflow" | "workflowRunOutbox" | "transaction"
 >;
 
 export interface ProcessImminentSleepElapsedRunsDeps {
@@ -143,7 +143,7 @@ async function processChunk(
 			return [];
 		}
 
-		await txRepos.sleepQueue.bulkCompleteByWorkflowRunIds(transitionedRunIds, completedAt);
+		await txRepos.sleep.bulkCompleteByWorkflowRunIds(transitionedRunIds, completedAt);
 
 		let stateTransitionEntriesToInsert = stateTransitionEntries;
 		let outboxEntriesToInsert = outboxEntries;

@@ -23,10 +23,6 @@ export interface EventWaitTimeout extends EventWaitBase {
 
 export type EventWait<Data> = EventWaitReceived<Data> | EventWaitTimeout;
 
-export interface EventWaitQueue<Data> {
-	eventWaits: EventWait<Data>[];
-}
-
 export interface EventWaitOptions<Timed extends boolean> {
 	timeout?: Timed extends true ? DurationObject : never;
 }

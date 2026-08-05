@@ -1,23 +1,19 @@
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
-import type {
-	ChildWorkflowRunWait,
-	ChildWorkflowRunWaitQueue,
-	TerminalWorkflowRunStatus,
-} from "@aikirun/types/workflow/run";
+import type { ChildWorkflowRunWait, TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
 import { workflowRunHandle } from "./handle";
 import { childWorkflowRunHandle } from "./handle-child";
 import { describe, expect, test } from "bun:test";
 
-function childWaitQueues(
+function childWaits(
 	waits: Partial<Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]>>
-): Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue> {
+): Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]> {
 	return {
-		cancelled: { childWorkflowRunWaits: waits.cancelled ?? [] },
-		completed: { childWorkflowRunWaits: waits.completed ?? [] },
-		failed: { childWorkflowRunWaits: waits.failed ?? [] },
+		cancelled: waits.cancelled ?? [],
+		completed: waits.completed ?? [],
+		failed: waits.failed ?? [],
 	};
 }
 
@@ -28,12 +24,12 @@ describe("childWorkflowRunHandle", () => {
 				const parentRecord = runningWorkflowRunRecordFactory.build();
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentHandle = workflowRunHandle(client, parentRecord);
-				const queues = childWaitQueues({
+				const waits = childWaits({
 					completed: [
 						{ status: "completed", completedAt: 0, childWorkflowRunState: { status: "completed", output: "done" } },
 					],
 				});
-				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, queues, client.logger);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, waits, client.logger);
 
 				expect(await childHandle.waitForStatus("completed")).toEqual({
 					success: true,
@@ -46,8 +42,8 @@ describe("childWorkflowRunHandle", () => {
 				const parentRecord = runningWorkflowRunRecordFactory.build();
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentHandle = workflowRunHandle(client, parentRecord);
-				const queues = childWaitQueues({ completed: [{ status: "timeout", timedOutAt: 0 }] });
-				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, queues, client.logger);
+				const waits = childWaits({ completed: [{ status: "timeout", timedOutAt: 0 }] });
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, waits, client.logger);
 
 				expect(await childHandle.waitForStatus("completed", { timeout: { minutes: 5 } })).toEqual({
 					success: false,
@@ -60,7 +56,7 @@ describe("childWorkflowRunHandle", () => {
 				const parentRecord = runningWorkflowRunRecordFactory.build();
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentHandle = workflowRunHandle(client, parentRecord);
-				const queues = childWaitQueues({
+				const waits = childWaits({
 					completed: [
 						{
 							status: "completed",
@@ -69,7 +65,7 @@ describe("childWorkflowRunHandle", () => {
 						},
 					],
 				});
-				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, queues, client.logger);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, waits, client.logger);
 
 				expect(await childHandle.waitForStatus("completed")).toEqual({ success: false, cause: "run_terminated" });
 			}));
@@ -79,13 +75,7 @@ describe("childWorkflowRunHandle", () => {
 				const parentRecord = runningWorkflowRunRecordFactory.build({ revision: 0 });
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentHandle = workflowRunHandle(client, parentRecord);
-				const childHandle = childWorkflowRunHandle(
-					client,
-					childRecord,
-					parentHandle,
-					childWaitQueues({}),
-					client.logger
-				);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, childWaits({}), client.logger);
 
 				client.api.workflowRun.transitionStateV1.once(
 					{
@@ -109,13 +99,7 @@ describe("childWorkflowRunHandle", () => {
 				const parentRecord = runningWorkflowRunRecordFactory.build({ revision: 0 });
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentHandle = workflowRunHandle(client, parentRecord);
-				const childHandle = childWorkflowRunHandle(
-					client,
-					childRecord,
-					parentHandle,
-					childWaitQueues({}),
-					client.logger
-				);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, childWaits({}), client.logger);
 
 				client.api.workflowRun.transitionStateV1.once(
 					{
@@ -142,13 +126,7 @@ describe("childWorkflowRunHandle", () => {
 				const parentRecord = runningWorkflowRunRecordFactory.build({ revision: 0 });
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentHandle = workflowRunHandle(client, parentRecord);
-				const childHandle = childWorkflowRunHandle(
-					client,
-					childRecord,
-					parentHandle,
-					childWaitQueues({}),
-					client.logger
-				);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, childWaits({}), client.logger);
 
 				client.api.workflowRun.transitionStateV1.rejectsOnce(
 					{
@@ -172,7 +150,7 @@ describe("childWorkflowRunHandle", () => {
 				const parentRecord = runningWorkflowRunRecordFactory.build();
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentHandle = workflowRunHandle(client, parentRecord);
-				const queues = childWaitQueues({
+				const waits = childWaits({
 					completed: [
 						{ status: "completed", completedAt: 0, childWorkflowRunState: { status: "completed", output: "first" } },
 						{
@@ -182,7 +160,7 @@ describe("childWorkflowRunHandle", () => {
 						},
 					],
 				});
-				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, queues, client.logger);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, waits, client.logger);
 
 				expect(await childHandle.waitForStatus("completed")).toEqual({
 					success: true,
@@ -197,7 +175,7 @@ describe("childWorkflowRunHandle", () => {
 			const parentRecord = runningWorkflowRunRecordFactory.build();
 			const childRecord = runningWorkflowRunRecordFactory.build();
 			const parentHandle = workflowRunHandle(client, parentRecord);
-			const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, childWaitQueues({}), client.logger);
+			const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, childWaits({}), client.logger);
 
 			expect(childHandle.run).toEqual(childRecord);
 		}));
@@ -207,7 +185,7 @@ describe("childWorkflowRunHandle", () => {
 			const parentRecord = runningWorkflowRunRecordFactory.build();
 			const childRecord = runningWorkflowRunRecordFactory.build({ revision: 2 });
 			const parentHandle = workflowRunHandle(client, parentRecord);
-			const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, childWaitQueues({}), client.logger);
+			const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, childWaits({}), client.logger);
 
 			client.api.workflowRun.transitionStateV1.once(
 				{ type: "pessimistic", id: childRecord.id, state: { status: "cancelled", reason: "stop it" } },

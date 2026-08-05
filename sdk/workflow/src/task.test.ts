@@ -273,7 +273,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: sendEmail.name, referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({ name: sendEmail.name, state: { output } });
 				const runRecord = runningWorkflowRunRecordFactory.build({
-					taskQueues: { [address]: { tasks: [recordedTask] } },
+					tasks: { [address]: [recordedTask] },
 				});
 				const run = createTestWorkflowRun(client, runRecord);
 
@@ -310,7 +310,7 @@ describe("task", () => {
 					state: { output: recordedOutput },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
-					taskQueues: { [address]: { tasks: [recordedTask] } },
+					tasks: { [address]: [recordedTask] },
 				});
 				const run = createTestWorkflowRun(client, runRecord);
 
@@ -365,7 +365,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
 				const failedTask = failedTaskInfoFactory.build({ name: chargeCard.name });
 				const runRecord = runningWorkflowRunRecordFactory.build({
-					taskQueues: { [address]: { tasks: [failedTask] } },
+					tasks: { [address]: [failedTask] },
 				});
 				const run = createTestWorkflowRun(client, runRecord);
 
@@ -381,7 +381,7 @@ describe("task", () => {
 				});
 
 				const runRecord = runningWorkflowRunRecordFactory.build({
-					taskQueues: { "other-task:other-hash": { tasks: [completedTaskInfoFactory.build()] } },
+					tasks: { "other-task:other-hash": [completedTaskInfoFactory.build()] },
 				});
 				const run = createTestWorkflowRun(client, runRecord);
 

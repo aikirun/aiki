@@ -19,11 +19,10 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ChildWorkflowRunInfo,
-	ChildWorkflowRunQueue,
-	ChildWorkflowRunWaitQueue,
+	ChildWorkflowRunWait,
 	EventReference,
-	EventWaitQueue,
-	SleepQueue,
+	EventWait,
+	Sleep,
 	TerminalWorkflowRunState,
 	TerminalWorkflowRunStatus,
 	WorkflowRunId,
@@ -32,14 +31,14 @@ import type {
 	WorkflowRunStateCancelled,
 	WorkflowRunStateScheduledByNew,
 } from "@aikirun/types/workflow/run";
-import type { TaskInfo, TaskQueue, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
+import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { monotonicFactory, ulid } from "ulidx";
 
 import { WorkflowRunConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
-import type { ChildWorkflowRunWaitQueueRow } from "../infra/db/types/child-workflow-run-wait-queue";
-import type { EventWaitQueueRow, EventWaitQueueRowInsert } from "../infra/db/types/event-wait-queue";
-import type { SleepQueueRow } from "../infra/db/types/sleep-queue";
+import type { ChildWorkflowRunWaitRow } from "../infra/db/types/child-workflow-run-wait";
+import type { EventWaitRow, EventWaitRowInsert } from "../infra/db/types/event-wait";
+import type { SleepRow } from "../infra/db/types/sleep";
 import type {
 	StateTransitionRepository,
 	StateTransitionRow,
@@ -60,9 +59,9 @@ export interface WorkflowRunServiceDeps {
 		| "workflow"
 		| "stateTransition"
 		| "task"
-		| "sleepQueue"
-		| "eventWaitQueue"
-		| "childWorkflowRunWaitQueue"
+		| "sleep"
+		| "eventWait"
+		| "childWorkflowRunWait"
 		| "transaction"
 	>;
 	childRunCanceller: ChildRunCanceller;
@@ -256,7 +255,7 @@ export const createWorkflowRunService = ({
 				throw new NotFoundError(`Workflow run not found: ${runId}`);
 			}
 
-			const eventWaitEntry: EventWaitQueueRowInsert = {
+			const eventWaitEntry: EventWaitRowInsert = {
 				id: ulid(),
 				workflowRunId: runId,
 				name: eventName,
@@ -265,9 +264,9 @@ export const createWorkflowRunService = ({
 				data,
 			};
 			if (propsRequiredNonNull(eventWaitEntry, "referenceId")) {
-				await txRepos.eventWaitQueue.upsert(eventWaitEntry);
+				await txRepos.eventWait.upsert(eventWaitEntry);
 			} else {
-				await txRepos.eventWaitQueue.insert(eventWaitEntry);
+				await txRepos.eventWait.insert(eventWaitEntry);
 			}
 
 			if (run.status !== "awaiting_event") {
@@ -632,10 +631,10 @@ async function getWorkflowRun(
 		await Promise.all([
 			repos.stateTransition.getById(runRow.latestStateTransitionId),
 			repos.task.listByWorkflowRunId(runRow.id),
-			repos.sleepQueue.listByWorkflowRunId(runRow.id as WorkflowRunId),
-			repos.eventWaitQueue.listByWorkflowRunId(runRow.id),
+			repos.sleep.listByWorkflowRunId(runRow.id as WorkflowRunId),
+			repos.eventWait.listByWorkflowRunId(runRow.id),
 			repos.workflowRun.getChildRuns({ parentRunId: runRow.id }),
-			repos.childWorkflowRunWaitQueue.listByParentRunId(runRow.id),
+			repos.childWorkflowRunWait.listByParentRunId(runRow.id),
 		]);
 
 	if (!latestTransition) {
@@ -648,10 +647,10 @@ async function getWorkflowRun(
 		: [];
 	const taskTransitionsById = new Map(taskTransitionRows.map((transition) => [transition.id, transition]));
 
-	const tasksByAddress = buildTaskQueuesByAddressRecord(taskRows, taskTransitionsById);
-	const sleepQueuesByName = buildSleepQueuesByNameRecord(sleepRows);
-	const eventWaitQueuesByName = buildEventWaitQueuesByNameRecord(eventWaitRows);
-	const childWorkflowRunsByAddress = await buildChildWorkflowRunQueuesByAddressRecord(
+	const tasksByAddress = buildTasksByAddress(taskRows, taskTransitionsById);
+	const sleepsByName = buildSleepsByName(sleepRows);
+	const eventWaitsByName = buildEventWaitsByName(eventWaitRows);
+	const childWorkflowRunsByAddress = await buildChildWorkflowRunsByAddress(
 		namespaceId,
 		childRunRows,
 		childWorkflowRunWaitRows,
@@ -671,20 +670,20 @@ async function getWorkflowRun(
 		options: runRow.options !== null ? runRow.options : undefined,
 		attempts: runRow.attempts,
 		state: latestTransition.state as WorkflowRunState,
-		taskQueues: tasksByAddress,
-		sleepQueues: sleepQueuesByName,
-		eventWaitQueues: eventWaitQueuesByName,
-		childWorkflowRunQueues: childWorkflowRunsByAddress,
+		tasks: tasksByAddress,
+		sleeps: sleepsByName,
+		eventWaits: eventWaitsByName,
+		childWorkflowRuns: childWorkflowRunsByAddress,
 		parentWorkflowRunId: runRow.parentWorkflowRunId ?? undefined,
 		scheduleId: runRow.scheduleId ?? undefined,
 	};
 }
 
-function buildTaskQueuesByAddressRecord(
+function buildTasksByAddress(
 	tasks: TaskRow[],
 	taskTransitionsById: Map<string, StateTransitionRow>
-): Record<string, TaskQueue> {
-	const taskQueuesByAddress: Record<string, TaskQueue> = {};
+): Record<string, TaskInfo[]> {
+	const tasksByAddress: Record<string, TaskInfo[]> = {};
 	for (const task of tasks) {
 		if (task.status === "discarded") {
 			continue;
@@ -700,36 +699,36 @@ function buildTaskQueuesByAddressRecord(
 			state: transition.state as Exclude<TaskState, TaskStateDiscarded>,
 			inputHash: task.inputHash,
 		};
-		const taskQueue = taskQueuesByAddress[address];
-		if (taskQueue) {
-			taskQueue.tasks.push(taskInfo);
+		const tasksForAddress = tasksByAddress[address];
+		if (tasksForAddress) {
+			tasksForAddress.push(taskInfo);
 		} else {
-			taskQueuesByAddress[address] = { tasks: [taskInfo] };
+			tasksByAddress[address] = [taskInfo];
 		}
 	}
-	return taskQueuesByAddress;
+	return tasksByAddress;
 }
 
-function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<string, SleepQueue> {
-	const sleepQueuesByName: Record<string, SleepQueue> = {};
+function buildSleepsByName(sleepRows: SleepRow[]): Record<string, Sleep[]> {
+	const sleepsByName: Record<string, Sleep[]> = {};
 
-	for (const row of sleepQueueRows) {
-		let queue = sleepQueuesByName[row.name];
-		if (!queue) {
-			queue = { sleeps: [] };
-			sleepQueuesByName[row.name] = queue;
+	for (const row of sleepRows) {
+		let sleeps = sleepsByName[row.name];
+		if (!sleeps) {
+			sleeps = [];
+			sleepsByName[row.name] = sleeps;
 		}
 
 		switch (row.status) {
 			case "sleeping":
-				queue.sleeps.push({ status: row.status, wakeupAt: row.wakeupAt });
+				sleeps.push({ status: row.status, wakeupAt: row.wakeupAt });
 				break;
 			case "completed": {
 				const { completedAt } = row;
 				if (completedAt === null) {
 					throw Error(`Sleep ${row.id} completed but no completedAt timestamp`);
 				}
-				queue.sleeps.push({
+				sleeps.push({
 					status: row.status,
 					durationMs: completedAt - row.createdAt,
 					completedAt: completedAt,
@@ -741,7 +740,7 @@ function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<s
 				if (cancelledAt === null) {
 					throw Error(`Sleep ${row.id} cancelled but no cancelledAt timestamp`);
 				}
-				queue.sleeps.push({ status: row.status, cancelledAt: cancelledAt });
+				sleeps.push({ status: row.status, cancelledAt: cancelledAt });
 				break;
 			}
 			default:
@@ -749,22 +748,22 @@ function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<s
 		}
 	}
 
-	return sleepQueuesByName;
+	return sleepsByName;
 }
 
-function buildEventWaitQueuesByNameRecord(eventWaitRows: EventWaitQueueRow[]): Record<string, EventWaitQueue<unknown>> {
-	const eventWaitQueuesByName: Record<string, EventWaitQueue<unknown>> = {};
+function buildEventWaitsByName(eventWaitRows: EventWaitRow[]): Record<string, EventWait<unknown>[]> {
+	const eventWaitsByName: Record<string, EventWait<unknown>[]> = {};
 
 	for (const row of eventWaitRows) {
-		let queue = eventWaitQueuesByName[row.name];
-		if (!queue) {
-			queue = { eventWaits: [] };
-			eventWaitQueuesByName[row.name] = queue;
+		let eventWaits = eventWaitsByName[row.name];
+		if (!eventWaits) {
+			eventWaits = [];
+			eventWaitsByName[row.name] = eventWaits;
 		}
 
 		switch (row.status) {
 			case "received":
-				queue.eventWaits.push({
+				eventWaits.push({
 					status: row.status,
 					data: row.data,
 					receivedAt: row.createdAt,
@@ -776,7 +775,7 @@ function buildEventWaitQueuesByNameRecord(eventWaitRows: EventWaitQueueRow[]): R
 				if (timedOutAt === null) {
 					throw Error(`Event wait ${row.id} timed out but no timeoutAt timestamp`);
 				}
-				queue.eventWaits.push({
+				eventWaits.push({
 					status: row.status,
 					timedOutAt: timedOutAt,
 				});
@@ -787,17 +786,17 @@ function buildEventWaitQueuesByNameRecord(eventWaitRows: EventWaitQueueRow[]): R
 		}
 	}
 
-	return eventWaitQueuesByName;
+	return eventWaitsByName;
 }
 
-async function buildChildWorkflowRunQueuesByAddressRecord(
+async function buildChildWorkflowRunsByAddress(
 	namespaceId: NamespaceId,
 	childRuns: WorkflowRunRow[],
-	childRunWaitQueues: ChildWorkflowRunWaitQueueRow[],
+	childRunWaits: ChildWorkflowRunWaitRow[],
 	stateTransitionRepo: StateTransitionRepository,
 	workflowRepo: WorkflowRepository
-): Promise<Record<string, ChildWorkflowRunQueue>> {
-	const childStateTransitionIds = childRunWaitQueues.reduce((acc: string[], { childWorkflowRunStateTransitionId }) => {
+): Promise<Record<string, ChildWorkflowRunInfo[]>> {
+	const childStateTransitionIds = childRunWaits.reduce((acc: string[], { childWorkflowRunStateTransitionId }) => {
 		if (childWorkflowRunStateTransitionId !== null) {
 			acc.push(childWorkflowRunStateTransitionId);
 		}
@@ -808,31 +807,31 @@ async function buildChildWorkflowRunQueuesByAddressRecord(
 		: [];
 	const childStateTransitionsById = new Map(childStateTransitions.map((transition) => [transition.id, transition]));
 
-	const waitQueuesByChildRunId = new Map<WorkflowRunId, Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>>();
+	const waitsByChildRunId = new Map<WorkflowRunId, Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]>>();
 
-	for (const childRunWaitQueue of childRunWaitQueues) {
-		const childRunId = childRunWaitQueue.childWorkflowRunId as WorkflowRunId;
+	for (const childRunWait of childRunWaits) {
+		const childRunId = childRunWait.childWorkflowRunId as WorkflowRunId;
 
-		let queues = waitQueuesByChildRunId.get(childRunId);
-		if (!queues) {
-			queues = {
-				cancelled: { childWorkflowRunWaits: [] },
-				completed: { childWorkflowRunWaits: [] },
-				failed: { childWorkflowRunWaits: [] },
+		let waits = waitsByChildRunId.get(childRunId);
+		if (!waits) {
+			waits = {
+				cancelled: [],
+				completed: [],
+				failed: [],
 			};
-			waitQueuesByChildRunId.set(childRunId, queues);
+			waitsByChildRunId.set(childRunId, waits);
 		}
 
-		const { childWorkflowRunStatus } = childRunWaitQueue;
+		const { childWorkflowRunStatus } = childRunWait;
 
-		switch (childRunWaitQueue.status) {
+		switch (childRunWait.status) {
 			case "completed": {
-				const { completedAt, childWorkflowRunStateTransitionId } = childRunWaitQueue;
+				const { completedAt, childWorkflowRunStateTransitionId } = childRunWait;
 				if (completedAt === null) {
-					throw new Error(`Child workflow run wait ${childRunWaitQueue.id} completed but no completedAt timestamp`);
+					throw new Error(`Child workflow run wait ${childRunWait.id} completed but no completedAt timestamp`);
 				}
 				if (childWorkflowRunStateTransitionId === null) {
-					throw new Error(`Child workflow run wait ${childRunWaitQueue.id} completed but no state transition id`);
+					throw new Error(`Child workflow run wait ${childRunWait.id} completed but no state transition id`);
 				}
 
 				const childStateTransition = childStateTransitionsById.get(childWorkflowRunStateTransitionId);
@@ -840,27 +839,27 @@ async function buildChildWorkflowRunQueuesByAddressRecord(
 					throw new Error(`State transition not found: ${childWorkflowRunStateTransitionId}`);
 				}
 
-				queues[childWorkflowRunStatus].childWorkflowRunWaits.push({
-					status: childRunWaitQueue.status,
+				waits[childWorkflowRunStatus].push({
+					status: childRunWait.status,
 					completedAt: completedAt,
 					childWorkflowRunState: childStateTransition.state as TerminalWorkflowRunState,
 				});
 				break;
 			}
 			case "timeout": {
-				const { timedOutAt } = childRunWaitQueue;
+				const { timedOutAt } = childRunWait;
 				if (timedOutAt === null) {
-					throw new Error(`Child workflow run wait ${childRunWaitQueue.id} timed out but no timedOutAt timestamp`);
+					throw new Error(`Child workflow run wait ${childRunWait.id} timed out but no timedOutAt timestamp`);
 				}
 
-				queues[childWorkflowRunStatus].childWorkflowRunWaits.push({
-					status: childRunWaitQueue.status,
+				waits[childWorkflowRunStatus].push({
+					status: childRunWait.status,
 					timedOutAt: timedOutAt,
 				});
 				break;
 			}
 			default:
-				childRunWaitQueue.status satisfies never;
+				childRunWait.status satisfies never;
 		}
 	}
 
@@ -870,7 +869,7 @@ async function buildChildWorkflowRunQueuesByAddressRecord(
 		: [];
 	const childWorkflowsById = new Map(childWorkflows.map((workflow) => [workflow.id, workflow]));
 
-	const childRunQueuesByAddress: Record<string, ChildWorkflowRunQueue> = {};
+	const childRunsByAddress: Record<string, ChildWorkflowRunInfo[]> = {};
 
 	for (const childRun of childRuns) {
 		const childWorkflow = childWorkflowsById.get(childRun.workflowId);
@@ -889,20 +888,20 @@ async function buildChildWorkflowRunQueuesByAddressRecord(
 			name: childWorkflow.name,
 			versionId: childWorkflow.versionId,
 			inputHash: childRun.inputHash,
-			childWorkflowRunWaitQueues: waitQueuesByChildRunId.get(childRun.id as WorkflowRunId) ?? {
-				cancelled: { childWorkflowRunWaits: [] },
-				completed: { childWorkflowRunWaits: [] },
-				failed: { childWorkflowRunWaits: [] },
+			waits: waitsByChildRunId.get(childRun.id as WorkflowRunId) ?? {
+				cancelled: [],
+				completed: [],
+				failed: [],
 			},
 		};
 
-		const childRunQueue = childRunQueuesByAddress[childRunAddress];
-		if (childRunQueue) {
-			childRunQueue.childWorkflowRuns.push(childRunInfo);
+		const addressChildRuns = childRunsByAddress[childRunAddress];
+		if (addressChildRuns) {
+			addressChildRuns.push(childRunInfo);
 		} else {
-			childRunQueuesByAddress[childRunAddress] = { childWorkflowRuns: [childRunInfo] };
+			childRunsByAddress[childRunAddress] = [childRunInfo];
 		}
 	}
 
-	return childRunQueuesByAddress;
+	return childRunsByAddress;
 }

@@ -23,8 +23,8 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 
 		const nextIndex = nextIndexBySleepName[sleepName] ?? 0;
 
-		const sleepQueue = handle.run.sleepQueues[sleepName] ?? { sleeps: [] };
-		const existingSleep = sleepQueue.sleeps[nextIndex];
+		const sleeps = handle.run.sleeps[sleepName] ?? [];
+		const existingSleep = sleeps[nextIndex];
 
 		if (!existingSleep) {
 			try {

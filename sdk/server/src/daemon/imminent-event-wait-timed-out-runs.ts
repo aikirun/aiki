@@ -8,7 +8,7 @@ import { ulid } from "ulidx";
 
 import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { Repositories } from "../infra/db/types";
-import type { EventWaitQueueRowInsert } from "../infra/db/types/event-wait-queue";
+import type { EventWaitRowInsert } from "../infra/db/types/event-wait";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRow } from "../infra/db/types/workflow";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
@@ -20,7 +20,7 @@ import type { DaemonContext } from "../middleware/context";
 
 type Repos = Pick<
 	Repositories,
-	"workflowRun" | "stateTransition" | "eventWaitQueue" | "workflow" | "workflowRunOutbox" | "transaction"
+	"workflowRun" | "stateTransition" | "eventWait" | "workflow" | "workflowRunOutbox" | "transaction"
 >;
 
 export interface ProcessImminentEventWaitTimedOutRunsDeps {
@@ -105,7 +105,7 @@ async function processChunk(
 ): Promise<void> {
 	const timedOutAt = Date.now() as TimestampMs;
 
-	const eventWaitEntries: EventWaitQueueRowInsert[] = [];
+	const eventWaitEntries: EventWaitRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -196,7 +196,7 @@ async function processChunk(
 			return [];
 		}
 
-		await txRepos.eventWaitQueue.insert(eventWaitEntriesToInsert);
+		await txRepos.eventWait.insert(eventWaitEntriesToInsert);
 		await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
 		await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
 		return outboxEntriesToInsert;

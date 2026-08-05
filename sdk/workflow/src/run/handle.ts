@@ -216,6 +216,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 	}
 
 	public async refresh() {
+		// TODO: when chunking is implemented, refresh should load only data after it's cursor
 		const { run: currentRun } = await this.api.workflowRun.getByIdV1({ id: this.run.id });
 		this._run = currentRun as WorkflowRunRecord<Input, Output>;
 	}

@@ -1,8 +1,8 @@
 import { createPgHandle, type PgClient, type PgDb } from "./provider";
-import { createChildWorkflowRunWaitQueueRepository } from "./repository/child-workflow-run-wait-queue";
-import { createEventWaitQueueRepository } from "./repository/event-wait-queue";
+import { createChildWorkflowRunWaitRepository } from "./repository/child-workflow-run-wait";
+import { createEventWaitRepository } from "./repository/event-wait";
 import { createScheduleRepository } from "./repository/schedule";
-import { createSleepQueueRepository } from "./repository/sleep-queue";
+import { createSleepRepository } from "./repository/sleep";
 import { createStateTransitionRepository } from "./repository/state-transition";
 import { createTaskRepository } from "./repository/task";
 import { createWorkflowRepository } from "./repository/workflow";
@@ -16,9 +16,9 @@ const createRepos = (db: PgDb): Omit<Repositories, "transaction"> => ({
 	stateTransition: createStateTransitionRepository(db),
 	schedule: createScheduleRepository(db),
 	workflow: createWorkflowRepository(db),
-	sleepQueue: createSleepQueueRepository(db),
-	eventWaitQueue: createEventWaitQueueRepository(db),
-	childWorkflowRunWaitQueue: createChildWorkflowRunWaitQueueRepository(db),
+	sleep: createSleepRepository(db),
+	eventWait: createEventWaitRepository(db),
+	childWorkflowRunWait: createChildWorkflowRunWaitRepository(db),
 	workflowRunOutbox: createWorkflowRunOutboxRepository(db),
 });
 

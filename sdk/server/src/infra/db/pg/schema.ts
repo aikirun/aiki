@@ -255,8 +255,8 @@ export const stateTransition = pgTable(
 	]
 );
 
-export const sleepQueue = pgTable(
-	"sleep_queue",
+export const sleep = pgTable(
+	"sleep",
 	{
 		id: text("id").primaryKey(),
 		workflowRunId: text("workflow_run_id").notNull(),
@@ -272,27 +272,25 @@ export const sleepQueue = pgTable(
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_sleep_queue_workflow_run",
+			name: "fk_sleep_workflow_run",
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
-		uniqueIndex("uqidx_sleep_queue_one_active_per_run")
-			.on(table.workflowRunId)
-			.where(sql`${table.status} = 'sleeping'`),
-		index("idx_sleep_queue_workflow_run_id").on(table.workflowRunId, table.id),
+		uniqueIndex("uqidx_sleep_one_active_per_run").on(table.workflowRunId).where(sql`${table.status} = 'sleeping'`),
+		index("idx_sleep_workflow_run_id").on(table.workflowRunId, table.id),
 		check(
-			"chk_sleep_queue_completed_requires_completed_at",
+			"chk_sleep_completed_requires_completed_at",
 			sql`${table.status} != 'completed' OR ${table.completedAt} IS NOT NULL`
 		),
 		check(
-			"chk_sleep_queue_cancelled_requires_cancelled_at",
+			"chk_sleep_cancelled_requires_cancelled_at",
 			sql`${table.status} != 'cancelled' OR ${table.cancelledAt} IS NOT NULL`
 		),
 	]
 );
 
-export const eventWaitQueue = pgTable(
-	"event_wait_queue",
+export const eventWait = pgTable(
+	"event_wait",
 	{
 		id: text("id").primaryKey(),
 		workflowRunId: text("workflow_run_id").notNull(),
@@ -309,25 +307,21 @@ export const eventWaitQueue = pgTable(
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_event_wait_queue_workflow_run",
+			name: "fk_event_wait_workflow_run",
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
-		uniqueIndex("uqidx_event_wait_queue_workflow_run_name_reference").on(
-			table.workflowRunId,
-			table.name,
-			table.referenceId
-		),
-		index("idx_event_wait_queue_workflow_run_id").on(table.workflowRunId, table.id),
+		uniqueIndex("uqidx_event_wait_workflow_run_name_reference").on(table.workflowRunId, table.name, table.referenceId),
+		index("idx_event_wait_workflow_run_id").on(table.workflowRunId, table.id),
 		check(
-			"chk_event_wait_queue_timeout_requires_timed_out_at",
+			"chk_event_wait_timeout_requires_timed_out_at",
 			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
 		),
 	]
 );
 
-export const childWorkflowRunWaitQueue = pgTable(
-	"child_workflow_run_wait_queue",
+export const childWorkflowRunWait = pgTable(
+	"child_workflow_run_wait",
 	{
 		id: text("id").primaryKey(),
 		parentWorkflowRunId: text("parent_workflow_run_id").notNull(),
@@ -344,21 +338,21 @@ export const childWorkflowRunWaitQueue = pgTable(
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_child_workflow_run_wait_queue_parent",
+			name: "fk_child_workflow_run_wait_parent",
 			columns: [table.parentWorkflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
 		foreignKey({
-			name: "fk_child_workflow_run_wait_queue_child",
+			name: "fk_child_workflow_run_wait_child",
 			columns: [table.childWorkflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
 		foreignKey({
-			name: "fk_child_workflow_run_wait_queue_state_transition",
+			name: "fk_child_workflow_run_wait_state_transition",
 			columns: [table.childWorkflowRunStateTransitionId],
 			foreignColumns: [stateTransition.id],
 		}),
-		index("idx_child_workflow_run_wait_queue_parent_id").on(table.parentWorkflowRunId, table.id),
+		index("idx_child_workflow_run_wait_parent_id").on(table.parentWorkflowRunId, table.id),
 		check(
 			"chk_child_workflow_run_wait_completed_invariants",
 			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL)`

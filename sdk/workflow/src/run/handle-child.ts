@@ -4,7 +4,7 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
-	type ChildWorkflowRunWaitQueue,
+	type ChildWorkflowRunWait,
 	type TerminalWorkflowRunStatus,
 	type WorkflowRunId,
 	type WorkflowRunRecord,
@@ -24,7 +24,7 @@ export function childWorkflowRunHandle<Input, Output, Context, TEvents extends E
 	client: Client<Context>,
 	run: WorkflowRunRecord<Input, Output>,
 	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
-	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
+	waits: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]>,
 	logger: Logger,
 	eventsDefinition?: TEvents
 ): ChildWorkflowRunHandle<Input, Output, Context, TEvents> {
@@ -34,7 +34,7 @@ export function childWorkflowRunHandle<Input, Output, Context, TEvents extends E
 		run: handle.run,
 		events: handle.events,
 		refresh: handle.refresh.bind(handle),
-		waitForStatus: createStatusWaiter(handle, parentRunHandle, childWorkflowRunWaitQueues, logger),
+		waitForStatus: createStatusWaiter(handle, parentRunHandle, waits, logger),
 		cancel: handle.cancel.bind(handle),
 		pause: handle.pause.bind(handle),
 		resume: handle.resume.bind(handle),
@@ -101,7 +101,7 @@ export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefinition>(
 	handle: WorkflowRunHandle<Input, Output, Context, TEvents>,
 	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
-	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
+	waits: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]>,
 	logger: Logger
 ) {
 	const nextIndexByStatus: Record<TerminalWorkflowRunStatus, number> = {
@@ -128,7 +128,7 @@ function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefini
 
 		const { run } = handle;
 
-		const childWorkflowRunWaits = childWorkflowRunWaitQueues[expectedStatus].childWorkflowRunWaits;
+		const childWorkflowRunWaits = waits[expectedStatus];
 		const existingChildWorkflowRunWait = childWorkflowRunWaits[nextIndex];
 
 		if (existingChildWorkflowRunWait) {
