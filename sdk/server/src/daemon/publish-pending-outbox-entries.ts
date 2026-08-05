@@ -100,15 +100,15 @@ async function publish(
 	const publishedEntryIds: string[] = [];
 
 	for (const outcome of PUBLISH_OUTCOMES) {
-		const bucket = result[outcome];
-		if (!isNonEmptyArray(bucket)) {
+		const runsBucket = result[outcome]?.runs;
+		if (!isNonEmptyArray(runsBucket)) {
 			continue;
 		}
 
 		switch (outcome) {
 			case "published":
-				logger.debug("Published ready workflow runs", { "aiki.count": bucket.length });
-				for (const { run } of bucket) {
+				logger.debug("Published ready workflow runs", { "aiki.count": runsBucket.length });
+				for (const { run } of runsBucket) {
 					const entry = entryByRunId.get(run.id);
 					if (entry) {
 						publishedEntryIds.push(entry.id);
@@ -116,13 +116,13 @@ async function publish(
 				}
 				break;
 			case "deferred":
-				logger.debug("Deferred publishing workflow runs", { "aiki.count": bucket.length });
+				logger.debug("Deferred publishing workflow runs", { "aiki.count": runsBucket.length });
 				break;
 			case "failed":
-				logger.debug("Failed to publish workflow runs", { "aiki.count": bucket.length });
+				logger.debug("Failed to publish workflow runs", { "aiki.count": runsBucket.length });
 				break;
 			case "declined":
-				logger.warn("Declined to publish workflow runs", { "aiki.count": bucket.length });
+				logger.warn("Declined to publish workflow runs", { "aiki.count": runsBucket.length });
 				break;
 			default:
 				outcome satisfies never;

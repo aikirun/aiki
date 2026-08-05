@@ -10,8 +10,12 @@ export interface ReadyWorkflowRun {
 	pool?: string;
 }
 
-export type PublishRunsResultBucket = Array<{ run: ReadyWorkflowRun }>;
-export type TimedPublishRunsResultBucket = Array<{ run: ReadyWorkflowRun; nextPublishAttemptAt: number }>;
+export interface PublishRunsResultBucket {
+	runs: Array<{ run: ReadyWorkflowRun }>;
+}
+export interface TimedPublishRunsResultBucket {
+	runs: Array<{ run: ReadyWorkflowRun; nextPublishAttemptAt: number }>;
+}
 
 export interface PublishRunsResult {
 	/** Handoff to broker confirmed. */
