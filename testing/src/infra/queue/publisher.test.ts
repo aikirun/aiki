@@ -11,7 +11,7 @@ describe("fakePublisher", () => {
 
 		const result = await publisher.publishRuns([readyRun1, readyRun2]);
 
-		expect(result).toEqual({ published: [{ run: readyRun1 }, { run: readyRun2 }] });
+		expect(result).toEqual({ published: { runs: [{ run: readyRun1 }, { run: readyRun2 }] } });
 	});
 
 	test("rejectsOnce throws on the next call, then heals", async () => {
@@ -22,7 +22,7 @@ describe("fakePublisher", () => {
 
 		expect(publisher.publishRuns([readyRun1])).rejects.toThrow("broker down");
 		expect(await publisher.publishRuns([readyRun2])).toEqual({
-			published: [{ run: readyRun2 }],
+			published: { runs: [{ run: readyRun2 }] },
 		});
 	});
 
@@ -30,7 +30,7 @@ describe("fakePublisher", () => {
 		const publisher = fakePublisher();
 		const readyRun1 = readyWorkflowRunFactory.build();
 
-		const degraded: PublishRunsResult = { failed: [{ run: readyRun1 }] };
+		const degraded: PublishRunsResult = { failed: { runs: [{ run: readyRun1 }] } };
 		publisher.publishRuns.once(expect.anything(), degraded);
 
 		expect(await publisher.publishRuns([readyRun1])).toEqual(degraded);
@@ -40,17 +40,17 @@ describe("fakePublisher", () => {
 		const publisher = fakePublisher();
 		const [readyRun1, readyRun2] = [readyWorkflowRunFactory.build(), readyWorkflowRunFactory.build()];
 
-		publisher.publishRuns.once(expect.anything(), (runs) => ({ failed: runs.map((run) => ({ run })) }));
+		publisher.publishRuns.once(expect.anything(), (runs) => ({ failed: { runs: runs.map((run) => ({ run })) } }));
 
 		const result = await publisher.publishRuns([readyRun1, readyRun2]);
 
-		expect(result).toEqual({ failed: [{ run: readyRun1 }, { run: readyRun2 }] });
+		expect(result).toEqual({ failed: { runs: [{ run: readyRun1 }, { run: readyRun2 }] } });
 	});
 
 	test("asserts the request against the matcher", async () => {
 		const publisher = fakePublisher();
 
-		publisher.publishRuns.once([readyWorkflowRunFactory.build({ id: "expected" })], { published: [] });
+		publisher.publishRuns.once([readyWorkflowRunFactory.build({ id: "expected" })], { published: { runs: [] } });
 
 		expect(publisher.publishRuns([readyWorkflowRunFactory.build({ id: "actual" })])).rejects.toThrow();
 	});
@@ -63,18 +63,20 @@ describe("fakePublisher", () => {
 			readyWorkflowRunFactory.build(),
 		];
 
-		publisher.publishRuns.rejectsOnce(expect.anything(), new Error("first")).once(expect.anything(), { published: [] });
+		publisher.publishRuns
+			.rejectsOnce(expect.anything(), new Error("first"))
+			.once(expect.anything(), { published: { runs: [] } });
 
 		expect(publisher.publishRuns([readyRun1])).rejects.toThrow("first");
-		expect(await publisher.publishRuns([readyRun2])).toEqual({ published: [] });
+		expect(await publisher.publishRuns([readyRun2])).toEqual({ published: { runs: [] } });
 		expect(await publisher.publishRuns([readyRun3])).toEqual({
-			published: [{ run: readyRun3 }],
+			published: { runs: [{ run: readyRun3 }] },
 		});
 	});
 
 	test("verify passes once every scripted call has been made", async () => {
 		const publisher = fakePublisher();
-		publisher.publishRuns.once(expect.anything(), { published: [] });
+		publisher.publishRuns.once(expect.anything(), { published: { runs: [] } });
 
 		await publisher.publishRuns([readyWorkflowRunFactory.build()]);
 
@@ -83,7 +85,7 @@ describe("fakePublisher", () => {
 
 	test("verify throws when a scripted call was never made", () => {
 		const publisher = fakePublisher();
-		publisher.publishRuns.once(expect.anything(), { published: [] });
+		publisher.publishRuns.once(expect.anything(), { published: { runs: [] } });
 
 		expect(() => publisher.verify()).toThrow();
 	});

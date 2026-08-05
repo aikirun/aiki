@@ -126,7 +126,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 		const [readyRun1, readyRun2] = [readyWorkflowRunFactory.build(), readyWorkflowRunFactory.build()];
 		const result = await publisher.publishRuns([readyRun1, readyRun2]);
 
-		expect(result.published).toEqual([{ run: readyRun1 }, { run: readyRun2 }]);
+		expect(result.published).toEqual({ runs: [{ run: readyRun1 }, { run: readyRun2 }] });
 	});
 });
 

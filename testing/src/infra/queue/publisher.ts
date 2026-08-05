@@ -73,7 +73,7 @@ export function fakePublisher(): FakePublisher {
 		const expectedCalls = expectations.getCalls(publishRunsFn.name);
 		const expectedCall = expectedCalls.shift();
 		if (expectedCall === undefined) {
-			return { published: actualRequest.map((run) => ({ run })) };
+			return { published: { runs: actualRequest.map((run) => ({ run })) } };
 		}
 		expect(actualRequest).toEqual(expectedCall.request as PublishRunsRequest);
 

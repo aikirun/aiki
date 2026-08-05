@@ -23,7 +23,7 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 		return {
 			async publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
 				if (!redisTracker.isAvailable()) {
-					return { failed: runs.map((run) => ({ run })) };
+					return { failed: { runs: runs.map((run) => ({ run })) } };
 				}
 
 				const dataByQueueName = new Map<string, QueueData>();
@@ -50,11 +50,11 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 					logger.warn("Publish pipeline returned no results, treating runs as failed", {
 						"aiki.count": runs.length,
 					});
-					return { failed: runs.map((run) => ({ run })) };
+					return { failed: { runs: runs.map((run) => ({ run })) } };
 				}
 
-				const published: PublishRunsResultBucket = [];
-				const failed: PublishRunsResultBucket = [];
+				const published: PublishRunsResultBucket = { runs: [] };
+				const failed: PublishRunsResultBucket = { runs: [] };
 				let err: Error | undefined;
 				for (const [i, queueData] of queueDataBatch.entries()) {
 					const result = results[i];
@@ -62,11 +62,11 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 					if (commandError !== null) {
 						err ??= commandError;
 						for (const run of queueData.runs) {
-							failed.push({ run });
+							failed.runs.push({ run });
 						}
 					} else {
 						for (const run of queueData.runs) {
-							published.push({ run });
+							published.runs.push({ run });
 						}
 					}
 				}
@@ -74,15 +74,15 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 				if (err) {
 					logger.warn("Publish command failed, treating its runs as failed", {
 						err,
-						"aiki.count": failed.length,
+						"aiki.count": failed.runs.length,
 					});
 				}
 
 				const result: PublishRunsResult = {};
-				if (published.length > 0) {
+				if (published.runs.length > 0) {
 					result.published = published;
 				}
-				if (failed.length > 0) {
+				if (failed.runs.length > 0) {
 					result.failed = failed;
 				}
 				return result;

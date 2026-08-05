@@ -27,7 +27,7 @@ export function createInMemoryPublisher(store: Store): CreatePublisher {
 				}
 			}
 
-			return { published: runs.map((run) => ({ run })) };
+			return { published: { runs: runs.map((run) => ({ run })) } };
 		},
 	});
 }
