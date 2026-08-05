@@ -57,28 +57,6 @@ import {
  *
  * @see {@link https://github.com/aikirun/aiki} for complete documentation
  */
-export interface WorkflowParams {
-	name: string;
-}
-
-export interface Workflow<Context> {
-	name: WorkflowName;
-
-	v: <
-		Input extends Serializable = void,
-		Output extends Serializable = void,
-		TEvents extends EventsDefinition = Record<string, never>,
-	>(
-		versionId: string,
-		params: WorkflowVersionParams<Input, Output, Context, TEvents>
-	) => WorkflowVersion<Input, Output, Context, TEvents>;
-
-	[INTERNAL]: {
-		getAllVersions: () => AnyWorkflowVersion[];
-		getVersion: (versionId: WorkflowVersionId) => AnyWorkflowVersion | undefined;
-	};
-}
-
 export function workflow<Context = null>(params: WorkflowParams): Workflow<Context> {
 	const name = params.name as WorkflowName;
 	const workflowVersions = new Map<WorkflowVersionId, AnyWorkflowVersion>();
@@ -101,5 +79,27 @@ export function workflow<Context = null>(params: WorkflowParams): Workflow<Conte
 			getAllVersions: () => Array.from(workflowVersions.values()),
 			getVersion: (versionId) => workflowVersions.get(versionId),
 		},
+	};
+}
+
+export interface WorkflowParams {
+	name: string;
+}
+
+export interface Workflow<Context> {
+	name: WorkflowName;
+
+	v: <
+		Input extends Serializable = void,
+		Output extends Serializable = void,
+		TEvents extends EventsDefinition = Record<string, never>,
+	>(
+		versionId: string,
+		params: WorkflowVersionParams<Input, Output, Context, TEvents>
+	) => WorkflowVersion<Input, Output, Context, TEvents>;
+
+	[INTERNAL]: {
+		getAllVersions: () => AnyWorkflowVersion[];
+		getVersion: (versionId: WorkflowVersionId) => AnyWorkflowVersion | undefined;
 	};
 }
