@@ -19,10 +19,11 @@ describe("createReplayManifest", () => {
 		test("returns the tasks for an address in order", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					taskQueues: {
-						[taskAddressA]: {
-							tasks: [completedTaskInfoFactory.build({ id: "t1" }), completedTaskInfoFactory.build({ id: "t2" })],
-						},
+					tasks: {
+						[taskAddressA]: [
+							completedTaskInfoFactory.build({ id: "t1" }),
+							completedTaskInfoFactory.build({ id: "t2" }),
+						],
 					},
 				})
 			);
@@ -34,7 +35,7 @@ describe("createReplayManifest", () => {
 		test("returns the complete task info", () => {
 			const task = completedTaskInfoFactory.build({ id: "t1" });
 			const manifest = createReplayManifest(
-				runningWorkflowRunRecordFactory.build({ taskQueues: { [taskAddressA]: { tasks: [task] } } })
+				runningWorkflowRunRecordFactory.build({ tasks: { [taskAddressA]: [task] } })
 			);
 
 			expect(manifest.consumeNextTask(taskAddressA)).toEqual(task);
@@ -43,7 +44,7 @@ describe("createReplayManifest", () => {
 		test("returns undefined once an address is exhausted", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					taskQueues: { [taskAddressA]: { tasks: [completedTaskInfoFactory.build()] } },
+					tasks: { [taskAddressA]: [completedTaskInfoFactory.build()] },
 				})
 			);
 
@@ -60,11 +61,12 @@ describe("createReplayManifest", () => {
 		test("tracks a separate cursor per address", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					taskQueues: {
-						[taskAddressA]: {
-							tasks: [completedTaskInfoFactory.build({ id: "a1" }), completedTaskInfoFactory.build({ id: "a2" })],
-						},
-						[taskAddressB]: { tasks: [completedTaskInfoFactory.build({ id: "b1" })] },
+					tasks: {
+						[taskAddressA]: [
+							completedTaskInfoFactory.build({ id: "a1" }),
+							completedTaskInfoFactory.build({ id: "a2" }),
+						],
+						[taskAddressB]: [completedTaskInfoFactory.build({ id: "b1" })],
 					},
 				})
 			);
@@ -80,13 +82,11 @@ describe("createReplayManifest", () => {
 		test("returns the child runs for an address in order", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					childWorkflowRunQueues: {
-						[childRunAddressA]: {
-							childWorkflowRuns: [
-								childWorkflowRunInfoFactory.build({ id: "c1" }),
-								childWorkflowRunInfoFactory.build({ id: "c2" }),
-							],
-						},
+					childWorkflowRuns: {
+						[childRunAddressA]: [
+							childWorkflowRunInfoFactory.build({ id: "c1" }),
+							childWorkflowRunInfoFactory.build({ id: "c2" }),
+						],
 					},
 				})
 			);
@@ -99,7 +99,7 @@ describe("createReplayManifest", () => {
 			const childRun = childWorkflowRunInfoFactory.build({ id: "c1" });
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					childWorkflowRunQueues: { [childRunAddressA]: { childWorkflowRuns: [childRun] } },
+					childWorkflowRuns: { [childRunAddressA]: [childRun] },
 				})
 			);
 
@@ -109,7 +109,7 @@ describe("createReplayManifest", () => {
 		test("returns undefined once an address is exhausted", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					childWorkflowRunQueues: { [childRunAddressA]: { childWorkflowRuns: [childWorkflowRunInfoFactory.build()] } },
+					childWorkflowRuns: { [childRunAddressA]: [childWorkflowRunInfoFactory.build()] },
 				})
 			);
 
@@ -126,14 +126,12 @@ describe("createReplayManifest", () => {
 		test("tracks a separate cursor per address", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					childWorkflowRunQueues: {
-						[childRunAddressA]: {
-							childWorkflowRuns: [
-								childWorkflowRunInfoFactory.build({ id: "a1" }),
-								childWorkflowRunInfoFactory.build({ id: "a2" }),
-							],
-						},
-						[childRunAddressB]: { childWorkflowRuns: [childWorkflowRunInfoFactory.build({ id: "b1" })] },
+					childWorkflowRuns: {
+						[childRunAddressA]: [
+							childWorkflowRunInfoFactory.build({ id: "a1" }),
+							childWorkflowRunInfoFactory.build({ id: "a2" }),
+						],
+						[childRunAddressB]: [childWorkflowRunInfoFactory.build({ id: "b1" })],
 					},
 				})
 			);
@@ -155,7 +153,7 @@ describe("createReplayManifest", () => {
 		test("is true while tasks remain and false once consumed", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					taskQueues: { [taskAddressA]: { tasks: [completedTaskInfoFactory.build()] } },
+					tasks: { [taskAddressA]: [completedTaskInfoFactory.build()] },
 				})
 			);
 
@@ -167,7 +165,7 @@ describe("createReplayManifest", () => {
 		test("is true while child runs remain and false once consumed", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					childWorkflowRunQueues: { [childRunAddressA]: { childWorkflowRuns: [childWorkflowRunInfoFactory.build()] } },
+					childWorkflowRuns: { [childRunAddressA]: [childWorkflowRunInfoFactory.build()] },
 				})
 			);
 
@@ -179,8 +177,8 @@ describe("createReplayManifest", () => {
 		test("stays true until both tasks and child runs are consumed", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					taskQueues: { [taskAddressA]: { tasks: [completedTaskInfoFactory.build()] } },
-					childWorkflowRunQueues: { [childRunAddressA]: { childWorkflowRuns: [childWorkflowRunInfoFactory.build()] } },
+					tasks: { [taskAddressA]: [completedTaskInfoFactory.build()] },
+					childWorkflowRuns: { [childRunAddressA]: [childWorkflowRunInfoFactory.build()] },
 				})
 			);
 
@@ -196,14 +194,15 @@ describe("createReplayManifest", () => {
 		test("lists all task and child run ids initially", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					taskQueues: {
-						[taskAddressA]: {
-							tasks: [completedTaskInfoFactory.build({ id: "t1" }), completedTaskInfoFactory.build({ id: "t2" })],
-						},
-						[taskAddressB]: { tasks: [completedTaskInfoFactory.build({ id: "t3" })] },
+					tasks: {
+						[taskAddressA]: [
+							completedTaskInfoFactory.build({ id: "t1" }),
+							completedTaskInfoFactory.build({ id: "t2" }),
+						],
+						[taskAddressB]: [completedTaskInfoFactory.build({ id: "t3" })],
 					},
-					childWorkflowRunQueues: {
-						[childRunAddressA]: { childWorkflowRuns: [childWorkflowRunInfoFactory.build({ id: "c1" })] },
+					childWorkflowRuns: {
+						[childRunAddressA]: [childWorkflowRunInfoFactory.build({ id: "c1" })],
 					},
 				})
 			);
@@ -217,11 +216,12 @@ describe("createReplayManifest", () => {
 		test("omits consumed tasks across addresses", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					taskQueues: {
-						[taskAddressA]: {
-							tasks: [completedTaskInfoFactory.build({ id: "t1" }), completedTaskInfoFactory.build({ id: "t2" })],
-						},
-						[taskAddressB]: { tasks: [completedTaskInfoFactory.build({ id: "t3" })] },
+					tasks: {
+						[taskAddressA]: [
+							completedTaskInfoFactory.build({ id: "t1" }),
+							completedTaskInfoFactory.build({ id: "t2" }),
+						],
+						[taskAddressB]: [completedTaskInfoFactory.build({ id: "t3" })],
 					},
 				})
 			);
@@ -237,13 +237,11 @@ describe("createReplayManifest", () => {
 		test("omits consumed child runs", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					childWorkflowRunQueues: {
-						[childRunAddressA]: {
-							childWorkflowRuns: [
-								childWorkflowRunInfoFactory.build({ id: "c1" }),
-								childWorkflowRunInfoFactory.build({ id: "c2" }),
-							],
-						},
+					childWorkflowRuns: {
+						[childRunAddressA]: [
+							childWorkflowRunInfoFactory.build({ id: "c1" }),
+							childWorkflowRunInfoFactory.build({ id: "c2" }),
+						],
 					},
 				})
 			);
@@ -259,9 +257,9 @@ describe("createReplayManifest", () => {
 		test("is empty after full consumption", () => {
 			const manifest = createReplayManifest(
 				runningWorkflowRunRecordFactory.build({
-					taskQueues: { [taskAddressA]: { tasks: [completedTaskInfoFactory.build({ id: "t1" })] } },
-					childWorkflowRunQueues: {
-						[childRunAddressA]: { childWorkflowRuns: [childWorkflowRunInfoFactory.build({ id: "c1" })] },
+					tasks: { [taskAddressA]: [completedTaskInfoFactory.build({ id: "t1" })] },
+					childWorkflowRuns: {
+						[childRunAddressA]: [childWorkflowRunInfoFactory.build({ id: "c1" })],
 					},
 				})
 			);

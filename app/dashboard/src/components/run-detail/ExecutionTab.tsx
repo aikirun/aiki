@@ -1,8 +1,8 @@
 import type {
 	ChildWorkflowRunInfo,
 	ChildWorkflowRunWaitCompleted,
-	EventWaitQueue,
-	SleepQueue,
+	EventWait,
+	Sleep,
 	TerminalWorkflowRunStatus,
 	WorkflowRunRecord,
 } from "@aikirun/types/workflow/run";
@@ -58,10 +58,10 @@ function ChevronIcon({ open }: { open: boolean }) {
 // ── Root component ────────────────────────────────────────────────────────────
 
 export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
-	const tasks = Object.values(run.taskQueues).flatMap((q) => q.tasks);
-	const childWorkflows = Object.values(run.childWorkflowRunQueues).flatMap((q) => q.childWorkflowRuns);
-	const sleepEntries = Object.entries(run.sleepQueues);
-	const eventEntries = Object.entries(run.eventWaitQueues);
+	const tasks = Object.values(run.tasks).flat();
+	const childWorkflows = Object.values(run.childWorkflowRuns).flat();
+	const sleepEntries = Object.entries(run.sleeps);
+	const eventEntries = Object.entries(run.eventWaits);
 
 	const awaitingChildId = run.state.status === "awaiting_child_workflow" ? run.state.childWorkflowRunId : undefined;
 
@@ -99,8 +99,8 @@ export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
 			{sleepEntries.length > 0 && (
 				<>
 					<SectionHeader label="Sleeps" />
-					{sleepEntries.map(([name, queue]) => (
-						<SleepRow key={name} name={name} queue={queue} />
+					{sleepEntries.map(([name, sleeps]) => (
+						<SleepRow key={name} name={name} sleeps={sleeps} />
 					))}
 				</>
 			)}
@@ -108,11 +108,11 @@ export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
 			{eventEntries.length > 0 && (
 				<>
 					<SectionHeader label="Events" />
-					{eventEntries.map(([name, queue]) => (
+					{eventEntries.map(([name, waits]) => (
 						<EventRow
 							key={name}
 							name={name}
-							queue={queue}
+							waits={waits}
 							isWaiting={run.state.status === "awaiting_event" && run.state.eventName === name}
 							timeoutAt={run.state.status === "awaiting_event" ? run.state.timeoutAt : undefined}
 						/>
@@ -300,10 +300,8 @@ function resolveChildStatus(child: ChildWorkflowRunInfo): {
 	status: TerminalWorkflowRunStatus | "running";
 	resolvedWait: ChildWorkflowRunWaitCompleted | null;
 } {
-	const waitQueues = child.childWorkflowRunWaitQueues;
 	for (const terminalStatus of ["completed", "failed", "cancelled"] as const) {
-		const queue = waitQueues[terminalStatus];
-		const wait = queue?.childWorkflowRunWaits[0];
+		const wait = child.waits[terminalStatus][0];
 		if (wait?.status === "completed") {
 			return { status: terminalStatus, resolvedWait: wait };
 		}
@@ -511,8 +509,8 @@ function ChildWorkflowResolvedPre({ wait }: { wait: ChildWorkflowRunWaitComplete
 
 // ── Sleeps ────────────────────────────────────────────────────────────────────
 
-function SleepRow({ name, queue }: { name: string; queue: SleepQueue }) {
-	const activeSleep = queue.sleeps.find((s) => s.status === "sleeping");
+function SleepRow({ name, sleeps }: { name: string; sleeps: Sleep[] }) {
+	const activeSleep = sleeps.find((s) => s.status === "sleeping");
 	const wakeupAt = activeSleep?.status === "sleeping" ? activeSleep.wakeupAt : undefined;
 
 	return (
@@ -560,16 +558,15 @@ function SleepCountdown({ wakeupAt }: { wakeupAt: number }) {
 
 function EventRow({
 	name,
-	queue,
+	waits,
 	isWaiting,
 	timeoutAt,
 }: {
 	name: string;
-	queue: EventWaitQueue<unknown>;
+	waits: EventWait<unknown>[];
 	isWaiting: boolean;
 	timeoutAt?: number;
 }) {
-	const waits = queue.eventWaits;
 	const hasWaits = waits.length > 0;
 	const [isOpen, setIsOpen] = useState(false);
 
@@ -674,7 +671,7 @@ function EventTimeoutCountdown({ timeoutAt }: { timeoutAt: number }) {
 	return <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "#F472B6" }}>timeout {label}</span>;
 }
 
-function EventWaitRow({ wait }: { wait: EventWaitQueue<unknown>["eventWaits"][number] }) {
+function EventWaitRow({ wait }: { wait: EventWait<unknown> }) {
 	const isReceived = wait.status === "received";
 	const color = isReceived ? "#34D399" : "#FB923C";
 

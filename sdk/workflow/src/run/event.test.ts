@@ -39,8 +39,8 @@ describe("createEventWaiters", () => {
 	test("returns the recorded data when the event was received", () =>
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({
-				eventWaitQueues: {
-					orderShipped: { eventWaits: [{ status: "received", data: { trackingId: "T1" }, receivedAt: 0 }] },
+				eventWaits: {
+					orderShipped: [{ status: "received", data: { trackingId: "T1" }, receivedAt: 0 }],
 				},
 			});
 			const definition = { orderShipped: event<{ trackingId: string }>() };
@@ -55,7 +55,7 @@ describe("createEventWaiters", () => {
 	test("returns a timeout when the recorded wait timed out", () =>
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({
-				eventWaitQueues: { orderShipped: { eventWaits: [{ status: "timeout", timedOutAt: 0 }] } },
+				eventWaits: { orderShipped: [{ status: "timeout", timedOutAt: 0 }] },
 			});
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
@@ -69,7 +69,7 @@ describe("createEventWaiters", () => {
 	test("returns recorded data as-is, without applying the event schema", () =>
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({
-				eventWaitQueues: { orderShipped: { eventWaits: [{ status: "received", data: "raw", receivedAt: 0 }] } },
+				eventWaits: { orderShipped: [{ status: "received", data: "raw", receivedAt: 0 }] },
 			});
 			const definition = { orderShipped: event({ schema: appendBangSchema }) };
 			const handle = workflowRunHandle(client, record, definition);
@@ -146,13 +146,11 @@ describe("createEventWaiters", () => {
 	test("advances the cursor across calls, consuming recorded waits in order", () =>
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({
-				eventWaitQueues: {
-					orderShipped: {
-						eventWaits: [
-							{ status: "received", data: "first", receivedAt: 0 },
-							{ status: "received", data: "second", receivedAt: 0 },
-						],
-					},
+				eventWaits: {
+					orderShipped: [
+						{ status: "received", data: "first", receivedAt: 0 },
+						{ status: "received", data: "second", receivedAt: 0 },
+					],
 				},
 			});
 			const definition = { orderShipped: event<string>() };

@@ -13,7 +13,3 @@ export const sleepSchema = type({
 		status: "'cancelled'",
 		cancelledAt: "number > 0",
 	});
-
-export const sleepQueueSchema = type({
-	sleeps: sleepSchema.array(),
-});

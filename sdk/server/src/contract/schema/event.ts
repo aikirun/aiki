@@ -11,7 +11,3 @@ export const eventWaitSchema = type({
 	status: "'timeout'",
 	timedOutAt: "number > 0",
 });
-
-export const eventWaitQueueSchema = type({
-	eventWaits: eventWaitSchema.array(),
-});

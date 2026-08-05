@@ -74,7 +74,7 @@ describe("createSleeper", () => {
 		test("suspends again without a transition when the recorded sleep is still sleeping", () =>
 			withFakeClient((client) => {
 				const record = runningWorkflowRunRecordFactory.build({
-					sleepQueues: { nap: { sleeps: [{ status: "sleeping", wakeupAt: 0 }] } },
+					sleeps: { nap: [{ status: "sleeping", wakeupAt: 0 }] },
 				});
 				const sleep = createTestSleeper(client, record);
 
@@ -84,7 +84,7 @@ describe("createSleeper", () => {
 		test("returns cancelled when the recorded sleep was cancelled", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({
-					sleepQueues: { nap: { sleeps: [{ status: "cancelled", cancelledAt: 0 }] } },
+					sleeps: { nap: [{ status: "cancelled", cancelledAt: 0 }] },
 				});
 				const sleep = createTestSleeper(client, record);
 
@@ -94,7 +94,7 @@ describe("createSleeper", () => {
 		test("returns not-cancelled when the recorded sleep completed at the same duration", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({
-					sleepQueues: { nap: { sleeps: [{ status: "completed", durationMs: 60_000, completedAt: 0 }] } },
+					sleeps: { nap: [{ status: "completed", durationMs: 60_000, completedAt: 0 }] },
 				});
 				const sleep = createTestSleeper(client, record);
 
@@ -104,7 +104,7 @@ describe("createSleeper", () => {
 		test("returns not-cancelled without sleeping again when the replay duration is shorter", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({
-					sleepQueues: { nap: { sleeps: [{ status: "completed", durationMs: 60_000, completedAt: 0 }] } },
+					sleeps: { nap: [{ status: "completed", durationMs: 60_000, completedAt: 0 }] },
 				});
 				const sleep = createTestSleeper(client, record);
 
@@ -115,7 +115,7 @@ describe("createSleeper", () => {
 			withFakeClient((client) => {
 				const record = runningWorkflowRunRecordFactory.build({
 					revision: 4,
-					sleepQueues: { nap: { sleeps: [{ status: "completed", durationMs: 60_000, completedAt: 0 }] } },
+					sleeps: { nap: [{ status: "completed", durationMs: 60_000, completedAt: 0 }] },
 				});
 				const sleep = createTestSleeper(client, record);
 
@@ -137,13 +137,11 @@ describe("createSleeper", () => {
 		test("advances the per-name cursor across calls", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({
-					sleepQueues: {
-						nap: {
-							sleeps: [
-								{ status: "completed", durationMs: 60_000, completedAt: 0 },
-								{ status: "cancelled", cancelledAt: 1 },
-							],
-						},
+					sleeps: {
+						nap: [
+							{ status: "completed", durationMs: 60_000, completedAt: 0 },
+							{ status: "cancelled", cancelledAt: 1 },
+						],
 					},
 				});
 				const sleep = createTestSleeper(client, record);
@@ -155,9 +153,9 @@ describe("createSleeper", () => {
 		test("tracks a separate cursor per sleep name", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({
-					sleepQueues: {
-						nap: { sleeps: [{ status: "cancelled", cancelledAt: 0 }] },
-						bath: { sleeps: [{ status: "completed", durationMs: 60_000, completedAt: 1 }] },
+					sleeps: {
+						nap: [{ status: "cancelled", cancelledAt: 0 }],
+						bath: [{ status: "completed", durationMs: 60_000, completedAt: 1 }],
 					},
 				});
 				const sleep = createTestSleeper(client, record);

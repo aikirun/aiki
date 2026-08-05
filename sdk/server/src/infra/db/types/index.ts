@@ -1,7 +1,7 @@
-import type { ChildWorkflowRunWaitQueueRepository } from "./child-workflow-run-wait-queue";
-import type { EventWaitQueueRepository } from "./event-wait-queue";
+import type { ChildWorkflowRunWaitRepository } from "./child-workflow-run-wait";
+import type { EventWaitRepository } from "./event-wait";
 import type { ScheduleRepository } from "./schedule";
-import type { SleepQueueRepository } from "./sleep-queue";
+import type { SleepRepository } from "./sleep";
 import type { StateTransitionRepository } from "./state-transition";
 import type { TaskRepository } from "./task";
 import type { WorkflowRepository } from "./workflow";
@@ -14,9 +14,9 @@ export interface Repositories {
 	stateTransition: StateTransitionRepository;
 	schedule: ScheduleRepository;
 	workflow: WorkflowRepository;
-	sleepQueue: SleepQueueRepository;
-	eventWaitQueue: EventWaitQueueRepository;
-	childWorkflowRunWaitQueue: ChildWorkflowRunWaitQueueRepository;
+	sleep: SleepRepository;
+	eventWait: EventWaitRepository;
+	childWorkflowRunWait: ChildWorkflowRunWaitRepository;
 	workflowRunOutbox: WorkflowRunOutboxRepository;
 	transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T>;
 }

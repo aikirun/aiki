@@ -143,18 +143,15 @@ export function RunDetail() {
 	const childWorkflowRuns = useMemo(() => {
 		if (!currentRun) return {};
 		const result: Record<string, ChildWorkflowRunInfo> = {};
-		for (const queue of Object.values(currentRun.childWorkflowRunQueues)) {
-			for (const child of queue.childWorkflowRuns) {
+		for (const addressChildRuns of Object.values(currentRun.childWorkflowRuns)) {
+			for (const child of addressChildRuns) {
 				result[child.id] = child;
 			}
 		}
 		return result;
 	}, [currentRun]);
 
-	const tasks = useMemo(
-		() => (currentRun ? Object.values(currentRun.taskQueues).flatMap((q) => q.tasks) : []),
-		[currentRun]
-	);
+	const tasks = useMemo(() => (currentRun ? Object.values(currentRun.tasks).flat() : []), [currentRun]);
 
 	const childRunCount = useMemo(() => Object.keys(childWorkflowRuns).length, [childWorkflowRuns]);
 
@@ -170,8 +167,8 @@ export function RunDetail() {
 		if (!currentRun || !transitions?.transitions) return undefined;
 		return buildTimelineLookups(
 			transitions.transitions,
-			currentRun.eventWaitQueues,
-			currentRun.sleepQueues,
+			currentRun.eventWaits,
+			currentRun.sleeps,
 			childWorkflowRuns,
 			taskById
 		);

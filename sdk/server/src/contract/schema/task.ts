@@ -65,7 +65,3 @@ export const taskInfoSchema = type({
 	state: nonDiscardedTaskStateSchema,
 	inputHash: "string > 0",
 });
-
-export const taskQueueSchema = type({
-	tasks: taskInfoSchema.array(),
-});

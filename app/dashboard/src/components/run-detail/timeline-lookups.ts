@@ -1,4 +1,4 @@
-import type { ChildWorkflowRunInfo, EventWaitQueue, SleepQueue } from "@aikirun/types/workflow/run";
+import type { ChildWorkflowRunInfo, EventWait, Sleep } from "@aikirun/types/workflow/run";
 import type { StateTransition } from "@aikirun/types/workflow/state-transition";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
@@ -30,8 +30,8 @@ export function formatDuration(ms: number): string {
 
 export function buildTimelineLookups(
 	transitions: StateTransition[],
-	eventWaitQueues: Record<string, EventWaitQueue<unknown>>,
-	sleepQueues: Record<string, SleepQueue>,
+	eventWaits: Record<string, EventWait<unknown>[]>,
+	sleeps: Record<string, Sleep[]>,
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>,
 	taskById: Map<string, TaskInfo>
 ): TimelineLookups {
@@ -58,8 +58,8 @@ export function buildTimelineLookups(
 					const prev = transitions[j];
 					if (prev.type === "workflow_run" && prev.state.status === "sleeping") {
 						const sleepName = prev.state.sleepName;
-						const queue = sleepQueues[sleepName];
-						if (queue?.sleeps.length > 0) {
+						const nameSleeps = sleeps[sleepName];
+						if (nameSleeps && nameSleeps.length > 0) {
 							let sleepIndex = 0;
 							for (let k = 0; k < j; k++) {
 								const t2 = transitions[k];
@@ -67,7 +67,7 @@ export function buildTimelineLookups(
 									sleepIndex++;
 								}
 							}
-							const sleep = queue.sleeps[sleepIndex];
+							const sleep = nameSleeps[sleepIndex];
 							if (sleep?.status === "completed") {
 								context.actualSleepDuration = formatDuration(sleep.durationMs);
 							}
@@ -90,8 +90,8 @@ export function buildTimelineLookups(
 						}
 						// The wait row carries the event data; it also classifies rows written before the
 						// reason split, whose timed-out waits are labelled "event".
-						const queue = eventWaitQueues[eventName];
-						if (queue?.eventWaits.length > 0) {
+						const nameEventWaits = eventWaits[eventName];
+						if (nameEventWaits && nameEventWaits.length > 0) {
 							let eventIndex = 0;
 							for (let k = 0; k < j; k++) {
 								const t2 = transitions[k];
@@ -103,7 +103,7 @@ export function buildTimelineLookups(
 									eventIndex++;
 								}
 							}
-							const event = queue.eventWaits[eventIndex];
+							const event = nameEventWaits[eventIndex];
 							if (event?.status === "received") {
 								context.eventData = event.data;
 							} else if (event?.status === "timeout") {
@@ -130,8 +130,7 @@ export function buildTimelineLookups(
 						// The wait row carries the child's terminal status; it also classifies rows written
 						// before the reason split, whose timed-out waits are labelled "child_workflow".
 						const childInfo = childWorkflowById.get(childId);
-						const waitQueue = childInfo?.childWorkflowRunWaitQueues[waitForStatus];
-						const waits = waitQueue?.childWorkflowRunWaits;
+						const waits = childInfo?.waits[waitForStatus];
 						if (waits && waits.length > 0) {
 							let waitIndex = 0;
 							for (let k = 0; k < j; k++) {

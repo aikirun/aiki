@@ -784,7 +784,7 @@ describe("creating a workflow run", () => {
 					versionId: childWorkflow.versionId,
 				});
 				const parentRunRecord = runningWorkflowRunRecordFactory.build({
-					childWorkflowRunQueues: { [address]: { childWorkflowRuns: [recordedChildRun] } },
+					childWorkflowRuns: { [address]: [recordedChildRun] },
 				});
 				const parentRun = createTestWorkflowRun(client, parentRunRecord);
 
@@ -812,8 +812,8 @@ describe("creating a workflow run", () => {
 					referenceId: "different-input-hash",
 				});
 				const parentRunRecord = runningWorkflowRunRecordFactory.build({
-					childWorkflowRunQueues: {
-						[mismatchedAddress]: { childWorkflowRuns: [childWorkflowRunInfoFactory.build()] },
+					childWorkflowRuns: {
+						[mismatchedAddress]: [childWorkflowRunInfoFactory.build()],
 					},
 				});
 				const parentRun = createTestWorkflowRun(client, parentRunRecord);

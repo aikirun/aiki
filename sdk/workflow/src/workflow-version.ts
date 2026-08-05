@@ -200,7 +200,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					client,
 					existingRun as WorkflowRunRecord<Input, Output>,
 					parentRun[INTERNAL].handle,
-					existingRunInfo.childWorkflowRunWaitQueues,
+					existingRunInfo.waits,
 					logger,
 					this[INTERNAL].eventsDefinition
 				);
@@ -232,9 +232,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			newRun as WorkflowRunRecord<Input, Output>,
 			parentRun[INTERNAL].handle,
 			{
-				cancelled: { childWorkflowRunWaits: [] },
-				completed: { childWorkflowRunWaits: [] },
-				failed: { childWorkflowRunWaits: [] },
+				cancelled: [],
+				completed: [],
+				failed: [],
 			},
 			logger,
 			this[INTERNAL].eventsDefinition

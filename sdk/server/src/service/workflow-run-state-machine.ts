@@ -186,13 +186,7 @@ export function assertIsValidWorkflowRunStateTransition(
 
 type TxRepos = Pick<
 	Repositories,
-	| "workflowRun"
-	| "workflow"
-	| "stateTransition"
-	| "sleepQueue"
-	| "task"
-	| "childWorkflowRunWaitQueue"
-	| "workflowRunOutbox"
+	"workflowRun" | "workflow" | "stateTransition" | "sleep" | "task" | "childWorkflowRunWait" | "workflowRunOutbox"
 >;
 
 export interface WorkflowRunStateMachineServiceDeps {
@@ -256,7 +250,7 @@ async function transitionStateInTx(
 	}
 
 	if (toState.status === "sleeping") {
-		await txRepos.sleepQueue.create({
+		await txRepos.sleep.create({
 			id: ulid(),
 			workflowRunId: runId,
 			name: toState.sleepName,
@@ -335,12 +329,12 @@ async function transitionStateInTx(
 }
 
 async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: number, txRepos: TxRepos) {
-	const activeSleep = await txRepos.sleepQueue.getActiveByWorkflowRunIdAndName(runId, sleepName);
+	const activeSleep = await txRepos.sleep.getActiveByWorkflowRunIdAndName(runId, sleepName);
 	if (!activeSleep) {
 		return;
 	}
 
-	await txRepos.sleepQueue.update(activeSleep.id, {
+	await txRepos.sleep.update(activeSleep.id, {
 		status: "cancelled",
 		cancelledAt: now as TimestampMs,
 	});
@@ -360,7 +354,7 @@ async function childWorkflowRunWaitNotNeeded(
 	}
 
 	if (childRun.status === toState.childWorkflowRunStatus || isTerminalWorkflowRunStatus(childRun.status)) {
-		await txRepos.childWorkflowRunWaitQueue.insert({
+		await txRepos.childWorkflowRunWait.insert({
 			id: ulid(),
 			parentWorkflowRunId: runId,
 			childWorkflowRunId: childRunId,
@@ -463,7 +457,7 @@ async function notifyParentOfStateChangeIfNecessary(
 			"aiki.status": childRun.status,
 		});
 
-		await txRepos.childWorkflowRunWaitQueue.insert({
+		await txRepos.childWorkflowRunWait.insert({
 			id: ulid(),
 			parentWorkflowRunId: parentRun.id,
 			childWorkflowRunId: childRun.id,

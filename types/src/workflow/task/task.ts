@@ -100,7 +100,3 @@ export interface TransitionTaskStateToAwaitingRetry extends TransitionTaskStateB
 export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAttemptAt"> & {
 	nextAttemptInMs: number;
 };
-
-export interface TaskQueue {
-	tasks: TaskInfo[];
-}

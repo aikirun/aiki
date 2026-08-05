@@ -1,10 +1,10 @@
 import { type } from "arktype";
 
-import { eventWaitQueueSchema } from "./event";
+import { eventWaitSchema } from "./event";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
-import { sleepQueueSchema } from "./sleep";
-import { taskQueueSchema } from "./task";
+import { sleepSchema } from "./sleep";
+import { taskInfoSchema } from "./task";
 import { triggerStrategySchema } from "./trigger";
 
 export const workflowRunStatusSchema = type(
@@ -147,20 +147,12 @@ const childWorkflowRunWaitSchema = type({
 	timedOutAt: "number > 0",
 });
 
-const childWorkflowRunWaitQueueSchema = type({
-	childWorkflowRunWaits: childWorkflowRunWaitSchema.array(),
-});
-
 const childWorkflowRunInfoSchema = type({
 	id: "string > 0",
 	name: "string > 0",
 	versionId: "string > 0",
 	inputHash: "string > 0",
-	childWorkflowRunWaitQueues: type({ "['cancelled'|'completed'|'failed']": childWorkflowRunWaitQueueSchema }),
-});
-
-const childWorkflowRunQueueSchema = type({
-	childWorkflowRuns: childWorkflowRunInfoSchema.array(),
+	waits: type({ "['cancelled'|'completed'|'failed']": childWorkflowRunWaitSchema.array() }),
 });
 
 export const workflowRunSchema = type({
@@ -175,10 +167,10 @@ export const workflowRunSchema = type({
 	"options?": workflowOptionsSchema.or("undefined"),
 	attempts: "number.integer >= 0",
 	state: workflowRunStateSchema,
-	taskQueues: type({ "[string]": taskQueueSchema }),
-	sleepQueues: type({ "[string]": sleepQueueSchema }),
-	eventWaitQueues: type({ "[string]": eventWaitQueueSchema }),
-	childWorkflowRunQueues: type({ "[string]": childWorkflowRunQueueSchema }),
+	tasks: type({ "[string]": taskInfoSchema.array() }),
+	sleeps: type({ "[string]": sleepSchema.array() }),
+	eventWaits: type({ "[string]": eventWaitSchema.array() }),
+	childWorkflowRuns: type({ "[string]": childWorkflowRunInfoSchema.array() }),
 	"parentWorkflowRunId?": "string > 0 | undefined",
 });
 

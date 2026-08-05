@@ -1,10 +1,10 @@
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { SerializableError } from "@aikirun/lib/serializable";
 
-import type { EventWaitQueue } from "./event";
-import type { SleepQueue } from "./sleep";
+import type { EventWait } from "./event";
+import type { Sleep } from "./sleep";
 import type { TriggerStrategy } from "./trigger";
-import type { TaskQueue } from "../task";
+import type { TaskInfo } from "../task";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 export type WorkflowRunAddress = string & { _brand: "workflow_run_address" };
@@ -271,16 +271,12 @@ export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	// prefetching all results might be problematic.
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
-	taskQueues: Record<string, TaskQueue>;
-	sleepQueues: Record<string, SleepQueue>;
-	eventWaitQueues: Record<string, EventWaitQueue<unknown>>;
-	childWorkflowRunQueues: Record<string, ChildWorkflowRunQueue>;
+	tasks: Record<string, TaskInfo[]>;
+	sleeps: Record<string, Sleep[]>;
+	eventWaits: Record<string, EventWait<unknown>[]>;
+	childWorkflowRuns: Record<string, ChildWorkflowRunInfo[]>;
 	parentWorkflowRunId?: string;
 	scheduleId?: string;
-}
-
-export interface ChildWorkflowRunQueue {
-	childWorkflowRuns: ChildWorkflowRunInfo[];
 }
 
 export interface ChildWorkflowRunInfo {
@@ -288,7 +284,7 @@ export interface ChildWorkflowRunInfo {
 	name: string;
 	versionId: string;
 	inputHash: string;
-	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>;
+	waits: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]>;
 }
 
 export const CHILD_WORKFLOW_RUN_WAIT_STATUSES = ["completed", "timeout"] as const;
@@ -310,7 +306,3 @@ export interface ChildWorkflowRunWaitTimeout extends ChildWorkflowRunWaitBase {
 }
 
 export type ChildWorkflowRunWait = ChildWorkflowRunWaitCompleted | ChildWorkflowRunWaitTimeout;
-
-export interface ChildWorkflowRunWaitQueue {
-	childWorkflowRunWaits: ChildWorkflowRunWait[];
-}
