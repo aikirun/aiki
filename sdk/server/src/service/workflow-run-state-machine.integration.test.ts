@@ -8,7 +8,7 @@ import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createWorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
 import { daemonContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { seedClaimedRun, seedStalledRun } from "../testing/run-seed";
+import { seedClaimedRun, seedScheduledRun, seedStalledRun } from "../testing/run-seed";
 
 const withHarness = createServiceHarness();
 
@@ -154,6 +154,164 @@ describe("WorkflowRunStateMachineService transition preconditions", () => {
 					status: "running",
 					revision: revisionWhenClaimed,
 					attempts: attemptsWhenClaimed,
+				})
+			);
+		}));
+});
+
+describe("WorkflowRunStateMachineService attempt counting", () => {
+	test("entering awaiting_retry charges no attempt", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			const result = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: {
+					status: "awaiting_retry",
+					cause: "self",
+					error: { name: "Error", message: "boom" },
+					nextAttemptInMs: 0,
+				},
+				expectedRevision: revisionWhenClaimed,
+			});
+
+			expect(result).toEqual({
+				revision: revisionWhenClaimed + 1,
+				state: {
+					status: "awaiting_retry",
+					cause: "self",
+					error: { name: "Error", message: "boom" },
+					nextAttemptAt: expect.any(Number),
+				},
+				attempts: attemptsWhenClaimed,
+			});
+
+			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			expect(run).toEqual(
+				expect.objectContaining({
+					id: runId,
+					status: "awaiting_retry",
+					revision: result.revision,
+					attempts: result.attempts,
+				})
+			);
+		}));
+
+	test("re-queueing a retry from awaiting_retry charges exactly one attempt", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			const awaitingRetryRun = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: {
+					status: "awaiting_retry",
+					cause: "self",
+					error: { name: "Error", message: "boom" },
+					nextAttemptInMs: 0,
+				},
+				expectedRevision: revisionWhenClaimed,
+			});
+
+			const result = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "queued", reason: "retry" },
+				expectedRevision: awaitingRetryRun.revision,
+			});
+
+			expect(result).toEqual({
+				revision: awaitingRetryRun.revision + 1,
+				state: { status: "queued", reason: "retry" },
+				attempts: attemptsWhenClaimed + 1,
+			});
+
+			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			expect(run).toEqual(
+				expect.objectContaining({
+					id: runId,
+					status: "queued",
+					revision: result.revision,
+					attempts: result.attempts,
+					state: { status: "queued", reason: "retry" },
+				})
+			);
+		}));
+
+	test("a task_retry re-queue charges no attempt", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			const result = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "queued", reason: "task_retry" },
+				expectedRevision: revisionWhenClaimed,
+			});
+
+			expect(result).toEqual({
+				revision: revisionWhenClaimed + 1,
+				state: { status: "queued", reason: "task_retry" },
+				attempts: attemptsWhenClaimed,
+			});
+
+			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			expect(run).toEqual(
+				expect.objectContaining({
+					id: runId,
+					status: "queued",
+					revision: result.revision,
+					attempts: result.attempts,
+					state: { status: "queued", reason: "task_retry" },
+				})
+			);
+		}));
+
+	test("a non-retry promotion from scheduled charges no attempt", () =>
+		withHarness(async ({ context, repos }) => {
+			const { runId, revisionWhenScheduled, attemptsWhenScheduled } = await seedScheduledRun({
+				namespaceRequestContext: context,
+				repos,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			const result = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "queued", reason: "new" },
+				expectedRevision: revisionWhenScheduled,
+			});
+
+			expect(result).toEqual({
+				revision: revisionWhenScheduled + 1,
+				state: { status: "queued", reason: "new" },
+				attempts: attemptsWhenScheduled,
+			});
+
+			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			expect(run).toEqual(
+				expect.objectContaining({
+					id: runId,
+					status: "queued",
+					revision: result.revision,
+					attempts: result.attempts,
+					state: { status: "queued", reason: "new" },
 				})
 			);
 		}));

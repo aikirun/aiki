@@ -11,6 +11,8 @@ Before writing any test, study the exemplars for its tier and match their idioms
   seeding, fake clock, assertion shapes.
 - `sdk/workflow/src/run/sleeper.test.ts` — timestamps as authored data.
 - `sdk/workflow/src/task.test.ts` — boundary-value config knobs, file-local helpers.
+- `sdk/server/src/service/workflow-run-state-machine.test.ts` — exhaustive legality matrix driven
+  from a typed case table.
 
 ## Determinism
 
@@ -96,3 +98,8 @@ Before writing any test, study the exemplars for its tier and match their idioms
   `satisfies Record<Exclude<StatusUnion, "claimed">, unknown>`, then `Object.entries(...)` into
   a test per key. The `Record` over `Exclude` makes the table complete by construction: a new
   union member fails the build until it gets an entry, and a typo'd key never compiles.
+- When a case table's cells carry a payload, type the payload so a degenerate entry cannot
+  compile. The legality-matrix cell shape is `{ reasons?: NonEmptyArray<string> }`: an absent
+  cell is the illegal case, `{}` is legal-unguarded, and `NonEmptyArray` forbids the empty guard
+  list a plain `string[]` would accept — `{ reasons: [] }` would generate zero accepts tests and
+  silently decline every reason.

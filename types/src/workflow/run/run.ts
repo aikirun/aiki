@@ -66,9 +66,6 @@ interface WorkflowRunStateBase {
 
 export const WORKFLOW_RUN_SCHEDULED_REASON = [
 	"new",
-	"retry",
-	"task_retry",
-	"wakeup",
 	"wakeup_early",
 	"resumption",
 	"event",
@@ -76,6 +73,15 @@ export const WORKFLOW_RUN_SCHEDULED_REASON = [
 	"redelivery",
 ] as const;
 export type WorkflowRunScheduledReason = (typeof WORKFLOW_RUN_SCHEDULED_REASON)[number];
+
+export function isWorkflowRunScheduledReason(reason: string): reason is WorkflowRunScheduledReason {
+	for (const scheduledReason of WORKFLOW_RUN_SCHEDULED_REASON) {
+		if (reason === scheduledReason) {
+			return true;
+		}
+	}
+	return false;
+}
 
 export interface WorkflowRunStateScheduledBase extends WorkflowRunStateBase {
 	status: "scheduled";
@@ -85,18 +91,6 @@ export interface WorkflowRunStateScheduledBase extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateScheduledByNew extends WorkflowRunStateScheduledBase {
 	reason: "new";
-}
-
-export interface WorkflowRunStateScheduledByRetry extends WorkflowRunStateScheduledBase {
-	reason: "retry";
-}
-
-export interface WorkflowRunStateScheduledByTaskRetry extends WorkflowRunStateScheduledBase {
-	reason: "task_retry";
-}
-
-export interface WorkflowRunStateScheduledByWakeup extends WorkflowRunStateScheduledBase {
-	reason: "wakeup";
 }
 
 export interface WorkflowRunStateScheduledByWakeupEarly extends WorkflowRunStateScheduledBase {
@@ -121,9 +115,6 @@ export interface WorkflowRunStateScheduledByRedelivery extends WorkflowRunStateS
 
 export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByNew
-	| WorkflowRunStateScheduledByRetry
-	| WorkflowRunStateScheduledByTaskRetry
-	| WorkflowRunStateScheduledByWakeup
 	| WorkflowRunStateScheduledByWakeupEarly
 	| WorkflowRunStateScheduledByResume
 	| WorkflowRunStateScheduledByEvent
@@ -138,7 +129,9 @@ export const WORKFLOW_RUN_QUEUED_REASON = [
 	"wakeup_early",
 	"resumption",
 	"event",
+	"event_wait_timeout",
 	"child_workflow",
+	"child_workflow_wait_timeout",
 	"recovery",
 	"redelivery",
 ] as const;
