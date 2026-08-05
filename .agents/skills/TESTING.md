@@ -31,8 +31,9 @@ Before writing any test, study the exemplars for its tier and match their idioms
     Integration-only (test files run sequentially in one process).
 - Use these tools only where the test's semantics need them. The fake clock earns its place
   where state must look stale or aged (a recovery threshold, an age cap keyed on a row id's
-  mint time), not where mere status suffices. Derive each piece of harness machinery from what
-  the test asserts; don't inherit it from the neighboring test.
+  mint time) or where an expectation pins an exact written timestamp, not where mere status
+  suffices. Derive each piece of harness machinery from what the test asserts; don't inherit
+  it from the neighboring test.
 - Waits ride event-signaled promises (see `lib/src/async/latch.ts`), never polling loops or
   sized sleeps. The one legitimate fixed wait is an absence check: wait a window, assert nothing
   changed.
@@ -67,11 +68,29 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Expectations compare whole arrays with matchers —
   `expect(rows).toEqual([expect.objectContaining({ ... })])` — never `rows[0]?.field` inside an
   `expect`. This pins count and content together.
-- Captures (probes, helper lookups) may index only after the count is pinned:
-  `expect(rows).toHaveLength(1)` then `rows[0]`. `rows[0]!` with a
-  `biome-ignore ...: the length has already been asserted` comment is the accepted narrowing.
+- Captures (indexing a row out to reuse a value) are a last resort, not an idiom: authored
+  instants let the whole-array assertion carry every field, and asserting row order replaces
+  reading out an id to filter by. Where a later step genuinely needs a value that cannot be
+  authored, index only after `expect(rows).toHaveLength(n)`; `rows[0]!` with a
+  `biome-ignore ...: the length has already been asserted` comment is the tolerated narrowing,
+  and its presence is a prompt to ask whether the value could have been authored instead.
 - Merge related equality fields into one `objectContaining` (include ids). An ordered comparison
   (`toBeGreaterThan`) gets its own assertion line — no asymmetric ordering matcher exists.
+- Timestamps in expectations are exact values, never `expect.any(Number)` — presence-only
+  survives a dropped duration or a seconds/ms mix-up. Capture an instant, freeze the clock
+  around the one mutating call, and assert the arithmetic
+  (`const sleepStartedAt = Date.now()`, then `wakeupAt: sleepStartedAt + durationMs`).
+  Seeding the freeze from `Date.now()` is not the real-time smell: nothing depends on the
+  value, and a current-time seed keeps the frozen instant after earlier real-time steps so
+  ulids stay causally ordered. Scope the freeze to the call under assertion. Timestamps minted
+  in one transaction share its single `now` — asserting them against the same instant pins
+  that property too. Where the clock cannot be frozen, bracket from both sides
+  (`before + duration <= t <= after + duration`); a one-sided bound still passes a doubled
+  duration.
+- A captured row pins stability, not exactness: comparing against an earlier read proves the
+  row didn't change, while its timestamps stay unfrozen wall-clock values. When exactness is
+  the point, freeze the instant that minted the row and assert the authored value — the
+  whole-array form then needs no capture at all.
 - An absence assertion must be a read that would have shown the row if it existed.
 - When a test claims "X prevents Y", first prove Y was actually going to happen: assert the
   seeded state is one Y would hit (the claim is old enough to be recovered), then do X, then
@@ -92,6 +111,12 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Mutation-test your assertions: if the behavior under test were deleted, would this test fail?
   Baselines captured before an intermediate step, or comparisons that hold vacuously (0 === 0),
   are the common failure.
+- When the claim is "X leaves Y untouched", mint Y in a state X cannot write: a bystander
+  sleep finalized `completed` (a `durationMs: 0` sleep is due for the elapsed-runs daemon
+  immediately) against an X that writes `cancelled`. A same-status bystander forces the
+  assertion to lean on incidental values; a distinguishable status turns any violation into a
+  visible flip. Assert the bystander's outcome columns with their null complements
+  (`completedAt` set, `cancelledAt: null`) so finalization is pinned to exactly one outcome.
 - When a behavior applies only to one status (a guard like `status = 'claimed'`), test every
   excluded status, not one representative. Build the case table as an object keyed by the
   excluded statuses and pin it with

@@ -33,6 +33,13 @@ export const createSleepRepository = (db: PgDb) => ({
 			.where(and(inArray(sleep.workflowRunId, workflowRunIds), eq(sleep.status, "sleeping")));
 	},
 
+	async bulkCancelByWorkflowRunIds(workflowRunIds: NonEmptyArray<string>, cancelledAt: TimestampMs): Promise<void> {
+		await db
+			.update(sleep)
+			.set({ status: "cancelled", cancelledAt })
+			.where(and(inArray(sleep.workflowRunId, workflowRunIds), eq(sleep.status, "sleeping")));
+	},
+
 	async getActiveByWorkflowRunIdAndName(workflowRunId: WorkflowRunId, name: string): Promise<SleepRow | null> {
 		const result = await db
 			.select()

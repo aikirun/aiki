@@ -245,7 +245,7 @@ async function transitionStateInTx(
 	const now = Date.now();
 	let toState = convertDurationToTimestamp(request.state, now);
 
-	if (fromState.status === "sleeping" && toState.status === "scheduled") {
+	if (fromState.status === "sleeping" && (toState.status === "scheduled" || toState.status === "cancelled")) {
 		await cancelSleep(runId, fromState.sleepName, now, txRepos);
 	}
 

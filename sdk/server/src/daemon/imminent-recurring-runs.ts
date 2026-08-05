@@ -410,6 +410,7 @@ async function processOverlapCancelPreviousSchedules(
 		// cancel state transitions only for actually cancelled runs and set latestStateTransitionId
 		if (isNonEmptyArray(cancelledRunIds)) {
 			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+			await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now as TimestampMs);
 			await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
 			const cancelledRunIdsSet = new Set(cancelledRunIds);
