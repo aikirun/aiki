@@ -78,12 +78,18 @@ export function buildTimelineLookups(
 			}
 
 			// Handle event - look up the previous awaiting_event transition
-			if (reason === "event") {
+			if (reason === "event" || reason === "event_wait_timeout") {
 				for (let j = i - 1; j >= 0; j--) {
 					const prev = transitions[j];
 					if (prev.type === "workflow_run" && prev.state.status === "awaiting_event") {
 						const eventName = prev.state.eventName;
 						context.eventDataName = eventName;
+						if (reason === "event_wait_timeout") {
+							context.eventTimedOut = true;
+							break;
+						}
+						// The wait row carries the event data; it also classifies rows written before the
+						// reason split, whose timed-out waits are labelled "event".
 						const queue = eventWaitQueues[eventName];
 						if (queue?.eventWaits.length > 0) {
 							let eventIndex = 0;
@@ -110,13 +116,19 @@ export function buildTimelineLookups(
 			}
 
 			// Handle child_workflow - look up the previous awaiting_child_workflow transition
-			if (reason === "child_workflow") {
+			if (reason === "child_workflow" || reason === "child_workflow_wait_timeout") {
 				for (let j = i - 1; j >= 0; j--) {
 					const prev = transitions[j];
 					if (prev.type === "workflow_run" && prev.state.status === "awaiting_child_workflow") {
 						const childId = prev.state.childWorkflowRunId;
 						const waitForStatus = prev.state.childWorkflowRunStatus;
 						context.scheduledByChildWorkflowRunId = childId;
+						if (reason === "child_workflow_wait_timeout") {
+							context.childWorkflowTimedOut = true;
+							break;
+						}
+						// The wait row carries the child's terminal status; it also classifies rows written
+						// before the reason split, whose timed-out waits are labelled "child_workflow".
 						const childInfo = childWorkflowById.get(childId);
 						const waitQueue = childInfo?.childWorkflowRunWaitQueues[waitForStatus];
 						const waits = waitQueue?.childWorkflowRunWaits;

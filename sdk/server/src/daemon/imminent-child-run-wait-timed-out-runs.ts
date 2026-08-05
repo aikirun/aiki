@@ -136,7 +136,7 @@ async function processChunk(
 		});
 
 		const stateTransitionId = ulid();
-		const toState: WorkflowRunStateQueued = { status: "queued", reason: "child_workflow" };
+		const toState: WorkflowRunStateQueued = { status: "queued", reason: "child_workflow_wait_timeout" };
 		stateTransitionEntries.push({
 			id: stateTransitionId,
 			workflowRunId: run.id,

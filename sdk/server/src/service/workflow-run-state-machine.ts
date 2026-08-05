@@ -11,10 +11,9 @@ import type {
 	WorkflowRunId,
 	WorkflowRunState,
 	WorkflowRunStateAwaitingChildWorkflow,
-	WorkflowRunStateScheduled,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
-import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
+import { isTerminalWorkflowRunStatus, isWorkflowRunScheduledReason } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../errors";
@@ -31,7 +30,15 @@ const workflowRunStateTransitionValidator: Record<
 > = {
 	scheduled: (() => {
 		const allowedDestinations: WorkflowRunStatus[] = ["queued", "paused", "cancelled"];
-		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
+		return (to) => {
+			if (!allowedDestinations.includes(to.status)) {
+				return { allowed: false };
+			}
+			if (to.status === "queued" && !isWorkflowRunScheduledReason(to.reason)) {
+				return { allowed: false, reason: "Only scheduled reasons allowed" };
+			}
+			return { allowed: true };
+		};
 	})(),
 
 	queued: (() => {
@@ -101,8 +108,8 @@ const workflowRunStateTransitionValidator: Record<
 			if (to.status === "scheduled" && to.reason !== "event") {
 				return { allowed: false, reason: "Only event received run allowed" };
 			}
-			if (to.status === "queued" && to.reason !== "event") {
-				return { allowed: false, reason: "Only event received run allowed" };
+			if (to.status === "queued" && to.reason !== "event_wait_timeout") {
+				return { allowed: false, reason: "Only event_wait_timeout run allowed" };
 			}
 			return { allowed: true };
 		};
@@ -130,8 +137,8 @@ const workflowRunStateTransitionValidator: Record<
 			if (to.status === "scheduled" && to.reason !== "child_workflow") {
 				return { allowed: false, reason: "Only child workflow triggered run allowed" };
 			}
-			if (to.status === "queued" && to.reason !== "child_workflow") {
-				return { allowed: false, reason: "Only child workflow triggered run allowed" };
+			if (to.status === "queued" && to.reason !== "child_workflow_wait_timeout") {
+				return { allowed: false, reason: "Only child_workflow_wait_timeout run allowed" };
 			}
 			return { allowed: true };
 		};
@@ -202,12 +209,17 @@ export const createWorkflowRunStateMachineService = ({
 		request: WorkflowRunTransitionStateRequestV1,
 		txRepos?: TxRepos
 	): Promise<WorkflowRunTransitionStateResponseV1> {
-		if (txRepos) {
-			return transitionStateInTx(context, request, childRunCanceller, txRepos);
-		}
-		return repos.transaction(async (transactionRepos) =>
-			transitionStateInTx(context, request, childRunCanceller, transactionRepos)
-		);
+		const response = txRepos
+			? await transitionStateInTx(context, request, childRunCanceller, txRepos)
+			: await repos.transaction(async (newTxRepos) =>
+					transitionStateInTx(context, request, childRunCanceller, newTxRepos)
+				);
+		context.logger.info("Workflow state transition", {
+			"aiki.runId": request.id,
+			"aiki.state": response.state,
+			"aiki.attempts": response.attempts,
+		});
+		return response;
 	},
 });
 
@@ -239,14 +251,8 @@ async function transitionStateInTx(
 	const now = Date.now();
 	let toState = convertDurationToTimestamp(request.state, now);
 
-	context.logger.info("Workflow state transition", {
-		"aiki.runId": runId,
-		"aiki.state": toState,
-		"aiki.attempts": run.attempts,
-	});
-
 	if (fromState.status === "sleeping" && toState.status === "scheduled") {
-		await finalizeSleep(runId, fromState.sleepName, toState, now, txRepos);
+		await cancelSleep(runId, fromState.sleepName, now, txRepos);
 	}
 
 	if (toState.status === "sleeping") {
@@ -263,10 +269,7 @@ async function transitionStateInTx(
 	if (toState.status === "scheduled" || toState.status === "queued") {
 		switch (toState.reason) {
 			case "retry":
-				// fromState guard prevents double-count across scheduled(retry) -> queued(retry).
-				if (fromState.status !== "scheduled" && fromState.status !== "queued") {
-					attempts++;
-				}
+				attempts++;
 				break;
 			default:
 				toState.reason satisfies
@@ -276,7 +279,9 @@ async function transitionStateInTx(
 					| "wakeup_early"
 					| "resumption"
 					| "event"
+					| "event_wait_timeout"
 					| "child_workflow"
+					| "child_workflow_wait_timeout"
 					| "recovery"
 					| "redelivery";
 		}
@@ -286,10 +291,6 @@ async function transitionStateInTx(
 		await txRepos.workflowRunOutbox.markClaimed(namespaceId, runId);
 	} else if (toState.status !== "queued") {
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
-	}
-
-	if (toState.status === "scheduled" && toState.reason === "retry") {
-		await discardStaleTasks(runId, ["running", "awaiting_retry", "failed"], txRepos);
 	}
 
 	if (toState.status === "awaiting_child_workflow") {
@@ -333,29 +334,16 @@ async function transitionStateInTx(
 	return { revision: newRevision, state: toState, attempts };
 }
 
-async function finalizeSleep(
-	runId: WorkflowRunId,
-	sleepName: string,
-	toState: WorkflowRunStateScheduled,
-	now: number,
-	txRepos: TxRepos
-) {
+async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: number, txRepos: TxRepos) {
 	const activeSleep = await txRepos.sleepQueue.getActiveByWorkflowRunIdAndName(runId, sleepName);
 	if (!activeSleep) {
 		return;
 	}
 
-	if (toState.reason === "wakeup") {
-		await txRepos.sleepQueue.update(activeSleep.id, {
-			status: "completed",
-			completedAt: now as TimestampMs,
-		});
-	} else {
-		await txRepos.sleepQueue.update(activeSleep.id, {
-			status: "cancelled",
-			cancelledAt: now as TimestampMs,
-		});
-	}
+	await txRepos.sleepQueue.update(activeSleep.id, {
+		status: "cancelled",
+		cancelledAt: now as TimestampMs,
+	});
 }
 
 async function childWorkflowRunWaitNotNeeded(

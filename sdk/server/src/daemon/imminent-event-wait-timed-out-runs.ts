@@ -135,7 +135,7 @@ async function processChunk(
 		});
 
 		const stateTransitionId = ulid();
-		const toState: WorkflowRunStateQueued = { status: "queued", reason: "event" };
+		const toState: WorkflowRunStateQueued = { status: "queued", reason: "event_wait_timeout" };
 		stateTransitionEntries.push({
 			id: stateTransitionId,
 			workflowRunId: run.id,

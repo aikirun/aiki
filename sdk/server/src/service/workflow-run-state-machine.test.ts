@@ -1,3 +1,4 @@
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
 import type { WorkflowRunStateRequest } from "@aikirun/types/api/workflow-run";
 import {
@@ -21,34 +22,41 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 		);
 	}
 
-	const validTransitions: Record<WorkflowRunStatus, Partial<Record<WorkflowRunStatus, { reason: string } | null>>> = {
-		scheduled: { queued: null, paused: null, cancelled: null },
-		queued: { running: null, paused: null, cancelled: null, failed: null, stalled: null },
+	const validTransitions: Record<
+		WorkflowRunStatus,
+		Partial<Record<WorkflowRunStatus, { reasons?: NonEmptyArray<string> }>>
+	> = {
+		scheduled: {
+			queued: { reasons: ["new", "wakeup_early", "resumption", "event", "child_workflow", "redelivery"] },
+			paused: {},
+			cancelled: {},
+		},
+		queued: { running: {}, paused: {}, cancelled: {}, failed: {}, stalled: {} },
 		running: {
-			queued: { reason: "task_retry" },
-			running: null,
-			paused: null,
-			sleeping: null,
-			awaiting_event: null,
-			awaiting_retry: null,
-			awaiting_child_workflow: null,
-			cancelled: null,
-			completed: null,
-			failed: null,
+			queued: { reasons: ["task_retry"] },
+			running: {},
+			paused: {},
+			sleeping: {},
+			awaiting_event: {},
+			awaiting_retry: {},
+			awaiting_child_workflow: {},
+			cancelled: {},
+			completed: {},
+			failed: {},
 		},
-		paused: { scheduled: { reason: "resumption" }, cancelled: null },
-		sleeping: { scheduled: { reason: "wakeup_early" }, queued: { reason: "wakeup" }, cancelled: null },
-		awaiting_event: { scheduled: { reason: "event" }, queued: { reason: "event" }, cancelled: null },
-		awaiting_retry: { queued: { reason: "retry" }, cancelled: null },
+		paused: { scheduled: { reasons: ["resumption"] }, cancelled: {} },
+		sleeping: { scheduled: { reasons: ["wakeup_early"] }, queued: { reasons: ["wakeup"] }, cancelled: {} },
+		awaiting_event: { scheduled: { reasons: ["event"] }, queued: { reasons: ["event_wait_timeout"] }, cancelled: {} },
+		awaiting_retry: { queued: { reasons: ["retry"] }, cancelled: {} },
 		awaiting_child_workflow: {
-			scheduled: { reason: "child_workflow" },
-			queued: { reason: "child_workflow" },
-			cancelled: null,
+			scheduled: { reasons: ["child_workflow"] },
+			queued: { reasons: ["child_workflow_wait_timeout"] },
+			cancelled: {},
 		},
-		stalled: { scheduled: { reason: "redelivery" }, cancelled: null },
+		stalled: { scheduled: { reasons: ["redelivery"] }, cancelled: {} },
 		cancelled: {},
 		completed: {},
-		failed: { awaiting_retry: null },
+		failed: { awaiting_retry: {} },
 	};
 
 	const possibleReasons = Array.from(new Set([...WORKFLOW_RUN_SCHEDULED_REASON, ...WORKFLOW_RUN_QUEUED_REASON]));
@@ -69,17 +77,21 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 					continue;
 				}
 
-				const validReason = validDestination?.reason;
-
-				test(`accepts to ${toStatus} ${validReason ? `(${validReason})` : ""}`, () => {
-					expect(() => attemptTransition(fromStatus, { status: toStatus, reason: validReason })).not.toThrow();
-				});
-
-				if (!validReason) {
+				const validReasons = validDestination?.reasons;
+				if (validReasons === undefined) {
+					test(`accepts to ${toStatus}`, () => {
+						expect(() => attemptTransition(fromStatus, { status: toStatus })).not.toThrow();
+					});
 					continue;
 				}
+
+				for (const reason of validReasons) {
+					test(`accepts to ${toStatus} (${reason})`, () => {
+						expect(() => attemptTransition(fromStatus, { status: toStatus, reason })).not.toThrow();
+					});
+				}
 				for (const reason of possibleReasons) {
-					if (reason === validReason) {
+					if (validReasons.includes(reason)) {
 						continue;
 					}
 					test(`declines to ${toStatus} (${reason})`, () => {
@@ -97,9 +109,9 @@ describe("convertDurationToTimestamp", () => {
 	const now = 1_000;
 
 	test("scheduled: scheduledInMs becomes an absolute scheduledAt", () => {
-		expect(convertDurationToTimestamp({ status: "scheduled", reason: "wakeup", scheduledInMs: 500 }, now)).toEqual({
+		expect(convertDurationToTimestamp({ status: "scheduled", reason: "event", scheduledInMs: 500 }, now)).toEqual({
 			status: "scheduled",
-			reason: "wakeup",
+			reason: "event",
 			scheduledAt: 1_500,
 		});
 	});
