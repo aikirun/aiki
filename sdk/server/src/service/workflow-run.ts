@@ -483,6 +483,7 @@ export const createWorkflowRunService = ({
 			}
 
 			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+			await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, Date.now() as TimestampMs);
 			await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
 			const cancelledRuns = await txRepos.workflowRun.getByIds(namespaceId, cancelledRunIds);
