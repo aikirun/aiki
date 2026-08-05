@@ -1,9 +1,8 @@
+import { delay } from "@aikirun/lib/async";
 import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import type { DistributiveOmit } from "@aikirun/lib/object";
-import type { RetryStrategy } from "@aikirun/lib/retry";
-import { withRetry } from "@aikirun/lib/retry";
 import type {
 	WorkflowRunStateRequest,
 	WorkflowRunTransitionStateResponseV1,
@@ -253,62 +252,71 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 		expectedStatus: Status,
 		options?: WorkflowRunWaitOptions<boolean, boolean>
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
-		if (options?.signal?.aborted) {
-			return {
-				success: false,
-				cause: "aborted",
-			};
-		}
-
-		const delayMs = options?.interval ? toMilliseconds(options.interval) : 1_000;
-		const maxAttempts = options?.timeout
-			? Math.ceil(toMilliseconds(options.timeout) / delayMs)
-			: Number.POSITIVE_INFINITY;
-		const retryStrategy: RetryStrategy = { type: "fixed", maxAttempts, delayMs };
+		const signal = options?.signal;
+		const intervalMs = options?.interval ? toMilliseconds(options.interval) : 1_000;
+		const timeoutAt = options?.timeout ? Date.now() + toMilliseconds(options.timeout) : undefined;
 
 		let afterStateTransitionId = this._run.stateTransitionId;
+		let finalPoll = false;
 
-		const hasTerminated = async () => {
-			const { terminated, latestStateTransitionId } = await this.api.workflowRun.hasTerminatedV1({
-				id: this._run.id,
-				afterStateTransitionId,
-			});
-			afterStateTransitionId = latestStateTransitionId;
-			return terminated;
-		};
-
-		const shouldRetryOnResult = (terminated: boolean) => !terminated;
-
-		const maybeResult = options?.signal
-			? await withRetry(hasTerminated, retryStrategy, {
-					signal: options.signal,
-					shouldRetryOnResult,
-				}).run()
-			: await withRetry(hasTerminated, retryStrategy, { shouldRetryOnResult }).run();
-
-		if (maybeResult.state === "timeout") {
-			if (!Number.isFinite(maxAttempts)) {
-				throw new Error("Something's wrong, this should've never timed out");
+		while (!signal?.aborted) {
+			let terminated: boolean;
+			try {
+				const response = await this.api.workflowRun.hasTerminatedV1({
+					id: this._run.id,
+					afterStateTransitionId,
+				});
+				afterStateTransitionId = response.latestStateTransitionId;
+				terminated = response.terminated;
+			} catch (err) {
+				this.logger.warn("Failed while checking if workflow has terminated", { err });
+				terminated = false;
 			}
-			return { success: false, cause: "timeout" };
+
+			if (terminated) {
+				await this.refresh();
+
+				// TODO: If the run transitions from failed -> awaiting_retry between the refresh and this check,
+				// a wrong response will be sent to the caller i.e. { success: false, cause: "run_terminated" }.
+				// The correct response should be { success: true, state }
+				if (this._run.state.status === expectedStatus) {
+					return {
+						success: true,
+						state: this._run.state as WorkflowRunWaitResultSuccess<Status, Output>,
+					};
+				}
+
+				return { success: false, cause: "run_terminated" };
+			}
+
+			if (finalPoll) {
+				return { success: false, cause: "timeout" };
+			}
+
+			let delayMs = intervalMs;
+			if (timeoutAt !== undefined) {
+				const remainingTimeoutMs = timeoutAt - Date.now();
+				if (remainingTimeoutMs <= 0) {
+					return { success: false, cause: "timeout" };
+				}
+
+				// The last sleep is capped to the remaining timeout budget, so the run gets
+				// exactly one final poll at the deadline before the wait gives up, regardless
+				// of timer precision.
+				if (remainingTimeoutMs <= intervalMs) {
+					delayMs = remainingTimeoutMs;
+					finalPoll = true;
+				}
+			}
+
+			try {
+				await delay(delayMs, { signal });
+			} catch {
+				return { success: false, cause: "aborted" };
+			}
 		}
 
-		if (maybeResult.state === "aborted") {
-			return { success: false, cause: "aborted" };
-		}
-
-		maybeResult.state satisfies "completed";
-
-		await this.refresh();
-
-		if (this._run.state.status === expectedStatus) {
-			return {
-				success: true,
-				state: this._run.state as WorkflowRunWaitResultSuccess<Status, Output>,
-			};
-		}
-
-		return { success: false, cause: "run_terminated" };
+		return { success: false, cause: "aborted" };
 	}
 
 	public async cancel(reason?: string): Promise<void> {

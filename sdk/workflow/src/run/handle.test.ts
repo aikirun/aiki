@@ -328,20 +328,20 @@ describe("workflowRunHandle", () => {
 				expect(result).toEqual({ success: true, state: { status: "completed", output: 42 } });
 			}));
 
-		test("returns timeout when the run has not terminated by the last poll", () =>
+		test("returns timeout after a final poll at the deadline", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0" });
 				const handle = workflowRunHandle(client, record);
 
-				client.api.workflowRun.hasTerminatedV1.once(
-					{ id: record.id, afterStateTransitionId: "t0" },
-					{ terminated: false, latestStateTransitionId: "t1" }
-				);
+				client.api.workflowRun.hasTerminatedV1
+					.once({ id: record.id, afterStateTransitionId: "t0" }, { terminated: false, latestStateTransitionId: "t1" })
+					.once({ id: record.id, afterStateTransitionId: "t1" }, { terminated: false, latestStateTransitionId: "t2" });
 
-				// timeout <= interval means max poll attempts will be 1
+				// timeout < interval: the sleep after the first poll is capped to the remaining
+				// budget, and exactly one more poll happens at the deadline before giving up
 				const result = await handle.waitForStatus("completed", {
 					interval: { seconds: 2 },
-					timeout: { seconds: 1 },
+					timeout: { milliseconds: 20 },
 				});
 
 				expect(result).toEqual({ success: false, cause: "timeout" });
