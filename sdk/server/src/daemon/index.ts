@@ -31,6 +31,9 @@ export interface StartDaemonsDeps {
 	childRunCanceller: ChildRunCanceller;
 }
 
+const MIN_GAP_FRACTION = 0.2;
+const JITTER_FRACTION = 0.1;
+
 const pollingDaemon = (
 	logger: Logger,
 	signal: AbortSignal,
@@ -53,10 +56,23 @@ const pollingDaemon = (
 						await fn(context, deps, config);
 						const durationMs = Math.round(performance.now() - start);
 						context.logger.debug("Completed", { "aiki.durationMs": durationMs });
-						const delayMs = config.intervalMs - durationMs;
-						if (delayMs > 0) {
-							await delay(delayMs, { signal });
-						}
+
+						// When a tick runs longer than the interval, the remaining delay goes negative.
+						// Without a minimum delay the daemon would scan again immediately, hitting the
+						// database hardest exactly when it is slowest.
+						// The jitter adds or subtracts (both equally likely) a small random amount, so over
+						// many ticks it cancels out and the average pace stays approximately intervalMs.
+						// A new random amount is picked every tick, so daemons that started at the same
+						// moment drift apart instead of scanning in sync forever.
+						// The jitter is added last, so it can pull the delay below the minimum.
+						// The most it can subtract is 10% of the interval and the minimum is 20% of the interval,
+						// so the daemon always waits at least 10% of the interval.
+						// Overlapping scans are safe regardless. This only trims wasted work, so both numbers
+						// are rough on purpose and don't need config knobs.
+						const durationUntilNextTickMs = config.intervalMs - durationMs;
+						const jitterMs = (Math.random() * 2 - 1) * JITTER_FRACTION * config.intervalMs;
+						const delayMs = Math.max(MIN_GAP_FRACTION * config.intervalMs, durationUntilNextTickMs) + jitterMs;
+						await delay(delayMs, { signal });
 					},
 					{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
 					{
