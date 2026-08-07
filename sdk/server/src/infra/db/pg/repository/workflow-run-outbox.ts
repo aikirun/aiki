@@ -6,6 +6,7 @@ import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
+import { computeRank, PRIORITY_LEVELS } from "../../../../lib/rank";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { workflowRunOutbox } from "../schema";
@@ -18,7 +19,6 @@ export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & {
 	status: "published";
 	firstPublishedAt: TimestampMs;
 	lastPublishedAt: TimestampMs;
-	nextPublishAttemptAt: TimestampMs;
 };
 export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "claimed"; claimedAt: TimestampMs };
 
@@ -36,34 +36,66 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 		await db.delete(workflowRunOutbox).where(inArray(workflowRunOutbox.workflowRunId, workflowRunIds));
 	},
 
-	async listPending(
-		_context: DaemonContext,
-		limit: number,
-		cursor?: KeysetStreamCursor
-	): Promise<WorkflowRunOutboxRowPending[]> {
+	async listPending(_context: DaemonContext, limit: number): Promise<WorkflowRunOutboxRowPending[]> {
 		const rows = await db
 			.select()
 			.from(workflowRunOutbox)
-			.where(
-				and(
-					eq(workflowRunOutbox.status, "pending"),
-					keysetStreamCursorFilter(workflowRunOutbox.rank, workflowRunOutbox.id, cursor)
-				)
-			)
-			.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
+			.where(eq(workflowRunOutbox.status, "pending"))
+			.orderBy(workflowRunOutbox.nextPublishAttemptRank, workflowRunOutbox.id)
 			.limit(limit);
 
 		return rows as WorkflowRunOutboxRowPending[];
 	},
 
-	async markPublished(entries: NonEmptyArray<{ id: string; nextPublishAttemptAt: TimestampMs }>): Promise<void> {
+	async leaseDuePending(
+		_context: DaemonContext,
+		params: { leaseDurationMs: number; limit: number }
+	): Promise<WorkflowRunOutboxRowPending[]> {
+		const { leaseDurationMs, limit } = params;
+		const now = Date.now();
+		// PRIORITY_LEVELS - 1 is the least priority and produces a rank greater than or equal to any rank due on or before now.
+		const maxNextPublishAttemptRank = computeRank({ dueAt: now, priority: PRIORITY_LEVELS - 1 });
+
+		const leaseRankBase = (now + leaseDurationMs) * PRIORITY_LEVELS;
+
+		const duePendingRows = db
+			.select({ id: workflowRunOutbox.id })
+			.from(workflowRunOutbox)
+			.where(
+				and(
+					eq(workflowRunOutbox.status, "pending"),
+					lte(workflowRunOutbox.nextPublishAttemptRank, maxNextPublishAttemptRank)
+				)
+			)
+			.orderBy(workflowRunOutbox.nextPublishAttemptRank, workflowRunOutbox.id)
+			.limit(limit);
+
+		const rows = await db
+			.update(workflowRunOutbox)
+			.set({
+				// Each row preserves its priority digit, only the dueAt portion of the rank shifts.
+				nextPublishAttemptRank: sql`${leaseRankBase} + (${workflowRunOutbox.rank} - floor(${workflowRunOutbox.rank} / ${PRIORITY_LEVELS}) * ${PRIORITY_LEVELS})`,
+			})
+			.where(
+				and(
+					eq(workflowRunOutbox.status, "pending"),
+					lte(workflowRunOutbox.nextPublishAttemptRank, maxNextPublishAttemptRank),
+					inArray(workflowRunOutbox.id, duePendingRows)
+				)
+			)
+			.returning();
+
+		return rows as WorkflowRunOutboxRowPending[];
+	},
+
+	async markPublished(entries: NonEmptyArray<{ id: string; nextPublishAttemptRank: number }>): Promise<void> {
 		const now = Date.now() as TimestampMs;
 
 		const valueRows = entries.map((entry, index) => {
 			if (index === 0) {
-				return sql`(${entry.id}::text, ${new Date(entry.nextPublishAttemptAt).toISOString()}::timestamptz)`;
+				return sql`(${entry.id}::text, ${entry.nextPublishAttemptRank}::float8)`;
 			}
-			return sql`(${entry.id}, ${new Date(entry.nextPublishAttemptAt).toISOString()})`;
+			return sql`(${entry.id}, ${entry.nextPublishAttemptRank})`;
 		});
 
 		await db
@@ -72,17 +104,35 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 				status: "published",
 				firstPublishedAt: sql`COALESCE(${workflowRunOutbox.firstPublishedAt}, ${new Date(now).toISOString()}::timestamptz)`,
 				lastPublishedAt: now,
-				nextPublishAttemptAt: sql`v.next_publish_attempt_at`,
+				nextPublishAttemptRank: sql`v.next_publish_attempt_rank`,
 			})
-			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, next_publish_attempt_at)`)
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, next_publish_attempt_rank)`)
+			.where(and(eq(workflowRunOutbox.status, "pending"), sql`${workflowRunOutbox.id} = v.id`));
+	},
+
+	async setNextPublishAttemptRank(
+		entries: NonEmptyArray<{ id: string; nextPublishAttemptRank: number }>
+	): Promise<void> {
+		const valueRows = entries.map((entry, index) => {
+			if (index === 0) {
+				return sql`(${entry.id}::text, ${entry.nextPublishAttemptRank}::float8)`;
+			}
+			return sql`(${entry.id}, ${entry.nextPublishAttemptRank})`;
+		});
+
+		await db
+			.update(workflowRunOutbox)
+			.set({ nextPublishAttemptRank: sql`v.next_publish_attempt_rank` })
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, next_publish_attempt_rank)`)
 			.where(and(eq(workflowRunOutbox.status, "pending"), sql`${workflowRunOutbox.id} = v.id`));
 	},
 
 	// firstPublishedAt and lastPublishedAt are not cleared so that backoff anchors survive recovery churn.
+	// nextPublishAttemptRank resets to rank so the returned row is immediately due.
 	async returnToPending(ids: NonEmptyArray<string>, fromStatus: "claimed" | "published"): Promise<void> {
 		await db
 			.update(workflowRunOutbox)
-			.set({ status: "pending", claimedAt: null, nextPublishAttemptAt: null })
+			.set({ status: "pending", claimedAt: null, nextPublishAttemptRank: workflowRunOutbox.rank })
 			.where(and(inArray(workflowRunOutbox.id, ids), eq(workflowRunOutbox.status, fromStatus)));
 	},
 
@@ -111,7 +161,8 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<WorkflowRunOutboxRowPublished[]> {
-		const now = Date.now() as TimestampMs;
+		// PRIORITY_LEVELS - 1 is the least priority and produces a rank greater than or equal to any rank due on or before now.
+		const maxNextPublishAttemptRank = computeRank({ dueAt: Date.now(), priority: PRIORITY_LEVELS - 1 });
 
 		const rows = await db
 			.select()
@@ -119,11 +170,11 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.where(
 				and(
 					eq(workflowRunOutbox.status, "published"),
-					lte(workflowRunOutbox.nextPublishAttemptAt, now),
-					keysetStreamCursorFilter(workflowRunOutbox.nextPublishAttemptAt, workflowRunOutbox.id, cursor)
+					lte(workflowRunOutbox.nextPublishAttemptRank, maxNextPublishAttemptRank),
+					keysetStreamCursorFilter(workflowRunOutbox.nextPublishAttemptRank, workflowRunOutbox.id, cursor)
 				)
 			)
-			.orderBy(workflowRunOutbox.nextPublishAttemptAt, workflowRunOutbox.id)
+			.orderBy(workflowRunOutbox.nextPublishAttemptRank, workflowRunOutbox.id)
 			.limit(limit);
 
 		return rows as WorkflowRunOutboxRowPublished[];
@@ -131,10 +182,13 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 
 	async listStaleClaimed(
 		_context: DaemonContext,
-		claimIdleTimeoutMs: number,
-		limit: number,
-		cursor?: KeysetStreamCursor
+		params: {
+			claimIdleTimeoutMs: number;
+			limit: number;
+			cursor?: KeysetStreamCursor;
+		}
 	): Promise<WorkflowRunOutboxRowClaimed[]> {
+		const { claimIdleTimeoutMs, limit, cursor } = params;
 		const rows = await db
 			.select()
 			.from(workflowRunOutbox)
@@ -151,7 +205,8 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 		return rows as WorkflowRunOutboxRowClaimed[];
 	},
 
-	async listUndeliverable(_context: DaemonContext, maxId: string, limit: number, cursorId?: string) {
+	async listUndeliverable(_context: DaemonContext, params: { maxId: string; limit: number; cursorId?: string }) {
+		const { maxId, limit, cursorId } = params;
 		const conditions = [inArray(workflowRunOutbox.status, ["pending", "published"]), lte(workflowRunOutbox.id, maxId)];
 		if (cursorId !== undefined) {
 			conditions.push(sql`${workflowRunOutbox.id} > ${cursorId}`);
@@ -168,20 +223,33 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			.limit(limit);
 	},
 
-	async getByWorkflowRunId(namespaceId: string, workflowRunId: string): Promise<WorkflowRunOutboxRow | null> {
+	async getByWorkflowRunId(params: {
+		namespaceId: string;
+		workflowRunId: string;
+	}): Promise<WorkflowRunOutboxRow | null> {
 		const result = await db
 			.select()
 			.from(workflowRunOutbox)
-			.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)))
+			.where(
+				and(
+					eq(workflowRunOutbox.namespaceId, params.namespaceId),
+					eq(workflowRunOutbox.workflowRunId, params.workflowRunId)
+				)
+			)
 			.limit(1);
 
 		return result[0] ?? null;
 	},
 
-	async deleteByWorkflowRunId(namespaceId: string, workflowRunId: string): Promise<void> {
+	async deleteByWorkflowRunId(params: { namespaceId: string; workflowRunId: string }): Promise<void> {
 		await db
 			.delete(workflowRunOutbox)
-			.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
+			.where(
+				and(
+					eq(workflowRunOutbox.namespaceId, params.namespaceId),
+					eq(workflowRunOutbox.workflowRunId, params.workflowRunId)
+				)
+			);
 	},
 
 	async claimPending(namespaceId: string, filters: ClaimFilter, limit: number) {

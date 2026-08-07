@@ -131,6 +131,7 @@ async function processChunk(
 			pool: run.options?.pool,
 			status: "pending",
 			rank: run.rank,
+			nextPublishAttemptRank: run.rank,
 		});
 	}
 

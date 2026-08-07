@@ -10,5 +10,6 @@ export const pendingWorkflowRunOutboxRowFactory = Factory.define<WorkflowRunOutb
 	workflowName: "sync-inventory",
 	workflowVersionId: "v1",
 	rank: 1,
+	nextPublishAttemptRank: 1,
 	status: "pending",
 }));

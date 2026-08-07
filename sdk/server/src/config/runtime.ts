@@ -20,9 +20,11 @@ export interface ServerRuntimeConfig {
 		imminentChildRunWaitTimedOutRuns: ImminentPollingDaemonConfig;
 		imminentRecurringRuns: ImminentPollingDaemonConfig;
 		publishPendingOutboxEntries: PollingDaemonConfig & {
+			leaseDurationMs: number;
 			republishBackoff: {
 				baseDelayMs: number;
 				maxDelayMs: number;
+				declinedBackoffMs: number;
 			};
 		};
 		recoverOverdueOutboxEntries: PollingDaemonConfig & {
@@ -81,9 +83,11 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 		publishPendingOutboxEntries: {
 			intervalMs: 1_000,
 			limit: 1_000,
+			leaseDurationMs: 5_000,
 			republishBackoff: {
 				baseDelayMs: 5_000,
 				maxDelayMs: 300_000,
+				declinedBackoffMs: 30_000,
 			},
 		},
 		recoverOverdueOutboxEntries: {

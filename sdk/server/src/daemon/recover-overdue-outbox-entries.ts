@@ -22,9 +22,9 @@ const advanceClaimedCursor = createKeysetStreamCursorAdvancer<{ id: string; clai
 
 const advancePublishedCursor = createKeysetStreamCursorAdvancer<{
 	id: string;
-	nextPublishAttemptAt: TimestampMs;
+	nextPublishAttemptRank: number;
 }>({
-	getOrder: (entry) => entry.nextPublishAttemptAt,
+	getOrder: (entry) => entry.nextPublishAttemptRank,
 	getId: (entry) => entry.id,
 });
 
@@ -34,7 +34,7 @@ export async function recoverOverdueOutboxEntries(
 	{ claimIdleTimeoutMs, limit }: { claimIdleTimeoutMs: number; limit: number }
 ): Promise<void> {
 	for await (const staleEntries of streamChunks(
-		(cursor) => repos.workflowRunOutbox.listStaleClaimed(context, claimIdleTimeoutMs, limit, cursor),
+		(cursor) => repos.workflowRunOutbox.listStaleClaimed(context, { claimIdleTimeoutMs, limit, cursor }),
 		{
 			advanceCursor: advanceClaimedCursor,
 			until: (chunk) => chunk.length < limit,

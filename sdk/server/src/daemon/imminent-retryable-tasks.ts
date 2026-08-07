@@ -59,7 +59,7 @@ export async function processImminentRetryableTasks(
 			const rankByRunId = new Map<string, number>();
 			for (const { workflowRunId, dueAt } of tasksDueNow) {
 				runIds.push(workflowRunId);
-				rankByRunId.set(workflowRunId, computeRank(dueAt));
+				rankByRunId.set(workflowRunId, computeRank({ dueAt }));
 			}
 
 			const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds as NonEmptyArray<string>, "running");
@@ -80,7 +80,7 @@ export async function processImminentRetryableTasks(
 				type: "task_retry",
 				id: task.workflowRunId,
 				dueAt: task.dueAt,
-				rank: computeRank(task.dueAt),
+				rank: computeRank({ dueAt: task.dueAt }),
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
 			if (result.status === "failed") {
@@ -162,6 +162,7 @@ async function processChunk(
 			workflowVersionId: workflow.versionId,
 			pool: run.options?.pool,
 			rank: run.rank,
+			nextPublishAttemptRank: run.rank,
 			status: "pending",
 		});
 	}

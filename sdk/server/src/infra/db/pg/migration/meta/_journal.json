@@ -120,6 +120,13 @@
 			"when": 1785921506602,
 			"tag": "0016_bent_marten_broadcloak",
 			"breakpoints": true
+		},
+		{
+			"idx": 17,
+			"version": "7",
+			"when": 1786109614480,
+			"tag": "0017_broad_trauma",
+			"breakpoints": true
 		}
 	]
 }

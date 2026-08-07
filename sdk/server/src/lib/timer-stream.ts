@@ -27,8 +27,8 @@ export async function* streamTimers<Item extends Timer>(
 		advanceCursor: advanceTimerStreamCursor,
 		until: options?.until,
 		partition: (timer) => {
-			const dueAtMs = timer.dueAt;
-			return { meetsCondition: dueAtMs <= now, item: { ...timer, rank: computeRank(dueAtMs) } };
+			const dueAt = timer.dueAt;
+			return { meetsCondition: dueAt <= now, item: { ...timer, rank: computeRank({ dueAt }) } };
 		},
 	})) {
 		yield { dueNow: whenTrue, dueSoon: whenFalse };

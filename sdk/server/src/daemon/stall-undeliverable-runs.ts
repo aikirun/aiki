@@ -25,7 +25,7 @@ export async function stallUndeliverableRuns(
 	const maxId = ulidUpperBound(Date.now() - maxAgeMs);
 
 	for await (const undeliverableEntries of streamChunks(
-		(cursor) => repos.workflowRunOutbox.listUndeliverable(context, maxId, limit, cursor),
+		(cursorId) => repos.workflowRunOutbox.listUndeliverable(context, { maxId, limit, cursorId }),
 		{
 			advanceCursor: advanceStreamCursor,
 			until: (chunk) => chunk.length < limit,

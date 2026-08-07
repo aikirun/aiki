@@ -38,7 +38,10 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 			const pendingRows = await repos.workflowRunOutbox.listPending(daemonContext, 100);
 			expect(pendingRows).toHaveLength(0);
 
-			const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(daemonContext, EVERY_CLAIM_IS_STALE_MS, 100);
+			const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(daemonContext, {
+				claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS,
+				limit: 100,
+			});
 			expect(claimedRows).toEqual([expect.objectContaining({ workflowRunId: runId, status: "claimed" })]);
 			expect(claimedRows[0]?.claimedAt).toBeGreaterThan(0);
 		}));
@@ -204,7 +207,10 @@ describe("WorkflowRunOutboxService.refreshClaim", () => {
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			await outboxService.refreshClaim(context, runId);
 
-			const row = await repos.workflowRunOutbox.getByWorkflowRunId(context.namespaceId, runId);
+			const row = await repos.workflowRunOutbox.getByWorkflowRunId({
+				namespaceId: context.namespaceId,
+				workflowRunId: runId,
+			});
 			expect(row).toEqual(expect.objectContaining({ workflowRunId: runId, status: "claimed" }));
 			expect(row?.claimedAt).toBeGreaterThan(EPOCH_MS);
 		}));
@@ -220,7 +226,10 @@ describe("WorkflowRunOutboxService.refreshClaim", () => {
 				const outboxService = createWorkflowRunOutboxService({ repos });
 				await outboxService.refreshClaim(context, runId);
 
-				const row = await repos.workflowRunOutbox.getByWorkflowRunId(context.namespaceId, runId);
+				const row = await repos.workflowRunOutbox.getByWorkflowRunId({
+					namespaceId: context.namespaceId,
+					workflowRunId: runId,
+				});
 				expect(row).toEqual(expect.objectContaining({ workflowRunId: runId, status, claimedAt: null }));
 			}));
 	});
