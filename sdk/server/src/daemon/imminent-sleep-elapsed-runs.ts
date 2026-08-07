@@ -129,6 +129,7 @@ async function processChunk(
 			workflowVersionId: workflow.versionId,
 			pool: run.options?.pool,
 			rank: run.rank,
+			nextPublishAttemptRank: run.rank,
 			status: "pending",
 		});
 	}

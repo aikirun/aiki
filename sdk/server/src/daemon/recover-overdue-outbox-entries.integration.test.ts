@@ -32,18 +32,29 @@ describe("recoverOverdueOutboxEntries", () => {
 					repos: deps.repos,
 				});
 
+				expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([]);
+
+				const originalRank = (
+					await repos.workflowRunOutbox.getByWorkflowRunId({
+						namespaceId: namespaceRequestContext.namespaceId,
+						workflowRunId: runId,
+					})
+				)?.rank;
+				expect(originalRank).toBeGreaterThan(0);
+
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
 					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
-				expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
+				const pendingRows = await repos.workflowRunOutbox.listPending(context, 100);
+				expect(pendingRows).toEqual([
 					expect.objectContaining({
 						id: outboxRowId,
 						workflowRunId: runId,
 						claimedAt: null,
-						nextPublishAttemptAt: null,
+						nextPublishAttemptRank: originalRank,
 					}),
 				]);
 			}));
@@ -58,7 +69,10 @@ describe("recoverOverdueOutboxEntries", () => {
 					repos: deps.repos,
 				});
 
-				const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100);
+				const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(context, {
+					claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS,
+					limit: 100,
+				});
 				expect(claimedRows).toHaveLength(1);
 				const firstPublishedAt = claimedRows[0]?.firstPublishedAt;
 				expect(firstPublishedAt).toBeGreaterThan(0);
@@ -154,9 +168,12 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(context, { repos }, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 });
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
-				expect(await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100)).toEqual([
-					expect.objectContaining({ id: outboxRowId, workflowRunId: runId }),
-				]);
+				expect(
+					await repos.workflowRunOutbox.listStaleClaimed(context, {
+						claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS,
+						limit: 100,
+					})
+				).toEqual([expect.objectContaining({ id: outboxRowId, workflowRunId: runId })]);
 			}));
 
 		test("leaves a refreshed claim untouched", () =>
@@ -172,9 +189,9 @@ describe("recoverOverdueOutboxEntries", () => {
 				);
 
 				// The epoch-old claim is initially recoverable.
-				expect(await repos.workflowRunOutbox.listStaleClaimed(context, ONE_HOUR_MS, 100)).toEqual([
-					expect.objectContaining({ id: outboxRowId, workflowRunId: runId }),
-				]);
+				expect(
+					await repos.workflowRunOutbox.listStaleClaimed(context, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 })
+				).toEqual([expect.objectContaining({ id: outboxRowId, workflowRunId: runId })]);
 
 				const outboxService = createWorkflowRunOutboxService({ repos });
 				await outboxService.refreshClaim(namespaceRequestContext, runId);
@@ -182,9 +199,12 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(context, { repos }, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 });
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
-				expect(await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100)).toEqual([
-					expect.objectContaining({ id: outboxRowId, workflowRunId: runId }),
-				]);
+				expect(
+					await repos.workflowRunOutbox.listStaleClaimed(context, {
+						claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS,
+						limit: 100,
+					})
+				).toEqual([expect.objectContaining({ id: outboxRowId, workflowRunId: runId })]);
 			}));
 	});
 
@@ -203,8 +223,10 @@ describe("recoverOverdueOutboxEntries", () => {
 
 				const publishableRows = await repos.workflowRunOutbox.listPublishable(context, 100);
 				expect(publishableRows).toHaveLength(1);
-				const firstPublishedAt = publishableRows[0]?.firstPublishedAt;
-				expect(firstPublishedAt).toBeGreaterThan(0);
+				const originalFirstPublishedAt = publishableRows[0]?.firstPublishedAt;
+				const originalRank = publishableRows[0]?.rank;
+				expect(originalFirstPublishedAt).toBeGreaterThan(0);
+				expect(originalRank).toBeDefined();
 
 				await recoverOverdueOutboxEntries(
 					context,
@@ -212,12 +234,13 @@ describe("recoverOverdueOutboxEntries", () => {
 					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
-				expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
+				const pendingRows = await repos.workflowRunOutbox.listPending(context, 100);
+				expect(pendingRows).toEqual([
 					expect.objectContaining({
 						id: outboxRowId,
 						workflowRunId: runId,
-						nextPublishAttemptAt: null,
-						firstPublishedAt,
+						firstPublishedAt: originalFirstPublishedAt,
+						nextPublishAttemptRank: originalRank,
 					}),
 				]);
 			}));
@@ -289,7 +312,10 @@ describe("recoverOverdueOutboxEntries", () => {
 						status: "running",
 					})
 				);
-				const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(context, EVERY_CLAIM_IS_STALE_MS, 100);
+				const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(context, {
+					claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS,
+					limit: 100,
+				});
 				expect(claimedRows).toEqual([expect.objectContaining({ id: outboxRowId, workflowRunId: runId })]);
 			}));
 	});

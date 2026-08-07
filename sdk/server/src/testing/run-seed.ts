@@ -3,6 +3,7 @@ import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
 import { withFakeClock } from "./clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "./data-factory/middleware/context";
+import { defaultServerRuntimeConfig } from "../config/runtime";
 import { processImminentScheduledRuns } from "../daemon/imminent-scheduled-runs";
 import { publishPendingOutboxEntries } from "../daemon/publish-pending-outbox-entries";
 import { stallUndeliverableRuns } from "../daemon/stall-undeliverable-runs";
@@ -14,7 +15,7 @@ import { createWorkflowRunStateMachineService } from "../service/workflow-run-st
 
 const seededWorkflow = { name: "ship-orders", versionId: "v2" };
 
-const republishBackoff = { baseDelayMs: 5_000, maxDelayMs: 300_000 };
+const publishPendingOutboxEntriesDaemonConfig = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
 
 function createServices(repos: Repositories) {
 	const childRunCanceller = createChildRunCanceller();
@@ -79,9 +80,16 @@ async function _seedQueuedRun(deps: SeedRunDeps, pool: string | undefined) {
 
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 
-	await processImminentScheduledRuns(daemonContext, { repos }, { limit: 100, lookaheadWindowMs: 0, republishBackoff });
+	await processImminentScheduledRuns(
+		daemonContext,
+		{ repos },
+		{ limit: 100, lookaheadWindowMs: 0, republishBackoff: publishPendingOutboxEntriesDaemonConfig.republishBackoff }
+	);
 
-	const outboxRow = await repos.workflowRunOutbox.getByWorkflowRunId(namespaceRequestContext.namespaceId, runId);
+	const outboxRow = await repos.workflowRunOutbox.getByWorkflowRunId({
+		namespaceId: namespaceRequestContext.namespaceId,
+		workflowRunId: runId,
+	});
 	if (!outboxRow) {
 		throw new Error(`Outbox row not found for run: ${runId}`);
 	}
@@ -119,7 +127,7 @@ export async function seedClaimedRun(deps: SeedRunDeps & { publisher: FakePublis
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedQueuedRun(deps);
 
-	await publishPendingOutboxEntries(daemonContext, { repos, publisher }, { limit: 100, republishBackoff });
+	await publishPendingOutboxEntries(daemonContext, { repos, publisher }, publishPendingOutboxEntriesDaemonConfig);
 
 	const claim = await claimRun({ context: namespaceRequestContext, repos, runId: seeded.runId });
 	return { ...seeded, ...claim };
@@ -130,7 +138,7 @@ export async function seedPublishedRun(deps: SeedRunDeps & { publisher: FakePubl
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const seeded = await seedQueuedRun(deps);
 
-	await publishPendingOutboxEntries(daemonContext, { repos, publisher }, { limit: 100, republishBackoff });
+	await publishPendingOutboxEntries(daemonContext, { repos, publisher }, publishPendingOutboxEntriesDaemonConfig);
 
 	return seeded;
 }

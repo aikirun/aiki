@@ -380,7 +380,7 @@ export const workflowRunOutbox = pgTable(
 		claimedAt: timestampMs("claimed_at"),
 		firstPublishedAt: timestampMs("first_published_at"),
 		lastPublishedAt: timestampMs("last_published_at"),
-		nextPublishAttemptAt: timestampMs("next_publish_attempt_at"),
+		nextPublishAttemptRank: doublePrecision("next_publish_attempt_rank").notNull(),
 
 		dispatchAttempts: integer("dispatch_attempts").notNull().default(0),
 
@@ -396,9 +396,11 @@ export const workflowRunOutbox = pgTable(
 			.where(sql`${table.status} = 'pending'`),
 
 		// Daemon list paths: broad scans over one status to feed broker.
-		index("idx_workflow_run_outbox_list_pending").on(table.rank, table.id).where(sql`${table.status} = 'pending'`),
+		index("idx_workflow_run_outbox_list_pending")
+			.on(table.nextPublishAttemptRank, table.id)
+			.where(sql`${table.status} = 'pending'`),
 		index("idx_workflow_run_outbox_list_published")
-			.on(table.nextPublishAttemptAt, table.id)
+			.on(table.nextPublishAttemptRank, table.id)
 			.where(sql`${table.status} = 'published'`),
 		index("idx_workflow_run_outbox_list_claimed").on(table.claimedAt, table.id).where(sql`${table.status} = 'claimed'`),
 
@@ -410,7 +412,7 @@ export const workflowRunOutbox = pgTable(
 
 		check(
 			"chk_workflow_run_outbox_published_requires_first_published_at",
-			sql`${table.status} != 'published' OR (${table.firstPublishedAt} IS NOT NULL AND ${table.nextPublishAttemptAt} IS NOT NULL)`
+			sql`${table.status} != 'published' OR ${table.firstPublishedAt} IS NOT NULL`
 		),
 		check(
 			"chk_workflow_run_outbox_claimed_requires_claimed_at",

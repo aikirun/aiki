@@ -57,14 +57,16 @@ describe("WorkflowRunService cancelByIds", () => {
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
 
-			expect(await repos.workflowRunOutbox.getByWorkflowRunId(context.namespaceId, runId)).toEqual(
-				expect.objectContaining({ workflowRunId: runId })
-			);
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toEqual(expect.objectContaining({ workflowRunId: runId }));
 
 			const { service } = createService(repos);
 			await service.cancelByIds(context, { ids: [runId] });
 
-			expect(await repos.workflowRunOutbox.getByWorkflowRunId(context.namespaceId, runId)).toBeNull();
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toBeNull();
 		}));
 
 	test("an empty ids request cancels nothing", () =>

@@ -189,7 +189,7 @@ async function transitionStateInTx(
 		// row when it transitions the workflow to `queued`.
 		// Also note that if the entry is not deleted, `processImminentRetryableTasks` will
 		// fail on insert due to duplicate key
-		await txRepos.workflowRunOutbox.deleteByWorkflowRunId(namespaceId, runId);
+		await txRepos.workflowRunOutbox.deleteByWorkflowRunId({ namespaceId, workflowRunId: runId });
 	}
 
 	logger.info("Transitioning task state", {

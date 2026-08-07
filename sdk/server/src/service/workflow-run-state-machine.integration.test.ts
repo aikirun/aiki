@@ -421,7 +421,11 @@ describe("WorkflowRunStateMachineService sleep lifecycle", () => {
 				processImminentSleepElapsedRuns(
 					daemonContext,
 					{ repos },
-					{ limit: 100, lookaheadWindowMs: 0, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
+					{
+						limit: 100,
+						lookaheadWindowMs: 0,
+						republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
+					}
 				)
 			);
 			const reclaimed = await claimRun({ context, repos, runId });
@@ -517,7 +521,9 @@ describe("WorkflowRunStateMachineService redelivery", () => {
 		withHarness(async ({ context, repos }) => {
 			const { runId } = await seedStalledRun({ namespaceRequestContext: context, repos });
 
-			expect(await repos.workflowRunOutbox.getByWorkflowRunId(context.namespaceId, runId)).toBeNull();
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toBeNull();
 
 			const stateMachine = createStateMachine(repos);
 			await stateMachine.transitionState(context, {
@@ -528,7 +534,11 @@ describe("WorkflowRunStateMachineService redelivery", () => {
 			await processImminentScheduledRuns(
 				daemonContext,
 				{ repos },
-				{ limit: 100, lookaheadWindowMs: 0, republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 } }
+				{
+					limit: 100,
+					lookaheadWindowMs: 0,
+					republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
+				}
 			);
 
 			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
@@ -540,7 +550,10 @@ describe("WorkflowRunStateMachineService redelivery", () => {
 				})
 			);
 
-			const row = await repos.workflowRunOutbox.getByWorkflowRunId(context.namespaceId, runId);
+			const row = await repos.workflowRunOutbox.getByWorkflowRunId({
+				namespaceId: context.namespaceId,
+				workflowRunId: runId,
+			});
 			expect(row).toEqual(expect.objectContaining({ workflowRunId: runId, status: "pending" }));
 		}));
 

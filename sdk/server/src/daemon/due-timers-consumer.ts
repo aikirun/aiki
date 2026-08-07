@@ -18,7 +18,7 @@ import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import type { RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
-import { computeRank, type Ranked, rankDueAtMs } from "../lib/rank";
+import { computeRank, extractRankDueAtMs, type Ranked } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 import { createDaemonContext } from "../middleware/context";
 import type { ChildRunCanceller } from "../service/cancel-child-runs";
@@ -78,7 +78,7 @@ async function dueTimersConsumerLoop(
 	if (nextTimerRankResponse.state !== "completed") {
 		return;
 	}
-	let nextTimerDueAtMs = nextTimerRankResponse.result && rankDueAtMs(nextTimerRankResponse.result);
+	let nextTimerDueAtMs = nextTimerRankResponse.result && extractRankDueAtMs(nextTimerRankResponse.result);
 
 	while (!abortSignal.aborted) {
 		await withRetry(
@@ -106,7 +106,7 @@ async function dueTimersConsumerLoop(
 				}
 
 				const context = createDaemonContext({ name: processDueTimers.name, logger, signal: abortSignal });
-				const next = () => timerPriorityQueue.popDue(computeRank(Date.now()), configProvider.config.limit);
+				const next = () => timerPriorityQueue.popDue(computeRank({ dueAt: Date.now() }), configProvider.config.limit);
 
 				for await (const dueTimers of streamChunks(next, {
 					until: (chunk) => chunk.length < configProvider.config.limit,
@@ -119,7 +119,7 @@ async function dueTimersConsumerLoop(
 				}
 
 				const nextTimerRank = await timerPriorityQueue.peekNextRank();
-				nextTimerDueAtMs = nextTimerRank && rankDueAtMs(nextTimerRank);
+				nextTimerDueAtMs = nextTimerRank && extractRankDueAtMs(nextTimerRank);
 			},
 			retryStrategy,
 			{

@@ -84,3 +84,22 @@ export function createDaemonHarness() {
 export function createServiceHarness() {
 	return createHarness(() => namespaceRequestContextFactory.build());
 }
+
+/**
+ * Opens a fresh connection with its own `Repositories` for the scope of `fn`.
+ * The db connection exists only inside `fn` and is closed on the way out.
+ *
+ * @example
+ * withRepos(async (repos) => { ... }));
+ */
+export async function withRepos(fn: (repos: Repositories) => Promise<void>): Promise<void> {
+	const dbConfig = loadDatabaseConfig();
+	const createDb = database(dbConfig);
+	const db = await createDb();
+	try {
+		const repos = await createRepos(db);
+		await fn(repos);
+	} finally {
+		await createDb.close();
+	}
+}

@@ -3,10 +3,21 @@ export type Ranked<T> = T & { rank: number };
 export const PRIORITY_LEVELS = 10;
 export const DEFAULT_PRIORITY = PRIORITY_LEVELS - 1;
 
-export function computeRank(dueAtMs: number, priority: number = DEFAULT_PRIORITY): number {
-	return dueAtMs * PRIORITY_LEVELS + priority;
+/**
+ * Encodes a due time and a priority into one sortable number: `dueAt * PRIORITY_LEVELS + priority`.
+ * Lower ranks dispatch first. Time dominates: an item due 1ms earlier always outranks a later one,
+ * whatever their priorities. Priority (0 highest, `DEFAULT_PRIORITY` lowest) only breaks ties
+ * between items due in the same millisecond.
+ */
+export function computeRank(params: { dueAt: number; priority?: number }): number {
+	return params.dueAt * PRIORITY_LEVELS + (params.priority ?? DEFAULT_PRIORITY);
 }
 
-export function rankDueAtMs(rank: number): number {
+export function extractRankDueAtMs(rank: number): number {
 	return Math.floor(rank / PRIORITY_LEVELS);
+}
+
+// The priority digit is the low-order digit of the rank — `rank mod PRIORITY_LEVELS`.
+export function extractRankPriority(rank: number): number {
+	return rank - extractRankDueAtMs(rank) * PRIORITY_LEVELS;
 }

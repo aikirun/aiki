@@ -83,7 +83,7 @@ export async function processImminentRecurringRuns(
 				type: "recurring",
 				id: schedule.id,
 				dueAt: schedule.nextRunAt,
-				rank: computeRank(schedule.nextRunAt),
+				rank: computeRank({ dueAt: schedule.nextRunAt }),
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
 			if (result.status === "failed") {
@@ -180,13 +180,15 @@ async function processOverlapAllowSchedules(
 				attempt: 1,
 				state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 			});
+			const rank = computeRank({ dueAt: occurrence });
 			outboxEntries.push({
 				id: ulid(),
 				namespaceId: schedule.namespaceId,
 				workflowRunId: runId,
 				workflowName: schedule.workflowName,
 				workflowVersionId: schedule.workflowVersionId,
-				rank: computeRank(occurrence),
+				rank,
+				nextPublishAttemptRank: rank,
 				pool: schedule.workflowRunOptions?.pool ?? null,
 				status: "pending",
 			});
@@ -276,13 +278,15 @@ async function processOverlapSkipSchedules(
 			attempt: 1,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
+		const rank = computeRank({ dueAt: occurrence });
 		outboxEntries.push({
 			id: ulid(),
 			namespaceId: schedule.namespaceId,
 			workflowRunId: runId,
 			workflowName: schedule.workflowName,
 			workflowVersionId: schedule.workflowVersionId,
-			rank: computeRank(occurrence),
+			rank,
+			nextPublishAttemptRank: rank,
 			pool: schedule.workflowRunOptions?.pool ?? null,
 			status: "pending",
 		});
@@ -372,13 +376,15 @@ async function processOverlapCancelPreviousSchedules(
 			attempt: 1,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
+		const rank = computeRank({ dueAt: occurrence });
 		newOutboxEntries.push({
 			id: ulid(),
 			namespaceId: schedule.namespaceId,
 			workflowRunId: runId,
 			workflowName: schedule.workflowName,
 			workflowVersionId: schedule.workflowVersionId,
-			rank: computeRank(occurrence),
+			rank,
+			nextPublishAttemptRank: rank,
 			pool: schedule.workflowRunOptions?.pool ?? null,
 			status: "pending",
 		});
