@@ -1,6 +1,6 @@
 import { delay } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
-import { createConsoleLogger } from "@aikirun/lib/logger";
+import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 
 import { startDueTimersConsumer } from "./due-timers-consumer";
@@ -12,7 +12,7 @@ describe("startDueTimersConsumer", () => {
 	test("resolves when the runtime signal aborts while parked in an indefinite wait", async () => {
 		const abortController = new AbortController();
 		const { signal } = abortController;
-		const logger = createConsoleLogger({ level: "ERROR" });
+		const logger = noopLogger;
 
 		const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger, signal });
 		const configProvider = asConfigProvider(() => ({

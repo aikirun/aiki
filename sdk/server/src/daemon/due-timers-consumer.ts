@@ -135,7 +135,7 @@ async function dueTimersConsumerLoop(
 	}
 }
 
-async function processDueTimers(
+export async function processDueTimers(
 	context: DaemonContext,
 	deps: DueTimersConsumerDeps,
 	dueTimers: NonEmptyArray<DueTimer>

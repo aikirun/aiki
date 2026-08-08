@@ -34,15 +34,15 @@ export interface StartDaemonsDeps {
 const MIN_GAP_FRACTION = 0.2;
 const JITTER_FRACTION = 0.1;
 
-const pollingDaemon = (
+export const pollingDaemon = <DaemonConfig>(
 	logger: Logger,
 	signal: AbortSignal,
-	configProvider: ConfigProvider<ServerRuntimeConfig["daemons"]>
+	configProvider: ConfigProvider<DaemonConfig>
 ) => ({
 	start<Deps, DaemonOptions>(
-		getConfig: (config: ServerRuntimeConfig["daemons"]) => DaemonOptions & { intervalMs: number },
 		fn: (context: DaemonContext, deps: Deps, options: DaemonOptions) => Promise<void>,
-		deps: Deps
+		deps: Deps,
+		getConfig: (config: DaemonConfig) => DaemonOptions & { intervalMs: number }
 	) {
 		const name = fn.name;
 
@@ -96,72 +96,49 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 	const { start: startPollingDaemon } = pollingDaemon(logger, signal, configProvider.scope("daemons"));
 
 	const daemonPromises: Promise<void>[] = [
+		startPollingDaemon(processImminentScheduledRuns, { repos, publisher, timerPriorityQueue }, (config) => ({
+			...config.imminentScheduledRuns,
+			republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+		})),
+		startPollingDaemon(processImminentSleepElapsedRuns, { repos, publisher, timerPriorityQueue }, (config) => ({
+			...config.imminentSleepElapsedRuns,
+			republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+		})),
+		startPollingDaemon(processImminentRetryableRuns, { repos, publisher, timerPriorityQueue }, (config) => ({
+			...config.imminentRetryableRuns,
+			republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+		})),
+		startPollingDaemon(processImminentRetryableTasks, { repos, publisher, timerPriorityQueue }, (config) => ({
+			...config.imminentRetryableTasks,
+			republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+		})),
+		startPollingDaemon(processImminentEventWaitTimedOutRuns, { repos, publisher, timerPriorityQueue }, (config) => ({
+			...config.imminentEventWaitTimedOutRuns,
+			republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+		})),
+		startPollingDaemon(processImminentChildRunWaitTimedOutRuns, { repos, publisher, timerPriorityQueue }, (config) => ({
+			...config.imminentChildRunWaitTimedOutRuns,
+			republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+		})),
 		startPollingDaemon(
-			(config) => ({
-				...config.imminentScheduledRuns,
-				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
-			}),
-			processImminentScheduledRuns,
-			{ repos, publisher, timerPriorityQueue }
-		),
-		startPollingDaemon(
-			(config) => ({
-				...config.imminentSleepElapsedRuns,
-				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
-			}),
-			processImminentSleepElapsedRuns,
-			{ repos, publisher, timerPriorityQueue }
-		),
-		startPollingDaemon(
-			(config) => ({
-				...config.imminentRetryableRuns,
-				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
-			}),
-			processImminentRetryableRuns,
-			{ repos, publisher, timerPriorityQueue }
-		),
-		startPollingDaemon(
-			(config) => ({
-				...config.imminentRetryableTasks,
-				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
-			}),
-			processImminentRetryableTasks,
-			{ repos, publisher, timerPriorityQueue }
-		),
-		startPollingDaemon(
-			(config) => ({
-				...config.imminentEventWaitTimedOutRuns,
-				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
-			}),
-			processImminentEventWaitTimedOutRuns,
-			{ repos, publisher, timerPriorityQueue }
-		),
-		startPollingDaemon(
-			(config) => ({
-				...config.imminentChildRunWaitTimedOutRuns,
-				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
-			}),
-			processImminentChildRunWaitTimedOutRuns,
-			{ repos, publisher, timerPriorityQueue }
-		),
-		startPollingDaemon(
+			processImminentRecurringRuns,
+			{ repos, childRunCanceller, publisher, timerPriorityQueue },
 			(config) => ({
 				...config.imminentRecurringRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
-			}),
-			processImminentRecurringRuns,
-			{ repos, childRunCanceller, publisher, timerPriorityQueue }
+			})
 		),
-		startPollingDaemon((config) => config.recoverOverdueOutboxEntries, recoverOverdueOutboxEntries, { repos }),
-		startPollingDaemon((config) => config.stallUndeliverableRuns, stallUndeliverableRuns, { repos }),
+		startPollingDaemon(recoverOverdueOutboxEntries, { repos }, (config) => config.recoverOverdueOutboxEntries),
+		startPollingDaemon(stallUndeliverableRuns, { repos }, (config) => config.stallUndeliverableRuns),
 	];
 
 	if (publisher) {
 		daemonPromises.push(
-			startPollingDaemon((config) => config.publishPendingOutboxEntries, publishPendingOutboxEntries, {
-				repos,
-				publisher,
-			})
+			startPollingDaemon(
+				publishPendingOutboxEntries,
+				{ repos, publisher },
+				(config) => config.publishPendingOutboxEntries
+			)
 		);
 	}
 

@@ -1,4 +1,4 @@
-import { createConsoleLogger } from "@aikirun/lib/logger";
+import { noopLogger } from "@aikirun/lib/logger";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { Factory } from "fishery";
@@ -10,7 +10,7 @@ export const namespaceRequestContextFactory = Factory.define<NamespaceRequestCon
 	type: "request",
 	traceId: ulid(),
 	spanId: ulid(),
-	logger: createConsoleLogger({ level: "ERROR" }),
+	logger: noopLogger,
 	requestType: "authed",
 	headers: new Headers(),
 	method: "POST",
@@ -23,7 +23,7 @@ export const daemonContextFactory = Factory.define<DaemonContext>(() => ({
 	type: "daemon",
 	traceId: ulid(),
 	spanId: ulid(),
-	logger: createConsoleLogger({ level: "ERROR" }),
+	logger: noopLogger,
 	name: "test",
 	signal: new AbortController().signal,
 }));

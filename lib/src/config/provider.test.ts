@@ -1,7 +1,7 @@
 import { asConfigProvider, dynamicConfigProvider } from "./provider";
 import { describe, expect, spyOn, test } from "bun:test";
 import { delay } from "../async";
-import { createConsoleLogger } from "../logger";
+import { noopLogger } from "../logger";
 
 describe("asConfigProvider", () => {
 	test("config returns the read value", () => {
@@ -45,7 +45,7 @@ describe("asConfigProvider", () => {
 
 describe("dynamicConfigProvider", () => {
 	test("starts on the initial value before any refresh completes", async () => {
-		const logger = createConsoleLogger({ level: "ERROR" });
+		const logger = noopLogger;
 		const abortController = new AbortController();
 
 		let resolveRefresh: (value: { v: number }) => void = () => {};
@@ -66,7 +66,7 @@ describe("dynamicConfigProvider", () => {
 	});
 
 	test("threads the current config into each refresh and advances it", async () => {
-		const logger = createConsoleLogger({ level: "ERROR" });
+		const logger = noopLogger;
 		const abortController = new AbortController();
 		const seenConfigs: number[] = [];
 
@@ -95,7 +95,7 @@ describe("dynamicConfigProvider", () => {
 	});
 
 	test("applies a successful refresh to the live snapshot", async () => {
-		const logger = createConsoleLogger({ level: "ERROR" });
+		const logger = noopLogger;
 		const abortController = new AbortController();
 
 		let resolveRefreshApplied: () => void = () => {};
@@ -123,7 +123,7 @@ describe("dynamicConfigProvider", () => {
 	});
 
 	test("a failed refresh keeps the current snapshot and logs a warning", async () => {
-		const logger = createConsoleLogger({ level: "ERROR" });
+		const logger = noopLogger;
 		const abortController = new AbortController();
 
 		let resolveRefreshFailed: () => void = () => {};
@@ -148,7 +148,7 @@ describe("dynamicConfigProvider", () => {
 	});
 
 	test("stops refreshing once the signal aborts", async () => {
-		const logger = createConsoleLogger({ level: "ERROR" });
+		const logger = noopLogger;
 		const abortController = new AbortController();
 
 		const refreshIntervalMs = 1;

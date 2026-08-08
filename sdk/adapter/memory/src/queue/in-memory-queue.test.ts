@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import { createConsoleLogger } from "@aikirun/lib/logger";
+import { noopLogger } from "@aikirun/lib/logger";
 import { readyWorkflowRunFactory } from "@aikirun/testing/data-factory/infra/queue";
 import type { PublisherContext, SubscriberContext } from "@aikirun/types/infra/queue";
 import type { WorkflowMeta, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -8,7 +8,7 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { inMemoryQueue } from "./in-memory-queue";
 import { describe, expect, test } from "bun:test";
 
-const logger = createConsoleLogger({ level: "ERROR" });
+const logger = noopLogger;
 
 const defaultWorkflow: WorkflowMeta = {
 	name: "sync-inventory" as WorkflowName,
