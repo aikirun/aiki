@@ -2,10 +2,7 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { Redis } from "ioredis";
 
 export interface RedisConnectionParams {
-	host: string;
-	port: number;
-	password?: string;
-	db?: number;
+	url: string;
 	connectTimeoutMs?: number;
 }
 

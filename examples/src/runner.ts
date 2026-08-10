@@ -98,14 +98,8 @@ async function setup(): Promise<Setup> {
 	const url = process.env.AIKI_SERVER_URL ?? "http://localhost:9850";
 	const apiKey = process.env.AIKI_API_KEY;
 
-	const redisHost = process.env.REDIS_HOST;
-	const subscriber = redisHost
-		? redisSubscriber({
-				host: redisHost,
-				port: Number(process.env.REDIS_PORT ?? 6379),
-				...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
-			})
-		: undefined;
+	const redisUrl = process.env.REDIS_URL;
+	const subscriber = redisUrl ? redisSubscriber({ url: redisUrl }) : undefined;
 
 	return {
 		client: client({ url, ...(apiKey && { apiKey }) }),

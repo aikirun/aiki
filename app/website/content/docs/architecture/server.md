@@ -72,7 +72,7 @@ Optional pieces plug in the same way — `cache`, `iam` (multi-tenancy and auth)
 import { redisPublisher, redisTimerPriorityQueue } from "@aikirun/redis";
 import { Redis } from "ioredis";
 
-const redis = new Redis({ host: "localhost", port: 6379 });
+const redis = new Redis("redis://localhost:6379");
 
 const aikiServer = server({
   db: database({ provider: "pg", url: databaseUrl }),

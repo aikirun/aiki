@@ -100,7 +100,7 @@ import { redisSubscriber } from "@aikirun/redis";
 
 const aikiWorker = worker({
   workflows: [orderWorkflowV1],
-  subscriber: redisSubscriber({ host: "localhost", port: 6379 }),
+  subscriber: redisSubscriber({ url: "redis://localhost:6379" }),
 });
 ```
 

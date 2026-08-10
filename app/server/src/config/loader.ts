@@ -13,11 +13,9 @@ export async function loadAppServerConfig(params?: { path?: string }): Promise<C
 
 	const db = loadDatabaseConfig();
 
-	const redisRaw = process.env.REDIS_HOST
+	const redisRaw = process.env.REDIS_URL
 		? {
-				host: process.env.REDIS_HOST,
-				port: process.env.REDIS_PORT,
-				password: process.env.REDIS_PASSWORD,
+				url: process.env.REDIS_URL,
 			}
 		: undefined;
 
