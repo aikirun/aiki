@@ -1,4 +1,4 @@
-import { delay } from "@aikirun/lib/async";
+import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
@@ -192,16 +192,13 @@ describe("executeWorkflowRun", () => {
 		test("keeps the claim alive by refreshing it while the handler runs", () =>
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
-				let resolveFirstClaimRefresh = () => {};
-				const firstClaimRefresh = new Promise<void>((resolve) => {
-					resolveFirstClaimRefresh = resolve;
-				});
-				client.api.workflowRun.claimRefreshV1.onNextCall(resolveFirstClaimRefresh);
+				const firstClaimRefresh = createBinaryLatch();
+				client.api.workflowRun.claimRefreshV1.onNextCall(() => firstClaimRefresh.signal());
 				client.api.workflowRun.claimRefreshV1.once({ id: workflowRun.id });
 
 				// The handler blocks until the first claim refresh fires.
 				const workflowVersion = fakeWorkflowVersion(async () => {
-					await firstClaimRefresh;
+					await firstClaimRefresh.wait();
 				});
 
 				const result = await executeWorkflowRun({
@@ -222,12 +219,9 @@ describe("executeWorkflowRun", () => {
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const controller = new AbortController();
-				let resolveHandler = () => {};
-				const handler = new Promise<void>((resolve) => {
-					resolveHandler = resolve;
-				});
+				const handlerReleased = createBinaryLatch();
 				const workflowVersion = fakeWorkflowVersion(async () => {
-					await handler;
+					await handlerReleased.wait();
 				});
 
 				controller.abort();
@@ -247,7 +241,7 @@ describe("executeWorkflowRun", () => {
 				// Absence check: a 1ms claimRefreshIntervalMs would fire within this window had abort not torn it down.
 				await delay(20);
 
-				resolveHandler();
+				handlerReleased.signal();
 				expect(await executionPromise).toBe(true);
 			}));
 	});
@@ -257,17 +251,14 @@ describe("executeWorkflowRun", () => {
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				let heartbeatCalls = 0;
-				let resolveFirstHeartbeat = () => {};
-				const firstHeartbeat = new Promise<void>((resolve) => {
-					resolveFirstHeartbeat = resolve;
-				});
+				const firstHeartbeat = createBinaryLatch();
 				const sendHeartbeat = async () => {
 					heartbeatCalls++;
-					resolveFirstHeartbeat();
+					firstHeartbeat.signal();
 				};
 				// The handler blocks until the heartbeat has fired once.
 				const workflowVersion = fakeWorkflowVersion(async () => {
-					await firstHeartbeat;
+					await firstHeartbeat.wait();
 				});
 
 				const result = await executeWorkflowRun({
@@ -291,12 +282,9 @@ describe("executeWorkflowRun", () => {
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const controller = new AbortController();
-				let resolveHandler = () => {};
-				const handler = new Promise<void>((resolve) => {
-					resolveHandler = resolve;
-				});
+				const handlerReleased = createBinaryLatch();
 				const workflowVersion = fakeWorkflowVersion(async () => {
-					await handler;
+					await handlerReleased.wait();
 				});
 				let heartbeatCalls = 0;
 				const sendHeartbeat = async () => {
@@ -319,7 +307,7 @@ describe("executeWorkflowRun", () => {
 				await delay(20);
 				expect(heartbeatCalls).toBe(0);
 
-				resolveHandler();
+				handlerReleased.signal();
 				expect(await executionPromise).toBe(true);
 			}));
 	});

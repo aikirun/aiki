@@ -1,6 +1,6 @@
 import { asConfigProvider, dynamicConfigProvider } from "./provider";
 import { describe, expect, spyOn, test } from "bun:test";
-import { delay } from "../async";
+import { createBinaryLatch, delay } from "../async";
 import { noopLogger } from "../logger";
 
 describe("asConfigProvider", () => {
@@ -70,24 +70,21 @@ describe("dynamicConfigProvider", () => {
 		const abortController = new AbortController();
 		const seenConfigs: number[] = [];
 
-		let resolveTwoRefreshesApplied: () => void = () => {};
-		const twoRefreshesAppliedPromise = new Promise<void>((resolve) => {
-			resolveTwoRefreshesApplied = resolve;
-		});
+		const twoRefreshesApplied = createBinaryLatch();
 
 		dynamicConfigProvider({
 			initial: { v: 0 },
 			refresh: (current) => {
 				seenConfigs.push(current.v);
 				if (seenConfigs.length >= 2) {
-					resolveTwoRefreshesApplied();
+					twoRefreshesApplied.signal();
 				}
 				return { v: current.v + 1 };
 			},
 			refreshIntervalMs: 1,
 		})({ logger, signal: abortController.signal });
 
-		await twoRefreshesAppliedPromise;
+		await twoRefreshesApplied.wait();
 		abortController.abort();
 
 		expect(seenConfigs[0]).toBe(0);
@@ -98,25 +95,22 @@ describe("dynamicConfigProvider", () => {
 		const logger = noopLogger;
 		const abortController = new AbortController();
 
-		let resolveRefreshApplied: () => void = () => {};
-		const refreshAppliedPromise = new Promise<void>((resolve) => {
-			resolveRefreshApplied = resolve;
-		});
+		const refreshApplied = createBinaryLatch();
 
 		const provider = dynamicConfigProvider({
 			initial: { v: 1 },
 			refresh: (current) => {
-				// Resolve refreshAppliedPromise when the loop calls refresh again with the
+				// Signal refreshApplied when the loop calls refresh again with the
 				// applied value as `current` — proof that { v: 2 } was swapped into the snapshot.
 				if (current.v === 2) {
-					resolveRefreshApplied();
+					refreshApplied.signal();
 				}
 				return { v: 2 };
 			},
 			refreshIntervalMs: 1,
 		})({ logger, signal: abortController.signal });
 
-		await refreshAppliedPromise;
+		await refreshApplied.wait();
 
 		expect(provider.config).toEqual({ v: 2 });
 		abortController.abort();
@@ -126,11 +120,8 @@ describe("dynamicConfigProvider", () => {
 		const logger = noopLogger;
 		const abortController = new AbortController();
 
-		let resolveRefreshFailed: () => void = () => {};
-		const refreshFailedPromise = new Promise<void>((resolve) => {
-			resolveRefreshFailed = resolve;
-		});
-		const warnSpy = spyOn(logger, "warn").mockImplementation(() => resolveRefreshFailed());
+		const refreshFailed = createBinaryLatch();
+		const warnSpy = spyOn(logger, "warn").mockImplementation(() => refreshFailed.signal());
 
 		const provider = dynamicConfigProvider({
 			initial: { v: 1 },
@@ -140,7 +131,7 @@ describe("dynamicConfigProvider", () => {
 			refreshIntervalMs: 10_000,
 		})({ logger, signal: abortController.signal });
 
-		await refreshFailedPromise;
+		await refreshFailed.wait();
 
 		expect(provider.config).toEqual({ v: 1 });
 		expect(warnSpy.mock.calls.some(([message]) => message.includes("Config refresh failed"))).toBe(true);
@@ -154,11 +145,8 @@ describe("dynamicConfigProvider", () => {
 		const refreshIntervalMs = 1;
 		let refreshCount = 0;
 
-		// Resolve once the loop has refreshed twice, so it is clearly running.
-		let resolveRefreshLoopRunning: () => void = () => {};
-		const refreshLoopRunningPromise = new Promise<void>((resolve) => {
-			resolveRefreshLoopRunning = resolve;
-		});
+		// Signal once the loop has refreshed twice, so it is clearly running.
+		const refreshLoopRunning = createBinaryLatch();
 
 		dynamicConfigProvider({
 			initial: { v: 0 },
@@ -168,14 +156,14 @@ describe("dynamicConfigProvider", () => {
 			refresh: (current) => {
 				refreshCount++;
 				if (refreshCount >= 2) {
-					resolveRefreshLoopRunning();
+					refreshLoopRunning.signal();
 				}
 				return { v: current.v + 1 };
 			},
 			refreshIntervalMs,
 		})({ logger, signal: abortController.signal });
 
-		await refreshLoopRunningPromise;
+		await refreshLoopRunning.wait();
 		abortController.abort();
 
 		const refreshCountAtAbort = refreshCount;

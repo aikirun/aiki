@@ -1,3 +1,4 @@
+import { createBinaryLatch } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 
 import type { WorkflowRunOutboxRowInsert } from "./types/workflow-run-outbox";
@@ -208,15 +209,8 @@ describe("claimPending — concurrent worker claims are disjoint", () => {
 				];
 				await primaryRepos.workflowRunOutbox.createBatch(seededOutboxRows);
 
-				let resolvePrimaryChunkClaimed = () => {};
-				const primaryChunkClaimedPromise = new Promise<void>((resolve) => {
-					resolvePrimaryChunkClaimed = resolve;
-				});
-
-				let commitPrimaryTx = () => {};
-				const commitPrimaryTxPromise = new Promise<void>((resolve) => {
-					commitPrimaryTx = resolve;
-				});
+				const primaryChunkClaimed = createBinaryLatch();
+				const commitPrimaryTx = createBinaryLatch();
 
 				// Transaction A claims a strict subset, then stays open (uncommitted) holding its
 				// row locks until released.
@@ -226,11 +220,11 @@ describe("claimPending — concurrent worker claims are disjoint", () => {
 						{ workflows: [{ name: workflowName, versionId: workflowVersionId }] },
 						2
 					);
-					resolvePrimaryChunkClaimed();
-					await commitPrimaryTxPromise;
+					primaryChunkClaimed.signal();
+					await commitPrimaryTx.wait();
 					return claimedRows;
 				});
-				await primaryChunkClaimedPromise;
+				await primaryChunkClaimed.wait();
 
 				// Connection B tries to claim everything while A is still open (not awaited yet).
 				const secondaryChunkPromise = secondaryRepos.workflowRunOutbox.claimPending(
@@ -239,7 +233,7 @@ describe("claimPending — concurrent worker claims are disjoint", () => {
 					100
 				);
 
-				commitPrimaryTx();
+				commitPrimaryTx.signal();
 				const primaryClaimedRows = await primaryChunkPromise;
 				const secondaryClaimedRows = await secondaryChunkPromise;
 
@@ -268,15 +262,8 @@ describe("leaseDuePending — concurrent delivery leases are disjoint", () => {
 					];
 					await primaryRepos.workflowRunOutbox.createBatch(seededOutboxRows);
 
-					let resolvePrimaryChunkLeased = () => {};
-					const primaryChunkLeasedPromise = new Promise<void>((resolve) => {
-						resolvePrimaryChunkLeased = resolve;
-					});
-
-					let commitPrimaryTx = () => {};
-					const commitPrimaryTxPromise = new Promise<void>((resolve) => {
-						commitPrimaryTx = resolve;
-					});
+					const primaryChunkLeased = createBinaryLatch();
+					const commitPrimaryTx = createBinaryLatch();
 
 					// Transaction A leases a strict subset, then stays open (uncommitted) holding its
 					// row locks until released.
@@ -285,11 +272,11 @@ describe("leaseDuePending — concurrent delivery leases are disjoint", () => {
 							leaseDurationMs: 5_000,
 							limit: 2,
 						});
-						resolvePrimaryChunkLeased();
-						await commitPrimaryTxPromise;
+						primaryChunkLeased.signal();
+						await commitPrimaryTx.wait();
 						return leasedRows;
 					});
-					await primaryChunkLeasedPromise;
+					await primaryChunkLeased.wait();
 
 					// Connection B leases while A is still open. Without the outer eligibility guard,
 					// B would take A's leased rows — both saw them due before A's lease was written.
@@ -298,7 +285,7 @@ describe("leaseDuePending — concurrent delivery leases are disjoint", () => {
 						limit: 100,
 					});
 
-					commitPrimaryTx();
+					commitPrimaryTx.signal();
 					const primaryLeasedRows = await primaryChunkPromise;
 					const secondaryLeasedRows = await secondaryChunkPromise;
 

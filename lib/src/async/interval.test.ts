@@ -1,5 +1,6 @@
 import { delay } from "./delay";
 import { runOnInterval } from "./interval";
+import { createBinaryLatch } from "./latch";
 import { describe, expect, spyOn, test } from "bun:test";
 
 describe("runOnInterval", () => {
@@ -18,42 +19,36 @@ describe("runOnInterval", () => {
 
 	test("invokes fn repeatedly on the interval", async () => {
 		let calls = 0;
-		let resolveThird: () => void = () => {};
-		const thirdCall = new Promise<void>((resolve) => {
-			resolveThird = resolve;
-		});
+		const thirdCall = createBinaryLatch();
 
 		const { stop } = runOnInterval(
 			async () => {
 				calls += 1;
 				if (calls === 3) {
-					resolveThird();
+					thirdCall.signal();
 				}
 			},
 			{ intervalMs: 1, onError: () => {} }
 		);
 
-		await thirdCall;
+		await thirdCall.wait();
 		stop();
 		expect(calls).toBeGreaterThanOrEqual(3);
 	});
 
 	test("stop prevents further invocations", async () => {
 		let calls = 0;
-		let resolveFirst: () => void = () => {};
-		const firstCall = new Promise<void>((resolve) => {
-			resolveFirst = resolve;
-		});
+		const firstCall = createBinaryLatch();
 
 		const { stop } = runOnInterval(
 			async () => {
 				calls += 1;
-				resolveFirst();
+				firstCall.signal();
 			},
 			{ intervalMs: 1, onError: () => {} }
 		);
 
-		await firstCall;
+		await firstCall.wait();
 		stop();
 		const callsAtStop = calls;
 
@@ -81,20 +76,17 @@ describe("runOnInterval", () => {
 	test("aborting the signal stops further invocations", async () => {
 		const controller = new AbortController();
 		let calls = 0;
-		let resolveFirst: () => void = () => {};
-		const firstCall = new Promise<void>((resolve) => {
-			resolveFirst = resolve;
-		});
+		const firstCall = createBinaryLatch();
 
 		runOnInterval(
 			async () => {
 				calls += 1;
-				resolveFirst();
+				firstCall.signal();
 			},
 			{ intervalMs: 1, onError: () => {}, signal: controller.signal }
 		);
 
-		await firstCall;
+		await firstCall.wait();
 		controller.abort();
 		const callsAtAbort = calls;
 
@@ -105,16 +97,13 @@ describe("runOnInterval", () => {
 	test("re-reads a function intervalMs on each tick", async () => {
 		let reads = 0;
 		let calls = 0;
-		let resolveSecond: () => void = () => {};
-		const secondCall = new Promise<void>((resolve) => {
-			resolveSecond = resolve;
-		});
+		const secondCall = createBinaryLatch();
 
 		const { stop } = runOnInterval(
 			async () => {
 				calls += 1;
 				if (calls === 2) {
-					resolveSecond();
+					secondCall.signal();
 				}
 			},
 			{
@@ -126,7 +115,7 @@ describe("runOnInterval", () => {
 			}
 		);
 
-		await secondCall;
+		await secondCall.wait();
 		stop();
 		expect(reads).toBeGreaterThanOrEqual(2);
 	});
@@ -134,10 +123,7 @@ describe("runOnInterval", () => {
 	test("routes fn rejections to onError and keeps running", async () => {
 		const errors: Error[] = [];
 		let calls = 0;
-		let resolveSecondError: () => void = () => {};
-		const secondError = new Promise<void>((resolve) => {
-			resolveSecondError = resolve;
-		});
+		const secondError = createBinaryLatch();
 
 		const { stop } = runOnInterval(
 			async () => {
@@ -149,13 +135,13 @@ describe("runOnInterval", () => {
 				onError: (err) => {
 					errors.push(err);
 					if (errors.length === 2) {
-						resolveSecondError();
+						secondError.signal();
 					}
 				},
 			}
 		);
 
-		await secondError;
+		await secondError.wait();
 		stop();
 		expect(errors.length).toBeGreaterThanOrEqual(2);
 		expect(errors[0]?.message).toBe("boom 1");

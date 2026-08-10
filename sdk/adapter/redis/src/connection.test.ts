@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { delay } from "@aikirun/lib/async";
+import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Redis } from "ioredis";
 
@@ -142,16 +142,13 @@ describe("untilReadyHandshake", () => {
 describe("attachConnectionSupervisor", () => {
 	function supervisedRedis(params?: { connectTimeout?: number }) {
 		const disconnectCalls: boolean[] = [];
-		let signalDisconnect: () => void = () => {};
-		const disconnected = new Promise<void>((resolve) => {
-			signalDisconnect = resolve;
-		});
+		const disconnected = createBinaryLatch();
 		const redis = Object.assign(new EventEmitter(), {
 			status: "wait" as Redis["status"],
 			options: { connectTimeout: params?.connectTimeout },
 			disconnect: (reconnect = false) => {
 				disconnectCalls.push(reconnect);
-				signalDisconnect();
+				disconnected.signal();
 			},
 		}) as unknown as Redis;
 
@@ -170,7 +167,7 @@ describe("attachConnectionSupervisor", () => {
 		attachConnectionSupervisor(redis, { logger });
 
 		redis.emit("connect");
-		await disconnected;
+		await disconnected.wait();
 
 		expect(disconnectCalls).toEqual([true]);
 		expect(warnMessages).toEqual(["Redis connect handshake stalled, forcing reconnect"]);
@@ -181,7 +178,7 @@ describe("attachConnectionSupervisor", () => {
 		attachConnectionSupervisor(redis);
 
 		redis.emit("connect");
-		await disconnected;
+		await disconnected.wait();
 
 		expect(disconnectCalls).toEqual([true]);
 	});
@@ -204,7 +201,7 @@ describe("attachConnectionSupervisor", () => {
 		redis.emit("connect");
 		redis.emit("close");
 		redis.emit("connect");
-		await disconnected;
+		await disconnected.wait();
 		await delay(25);
 
 		expect(disconnectCalls).toEqual([true]);

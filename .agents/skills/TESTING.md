@@ -46,9 +46,13 @@ Before writing any test, study the exemplars for its tier and match their idioms
   chosen to defeat a specific wrong implementation. "Rank 1 is due under a pinned clock"
   needs no comment. Where pinning is genuinely impossible, a comment saying why the premise
   holds is the floor.
-- Waits ride event-signaled promises (see `lib/src/async/latch.ts`), never polling loops or
-  sized sleeps. The one legitimate fixed wait is an absence check: wait a window, assert nothing
-  changed.
+- Waits ride event signals, never polling loops or sized sleeps. The one legitimate fixed wait
+  is an absence check: wait a window, assert nothing changed.
+- The signal primitive is `createBinaryLatch` (`lib/src/async/latch.ts`), not a hand-rolled
+  resolve-captured promise. The two behave identically for one signal/one wait, but the latch
+  re-arms after each wait — a later wait that should block hangs loudly instead of silently
+  falling through a permanently resolved promise. Hand-roll a promise only when the resolution
+  must carry a value.
 - To catch the moment the code under test reaches a blocking call, wrap the dependency it
   blocks on: an object that fires a latch on entry, then forwards to the real thing. This turns
   "has it parked yet?" into an event instead of sleeping for a while and hoping:
@@ -222,29 +226,23 @@ Before writing any test, study the exemplars for its tier and match their idioms
     withRepos(async (secondaryRepos) => {
       // ...seed rows...
 
-      let resolvePrimaryChunkClaimed = () => {};
-      const primaryChunkClaimedPromise = new Promise<void>((resolve) => {
-        resolvePrimaryChunkClaimed = resolve;
-      });
-      let commitPrimaryTx = () => {};
-      const primaryTxCommitPromise = new Promise<void>((resolve) => {
-        commitPrimaryTx = resolve;
-      });
+      const primaryChunkClaimed = createBinaryLatch();
+      const commitPrimaryTx = createBinaryLatch();
 
       // A claims a strict subset, signals, then holds its transaction open —
       // locks held, uncommitted.
       const primaryChunkPromise = primaryRepos.transaction(async (txRepos) => {
         const claimedRows = await txRepos.workflowRunOutbox.claimPending(/* subset */);
-        resolvePrimaryChunkClaimed();
-        await primaryTxCommitPromise;
+        primaryChunkClaimed.signal();
+        await commitPrimaryTx.wait();
         return claimedRows;
       });
-      await primaryChunkClaimedPromise;
+      await primaryChunkClaimed.wait();
 
       // B is dispatched while A is still open — deliberately not awaited yet.
       const secondaryChunkPromise = secondaryRepos.workflowRunOutbox.claimPending(/* all */);
 
-      commitPrimaryTx();
+      commitPrimaryTx.signal();
       const primaryClaimedRows = await primaryChunkPromise; // resolves after the COMMIT
       const secondaryClaimedRows = await secondaryChunkPromise;
 
