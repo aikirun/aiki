@@ -15,6 +15,8 @@ Before writing any test, study the exemplars for its tier and match their idioms
   from a typed case table.
 - `sdk/server/src/infra/db/workflow-run-outbox.integration.test.ts` — provider-contract suite,
   two-connection concurrency choreography.
+- `sdk/server/src/infra/timer/priority-queue.integration.test.ts` — infra contract suite,
+  provider-selected via the harness, wake and absence checks.
 
 ## Determinism
 
@@ -47,6 +49,26 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Waits ride event-signaled promises (see `lib/src/async/latch.ts`), never polling loops or
   sized sleeps. The one legitimate fixed wait is an absence check: wait a window, assert nothing
   changed.
+- To catch the moment the code under test reaches a blocking call, wrap the dependency it
+  blocks on: an object that fires a latch on entry, then forwards to the real thing. This turns
+  "has it parked yet?" into an event instead of sleeping for a while and hoping:
+
+  ```ts
+  const waitReached = createBinaryLatch();
+  const timerPriorityQueue: TimerPriorityQueue = {
+  	...realTimerPriorityQueue,
+  	createWaiter: () => {
+  		const realWaiter = realTimerPriorityQueue.createWaiter();
+  		return {
+  			...realWaiter,
+  			wait: (timeoutSeconds: number) => {
+  				waitReached.signal();
+  				return realWaiter.wait(timeoutSeconds);
+  			},
+  		};
+  	},
+  };
+  ```
 - Assert async rejections with a floating `expect(promise).rejects.toThrow(...)` — do not await
   it and do not rewrite it as try/catch.
 
@@ -121,13 +143,32 @@ Before writing any test, study the exemplars for its tier and match their idioms
   doesn't assert.
 - Test a behavior in the suite of the component that owns it: what a service writes is the
   service suite's contract; how a daemon reads it belongs to the daemon's suite. Don't place a
-  test by where you happen to be working.
-- Repository behavior is a provider contract. Test it once, at the provider-neutral level
-  (`sdk/server/src/infra/db/*.integration.test.ts`), never inside a provider directory. The
-  harness goes through the same `Database` seam as production, and `DATABASE_PROVIDER` in
-  `.env.test` picks the implementation — a new provider adds an env matrix row, not test
-  files. Assert outcomes, not locking mechanics; that is what keeps one suite valid for
-  every provider.
+  test by where you happen to be working. A loop or wiring test stops at the seam where it
+  hands work off — proving a popped timer reached the run lookup is the loop's claim; what
+  processing then writes belongs to the processing suite, driven directly at its own seam.
+- Observe the code under test through a dependency it calls on purpose — a repos lookup, a
+  queue pop — never through a side effect like the names bound via `logger.child`. A
+  logger-based observation only holds while the logging sits at a particular line inside the
+  function; move that line and the test starts passing before the behavior it claims to check
+  has happened.
+- Name tests and write their comments in the vocabulary of the interface under test. A
+  timer-queue consumer waits and wakes; "signal" is one adapter's way of waking it, and
+  another adapter may wake it differently. A word that only makes sense inside one
+  implementation doesn't belong in tests of the interface.
+- Pluggable infra is a provider contract — the database, the timer priority queue. Test the
+  contract once, at the provider-neutral level (`sdk/server/src/infra/db/`,
+  `sdk/server/src/infra/timer/`), never inside an adapter's directory. An env variable picks
+  the implementation (`DATABASE_PROVIDER`, `TIMER_PRIORITY_QUEUE_PROVIDER` in `.env.test`)
+  and CI supplies the matrix — a new provider adds a matrix row, not test files. Integration
+  tests get the instance from the harness (`withTimerPriorityQueue`, a scoped combinator like
+  `withRepos`). Assert outcomes, not locking or notification mechanics; that is what keeps
+  one suite valid for every provider.
+- Code that uses a contract may assume any conforming implementation, so its tests can run
+  against the cheapest one: the consumer's unit tests hardcode the in-memory queue as a
+  stand-in for "anything the contract suite has proven". The other half of that bargain:
+  every behavior a consumer leans on must actually be a contract test. The consumer's
+  shutdown always relied on close resolving a parked wait — nothing proved it, and when the
+  contract test was finally written, one adapter turned out to get it wrong.
 - Pick fixture data semantically orthogonal to the subject: don't give a time-based test
   time-shaped input.
 - Capture baselines from operation responses (a transition's returned revision, attempts) rather

@@ -49,7 +49,6 @@ export async function processImminentRetryableRuns(
 			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
 				type: "retry",
 				id: run.id,
-				dueAt: run.dueAt,
 				rank: run.rank,
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);

@@ -4,7 +4,7 @@ import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import { type RetryStrategy, withRetry } from "@aikirun/lib/retry";
 import type { Publisher } from "@aikirun/types/infra/queue";
-import type { DueTimer, TimerPriorityQueue, TimerSignalWaiter, TimerType } from "@aikirun/types/infra/timer";
+import type { DueTimer, TimerPriorityQueue, TimerPriorityQueueWaiter, TimerType } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 
@@ -40,22 +40,22 @@ export interface DueTimersConsumerDeps {
 }
 
 export async function startDueTimersConsumer(logger: Logger, deps: DueTimersConsumerDeps): Promise<void> {
-	const timerSignalWaiter = deps.timerPriorityQueue.createSignalWaiter();
-	deps.signal.addEventListener("abort", () => void timerSignalWaiter.close(), { once: true });
+	const timerPriorityQueueWaiter = deps.timerPriorityQueue.createWaiter();
+	deps.signal.addEventListener("abort", () => void timerPriorityQueueWaiter.close(), { once: true });
 
 	try {
-		await dueTimersConsumerLoop(logger, deps, timerSignalWaiter);
+		await dueTimersConsumerLoop(logger, deps, timerPriorityQueueWaiter);
 	} finally {
-		await timerSignalWaiter.close();
+		await timerPriorityQueueWaiter.close();
 	}
 }
 
 async function dueTimersConsumerLoop(
 	logger: Logger,
 	deps: DueTimersConsumerDeps,
-	timerSignalWaiter: TimerSignalWaiter
+	timerPriorityQueueWaiter: TimerPriorityQueueWaiter
 ): Promise<void> {
-	const { timerPriorityQueue, signal: abortSignal, configProvider } = deps;
+	const { timerPriorityQueue, signal, configProvider } = deps;
 
 	const retryStrategy: RetryStrategy = {
 		type: "jittered",
@@ -64,49 +64,56 @@ async function dueTimersConsumerLoop(
 		maxDelayMs: 30_000,
 	};
 
-	// Peek on startup to discover entries left over from a previous consumer's lifecycle: they have
-	// no pending signal, so without this the first wait could block indefinitely.
-	const nextTimerRankResponse = await withRetry(() => timerPriorityQueue.peekNextRank(), retryStrategy, {
-		signal: abortSignal,
+	// Peek on startup to discover entries left over from a previous consumer's lifecycle.
+	// The waiter only unblocks on new entries, so without this the first wait could block indefinitely.
+	const nextTimerResponse = await withRetry(() => timerPriorityQueue.peekNext(), retryStrategy, {
+		signal,
 		onError: (err: unknown) => {
-			if (abortSignal.aborted) {
+			if (signal.aborted) {
 				return;
 			}
 			logger.warn("Due timers consumer failed, will retry", { err });
 		},
 	}).run();
-	if (nextTimerRankResponse.state !== "completed") {
+	if (nextTimerResponse.state !== "completed") {
 		return;
 	}
-	let nextTimerDueAtMs = nextTimerRankResponse.result && extractRankDueAtMs(nextTimerRankResponse.result);
+	let nextTimerDueAtMs = nextTimerResponse.result && extractRankDueAtMs(nextTimerResponse.result.rank);
 
-	while (!abortSignal.aborted) {
+	while (!signal.aborted) {
 		await withRetry(
 			async () => {
-				let timerSignal = 0;
+				let newTimer: { rank: number } | null = null;
 
 				if (nextTimerDueAtMs === null) {
-					timerSignal = await timerSignalWaiter.wait(0);
+					newTimer = await timerPriorityQueueWaiter.wait(0);
 				} else {
 					const waitMs = nextTimerDueAtMs - Date.now() + configProvider.config.overshootMs;
 					if (waitMs > 0) {
-						timerSignal = await timerSignalWaiter.wait(waitMs / 1_000);
+						newTimer = await timerPriorityQueueWaiter.wait(waitMs / 1_000);
 					}
 				}
 
-				if (abortSignal.aborted) {
+				if (signal.aborted) {
 					return;
 				}
 
-				if (timerSignal > Date.now()) {
-					if (nextTimerDueAtMs === null || timerSignal < nextTimerDueAtMs) {
-						nextTimerDueAtMs = timerSignal;
+				if (newTimer !== null) {
+					const newTimerDueAt = extractRankDueAtMs(newTimer.rank);
+					if (newTimerDueAt > Date.now()) {
+						if (nextTimerDueAtMs === null || newTimerDueAt < nextTimerDueAtMs) {
+							nextTimerDueAtMs = newTimerDueAt;
+						}
+						return;
 					}
-					return;
 				}
 
-				const context = createDaemonContext({ name: processDueTimers.name, logger, signal: abortSignal });
-				const next = () => timerPriorityQueue.popDue(computeRank({ dueAt: Date.now() }), configProvider.config.limit);
+				const context = createDaemonContext({ name: processDueTimers.name, logger, signal });
+				const next = () =>
+					timerPriorityQueue.popDue({
+						maxRank: computeRank({ dueAt: Date.now() }),
+						limit: configProvider.config.limit,
+					});
 
 				for await (const dueTimers of streamChunks(next, {
 					until: (chunk) => chunk.length < configProvider.config.limit,
@@ -118,14 +125,14 @@ async function dueTimersConsumerLoop(
 					}
 				}
 
-				const nextTimerRank = await timerPriorityQueue.peekNextRank();
-				nextTimerDueAtMs = nextTimerRank && extractRankDueAtMs(nextTimerRank);
+				const nextTimer = await timerPriorityQueue.peekNext();
+				nextTimerDueAtMs = nextTimer && extractRankDueAtMs(nextTimer.rank);
 			},
 			retryStrategy,
 			{
-				signal: abortSignal,
+				signal,
 				onError: (err: unknown) => {
-					if (abortSignal.aborted) {
+					if (signal.aborted) {
 						return;
 					}
 					logger.warn("Due timers consumer failed, will retry", { err });

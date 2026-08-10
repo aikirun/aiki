@@ -5,7 +5,6 @@ import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 
-import { processDueTimers } from "./due-timers-consumer";
 import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { processImminentRecurringRuns } from "./imminent-recurring-runs";
@@ -141,7 +140,7 @@ describe("pollingDaemon", () => {
 		await loop;
 
 		expect(tickCount).toBeGreaterThanOrEqual(2);
-	}, 5_000);
+	});
 
 	test("resolves promptly when aborted while parked in the inter-tick delay", async () => {
 		const abortController = new AbortController();
@@ -170,30 +169,27 @@ describe("startDaemons", () => {
 	function startTestDaemons(
 		signal: AbortSignal,
 		logger: Logger,
-		extraDeps?: { publisher?: Publisher; timerPriorityQueue?: TimerPriorityQueue }
+		deps?: { repos?: Repositories; publisher?: Publisher; timerPriorityQueue?: TimerPriorityQueue }
 	): Promise<void> {
 		return startDaemons(logger, {
-			repos: {} as unknown as Repositories,
+			repos: deps?.repos ?? ({} as unknown as Repositories),
 			signal,
 			configProvider: asConfigProvider(() => defaultServerRuntimeConfig),
+			publisher: deps?.publisher,
+			timerPriorityQueue: deps?.timerPriorityQueue,
 			childRunCanceller: createChildRunCanceller(),
-			...extraDeps,
 		});
 	}
 
 	// Daemons name their context on each tick via logger.child({ "aiki.daemonName" }),
 	// so the child bindings are where mounted daemons become observable.
-	function createDaemonNameRecordingLogger(
-		seenDaemonNames: string[],
-		onDaemonName?: (daemonName: string) => void
-	): Logger {
+	function createDaemonNameRecordingLogger(seenDaemonNames: string[]): Logger {
 		const logger: Logger = {
 			...noopLogger,
 			child: (bindings) => {
 				const daemonName = bindings["aiki.daemonName"];
 				if (typeof daemonName === "string") {
 					seenDaemonNames.push(daemonName);
-					onDaemonName?.(daemonName);
 				}
 				return logger;
 			},
@@ -241,26 +237,30 @@ describe("startDaemons", () => {
 
 	test("mounts the due-timers consumer when a timer priority queue is provided", async () => {
 		const abortController = new AbortController();
-		const consumerWoken = createBinaryLatch();
-		const seenDaemonNames: string[] = [];
+		const consumerProcessingReached = createBinaryLatch();
 
-		const logger = createDaemonNameRecordingLogger(seenDaemonNames, (daemonName) => {
-			if (daemonName === processDueTimers.name) {
-				consumerWoken.signal();
-			}
-		});
-		const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger, signal: abortController.signal });
+		const seenRunLookups: { ids: string[]; status: string }[] = [];
+		const repos = {
+			workflowRun: {
+				listByIdsAndStatus: async (_context: unknown, ids: string[], status: string) => {
+					seenRunLookups.push({ ids, status });
+					consumerProcessingReached.signal();
+					return [];
+				},
+			},
+		} as unknown as Repositories;
+		const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger, signal: abortController.signal });
 
-		const daemons = startTestDaemons(abortController.signal, logger, { timerPriorityQueue });
+		const daemons = startTestDaemons(abortController.signal, noopLogger, { timerPriorityQueue, repos });
 
-		// dueAt 0 wakes the consumer immediately.
-		await timerPriorityQueue.add([{ type: "scheduled", id: "timer-1", dueAt: 0, rank: 0 }]);
-		await consumerWoken.wait();
+		await timerPriorityQueue.add([{ type: "scheduled", id: "timer-1", rank: 0 }]);
+		await consumerProcessingReached.wait();
 
 		abortController.abort();
 		await daemons;
 
-		expect(seenDaemonNames).toEqual(baseDaemonNames.concat(processDueTimers.name));
+		expect(seenRunLookups).toEqual([{ ids: ["timer-1"], status: "scheduled" }]);
+		expect(await timerPriorityQueue.peekNext()).toBeNull();
 	});
 
 	test("resolves when the signal aborts", async () => {

@@ -5,7 +5,7 @@ import type {
 	TimerAddResult,
 	TimerEntry,
 	TimerPriorityQueue,
-	TimerSignalWaiter,
+	TimerPriorityQueueWaiter,
 	TimerType,
 } from "@aikirun/types/infra/timer";
 import type { Redis } from "ioredis";
@@ -27,15 +27,20 @@ function decodeMember(member: string, rank: number): DueTimer {
 
 /**
  * Atomically adds entries to the sorted set and pushes a signal carrying the
- * minimum dueAt timestamp of the batch. ARGV[1] is the minDueAt; subsequent
- * pairs are score/member.
+ * batch's minimum rank — but only when that minimum beats the previous earliest
+ * entry, or the set was empty. A signal exists to shorten the waiter's sleep;
+ * a timer behind the current earliest is already covered by the wake the
+ * waiter has scheduled for it. ARGV[1] is the minimum rank; subsequent pairs
+ * are score/member.
  */
 const ADD_AND_SIGNAL_SCRIPT = `
-local minDueAt = ARGV[1]
+local head = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
 for i = 2, #ARGV - 1, 2 do
   redis.call('ZADD', KEYS[1], ARGV[i], ARGV[i + 1])
 end
-redis.call('LPUSH', KEYS[2], minDueAt)
+if #head == 0 or tonumber(ARGV[1]) < tonumber(head[2]) then
+  redis.call('LPUSH', KEYS[2], ARGV[1])
+end
 return 1
 `;
 
@@ -83,18 +88,18 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 					return { status: "failed" };
 				}
 
-				let minDueAt = timers[0].dueAt;
+				let minRank = timers[0].rank;
 				const args: (string | number)[] = [];
 				for (const timer of timers) {
-					if (timer.dueAt < minDueAt) {
-						minDueAt = timer.dueAt;
+					if (timer.rank < minRank) {
+						minRank = timer.rank;
 					}
 					const member = encodeMember(timer.type, timer.id);
 					args.push(timer.rank, member);
 				}
 
 				try {
-					await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minDueAt, ...args);
+					await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minRank, ...args);
 				} catch (err) {
 					logger.warn("Timer add command failed", { err, "aiki.count": timers.length });
 					return { status: "failed" };
@@ -102,7 +107,7 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 				return { status: "added" };
 			},
 
-			async popDue(maxRank: number, limit: number): Promise<DueTimer[]> {
+			async popDue({ maxRank, limit }: { maxRank: number; limit: number }): Promise<DueTimer[]> {
 				redisTracker.assertIsAvailable();
 				const pairs = (await redis.eval(POP_DUE_TIMERS_SCRIPT, 1, key, maxRank, limit)) as string[];
 				if (pairs.length === 0) {
@@ -118,16 +123,16 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 				return result;
 			},
 
-			async peekNextRank(): Promise<number | null> {
+			async peekNext(): Promise<{ rank: number } | null> {
 				redisTracker.assertIsAvailable();
 				const result = await redis.zrangebyscore(key, "-inf", "+inf", "WITHSCORES", "LIMIT", 0, 1);
 				if (result.length < 2) {
 					return null;
 				}
-				return Number(result[1]);
+				return { rank: Number(result[1]) };
 			},
 
-			createSignalWaiter(): TimerSignalWaiter {
+			createWaiter(): TimerPriorityQueueWaiter {
 				const redisDuplicate = redis.duplicate({
 					maxRetriesPerRequest: 0,
 					enableOfflineQueue: false,
@@ -140,28 +145,37 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 				return {
 					/**
 					 * Blocks on the signal list, then drains any remaining signals.
-					 * Returns the minimum signal observed (combining BRPOP value with drained values).
-					 * Returns 0 if BRPOP timed out — drained values are discarded in that case since
-					 * peek-after-pop will rediscover them.
+					 * Returns the minimum signalled rank (combining BRPOP value with drained values).
+					 * Returns null if BRPOP timed out — drained values are discarded in that case
+					 * since peek-after-pop will rediscover them.
+					 * Close tears down the connection, which surfaces here as a rejected
+					 * command; a closed waiter turns that into the contract's null.
 					 */
-					async wait(timeoutSeconds: number): Promise<number> {
-						if (!completedReadyHandshake) {
-							await untilReadyHandshake(redisDuplicate);
-							completedReadyHandshake = true;
-						}
+					async wait(timeoutSeconds: number): Promise<{ rank: number } | null> {
+						try {
+							if (!completedReadyHandshake) {
+								await untilReadyHandshake(redisDuplicate);
+								completedReadyHandshake = true;
+							}
 
-						const result = await redisDuplicate.brpop(signalKey, timeoutSeconds);
-						if (result === null) {
-							await redisDuplicate.del(signalKey);
-							return 0;
-						}
+							const result = await redisDuplicate.brpop(signalKey, timeoutSeconds);
+							if (result === null) {
+								await redisDuplicate.del(signalKey);
+								return null;
+							}
 
-						const signal = Number(result[1]);
-						const minSignal = (await redisDuplicate.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
-						if (minSignal === null) {
-							return signal;
+							const signal = Number(result[1]);
+							const minSignal = (await redisDuplicate.eval(DRAIN_SIGNALS_SCRIPT, 1, signalKey)) as number | null;
+							if (minSignal === null) {
+								return { rank: signal };
+							}
+							return { rank: Math.min(signal, minSignal) };
+						} catch (err) {
+							if (closed) {
+								return null;
+							}
+							throw err;
 						}
-						return Math.min(signal, minSignal);
 					},
 
 					async close(): Promise<void> {

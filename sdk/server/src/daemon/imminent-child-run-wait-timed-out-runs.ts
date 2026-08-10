@@ -49,7 +49,6 @@ export async function processImminentChildRunWaitTimedOutRuns(
 			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
 				type: "child_wait_timeout",
 				id: run.id,
-				dueAt: run.dueAt,
 				rank: run.rank,
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
