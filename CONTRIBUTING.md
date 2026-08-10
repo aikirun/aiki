@@ -119,9 +119,20 @@ bun run test:db:migrate:apply    # apply the server + iam migrations to it
 bun run test:integration
 ```
 
-CI runs these automatically against a throwaway Postgres, so opening a PR does not
-require a local test database — but run them locally when your change touches the
-database layer.
+Tests that use the timer priority queue are provider-selected: by default they run
+against the in-memory adapter, which needs no service. To run them against Redis:
+
+```bash
+docker run --name aiki-redis -p 6379:6379 -d redis:7
+TIMER_PRIORITY_QUEUE_PROVIDER=redis bun run test:integration
+```
+
+`REDIS_URL` overrides the default `redis://localhost:6379`.
+
+CI runs all of this automatically against throwaway Postgres and Redis services,
+matrixed over the timer-queue provider, so opening a PR does not require local
+services — but run the tests locally when your change touches the database layer
+or a timer-queue adapter.
 
 ## Before you open a PR
 

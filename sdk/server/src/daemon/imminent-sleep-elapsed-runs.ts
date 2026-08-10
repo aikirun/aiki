@@ -47,7 +47,6 @@ export async function processImminentSleepElapsedRuns(
 			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
 				type: "sleep",
 				id: run.id,
-				dueAt: run.dueAt,
 				rank: run.rank,
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);

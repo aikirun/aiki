@@ -7,7 +7,7 @@ import type {
 	TimerEntry,
 	TimerPriorityQueue,
 	TimerPriorityQueueContext,
-	TimerSignalWaiter,
+	TimerPriorityQueueWaiter,
 	TimerType,
 } from "@aikirun/types/infra/timer";
 
@@ -40,9 +40,9 @@ function compareTimerItems(a: TimerHeapItem, b: TimerHeapItem): number {
  * Returns a factory for creating the sorted set.
  *
  * State is allocated once per call to `inMemoryTimerPriorityQueue()` and persists
- * for the lifetime of the returned factory. That factory returns the
- * same underlying instance on every invocation, so a server can be stopped
- * and restarted (which re-invokes the factory) without losing queued timers.
+ * for the lifetime of the returned factory. Every factory invocation returns a
+ * queue over that same state, so a server can be stopped and restarted (which
+ * re-invokes the factory) without losing queued timers.
  */
 export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 	const heap = createMinHeap<TimerHeapItem>(compareTimerItems);
@@ -50,7 +50,7 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 
 	const waiterHandles = new Set<{ wake: () => void }>();
 
-	function drainSignals(): number {
+	function drainSignals(): { rank: number } | null {
 		let min: number | undefined;
 		for (const signal of signals) {
 			if (min === undefined || signal < min) {
@@ -58,24 +58,33 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 			}
 		}
 		signals.length = 0;
-		return min ?? 0;
+		return min === undefined ? null : { rank: min };
 	}
 
-	const timerPriorityQueue: TimerPriorityQueue = {
+	return (_context: TimerPriorityQueueContext): TimerPriorityQueue => ({
 		async add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult> {
-			let minDueAt = timers[0].dueAt;
+			const minRank = heap.peek()?.rank;
+
+			let proposedMinRank = timers[0].rank;
 			for (const timer of timers) {
-				if (timer.dueAt < minDueAt) {
-					minDueAt = timer.dueAt;
+				if (timer.rank < proposedMinRank) {
+					proposedMinRank = timer.rank;
 				}
 				heap.push({ rank: timer.rank, type: timer.type, id: timer.id });
 			}
-			signals.push(minDueAt);
-			waiterHandles.values().next().value?.wake();
+
+			// A signal exists to shorten the waiter's sleep. A timer that is not the
+			// new earliest is already covered by the wake the waiter has scheduled
+			// for the current earliest, so only a new front-of-queue sends one.
+			if (minRank === undefined || proposedMinRank < minRank) {
+				signals.push(proposedMinRank);
+				waiterHandles.values().next().value?.wake();
+			}
+
 			return { status: "added" };
 		},
 
-		async popDue(maxRank: number, limit: number): Promise<DueTimer[]> {
+		async popDue({ maxRank, limit }: { maxRank: number; limit: number }): Promise<DueTimer[]> {
 			const result: DueTimer[] = [];
 			while (result.length < limit) {
 				const next = heap.peek();
@@ -88,12 +97,12 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 			return result;
 		},
 
-		async peekNextRank(): Promise<number | null> {
+		async peekNext(): Promise<{ rank: number } | null> {
 			const next = heap.peek();
-			return next === undefined ? null : next.rank;
+			return next === undefined ? null : { rank: next.rank };
 		},
 
-		createSignalWaiter(): TimerSignalWaiter {
+		createWaiter(): TimerPriorityQueueWaiter {
 			let waiterHandle:
 				| {
 						timeout: ReturnType<typeof setTimeout> | undefined;
@@ -104,9 +113,9 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 			let closed = false;
 
 			return {
-				async wait(timeoutSeconds: number): Promise<number> {
+				async wait(timeoutSeconds: number): Promise<{ rank: number } | null> {
 					if (closed) {
-						return 0;
+						return null;
 					}
 					if (signals.length > 0) {
 						// Do not block if there are items in the set.
@@ -114,7 +123,7 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 						return drainSignals();
 					}
 
-					return new Promise<number>((resolve) => {
+					return new Promise<{ rank: number } | null>((resolve) => {
 						const detach = (): void => {
 							if (waiterHandle) {
 								if (waiterHandle.timeout !== undefined) {
@@ -133,7 +142,7 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 									? setTimeout(() => {
 											detach();
 											signals.length = 0;
-											resolve(0);
+											resolve(null);
 										}, timeoutSeconds * 1_000)
 									: undefined,
 							wake: () => {
@@ -143,7 +152,7 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 							},
 							close: () => {
 								detach();
-								resolve(0);
+								resolve(null);
 							},
 						};
 
@@ -160,7 +169,5 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 				},
 			};
 		},
-	};
-
-	return (_context: TimerPriorityQueueContext): TimerPriorityQueue => timerPriorityQueue;
+	});
 }

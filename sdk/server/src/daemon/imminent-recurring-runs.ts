@@ -82,7 +82,6 @@ export async function processImminentRecurringRuns(
 			const timers: TimerEntry[] = schedulesDueSoon.map((schedule) => ({
 				type: "recurring",
 				id: schedule.id,
-				dueAt: schedule.nextRunAt,
 				rank: computeRank({ dueAt: schedule.nextRunAt }),
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);

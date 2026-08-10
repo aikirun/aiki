@@ -79,7 +79,6 @@ export async function processImminentRetryableTasks(
 			const timers: TimerEntry[] = tasksDueSoon.map((task) => ({
 				type: "task_retry",
 				id: task.workflowRunId,
-				dueAt: task.dueAt,
 				rank: computeRank({ dueAt: task.dueAt }),
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
