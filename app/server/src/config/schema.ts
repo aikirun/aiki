@@ -16,9 +16,7 @@ const uniqueCommaSeparatedToItems = type("string").pipe((v) =>
 );
 
 export const redisConfigSchema = type({
-	host: "string > 0 = 'localhost'",
-	port: "string.integer.parse | number.integer > 0 = 6379",
-	"password?": "string | undefined",
+	url: "string > 0",
 });
 
 export const authConfigSchema = type({

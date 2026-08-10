@@ -78,11 +78,7 @@ export async function startAppServer({ config }: { config: AppServerConfig }): P
 }
 
 function createRedis(config: RedisConfig, logger: Logger) {
-	const redis = new Redis({
-		host: config.host,
-		port: config.port,
-		password: config.password,
-	});
+	const redis = new Redis(config.url);
 	const connectionSupervisor = attachConnectionSupervisor(redis, { logger });
 
 	type State =

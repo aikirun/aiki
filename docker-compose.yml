@@ -36,9 +36,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
       DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
-      REDIS_HOST: ${REDIS_HOST:-}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_URL: ${REDIS_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PRETTY_LOGS: ${PRETTY_LOGS:-true}
     extra_hosts:

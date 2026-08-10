@@ -171,9 +171,7 @@ These apply to the standalone server and the dashboard. If you embed the server 
 | `AIKI_SERVER_BASE_URL` | If IAM is on | — | Public URL of the server; required only when `AIKI_SERVER_AUTH_SECRET` is also set |
 | `AIKI_SERVER_AUTH_SECRET` | If IAM is on | — | Authentication secret; setting this (with `AIKI_SERVER_BASE_URL`) activates the IAM package |
 | `CORS_ORIGINS` | If the dashboard is cross-origin | — | Comma-separated allowed origins, e.g. a static-host dashboard's; unneeded behind the dashboard image's proxy |
-| `REDIS_HOST` | No | — | Enables Redis-backed work distribution and timer dispatch |
-| `REDIS_PORT` | No | `6379` | Redis port |
-| `REDIS_PASSWORD` | No | — | Redis password |
+| `REDIS_URL` | No | — | Redis connection string, e.g. `redis://localhost:6379`; setting it enables Redis-backed work distribution and timer dispatch |
 | `LOG_LEVEL` | No | `info` | Log level |
 | `PRETTY_LOGS` | No | `true` | Pretty-print logs (set `false` for JSON output) |
 

@@ -95,11 +95,7 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 	return ({ workflows, pools, logger, signal }): Subscriber => {
 		const connectTimeoutMs = params.connectTimeoutMs ?? 5_000;
 
-		const redis = new Redis({
-			host: params.host,
-			port: params.port,
-			password: params.password,
-			db: params.db,
+		const redis = new Redis(params.url, {
 			maxRetriesPerRequest: 0,
 			enableOfflineQueue: false,
 			connectTimeout: connectTimeoutMs,
