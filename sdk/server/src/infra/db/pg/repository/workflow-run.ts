@@ -208,6 +208,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return db.select().from(workflowRun).where(conditions);
 	},
 
+	// TODO: remove offset based pagination
 	async listByFilters(
 		namespaceId: NamespaceId,
 		filter: {
