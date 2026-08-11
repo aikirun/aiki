@@ -28,6 +28,47 @@ function createService(repos: Repositories) {
 	};
 }
 
+describe("WorkflowRunService getWorkflowRunById", () => {
+	test("returns workflow run record content including source", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: { orderId: "order-1" },
+				options: { pool: "eu-west" },
+			});
+
+			const run = await service.getWorkflowRunById(context, runId);
+
+			expect(run).toEqual(
+				expect.objectContaining({
+					id: runId,
+					name: "checkout",
+					versionId: "v1",
+					source: "user",
+					createdAt: expect.any(Number),
+					revision: 0,
+					stateTransitionId: expect.any(String),
+					input: { orderId: "order-1" },
+					inputHash: expect.any(String),
+					options: { pool: "eu-west" },
+					attempts: 1,
+					tasks: {},
+					sleeps: {},
+					eventWaits: {},
+					childWorkflowRuns: {},
+					state: expect.objectContaining({
+						status: "scheduled",
+						reason: "new",
+						scheduledAt: expect.any(Number),
+					}),
+				})
+			);
+		}));
+});
+
 describe("WorkflowRunService cancelByIds", () => {
 	test("cancels a claimed run with reason Cancelled", () =>
 		withHarness(async ({ context, repos, publisher }) => {

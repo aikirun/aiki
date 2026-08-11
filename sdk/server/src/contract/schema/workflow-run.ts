@@ -6,6 +6,7 @@ import { serializedErrorSchema } from "./serializable";
 import { sleepSchema } from "./sleep";
 import { taskInfoSchema } from "./task";
 import { triggerStrategySchema } from "./trigger";
+import { workflowSourceSchema } from "./workflow";
 
 export const workflowRunStatusSchema = type(
 	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_child_workflow' | 'stalled' | 'cancelled' | 'failed' | 'completed'"
@@ -159,6 +160,7 @@ export const workflowRunSchema = type({
 	id: "string > 0",
 	name: "string > 0",
 	versionId: "string > 0",
+	source: workflowSourceSchema,
 	createdAt: "number > 0",
 	revision: "number >= 0",
 	stateTransitionId: "string > 0",

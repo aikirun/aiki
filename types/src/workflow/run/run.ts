@@ -5,6 +5,7 @@ import type { EventWait } from "./event";
 import type { Sleep } from "./sleep";
 import type { TriggerStrategy } from "./trigger";
 import type { TaskInfo } from "../task";
+import type { WorkflowSource } from "../workflow";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 export type WorkflowRunAddress = string & { _brand: "workflow_run_address" };
@@ -258,6 +259,7 @@ export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	id: string;
 	name: string;
 	versionId: string;
+	source: WorkflowSource;
 	createdAt: number;
 	revision: number;
 	stateTransitionId: string;
