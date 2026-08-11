@@ -50,6 +50,7 @@ const baseWorkflowRunRecord = (sequence: number): Omit<WorkflowRunRecord, "state
 	id: `run-${sequence}`,
 	name: "workflow",
 	versionId: "1.0.0",
+	source: "user",
 	createdAt: 0,
 	revision: 0,
 	stateTransitionId: "transition",

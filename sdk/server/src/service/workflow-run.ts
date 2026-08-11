@@ -663,6 +663,7 @@ async function getWorkflowRun(
 		id: runRow.id,
 		name: workflowRow.name,
 		versionId: workflowRow.versionId,
+		source: workflowRow.source,
 		createdAt: runRow.createdAt,
 		revision: runRow.revision,
 		stateTransitionId: runRow.latestStateTransitionId,
