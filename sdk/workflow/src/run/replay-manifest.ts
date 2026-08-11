@@ -9,7 +9,7 @@ import type {
 } from "@aikirun/types/workflow/run";
 import type { TaskAddress, TaskInfo } from "@aikirun/types/workflow/task";
 
-export function createReplayManifest(run: WorkflowRunRecord): ReplayManifest {
+export function createReplayManifest(run: Pick<WorkflowRunRecord, "tasks" | "childWorkflowRuns">): ReplayManifest {
 	const { tasks, childWorkflowRuns } = run;
 
 	let totalEntries = 0;
