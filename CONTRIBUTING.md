@@ -109,30 +109,24 @@ dashboard locally** step above (`bun run --cwd app/server db:migrate:apply`).
 
 ## Integration tests
 
-Unit tests (`bun run test:unit`) need no database. Integration tests
-(`bun run test:integration`) run against a real Postgres and truncate every table
-between tests, so they need a **dedicated** test database — never a real one.
+Unit tests (`bun run test:unit`) need no backing services. Integration tests
+(`bun run test:integration`) need two: a Postgres they truncate every table in
+between tests — so it must be a **dedicated** test database, never a real one —
+and a Redis for the redis adapter's tests.
 
 ```bash
-cp .env.test.example .env.test   # then set DATABASE_URL to a test-only database
-bun run test:db:migrate:apply    # apply the server + iam migrations to it
+docker exec aiki-pg createdb -U user aiki_test    # test database in the Postgres started above
+docker run --name aiki-redis -p 6379:6379 -d redis:7
+cp .env.test.example .env.test    # defaults match the two containers above
+bun run test:db:migrate:apply     # apply the server + iam migrations to the test database
 bun run test:integration
 ```
 
-Tests that use the timer priority queue are provider-selected: by default they run
-against the in-memory adapter, which needs no service. To run them against Redis:
-
-```bash
-docker run --name aiki-redis -p 6379:6379 -d redis:7
-TIMER_PRIORITY_QUEUE_PROVIDER=redis bun run test:integration
-```
-
-`REDIS_URL` overrides the default `redis://localhost:6379`.
+`DATABASE_URL` and `REDIS_URL` in `.env.test` point the suite elsewhere.
 
 CI runs all of this automatically against throwaway Postgres and Redis services,
-matrixed over the timer-queue provider, so opening a PR does not require local
-services — but run the tests locally when your change touches the database layer
-or a timer-queue adapter.
+so opening a PR does not require local services — but run the tests locally when
+your change touches the database layer or a timer-queue adapter.
 
 ## Before you open a PR
 

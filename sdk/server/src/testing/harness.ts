@@ -1,11 +1,6 @@
 import { loadDatabaseConfig } from "@aikirun/lib/db";
-import { noopLogger } from "@aikirun/lib/logger";
-import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
-import { redisTimerPriorityQueue } from "@aikirun/redis";
 import { type FakePublisher, fakePublisher } from "@aikirun/testing/infra/queue";
 import type { CreateDatabase, Database } from "@aikirun/types/infra/db";
-import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
-import Redis from "ioredis";
 
 import { daemonContextFactory, namespaceRequestContextFactory } from "./data-factory/middleware/context";
 import { resetDatabase } from "./infra/db/reset";
@@ -106,50 +101,5 @@ export async function withRepos(fn: (repos: Repositories) => Promise<void>): Pro
 		await fn(repos);
 	} finally {
 		await createDb.close();
-	}
-}
-
-/**
- * Provides a `TimerPriorityQueue` for the scope of `fn`.
- * `TIMER_PRIORITY_QUEUE_PROVIDER` env variable is read to determine which implementation is used.
- * Supported values are "memory" and "redis". Default is "memory".
- *
- * @example
- * withTimerPriorityQueue(async (queue) => { ... });
- */
-export async function withTimerPriorityQueue(fn: (queue: TimerPriorityQueue) => Promise<void>): Promise<void> {
-	const provider = process.env.TIMER_PRIORITY_QUEUE_PROVIDER ?? "memory";
-	const abortController = new AbortController();
-	try {
-		switch (provider) {
-			case "memory": {
-				const queue = inMemoryTimerPriorityQueue()({ logger: noopLogger, signal: abortController.signal });
-				await fn(queue);
-				return;
-			}
-			case "redis": {
-				const redisClient = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
-				redisClient.on("error", () => {});
-				try {
-					const timersKey = "aiki:timers";
-					await redisClient.del(timersKey, `${timersKey}:signal`);
-					const queue = redisTimerPriorityQueue(
-						redisClient,
-						timersKey
-					)({
-						logger: noopLogger,
-						signal: abortController.signal,
-					});
-					await fn(queue);
-				} finally {
-					await redisClient.quit();
-				}
-				return;
-			}
-			default:
-				throw new Error(`Unsupported TIMER_PRIORITY_QUEUE_PROVIDER: ${provider}. Must be one of "memory, redis"`);
-		}
-	} finally {
-		abortController.abort();
 	}
 }
