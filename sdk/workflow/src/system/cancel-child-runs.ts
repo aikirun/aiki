@@ -7,7 +7,7 @@ import { workflow } from "../workflow";
 
 export const createCancelChildRunsV1 = (api: ApiClient) => {
 	const listNonTerminalChildRuns = task({
-		name: "aiki:list-non-terminal-child-runs",
+		name: "list-non-terminal-child-runs",
 		async handler(parentRunId: string) {
 			const { runs } = await api.workflowRun.listChildRunsV1({
 				parentRunId,
@@ -18,14 +18,14 @@ export const createCancelChildRunsV1 = (api: ApiClient) => {
 	});
 
 	const cancelRuns = task({
-		name: "aiki:cancel-runs",
+		name: "cancel-runs",
 		async handler(runIds: string[]) {
 			const { cancelledIds } = await api.workflowRun.cancelByIdsV1({ ids: runIds });
 			return cancelledIds;
 		},
 	});
 
-	return workflow({ name: "aiki:cancel-child-runs" }).v("1.0.0", {
+	return workflow({ name: "cancel-child-runs" }).v("1.0.0", {
 		async handler(run, parentRunId: string) {
 			const childRunIds = await listNonTerminalChildRuns.start(run, parentRunId);
 			if (!isNonEmptyArray(childRunIds)) {

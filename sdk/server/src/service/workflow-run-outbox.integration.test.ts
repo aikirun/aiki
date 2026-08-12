@@ -22,14 +22,14 @@ const daemonContext = daemonContextFactory.build();
 describe("WorkflowRunOutboxService.claimReady", () => {
 	test("returns a pending row for the requested workflow and transitions its outbox row to claimed", () =>
 		withHarness(async ({ context, repos }) => {
-			const { runId, workflowName, workflowVersionId } = await seedQueuedRun({
+			const { runId, workflowSource, workflowName, workflowVersionId } = await seedQueuedRun({
 				namespaceRequestContext: context,
 				repos,
 			});
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
-				workflows: [{ name: workflowName, versionId: workflowVersionId }],
+				workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }],
 				limit: 10,
 			});
 
@@ -52,7 +52,23 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
-				workflows: [{ name: "unknown-workflow", versionId: "v1" }],
+				workflows: [{ source: "user", name: "unknown-workflow", versionId: "v1" }],
+				limit: 10,
+			});
+
+			expect(result).toHaveLength(0);
+		}));
+
+	test("does not return a user row to a request naming the same workflow under the system source", () =>
+		withHarness(async ({ context, repos }) => {
+			const { workflowName, workflowVersionId } = await seedQueuedRun({
+				namespaceRequestContext: context,
+				repos,
+			});
+
+			const outboxService = createWorkflowRunOutboxService({ repos });
+			const result = await outboxService.claimReady(context, {
+				workflows: [{ source: "system", name: workflowName, versionId: workflowVersionId }],
 				limit: 10,
 			});
 
@@ -62,14 +78,14 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 	test("does not return a pending row outside the requested pools", () =>
 		withHarness(async ({ context, repos }) => {
 			// The seeded run has no pool; requesting a specific pool excludes it.
-			const { workflowName, workflowVersionId } = await seedQueuedRun({
+			const { workflowSource, workflowName, workflowVersionId } = await seedQueuedRun({
 				namespaceRequestContext: context,
 				repos,
 			});
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
-				workflows: [{ name: workflowName, versionId: workflowVersionId }],
+				workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }],
 				pools: ["eu-east"],
 				limit: 10,
 			});
@@ -79,14 +95,14 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 
 	test("claims a pending row in the requested pool", () =>
 		withHarness(async ({ context, repos }) => {
-			const { runId, workflowName, workflowVersionId, pool } = await seedPooledQueuedRun({
+			const { runId, workflowSource, workflowName, workflowVersionId, pool } = await seedPooledQueuedRun({
 				namespaceRequestContext: context,
 				repos,
 			});
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
-				workflows: [{ name: workflowName, versionId: workflowVersionId }],
+				workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }],
 				pools: [pool],
 				limit: 10,
 			});
@@ -96,14 +112,14 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 
 	test("does not return a pooled row when the request has no pools", () =>
 		withHarness(async ({ context, repos }) => {
-			const { workflowName, workflowVersionId } = await seedPooledQueuedRun({
+			const { workflowSource, workflowName, workflowVersionId } = await seedPooledQueuedRun({
 				namespaceRequestContext: context,
 				repos,
 			});
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
-				workflows: [{ name: workflowName, versionId: workflowVersionId }],
+				workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }],
 				limit: 10,
 			});
 
@@ -113,13 +129,13 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 	test("respects the limit and does not return more rows than requested", () =>
 		withHarness(async ({ context, repos }) => {
 			const seedQueuedRunDeps = { namespaceRequestContext: context, repos };
-			const { workflowName, workflowVersionId } = await seedQueuedRun(seedQueuedRunDeps);
+			const { workflowSource, workflowName, workflowVersionId } = await seedQueuedRun(seedQueuedRunDeps);
 			await seedQueuedRun(seedQueuedRunDeps);
 			await seedQueuedRun(seedQueuedRunDeps);
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
-				workflows: [{ name: workflowName, versionId: workflowVersionId }],
+				workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }],
 				limit: 2,
 			});
 
@@ -128,7 +144,7 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 
 	test("does not return a claimed row", () =>
 		withHarness(async ({ context, repos }) => {
-			const { runId, workflowName, workflowVersionId } = await seedQueuedRun({
+			const { runId, workflowSource, workflowName, workflowVersionId } = await seedQueuedRun({
 				namespaceRequestContext: context,
 				repos,
 			});
@@ -136,7 +152,7 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
-				workflows: [{ name: workflowName, versionId: workflowVersionId }],
+				workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }],
 				limit: 10,
 			});
 
@@ -145,7 +161,7 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 
 	test("does not return a published row", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { workflowName, workflowVersionId } = await seedPublishedRun({
+			const { workflowSource, workflowName, workflowVersionId } = await seedPublishedRun({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
@@ -153,7 +169,7 @@ describe("WorkflowRunOutboxService.claimReady", () => {
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const result = await outboxService.claimReady(context, {
-				workflows: [{ name: workflowName, versionId: workflowVersionId }],
+				workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }],
 				limit: 10,
 			});
 
@@ -165,12 +181,17 @@ describe("claimReady visibility after recovery", () => {
 	test("a stale claimed row and a publishable row are invisible to claimReady until recovery returns them to pending", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const seedRunDeps = { namespaceRequestContext: context, repos, publisher };
-			const { runId: claimedRunId, workflowName, workflowVersionId } = await seedClaimedRun(seedRunDeps);
+			const {
+				runId: claimedRunId,
+				workflowSource,
+				workflowName,
+				workflowVersionId,
+			} = await seedClaimedRun(seedRunDeps);
 			const { runId: publishedRunId } = await withFakeClock(EPOCH_MS, () => seedPublishedRun(seedRunDeps));
 
 			const outboxService = createWorkflowRunOutboxService({ repos });
 			const claimRequest = {
-				workflows: [{ name: workflowName, versionId: workflowVersionId }],
+				workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }],
 				limit: 10,
 			};
 
@@ -188,12 +209,10 @@ describe("claimReady visibility after recovery", () => {
 			// Both runs are now visible to claimReady.
 			const afterRecovery = await outboxService.claimReady(context, claimRequest);
 			expect(afterRecovery).toHaveLength(2);
-			expect(afterRecovery).toEqual(
-				expect.arrayContaining([
-					expect.objectContaining({ id: claimedRunId }),
-					expect.objectContaining({ id: publishedRunId }),
-				])
-			);
+			expect(afterRecovery).toEqual([
+				expect.objectContaining({ id: claimedRunId }),
+				expect.objectContaining({ id: publishedRunId }),
+			]);
 		}));
 });
 

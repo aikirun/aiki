@@ -5,6 +5,7 @@ export const WORKFLOW_SOURCES = ["user", "system"] as const;
 export type WorkflowSource = (typeof WORKFLOW_SOURCES)[number];
 
 export interface WorkflowMeta {
+	source: WorkflowSource;
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
 }

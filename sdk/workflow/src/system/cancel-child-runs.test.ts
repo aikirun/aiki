@@ -14,8 +14,8 @@ import type { WorkflowRun } from "../run";
 import { workflowRunHandle } from "../run/handle";
 import { createReplayManifest } from "../run/replay-manifest";
 
-const LIST_NON_TERMINAL_CHILDREN_TASK_NAME = "aiki:list-non-terminal-child-runs";
-const CANCEL_RUNS_TASK_NAME = "aiki:cancel-runs";
+const LIST_NON_TERMINAL_CHILDREN_TASK_NAME = "list-non-terminal-child-runs";
+const CANCEL_RUNS_TASK_NAME = "cancel-runs";
 
 function createTestWorkflowRun(
 	client: Client,

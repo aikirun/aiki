@@ -127,6 +127,13 @@
 			"when": 1786109614480,
 			"tag": "0017_broad_trauma",
 			"breakpoints": true
+		},
+		{
+			"idx": 18,
+			"version": "7",
+			"when": 1786551260476,
+			"tag": "0018_lethal_serpent_society",
+			"breakpoints": true
 		}
 	]
 }

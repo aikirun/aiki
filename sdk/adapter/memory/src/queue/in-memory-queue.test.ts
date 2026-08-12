@@ -11,11 +11,13 @@ import { describe, expect, test } from "bun:test";
 const logger = noopLogger;
 
 const defaultWorkflow: WorkflowMeta = {
+	source: "user",
 	name: "sync-inventory" as WorkflowName,
 	versionId: "v1" as WorkflowVersionId,
 };
 
 const otherWorkflow: WorkflowMeta = {
+	source: "user",
 	name: "reconcile-ledger" as WorkflowName,
 	versionId: "v1" as WorkflowVersionId,
 };

@@ -1,9 +1,11 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Logger } from "@aikirun/lib/logger";
+import type { WorkflowSource } from "@aikirun/types/workflow";
 
 export interface ReadyWorkflowRun {
 	namespaceId: string;
 	id: string;
+	source: WorkflowSource;
 	name: string;
 	versionId: string;
 	rank: number;

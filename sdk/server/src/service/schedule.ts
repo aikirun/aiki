@@ -13,7 +13,7 @@ import type {
 	ScheduleSpec,
 	ScheduleStatus,
 } from "@aikirun/types/schedule";
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
 import CronExpressionParser from "cron-parser";
 import { ulid } from "ulidx";
 
@@ -151,7 +151,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 				source: "user",
 			});
 
-			const workflowInfo = { workflowName, workflowVersionId };
+			const workflowInfo = { workflowSource: workflowRow.source, workflowName, workflowVersionId };
 			const now = Date.now();
 			const nextRunAt = getNextOccurrence(spec, now) as TimestampMs;
 
@@ -380,7 +380,7 @@ async function createSchedule(
 
 export function scheduleRowToDomain(
 	schedule: ScheduleRow,
-	workflow: { workflowName: string; workflowVersionId: string }
+	workflow: { workflowSource: WorkflowSource; workflowName: string; workflowVersionId: string }
 ): Schedule {
 	const spec: ScheduleSpec =
 		schedule.type === "cron"
@@ -397,6 +397,7 @@ export function scheduleRowToDomain(
 
 	return {
 		id: schedule.id,
+		workflowSource: workflow.workflowSource,
 		workflowName: workflow.workflowName,
 		workflowVersionId: workflow.workflowVersionId,
 		status: schedule.status,

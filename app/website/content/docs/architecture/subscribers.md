@@ -50,15 +50,15 @@ It pairs with the server's Redis publisher — work flows through Redis only if 
 Each workflow version gets its own queue — a Redis sorted set ordered by when each run became due, with priority breaking ties between runs due at the same moment:
 
 ```
-aiki:workflow:order-processing:1.0.0
-aiki:workflow:user-onboarding:1.0.0
+aiki:workflow:user:order-processing:1.0.0
+aiki:workflow:user:user-onboarding:1.0.0
 ```
 
 With worker pools in use:
 
 ```
-aiki:workflow:order-processing:1.0.0:tenant-acme
-aiki:workflow:order-processing:1.0.0:tenant-globex
+aiki:workflow:user:order-processing:1.0.0:tenant-acme
+aiki:workflow:user:order-processing:1.0.0:tenant-globex
 ```
 
 ### Work Distribution

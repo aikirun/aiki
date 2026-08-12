@@ -300,7 +300,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			expect(scheduledRuns).toEqual({
 				rows: [
 					expect.objectContaining({ id: childRunId, status: "scheduled", name: parent.workflowName }),
-					expect.objectContaining({ status: "scheduled", name: "aiki:cancel-child-runs" }),
+					expect.objectContaining({ status: "scheduled", name: "cancel-child-runs" }),
 				],
 				total: 2,
 			});
