@@ -58,7 +58,7 @@ export const createChildRunCanceller = () => ({
 				seenNamespaceIds.add(namespaceId);
 				workflowEntries.push({
 					namespaceId: namespaceId,
-					name: "aiki:cancel-child-runs" as WorkflowName,
+					name: "cancel-child-runs" as WorkflowName,
 					versionId: "1.0.0" as WorkflowVersionId,
 					source: "system",
 				});

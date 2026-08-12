@@ -1,6 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
+import type { WorkflowSource } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
@@ -23,7 +24,7 @@ export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & {
 export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "claimed"; claimedAt: TimestampMs };
 
 interface ClaimFilter {
-	workflows: NonEmptyArray<{ name: string; versionId: string }>;
+	workflows: NonEmptyArray<{ source: WorkflowSource; name: string; versionId: string }>;
 	pools?: string[];
 }
 
@@ -263,6 +264,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 					or(
 						...filters.workflows.map((workflow) =>
 							and(
+								eq(workflowRunOutbox.workflowSource, workflow.source),
 								eq(workflowRunOutbox.workflowName, workflow.name),
 								eq(workflowRunOutbox.workflowVersionId, workflow.versionId)
 							)

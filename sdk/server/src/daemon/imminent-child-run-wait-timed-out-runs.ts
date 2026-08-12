@@ -157,6 +157,7 @@ async function processChunk(
 			id: ulid(),
 			namespaceId: run.namespaceId,
 			workflowRunId: run.id,
+			workflowSource: workflow.source,
 			workflowName: workflow.name,
 			workflowVersionId: workflow.versionId,
 			pool: run.options?.pool,

@@ -1,16 +1,26 @@
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
-import type { WorkflowMeta } from "@aikirun/types/workflow/workflow";
+import type { WorkflowMeta, WorkflowSource } from "@aikirun/types/workflow/workflow";
 
-export function getWorkflowQueueName(name: string, versionId: string, pool?: string): string {
-	return pool ? `aiki:workflow:${name}:${versionId}:${pool}` : `aiki:workflow:${name}:${versionId}`;
+export function getWorkflowQueueName(params: {
+	source: WorkflowSource;
+	name: string;
+	versionId: string;
+	pool?: string;
+}): string {
+	const { source, name, versionId, pool } = params;
+	return pool ? `aiki:workflow:${source}:${name}:${versionId}:${pool}` : `aiki:workflow:${source}:${name}:${versionId}`;
 }
 
 export function getWorkflowQueueNames(workflows: WorkflowMeta[], pools?: string[]): string[] {
 	if (!isNonEmptyArray(pools)) {
-		return workflows.map((workflow) => getWorkflowQueueName(workflow.name, workflow.versionId));
+		return workflows.map((workflow) =>
+			getWorkflowQueueName({ source: workflow.source, name: workflow.name, versionId: workflow.versionId })
+		);
 	}
 
 	return workflows.flatMap((workflow) =>
-		pools.map((pool) => getWorkflowQueueName(workflow.name, workflow.versionId, pool))
+		pools.map((pool) =>
+			getWorkflowQueueName({ source: workflow.source, name: workflow.name, versionId: workflow.versionId, pool })
+		)
 	);
 }

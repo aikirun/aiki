@@ -91,7 +91,7 @@ describe("claim-path ignores nextPublishAttemptRank", () => {
 		withHarness(async ({ context, repos }) => {
 			const now = 1_000_000;
 			await withFakeClock(now, async () => {
-				const { runId, outboxRowId, workflowName, workflowVersionId } = await seedQueuedRun({
+				const { runId, outboxRowId, workflowSource, workflowName, workflowVersionId } = await seedQueuedRun({
 					daemonContext: context,
 					namespaceRequestContext,
 					repos,
@@ -111,11 +111,42 @@ describe("claim-path ignores nextPublishAttemptRank", () => {
 
 				const workerClaim = await repos.workflowRunOutbox.claimPending(
 					namespaceRequestContext.namespaceId,
-					{ workflows: [{ name: workflowName, versionId: workflowVersionId }] },
+					{ workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }] },
 					100
 				);
 				expect(workerClaim).toEqual([expect.objectContaining({ workflowRunId: runId })]);
 			});
+		}));
+});
+
+describe("claimPending — workflow source", () => {
+	test("claims only the row matching the requested source when name and versionId collide", () =>
+		withHarness(async ({ repos }) => {
+			const workflowName = "reconcile-ledger";
+			const workflowVersionId = "v3";
+
+			const collidingRowFactory = pendingWorkflowRunOutboxRowFactory.associations({
+				namespaceId: namespaceRequestContext.namespaceId,
+				workflowName,
+				workflowVersionId,
+			});
+			const userRow = collidingRowFactory.build({ workflowSource: "user" });
+			const systemRow = collidingRowFactory.build({ workflowSource: "system" });
+			await repos.workflowRunOutbox.createBatch([userRow, systemRow]);
+
+			const systemClaim = await repos.workflowRunOutbox.claimPending(
+				namespaceRequestContext.namespaceId,
+				{ workflows: [{ source: "system", name: workflowName, versionId: workflowVersionId }] },
+				100
+			);
+			expect(systemClaim).toEqual([{ workflowRunId: systemRow.workflowRunId }]);
+
+			const userClaim = await repos.workflowRunOutbox.claimPending(
+				namespaceRequestContext.namespaceId,
+				{ workflows: [{ source: "user", name: workflowName, versionId: workflowVersionId }] },
+				100
+			);
+			expect(userClaim).toEqual([{ workflowRunId: userRow.workflowRunId }]);
 		}));
 });
 
@@ -193,11 +224,13 @@ describe("claimPending — concurrent worker claims are disjoint", () => {
 	test("two concurrent worker claims together cover all seeded rows with no overlap", () =>
 		withHarness(async ({ repos: primaryRepos }) =>
 			withRepos(async (secondaryRepos) => {
+				const workflowSource = "user";
 				const workflowName = "sync-inventory";
 				const workflowVersionId = "v1";
 
 				const workflowRunOutboxRowFactory = pendingWorkflowRunOutboxRowFactory.associations({
 					namespaceId: namespaceRequestContext.namespaceId,
+					workflowSource,
 					workflowName,
 					workflowVersionId,
 				});
@@ -217,7 +250,7 @@ describe("claimPending — concurrent worker claims are disjoint", () => {
 				const primaryChunkPromise = primaryRepos.transaction(async (txRepos) => {
 					const claimedRows = await txRepos.workflowRunOutbox.claimPending(
 						namespaceRequestContext.namespaceId,
-						{ workflows: [{ name: workflowName, versionId: workflowVersionId }] },
+						{ workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }] },
 						2
 					);
 					primaryChunkClaimed.signal();
@@ -229,7 +262,7 @@ describe("claimPending — concurrent worker claims are disjoint", () => {
 				// Connection B tries to claim everything while A is still open (not awaited yet).
 				const secondaryChunkPromise = secondaryRepos.workflowRunOutbox.claimPending(
 					namespaceRequestContext.namespaceId,
-					{ workflows: [{ name: workflowName, versionId: workflowVersionId }] },
+					{ workflows: [{ source: workflowSource, name: workflowName, versionId: workflowVersionId }] },
 					100
 				);
 

@@ -19,7 +19,9 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 	const { client, secret } = params;
 	const configParam = params.config;
 
-	const registry = workflowRegistry().addMany(getSystemWorkflows(client.api)).addMany(params.workflows);
+	const registry = workflowRegistry()
+		.addMany("system", getSystemWorkflows(client.api))
+		.addMany("user", params.workflows);
 
 	const logger = client.logger.child({ "aiki.component": "endpoint" });
 
@@ -85,7 +87,11 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 			"aiki.workflowRunId": workflowRun.id,
 		});
 
-		const workflowVersion = registry.get(workflowRun.name as WorkflowName, workflowRun.versionId as WorkflowVersionId);
+		const workflowVersion = registry.get(
+			workflowRun.source,
+			workflowRun.name as WorkflowName,
+			workflowRun.versionId as WorkflowVersionId
+		);
 		if (!workflowVersion) {
 			runLogger.warn("Workflow version not found");
 			return jsonResponse(404);

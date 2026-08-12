@@ -13,7 +13,7 @@ import {
 import type { Client } from "@aikirun/types/client";
 import type { CreateSubscriber, Subscriber, WorkflowRunMessage } from "@aikirun/types/infra/queue";
 import type { WorkerId } from "@aikirun/types/worker";
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowMeta, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	type AnyWorkflowVersion,
@@ -134,9 +134,16 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		private readonly startOptions: WorkerStartOptions
 	) {
 		this.id = ulid() as WorkerId;
-		this.registry = workflowRegistry().addMany(getSystemWorkflows(this.client.api)).addMany(this.params.workflows);
+		this.registry = workflowRegistry()
+			.addMany("system", getSystemWorkflows(this.client.api))
+			.addMany("user", this.params.workflows);
 		const workflows = this.registry.getAll();
-		if (!isNonEmptyArray(workflows)) {
+		const workflowsMeta: WorkflowMeta[] = workflows.map(({ source, workflow }) => ({
+			source,
+			name: workflow.name,
+			versionId: workflow.versionId,
+		}));
+		if (!isNonEmptyArray(workflowsMeta)) {
 			throw new Error("No workflow registered");
 		}
 
@@ -161,7 +168,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		const createPrimarySubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
 		this.primarySubscriber = createPrimarySubscriber({
 			workerId: this.id,
-			workflows,
+			workflows: workflowsMeta,
 			pools: this.startOptions.pools,
 			logger: this.logger.child({ "aiki.subscriber": "primary" }),
 			signal,
@@ -174,7 +181,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			const createBackupSubscriber = httpSubscriber({ api: this.client.api });
 			this.backupSubscriber = createBackupSubscriber({
 				workerId: this.id,
-				workflows,
+				workflows: workflowsMeta,
 				pools: this.startOptions.pools,
 				logger: this.logger.child({ "aiki.subscriber": "backup" }),
 				signal,
@@ -372,6 +379,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				}
 
 				const workflowVersion = this.registry.get(
+					workflowRun.source,
 					workflowRun.name as WorkflowName,
 					workflowRun.versionId as WorkflowVersionId
 				);

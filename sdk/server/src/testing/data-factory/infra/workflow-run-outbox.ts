@@ -7,6 +7,7 @@ export const pendingWorkflowRunOutboxRowFactory = Factory.define<WorkflowRunOutb
 	id: ulid(),
 	namespaceId: "ns",
 	workflowRunId: ulid(),
+	workflowSource: "user",
 	workflowName: "sync-inventory",
 	workflowVersionId: "v1",
 	rank: 1,

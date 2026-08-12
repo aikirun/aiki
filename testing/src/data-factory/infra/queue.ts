@@ -4,6 +4,7 @@ import { Factory } from "fishery";
 export const readyWorkflowRunFactory = Factory.define<ReadyWorkflowRun>(({ sequence }) => ({
 	namespaceId: "ns",
 	id: `run-${sequence}`,
+	source: "user",
 	name: "sync-inventory",
 	versionId: "v1",
 	rank: 1,

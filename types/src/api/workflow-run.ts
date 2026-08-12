@@ -293,7 +293,7 @@ export interface WorkflowRunCancelByIdsResponseV1 {
 }
 
 export interface WorkflowRunClaimReadyRequestV1 {
-	workflows: Array<{ name: string; versionId: string }>;
+	workflows: Array<{ source: WorkflowSource; name: string; versionId: string }>;
 	pools?: string[];
 	limit: number;
 }

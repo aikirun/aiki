@@ -149,7 +149,11 @@ export const createScheduleRepository = (db: PgDb) => ({
 			db
 				.select({
 					schedule: getTableColumns(schedule),
-					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
+					workflow: {
+						workflowSource: workflow.source,
+						workflowName: workflow.name,
+						workflowVersionId: workflow.versionId,
+					},
 				})
 				.from(schedule)
 				.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
@@ -167,7 +171,11 @@ export const createScheduleRepository = (db: PgDb) => ({
 		return db
 			.select({
 				schedule: getTableColumns(schedule),
-				workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
+				workflow: {
+					workflowSource: workflow.source,
+					workflowName: workflow.name,
+					workflowVersionId: workflow.versionId,
+				},
 			})
 			.from(schedule)
 			.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
@@ -181,7 +189,11 @@ export const createScheduleRepository = (db: PgDb) => ({
 					...getTableColumns(schedule),
 					nextRunAt: sql<Date>`${schedule.nextRunAt}`.mapWith(schedule.nextRunAt),
 				},
-				workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
+				workflow: {
+					workflowSource: workflow.source,
+					workflowName: workflow.name,
+					workflowVersionId: workflow.versionId,
+				},
 			})
 			.from(schedule)
 			.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
@@ -200,7 +212,11 @@ export const createScheduleRepository = (db: PgDb) => ({
 		const result = await db
 			.select({
 				schedule: getTableColumns(schedule),
-				workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
+				workflow: {
+					workflowSource: workflow.source,
+					workflowName: workflow.name,
+					workflowVersionId: workflow.versionId,
+				},
 			})
 			.from(schedule)
 			.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
@@ -213,7 +229,11 @@ export const createScheduleRepository = (db: PgDb) => ({
 		const result = await db
 			.select({
 				schedule: getTableColumns(schedule),
-				workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
+				workflow: {
+					workflowSource: workflow.source,
+					workflowName: workflow.name,
+					workflowVersionId: workflow.versionId,
+				},
 			})
 			.from(schedule)
 			.innerJoin(workflow, eq(schedule.workflowId, workflow.id))

@@ -13,7 +13,7 @@ import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createWorkflowRunService } from "../service/workflow-run";
 import { createWorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
 
-const seededWorkflow = { name: "ship-orders", versionId: "v2" };
+const seededWorkflow = { source: "user", name: "ship-orders", versionId: "v2" } as const;
 
 const publishPendingOutboxEntriesDaemonConfig = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
 
@@ -97,6 +97,7 @@ async function _seedQueuedRun(deps: SeedRunDeps, pool: string | undefined) {
 	return {
 		runId,
 		outboxRowId: outboxRow.id,
+		workflowSource: seededWorkflow.source,
 		workflowName: seededWorkflow.name,
 		workflowVersionId: seededWorkflow.versionId,
 	};
@@ -149,5 +150,10 @@ export async function seedStalledRun(deps: SeedRunDeps) {
 
 	await stallUndeliverableRuns(daemonContext, { repos: deps.repos }, { maxAgeMs: 60_000, limit: 100 });
 
-	return { runId: seeded.runId, workflowName: seeded.workflowName, workflowVersionId: seeded.workflowVersionId };
+	return {
+		runId: seeded.runId,
+		workflowSource: seeded.workflowSource,
+		workflowName: seeded.workflowName,
+		workflowVersionId: seeded.workflowVersionId,
+	};
 }

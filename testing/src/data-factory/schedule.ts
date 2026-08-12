@@ -3,6 +3,7 @@ import { Factory } from "fishery";
 
 export const intervalScheduleFactory = Factory.define<Schedule & { spec: IntervalScheduleSpec }>(({ sequence }) => ({
 	id: `schedule-${sequence}`,
+	workflowSource: "user",
 	workflowName: "workflow",
 	workflowVersionId: "1.0.0",
 	status: "active",
@@ -14,6 +15,7 @@ export const intervalScheduleFactory = Factory.define<Schedule & { spec: Interva
 
 export const cronScheduleFactory = Factory.define<Schedule & { spec: CronScheduleSpec }>(({ sequence }) => ({
 	id: `schedule-${sequence}`,
+	workflowSource: "user",
 	workflowName: "workflow",
 	workflowVersionId: "1.0.0",
 	status: "active",

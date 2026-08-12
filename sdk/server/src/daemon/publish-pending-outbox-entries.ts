@@ -58,6 +58,7 @@ export async function publishOutboxEntries(
 		runs.push({
 			namespaceId: entry.namespaceId,
 			id: entry.workflowRunId,
+			source: entry.workflowSource,
 			name: entry.workflowName,
 			versionId: entry.workflowVersionId,
 			rank: entry.rank,

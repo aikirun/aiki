@@ -1,3 +1,4 @@
+import type { WorkflowSource } from "./workflow";
 import type { WorkflowStartOptions } from "./workflow/run";
 
 export type ScheduleId = string & { _brand: "schedule_id" };
@@ -45,6 +46,7 @@ export interface ScheduleActivateOptions {
 
 export interface Schedule {
 	id: string;
+	workflowSource: WorkflowSource;
 	workflowName: string;
 	workflowVersionId: string;
 	status: ScheduleStatus;

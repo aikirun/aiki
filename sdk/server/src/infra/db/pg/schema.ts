@@ -63,7 +63,7 @@ export const workflow = pgTable(
 	{
 		id: text("id").primaryKey(),
 		namespaceId: text("namespace_id").notNull(),
-		source: workflowSourceEnum("source").notNull().default("user"),
+		source: workflowSourceEnum("source").notNull(),
 		name: text("name").notNull(),
 		versionId: text("version_id").notNull(),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
@@ -370,6 +370,7 @@ export const workflowRunOutbox = pgTable(
 		id: text("id").primaryKey(),
 		namespaceId: text("namespace_id").notNull(),
 		workflowRunId: text("workflow_run_id").notNull(),
+		workflowSource: workflowSourceEnum("workflow_source").notNull(),
 		workflowName: text("workflow_name").notNull(),
 		workflowVersionId: text("workflow_version_id").notNull(),
 		pool: text("pool"),
@@ -392,7 +393,15 @@ export const workflowRunOutbox = pgTable(
 
 		// Claim path: worker claims rank ordered pending rows by workflow identity and pool.
 		index("idx_workflow_run_outbox_claim_pending")
-			.on(table.namespaceId, table.workflowName, table.workflowVersionId, table.pool, table.rank, table.id)
+			.on(
+				table.namespaceId,
+				table.workflowSource,
+				table.workflowName,
+				table.workflowVersionId,
+				table.pool,
+				table.rank,
+				table.id
+			)
 			.where(sql`${table.status} = 'pending'`),
 
 		// Daemon list paths: broad scans over one status to feed broker.

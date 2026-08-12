@@ -50,7 +50,11 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 			async getReadyRuns(size: number): Promise<WorkflowRunMessage[]> {
 				const response = await api.workflowRun.claimReadyV1(
 					{
-						workflows: workflows.map((workflow) => ({ name: workflow.name, versionId: workflow.versionId })),
+						workflows: workflows.map((workflow) => ({
+							source: workflow.source,
+							name: workflow.name,
+							versionId: workflow.versionId,
+						})),
 						pools,
 						limit: size,
 					},

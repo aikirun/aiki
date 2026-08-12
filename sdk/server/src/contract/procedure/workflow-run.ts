@@ -336,6 +336,7 @@ const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRu
 	.input(
 		type({
 			workflows: type({
+				source: workflowSourceSchema,
 				name: "string > 0",
 				versionId: "string > 0",
 			})
