@@ -15,6 +15,7 @@
 	"dependencies": {
 		"@aikirun/iam": "workspace:*",
 		"@aikirun/lib": "workspace:*",
+		"@aikirun/memory": "workspace:*",
 		"@aikirun/redis": "workspace:*",
 		"@aikirun/server": "workspace:*",
 		"@aikirun/types": "workspace:*",

@@ -50,7 +50,7 @@ The runtime's daemons drive workflow state transitions:
 
 The publish daemon runs only when a publisher is configured; without one, workers claim work directly from the outbox. Recovery runs unconditionally — a crashed worker's claim is released after `claimIdleTimeoutMs` either way (see [Workflow Run Claims](./workflow-run-claims.md)).
 
-By default, due work is detected by periodic database scans. Configuring a **timer priority queue** (`@aikirun/redis`) promotes near-term timers into a sorted queue that fires them with sub-second precision.
+By default, due work is detected by periodic database scans. Configuring a **timer priority queue** (`@aikirun/redis`) promotes near-term timers into a sorted queue that fires them with sub-second precision. The bundled standalone server always runs one: in-process by default, Redis-backed when `REDIS_URL` is set. With multiple server instances, prefer Redis — the shared queue hands each timer to exactly one instance, where per-instance in-process queues wake every instance for every timer (correctness is not affected, but work is duplicated). The queue is disposable acceleration state — the database keeps every deadline, and the scans repopulate the queue after a restart.
 
 ## Configuration
 
