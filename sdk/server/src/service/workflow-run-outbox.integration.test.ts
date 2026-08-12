@@ -209,10 +209,7 @@ describe("claimReady visibility after recovery", () => {
 			// Both runs are now visible to claimReady.
 			const afterRecovery = await outboxService.claimReady(context, claimRequest);
 			expect(afterRecovery).toHaveLength(2);
-			expect(afterRecovery).toEqual([
-				expect.objectContaining({ id: claimedRunId }),
-				expect.objectContaining({ id: publishedRunId }),
-			]);
+			expect(afterRecovery.map((run) => run.id).sort()).toEqual([claimedRunId, publishedRunId].sort());
 		}));
 });
 
