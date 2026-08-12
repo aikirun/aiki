@@ -1,6 +1,7 @@
 import process from "node:process";
 import { iam } from "@aikirun/iam";
 import type { Logger } from "@aikirun/lib/logger";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { attachConnectionSupervisor, redisCache, redisPublisher, redisTimerPriorityQueue } from "@aikirun/redis";
 import { database, server } from "@aikirun/server";
 import { Redis } from "ioredis";
@@ -33,10 +34,8 @@ export async function startAppServer({ config }: { config: AppServerConfig }): P
 					: undefined,
 		},
 		runtime: {
-			...(redis && {
-				publisher: redisPublisher(redis.client),
-				timerPriorityQueue: redisTimerPriorityQueue(redis.client, "aiki:timers"),
-			}),
+			publisher: redis ? redisPublisher(redis.client) : undefined,
+			timerPriorityQueue: redis ? redisTimerPriorityQueue(redis.client, "aiki:timers") : inMemoryTimerPriorityQueue(),
 		},
 	});
 
