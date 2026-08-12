@@ -6,13 +6,9 @@ on:
 
 jobs:
   integration-test:
-    name: Integration Test (${{ matrix.timer-priority-queue-provider }} timers)
+    name: Integration Test
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        timer-priority-queue-provider: [memory, redis]
     services:
       postgres:
         image: postgres:16
@@ -28,7 +24,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       redis:
-        image: ${{ matrix.timer-priority-queue-provider == 'redis' && 'redis:7' || '' }}
+        image: redis:7
         ports:
           - 6379:6379
         options: >-
@@ -39,7 +35,6 @@ jobs:
     env:
       DATABASE_PROVIDER: pg
       DATABASE_URL: postgresql://user:password@localhost:5432/aiki_test
-      TIMER_PRIORITY_QUEUE_PROVIDER: ${{ matrix.timer-priority-queue-provider }}
       REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

@@ -15,8 +15,9 @@ Before writing any test, study the exemplars for its tier and match their idioms
   from a typed case table.
 - `sdk/server/src/infra/db/workflow-run-outbox.integration.test.ts` — provider-contract suite,
   two-connection concurrency choreography.
-- `sdk/server/src/infra/timer/priority-queue.integration.test.ts` — infra contract suite,
-  provider-selected via the harness, wake and absence checks.
+- `testing/src/infra/timer.ts` — infra contract suite, wake and absence checks;
+  runner-injected so implementers can run it too, with each adapter binding it in its own
+  package (`sdk/adapter/*/src/timer/`).
 
 ## Determinism
 
@@ -159,14 +160,18 @@ Before writing any test, study the exemplars for its tier and match their idioms
   timer-queue consumer waits and wakes; "signal" is one adapter's way of waking it, and
   another adapter may wake it differently. A word that only makes sense inside one
   implementation doesn't belong in tests of the interface.
-- Pluggable infra is a provider contract — the database, the timer priority queue. Test the
-  contract once, at the provider-neutral level (`sdk/server/src/infra/db/`,
-  `sdk/server/src/infra/timer/`), never inside an adapter's directory. An env variable picks
-  the implementation (`DATABASE_PROVIDER`, `TIMER_PRIORITY_QUEUE_PROVIDER` in `.env.test`)
-  and CI supplies the matrix — a new provider adds a matrix row, not test files. Integration
-  tests get the instance from the harness (`withTimerPriorityQueue`, a scoped combinator like
-  `withRepos`). Assert outcomes, not locking or notification mechanics; that is what keeps
-  one suite valid for every provider.
+- Pluggable infra is a provider contract — the database, the timer priority queue. Write the
+  suite once, provider-neutral; an adapter never gets its own assertions. Where the suite
+  runs follows who may implement the contract. The database is pluggable only by Aiki: its
+  suite stays internal at `sdk/server/src/infra/db/`, `DATABASE_PROVIDER` picks the
+  implementation, and CI supplies the matrix — a new provider adds a matrix row. The timer
+  priority queue is pluggable by users: the suite body is exported from
+  `@aikirun/testing/infra/timer` with the test runner and queue provider injected, so
+  third-party implementations run the identical suite, and each adapter binds it in its own
+  package with its own `withQueue` — the in-memory binder is a unit test, the redis binder
+  an integration test reading `REDIS_URL`, and a new provider adds a binder file, not a
+  matrix row. Assert outcomes, not locking or notification mechanics; that is what keeps one
+  suite valid for every provider.
 - Code that uses a contract may assume any conforming implementation, so its tests can run
   against the cheapest one: the consumer's unit tests hardcode the in-memory queue as a
   stand-in for "anything the contract suite has proven". The other half of that bargain:
