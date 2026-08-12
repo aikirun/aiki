@@ -29,6 +29,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { WorkflowRun } from "./run";
 import type { WorkflowExecutionConfig } from "./run/execute";
 import type { WorkflowRunHandle } from "./run/handle";
+import { validateWithSchema } from "./run/schema-validation";
 
 type UnknownWorkflowRun = WorkflowRun<unknown, unknown>;
 type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
@@ -126,8 +127,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
-		const parseInputResult = inputSchema ? this.parse(handle, inputSchema, inputRaw, run.logger) : (inputRaw as Input);
-		const input = parseInputResult instanceof Promise ? await parseInputResult : parseInputResult;
+		const inputSchemaValidationResult = inputSchema
+			? validateWithSchema(handle, inputSchema, inputRaw, run.logger, "Invalid task data")
+			: (inputRaw as Input);
+		const input =
+			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		const inputHash = await hashInput(input);
 		const address = getCompositeId<TaskAddress>({ name: this.name, referenceId: inputHash });
 
@@ -299,10 +303,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			try {
 				const outputRaw = await this.params.handler(input);
 				const outputSchema = this.params.schema?.output;
-				const parseOutputResult = outputSchema
-					? this.parse(handle, outputSchema, outputRaw, logger)
+				const outputSchemaValidationResult = outputSchema
+					? validateWithSchema(handle, outputSchema, outputRaw, logger, "Invalid task data")
 					: (outputRaw as Output);
-				const output = parseOutputResult instanceof Promise ? await parseOutputResult : parseOutputResult;
+				const output =
+					outputSchemaValidationResult instanceof Promise
+						? await outputSchemaValidationResult
+						: outputSchemaValidationResult;
 				return { output, lastAttempt: attempts };
 			} catch (err) {
 				if (
@@ -364,51 +371,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			});
 			throw new TaskFailedError(taskId, attempts, "Task retry not allowed");
 		}
-	}
-
-	private parse<T>(
-		handle: UnknownWorkflowRunHandle,
-		schema: StandardSchemaV1<T>,
-		data: unknown,
-		logger: Logger
-	): T | Promise<T> {
-		const schemaValidation = schema["~standard"].validate(data);
-		if (schemaValidation instanceof Promise) {
-			return this.parseAsync(handle, schemaValidation, logger);
-		}
-		if (!schemaValidation.issues) {
-			return schemaValidation.value;
-		}
-		return this.throwSchemaValidationError(handle, schemaValidation.issues, logger);
-	}
-
-	private async parseAsync<T>(
-		handle: UnknownWorkflowRunHandle,
-		schemaValidation: Promise<StandardSchemaV1.Result<T>>,
-		logger: Logger
-	): Promise<T> {
-		const schemaValidationResult = await schemaValidation;
-		if (!schemaValidationResult.issues) {
-			return schemaValidationResult.value;
-		}
-		return this.throwSchemaValidationError(handle, schemaValidationResult.issues, logger);
-	}
-
-	private async throwSchemaValidationError(
-		handle: UnknownWorkflowRunHandle,
-		issues: readonly StandardSchemaV1.Issue[],
-		logger: Logger
-	): Promise<never> {
-		logger.error("Invalid task data", { "aiki.issues": issues });
-		await handle[INTERNAL].transitionState({
-			status: "failed",
-			cause: "self",
-			error: {
-				name: "SchemaValidationError",
-				message: JSON.stringify(issues),
-			},
-		});
-		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 	}
 }
 

@@ -1,6 +1,5 @@
 import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
-import type { Logger } from "@aikirun/lib/logger";
 import {
 	type ObjectBuilder,
 	objectOverrider,
@@ -38,6 +37,7 @@ import type { WorkflowRun } from "./run";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
+import { validateWithSchema } from "./run/schema-validation";
 
 export interface WorkflowVersionParams<Input, Output, Context, TEvents extends EventsDefinition> {
 	handler: (run: Readonly<WorkflowRun<Input, Context, TEvents>>, input: Input) => Promise<Output>;
@@ -171,10 +171,11 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
-		const parseInputResult = inputSchema
-			? this.parse(parentRunHandle, inputSchema, inputRaw, parentRun.logger)
+		const inputSchemaValidationResult = inputSchema
+			? validateWithSchema(parentRunHandle, inputSchema, inputRaw, parentRun.logger, "Invalid workflow data")
 			: inputRaw;
-		const input = parseInputResult instanceof Promise ? await parseInputResult : parseInputResult;
+		const input =
+			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		const inputHash = await hashInput(input);
 
 		const referenceId = startOptions.reference?.id;
@@ -316,10 +317,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			try {
 				const outputRaw = await this.params.handler(run, input);
 				const outputSchema = this.params.schema?.output;
-				const parseOutputResult = outputSchema
-					? this.parse(handle, outputSchema, outputRaw, run.logger)
+				const outputSchemaValidationResult = outputSchema
+					? validateWithSchema(handle, outputSchema, outputRaw, run.logger, "Invalid workflow data")
 					: (outputRaw as Output);
-				const output = parseOutputResult instanceof Promise ? await parseOutputResult : parseOutputResult;
+				const output =
+					outputSchemaValidationResult instanceof Promise
+						? await outputSchemaValidationResult
+						: outputSchemaValidationResult;
 				return output;
 			} catch (err) {
 				if (
@@ -367,51 +371,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				throw new WorkflowRunSuspendedError(run.id);
 			}
 		}
-	}
-
-	private parse<T>(
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
-		schema: StandardSchemaV1<T>,
-		data: unknown,
-		logger: Logger
-	): T | Promise<T> {
-		const schemaValidation = schema["~standard"].validate(data);
-		if (schemaValidation instanceof Promise) {
-			return this.parseAsync(handle, schemaValidation, logger);
-		}
-		if (!schemaValidation.issues) {
-			return schemaValidation.value;
-		}
-		return this.throwSchemaValidationError(handle, schemaValidation.issues, logger);
-	}
-
-	private async parseAsync<T>(
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
-		schemaValidation: Promise<StandardSchemaV1.Result<T>>,
-		logger: Logger
-	): Promise<T> {
-		const schemaValidationResult = await schemaValidation;
-		if (!schemaValidationResult.issues) {
-			return schemaValidationResult.value;
-		}
-		return this.throwSchemaValidationError(handle, schemaValidationResult.issues, logger);
-	}
-
-	private async throwSchemaValidationError(
-		handle: WorkflowRunHandle<unknown, unknown, unknown, EventsDefinition>,
-		issues: readonly StandardSchemaV1.Issue[],
-		logger: Logger
-	): Promise<never> {
-		logger.error("Invalid workflow data", { "aiki.issues": issues });
-		await handle[INTERNAL].transitionState({
-			status: "failed",
-			cause: "self",
-			error: {
-				name: "SchemaValidationError",
-				message: JSON.stringify(issues),
-			},
-		});
-		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 	}
 
 	private createFailedState(err: unknown): WorkflowRunStateFailed {
