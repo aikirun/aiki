@@ -136,10 +136,12 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			input = schemaValidationResult.value;
 		}
 
+		const inputHash = await hashInput(input);
 		const { id } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
 			input,
+			inputHash,
 			options: startOptions,
 		});
 
@@ -215,6 +217,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			name: this.name,
 			versionId: this.versionId,
 			input,
+			inputHash,
 			parentWorkflowRunId: parentRun.id,
 			options: pool === undefined ? startOptions : { ...startOptions, pool },
 		});
