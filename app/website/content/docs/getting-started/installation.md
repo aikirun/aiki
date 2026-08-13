@@ -122,21 +122,21 @@ Add `--package server,iam` to the migration when the server runs with auth. The 
 
 ### From source
 
-The same stack runs without Docker (this path needs Bun). Clone at a release tag so you run released code:
+The same stack runs without Docker (this path needs Bun). Clone at a release tag so you run released code — pick one from the [releases](https://github.com/aikirun/aiki/releases):
 
 ```bash
-git clone --branch v0.34.1 https://github.com/aikirun/aiki.git
+git clone --branch <version> https://github.com/aikirun/aiki.git
 cd aiki
 bun install
 cp app/server/.env.example app/server/.env
 # Edit app/server/.env with your DATABASE_URL
 
-bun run db:migrate:apply:server   # the migration step
-bun run server                    # Terminal 1
-bun run dashboard                 # Terminal 2
+bun run --cwd app/server db:migrate:apply:server   # the migration step
+bun run server                                     # Terminal 1
+bun run dashboard                                  # Terminal 2
 ```
 
-Run `bun run db:migrate:apply:iam` too when the server will run with auth. One piece differs from its container form: the dashboard here is a dev server, and the browser calls the Aiki server directly on `localhost:9850` — no proxy and no `AIKI_SERVER_UPSTREAM_URL` (the `.env.example` already allows the dashboard's origin through `CORS_ORIGINS`).
+Run `bun run --cwd app/server db:migrate:apply:iam` too when the server will run with auth. One piece differs from its container form: the dashboard here is a dev server, and the browser calls the Aiki server directly on `localhost:9850` — no proxy and no `AIKI_SERVER_UPSTREAM_URL` (the `.env.example` already allows the dashboard's origin through `CORS_ORIGINS`).
 
 ## Run the dashboard on its own
 
@@ -145,7 +145,7 @@ Serve the dashboard by itself when the server is embedded in your app (the [SDK 
 The server's URL is baked into the bundle at build time, so the dashboard is built per deployment (the build needs Bun) — from the release tag matching your installed `@aikirun/*` version:
 
 ```bash
-git clone --branch v0.34.1 https://github.com/aikirun/aiki.git
+git clone --branch <version> https://github.com/aikirun/aiki.git
 cd aiki
 bun install
 bun run build:types
