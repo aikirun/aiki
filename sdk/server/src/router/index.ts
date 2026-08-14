@@ -4,7 +4,7 @@ import { createTaskRouter } from "./task";
 import { createWorkflowRouter } from "./workflow";
 import { createWorkflowRunRouter, type WorkflowRunRouterDeps } from "./workflow-run";
 import type { ScheduleService } from "../service/schedule";
-import type { TaskStateMachine } from "../service/state-machine/task-state-machine";
+import type { TaskStateMachine } from "../service/state-machine/task";
 import type { TaskService } from "../service/task";
 import type { WorkflowService } from "../service/workflow";
 

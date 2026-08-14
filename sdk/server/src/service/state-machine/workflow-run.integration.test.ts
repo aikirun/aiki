@@ -1,6 +1,6 @@
 import { NotFoundError } from "@aikirun/lib/error";
 
-import { createWorkflowRunStateMachine } from "./workflow-run-state-machine";
+import { createWorkflowRunStateMachine } from "./workflow-run";
 import { describe, expect, test } from "bun:test";
 import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "../../daemon/imminent-sleep-elapsed-runs";

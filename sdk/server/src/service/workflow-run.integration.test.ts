@@ -3,11 +3,8 @@ import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/wo
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 
-import { createTaskStateMachine } from "./state-machine/task-state-machine";
-import {
-	createWorkflowRunStateMachine,
-	type WorkflowRunStateMachine,
-} from "./state-machine/workflow-run-state-machine";
+import { createTaskStateMachine } from "./state-machine/task";
+import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./state-machine/workflow-run";
 import { describe, expect, test } from "bun:test";
 import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";

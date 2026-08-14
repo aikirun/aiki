@@ -9,7 +9,7 @@ import { stallUndeliverableRuns } from "../../daemon/stall-undeliverable-runs";
 import type { Repositories } from "../../infra/db/types";
 import type { DaemonContext, NamespaceRequestContext } from "../../middleware/context";
 import { createChildRunCanceller } from "../../service/cancel-child-runs";
-import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run-state-machine";
+import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
 import { createWorkflowRunService } from "../../service/workflow-run";
 import { withFakeClock } from "../clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../data-factory/middleware/context";

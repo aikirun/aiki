@@ -1,5 +1,5 @@
 import { namespaceAuthedImplementer } from "./implementer";
-import type { TaskStateMachine } from "../service/state-machine/task-state-machine";
+import type { TaskStateMachine } from "../service/state-machine/task";
 import type { TaskService } from "../service/task";
 
 export interface TaskRouterDeps {

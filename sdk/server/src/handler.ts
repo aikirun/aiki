@@ -14,8 +14,8 @@ import { createNamespaceRequestContext, type NamespaceRequestContext } from "./m
 import { createNamespaceAuthedRouter } from "./router/index";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 import { createScheduleService } from "./service/schedule";
-import { createTaskStateMachine } from "./service/state-machine/task-state-machine";
-import { createWorkflowRunStateMachine } from "./service/state-machine/workflow-run-state-machine";
+import { createTaskStateMachine } from "./service/state-machine/task";
+import { createWorkflowRunStateMachine } from "./service/state-machine/workflow-run";
 import { createTaskService } from "./service/task";
 import { createWorkflowService } from "./service/workflow";
 import { createWorkflowRunService } from "./service/workflow-run";

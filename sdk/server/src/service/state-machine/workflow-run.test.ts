@@ -9,7 +9,7 @@ import {
 	type WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
 
-import { assertIsValidWorkflowRunStateTransition, convertDurationToTimestamp } from "./workflow-run-state-machine";
+import { assertIsValidWorkflowRunStateTransition, convertDurationToTimestamp } from "./workflow-run";
 import { describe, expect, test } from "bun:test";
 import { InvalidWorkflowRunStateTransitionError } from "../../errors";
 

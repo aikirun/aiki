@@ -32,7 +32,7 @@ import type {
 import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import type { WorkflowRunStateMachine } from "./state-machine/workflow-run-state-machine";
+import type { WorkflowRunStateMachine } from "./state-machine/workflow-run";
 import { WorkflowRunReferenceConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { ChildWorkflowRunWaitRow } from "../infra/db/types/child-workflow-run-wait";

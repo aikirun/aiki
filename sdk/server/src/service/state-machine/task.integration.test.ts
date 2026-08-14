@@ -1,7 +1,7 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
-import { createTaskStateMachine } from "./task-state-machine";
+import { createTaskStateMachine } from "./task";
 import { describe, expect, test } from "bun:test";
 import { namespaceRequestContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../../testing/harness";

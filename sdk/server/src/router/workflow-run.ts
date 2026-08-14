@@ -2,7 +2,7 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { namespaceAuthedImplementer } from "./implementer";
 import { runConcurrently } from "../lib/concurrency";
-import type { WorkflowRunStateMachine } from "../service/state-machine/workflow-run-state-machine";
+import type { WorkflowRunStateMachine } from "../service/state-machine/workflow-run";
 import type { WorkflowRunService } from "../service/workflow-run";
 import type { WorkflowRunOutboxService } from "../service/workflow-run-outbox";
 

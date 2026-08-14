@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createTaskStateMachine } from "../../service/state-machine/task-state-machine";
+import { createTaskStateMachine } from "../../service/state-machine/task";
 import { createServiceHarness } from "../../testing/harness";
 import { seedCompletedTask, seedRunningTask } from "../../testing/seed/task";
 

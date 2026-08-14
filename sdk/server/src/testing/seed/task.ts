@@ -2,7 +2,7 @@ import { hashInput } from "@aikirun/lib/crypto";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
 import { type SeedRunDeps, seedClaimedRun } from "./run";
-import { createTaskStateMachine } from "../../service/state-machine/task-state-machine";
+import { createTaskStateMachine } from "../../service/state-machine/task";
 import { namespaceRequestContextFactory } from "../data-factory/middleware/context";
 
 const seededTask = {
