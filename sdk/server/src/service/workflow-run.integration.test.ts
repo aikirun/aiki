@@ -1,3 +1,4 @@
+import { hashInput } from "@aikirun/lib/crypto";
 import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
@@ -33,10 +34,13 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 		withHarness(async ({ context, repos }) => {
 			const { service } = createService(repos);
 
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
 			const runId = await service.createWorkflowRun(context, {
 				name: "checkout",
 				versionId: "v1",
-				input: { orderId: "order-1" },
+				input,
+				inputHash,
 				options: { pool: "eu-west" },
 			});
 
@@ -52,7 +56,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					revision: 0,
 					stateTransitionId: expect.any(String),
 					input: { orderId: "order-1" },
-					inputHash: expect.any(String),
+					inputHash,
 					options: { pool: "eu-west" },
 					attempts: 1,
 					tasks: {},
@@ -277,10 +281,12 @@ describe("WorkflowRunService cancelByIds", () => {
 			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
 
 			const { service } = createService(repos);
+			const childInput = { orderId: "order-9" };
 			const childRunId = await service.createWorkflowRun(context, {
 				name: parent.workflowName,
 				versionId: parent.workflowVersionId,
-				input: { orderId: "order-9" },
+				input: childInput,
+				inputHash: await hashInput(childInput),
 				parentWorkflowRunId: parent.runId,
 			});
 
