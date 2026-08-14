@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
+import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 
@@ -7,7 +8,7 @@ import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
-import { task } from "../schema";
+import { stateTransition, task, workflowRun } from "../schema";
 
 export type TaskRow = typeof task.$inferSelect;
 type TaskRowInsert = typeof task.$inferInsert;
@@ -23,13 +24,41 @@ export const createTaskRepository = (db: PgDb) => ({
 		return created;
 	},
 
-	async getById(id: string): Promise<TaskRow | null> {
-		const result = await db.select().from(task).where(eq(task.id, id)).limit(1);
+	async getById(params: { id: string; workflowRunId: string }): Promise<TaskRow | null> {
+		const result = await db
+			.select()
+			.from(task)
+			.where(and(eq(task.id, params.id), eq(task.workflowRunId, params.workflowRunId)))
+			.limit(1);
 		return result[0] ?? null;
 	},
 
-	async update(id: string, updates: TaskRowUpdate): Promise<TaskRow | null> {
-		const result = await db.update(task).set(updates).where(eq(task.id, id)).returning();
+	async getByIdWithState(namespaceId: NamespaceId, id: string) {
+		const result = await db
+			.select({
+				id: task.id,
+				name: task.name,
+				workflowRunId: task.workflowRunId,
+				input: task.input,
+				inputHash: task.inputHash,
+				options: task.options,
+				state: stateTransition.state,
+			})
+			.from(task)
+			.innerJoin(workflowRun, eq(task.workflowRunId, workflowRun.id))
+			.innerJoin(stateTransition, eq(task.latestStateTransitionId, stateTransition.id))
+			.where(and(eq(workflowRun.namespaceId, namespaceId), eq(task.id, id)))
+			.limit(1);
+
+		return result[0] ?? null;
+	},
+
+	async update(filter: { id: string; workflowRunId: string }, updates: TaskRowUpdate): Promise<TaskRow | null> {
+		const result = await db
+			.update(task)
+			.set(updates)
+			.where(and(eq(task.id, filter.id), eq(task.workflowRunId, filter.workflowRunId)))
+			.returning();
 		return result[0] ?? null;
 	},
 
@@ -74,13 +103,16 @@ export const createTaskRepository = (db: PgDb) => ({
 	},
 
 	async bulkDiscard(
-		tasks: NonEmptyArray<{ filter: { id: string }; update: { latestStateTransitionId: string } }>
+		tasks: NonEmptyArray<{
+			filter: { id: string; workflowRunId: string };
+			update: { latestStateTransitionId: string };
+		}>
 	): Promise<void> {
 		const valueRows = tasks.map(({ filter, update }, index) => {
 			if (index === 0) {
-				return sql`(${filter.id}::text, ${update.latestStateTransitionId}::text)`;
+				return sql`(${filter.id}::text, ${filter.workflowRunId}::text, ${update.latestStateTransitionId}::text)`;
 			}
-			return sql`(${filter.id}, ${update.latestStateTransitionId})`;
+			return sql`(${filter.id}, ${filter.workflowRunId}, ${update.latestStateTransitionId})`;
 		});
 
 		await db
@@ -90,8 +122,8 @@ export const createTaskRepository = (db: PgDb) => ({
 				nextAttemptAt: null,
 				latestStateTransitionId: sql`v.state_transition_id`,
 			})
-			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, state_transition_id)`)
-			.where(sql`${task.id} = v.id`);
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, workflow_run_id, state_transition_id)`)
+			.where(sql`${task.id} = v.id AND ${task.workflowRunId} = v.workflow_run_id`);
 	},
 });
 

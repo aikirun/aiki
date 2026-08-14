@@ -7,16 +7,15 @@ export const taskOptionsSchema = type({
 	"retry?": retryStrategySchema,
 });
 
-export const taskStateRunningRequestSchema = type({
+export const taskStateRunningSchema = type({
 	status: "'running'",
 	attempts: "number.integer > 0",
-	"input?": "unknown",
 });
 
-export const taskStateCompletedRequestSchema = type({
+export const taskStateCompletedSchema = type({
 	status: "'completed'",
 	attempts: "number.integer > 0",
-	"output?": "unknown",
+	output: "unknown",
 });
 
 export const taskStateFailedSchema = type({
@@ -25,34 +24,17 @@ export const taskStateFailedSchema = type({
 	error: serializedErrorSchema,
 });
 
-export const taskStateAwaitingRetryRequestSchema = type({
+export const taskStateAwaitingRetrySchema = type({
 	status: "'awaiting_retry'",
 	attempts: "number.integer > 0",
 	error: serializedErrorSchema,
-	nextAttemptInMs: "number.integer > 0",
+	nextAttemptAt: "number > 0",
 });
 
-const nonDiscardedTaskStateSchema = type({
-	status: "'running'",
-	attempts: "number.integer > 0",
-	input: "unknown",
-})
-	.or({
-		status: "'awaiting_retry'",
-		attempts: "number.integer > 0",
-		error: serializedErrorSchema,
-		nextAttemptAt: "number > 0",
-	})
-	.or({
-		status: "'completed'",
-		attempts: "number.integer > 0",
-		output: "unknown",
-	})
-	.or({
-		status: "'failed'",
-		attempts: "number.integer > 0",
-		error: serializedErrorSchema,
-	});
+const nonDiscardedTaskStateSchema = taskStateRunningSchema
+	.or(taskStateAwaitingRetrySchema)
+	.or(taskStateCompletedSchema)
+	.or(taskStateFailedSchema);
 
 export const taskStateSchema = nonDiscardedTaskStateSchema.or({
 	status: "'discarded'",
@@ -64,4 +46,14 @@ export const taskInfoSchema = type({
 	name: "string > 0",
 	state: nonDiscardedTaskStateSchema,
 	inputHash: "string > 0",
+});
+
+export const taskRecordSchema = type({
+	id: "string > 0",
+	name: "string > 0",
+	workflowRunId: "string > 0",
+	"input?": "unknown",
+	inputHash: "string > 0",
+	"options?": taskOptionsSchema.or("undefined"),
+	state: taskStateSchema,
 });

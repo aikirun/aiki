@@ -12,6 +12,7 @@ import type {
 	WorkflowRunStatePaused,
 	WorkflowRunStateScheduled,
 	WorkflowRunStateSleeping,
+	WorkflowRunStateStalled,
 	WorkflowRunStatus,
 	WorkflowStartOptions,
 } from "../workflow/run";
@@ -176,27 +177,23 @@ interface WorkflowRunTransitionStateRequestBase {
 	state: WorkflowRunStateRequest;
 }
 
-export type WorkflowRunStateScheduledRequestOptimistic = Extract<
-	WorkflowRunStateScheduledRequest,
-	{ reason: "event" | "child_workflow" }
->;
+type WorkflowRunStateRequestOptimistic = Exclude<WorkflowRunStateRequest, WorkflowRunStateRequestPessimistic>;
 
-export type WorkflowRunStateScheduledRequestPessimistic = Extract<
-	WorkflowRunStateScheduledRequest,
-	{ reason: "new" | "wakeup_early" | "resumption" | "redelivery" }
->;
+type WorkflowRunStateRequestPessimistic =
+	| Extract<WorkflowRunStateScheduledRequest, { reason: "new" | "wakeup_early" | "resumption" | "redelivery" }>
+	| WorkflowRunStatePaused
+	| WorkflowRunStateStalled
+	| WorkflowRunStateCancelled;
 
 export interface WorkflowRunTransitionStateRequestOptimistic extends WorkflowRunTransitionStateRequestBase {
 	type: "optimistic";
-	state:
-		| WorkflowRunStateScheduledRequestOptimistic
-		| Exclude<WorkflowRunStateRequest, { status: "scheduled" | "paused" | "cancelled" }>;
 	expectedRevision: number;
+	state: WorkflowRunStateRequestOptimistic;
 }
 
 export interface WorkflowRunTransitionStateRequestPessimistic extends WorkflowRunTransitionStateRequestBase {
 	type: "pessimistic";
-	state: WorkflowRunStateScheduledRequestPessimistic | WorkflowRunStatePaused | WorkflowRunStateCancelled;
+	state: WorkflowRunStateRequestPessimistic;
 }
 
 export type WorkflowRunTransitionStateRequestV1 =

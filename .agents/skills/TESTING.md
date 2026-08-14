@@ -90,7 +90,7 @@ Before writing any test, study the exemplars for its tier and match their idioms
   connection, per-test reset, a scriptable fake publisher verified on teardown) and differ only
   in the injected context: `createDaemonHarness` injects a `DaemonContext`,
   `createServiceHarness` a `NamespaceRequestContext`. Pick by the SUT's seam.
-- Seeds (`sdk/server/src/testing/run-seed.ts`) take
+- Seeds (`sdk/server/src/testing/seed/`, one module per domain: `run.ts`, `task.ts`) take
   `{ repos, daemonContext?, namespaceRequestContext?, publisher }`: always feed the context your
   harness injected; the other may be omitted (factory default). Take pure filler data (contexts,
   rows) from the fishery factories under `sdk/server/src/testing/data-factory/`, at the path

@@ -6,7 +6,15 @@ import type {
 	WorkflowRunTransitionTaskStateRequestV1,
 } from "@aikirun/types/api/workflow-run";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
-import type { TaskId, TaskInfo, TaskName, TaskState, TaskStateFailed, TaskStatus } from "@aikirun/types/workflow/task";
+import type {
+	TaskId,
+	TaskInfo,
+	TaskName,
+	TaskState,
+	TaskStateFailed,
+	TaskStateRunning,
+	TaskStatus,
+} from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
 import { InvalidTaskStateTransitionError, WorkflowRunRevisionConflictError } from "../errors";
@@ -84,16 +92,14 @@ async function transitionStateInTx(
 	}
 
 	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
-		const toTaskState = request.taskState;
-		const inputHash = await hashInput(toTaskState.input);
+		const inputHash = await hashInput(request.input);
 		const taskName = request.taskName as TaskName;
 		const taskId = ulid() as TaskId;
 		const stateTransitionId = ulid();
 
-		const taskState: TaskState = {
+		const taskState: TaskStateRunning = {
 			status: "running",
-			attempts: toTaskState.attempts,
-			input: toTaskState.input,
+			attempts: 1,
 		};
 
 		assertIsValidTaskStateTransition(runId, taskName, taskId, undefined, taskState.status);
@@ -104,7 +110,7 @@ async function transitionStateInTx(
 			workflowRunId: runId,
 			status: taskState.status,
 			attempts: taskState.attempts,
-			input: toTaskState.input,
+			input: request.input,
 			inputHash,
 			options: request.options,
 			latestStateTransitionId: stateTransitionId,
@@ -129,7 +135,7 @@ async function transitionStateInTx(
 	}
 
 	const taskId = request.taskId as TaskId;
-	const existingTask = await txRepos.task.getById(taskId);
+	const existingTask = await txRepos.task.getById({ id: taskId, workflowRunId: runId });
 	if (!existingTask) {
 		throw new NotFoundError(`Task not found: ${taskId}`);
 	}
@@ -144,7 +150,6 @@ async function transitionStateInTx(
 			? {
 					status: requestTaskState.status,
 					attempts: requestTaskState.attempts,
-					input: requestTaskState.input,
 				}
 			: requestTaskState.status === "completed"
 				? {
@@ -174,12 +179,15 @@ async function transitionStateInTx(
 		state: taskState,
 	});
 
-	await txRepos.task.update(taskId, {
-		status: taskState.status,
-		attempts: taskState.attempts,
-		latestStateTransitionId: stateTransitionId,
-		nextAttemptAt: taskState.status === "awaiting_retry" ? (taskState.nextAttemptAt as TimestampMs) : null,
-	});
+	await txRepos.task.update(
+		{ id: taskId, workflowRunId: runId },
+		{
+			status: taskState.status,
+			attempts: taskState.attempts,
+			latestStateTransitionId: stateTransitionId,
+			nextAttemptAt: taskState.status === "awaiting_retry" ? (taskState.nextAttemptAt as TimestampMs) : null,
+		}
+	);
 
 	if (taskState.status === "awaiting_retry") {
 		// The workflow run stays in `running` while the task waits for its retry, so the outbox row

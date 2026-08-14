@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
 	entry: {
 		"api/schedule": "src/api/schedule.ts",
+		"api/task": "src/api/task.ts",
 		"api/workflow": "src/api/workflow.ts",
 		"api/workflow-run": "src/api/workflow-run.ts",
 		client: "src/client.ts",

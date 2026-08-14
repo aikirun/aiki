@@ -349,6 +349,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 						targetState.reason === "wakeup_early" ||
 						targetState.reason === "redelivery")) ||
 				targetState.status === "paused" ||
+				targetState.status === "stalled" ||
 				targetState.status === "cancelled"
 			) {
 				response = await this.api.workflowRun.transitionStateV1({

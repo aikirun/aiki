@@ -19,7 +19,10 @@ export async function discardStaleTasks(
 	}
 
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
-	const taskUpdates: Array<{ filter: { id: string }; update: { latestStateTransitionId: string } }> = [];
+	const taskUpdates: Array<{
+		filter: { id: string; workflowRunId: string };
+		update: { latestStateTransitionId: string };
+	}> = [];
 
 	for (const task of staleTasks) {
 		const transitionId = ulid();
@@ -33,7 +36,7 @@ export async function discardStaleTasks(
 			state: { status: "discarded", attempts: task.attempts } satisfies TaskStateDiscarded,
 		});
 		taskUpdates.push({
-			filter: { id: task.id },
+			filter: { id: task.id, workflowRunId: task.workflowRunId },
 			update: { latestStateTransitionId: transitionId },
 		});
 	}

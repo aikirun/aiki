@@ -20,9 +20,8 @@ interface TaskStateBase {
 	attempts: number;
 }
 
-export interface TaskStateRunning<Input> extends TaskStateBase {
+export interface TaskStateRunning extends TaskStateBase {
 	status: "running";
-	input: Input;
 }
 
 export interface TaskStateAwaitingRetry extends TaskStateBase {
@@ -45,8 +44,8 @@ export interface TaskStateDiscarded extends TaskStateBase {
 	status: "discarded";
 }
 
-export type TaskState<Input = unknown, Output = unknown> =
-	| TaskStateRunning<Input>
+export type TaskState<Output = unknown> =
+	| TaskStateRunning
 	| TaskStateAwaitingRetry
 	| TaskStateCompleted<Output>
 	| TaskStateFailed
@@ -59,6 +58,16 @@ export interface TaskInfo {
 	inputHash: string;
 }
 
+export interface TaskRecord<Input = unknown, Output = unknown> {
+	id: string;
+	name: string;
+	workflowRunId: string;
+	input?: Input;
+	inputHash: string;
+	options?: TaskStartOptions;
+	state: TaskState<Output>;
+}
+
 export interface TransitionTaskStateBase {
 	id: string;
 	expectedWorkflowRunRevision: number;
@@ -68,17 +77,16 @@ export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateB
 	type: "create";
 	taskName: string;
 	options?: TaskStartOptions;
-	taskState: TaskStateRunningRequest;
+	input?: unknown;
+	taskState: Omit<TaskStateRunning, "attempts">;
 }
 
 export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
 	type: "retry";
 	taskId: string;
 	options?: TaskStartOptions;
-	taskState: TaskStateRunningRequest;
+	taskState: TaskStateRunning;
 }
-
-export type TaskStateRunningRequest = OptionalProp<TaskStateRunning<unknown>, "input">;
 
 export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
 	taskId: string;

@@ -153,7 +153,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			type: "create",
 			taskName: this.name,
 			options: startOptions,
-			taskState: { status: "running", attempts, input },
+			input,
+			taskState: { status: "running" },
 		});
 
 		const logger = run.logger.child({
@@ -254,7 +255,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			type: "retry",
 			taskId,
 			options: startOptions,
-			taskState: { status: "running", attempts, input },
+			taskState: { status: "running", attempts },
 		});
 
 		const logger = run.logger.child({

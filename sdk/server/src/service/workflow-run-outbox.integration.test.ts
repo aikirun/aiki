@@ -7,7 +7,7 @@ import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
 import { daemonContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { claimRun, seedClaimedRun, seedPooledQueuedRun, seedPublishedRun, seedQueuedRun } from "../testing/run-seed";
+import { claimRun, seedClaimedRun, seedPooledQueuedRun, seedPublishedRun, seedQueuedRun } from "../testing/seed/run";
 
 const withHarness = createServiceHarness();
 

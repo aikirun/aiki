@@ -1,17 +1,17 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
-import { withFakeClock } from "./clock";
-import { daemonContextFactory, namespaceRequestContextFactory } from "./data-factory/middleware/context";
-import { defaultServerRuntimeConfig } from "../config/runtime";
-import { processImminentScheduledRuns } from "../daemon/imminent-scheduled-runs";
-import { publishPendingOutboxEntries } from "../daemon/publish-pending-outbox-entries";
-import { stallUndeliverableRuns } from "../daemon/stall-undeliverable-runs";
-import type { Repositories } from "../infra/db/types";
-import type { DaemonContext, NamespaceRequestContext } from "../middleware/context";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
-import { createWorkflowRunService } from "../service/workflow-run";
-import { createWorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
+import { defaultServerRuntimeConfig } from "../../config/runtime";
+import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-runs";
+import { publishPendingOutboxEntries } from "../../daemon/publish-pending-outbox-entries";
+import { stallUndeliverableRuns } from "../../daemon/stall-undeliverable-runs";
+import type { Repositories } from "../../infra/db/types";
+import type { DaemonContext, NamespaceRequestContext } from "../../middleware/context";
+import { createChildRunCanceller } from "../../service/cancel-child-runs";
+import { createWorkflowRunService } from "../../service/workflow-run";
+import { createWorkflowRunStateMachineService } from "../../service/workflow-run-state-machine";
+import { withFakeClock } from "../clock";
+import { daemonContextFactory, namespaceRequestContextFactory } from "../data-factory/middleware/context";
 
 const seededWorkflow = { source: "user", name: "ship-orders", versionId: "v2" } as const;
 
@@ -28,7 +28,7 @@ function createServices(repos: Repositories) {
 	return { workflowRun, workflowRunStateMachine };
 }
 
-interface SeedRunDeps {
+export interface SeedRunDeps {
 	repos: Repositories;
 	daemonContext?: DaemonContext;
 	namespaceRequestContext?: NamespaceRequestContext;

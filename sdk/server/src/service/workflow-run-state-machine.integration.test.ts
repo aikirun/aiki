@@ -10,7 +10,7 @@ import { createWorkflowRunStateMachineService } from "../service/workflow-run-st
 import { withFakeClock } from "../testing/clock";
 import { daemonContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { claimRun, seedClaimedRun, seedScheduledRun, seedStalledRun } from "../testing/run-seed";
+import { claimRun, seedClaimedRun, seedScheduledRun, seedStalledRun } from "../testing/seed/run";
 
 const withHarness = createServiceHarness();
 
@@ -143,7 +143,8 @@ describe("WorkflowRunStateMachineService transition preconditions", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
-					state: { status: "stalled" },
+					// A running run may only be re-queued for a task_retry reason.
+					state: { status: "queued", reason: "wakeup" },
 					// The revision is correct: the transition itself is the only fault.
 					expectedRevision: revisionWhenClaimed,
 				})

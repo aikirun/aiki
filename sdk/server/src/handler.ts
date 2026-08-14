@@ -14,6 +14,7 @@ import { createNamespaceRequestContext, type NamespaceRequestContext } from "./m
 import { createNamespaceAuthedRouter } from "./router/index";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 import { createScheduleService } from "./service/schedule";
+import { createTaskService } from "./service/task";
 import { createTaskStateMachineService } from "./service/task-state-machine";
 import { createWorkflowService } from "./service/workflow";
 import { createWorkflowRunService } from "./service/workflow-run";
@@ -48,12 +49,14 @@ export async function createHandler(params: CreateHandlerParams) {
 	});
 	const workflowService = createWorkflowService({ repos });
 	const scheduleService = createScheduleService({ repos });
+	const taskService = createTaskService({ repos });
 	const workflowRunOutboxService = createWorkflowRunOutboxService({ repos });
 
 	const namespaceAuthedRouter = createNamespaceAuthedRouter({
 		workflowRunService,
 		workflowRunStateMachineService,
 		taskStateMachineService,
+		taskService,
 		workflowService,
 		scheduleService,
 		workflowRunOutboxService,
