@@ -569,6 +569,9 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result;
 	},
 
+	// Sets the pointer for whatever run ids it is given, with no guard of its own.
+	// Call it in the same transaction as the guarded bulk transition that returned these ids:
+	// that transition's row locks keep the runs unchanged until this write commits with it.
 	async bulkSetLatestStateTransitionId(runs: NonEmptyArray<{ id: string; stateTransitionId: string }>): Promise<void> {
 		const valueRows = runs.map((run, index) => {
 			if (index === 0) {

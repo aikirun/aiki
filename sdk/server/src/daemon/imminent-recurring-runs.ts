@@ -17,6 +17,7 @@ import { ulid } from "ulidx";
 
 import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { Repositories } from "../infra/db/types";
+import type { ScheduleOccurrenceUpdate } from "../infra/db/types/schedule";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
@@ -146,7 +147,7 @@ async function processOverlapAllowSchedules(
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
-	const scheduleUpdates: { id: string; lastOccurrence: TimestampMs; nextRunAt: TimestampMs }[] = [];
+	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
 		const occurrences = getDueOccurrences(schedule, now);
@@ -197,9 +198,11 @@ async function processOverlapAllowSchedules(
 		// biome-ignore lint/style/noNonNullAssertion: isNonEmptyArray guarantees at least one element
 		const lastOccurrence = occurrences.at(-1)!;
 		scheduleUpdates.push({
-			id: schedule.id,
-			lastOccurrence: lastOccurrence as TimestampMs,
-			nextRunAt: getNextOccurrence(schedule.spec, lastOccurrence) as TimestampMs,
+			filter: { id: schedule.id, nextRunAt: schedule.nextRunAt as TimestampMs },
+			update: {
+				lastOccurrence: lastOccurrence as TimestampMs,
+				nextRunAt: getNextOccurrence(schedule.spec, lastOccurrence) as TimestampMs,
+			},
 		});
 	}
 
@@ -237,7 +240,7 @@ async function processOverlapSkipSchedules(
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
-	const scheduleUpdates: { id: string; lastOccurrence?: TimestampMs; nextRunAt: TimestampMs }[] = [];
+	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
 		const occurrences = getDueOccurrences(schedule, now);
@@ -248,8 +251,8 @@ async function processOverlapSkipSchedules(
 
 		if (activeRunsByScheduleId.has(schedule.id)) {
 			scheduleUpdates.push({
-				id: schedule.id,
-				nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
+				filter: { id: schedule.id, nextRunAt: schedule.nextRunAt as TimestampMs },
+				update: { nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs },
 			});
 			continue;
 		}
@@ -292,9 +295,11 @@ async function processOverlapSkipSchedules(
 			status: "pending",
 		});
 		scheduleUpdates.push({
-			id: schedule.id,
-			lastOccurrence: occurrence as TimestampMs,
-			nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
+			filter: { id: schedule.id, nextRunAt: schedule.nextRunAt as TimestampMs },
+			update: {
+				lastOccurrence: occurrence as TimestampMs,
+				nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
+			},
 		});
 	}
 
@@ -335,7 +340,7 @@ async function processOverlapCancelPreviousSchedules(
 	const newWorkflowRunEntries: WorkflowRunRowInsert[] = [];
 	const newRunStateTransitionEntries: StateTransitionRowInsert[] = [];
 	const newOutboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
-	const scheduleUpdates: { id: string; lastOccurrence: TimestampMs; nextRunAt: TimestampMs }[] = [];
+	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
 		const occurrences = getDueOccurrences(schedule, now);
@@ -391,9 +396,11 @@ async function processOverlapCancelPreviousSchedules(
 			status: "pending",
 		});
 		scheduleUpdates.push({
-			id: schedule.id,
-			lastOccurrence: occurrence as TimestampMs,
-			nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
+			filter: { id: schedule.id, nextRunAt: schedule.nextRunAt as TimestampMs },
+			update: {
+				lastOccurrence: occurrence as TimestampMs,
+				nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
+			},
 		});
 	}
 
