@@ -6,9 +6,10 @@ import type {
 	TaskSetStateRequestV1,
 } from "@aikirun/types/api/task";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
-import type { TaskRecord, TaskState, TaskStateRunning } from "@aikirun/types/workflow/task";
+import type { TaskId, TaskRecord, TaskState, TaskStateRunning } from "@aikirun/types/workflow/task";
 import { monotonicFactory, ulid } from "ulidx";
 
+import { TaskStateConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 
@@ -153,12 +154,23 @@ async function setExistingTaskStateInTx(
 		attempt: state.attempts,
 		state: state,
 	});
-	await txRepos.task.update(
-		{ id: existingTaskRow.id, workflowRunId: runId },
+	const updatedTask = await txRepos.task.update(
+		{
+			id: existingTaskRow.id,
+			workflowRunId: runId,
+			status: existingTaskRow.status,
+			attempts: existingTaskRow.attempts,
+		},
 		{
 			status: state.status,
 			attempts: state.attempts,
 			latestStateTransitionId: transitionId,
 		}
 	);
+	if (!updatedTask) {
+		throw new TaskStateConflictError(runId, existingTaskRow.id as TaskId, {
+			status: existingTaskRow.status,
+			attempts: existingTaskRow.attempts,
+		});
+	}
 }

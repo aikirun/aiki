@@ -5,6 +5,7 @@ import {
 	InvalidTaskStateTransitionError,
 	InvalidWorkflowRunStateTransitionError,
 	ScheduleConflictError,
+	TaskStateConflictError,
 	WorkflowRunReferenceConflictError,
 	WorkflowRunRevisionConflictError,
 } from "../errors";
@@ -41,6 +42,10 @@ export function handleError<T extends RequestContext>({ logger }: T, err: unknow
 
 	if (err instanceof ScheduleConflictError) {
 		throw new ORPCError("SCHEDULE_CONFLICT", { message: err.message, status: 409 });
+	}
+
+	if (err instanceof TaskStateConflictError) {
+		throw new ORPCError("TASK_STATE_CONFLICT", { message: err.message, status: 409 });
 	}
 
 	if (err instanceof InvalidWorkflowRunStateTransitionError) {
