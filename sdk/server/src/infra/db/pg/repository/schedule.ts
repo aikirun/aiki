@@ -31,6 +31,10 @@ type ScheduleRowUpdate = Partial<
 		| "workflowId"
 	>
 >;
+export interface ScheduleOccurrenceUpdate {
+	filter: { id: string; nextRunAt: TimestampMs };
+	update: { lastOccurrence?: TimestampMs; nextRunAt: TimestampMs };
+}
 
 export const createScheduleRepository = (db: PgDb) => ({
 	async create(input: ScheduleRowInsert): Promise<ScheduleRow> {
@@ -70,34 +74,39 @@ export const createScheduleRepository = (db: PgDb) => ({
 		return result[0] ?? null;
 	},
 
-	async bulkUpdateOccurrence(
-		entries: NonEmptyArray<{ id: string; lastOccurrence?: TimestampMs; nextRunAt: TimestampMs }>
-	): Promise<void> {
-		const valueRows = entries.map((entry, index) => {
-			const lastOccurrenceIso = entry.lastOccurrence ? new Date(entry.lastOccurrence).toISOString() : null;
-			const nextRunAtIso = new Date(entry.nextRunAt).toISOString();
+	async bulkUpdateOccurrence(entries: NonEmptyArray<ScheduleOccurrenceUpdate>): Promise<void> {
+		const valueRows = entries.map(({ filter, update }, index) => {
+			const expectedNextRunAtIso = new Date(filter.nextRunAt).toISOString();
+			const lastOccurrenceIso = update.lastOccurrence ? new Date(update.lastOccurrence).toISOString() : null;
+			const nextRunAtIso = new Date(update.nextRunAt).toISOString();
 			if (index === 0) {
-				return sql`(${entry.id}::text, ${nextRunAtIso}::timestamptz, ${lastOccurrenceIso}::timestamptz)`;
+				return sql`(${filter.id}::text, ${expectedNextRunAtIso}::timestamptz, ${lastOccurrenceIso}::timestamptz, ${nextRunAtIso}::timestamptz)`;
 			}
-			return sql`(${entry.id}, ${nextRunAtIso}, ${lastOccurrenceIso})`;
+			return sql`(${filter.id}, ${expectedNextRunAtIso}, ${lastOccurrenceIso}, ${nextRunAtIso})`;
 		});
 
+		// The update applies only while nextRunAt still holds the value the caller read.
+		// Every occurrence advance changes nextRunAt, so an update built from an outdated
+		// read matches nothing.
 		await db
 			.update(schedule)
 			.set({
 				nextRunAt: sql`v.next_run_at`,
 				lastOccurrence: sql`COALESCE(v.last_occurrence, ${schedule.lastOccurrence})`,
 			})
-			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, next_run_at, last_occurrence)`)
-			.where(sql`${schedule.id} = v.id`);
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, expected_next_run_at, last_occurrence, next_run_at)`)
+			.where(sql`${schedule.id} = v.id AND ${schedule.nextRunAt} = v.expected_next_run_at`);
 	},
 
 	async get(
 		namespaceId: NamespaceId,
-		filter: { definitionHash?: string; referenceId?: string | null }
+		filter: { id?: string; definitionHash?: string; referenceId?: string | null }
 	): Promise<ScheduleRow | null> {
 		const conditions = [eq(schedule.namespaceId, namespaceId)];
 
+		if (filter.id) {
+			conditions.push(eq(schedule.id, filter.id));
+		}
 		if (filter.definitionHash) {
 			conditions.push(eq(schedule.definitionHash, filter.definitionHash));
 		}

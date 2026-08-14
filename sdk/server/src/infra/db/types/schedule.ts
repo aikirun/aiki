@@ -1,1 +1,1 @@
-export type { ScheduleRepository, ScheduleRow } from "../pg/repository/schedule";
+export type { ScheduleOccurrenceUpdate, ScheduleRepository, ScheduleRow } from "../pg/repository/schedule";
