@@ -366,6 +366,7 @@ async function createSchedule(
 		status: "active",
 		type: spec.type,
 		cronExpression: spec.type === "cron" ? spec.expression : null,
+		cronTimezone: spec.type === "cron" ? (spec.timezone ?? null) : null,
 		intervalMs: spec.type === "interval" ? spec.everyMs : null,
 		overlapPolicy: spec.overlapPolicy ?? null,
 		workflowRunInput: params.workflowRunInput,
@@ -382,18 +383,7 @@ export function scheduleRowToDomain(
 	schedule: ScheduleRow,
 	workflow: { workflowSource: WorkflowSource; workflowName: string; workflowVersionId: string }
 ): Schedule {
-	const spec: ScheduleSpec =
-		schedule.type === "cron"
-			? {
-					type: "cron",
-					expression: schedule.cronExpression ?? "",
-					overlapPolicy: schedule.overlapPolicy ?? undefined,
-				}
-			: {
-					type: "interval",
-					everyMs: schedule.intervalMs ?? 0,
-					overlapPolicy: schedule.overlapPolicy ?? undefined,
-				};
+	const spec = toScheduleSpec(schedule);
 
 	return {
 		id: schedule.id,
@@ -412,4 +402,27 @@ export function scheduleRowToDomain(
 		lastOccurrence: schedule.lastOccurrence ?? undefined,
 		nextRunAt: schedule.nextRunAt ?? 0,
 	};
+}
+
+function toScheduleSpec(schedule: ScheduleRow): ScheduleSpec {
+	const overlapPolicy = schedule.overlapPolicy ?? undefined;
+
+	if (schedule.type === "cron") {
+		if (schedule.cronExpression === null) {
+			throw new Error(`Cron schedule has no expression: ${schedule.id}`);
+		}
+		return {
+			type: "cron",
+			expression: schedule.cronExpression,
+			timezone: schedule.cronTimezone ?? undefined,
+			overlapPolicy,
+		};
+	}
+
+	schedule.type satisfies "interval";
+
+	if (schedule.intervalMs === null) {
+		throw new Error(`Interval schedule has no interval: ${schedule.id}`);
+	}
+	return { type: "interval", everyMs: schedule.intervalMs, overlapPolicy };
 }

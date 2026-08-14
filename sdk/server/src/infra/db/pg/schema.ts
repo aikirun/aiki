@@ -89,6 +89,7 @@ export const schedule = pgTable(
 
 		type: scheduleTypeEnum("type").notNull(),
 		cronExpression: text("cron_expression"),
+		cronTimezone: text("cron_timezone"),
 		intervalMs: integer("interval_ms"),
 		overlapPolicy: scheduleOverlapPolicyEnum("overlap_policy"),
 
@@ -119,6 +120,10 @@ export const schedule = pgTable(
 		index("idx_schedule_namespace_workflow").on(table.namespaceId, table.workflowId),
 		// TODO: how to prevent certain namespaces from starving others
 		index("idx_schedule_status_next_run_at_id").on(table.status, table.nextRunAt, table.id),
+		check(
+			"chk_schedule_spec_matches_type",
+			sql`(${table.type} = 'cron' AND ${table.cronExpression} IS NOT NULL AND ${table.intervalMs} IS NULL) OR (${table.type} = 'interval' AND ${table.intervalMs} > 0 AND ${table.cronExpression} IS NULL AND ${table.cronTimezone} IS NULL)`
+		),
 	]
 );
 
