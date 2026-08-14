@@ -53,6 +53,24 @@ export class InvalidTaskStateTransitionError extends Error {
 	}
 }
 
+export class TaskStateConflictError extends Error {
+	public readonly workflowRunId: WorkflowRunId;
+	public readonly taskId: TaskId;
+	public readonly expectedStatus: TaskStatus;
+	public readonly expectedAttempts: number;
+
+	constructor(workflowRunId: WorkflowRunId, taskId: TaskId, expected: { status: TaskStatus; attempts: number }) {
+		super(
+			`State conflict for task ${taskId}: expected ${expected.status} with attempts ${expected.attempts} (workflow ${workflowRunId})`
+		);
+		this.name = "TaskStateConflictError";
+		this.workflowRunId = workflowRunId;
+		this.taskId = taskId;
+		this.expectedStatus = expected.status;
+		this.expectedAttempts = expected.attempts;
+	}
+}
+
 export class ScheduleConflictError extends Error {
 	public readonly definitionHash: string;
 	public readonly referenceId?: string;

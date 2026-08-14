@@ -1,5 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import { isNonEmptyArray } from "@aikirun/lib/collection/array";
+import { asNonEmptyArray, isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TaskStateDiscarded } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
@@ -18,33 +18,40 @@ export async function discardStaleTasks(
 		return;
 	}
 
-	const stateTransitionEntries: StateTransitionRowInsert[] = [];
-	const taskUpdates: Array<{
-		filter: { id: string; workflowRunId: string };
-		update: { latestStateTransitionId: string };
-	}> = [];
-
-	for (const task of staleTasks) {
-		const transitionId = ulid();
-		stateTransitionEntries.push({
-			id: transitionId,
-			workflowRunId: task.workflowRunId,
-			type: "task",
-			taskId: task.id,
-			status: "discarded",
-			attempt: task.attempts,
-			state: { status: "discarded", attempts: task.attempts } satisfies TaskStateDiscarded,
-		});
-		taskUpdates.push({
-			filter: { id: task.id, workflowRunId: task.workflowRunId },
-			update: { latestStateTransitionId: transitionId },
-		});
-	}
-
-	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(taskUpdates)) {
+	const taskUpdatesById = new Map(
+		staleTasks.map((task) => [
+			task.id,
+			{
+				filter: { id: task.id, workflowRunId: task.workflowRunId, status: task.status, attempts: task.attempts },
+				update: { latestStateTransitionId: ulid() },
+			},
+		])
+	);
+	const taskUpdates = Array.from(taskUpdatesById.values());
+	const discardedTaskIds = await txRepos.task.bulkDiscard(asNonEmptyArray(taskUpdates));
+	if (!isNonEmptyArray(discardedTaskIds)) {
 		return;
 	}
 
-	await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-	await txRepos.task.bulkDiscard(taskUpdates);
+	const stateTransitionEntries: StateTransitionRowInsert[] = [];
+
+	for (const discardedTaskId of discardedTaskIds) {
+		const taskUpdate = taskUpdatesById.get(discardedTaskId);
+		if (!taskUpdate) {
+			continue;
+		}
+		stateTransitionEntries.push({
+			id: taskUpdate.update.latestStateTransitionId,
+			workflowRunId: taskUpdate.filter.workflowRunId,
+			type: "task",
+			taskId: discardedTaskId,
+			status: "discarded",
+			attempt: taskUpdate.filter.attempts,
+			state: { status: "discarded", attempts: taskUpdate.filter.attempts } satisfies TaskStateDiscarded,
+		});
+	}
+
+	if (isNonEmptyArray(stateTransitionEntries)) {
+		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+	}
 }

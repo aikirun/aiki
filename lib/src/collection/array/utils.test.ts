@@ -1,4 +1,4 @@
-import { chunkLazy, groupBy, isNonEmptyArray, partitionArray, shuffleArray } from "./utils";
+import { asNonEmptyArray, chunkLazy, groupBy, isNonEmptyArray, partitionArray, shuffleArray } from "./utils";
 import { describe, expect, spyOn, test } from "bun:test";
 
 describe("isNonEmptyArray", () => {
@@ -16,6 +16,12 @@ describe("isNonEmptyArray", () => {
 
 	test("returns false for undefined", () => {
 		expect(isNonEmptyArray(undefined)).toBe(false);
+	});
+});
+
+describe("asNonEmptyArray", () => {
+	test("returns array unchanged", () => {
+		expect(asNonEmptyArray([1, 2, 3])).toEqual([1, 2, 3]);
 	});
 });
 
