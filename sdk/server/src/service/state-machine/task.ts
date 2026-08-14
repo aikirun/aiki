@@ -81,7 +81,7 @@ async function transitionStateInTx(
 	txRepos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
 ): Promise<TaskInfo> {
 	const runId = request.workflowRunId as WorkflowRunId;
-	const run = await txRepos.workflowRun.getById(namespaceId, runId);
+	const run = await txRepos.workflowRun.getById({ namespaceId, id: runId });
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}

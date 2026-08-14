@@ -23,7 +23,7 @@ import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workfl
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import { computeRank } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
-import type { CancelledParentRun, ChildRunCanceller } from "../service/cancel-child-runs";
+import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "../service/schedule";
 
@@ -416,9 +416,10 @@ async function processOverlapCancelPreviousSchedules(
 		// we should only insert cancellation state transitions if the cancellation occurred, otherwise, we'll have dangling transitions
 
 		// Step 1: Cancel active runs (without setting latestStateTransitionId)
-		const cancelledRunIds = isNonEmptyArray(runIdsToCancel)
-			? await txRepos.workflowRun.bulkTransitionToCancelledGlobal(context, runIdsToCancel)
+		const cancelledRuns = isNonEmptyArray(runIdsToCancel)
+			? await txRepos.workflowRun.bulkTransitionToCancelled(context, runIdsToCancel)
 			: [];
+		const cancelledRunIds = cancelledRuns.map((run) => run.id);
 
 		// Step 2: Discard in-flight tasks and outbox entries for the cancelled runs, then insert
 		// cancel state transitions only for actually cancelled runs and set latestStateTransitionId
@@ -429,8 +430,11 @@ async function processOverlapCancelPreviousSchedules(
 
 			const cancelledRunIdsSet = new Set(cancelledRunIds);
 			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
-			const cancelledRunStateTransitionIdUpdates: { id: string; stateTransitionId: string }[] = [];
-			const cancelledRuns: CancelledParentRun[] = [];
+			const cancelledRunStateTransitionIdUpdates: {
+				filter: { namespaceId: NamespaceId; id: string };
+				update: { stateTransitionId: string };
+			}[] = [];
+			const cancelledRuns: CancelledRunMeta[] = [];
 
 			for (const run of runsToCancel) {
 				if (!cancelledRunIdsSet.has(run.id)) {
@@ -445,8 +449,11 @@ async function processOverlapCancelPreviousSchedules(
 					attempt: run.attempts,
 					state: { status: "cancelled", reason: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
 				});
-				cancelledRunStateTransitionIdUpdates.push({ id: run.id, stateTransitionId });
-				cancelledRuns.push({ namespaceId: run.namespaceId, runId: run.id, pool: run.pool });
+				cancelledRunStateTransitionIdUpdates.push({
+					filter: { namespaceId: run.namespaceId, id: run.id },
+					update: { stateTransitionId },
+				});
+				cancelledRuns.push({ namespaceId: run.namespaceId, id: run.id, pool: run.pool });
 			}
 
 			if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionIdUpdates)) {
@@ -478,7 +485,7 @@ async function fetchActiveRunsBySchedule(
 	repos: ProcessImminentRecurringRunsDeps["repos"],
 	schedules: NonEmptyArray<DueSchedule>
 ) {
-	const workflowAndReferenceIdPairs: { workflowId: string; referenceId: string }[] = [];
+	const workflowAndReferenceIdPairs: { namespaceId: NamespaceId; workflowId: string; referenceId: string }[] = [];
 	const schedulesByWorkflowAndReferenceId = new Map<string, Map<string, DueSchedule>>();
 
 	for (const schedule of schedules) {
@@ -486,7 +493,11 @@ async function fetchActiveRunsBySchedule(
 			continue;
 		}
 		const referenceId = getReferenceId(schedule.id, schedule.lastOccurrence);
-		workflowAndReferenceIdPairs.push({ workflowId: schedule.workflowId, referenceId });
+		workflowAndReferenceIdPairs.push({
+			namespaceId: schedule.namespaceId,
+			workflowId: schedule.workflowId,
+			referenceId,
+		});
 
 		let schedulesByReferenceId = schedulesByWorkflowAndReferenceId.get(schedule.workflowId);
 		if (!schedulesByReferenceId) {

@@ -102,7 +102,7 @@ export async function queueRetryableTasks(
 	const { chunkSize = runs.length } = options ?? {};
 
 	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId))) as NonEmptyArray<string>;
-	const workflows = await repos.workflow.getByIdsGlobal(context, workflowIds);
+	const workflows = await repos.workflow.getByIds(context, workflowIds);
 	const workflowsById = new Map(workflows.map((workflow) => [workflow.id, workflow]));
 
 	await runConcurrently(context, chunkLazy(runs, chunkSize), async (chunk, spanCtx) => {
@@ -172,7 +172,7 @@ async function processChunk(
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsertPending[] = await repos.transaction(async (txRepos) => {
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("running", workflowRunUpdates);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(context, "running", workflowRunUpdates);
 		if (!isNonEmptyArray(transitionedRunIds)) {
 			return [];
 		}

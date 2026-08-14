@@ -2,9 +2,10 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TaskStatus } from "@aikirun/types/workflow/task";
-import { and, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
+import { and, count, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
+import { toTaskState } from "./state-transition";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
@@ -72,14 +73,22 @@ export const createTaskRepository = (db: PgDb) => ({
 		return result[0] ?? null;
 	},
 
-	async listByWorkflowRunId(workflowRunId: string): Promise<TaskRow[]> {
+	async listByWorkflowRunIdWithState(workflowRunId: string) {
 		// TODO: explore loading in chunks
-		return db
-			.select()
+		const rows = await db
+			.select({
+				id: task.id,
+				name: task.name,
+				inputHash: task.inputHash,
+				state: stateTransition.state,
+			})
 			.from(task)
+			.innerJoin(stateTransition, eq(task.latestStateTransitionId, stateTransition.id))
 			.where(and(eq(task.workflowRunId, workflowRunId), ne(task.status, "discarded")))
 			.orderBy(task.id)
 			.limit(10_000);
+
+		return rows.map((row) => ({ ...row, state: toTaskState(row.state) }));
 	},
 
 	async listRetryableTasks(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: KeysetStreamCursor) {
@@ -107,6 +116,29 @@ export const createTaskRepository = (db: PgDb) => ({
 			.select({ id: task.id, workflowRunId: task.workflowRunId, attempts: task.attempts, status: task.status })
 			.from(task)
 			.where(and(runIdsFilter, inArray(task.status, statuses)));
+	},
+
+	async countByWorkflowRunIds(workflowRunIds: NonEmptyArray<string>): Promise<Map<string, Record<TaskStatus, number>>> {
+		const rows = await db
+			.select({
+				workflowRunId: task.workflowRunId,
+				status: task.status,
+				count: count(),
+			})
+			.from(task)
+			.where(inArray(task.workflowRunId, workflowRunIds))
+			.groupBy(task.workflowRunId, task.status);
+
+		const result = new Map<string, Record<TaskStatus, number>>();
+		for (const row of rows) {
+			let taskCounts = result.get(row.workflowRunId);
+			if (!taskCounts) {
+				taskCounts = { completed: 0, running: 0, failed: 0, awaiting_retry: 0, discarded: 0 };
+				result.set(row.workflowRunId, taskCounts);
+			}
+			taskCounts[row.status] = row.count;
+		}
+		return result;
 	},
 
 	async bulkDiscard(

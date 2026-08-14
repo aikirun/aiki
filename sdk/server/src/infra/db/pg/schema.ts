@@ -170,7 +170,7 @@ export const workflowRun = pgTable(
 		index("idx_workflow_run_workflow_id").on(table.workflowId, table.id),
 		index("idx_workflow_run_workflow_status_id").on(table.workflowId, table.status, table.id),
 
-		index("idx_workflow_run_schedule").on(table.scheduleId),
+		index("idx_workflow_run_schedule_namespace").on(table.scheduleId, table.namespaceId),
 		index("idx_workflow_run_parent_workflow_run_status").on(table.parentWorkflowRunId, table.status),
 
 		// TODO: will adding an index on input hash make conflict resolution faster?

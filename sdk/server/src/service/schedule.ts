@@ -237,7 +237,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 		if (!result) {
 			throw new NotFoundError(`Schedule not found: ${id}`);
 		}
-		const runCount = await repos.workflowRun.getRunCount(result.schedule.id);
+		const runCount = await repos.workflowRun.getRunCount(namespaceId, result.schedule.id);
 		return { schedule: scheduleRowToDomain(result.schedule, result.workflow), runCount };
 	},
 
@@ -246,7 +246,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 		if (!result) {
 			throw new NotFoundError(`Schedule not found with referenceId: ${referenceId}`);
 		}
-		const runCount = await repos.workflowRun.getRunCount(result.schedule.id);
+		const runCount = await repos.workflowRun.getRunCount(namespaceId, result.schedule.id);
 		return { schedule: scheduleRowToDomain(result.schedule, result.workflow), runCount };
 	},
 
@@ -281,7 +281,7 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 		if (!isNonEmptyArray(scheduleIds)) {
 			return { schedules: [], total };
 		}
-		const runCountsByScheduleId = await repos.workflowRun.getRunCounts(scheduleIds);
+		const runCountsByScheduleId = await repos.workflowRun.getRunCounts(namespaceId, scheduleIds);
 
 		return {
 			schedules: schedules.map(({ schedule, workflow }) => ({

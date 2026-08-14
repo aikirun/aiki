@@ -1,5 +1,6 @@
 import { streamChunks } from "@aikirun/lib/async";
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStateStalled } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
@@ -39,19 +40,21 @@ export async function stallUndeliverableRuns(
 
 export async function stallByRunIds(context: DaemonContext, repos: Repos, runIds: NonEmptyArray<string>) {
 	return repos.transaction(async (txRepos) => {
-		const stalledRunIds = await txRepos.workflowRun.bulkTransitionToStalled(runIds);
-		if (!isNonEmptyArray(stalledRunIds)) {
+		const stalledRuns = await txRepos.workflowRun.bulkTransitionToStalled(context, runIds);
+		if (!isNonEmptyArray(stalledRuns)) {
 			return [];
 		}
+		const stalledRunIds = stalledRuns.map((run) => run.id) as NonEmptyArray<string>;
 
 		await discardStaleTasks(stalledRunIds, ["running", "awaiting_retry"], txRepos);
 
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(stalledRunIds);
 
-		const stalledRuns = await txRepos.workflowRun.getByIdsGlobal(context, stalledRunIds);
-
 		const stallStateTransitionEntries: StateTransitionRowInsert[] = [];
-		const stalledRunStateTransitionUpdates: { id: string; stateTransitionId: string }[] = [];
+		const stalledRunStateTransitionUpdates: {
+			filter: { namespaceId: NamespaceId; id: string };
+			update: { stateTransitionId: string };
+		}[] = [];
 
 		for (const run of stalledRuns) {
 			const stateTransitionId = ulid();
@@ -63,7 +66,10 @@ export async function stallByRunIds(context: DaemonContext, repos: Repos, runIds
 				attempt: run.attempts,
 				state: { status: "stalled" } satisfies WorkflowRunStateStalled,
 			});
-			stalledRunStateTransitionUpdates.push({ id: run.id, stateTransitionId });
+			stalledRunStateTransitionUpdates.push({
+				filter: { namespaceId: run.namespaceId as NamespaceId, id: run.id },
+				update: { stateTransitionId },
+			});
 		}
 
 		if (isNonEmptyArray(stallStateTransitionEntries) && isNonEmptyArray(stalledRunStateTransitionUpdates)) {

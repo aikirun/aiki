@@ -148,6 +148,13 @@
 			"when": 1786719233638,
 			"tag": "0020_flowery_scarecrow",
 			"breakpoints": true
+		},
+		{
+			"idx": 21,
+			"version": "7",
+			"when": 1786738190034,
+			"tag": "0021_bumpy_songbird",
+			"breakpoints": true
 		}
 	]
 }

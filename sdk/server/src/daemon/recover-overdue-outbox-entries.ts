@@ -1,6 +1,7 @@
 import { streamChunks } from "@aikirun/lib/async";
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
+import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
@@ -52,11 +53,14 @@ export async function recoverOverdueOutboxEntries(
 		}
 
 		await repos.transaction(async (txRepos) => {
-			const releasedRuns = await txRepos.workflowRun.bulkReleaseToQueued(runIds);
+			const releasedRuns = await txRepos.workflowRun.bulkReleaseToQueued(context, runIds);
 
 			if (isNonEmptyArray(releasedRuns)) {
 				const stateTransitionEntries: StateTransitionRowInsert[] = [];
-				const stateTransitionUpdates: { id: string; stateTransitionId: string }[] = [];
+				const stateTransitionUpdates: {
+					filter: { namespaceId: NamespaceId; id: string };
+					update: { stateTransitionId: string };
+				}[] = [];
 
 				for (const run of releasedRuns) {
 					const stateTransitionId = ulid();
@@ -68,7 +72,10 @@ export async function recoverOverdueOutboxEntries(
 						attempt: run.attempts,
 						state: { status: "queued", reason: "recovery" } satisfies WorkflowRunStateQueued,
 					});
-					stateTransitionUpdates.push({ id: run.id, stateTransitionId });
+					stateTransitionUpdates.push({
+						filter: { namespaceId: run.namespaceId as NamespaceId, id: run.id },
+						update: { stateTransitionId },
+					});
 				}
 
 				if (isNonEmptyArray(stateTransitionEntries) && isNonEmptyArray(stateTransitionUpdates)) {

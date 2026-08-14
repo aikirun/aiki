@@ -17,15 +17,15 @@ import type { StateTransitionRowInsert } from "../infra/db/types/state-transitio
 import type { WorkflowRowInsert } from "../infra/db/types/workflow";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 
-export interface CancelledParentRun {
+export interface CancelledRunMeta {
 	namespaceId: NamespaceId;
-	runId: string;
+	id: string;
 	pool: string | undefined;
 }
 
 export const createChildRunCanceller = () => ({
 	async cancel(
-		parentRuns: NonEmptyArray<CancelledParentRun>,
+		runs: NonEmptyArray<CancelledRunMeta>,
 		repos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">,
 		logger: Logger
 	): Promise<void> {
@@ -33,27 +33,23 @@ export const createChildRunCanceller = () => ({
 			return;
 		}
 
-		const parentRunIds = parentRuns.map((r) => r.runId);
-		const parentRunIdsHavingChildren = await repos.workflowRun.hasChildRuns(
-			parentRunIds as NonEmptyArray<string>,
-			NON_TERMINAL_WORKFLOW_RUN_STATUSES
-		);
-		if (parentRunIdsHavingChildren.size === 0) {
+		const runIdsHavingChildren = await repos.workflowRun.hasChildRuns(runs, NON_TERMINAL_WORKFLOW_RUN_STATUSES);
+		if (runIdsHavingChildren.size === 0) {
 			return;
 		}
 
-		const parentRunsHavingChildren = parentRuns.filter((r) => parentRunIdsHavingChildren.has(r.runId));
-		if (!isNonEmptyArray(parentRunsHavingChildren)) {
+		const runsHavingChildren = runs.filter((run) => runIdsHavingChildren.has(run.id));
+		if (!isNonEmptyArray(runsHavingChildren)) {
 			return;
 		}
 
-		logger.info("Scheduling cancel-child-runs workflows", { "aiki.parentRunIds": parentRunIdsHavingChildren });
+		logger.info("Scheduling cancel-child-runs workflows", { "aiki.parentRunIds": runIdsHavingChildren });
 
 		const workflowEntries: WorkflowRowInsert[] = [];
 		const inputHashPromises: Array<Promise<string>> = [];
 		const seenNamespaceIds = new Set<NamespaceId>();
 
-		for (const { namespaceId, runId } of parentRunsHavingChildren) {
+		for (const { namespaceId, id: runId } of runsHavingChildren) {
 			if (!seenNamespaceIds.has(namespaceId)) {
 				seenNamespaceIds.add(namespaceId);
 				workflowEntries.push({
@@ -78,7 +74,7 @@ export const createChildRunCanceller = () => ({
 		const workflowRunEntries: WorkflowRunRowInsert[] = [];
 		const stateTransitionEntries: StateTransitionRowInsert[] = [];
 
-		for (const [i, parentRun] of parentRunsHavingChildren.entries()) {
+		for (const [i, parentRun] of runsHavingChildren.entries()) {
 			const workflow = workflowsByNamespaceId.get(parentRun.namespaceId);
 			const inputHash = inputHashes[i];
 			if (!workflow || inputHash === undefined) {
@@ -93,7 +89,7 @@ export const createChildRunCanceller = () => ({
 				namespaceId: parentRun.namespaceId,
 				workflowId: workflow.id,
 				status: "scheduled",
-				input: parentRun.runId,
+				input: parentRun.id,
 				inputHash,
 				options: {
 					pool: parentRun.pool,

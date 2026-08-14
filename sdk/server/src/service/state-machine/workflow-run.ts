@@ -225,13 +225,14 @@ async function transitionStateInTx(
 	const namespaceId = context.namespaceId;
 	const runId = request.id as WorkflowRunId;
 
-	const run = await txRepos.workflowRun.getByIdWithState(namespaceId, runId, {
-		forUpdate: request.type === "pessimistic",
-	});
-	if (!run) {
+	const result = await txRepos.workflowRun.getByIdWithState(
+		{ namespaceId, id: runId },
+		{ forUpdate: request.type === "pessimistic" }
+	);
+	if (!result) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
-	const fromState = run.state;
+	const { run, state: fromState } = result;
 
 	assertIsValidWorkflowRunStateTransition(runId, fromState, request.state);
 
@@ -300,11 +301,11 @@ async function transitionStateInTx(
 		state: toState,
 	});
 
-	const newRevision = await updateWorkflowRun(runId, request, toState, stateTransitionId, attempts, txRepos);
+	const newRevision = await updateWorkflowRun(context, runId, request, toState, stateTransitionId, attempts, txRepos);
 
 	if (toState.status === "cancelled") {
 		await discardStaleTasks(runId, ["running", "awaiting_retry"], txRepos);
-		await childRunCanceller.cancel([{ namespaceId, runId, pool: run.options?.pool }], txRepos, context.logger);
+		await childRunCanceller.cancel([{ namespaceId, id: runId, pool: run.options?.pool }], txRepos, context.logger);
 	}
 
 	if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {
@@ -345,10 +346,11 @@ async function childWorkflowRunWaitNotNeeded(
 	txRepos: TxRepos
 ) {
 	const childRunId = toState.childWorkflowRunId as WorkflowRunId;
-	const childRun = await txRepos.workflowRun.getByIdWithState(namespaceId, childRunId);
-	if (!childRun) {
+	const childRunResult = await txRepos.workflowRun.getByIdWithState({ namespaceId, id: childRunId });
+	if (!childRunResult) {
 		throw new NotFoundError(`Workflow run not found: ${childRunId}`);
 	}
+	const childRun = childRunResult.run;
 
 	if (childRun.status === toState.childWorkflowRunStatus || isTerminalWorkflowRunStatus(childRun.status)) {
 		await txRepos.childWorkflowRunWait.insert({
@@ -374,6 +376,7 @@ async function childWorkflowRunWaitNotNeeded(
 }
 
 async function updateWorkflowRun(
+	context: NamespaceRequestContext,
 	runId: WorkflowRunId,
 	request: WorkflowRunTransitionStateRequestV1,
 	toState: WorkflowRunState,
@@ -406,6 +409,7 @@ async function updateWorkflowRun(
 	if (request.type === "optimistic") {
 		const result = await txRepos.workflowRun.update(
 			{
+				namespaceId: context.namespaceId,
 				id: runId,
 				revision: request.expectedRevision,
 			},
@@ -416,7 +420,7 @@ async function updateWorkflowRun(
 		}
 		return result.revision;
 	} else {
-		const result = await txRepos.workflowRun.update({ id: runId }, updates);
+		const result = await txRepos.workflowRun.update({ namespaceId: context.namespaceId, id: runId }, updates);
 		if (!result) {
 			throw new NotFoundError(`Workflow run not found: ${runId}`);
 		}
@@ -436,12 +440,15 @@ async function notifyParentOfStateChangeIfNecessary(
 	childRunCanceller: ChildRunCanceller,
 	txRepos: TxRepos
 ): Promise<void> {
-	const parentRun = await txRepos.workflowRun.getByIdWithState(context.namespaceId, childRun.parentWorkflowRunId);
-	if (!parentRun) {
+	const parentRunResult = await txRepos.workflowRun.getByIdWithState({
+		namespaceId: context.namespaceId,
+		id: childRun.parentWorkflowRunId,
+	});
+	if (!parentRunResult) {
 		throw new NotFoundError(`Workflow run not found: ${childRun.parentWorkflowRunId}`);
 	}
 
-	const parentRunState = parentRun.state;
+	const { run: parentRun, state: parentRunState } = parentRunResult;
 
 	if (
 		parentRunState.status === "awaiting_child_workflow" &&
