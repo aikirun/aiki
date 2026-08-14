@@ -53,11 +53,21 @@ export const createTaskRepository = (db: PgDb) => ({
 		return result[0] ?? null;
 	},
 
-	async update(filter: { id: string; workflowRunId: string }, updates: TaskRowUpdate): Promise<TaskRow | null> {
+	async update(
+		filter: { id: string; workflowRunId: string; status: TaskStatus; attempts: number },
+		updates: TaskRowUpdate
+	): Promise<TaskRow | null> {
 		const result = await db
 			.update(task)
 			.set(updates)
-			.where(and(eq(task.id, filter.id), eq(task.workflowRunId, filter.workflowRunId)))
+			.where(
+				and(
+					eq(task.id, filter.id),
+					eq(task.workflowRunId, filter.workflowRunId),
+					eq(task.status, filter.status),
+					eq(task.attempts, filter.attempts)
+				)
+			)
 			.returning();
 		return result[0] ?? null;
 	},
@@ -88,42 +98,46 @@ export const createTaskRepository = (db: PgDb) => ({
 			.limit(limit);
 	},
 
-	async listByWorkflowRunIdsAndStatuses(
-		workflowRunIds: string | NonEmptyArray<string>,
-		statuses: TaskStatus[]
-	): Promise<Array<Pick<TaskRow, "id" | "workflowRunId" | "attempts">>> {
+	async listByWorkflowRunIdsAndStatuses(workflowRunIds: string | NonEmptyArray<string>, statuses: TaskStatus[]) {
 		const runIdsFilter =
 			typeof workflowRunIds === "string"
 				? eq(task.workflowRunId, workflowRunIds)
 				: inArray(task.workflowRunId, workflowRunIds);
 		return db
-			.select({ id: task.id, workflowRunId: task.workflowRunId, attempts: task.attempts })
+			.select({ id: task.id, workflowRunId: task.workflowRunId, attempts: task.attempts, status: task.status })
 			.from(task)
 			.where(and(runIdsFilter, inArray(task.status, statuses)));
 	},
 
 	async bulkDiscard(
 		tasks: NonEmptyArray<{
-			filter: { id: string; workflowRunId: string };
+			filter: { id: string; workflowRunId: string; status: TaskStatus; attempts: number };
 			update: { latestStateTransitionId: string };
 		}>
-	): Promise<void> {
+	): Promise<string[]> {
 		const valueRows = tasks.map(({ filter, update }, index) => {
 			if (index === 0) {
-				return sql`(${filter.id}::text, ${filter.workflowRunId}::text, ${update.latestStateTransitionId}::text)`;
+				return sql`(${filter.id}::text, ${filter.workflowRunId}::text, ${filter.status}::task_status, ${filter.attempts}::integer, ${update.latestStateTransitionId}::text)`;
 			}
-			return sql`(${filter.id}, ${filter.workflowRunId}, ${update.latestStateTransitionId})`;
+			return sql`(${filter.id}, ${filter.workflowRunId}, ${filter.status}, ${filter.attempts}, ${update.latestStateTransitionId})`;
 		});
 
-		await db
+		const result = await db
 			.update(task)
 			.set({
 				status: "discarded",
 				nextAttemptAt: null,
 				latestStateTransitionId: sql`v.state_transition_id`,
 			})
-			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, workflow_run_id, state_transition_id)`)
-			.where(sql`${task.id} = v.id AND ${task.workflowRunId} = v.workflow_run_id`);
+			.from(
+				sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, workflow_run_id, status, attempts, state_transition_id)`
+			)
+			.where(
+				sql`${task.id} = v.id AND ${task.workflowRunId} = v.workflow_run_id AND ${task.status} = v.status AND ${task.attempts} = v.attempts`
+			)
+			.returning({ id: task.id });
+
+		return result.map((row) => row.id);
 	},
 });
 

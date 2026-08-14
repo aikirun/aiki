@@ -23,6 +23,10 @@ export function isNonEmptyArray<T>(value: T[] | undefined): value is NonEmptyArr
 	return value !== undefined && value.length > 0;
 }
 
+export function asNonEmptyArray<T>(value: T[]): NonEmptyArray<T> {
+	return value as NonEmptyArray<T>;
+}
+
 export function* chunkLazy<T>(items: T[], size: number): Generator<NonEmptyArray<T>> {
 	let sliceStart = 0;
 	while (sliceStart < items.length) {

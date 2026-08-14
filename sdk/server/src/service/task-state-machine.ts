@@ -13,7 +13,7 @@ import type {
 } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import { InvalidTaskStateTransitionError, WorkflowRunRevisionConflictError } from "../errors";
+import { InvalidTaskStateTransitionError, TaskStateConflictError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 
@@ -175,8 +175,8 @@ async function transitionStateInTx(
 		state: taskState,
 	});
 
-	await txRepos.task.update(
-		{ id: taskId, workflowRunId: runId },
+	const updatedTask = await txRepos.task.update(
+		{ id: taskId, workflowRunId: runId, status: existingTask.status, attempts: existingTask.attempts },
 		{
 			status: taskState.status,
 			attempts: taskState.attempts,
@@ -184,6 +184,12 @@ async function transitionStateInTx(
 			nextAttemptAt: taskState.status === "awaiting_retry" ? (taskState.nextAttemptAt as TimestampMs) : null,
 		}
 	);
+	if (!updatedTask) {
+		throw new TaskStateConflictError(runId, taskId, {
+			status: existingTask.status,
+			attempts: existingTask.attempts,
+		});
+	}
 
 	if (taskState.status === "awaiting_retry") {
 		// The workflow run stays in `running` while the task waits for its retry, so the outbox row
