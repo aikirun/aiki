@@ -1,6 +1,6 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
-import type { TaskTransitionStateRequestV1, TransitionTaskStateToRunning } from "@aikirun/types/api/task";
+import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import type {
 	TaskId,
@@ -49,12 +49,6 @@ export function assertIsValidTaskStateTransition(
 	}
 }
 
-export function isTaskStateTransitionToRunning(
-	request: TaskTransitionStateRequestV1
-): request is TransitionTaskStateToRunning {
-	return request.taskState.status === "running";
-}
-
 export interface TaskStateMachineDeps {
 	repos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox" | "transaction">;
 }
@@ -91,7 +85,7 @@ async function transitionStateInTx(
 		throw new WorkflowRunRevisionConflictError(runId, expectedWorkflowRunRevision);
 	}
 
-	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
+	if ("type" in request && request.type === "create") {
 		const inputHash = request.inputHash;
 		const taskName = request.taskName as TaskName;
 		const taskId = ulid() as TaskId;

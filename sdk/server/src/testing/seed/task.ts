@@ -24,7 +24,6 @@ export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePubli
 		taskName: seededTask.name,
 		input: seededTask.input,
 		inputHash: await hashInput(seededTask.input),
-		taskState: { status: "running" },
 	});
 
 	return { ...seeded, taskInfo, taskInput: seededTask.input };

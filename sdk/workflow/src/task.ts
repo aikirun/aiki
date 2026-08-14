@@ -155,7 +155,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			options: startOptions,
 			input,
 			inputHash,
-			taskState: { status: "running" },
 		});
 
 		const logger = run.logger.child({

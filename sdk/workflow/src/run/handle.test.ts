@@ -117,7 +117,6 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
-					taskState: taskInfo.state,
 				};
 				client.api.task.transitionStateV1.once(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
@@ -139,7 +138,6 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
-					taskState: { status: "running" },
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
@@ -159,7 +157,6 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
-					taskState: { status: "running" },
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },

@@ -35,7 +35,6 @@ export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateB
 	options?: TaskStartOptions;
 	input?: unknown;
 	inputHash: string;
-	taskState: Omit<TaskStateRunning, "attempts">;
 }
 
 export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {

@@ -300,7 +300,6 @@ describe("WorkflowRunService cancelByIds", () => {
 				taskName: "charge-card",
 				input: taskInput,
 				inputHash: await hashInput(taskInput),
-				taskState: { status: "running" },
 			});
 
 			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"])).toBeEmpty();
