@@ -79,24 +79,18 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result.length > 0;
 	},
 
-	async getById(
-		filter: {
-			namespaceId: NamespaceId;
-			id: string;
-		},
-		options?: { forUpdate?: boolean }
-	) {
+	async getById(filter: { namespaceId: NamespaceId; id: string }, options?: { lock?: "share" }) {
 		const query = db
 			.select({ id: workflowRun.id, revision: workflowRun.revision })
 			.from(workflowRun)
 			.where(and(eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)))
 			.limit(1);
 
-		const result = options?.forUpdate ? await query.for("update") : await query;
+		const result = options?.lock ? await query.for(options.lock) : await query;
 		return result[0] ?? null;
 	},
 
-	async getByIdWithState(filter: { namespaceId: NamespaceId; id: string }, options?: { forUpdate?: boolean }) {
+	async getByIdWithState(filter: { namespaceId: NamespaceId; id: string }, options?: { lock?: "update" }) {
 		const query = db
 			.select({
 				run: {
@@ -115,7 +109,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.where(and(eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)))
 			.limit(1);
 
-		const result = options?.forUpdate ? await query.for("update", { of: workflowRun }) : await query;
+		const result = options?.lock ? await query.for(options.lock, { of: workflowRun }) : await query;
 		const row = result[0];
 		if (!row) {
 			return null;

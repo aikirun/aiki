@@ -740,7 +740,7 @@ describe("creating a workflow run", () => {
 						versionId: "1.0.0",
 						input: "payload",
 						inputHash,
-						parentWorkflowRunId: parentRunRecord.id,
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},
 					{ id: childRunRecord.id }
@@ -750,6 +750,32 @@ describe("creating a workflow run", () => {
 				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
 
 				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("throws WorkflowRunRevisionConflictError when the parent revision is stale", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.rejectsOnce(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: "payload",
+						inputHash,
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					Object.assign(new Error("Revision conflict"), { code: "WORKFLOW_RUN_REVISION_CONFLICT" })
+				);
+
+				expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toThrow(WorkflowRunRevisionConflictError);
 			}));
 
 		test("propagates the parent's pool to the child run", () =>
@@ -770,7 +796,7 @@ describe("creating a workflow run", () => {
 						versionId: "1.0.0",
 						input: "payload",
 						inputHash,
-						parentWorkflowRunId: parentRunRecord.id,
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { pool: "eu-west" },
 					},
 					{ id: childRunRecord.id }
@@ -894,7 +920,7 @@ describe("creating a workflow run", () => {
 						versionId: "1.0.0",
 						input: "PAYLOAD",
 						inputHash,
-						parentWorkflowRunId: parentRunRecord.id,
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},
 					{ id: childRunRecord.id }

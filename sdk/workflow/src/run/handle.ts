@@ -399,6 +399,6 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 	}
 }
 
-function isWorkflowRunRevisionConflictError(err: unknown): boolean {
+export function isWorkflowRunRevisionConflictError(err: unknown): boolean {
 	return err != null && typeof err === "object" && "code" in err && err.code === "WORKFLOW_RUN_REVISION_CONFLICT";
 }

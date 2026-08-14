@@ -157,7 +157,7 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 			versionId: "string > 0",
 			"input?": "unknown",
 			inputHash: "string > 0",
-			"parentWorkflowRunId?": "string > 0 | undefined",
+			"parent?": type({ workflowRunId: "string > 0", expectedRevision: "number.integer >= 0" }).or("undefined"),
 			"options?": workflowStartOptionsSchema,
 		})
 	)

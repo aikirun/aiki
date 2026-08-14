@@ -6,6 +6,7 @@ import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { createTaskStateMachine } from "./state-machine/task";
 import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./state-machine/workflow-run";
 import { describe, expect, test } from "bun:test";
+import { WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
@@ -314,6 +315,33 @@ describe("WorkflowRunService cancelByIds", () => {
 			expect(discardedTasks).toEqual([expect.objectContaining({ id: taskInfo.id, workflowRunId: runId })]);
 		}));
 
+	test("does not create a child when the parent revision is stale", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			// A running → running transition moves only the revision
+			const { service, stateMachine } = createService(repos);
+			await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: parent.runId,
+				state: { status: "running" },
+				expectedRevision: parent.revisionWhenClaimed,
+			});
+
+			const childInput = { orderId: "order-9" };
+			expect(
+				service.createWorkflowRun(context, {
+					name: parent.workflowName,
+					versionId: parent.workflowVersionId,
+					input: childInput,
+					inputHash: await hashInput(childInput),
+					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
+				})
+			).rejects.toThrow(WorkflowRunRevisionConflictError);
+
+			expect(await repos.workflowRun.getChildRuns({ namespaceId: context.namespaceId, id: parent.runId })).toBeEmpty();
+		}));
+
 	test("cancelling a parent with a live child schedules the cancel-child-runs workflow", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
@@ -325,7 +353,7 @@ describe("WorkflowRunService cancelByIds", () => {
 				versionId: parent.workflowVersionId,
 				input: childInput,
 				inputHash: await hashInput(childInput),
-				parentWorkflowRunId: parent.runId,
+				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 			});
 
 			await service.cancelByIds(context, { ids: [parent.runId] });

@@ -33,7 +33,7 @@ import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikir
 import { ulid } from "ulidx";
 
 import type { WorkflowRunStateMachine } from "./state-machine/workflow-run";
-import { WorkflowRunReferenceConflictError } from "../errors";
+import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { EventWaitRow, EventWaitRowInsert } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
@@ -413,9 +413,18 @@ async function createWorkflowRunInTx(
 ): Promise<WorkflowRunId> {
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
-	const parentWorkflowRunId = request.parentWorkflowRunId as WorkflowRunId | undefined;
-	const { input, inputHash, options } = request;
+	const { input, inputHash, options, parent } = request;
 	const referenceId = options?.reference?.id;
+
+	if (parent) {
+		const parentRun = await txRepos.workflowRun.getById({ namespaceId, id: parent.workflowRunId }, { lock: "share" });
+		if (!parentRun) {
+			throw new NotFoundError(`Workflow run not found: ${parent.workflowRunId}`);
+		}
+		if (parentRun.revision !== parent.expectedRevision) {
+			throw new WorkflowRunRevisionConflictError(parent.workflowRunId as WorkflowRunId, parent.expectedRevision);
+		}
+	}
 
 	const workflow = await txRepos.workflow.getOrCreate({ namespaceId, name, versionId, source: "user" });
 
@@ -457,7 +466,7 @@ async function createWorkflowRunInTx(
 		id: runId,
 		namespaceId,
 		workflowId: workflow.id,
-		parentWorkflowRunId,
+		parentWorkflowRunId: parent?.workflowRunId,
 		status: "scheduled",
 		input,
 		inputHash,

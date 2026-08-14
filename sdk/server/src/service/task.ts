@@ -56,7 +56,7 @@ async function setNewTaskStateInTx(
 ): Promise<void> {
 	const { namespaceId, logger } = context;
 	const runId = request.workflowRunId as WorkflowRunId;
-	const run = await txRepos.workflowRun.getById({ namespaceId, id: runId }, { forUpdate: true });
+	const run = await txRepos.workflowRun.getById({ namespaceId, id: runId }, { lock: "share" });
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
@@ -121,7 +121,7 @@ async function setExistingTaskStateInTx(
 ): Promise<void> {
 	const { namespaceId, logger } = context;
 	const runId = request.workflowRunId as WorkflowRunId;
-	const run = await txRepos.workflowRun.getById({ namespaceId, id: runId }, { forUpdate: true });
+	const run = await txRepos.workflowRun.getById({ namespaceId, id: runId }, { lock: "share" });
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
