@@ -6,6 +6,7 @@ import { createTaskService } from "../service/task";
 import { createTaskStateMachineService } from "../service/task-state-machine";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
+import { seedClaimedRun } from "../testing/seed/run";
 import { seedRunningTask } from "../testing/seed/task";
 
 const withHarness = createServiceHarness();
@@ -42,9 +43,9 @@ describe("TaskService getTaskById", () => {
 			const taskStateMachine = createTaskStateMachineService({ repos });
 			await taskStateMachine.transitionState(context, {
 				type: "retry",
-				id: runId,
+				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
-				taskId: taskInfo.id,
+				id: taskInfo.id,
 				taskState: { status: "running", attempts: 2 },
 			});
 
@@ -65,5 +66,42 @@ describe("TaskService getTaskById", () => {
 
 			const taskService = createTaskService({ repos });
 			expect(taskService.getTaskById(context, foreignTaskSeed.taskInfo.id)).rejects.toBeInstanceOf(NotFoundError);
+		}));
+});
+
+describe("TaskService setTaskState", () => {
+	test("does not set the state of a task belonging to another run", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const otherNamespaceContext = namespaceRequestContextFactory.build({ namespaceId: "other-ns" as NamespaceId });
+			const victimTaskSeed = await seedRunningTask({
+				namespaceRequestContext: otherNamespaceContext,
+				repos,
+				publisher,
+			});
+			const victimRowBefore = await repos.task.getById({
+				id: victimTaskSeed.taskInfo.id,
+				workflowRunId: victimTaskSeed.runId,
+			});
+
+			// The attacker holds a perfectly valid run of their own; only the task is foreign.
+			const attackerRunSeed = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const taskService = createTaskService({ repos });
+			expect(
+				taskService.setTaskState(context, {
+					type: "existing",
+					id: victimTaskSeed.taskInfo.id,
+					workflowRunId: attackerRunSeed.runId,
+					state: { status: "completed", output: "hijacked" },
+				})
+			).rejects.toBeInstanceOf(NotFoundError);
+
+			expect(await repos.task.getById({ id: victimTaskSeed.taskInfo.id, workflowRunId: victimTaskSeed.runId })).toEqual(
+				victimRowBefore
+			);
 		}));
 });

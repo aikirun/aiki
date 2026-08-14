@@ -5,6 +5,7 @@ import {
 	workflowRunStateByStatus,
 } from "@aikirun/testing/data-factory/workflow/run";
 import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
+import type { TransitionTaskStateToRunningCreate } from "@aikirun/types/api/task";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
@@ -12,7 +13,6 @@ import {
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
 } from "@aikirun/types/workflow/run";
-import type { TransitionTaskStateToRunningCreate } from "@aikirun/types/workflow/task";
 
 import { workflowRunHandle } from "./handle";
 import { describe, expect, test } from "bun:test";
@@ -112,14 +112,14 @@ describe("workflowRunHandle", () => {
 				const handle = workflowRunHandle(client, record);
 
 				const taskInfo = runningTaskInfoFactory.build();
-				const request: Omit<TransitionTaskStateToRunningCreate, "id" | "expectedWorkflowRunRevision"> = {
+				const request: Omit<TransitionTaskStateToRunningCreate, "workflowRunId" | "expectedWorkflowRunRevision"> = {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
 					taskState: taskInfo.state,
 				};
-				client.api.workflowRun.transitionTaskStateV1.once(
-					{ ...request, id: record.id, expectedWorkflowRunRevision: 5 },
+				client.api.task.transitionStateV1.once(
+					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
 					{ taskInfo }
 				);
 
@@ -133,14 +133,14 @@ describe("workflowRunHandle", () => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
 				const handle = workflowRunHandle(client, record);
 
-				const request: Omit<TransitionTaskStateToRunningCreate, "id" | "expectedWorkflowRunRevision"> = {
+				const request: Omit<TransitionTaskStateToRunningCreate, "workflowRunId" | "expectedWorkflowRunRevision"> = {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
 					taskState: { status: "running" },
 				};
-				client.api.workflowRun.transitionTaskStateV1.rejectsOnce(
-					{ ...request, id: record.id, expectedWorkflowRunRevision: 5 },
+				client.api.task.transitionStateV1.rejectsOnce(
+					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);
 
@@ -152,14 +152,14 @@ describe("workflowRunHandle", () => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
 				const handle = workflowRunHandle(client, record);
 				const nonConflictError = { code: "SOME_OTHER_ERROR" };
-				const request: Omit<TransitionTaskStateToRunningCreate, "id" | "expectedWorkflowRunRevision"> = {
+				const request: Omit<TransitionTaskStateToRunningCreate, "workflowRunId" | "expectedWorkflowRunRevision"> = {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
 					taskState: { status: "running" },
 				};
-				client.api.workflowRun.transitionTaskStateV1.rejectsOnce(
-					{ ...request, id: record.id, expectedWorkflowRunRevision: 5 },
+				client.api.task.transitionStateV1.rejectsOnce(
+					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
 					nonConflictError
 				);
 

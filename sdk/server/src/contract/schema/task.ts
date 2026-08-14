@@ -57,3 +57,16 @@ export const taskRecordSchema = type({
 	"options?": taskOptionsSchema.or("undefined"),
 	state: taskStateSchema,
 });
+
+export const taskSetStateRequestSchema = type({
+	type: "'new'",
+	workflowRunId: "string > 0",
+	taskName: "string > 0",
+	"input?": "unknown",
+	state: taskStateCompletedSchema.or(taskStateFailedSchema).omit("attempts"),
+}).or({
+	type: "'existing'",
+	id: "string > 0",
+	workflowRunId: "string > 0",
+	state: taskStateCompletedSchema.or(taskStateFailedSchema).omit("attempts"),
+});

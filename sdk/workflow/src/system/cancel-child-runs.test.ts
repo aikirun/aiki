@@ -92,7 +92,7 @@ describe("createCancelChildRunsV1", () => {
 					}
 				);
 
-			client.api.workflowRun.transitionTaskStateV1
+			client.api.task.transitionStateV1
 				.once(
 					{
 						type: "create",
@@ -100,16 +100,16 @@ describe("createCancelChildRunsV1", () => {
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
 						taskState: { status: runningListNonTerminalChildrenTask.state.status },
-						id: runRecord.id,
+						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
 					{ taskInfo: runningListNonTerminalChildrenTask }
 				)
 				.once(
 					{
-						taskId: runningListNonTerminalChildrenTask.id,
+						id: runningListNonTerminalChildrenTask.id,
 						taskState: completedListNonTerminalChildrenTask.state,
-						id: runRecord.id,
+						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
 					{ taskInfo: completedListNonTerminalChildrenTask }
@@ -121,16 +121,16 @@ describe("createCancelChildRunsV1", () => {
 						taskName: runningCancelRunsTask.name,
 						options: {},
 						taskState: { status: runningCancelRunsTask.state.status },
-						id: runRecord.id,
+						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
 					{ taskInfo: runningCancelRunsTask }
 				)
 				.once(
 					{
-						taskId: runningCancelRunsTask.id,
+						id: runningCancelRunsTask.id,
 						taskState: completedCancelRunsTask.state,
-						id: runRecord.id,
+						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
 					{ taskInfo: completedCancelRunsTask }
@@ -189,7 +189,7 @@ describe("createCancelChildRunsV1", () => {
 					}
 				);
 
-			client.api.workflowRun.transitionTaskStateV1
+			client.api.task.transitionStateV1
 				.once(
 					{
 						type: "create",
@@ -197,16 +197,16 @@ describe("createCancelChildRunsV1", () => {
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
 						taskState: { status: runningListNonTerminalChildrenTask.state.status },
-						id: runRecord.id,
+						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
 					{ taskInfo: runningListNonTerminalChildrenTask }
 				)
 				.once(
 					{
-						taskId: runningListNonTerminalChildrenTask.id,
+						id: runningListNonTerminalChildrenTask.id,
 						taskState: completedListNonTerminalChildrenTask.state,
-						id: runRecord.id,
+						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
 					{ taskInfo: completedListNonTerminalChildrenTask }

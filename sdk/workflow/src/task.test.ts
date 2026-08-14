@@ -83,7 +83,7 @@ describe("task", () => {
 						state: { output },
 					});
 
-					client.api.workflowRun.transitionTaskStateV1
+					client.api.task.transitionStateV1
 						.once(
 							{
 								type: "create",
@@ -91,16 +91,16 @@ describe("task", () => {
 								taskName: sendEmail.name,
 								options: {},
 								taskState: { status: "running" },
-								id: runRecord.id,
+								workflowRunId: runRecord.id,
 								expectedWorkflowRunRevision: runRecord.revision,
 							},
 							{ taskInfo: runningTaskInfo }
 						)
 						.once(
 							{
-								taskId: runningTaskInfo.id,
+								id: runningTaskInfo.id,
 								taskState: completedTaskInfo.state,
-								id: runRecord.id,
+								workflowRunId: runRecord.id,
 								expectedWorkflowRunRevision: runRecord.revision,
 							},
 							{ taskInfo: completedTaskInfo }
@@ -139,7 +139,7 @@ describe("task", () => {
 					state: { attempts: 2, output },
 				});
 
-				client.api.workflowRun.transitionTaskStateV1
+				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
@@ -147,16 +147,16 @@ describe("task", () => {
 							taskName: chargeCard.name,
 							options: { retry },
 							taskState: { status: "running" },
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
 					.once(
 						{
-							taskId: runningTaskInfo.id,
+							id: runningTaskInfo.id,
 							taskState: completedTaskInfo.state,
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: completedTaskInfo }
@@ -183,7 +183,7 @@ describe("task", () => {
 				const input = { cardId: "card-1" };
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 
-				client.api.workflowRun.transitionTaskStateV1
+				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
@@ -191,21 +191,21 @@ describe("task", () => {
 							taskName: chargeCard.name,
 							options: { retry },
 							taskState: { status: "running" },
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
 					.once(
 						{
-							taskId: runningTaskInfo.id,
+							id: runningTaskInfo.id,
 							taskState: {
 								status: "awaiting_retry",
 								attempts: 1,
 								error: expect.objectContaining({ message: "down" }),
 								nextAttemptInMs: 1_000,
 							},
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
@@ -229,7 +229,7 @@ describe("task", () => {
 				const input = { cardId: "card-1" };
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 
-				client.api.workflowRun.transitionTaskStateV1
+				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
@@ -237,20 +237,20 @@ describe("task", () => {
 							taskName: chargeCard.name,
 							options: {},
 							taskState: { status: "running" },
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
 					.once(
 						{
-							taskId: runningTaskInfo.id,
+							id: runningTaskInfo.id,
 							taskState: {
 								status: "failed",
 								attempts: 1,
 								error: expect.objectContaining({ message: "declined" }),
 							},
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
@@ -447,7 +447,7 @@ describe("task", () => {
 					state: { output },
 				});
 
-				client.api.workflowRun.transitionTaskStateV1
+				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
@@ -455,16 +455,16 @@ describe("task", () => {
 							taskName: sendEmail.name,
 							options: { retry },
 							taskState: { status: "running" },
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
 					.once(
 						{
-							taskId: runningTaskInfo.id,
+							id: runningTaskInfo.id,
 							taskState: completedTaskInfo.state,
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: completedTaskInfo }

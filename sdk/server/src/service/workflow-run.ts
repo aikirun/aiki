@@ -1,5 +1,4 @@
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
-import { hashInput } from "@aikirun/lib/crypto";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { NotFoundError } from "@aikirun/lib/error";
 import { getCompositeId } from "@aikirun/lib/id";
@@ -13,7 +12,6 @@ import type {
 	WorkflowRunListResponseV1,
 	WorkflowRunListTransitionsRequestV1,
 	WorkflowRunReference,
-	WorkflowRunSetTaskStateRequestV1,
 } from "@aikirun/types/api/workflow-run";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -31,14 +29,8 @@ import type {
 	WorkflowRunStateCancelled,
 	WorkflowRunStateScheduledByNew,
 } from "@aikirun/types/workflow/run";
-import type {
-	TaskInfo,
-	TaskState,
-	TaskStateDiscarded,
-	TaskStateRunning,
-	TaskStatus,
-} from "@aikirun/types/workflow/task";
-import { monotonicFactory, ulid } from "ulidx";
+import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
+import { ulid } from "ulidx";
 
 import { WorkflowRunConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
@@ -73,8 +65,6 @@ export interface WorkflowRunServiceDeps {
 	childRunCanceller: ChildRunCanceller;
 	workflowRunStateMachineService: WorkflowRunStateMachineService;
 }
-
-const monotonic = monotonicFactory();
 
 export const createWorkflowRunService = ({
 	repos,
@@ -352,112 +342,6 @@ export const createWorkflowRunService = ({
 				throw new NotFoundError(`Workflow run not found: ${name}:${versionId}:${referenceId}`);
 			}
 			return run.id as WorkflowRunId;
-		});
-	},
-
-	async setTaskState(context: NamespaceRequestContext, request: WorkflowRunSetTaskStateRequestV1): Promise<void> {
-		const { namespaceId, logger } = context;
-		const runId = request.id as WorkflowRunId;
-
-		return repos.transaction(async (txRepos) => {
-			const run = await txRepos.workflowRun.getById(namespaceId, runId);
-			if (!run) {
-				throw new NotFoundError(`Workflow run not found: ${runId}`);
-			}
-
-			if (request.type === "new") {
-				const inputHash = await hashInput(request.input);
-
-				const taskId = ulid();
-				const runningStateTransitionId = monotonic();
-				const finalStateTransitionId = monotonic();
-
-				logger.info("Setting task state (new task)", {
-					"aiki.runId": runId,
-					"aiki.taskId": taskId,
-					"aiki.state": request.state,
-				});
-
-				const runningState: TaskStateRunning = {
-					status: "running",
-					attempts: 1,
-				};
-
-				const finalState: TaskState =
-					request.state.status === "completed"
-						? { status: "completed", attempts: 1, output: request.state.output }
-						: { status: request.state.status satisfies "failed", attempts: 1, error: request.state.error };
-
-				await txRepos.task.create({
-					id: taskId,
-					name: request.taskName,
-					workflowRunId: runId,
-					status: finalState.status,
-					attempts: 1,
-					input: request.input,
-					inputHash: inputHash,
-					options: null,
-					latestStateTransitionId: finalStateTransitionId,
-				});
-				await txRepos.stateTransition.append({
-					id: runningStateTransitionId,
-					workflowRunId: runId,
-					type: "task",
-					taskId,
-					status: runningState.status,
-					attempt: runningState.attempts,
-					state: runningState,
-				});
-				await txRepos.stateTransition.append({
-					id: finalStateTransitionId,
-					workflowRunId: runId,
-					type: "task",
-					taskId,
-					status: finalState.status,
-					attempt: finalState.attempts,
-					state: finalState,
-				});
-
-				return;
-			}
-
-			const existingTaskRow = await txRepos.task.getById({ id: request.taskId, workflowRunId: runId });
-			if (!existingTaskRow) {
-				throw new NotFoundError(`Task not found: ${request.taskId}`);
-			}
-
-			logger.info("Setting task state (existing task)", {
-				"aiki.runId": runId,
-				"aiki.taskId": request.taskId,
-				"aiki.state": request.state,
-			});
-
-			const attempts = existingTaskRow.attempts;
-
-			const finalState: TaskState =
-				request.state.status === "completed"
-					? { status: "completed", attempts: attempts + 1, output: request.state.output }
-					: { status: request.state.status satisfies "failed", attempts: attempts + 1, error: request.state.error };
-
-			const finalTransitionId = ulid();
-			await txRepos.stateTransition.append({
-				id: finalTransitionId,
-				workflowRunId: runId,
-				type: "task",
-				taskId: existingTaskRow.id,
-				status: finalState.status,
-				attempt: finalState.attempts,
-				state: finalState,
-			});
-
-			await txRepos.task.update(
-				{ id: existingTaskRow.id, workflowRunId: runId },
-				{
-					status: finalState.status,
-					attempts: finalState.attempts,
-					latestStateTransitionId: finalTransitionId,
-				}
-			);
 		});
 	},
 

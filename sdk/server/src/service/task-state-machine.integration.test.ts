@@ -34,9 +34,9 @@ describe("TaskStateMachineService transitionState", () => {
 			const taskStateMachine = createTaskStateMachineService({ repos });
 			expect(
 				taskStateMachine.transitionState(context, {
-					id: attackerRunSeed.runId,
+					workflowRunId: attackerRunSeed.runId,
 					expectedWorkflowRunRevision: attackerRunSeed.revisionWhenClaimed,
-					taskId: victimTaskSeed.taskInfo.id,
+					id: victimTaskSeed.taskInfo.id,
 					taskState: { status: "completed", attempts: 2, output: "hijacked" },
 				})
 			).rejects.toBeInstanceOf(NotFoundError);

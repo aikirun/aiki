@@ -84,12 +84,18 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result.length > 0;
 	},
 
-	async getById(namespaceId: NamespaceId, id: string): Promise<WorkflowRunRow | null> {
-		const result = await db
+	async getById(
+		namespaceId: NamespaceId,
+		id: string,
+		options?: { forUpdate?: boolean }
+	): Promise<WorkflowRunRow | null> {
+		const query = db
 			.select()
 			.from(workflowRun)
 			.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
 			.limit(1);
+
+		const result = options?.forUpdate ? await query.for("update") : await query;
 		return result[0] ?? null;
 	},
 
@@ -121,7 +127,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
 			.limit(1);
 
-		const result = options?.forUpdate ? await query.for("update") : await query;
+		const result = options?.forUpdate ? await query.for("update", { of: workflowRun }) : await query;
 		const row = result[0];
 		if (!row) {
 			return null;

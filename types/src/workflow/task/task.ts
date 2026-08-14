@@ -1,4 +1,3 @@
-import type { OptionalProp } from "@aikirun/lib/object";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { SerializableError } from "@aikirun/lib/serializable";
 
@@ -67,44 +66,3 @@ export interface TaskRecord<Input = unknown, Output = unknown> {
 	options?: TaskStartOptions;
 	state: TaskState<Output>;
 }
-
-export interface TransitionTaskStateBase {
-	id: string;
-	expectedWorkflowRunRevision: number;
-}
-
-export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateBase {
-	type: "create";
-	taskName: string;
-	options?: TaskStartOptions;
-	input?: unknown;
-	taskState: Omit<TaskStateRunning, "attempts">;
-}
-
-export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
-	type: "retry";
-	taskId: string;
-	options?: TaskStartOptions;
-	taskState: TaskStateRunning;
-}
-
-export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
-	taskId: string;
-	taskState: TaskStateCompletedRequest;
-}
-
-export type TaskStateCompletedRequest = OptionalProp<TaskStateCompleted<unknown>, "output">;
-
-export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
-	taskId: string;
-	taskState: TaskStateFailed;
-}
-
-export interface TransitionTaskStateToAwaitingRetry extends TransitionTaskStateBase {
-	taskId: string;
-	taskState: TaskStateAwaitingRetryRequest;
-}
-
-export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAttemptAt"> & {
-	nextAttemptInMs: number;
-};

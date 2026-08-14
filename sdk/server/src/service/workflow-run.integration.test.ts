@@ -1,5 +1,4 @@
 import { hashInput } from "@aikirun/lib/crypto";
-import { NotFoundError } from "@aikirun/lib/error";
 import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
@@ -282,7 +281,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			const taskStateMachine = createTaskStateMachineService({ repos });
 			const taskInfo = await taskStateMachine.transitionState(context, {
 				type: "create",
-				id: runId,
+				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
 				taskName: "charge-card",
 				input: { amountCents: 1250 },
@@ -338,43 +337,6 @@ describe("WorkflowRunService cancelByIds", () => {
 		}));
 });
 
-describe("WorkflowRunService setTaskState", () => {
-	test("does not set the state of a task belonging to another run", () =>
-		withHarness(async ({ context, repos, publisher }) => {
-			const otherNamespaceContext = namespaceRequestContextFactory.build({ namespaceId: "other-ns" as NamespaceId });
-			const victimTaskSeed = await seedRunningTask({
-				namespaceRequestContext: otherNamespaceContext,
-				repos,
-				publisher,
-			});
-			const victimRowBefore = await repos.task.getById({
-				id: victimTaskSeed.taskInfo.id,
-				workflowRunId: victimTaskSeed.runId,
-			});
-
-			// The attacker holds a perfectly valid run of their own; only the task is foreign.
-			const attackerRunSeed = await seedClaimedRun({
-				namespaceRequestContext: context,
-				repos,
-				publisher,
-			});
-
-			const { service } = createService(repos);
-			expect(
-				service.setTaskState(context, {
-					type: "existing",
-					id: attackerRunSeed.runId,
-					taskId: victimTaskSeed.taskInfo.id,
-					state: { status: "completed", output: "hijacked" },
-				})
-			).rejects.toBeInstanceOf(NotFoundError);
-
-			expect(await repos.task.getById({ id: victimTaskSeed.taskInfo.id, workflowRunId: victimTaskSeed.runId })).toEqual(
-				victimRowBefore
-			);
-		}));
-});
-
 describe("WorkflowRunService listWorkflowRunTransitions", () => {
 	test("lists a task's transitions with their stored states", () =>
 		withHarness(async ({ context, repos, publisher }) => {
@@ -387,9 +349,9 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 			const taskStateMachine = createTaskStateMachineService({ repos });
 			await taskStateMachine.transitionState(context, {
 				type: "retry",
-				id: runId,
+				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
-				taskId: taskInfo.id,
+				id: taskInfo.id,
 				taskState: { status: "running", attempts: 2 },
 			});
 

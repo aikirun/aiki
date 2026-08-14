@@ -2,7 +2,6 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { namespaceAuthedImplementer } from "./implementer";
 import { runConcurrently } from "../lib/concurrency";
-import type { TaskStateMachineService } from "../service/task-state-machine";
 import type { WorkflowRunService } from "../service/workflow-run";
 import type { WorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import type { WorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
@@ -10,14 +9,12 @@ import type { WorkflowRunStateMachineService } from "../service/workflow-run-sta
 export interface WorkflowRunRouterDeps {
 	workflowRunService: WorkflowRunService;
 	workflowRunStateMachineService: WorkflowRunStateMachineService;
-	taskStateMachineService: TaskStateMachineService;
 	workflowRunOutboxService: WorkflowRunOutboxService;
 }
 
 export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	const os = namespaceAuthedImplementer.workflowRun;
-	const { workflowRunService, workflowRunStateMachineService, taskStateMachineService, workflowRunOutboxService } =
-		deps;
+	const { workflowRunService, workflowRunStateMachineService, workflowRunOutboxService } = deps;
 
 	return os.router({
 		listV1: os.listV1.handler(async ({ input: request, context }) => {
@@ -50,15 +47,6 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 
 		transitionStateV1: os.transitionStateV1.handler(async ({ input: request, context }) => {
 			return workflowRunStateMachineService.transitionState(context, request);
-		}),
-
-		transitionTaskStateV1: os.transitionTaskStateV1.handler(async ({ input: request, context }) => {
-			const taskInfo = await taskStateMachineService.transitionState(context, request);
-			return { taskInfo };
-		}),
-
-		setTaskStateV1: os.setTaskStateV1.handler(async ({ input: request, context }) => {
-			await workflowRunService.setTaskState(context, request);
 		}),
 
 		listTransitionsV1: os.listTransitionsV1.handler(async ({ input: request, context }) => {

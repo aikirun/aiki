@@ -25,25 +25,14 @@ import type {
 	WorkflowRunMulticastEventByReferenceRequestV1,
 	WorkflowRunMulticastEventRequestV1,
 	WorkflowRunSendEventRequestV1,
-	WorkflowRunSetTaskStateRequestV1,
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
-	WorkflowRunTransitionTaskStateRequestV1,
-	WorkflowRunTransitionTaskStateResponseV1,
 } from "@aikirun/types/api/workflow-run";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 import { stateTransitionSchema } from "../schema/state-transition";
-import {
-	taskInfoSchema,
-	taskOptionsSchema,
-	taskStateAwaitingRetrySchema,
-	taskStateCompletedSchema,
-	taskStateFailedSchema,
-	taskStateRunningSchema,
-} from "../schema/task";
 import { workflowSourceSchema } from "../schema/workflow";
 import {
 	cancelByIdsRequestSchema,
@@ -52,7 +41,6 @@ import {
 	listChildRunsResponseSchema,
 	workflowOptionsSchema,
 	workflowRunRecordSchema,
-	workflowRunSetTaskStateRequestSchema,
 	workflowRunStateAwaitingChildWorkflowSchema,
 	workflowRunStateAwaitingEventSchema,
 	workflowRunStateAwaitingRetrySchema,
@@ -220,57 +208,6 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 			})
 		);
 
-const transitionTaskStateV1: ContractProcedure<
-	WorkflowRunTransitionTaskStateRequestV1,
-	WorkflowRunTransitionTaskStateResponseV1
-> = oc
-	.input(
-		type({
-			type: "'create'",
-			id: "string > 0",
-			taskName: "string > 0",
-			"options?": taskOptionsSchema,
-			"input?": "unknown",
-			taskState: taskStateRunningSchema.omit("attempts"),
-			expectedWorkflowRunRevision: "number.integer >= 0",
-		})
-			.or({
-				type: "'retry'",
-				id: "string > 0",
-				taskId: "string > 0",
-				"options?": taskOptionsSchema,
-				taskState: taskStateRunningSchema,
-				expectedWorkflowRunRevision: "number.integer >= 0",
-			})
-			.or({
-				id: "string > 0",
-				taskId: "string > 0",
-				taskState: taskStateCompletedSchema.omit("output").and({ "output?": "unknown" }),
-				expectedWorkflowRunRevision: "number.integer >= 0",
-			})
-			.or({
-				id: "string > 0",
-				taskId: "string > 0",
-				taskState: taskStateFailedSchema,
-				expectedWorkflowRunRevision: "number.integer >= 0",
-			})
-			.or({
-				id: "string > 0",
-				taskId: "string > 0",
-				taskState: taskStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }),
-				expectedWorkflowRunRevision: "number.integer >= 0",
-			})
-	)
-	.output(
-		type({
-			taskInfo: taskInfoSchema,
-		})
-	);
-
-const setTaskStateV1: ContractProcedure<WorkflowRunSetTaskStateRequestV1, void> = oc
-	.input(workflowRunSetTaskStateRequestSchema)
-	.output(type("undefined"));
-
 const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, WorkflowRunListTransitionsResponseV1> =
 	oc
 		.input(
@@ -393,8 +330,6 @@ export const workflowRunContract = {
 	getStateV1,
 	createV1,
 	transitionStateV1,
-	transitionTaskStateV1,
-	setTaskStateV1,
 	listTransitionsV1,
 	sendEventV1,
 	multicastEventV1,

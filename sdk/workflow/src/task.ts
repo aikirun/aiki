@@ -175,7 +175,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		);
 
 		await handle[INTERNAL].transitionTaskState({
-			taskId: taskInfo.id,
+			id: taskInfo.id,
 			taskState: { status: "completed", attempts: lastAttempt, output },
 		});
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
@@ -253,7 +253,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "retry",
-			taskId,
+			id: taskId,
 			options: startOptions,
 			taskState: { status: "running", attempts },
 		});
@@ -275,7 +275,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		);
 
 		await handle[INTERNAL].transitionTaskState({
-			taskId: taskInfo.id,
+			id: taskInfo.id,
 			taskState: { status: "completed", attempts: lastAttempt, output },
 		});
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
@@ -330,7 +330,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						"aiki.reason": serializableError.message,
 					});
 					await handle[INTERNAL].transitionTaskState({
-						taskId,
+						id: taskId,
 						taskState: { status: "failed", attempts, error: serializableError },
 					});
 					throw new TaskFailedError(taskId, attempts, serializableError.message);
@@ -349,7 +349,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				}
 
 				await handle[INTERNAL].transitionTaskState({
-					taskId,
+					id: taskId,
 					taskState: {
 						status: "awaiting_retry",
 						attempts,
