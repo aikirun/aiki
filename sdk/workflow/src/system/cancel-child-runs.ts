@@ -8,10 +8,10 @@ import { workflow } from "../workflow";
 export const createCancelChildRunsV1 = (api: ApiClient) => {
 	const listNonTerminalChildRuns = task({
 		name: "list-non-terminal-child-runs",
-		async handler(parentRunId: string) {
+		async handler(runId: string) {
 			const { runs } = await api.workflowRun.listChildRunsV1({
-				parentRunId,
-				status: NON_TERMINAL_WORKFLOW_RUN_STATUSES,
+				id: runId,
+				childRunStatus: NON_TERMINAL_WORKFLOW_RUN_STATUSES,
 			});
 			return runs.map((r) => r.id);
 		},
@@ -26,8 +26,8 @@ export const createCancelChildRunsV1 = (api: ApiClient) => {
 	});
 
 	return workflow({ name: "cancel-child-runs" }).v("1.0.0", {
-		async handler(run, parentRunId: string) {
-			const childRunIds = await listNonTerminalChildRuns.start(run, parentRunId);
+		async handler(run, runId: string) {
+			const childRunIds = await listNonTerminalChildRuns.start(run, runId);
 			if (!isNonEmptyArray(childRunIds)) {
 				return;
 			}

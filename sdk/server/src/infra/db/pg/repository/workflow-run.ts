@@ -216,14 +216,18 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.where(and(inArray(workflowRun.id, ids), eq(workflowRun.status, status)));
 	},
 
-	async getChildRuns(filter: { namespaceId: NamespaceId; id: string; status?: NonEmptyArray<WorkflowRunStatus> }) {
+	async getChildRuns(filter: {
+		namespaceId: NamespaceId;
+		id: string;
+		childRunStatus?: NonEmptyArray<WorkflowRunStatus>;
+	}) {
 		// TODO: explore loading in chunks
 		const conditions = [
 			eq(workflowRun.namespaceId, filter.namespaceId),
 			eq(workflowRun.parentWorkflowRunId, filter.id),
 		];
-		if (filter.status) {
-			conditions.push(inArray(workflowRun.status, filter.status));
+		if (filter.childRunStatus) {
+			conditions.push(inArray(workflowRun.status, filter.childRunStatus));
 		}
 
 		return db

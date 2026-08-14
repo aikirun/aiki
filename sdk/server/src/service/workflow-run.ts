@@ -323,8 +323,8 @@ export const createWorkflowRunService = ({
 	async listChildRuns(context: NamespaceRequestContext, request: WorkflowRunListChildRunsRequestV1) {
 		const childRuns = await repos.workflowRun.getChildRuns({
 			namespaceId: context.namespaceId,
-			id: request.parentRunId,
-			status: isNonEmptyArray(request.status) ? request.status : undefined,
+			id: request.id,
+			childRunStatus: isNonEmptyArray(request.childRunStatus) ? request.childRunStatus : undefined,
 		});
 		return {
 			runs: childRuns.map((child) => {

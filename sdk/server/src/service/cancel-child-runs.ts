@@ -66,7 +66,7 @@ export const createChildRunCanceller = () => ({
 		}
 
 		const workflows = await repos.workflow.getOrCreateBulk(workflowEntries);
-		const workflowsByNamespaceId = new Map(workflows.map((w) => [w.namespaceId, w]));
+		const workflowsByNamespaceId = new Map(workflows.map((workflow) => [workflow.namespaceId, workflow]));
 
 		const now = Date.now();
 		const inputHashes = await Promise.all(inputHashPromises);

@@ -142,7 +142,7 @@ describe("createCancelChildRunsV1", () => {
 				);
 
 			client.api.workflowRun.listChildRunsV1.once(
-				{ parentRunId, status: NON_TERMINAL_WORKFLOW_RUN_STATUSES },
+				{ id: parentRunId, childRunStatus: NON_TERMINAL_WORKFLOW_RUN_STATUSES },
 				{ runs: nonTerminalChildRunIds.map((id) => ({ id })) }
 			);
 			client.api.workflowRun.cancelByIdsV1.once(
@@ -220,7 +220,7 @@ describe("createCancelChildRunsV1", () => {
 				);
 
 			client.api.workflowRun.listChildRunsV1.once(
-				{ parentRunId, status: NON_TERMINAL_WORKFLOW_RUN_STATUSES },
+				{ id: parentRunId, childRunStatus: NON_TERMINAL_WORKFLOW_RUN_STATUSES },
 				{ runs: [] }
 			);
 

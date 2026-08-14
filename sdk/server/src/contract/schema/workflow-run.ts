@@ -193,8 +193,8 @@ export const workflowRunStateScheduledRequestOptimisticSchema = workflowRunState
 );
 
 export const listChildRunsRequestSchema = type({
-	parentRunId: "string > 0",
-	"status?": workflowRunStatusSchema.array(),
+	id: "string > 0",
+	"childRunStatus?": workflowRunStatusSchema.array(),
 });
 
 export const listChildRunsResponseSchema = type({

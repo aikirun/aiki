@@ -229,8 +229,8 @@ export interface WorkflowRunMulticastEventByReferenceRequestV1 {
 }
 
 export interface WorkflowRunListChildRunsRequestV1 {
-	parentRunId: string;
-	status?: WorkflowRunStatus[];
+	id: string;
+	childRunStatus?: WorkflowRunStatus[];
 }
 
 export interface WorkflowRunListChildRunsResponseV1 {
