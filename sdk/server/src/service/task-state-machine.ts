@@ -1,4 +1,3 @@
-import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { TaskTransitionStateRequestV1, TransitionTaskStateToRunning } from "@aikirun/types/api/task";
@@ -89,7 +88,7 @@ async function transitionStateInTx(
 	}
 
 	if (isTaskStateTransitionToRunning(request) && request.type === "create") {
-		const inputHash = await hashInput(request.input);
+		const inputHash = request.inputHash;
 		const taskName = request.taskName as TaskName;
 		const taskId = ulid() as TaskId;
 		const stateTransitionId = ulid();

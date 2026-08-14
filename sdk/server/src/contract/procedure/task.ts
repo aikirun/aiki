@@ -42,6 +42,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 			taskName: "string > 0",
 			"options?": taskOptionsSchema,
 			"input?": "unknown",
+			inputHash: "string > 0",
 			taskState: taskStateRunningSchema.omit("attempts"),
 			expectedWorkflowRunRevision: "number.integer >= 0",
 		})

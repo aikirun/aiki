@@ -1,4 +1,5 @@
 import { asConfigProvider } from "@aikirun/lib/config";
+import { hashInput } from "@aikirun/lib/crypto";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import { completedTaskInfoFactory, runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
@@ -50,6 +51,8 @@ describe("createCancelChildRunsV1", () => {
 
 			const parentRunId = "parent-run-1";
 			const nonTerminalChildRunIds = ["child-run-1", "child-run-2"];
+			const parentRunIdInputHash = await hashInput(parentRunId);
+			const nonTerminalChildRunIdsInputHash = await hashInput(nonTerminalChildRunIds);
 
 			const runningListNonTerminalChildrenTask = runningTaskInfoFactory.build({
 				name: LIST_NON_TERMINAL_CHILDREN_TASK_NAME,
@@ -97,6 +100,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "create",
 						input: parentRunId,
+						inputHash: parentRunIdInputHash,
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
 						taskState: { status: runningListNonTerminalChildrenTask.state.status },
@@ -118,6 +122,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "create",
 						input: nonTerminalChildRunIds,
+						inputHash: nonTerminalChildRunIdsInputHash,
 						taskName: runningCancelRunsTask.name,
 						options: {},
 						taskState: { status: runningCancelRunsTask.state.status },
@@ -155,6 +160,7 @@ describe("createCancelChildRunsV1", () => {
 			const canceChildRunsV1 = createCancelChildRunsV1(client.api);
 
 			const parentRunId = "parent-run-1";
+			const parentRunIdInputHash = await hashInput(parentRunId);
 
 			const runningListNonTerminalChildrenTask = runningTaskInfoFactory.build({
 				name: LIST_NON_TERMINAL_CHILDREN_TASK_NAME,
@@ -194,6 +200,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "create",
 						input: parentRunId,
+						inputHash: parentRunIdInputHash,
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
 						taskState: { status: runningListNonTerminalChildrenTask.state.status },

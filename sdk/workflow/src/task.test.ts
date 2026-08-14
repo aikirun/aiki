@@ -74,6 +74,7 @@ describe("task", () => {
 					});
 
 					const input = "info@aiki.run";
+					const inputHash = await hashInput(input);
 					const output = "Sent to info@aiki.run";
 
 					const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
@@ -88,6 +89,7 @@ describe("task", () => {
 							{
 								type: "create",
 								input,
+								inputHash,
 								taskName: sendEmail.name,
 								options: {},
 								taskState: { status: "running" },
@@ -130,6 +132,7 @@ describe("task", () => {
 				});
 
 				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
 				const output = "charged";
 
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
@@ -144,6 +147,7 @@ describe("task", () => {
 						{
 							type: "create",
 							input,
+							inputHash,
 							taskName: chargeCard.name,
 							options: { retry },
 							taskState: { status: "running" },
@@ -167,7 +171,7 @@ describe("task", () => {
 			}));
 
 		test("persists awaiting_retry and suspends when the delay exceeds the max inline wait", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: 0 });
 
@@ -181,6 +185,7 @@ describe("task", () => {
 				});
 
 				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 
 				client.api.task.transitionStateV1
@@ -188,6 +193,7 @@ describe("task", () => {
 						{
 							type: "create",
 							input,
+							inputHash,
 							taskName: chargeCard.name,
 							options: { retry },
 							taskState: { status: "running" },
@@ -215,7 +221,7 @@ describe("task", () => {
 			}));
 
 		test("fails the task and throws TaskFailedError when there is no retry budget", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord);
 
@@ -227,6 +233,7 @@ describe("task", () => {
 				});
 
 				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 
 				client.api.task.transitionStateV1
@@ -234,6 +241,7 @@ describe("task", () => {
 						{
 							type: "create",
 							input,
+							inputHash,
 							taskName: chargeCard.name,
 							options: {},
 							taskState: { status: "running" },
@@ -437,6 +445,7 @@ describe("task", () => {
 				});
 
 				const input = { to: "info@aiki.run" };
+				const inputHash = await hashInput(input);
 				const output = "sent";
 				const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
 
@@ -452,6 +461,7 @@ describe("task", () => {
 						{
 							type: "create",
 							input,
+							inputHash,
 							taskName: sendEmail.name,
 							options: { retry },
 							taskState: { status: "running" },

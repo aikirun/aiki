@@ -154,6 +154,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			taskName: this.name,
 			options: startOptions,
 			input,
+			inputHash,
 			taskState: { status: "running" },
 		});
 
