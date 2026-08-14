@@ -5,7 +5,7 @@ import {
 	InvalidTaskStateTransitionError,
 	InvalidWorkflowRunStateTransitionError,
 	ScheduleConflictError,
-	WorkflowRunConflictError,
+	WorkflowRunReferenceConflictError,
 	WorkflowRunRevisionConflictError,
 } from "../errors";
 import type { RequestContext } from "../middleware/context";
@@ -35,8 +35,8 @@ export function handleError<T extends RequestContext>({ logger }: T, err: unknow
 		throw new ORPCError("WORKFLOW_RUN_REVISION_CONFLICT", { message: err.message, status: 409 });
 	}
 
-	if (err instanceof WorkflowRunConflictError) {
-		throw new ORPCError("WORKFLOW_RUN_CONFLICT", { message: err.message, status: 409 });
+	if (err instanceof WorkflowRunReferenceConflictError) {
+		throw new ORPCError("WORKFLOW_RUN_REFERENCE_CONFLICT", { message: err.message, status: 409 });
 	}
 
 	if (err instanceof ScheduleConflictError) {

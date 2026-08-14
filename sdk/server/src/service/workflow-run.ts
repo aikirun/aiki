@@ -32,7 +32,7 @@ import type {
 import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import { WorkflowRunConflictError } from "../errors";
+import { WorkflowRunReferenceConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { ChildWorkflowRunWaitRow } from "../infra/db/types/child-workflow-run-wait";
 import type { EventWaitRow, EventWaitRowInsert } from "../infra/db/types/event-wait";
@@ -447,7 +447,7 @@ async function createWorkflowRunInTx(
 			if (existingRun.inputHash !== inputHash) {
 				const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 				if (conflictPolicy === "error") {
-					throw new WorkflowRunConflictError(name, versionId, referenceId);
+					throw new WorkflowRunReferenceConflictError(name, versionId, referenceId);
 				}
 				conflictPolicy satisfies "return_existing";
 			}

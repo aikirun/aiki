@@ -69,14 +69,14 @@ export class ScheduleConflictError extends Error {
 	}
 }
 
-export class WorkflowRunConflictError extends Error {
+export class WorkflowRunReferenceConflictError extends Error {
 	public readonly workflowName: WorkflowName;
 	public readonly workflowVersionId: WorkflowVersionId;
 	public readonly referenceId: string;
 
 	constructor(workflowName: WorkflowName, workflowVersionId: WorkflowVersionId, referenceId: string) {
 		super(`Workflow ${workflowName}:${workflowVersionId} run already exists with reference: ${referenceId}`);
-		this.name = "WorkflowRunConflictError";
+		this.name = "WorkflowRunReferenceConflictError";
 		this.workflowName = workflowName;
 		this.workflowVersionId = workflowVersionId;
 		this.referenceId = referenceId;
