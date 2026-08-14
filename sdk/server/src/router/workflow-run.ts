@@ -2,19 +2,19 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { namespaceAuthedImplementer } from "./implementer";
 import { runConcurrently } from "../lib/concurrency";
+import type { WorkflowRunStateMachine } from "../service/state-machine/workflow-run-state-machine";
 import type { WorkflowRunService } from "../service/workflow-run";
 import type { WorkflowRunOutboxService } from "../service/workflow-run-outbox";
-import type { WorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
 
 export interface WorkflowRunRouterDeps {
 	workflowRunService: WorkflowRunService;
-	workflowRunStateMachineService: WorkflowRunStateMachineService;
+	workflowRunStateMachine: WorkflowRunStateMachine;
 	workflowRunOutboxService: WorkflowRunOutboxService;
 }
 
 export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	const os = namespaceAuthedImplementer.workflowRun;
-	const { workflowRunService, workflowRunStateMachineService, workflowRunOutboxService } = deps;
+	const { workflowRunService, workflowRunStateMachine, workflowRunOutboxService } = deps;
 
 	return os.router({
 		listV1: os.listV1.handler(async ({ input: request, context }) => {
@@ -46,7 +46,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		}),
 
 		transitionStateV1: os.transitionStateV1.handler(async ({ input: request, context }) => {
-			return workflowRunStateMachineService.transitionState(context, request);
+			return workflowRunStateMachine.transitionState(context, request);
 		}),
 
 		listTransitionsV1: os.listTransitionsV1.handler(async ({ input: request, context }) => {

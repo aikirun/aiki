@@ -14,12 +14,12 @@ import { createNamespaceRequestContext, type NamespaceRequestContext } from "./m
 import { createNamespaceAuthedRouter } from "./router/index";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 import { createScheduleService } from "./service/schedule";
+import { createTaskStateMachine } from "./service/state-machine/task-state-machine";
+import { createWorkflowRunStateMachine } from "./service/state-machine/workflow-run-state-machine";
 import { createTaskService } from "./service/task";
-import { createTaskStateMachineService } from "./service/task-state-machine";
 import { createWorkflowService } from "./service/workflow";
 import { createWorkflowRunService } from "./service/workflow-run";
 import { createWorkflowRunOutboxService } from "./service/workflow-run-outbox";
-import { createWorkflowRunStateMachineService } from "./service/workflow-run-state-machine";
 import packageJson from "../package.json";
 
 export interface CreateHandlerParams {
@@ -37,15 +37,15 @@ export async function createHandler(params: CreateHandlerParams) {
 	const apiAuthorizer = (iam?.api ?? noopApiAuthorizer)({ logger });
 	const dashboardIam = iam?.dashboard?.({ logger });
 
-	const workflowRunStateMachineService = createWorkflowRunStateMachineService({
+	const workflowRunStateMachine = createWorkflowRunStateMachine({
 		repos,
 		childRunCanceller,
 	});
-	const taskStateMachineService = createTaskStateMachineService({ repos });
+	const taskStateMachine = createTaskStateMachine({ repos });
 	const workflowRunService = createWorkflowRunService({
 		repos,
 		childRunCanceller,
-		workflowRunStateMachineService,
+		workflowRunStateMachine,
 	});
 	const workflowService = createWorkflowService({ repos });
 	const scheduleService = createScheduleService({ repos });
@@ -54,8 +54,8 @@ export async function createHandler(params: CreateHandlerParams) {
 
 	const namespaceAuthedRouter = createNamespaceAuthedRouter({
 		workflowRunService,
-		workflowRunStateMachineService,
-		taskStateMachineService,
+		workflowRunStateMachine,
+		taskStateMachine,
 		taskService,
 		workflowService,
 		scheduleService,

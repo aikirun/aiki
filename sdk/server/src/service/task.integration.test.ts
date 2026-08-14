@@ -1,9 +1,9 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
+import { createTaskStateMachine } from "./state-machine/task-state-machine";
 import { describe, expect, test } from "bun:test";
 import { createTaskService } from "../service/task";
-import { createTaskStateMachineService } from "../service/task-state-machine";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
 import { seedClaimedRun } from "../testing/seed/run";
@@ -40,7 +40,7 @@ describe("TaskService getTaskById", () => {
 				publisher,
 			});
 
-			const taskStateMachine = createTaskStateMachineService({ repos });
+			const taskStateMachine = createTaskStateMachine({ repos });
 			await taskStateMachine.transitionState(context, {
 				type: "retry",
 				workflowRunId: runId,

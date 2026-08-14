@@ -3,16 +3,16 @@ import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/wo
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 
+import { createTaskStateMachine } from "./state-machine/task-state-machine";
+import {
+	createWorkflowRunStateMachine,
+	type WorkflowRunStateMachine,
+} from "./state-machine/workflow-run-state-machine";
 import { describe, expect, test } from "bun:test";
 import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
-import { createTaskStateMachineService } from "../service/task-state-machine";
 import { createWorkflowRunService } from "../service/workflow-run";
-import {
-	createWorkflowRunStateMachineService,
-	type WorkflowRunStateMachineService,
-} from "../service/workflow-run-state-machine";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
@@ -23,10 +23,10 @@ const withHarness = createServiceHarness();
 
 function createService(repos: Repositories) {
 	const childRunCanceller = createChildRunCanceller();
-	const workflowRunStateMachineService = createWorkflowRunStateMachineService({ repos, childRunCanceller });
+	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller });
 	return {
-		service: createWorkflowRunService({ repos, childRunCanceller, workflowRunStateMachineService }),
-		stateMachine: workflowRunStateMachineService,
+		service: createWorkflowRunService({ repos, childRunCanceller, workflowRunStateMachine }),
+		stateMachine: workflowRunStateMachine,
 	};
 }
 
@@ -210,7 +210,7 @@ describe("WorkflowRunService cancelByIds", () => {
 		TerminalWorkflowRunStatus,
 		(
 			context: NamespaceRequestContext,
-			stateMachine: WorkflowRunStateMachineService,
+			stateMachine: WorkflowRunStateMachine,
 			seed: { runId: string; revisionWhenClaimed: number }
 		) => Promise<WorkflowRunTransitionStateResponseV1>
 	>).forEach(([status, reachTerminalStatus]) => {
@@ -278,7 +278,7 @@ describe("WorkflowRunService cancelByIds", () => {
 				publisher,
 			});
 
-			const taskStateMachine = createTaskStateMachineService({ repos });
+			const taskStateMachine = createTaskStateMachine({ repos });
 			const taskInput = { amountCents: 1250 };
 			const taskInfo = await taskStateMachine.transitionState(context, {
 				type: "create",
@@ -348,7 +348,7 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 				publisher,
 			});
 
-			const taskStateMachine = createTaskStateMachineService({ repos });
+			const taskStateMachine = createTaskStateMachine({ repos });
 			await taskStateMachine.transitionState(context, {
 				type: "retry",
 				workflowRunId: runId,

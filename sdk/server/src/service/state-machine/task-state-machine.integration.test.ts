@@ -1,16 +1,16 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
+import { createTaskStateMachine } from "./task-state-machine";
 import { describe, expect, test } from "bun:test";
-import { createTaskStateMachineService } from "../service/task-state-machine";
-import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
-import { createServiceHarness } from "../testing/harness";
-import { seedClaimedRun } from "../testing/seed/run";
-import { seedRunningTask } from "../testing/seed/task";
+import { namespaceRequestContextFactory } from "../../testing/data-factory/middleware/context";
+import { createServiceHarness } from "../../testing/harness";
+import { seedClaimedRun } from "../../testing/seed/run";
+import { seedRunningTask } from "../../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
-describe("TaskStateMachineService transitionState", () => {
+describe("TaskStateMachine transitionState", () => {
 	test("does not transition a task belonging to another run", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const otherNamespaceContext = namespaceRequestContextFactory.build({ namespaceId: "other-ns" as NamespaceId });
@@ -31,7 +31,7 @@ describe("TaskStateMachineService transitionState", () => {
 				publisher,
 			});
 
-			const taskStateMachine = createTaskStateMachineService({ repos });
+			const taskStateMachine = createTaskStateMachine({ repos });
 			expect(
 				taskStateMachine.transitionState(context, {
 					workflowRunId: attackerRunSeed.runId,

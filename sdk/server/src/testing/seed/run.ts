@@ -9,8 +9,8 @@ import { stallUndeliverableRuns } from "../../daemon/stall-undeliverable-runs";
 import type { Repositories } from "../../infra/db/types";
 import type { DaemonContext, NamespaceRequestContext } from "../../middleware/context";
 import { createChildRunCanceller } from "../../service/cancel-child-runs";
+import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run-state-machine";
 import { createWorkflowRunService } from "../../service/workflow-run";
-import { createWorkflowRunStateMachineService } from "../../service/workflow-run-state-machine";
 import { withFakeClock } from "../clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../data-factory/middleware/context";
 
@@ -20,11 +20,11 @@ const publishPendingOutboxEntriesDaemonConfig = defaultServerRuntimeConfig.daemo
 
 function createServices(repos: Repositories) {
 	const childRunCanceller = createChildRunCanceller();
-	const workflowRunStateMachine = createWorkflowRunStateMachineService({ repos, childRunCanceller });
+	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller });
 	const workflowRun = createWorkflowRunService({
 		repos,
 		childRunCanceller,
-		workflowRunStateMachineService: workflowRunStateMachine,
+		workflowRunStateMachine,
 	});
 	return { workflowRun, workflowRunStateMachine };
 }

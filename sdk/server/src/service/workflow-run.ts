@@ -32,6 +32,7 @@ import type {
 import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
+import type { WorkflowRunStateMachine } from "./state-machine/workflow-run-state-machine";
 import { WorkflowRunReferenceConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import type { ChildWorkflowRunWaitRow } from "../infra/db/types/child-workflow-run-wait";
@@ -48,7 +49,6 @@ import type { WorkflowRunRow } from "../infra/db/types/workflow-run";
 import type { NamespaceRequestContext } from "../middleware/context";
 import type { CancelledParentRun, ChildRunCanceller } from "../service/cancel-child-runs";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
-import type { WorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
 
 export interface WorkflowRunServiceDeps {
 	repos: Pick<
@@ -63,13 +63,13 @@ export interface WorkflowRunServiceDeps {
 		| "transaction"
 	>;
 	childRunCanceller: ChildRunCanceller;
-	workflowRunStateMachineService: WorkflowRunStateMachineService;
+	workflowRunStateMachine: WorkflowRunStateMachine;
 }
 
 export const createWorkflowRunService = ({
 	repos,
 	childRunCanceller,
-	workflowRunStateMachineService,
+	workflowRunStateMachine,
 }: WorkflowRunServiceDeps) => ({
 	async createWorkflowRun(
 		context: NamespaceRequestContext,
@@ -275,7 +275,7 @@ export const createWorkflowRunService = ({
 			const currentState = latestStateTransition.state as WorkflowRunState;
 
 			if (currentState.status === "awaiting_event" && currentState.eventName === eventName) {
-				await workflowRunStateMachineService.transitionState(
+				await workflowRunStateMachine.transitionState(
 					context,
 					{
 						type: "optimistic",

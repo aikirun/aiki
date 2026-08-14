@@ -1,15 +1,15 @@
 import { namespaceAuthedImplementer } from "./implementer";
+import type { TaskStateMachine } from "../service/state-machine/task-state-machine";
 import type { TaskService } from "../service/task";
-import type { TaskStateMachineService } from "../service/task-state-machine";
 
 export interface TaskRouterDeps {
 	taskService: TaskService;
-	taskStateMachineService: TaskStateMachineService;
+	taskStateMachine: TaskStateMachine;
 }
 
 export function createTaskRouter(deps: TaskRouterDeps) {
 	const os = namespaceAuthedImplementer.task;
-	const { taskService, taskStateMachineService } = deps;
+	const { taskService, taskStateMachine } = deps;
 
 	return os.router({
 		getByIdV1: os.getByIdV1.handler(async ({ input: request, context }) => {
@@ -18,7 +18,7 @@ export function createTaskRouter(deps: TaskRouterDeps) {
 		}),
 
 		transitionStateV1: os.transitionStateV1.handler(async ({ input: request, context }) => {
-			const taskInfo = await taskStateMachineService.transitionState(context, request);
+			const taskInfo = await taskStateMachine.transitionState(context, request);
 			return { taskInfo };
 		}),
 

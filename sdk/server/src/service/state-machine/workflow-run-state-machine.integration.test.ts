@@ -1,26 +1,26 @@
 import { NotFoundError } from "@aikirun/lib/error";
 
+import { createWorkflowRunStateMachine } from "./workflow-run-state-machine";
 import { describe, expect, test } from "bun:test";
-import { processImminentScheduledRuns } from "../daemon/imminent-scheduled-runs";
-import { processImminentSleepElapsedRuns } from "../daemon/imminent-sleep-elapsed-runs";
-import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../errors";
-import type { Repositories } from "../infra/db/types";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
-import { createWorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
-import { withFakeClock } from "../testing/clock";
-import { daemonContextFactory } from "../testing/data-factory/middleware/context";
-import { createServiceHarness } from "../testing/harness";
-import { claimRun, seedClaimedRun, seedScheduledRun, seedStalledRun } from "../testing/seed/run";
+import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-runs";
+import { processImminentSleepElapsedRuns } from "../../daemon/imminent-sleep-elapsed-runs";
+import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
+import type { Repositories } from "../../infra/db/types";
+import { withFakeClock } from "../../testing/clock";
+import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
+import { createServiceHarness } from "../../testing/harness";
+import { claimRun, seedClaimedRun, seedScheduledRun, seedStalledRun } from "../../testing/seed/run";
+import { createChildRunCanceller } from "../cancel-child-runs";
 
 const withHarness = createServiceHarness();
 
 const daemonContext = daemonContextFactory.build();
 
 function createStateMachine(repos: Repositories) {
-	return createWorkflowRunStateMachineService({ repos, childRunCanceller: createChildRunCanceller() });
+	return createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() });
 }
 
-describe("WorkflowRunStateMachineService transition preconditions", () => {
+describe("WorkflowRunStateMachine transition preconditions", () => {
 	test("rejects a transition for an unknown run", () =>
 		withHarness(async ({ context, repos }) => {
 			const stateMachine = createStateMachine(repos);
@@ -162,7 +162,7 @@ describe("WorkflowRunStateMachineService transition preconditions", () => {
 		}));
 });
 
-describe("WorkflowRunStateMachineService attempt counting", () => {
+describe("WorkflowRunStateMachine attempt counting", () => {
 	test("entering awaiting_retry charges no attempt", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
@@ -323,7 +323,7 @@ describe("WorkflowRunStateMachineService attempt counting", () => {
 		}));
 });
 
-describe("WorkflowRunStateMachineService sleep lifecycle", () => {
+describe("WorkflowRunStateMachine sleep lifecycle", () => {
 	test("entering sleeping state creates an active sleep row", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
@@ -496,7 +496,7 @@ describe("WorkflowRunStateMachineService sleep lifecycle", () => {
 		}));
 });
 
-describe("WorkflowRunStateMachineService redelivery", () => {
+describe("WorkflowRunStateMachine redelivery", () => {
 	test("redelivers a stalled run to scheduled with reason redelivery", () =>
 		withHarness(async ({ context, repos }) => {
 			const { runId } = await seedStalledRun({ namespaceRequestContext: context, repos });

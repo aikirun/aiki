@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createTaskStateMachineService } from "../../service/task-state-machine";
+import { createTaskStateMachine } from "../../service/state-machine/task-state-machine";
 import { createServiceHarness } from "../../testing/harness";
 import { seedCompletedTask, seedRunningTask } from "../../testing/seed/task";
 
@@ -34,7 +34,7 @@ describe("task repository compare-and-swap guards", () => {
 
 			// A retry is the one transition that keeps the status and bumps attempts —
 			// the change a status-only guard cannot see.
-			const taskStateMachine = createTaskStateMachineService({ repos });
+			const taskStateMachine = createTaskStateMachine({ repos });
 			await taskStateMachine.transitionState(context, {
 				type: "retry",
 				id: taskInfo.id,
@@ -61,7 +61,7 @@ describe("task repository compare-and-swap guards", () => {
 				publisher,
 			});
 
-			const taskStateMachine = createTaskStateMachineService({ repos });
+			const taskStateMachine = createTaskStateMachine({ repos });
 			await taskStateMachine.transitionState(context, {
 				type: "retry",
 				id: taskInfo.id,

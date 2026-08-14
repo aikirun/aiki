@@ -11,7 +11,7 @@ import {
 
 import { assertIsValidWorkflowRunStateTransition, convertDurationToTimestamp } from "./workflow-run-state-machine";
 import { describe, expect, test } from "bun:test";
-import { InvalidWorkflowRunStateTransitionError } from "../errors";
+import { InvalidWorkflowRunStateTransitionError } from "../../errors";
 
 describe("assertIsValidWorkflowRunStateTransition", () => {
 	function attemptTransition(fromStatus: WorkflowRunStatus, to: { status: WorkflowRunStatus; reason?: string }): void {

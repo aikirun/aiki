@@ -16,11 +16,11 @@ import type {
 import { isTerminalWorkflowRunStatus, isWorkflowRunScheduledReason } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../errors";
-import type { Repositories } from "../infra/db/types";
-import type { NamespaceRequestContext } from "../middleware/context";
-import type { ChildRunCanceller } from "../service/cancel-child-runs";
-import { discardStaleTasks } from "../service/discard-stale-tasks";
+import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
+import type { Repositories } from "../../infra/db/types";
+import type { NamespaceRequestContext } from "../../middleware/context";
+import type { ChildRunCanceller } from "../cancel-child-runs";
+import { discardStaleTasks } from "../discard-stale-tasks";
 
 type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
 
@@ -189,15 +189,12 @@ type TxRepos = Pick<
 	"workflowRun" | "workflow" | "stateTransition" | "sleep" | "task" | "childWorkflowRunWait" | "workflowRunOutbox"
 >;
 
-export interface WorkflowRunStateMachineServiceDeps {
+export interface WorkflowRunStateMachineDeps {
 	repos: TxRepos & Pick<Repositories, "transaction">;
 	childRunCanceller: ChildRunCanceller;
 }
 
-export const createWorkflowRunStateMachineService = ({
-	repos,
-	childRunCanceller,
-}: WorkflowRunStateMachineServiceDeps) => ({
+export const createWorkflowRunStateMachine = ({ repos, childRunCanceller }: WorkflowRunStateMachineDeps) => ({
 	async transitionState(
 		context: NamespaceRequestContext,
 		request: WorkflowRunTransitionStateRequestV1,
@@ -217,7 +214,7 @@ export const createWorkflowRunStateMachineService = ({
 	},
 });
 
-export type WorkflowRunStateMachineService = ReturnType<typeof createWorkflowRunStateMachineService>;
+export type WorkflowRunStateMachine = ReturnType<typeof createWorkflowRunStateMachine>;
 
 async function transitionStateInTx(
 	context: NamespaceRequestContext,

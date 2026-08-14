@@ -13,9 +13,13 @@ import type {
 } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import { InvalidTaskStateTransitionError, TaskStateConflictError, WorkflowRunRevisionConflictError } from "../errors";
-import type { Repositories } from "../infra/db/types";
-import type { NamespaceRequestContext } from "../middleware/context";
+import {
+	InvalidTaskStateTransitionError,
+	TaskStateConflictError,
+	WorkflowRunRevisionConflictError,
+} from "../../errors";
+import type { Repositories } from "../../infra/db/types";
+import type { NamespaceRequestContext } from "../../middleware/context";
 
 const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
 	running: ["running", "awaiting_retry", "completed", "failed"],
@@ -51,11 +55,11 @@ export function isTaskStateTransitionToRunning(
 	return request.taskState.status === "running";
 }
 
-export interface TaskStateMachineServiceDeps {
+export interface TaskStateMachineDeps {
 	repos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox" | "transaction">;
 }
 
-export const createTaskStateMachineService = ({ repos }: TaskStateMachineServiceDeps) => ({
+export const createTaskStateMachine = ({ repos }: TaskStateMachineDeps) => ({
 	async transitionState(
 		context: NamespaceRequestContext,
 		request: TaskTransitionStateRequestV1,
@@ -69,7 +73,7 @@ export const createTaskStateMachineService = ({ repos }: TaskStateMachineService
 	},
 });
 
-export type TaskStateMachineService = ReturnType<typeof createTaskStateMachineService>;
+export type TaskStateMachine = ReturnType<typeof createTaskStateMachine>;
 
 async function transitionStateInTx(
 	{ namespaceId, logger }: NamespaceRequestContext,

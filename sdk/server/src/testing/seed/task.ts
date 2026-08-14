@@ -2,7 +2,7 @@ import { hashInput } from "@aikirun/lib/crypto";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
 import { type SeedRunDeps, seedClaimedRun } from "./run";
-import { createTaskStateMachineService } from "../../service/task-state-machine";
+import { createTaskStateMachine } from "../../service/state-machine/task-state-machine";
 import { namespaceRequestContextFactory } from "../data-factory/middleware/context";
 
 const seededTask = {
@@ -16,7 +16,7 @@ export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePubli
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
 
-	const taskStateMachine = createTaskStateMachineService({ repos });
+	const taskStateMachine = createTaskStateMachine({ repos });
 	const taskInfo = await taskStateMachine.transitionState(namespaceRequestContext, {
 		type: "create",
 		workflowRunId: seeded.runId,
@@ -35,7 +35,7 @@ export async function seedCompletedTask(deps: SeedRunDeps & { publisher: FakePub
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedRunningTask({ ...deps, namespaceRequestContext });
 
-	const taskStateMachine = createTaskStateMachineService({ repos });
+	const taskStateMachine = createTaskStateMachine({ repos });
 	const taskInfo = await taskStateMachine.transitionState(namespaceRequestContext, {
 		id: seeded.taskInfo.id,
 		workflowRunId: seeded.runId,
