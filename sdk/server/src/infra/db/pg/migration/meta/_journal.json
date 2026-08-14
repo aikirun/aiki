@@ -134,6 +134,13 @@
 			"when": 1786551260476,
 			"tag": "0018_lethal_serpent_society",
 			"breakpoints": true
+		},
+		{
+			"idx": 19,
+			"version": "7",
+			"when": 1786715913819,
+			"tag": "0019_medical_rocket_raccoon",
+			"breakpoints": true
 		}
 	]
 }
