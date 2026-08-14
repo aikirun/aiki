@@ -118,6 +118,7 @@ export interface WorkflowRunCreateRequestV1 {
 	name: string;
 	versionId: string;
 	input?: unknown;
+	inputHash: string;
 	parentWorkflowRunId?: string;
 	options?: WorkflowStartOptions;
 }

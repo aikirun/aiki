@@ -85,8 +85,7 @@ export const createWorkflowRunService = ({
 		context: NamespaceRequestContext,
 		request: WorkflowRunCreateRequestV1
 	): Promise<WorkflowRunId> {
-		const inputHash = await hashInput(request.input);
-		return repos.transaction(async (txRepos) => createWorkflowRunInTx(context, request, inputHash, txRepos));
+		return repos.transaction(async (txRepos) => createWorkflowRunInTx(context, request, txRepos));
 	},
 
 	async getWorkflowRunById(context: NamespaceRequestContext, id: string): Promise<WorkflowRunRecord> {
@@ -548,13 +547,12 @@ export type WorkflowRunService = ReturnType<typeof createWorkflowRunService>;
 async function createWorkflowRunInTx(
 	{ namespaceId, logger }: NamespaceRequestContext,
 	request: WorkflowRunCreateRequestV1,
-	inputHash: string,
 	txRepos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">
 ): Promise<WorkflowRunId> {
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
 	const parentWorkflowRunId = request.parentWorkflowRunId as WorkflowRunId | undefined;
-	const { input, options } = request;
+	const { input, inputHash, options } = request;
 	const referenceId = options?.reference?.id;
 
 	const workflow = await txRepos.workflow.getOrCreate({ namespaceId, name, versionId, source: "user" });

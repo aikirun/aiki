@@ -1,3 +1,4 @@
+import { hashInput } from "@aikirun/lib/crypto";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
@@ -52,10 +53,12 @@ async function _seedScheduledRun(
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const services = createServices(repos);
 
+	const input = { orderId: "order-7" };
 	const runId = await services.workflowRun.createWorkflowRun(namespaceRequestContext, {
 		name: seededWorkflow.name,
 		versionId: seededWorkflow.versionId,
-		input: { orderId: "order-7" },
+		input,
+		inputHash: await hashInput(input),
 		options: pool ? { pool } : undefined,
 	});
 
