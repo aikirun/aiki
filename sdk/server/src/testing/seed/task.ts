@@ -14,7 +14,7 @@ export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePubli
 	const taskStateMachine = createTaskStateMachineService({ repos });
 	const taskInfo = await taskStateMachine.transitionState(namespaceRequestContext, {
 		type: "create",
-		id: seeded.runId,
+		workflowRunId: seeded.runId,
 		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
 		taskName: seededTask.name,
 		input: seededTask.input,

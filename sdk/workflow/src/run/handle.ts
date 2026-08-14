@@ -3,11 +3,8 @@ import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import type { DistributiveOmit } from "@aikirun/lib/object";
-import type {
-	WorkflowRunStateRequest,
-	WorkflowRunTransitionStateResponseV1,
-	WorkflowRunTransitionTaskStateRequestV1,
-} from "@aikirun/types/api/workflow-run";
+import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
+import type { WorkflowRunStateRequest, WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
@@ -155,7 +152,7 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 		client: Client<Context>;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (
-			request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedWorkflowRunRevision">
+			request: DistributiveOmit<TaskTransitionStateRequestV1, "workflowRunId" | "expectedWorkflowRunRevision">
 		) => Promise<TaskInfo>;
 		assertExecutionAllowed: () => void;
 	};
@@ -377,12 +374,12 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 	}
 
 	private async transitionTaskState(
-		request: DistributiveOmit<WorkflowRunTransitionTaskStateRequestV1, "id" | "expectedWorkflowRunRevision">
+		request: DistributiveOmit<TaskTransitionStateRequestV1, "workflowRunId" | "expectedWorkflowRunRevision">
 	): Promise<TaskInfo> {
 		try {
-			const { taskInfo } = await this.api.workflowRun.transitionTaskStateV1({
+			const { taskInfo } = await this.api.task.transitionStateV1({
 				...request,
-				id: this.run.id,
+				workflowRunId: this.run.id,
 				expectedWorkflowRunRevision: this.run.revision,
 			});
 			return taskInfo;

@@ -1,10 +1,7 @@
 import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
-import type {
-	TransitionTaskStateToRunning,
-	WorkflowRunTransitionTaskStateRequestV1,
-} from "@aikirun/types/api/workflow-run";
+import type { TaskTransitionStateRequestV1, TransitionTaskStateToRunning } from "@aikirun/types/api/task";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import type {
 	TaskId,
@@ -50,7 +47,7 @@ export function assertIsValidTaskStateTransition(
 }
 
 export function isTaskStateTransitionToRunning(
-	request: WorkflowRunTransitionTaskStateRequestV1
+	request: TaskTransitionStateRequestV1
 ): request is TransitionTaskStateToRunning {
 	return request.taskState.status === "running";
 }
@@ -62,7 +59,7 @@ export interface TaskStateMachineServiceDeps {
 export const createTaskStateMachineService = ({ repos }: TaskStateMachineServiceDeps) => ({
 	async transitionState(
 		context: NamespaceRequestContext,
-		request: WorkflowRunTransitionTaskStateRequestV1,
+		request: TaskTransitionStateRequestV1,
 		txRepos?: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
 	): Promise<TaskInfo> {
 		if (txRepos) {
@@ -77,10 +74,10 @@ export type TaskStateMachineService = ReturnType<typeof createTaskStateMachineSe
 
 async function transitionStateInTx(
 	{ namespaceId, logger }: NamespaceRequestContext,
-	request: WorkflowRunTransitionTaskStateRequestV1,
+	request: TaskTransitionStateRequestV1,
 	txRepos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
 ): Promise<TaskInfo> {
-	const runId = request.id as WorkflowRunId;
+	const runId = request.workflowRunId as WorkflowRunId;
 	const run = await txRepos.workflowRun.getById(namespaceId, runId);
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
@@ -134,7 +131,7 @@ async function transitionStateInTx(
 		return { id: taskId, name: taskName, state: taskState, inputHash };
 	}
 
-	const taskId = request.taskId as TaskId;
+	const taskId = request.id as TaskId;
 	const existingTask = await txRepos.task.getById({ id: taskId, workflowRunId: runId });
 	if (!existingTask) {
 		throw new NotFoundError(`Task not found: ${taskId}`);

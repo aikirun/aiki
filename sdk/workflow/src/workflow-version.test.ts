@@ -350,27 +350,27 @@ describe("workflow version execution", () => {
 
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 
-				client.api.workflowRun.transitionTaskStateV1
+				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
 							taskName: chargeCard.name,
 							options: {},
 							taskState: { status: "running" },
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
 					.once(
 						{
-							taskId: runningTaskInfo.id,
+							id: runningTaskInfo.id,
 							taskState: {
 								status: "failed",
 								attempts: 1,
 								error: expect.objectContaining({ message: "declined" }),
 							},
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
@@ -422,27 +422,27 @@ describe("workflow version execution", () => {
 
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 
-				client.api.workflowRun.transitionTaskStateV1
+				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
 							taskName: chargeCard.name,
 							options: {},
 							taskState: { status: "running" },
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
 					.once(
 						{
-							taskId: runningTaskInfo.id,
+							id: runningTaskInfo.id,
 							taskState: {
 								status: "failed",
 								attempts: 1,
 								error: expect.objectContaining({ message: "declined" }),
 							},
-							id: runRecord.id,
+							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
 						{ taskInfo: runningTaskInfo }

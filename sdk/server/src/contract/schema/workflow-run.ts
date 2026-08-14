@@ -209,24 +209,3 @@ export const cancelByIdsRequestSchema = type({
 export const cancelByIdsResponseSchema = type({
 	cancelledIds: type("string > 0").array(),
 });
-
-const taskStateOutputSchema = type({
-	status: "'completed'",
-	output: "unknown",
-}).or({
-	status: "'failed'",
-	error: serializedErrorSchema,
-});
-
-export const workflowRunSetTaskStateRequestSchema = type({
-	type: "'new'",
-	id: "string > 0",
-	taskName: "string > 0",
-	"input?": "unknown",
-	state: taskStateOutputSchema,
-}).or({
-	type: "'existing'",
-	id: "string > 0",
-	taskId: "string > 0",
-	state: taskStateOutputSchema,
-});

@@ -18,17 +18,7 @@ import type {
 } from "../workflow/run";
 import type { EventSendOptions } from "../workflow/run/event";
 import type { StateTransition } from "../workflow/state-transition";
-import type {
-	TaskInfo,
-	TaskStateCompleted,
-	TaskStateFailed,
-	TaskStatus,
-	TransitionTaskStateToAwaitingRetry,
-	TransitionTaskStateToCompleted,
-	TransitionTaskStateToFailed,
-	TransitionTaskStateToRunningCreate,
-	TransitionTaskStateToRunningRetry,
-} from "../workflow/task";
+import type { TaskStatus } from "../workflow/task";
 
 export interface WorkflowRunApi {
 	listV1: (_: WorkflowRunListRequestV1) => Promise<WorkflowRunListResponseV1>;
@@ -37,10 +27,6 @@ export interface WorkflowRunApi {
 	getStateV1: (_: WorkflowRunGetStateRequestV1) => Promise<WorkflowRunGetStateResponseV1>;
 	createV1: (_: WorkflowRunCreateRequestV1) => Promise<WorkflowRunCreateResponseV1>;
 	transitionStateV1: (_: WorkflowRunTransitionStateRequestV1) => Promise<WorkflowRunTransitionStateResponseV1>;
-	transitionTaskStateV1: (
-		_: WorkflowRunTransitionTaskStateRequestV1
-	) => Promise<WorkflowRunTransitionTaskStateResponseV1>;
-	setTaskStateV1: (_: WorkflowRunSetTaskStateRequestV1) => Promise<void>;
 	listTransitionsV1: (_: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
 	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<void>;
 	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<void>;
@@ -206,37 +192,6 @@ export interface WorkflowRunTransitionStateResponseV1 {
 	state: WorkflowRunState;
 	attempts: number;
 }
-
-export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | TransitionTaskStateToRunningRetry;
-
-export type WorkflowRunTransitionTaskStateRequestV1 =
-	| TransitionTaskStateToRunning
-	| TransitionTaskStateToCompleted
-	| TransitionTaskStateToFailed
-	| TransitionTaskStateToAwaitingRetry;
-
-export interface WorkflowRunTransitionTaskStateResponseV1 {
-	taskInfo: TaskInfo;
-}
-
-export interface WorkflowRunSetTaskStateRequestNew {
-	type: "new";
-	id: string;
-	taskName: string;
-	input?: unknown;
-	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
-}
-
-export interface WorkflowRunSetTaskStateRequestExisting {
-	type: "existing";
-	id: string;
-	taskId: string;
-	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
-}
-
-export type WorkflowRunSetTaskStateRequestV1 =
-	| WorkflowRunSetTaskStateRequestNew
-	| WorkflowRunSetTaskStateRequestExisting;
 
 export interface WorkflowRunListTransitionsRequestV1 {
 	id: string;
