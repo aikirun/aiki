@@ -1,3 +1,4 @@
+import { hashInput } from "@aikirun/lib/crypto";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
 import { type SeedRunDeps, seedClaimedRun } from "./run";
@@ -18,6 +19,7 @@ export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePubli
 		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
 		taskName: seededTask.name,
 		input: seededTask.input,
+		inputHash: await hashInput(seededTask.input),
 		taskState: { status: "running" },
 	});
 

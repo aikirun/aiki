@@ -116,6 +116,7 @@ describe("workflowRunHandle", () => {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
+					inputHash: "hash",
 					taskState: taskInfo.state,
 				};
 				client.api.task.transitionStateV1.once(
@@ -137,6 +138,7 @@ describe("workflowRunHandle", () => {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
+					inputHash: "hash",
 					taskState: { status: "running" },
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
@@ -156,6 +158,7 @@ describe("workflowRunHandle", () => {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
+					inputHash: "hash",
 					taskState: { status: "running" },
 				};
 				client.api.task.transitionStateV1.rejectsOnce(

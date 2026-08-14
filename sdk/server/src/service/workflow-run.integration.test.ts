@@ -279,12 +279,14 @@ describe("WorkflowRunService cancelByIds", () => {
 			});
 
 			const taskStateMachine = createTaskStateMachineService({ repos });
+			const taskInput = { amountCents: 1250 };
 			const taskInfo = await taskStateMachine.transitionState(context, {
 				type: "create",
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
 				taskName: "charge-card",
-				input: { amountCents: 1250 },
+				input: taskInput,
+				inputHash: await hashInput(taskInput),
 				taskState: { status: "running" },
 			});
 

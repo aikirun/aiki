@@ -332,7 +332,7 @@ describe("workflow version execution", () => {
 
 	describe("task failures", () => {
 		test("fails with cause 'task' when retries are exhausted", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const chargeCard = task({
 					name: "charge-card",
 					handler: async () => {
@@ -349,11 +349,13 @@ describe("workflow version execution", () => {
 				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
 
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+				const inputHash = await hashInput(undefined);
 
 				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
+							inputHash,
 							taskName: chargeCard.name,
 							options: {},
 							taskState: { status: "running" },
@@ -404,7 +406,7 @@ describe("workflow version execution", () => {
 			}));
 
 		test("awaits retry with cause 'task' when retries remain", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const chargeCard = task({
 					name: "charge-card",
 					handler: async () => {
@@ -421,11 +423,13 @@ describe("workflow version execution", () => {
 				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
 
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+				const inputHash = await hashInput(undefined);
 
 				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
+							inputHash,
 							taskName: chargeCard.name,
 							options: {},
 							taskState: { status: "running" },
