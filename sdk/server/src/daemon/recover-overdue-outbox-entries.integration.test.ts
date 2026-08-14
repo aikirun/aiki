@@ -104,11 +104,16 @@ describe("recoverOverdueOutboxEntries", () => {
 					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					id: runId,
+				});
 				expect(run).toEqual(
 					expect.objectContaining({
-						id: runId,
-						status: "queued",
+						run: expect.objectContaining({
+							id: runId,
+							status: "queued",
+						}),
 						state: { status: "queued", reason: "recovery" },
 					})
 				);
@@ -130,9 +135,12 @@ describe("recoverOverdueOutboxEntries", () => {
 					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
-				expect(run).toEqual(expect.objectContaining({ id: runId, status: "queued" }));
-				expect(run?.revision).toBeGreaterThan(revisionWhenClaimed);
+				const run = await repos.workflowRun.getByIdWithState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					id: runId,
+				});
+				expect(run).toEqual(expect.objectContaining({ run: expect.objectContaining({ id: runId, status: "queued" }) }));
+				expect(run?.run.revision).toBeGreaterThan(revisionWhenClaimed);
 			}));
 
 		test("charges no execution attempt for the lost claim", () =>
@@ -151,8 +159,13 @@ describe("recoverOverdueOutboxEntries", () => {
 					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
 				);
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
-				expect(run).toEqual(expect.objectContaining({ id: runId, attempts: attemptsWhenClaimed }));
+				const run = await repos.workflowRun.getByIdWithState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					id: runId,
+				});
+				expect(run).toEqual(
+					expect.objectContaining({ run: expect.objectContaining({ id: runId, attempts: attemptsWhenClaimed }) })
+				);
 			}));
 
 		test("leaves a fresh claim untouched", () =>
@@ -256,11 +269,16 @@ describe("recoverOverdueOutboxEntries", () => {
 
 				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					id: runId,
+				});
 				expect(run).toEqual(
 					expect.objectContaining({
-						id: runId,
-						status: "stalled",
+						run: expect.objectContaining({
+							id: runId,
+							status: "stalled",
+						}),
 					})
 				);
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
@@ -280,11 +298,16 @@ describe("recoverOverdueOutboxEntries", () => {
 
 				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					id: runId,
+				});
 				expect(run).toEqual(
 					expect.objectContaining({
-						id: runId,
-						status: "stalled",
+						run: expect.objectContaining({
+							id: runId,
+							status: "stalled",
+						}),
 					})
 				);
 				expect(await repos.workflowRunOutbox.listPublishable(context, 100)).toHaveLength(0);
@@ -305,11 +328,16 @@ describe("recoverOverdueOutboxEntries", () => {
 
 				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
 
-				const run = await repos.workflowRun.getByIdWithState(namespaceRequestContext.namespaceId, runId);
+				const run = await repos.workflowRun.getByIdWithState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					id: runId,
+				});
 				expect(run).toEqual(
 					expect.objectContaining({
-						id: runId,
-						status: "running",
+						run: expect.objectContaining({
+							id: runId,
+							status: "running",
+						}),
 					})
 				);
 				const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(context, {

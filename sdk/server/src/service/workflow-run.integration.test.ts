@@ -106,13 +106,15 @@ describe("WorkflowRunService cancelByIds", () => {
 			const result = await service.cancelByIds(context, { ids: [runId] });
 			expect(result).toEqual({ cancelledIds: [runId] });
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "cancelled",
-					revision: revisionWhenClaimed + 1,
-					attempts: attemptsWhenClaimed,
+					run: expect.objectContaining({
+						id: runId,
+						status: "cancelled",
+						revision: revisionWhenClaimed + 1,
+						attempts: attemptsWhenClaimed,
+					}),
 					state: { status: "cancelled", reason: "Cancelled" },
 				})
 			);
@@ -145,8 +147,12 @@ describe("WorkflowRunService cancelByIds", () => {
 			const { service } = createService(repos);
 			expect(await service.cancelByIds(context, { ids: [] })).toEqual({ cancelledIds: [] });
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
-			expect(run).toEqual(expect.objectContaining({ id: runId, status: "running", revision: revisionWhenClaimed }));
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({ id: runId, status: "running", revision: revisionWhenClaimed }),
+				})
+			);
 		}));
 
 	test("cancelling a sleeping run cancels its active sleep", () =>
@@ -169,11 +175,13 @@ describe("WorkflowRunService cancelByIds", () => {
 			const result = await withFakeClock(cancelledAt, () => service.cancelByIds(context, { ids: [runId] }));
 			expect(result).toEqual({ cancelledIds: [runId] });
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "cancelled",
+					run: expect.objectContaining({
+						id: runId,
+						status: "cancelled",
+					}),
 					state: { status: "cancelled", reason: "Cancelled" },
 				})
 			);
@@ -230,12 +238,17 @@ describe("WorkflowRunService cancelByIds", () => {
 				const result = await service.cancelByIds(context, { ids: [terminalRunSeed.runId, cancellableRunId] });
 				expect(result).toEqual({ cancelledIds: [cancellableRunId] });
 
-				const terminalRun = await repos.workflowRun.getByIdWithState(context.namespaceId, terminalRunSeed.runId);
+				const terminalRun = await repos.workflowRun.getByIdWithState({
+					namespaceId: context.namespaceId,
+					id: terminalRunSeed.runId,
+				});
 				expect(terminalRun).toEqual(
 					expect.objectContaining({
-						id: terminalRunSeed.runId,
-						status,
-						revision: terminal.revision,
+						run: expect.objectContaining({
+							id: terminalRunSeed.runId,
+							status,
+							revision: terminal.revision,
+						}),
 						state: terminal.state,
 					})
 				);
@@ -254,15 +267,17 @@ describe("WorkflowRunService cancelByIds", () => {
 			const { service } = createService(repos);
 			expect(await service.cancelByIds(context, { ids: [foreignRunSeed.runId] })).toEqual({ cancelledIds: [] });
 
-			const foreignRun = await repos.workflowRun.getByIdWithState(
-				otherNamespaceContext.namespaceId,
-				foreignRunSeed.runId
-			);
+			const foreignRun = await repos.workflowRun.getByIdWithState({
+				namespaceId: otherNamespaceContext.namespaceId,
+				id: foreignRunSeed.runId,
+			});
 			expect(foreignRun).toEqual(
 				expect.objectContaining({
-					id: foreignRunSeed.runId,
-					status: "running",
-					revision: foreignRunSeed.revisionWhenClaimed,
+					run: expect.objectContaining({
+						id: foreignRunSeed.runId,
+						status: "running",
+						revision: foreignRunSeed.revisionWhenClaimed,
+					}),
 				})
 			);
 		}));
@@ -318,8 +333,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			// The child is not cancelled inline: a system workflow run is scheduled to cascade the
 			// cancellation, and the child stays untouched until that run executes.
 			const scheduledRuns = await repos.workflowRun.listByFilters(
-				context.namespaceId,
-				{ status: ["scheduled"] },
+				{ namespaceId: context.namespaceId, status: ["scheduled"] },
 				10,
 				0,
 				{

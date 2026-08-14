@@ -110,8 +110,8 @@ export async function claimRun(deps: { context: NamespaceRequestContext; repos: 
 	const { context, repos, runId } = deps;
 	const services = createServices(repos);
 
-	const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
-	if (!run) {
+	const result = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+	if (!result) {
 		throw new Error(`Run not found: ${runId}`);
 	}
 
@@ -119,7 +119,7 @@ export async function claimRun(deps: { context: NamespaceRequestContext; repos: 
 		type: "optimistic",
 		id: runId,
 		state: { status: "running" },
-		expectedRevision: run.revision,
+		expectedRevision: result.run.revision,
 	});
 
 	return { revisionWhenClaimed: claim.revision, attemptsWhenClaimed: claim.attempts };

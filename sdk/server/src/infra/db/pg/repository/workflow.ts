@@ -23,14 +23,7 @@ export const createWorkflowRepository = (db: PgDb) => ({
 		return result[0] ?? null;
 	},
 
-	async getByIds(namespaceId: NamespaceId, ids: NonEmptyArray<string>): Promise<WorkflowRow[]> {
-		return db
-			.select()
-			.from(workflow)
-			.where(and(eq(workflow.namespaceId, namespaceId), inArray(workflow.id, ids)));
-	},
-
-	async getByIdsGlobal(_context: DaemonContext, ids: NonEmptyArray<string>): Promise<WorkflowRow[]> {
+	async getByIds(_context: DaemonContext, ids: NonEmptyArray<string>): Promise<WorkflowRow[]> {
 		return db.select().from(workflow).where(inArray(workflow.id, ids));
 	},
 

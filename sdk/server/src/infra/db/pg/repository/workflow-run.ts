@@ -1,14 +1,9 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type {
-	WorkflowRunId,
-	WorkflowRunState,
-	WorkflowRunStatus,
-	WorkflowStartOptions,
-} from "@aikirun/types/workflow/run";
+import type { WorkflowSource } from "@aikirun/types/workflow";
+import type { WorkflowRunId, WorkflowRunOptions, WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
-import type { TaskStatus } from "@aikirun/types/workflow/task";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
@@ -16,7 +11,7 @@ import { toWorkflowRunState } from "./state-transition";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
-import { stateTransition, task, workflow, workflowRun } from "../schema";
+import { stateTransition, workflow, workflowRun } from "../schema";
 
 export type WorkflowRunRow = typeof workflowRun.$inferSelect;
 export type WorkflowRunRowInsert = typeof workflowRun.$inferInsert;
@@ -33,7 +28,7 @@ export interface WorkflowRunMeta {
 	workflowId: string;
 	revision: number;
 	attempts: number;
-	options: WorkflowStartOptions | null;
+	options: WorkflowRunOptions | null;
 	latestStateTransitionId: string;
 }
 
@@ -48,10 +43,10 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 	},
 
 	async update(
-		filter: { id: WorkflowRunId; revision?: number },
+		filter: { namespaceId: NamespaceId; id: WorkflowRunId; revision?: number },
 		updates: WorkflowRunRowUpdate
 	): Promise<{ revision: number } | undefined> {
-		const conditions = [eq(workflowRun.id, filter.id)];
+		const conditions = [eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)];
 		if (filter.revision !== undefined) {
 			conditions.push(eq(workflowRun.revision, filter.revision));
 		}
@@ -85,46 +80,39 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 	},
 
 	async getById(
-		namespaceId: NamespaceId,
-		id: string,
+		filter: {
+			namespaceId: NamespaceId;
+			id: string;
+		},
 		options?: { forUpdate?: boolean }
-	): Promise<WorkflowRunRow | null> {
+	) {
 		const query = db
-			.select()
+			.select({ id: workflowRun.id, revision: workflowRun.revision })
 			.from(workflowRun)
-			.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
+			.where(and(eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)))
 			.limit(1);
 
 		const result = options?.forUpdate ? await query.for("update") : await query;
 		return result[0] ?? null;
 	},
 
-	async getByIds(namespaceId: NamespaceId, ids: NonEmptyArray<string>): Promise<WorkflowRunRow[]> {
-		return db
-			.select()
-			.from(workflowRun)
-			.where(and(eq(workflowRun.namespaceId, namespaceId), inArray(workflowRun.id, ids)));
-	},
-
-	async getByIdsGlobal(_context: DaemonContext, ids: NonEmptyArray<string>): Promise<WorkflowRunRow[]> {
-		return db.select().from(workflowRun).where(inArray(workflowRun.id, ids));
-	},
-
-	async getByIdWithState(namespaceId: NamespaceId, id: string, options?: { forUpdate?: boolean }) {
+	async getByIdWithState(filter: { namespaceId: NamespaceId; id: string }, options?: { forUpdate?: boolean }) {
 		const query = db
 			.select({
-				id: workflowRun.id,
-				status: workflowRun.status,
-				revision: workflowRun.revision,
-				attempts: workflowRun.attempts,
-				latestStateTransitionId: workflowRun.latestStateTransitionId,
-				parentWorkflowRunId: workflowRun.parentWorkflowRunId,
-				options: workflowRun.options,
+				run: {
+					id: workflowRun.id,
+					status: workflowRun.status,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					parentWorkflowRunId: workflowRun.parentWorkflowRunId,
+					options: workflowRun.options,
+				},
 				state: stateTransition.state,
 			})
 			.from(workflowRun)
 			.innerJoin(stateTransition, eq(workflowRun.latestStateTransitionId, stateTransition.id))
-			.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
+			.where(and(eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)))
 			.limit(1);
 
 		const result = options?.forUpdate ? await query.for("update", { of: workflowRun }) : await query;
@@ -132,8 +120,85 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		if (!row) {
 			return null;
 		}
-		(row as Record<string, unknown>).state = toWorkflowRunState(row.state);
-		return row as Omit<typeof row, "state"> & { state: WorkflowRunState };
+		return { ...row, state: toWorkflowRunState(row.state) };
+	},
+
+	async getByIdWithWorkflowAndState(filter: { namespaceId: NamespaceId; id: string }) {
+		const result = await db
+			.select({
+				run: {
+					id: workflowRun.id,
+					createdAt: workflowRun.createdAt,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					input: workflowRun.input,
+					inputHash: workflowRun.inputHash,
+					referenceId: workflowRun.referenceId,
+					options: workflowRun.options,
+					parentWorkflowRunId: workflowRun.parentWorkflowRunId,
+					scheduleId: workflowRun.scheduleId,
+				},
+				workflow: { name: workflow.name, versionId: workflow.versionId, source: workflow.source },
+				state: stateTransition.state,
+			})
+			.from(workflowRun)
+			.innerJoin(workflow, eq(workflowRun.workflowId, workflow.id))
+			.innerJoin(stateTransition, eq(workflowRun.latestStateTransitionId, stateTransition.id))
+			.where(and(eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)))
+			.limit(1);
+
+		const row = result[0];
+		if (!row) {
+			return null;
+		}
+		return { ...row, state: toWorkflowRunState(row.state) };
+	},
+
+	async getByReferenceWithWorkflowAndState(filter: {
+		namespaceId: NamespaceId;
+		name: string;
+		versionId: string;
+		source: WorkflowSource;
+		referenceId: string;
+	}) {
+		const result = await db
+			.select({
+				run: {
+					id: workflowRun.id,
+					createdAt: workflowRun.createdAt,
+					revision: workflowRun.revision,
+					attempts: workflowRun.attempts,
+					latestStateTransitionId: workflowRun.latestStateTransitionId,
+					input: workflowRun.input,
+					inputHash: workflowRun.inputHash,
+					referenceId: workflowRun.referenceId,
+					options: workflowRun.options,
+					parentWorkflowRunId: workflowRun.parentWorkflowRunId,
+					scheduleId: workflowRun.scheduleId,
+				},
+				workflow: { name: workflow.name, versionId: workflow.versionId, source: workflow.source },
+				state: stateTransition.state,
+			})
+			.from(workflowRun)
+			.innerJoin(workflow, eq(workflowRun.workflowId, workflow.id))
+			.innerJoin(stateTransition, eq(workflowRun.latestStateTransitionId, stateTransition.id))
+			.where(
+				and(
+					eq(workflow.namespaceId, filter.namespaceId),
+					eq(workflow.name, filter.name),
+					eq(workflow.versionId, filter.versionId),
+					eq(workflow.source, filter.source),
+					eq(workflowRun.referenceId, filter.referenceId)
+				)
+			)
+			.limit(1);
+
+		const row = result[0];
+		if (!row) {
+			return null;
+		}
+		return { ...row, state: toWorkflowRunState(row.state) };
 	},
 
 	async listByIdsAndStatus(_context: DaemonContext, ids: NonEmptyArray<string>, status: WorkflowRunStatus) {
@@ -151,27 +216,50 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.where(and(inArray(workflowRun.id, ids), eq(workflowRun.status, status)));
 	},
 
-	async getChildRuns(filter: {
-		parentRunId: string;
-		status?: NonEmptyArray<WorkflowRunStatus>;
-	}): Promise<WorkflowRunRow[]> {
+	async getChildRuns(filter: { namespaceId: NamespaceId; id: string; status?: NonEmptyArray<WorkflowRunStatus> }) {
 		// TODO: explore loading in chunks
-
-		const conditions = [eq(workflowRun.parentWorkflowRunId, filter.parentRunId)];
+		const conditions = [
+			eq(workflowRun.namespaceId, filter.namespaceId),
+			eq(workflowRun.parentWorkflowRunId, filter.id),
+		];
 		if (filter.status) {
 			conditions.push(inArray(workflowRun.status, filter.status));
 		}
 
-		const whereClause = and(...conditions);
+		return db
+			.select({ id: workflowRun.id, options: workflowRun.options })
+			.from(workflowRun)
+			.where(and(...conditions))
+			.limit(10_000);
+	},
 
-		return db.select().from(workflowRun).where(whereClause).limit(10_000);
+	async getChildRunsWithWorkflow(filter: { namespaceId: NamespaceId; id: string }) {
+		// TODO: explore loading in chunks
+		return db
+			.select({
+				run: {
+					id: workflowRun.id,
+					inputHash: workflowRun.inputHash,
+					referenceId: workflowRun.referenceId,
+				},
+				workflow: { name: workflow.name, versionId: workflow.versionId },
+			})
+			.from(workflowRun)
+			.innerJoin(workflow, eq(workflowRun.workflowId, workflow.id))
+			.where(and(eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.parentWorkflowRunId, filter.id)))
+			.limit(10_000);
 	},
 
 	async hasChildRuns(
-		parentRunIds: NonEmptyArray<string>,
+		runs: NonEmptyArray<{ id: string }>,
 		childRunStatus?: NonEmptyArray<WorkflowRunStatus>
 	): Promise<Set<string>> {
-		const conditions = [inArray(workflowRun.parentWorkflowRunId, parentRunIds)];
+		const conditions = [
+			inArray(
+				workflowRun.parentWorkflowRunId,
+				runs.map((run) => run.id)
+			),
+		];
 		if (childRunStatus) {
 			conditions.push(inArray(workflowRun.status, childRunStatus));
 		}
@@ -191,33 +279,52 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result;
 	},
 
-	async getByWorkflowAndReferenceId(workflowId: string, referenceId: string): Promise<WorkflowRunRow | null> {
+	async getByWorkflowAndReferenceId(filter: { namespaceId: NamespaceId; workflowId: string; referenceId: string }) {
 		const result = await db
-			.select()
+			.select({ id: workflowRun.id, inputHash: workflowRun.inputHash })
 			.from(workflowRun)
-			.where(and(eq(workflowRun.workflowId, workflowId), eq(workflowRun.referenceId, referenceId)))
+			.where(
+				and(
+					eq(workflowRun.namespaceId, filter.namespaceId),
+					eq(workflowRun.workflowId, filter.workflowId),
+					eq(workflowRun.referenceId, filter.referenceId)
+				)
+			)
 			.limit(1);
 		return result[0] ?? null;
 	},
 
 	async listByWorkflowAndReferenceIdPairs(filter: {
-		pairs: NonEmptyArray<{ workflowId: string; referenceId: string }>;
+		pairs: NonEmptyArray<{ namespaceId: NamespaceId; workflowId: string; referenceId: string }>;
 		status?: NonEmptyArray<WorkflowRunStatus>;
-	}): Promise<WorkflowRunRow[]> {
+	}) {
 		const pairConditions = or(
-			...filter.pairs.map(({ workflowId, referenceId }) =>
-				and(eq(workflowRun.workflowId, workflowId), eq(workflowRun.referenceId, referenceId))
+			...filter.pairs.map(({ namespaceId, workflowId, referenceId }) =>
+				and(
+					eq(workflowRun.namespaceId, namespaceId),
+					eq(workflowRun.workflowId, workflowId),
+					eq(workflowRun.referenceId, referenceId)
+				)
 			)
 		);
 		const conditions = filter.status ? and(pairConditions, inArray(workflowRun.status, filter.status)) : pairConditions;
 
-		return db.select().from(workflowRun).where(conditions);
+		return db
+			.select({
+				id: workflowRun.id,
+				workflowId: workflowRun.workflowId,
+				referenceId: workflowRun.referenceId,
+				attempts: workflowRun.attempts,
+				options: workflowRun.options,
+			})
+			.from(workflowRun)
+			.where(conditions);
 	},
 
 	// TODO: remove offset based pagination
 	async listByFilters(
-		namespaceId: NamespaceId,
 		filter: {
+			namespaceId: NamespaceId;
 			id?: string;
 			scheduleId?: string;
 			status?: NonEmptyArray<WorkflowRunStatus>;
@@ -230,7 +337,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		offset: number,
 		sort: { order: "asc" | "desc" }
 	) {
-		const conditions = [eq(workflowRun.namespaceId, namespaceId)];
+		const conditions = [eq(workflowRun.namespaceId, filter.namespaceId)];
 		if (filter.id) {
 			conditions.push(eq(workflowRun.id, filter.id));
 		}
@@ -270,29 +377,6 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		]);
 
 		return { rows, total: countResult[0]?.count ?? 0 };
-	},
-
-	async getTaskCountsByRunIds(runIds: NonEmptyArray<string>): Promise<Map<string, Record<TaskStatus, number>>> {
-		const rows = await db
-			.select({
-				workflowRunId: task.workflowRunId,
-				status: task.status,
-				count: count(),
-			})
-			.from(task)
-			.where(inArray(task.workflowRunId, runIds))
-			.groupBy(task.workflowRunId, task.status);
-
-		const result = new Map<string, Record<TaskStatus, number>>();
-		for (const row of rows) {
-			let taskCounts = result.get(row.workflowRunId);
-			if (!taskCounts) {
-				taskCounts = { completed: 0, running: 0, failed: 0, awaiting_retry: 0, discarded: 0 };
-				result.set(row.workflowRunId, taskCounts);
-			}
-			taskCounts[row.status] = row.count;
-		}
-		return result;
 	},
 
 	async countByStatus(
@@ -459,6 +543,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 	},
 
 	async bulkTransitionToQueued(
+		_context: DaemonContext,
 		fromStatus: "scheduled" | "sleeping" | "awaiting_retry" | "awaiting_event" | "awaiting_child_workflow" | "running",
 		runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
 		options?: { incrementAttempts?: boolean }
@@ -495,7 +580,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result.map((row) => row.id);
 	},
 
-	async bulkTransitionToCancelled(namespaceId: NamespaceId, runIds: NonEmptyArray<string>): Promise<string[]> {
+	async bulkTransitionToCancelledInNamespace(namespaceId: NamespaceId, runIds: NonEmptyArray<string>) {
 		const result = await db
 			.update(workflowRun)
 			.set({
@@ -513,12 +598,12 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 					inArray(workflowRun.status, NON_TERMINAL_WORKFLOW_RUN_STATUSES)
 				)
 			)
-			.returning({ id: workflowRun.id });
+			.returning({ id: workflowRun.id, attempts: workflowRun.attempts, options: workflowRun.options });
 
-		return result.map((row) => row.id);
+		return result;
 	},
 
-	async bulkTransitionToCancelledGlobal(_context: DaemonContext, runIds: NonEmptyArray<string>): Promise<string[]> {
+	async bulkTransitionToCancelled(_context: DaemonContext, runIds: NonEmptyArray<string>) {
 		const result = await db
 			.update(workflowRun)
 			.set({
@@ -530,12 +615,17 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				nextAttemptAt: null,
 			})
 			.where(and(inArray(workflowRun.id, runIds), inArray(workflowRun.status, NON_TERMINAL_WORKFLOW_RUN_STATUSES)))
-			.returning({ id: workflowRun.id });
+			.returning({
+				id: workflowRun.id,
+				namespaceId: workflowRun.namespaceId,
+				attempts: workflowRun.attempts,
+				options: workflowRun.options,
+			});
 
-		return result.map((row) => row.id);
+		return result;
 	},
 
-	async bulkTransitionToStalled(runIds: NonEmptyArray<string>): Promise<string[]> {
+	async bulkTransitionToStalled(_context: DaemonContext, runIds: NonEmptyArray<string>) {
 		const result = await db
 			.update(workflowRun)
 			.set({
@@ -547,12 +637,12 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				nextAttemptAt: null,
 			})
 			.where(and(inArray(workflowRun.id, runIds), eq(workflowRun.status, "queued")))
-			.returning({ id: workflowRun.id });
+			.returning({ id: workflowRun.id, namespaceId: workflowRun.namespaceId, attempts: workflowRun.attempts });
 
-		return result.map((row) => row.id);
+		return result;
 	},
 
-	async bulkReleaseToQueued(runIds: NonEmptyArray<string>): Promise<{ id: string; attempts: number }[]> {
+	async bulkReleaseToQueued(_context: DaemonContext, runIds: NonEmptyArray<string>) {
 		const result = await db
 			.update(workflowRun)
 			.set({
@@ -564,7 +654,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				nextAttemptAt: null,
 			})
 			.where(and(inArray(workflowRun.id, runIds), eq(workflowRun.status, "running")))
-			.returning({ id: workflowRun.id, attempts: workflowRun.attempts });
+			.returning({ id: workflowRun.id, namespaceId: workflowRun.namespaceId, attempts: workflowRun.attempts });
 
 		return result;
 	},
@@ -572,12 +662,14 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 	// Sets the pointer for whatever run ids it is given, with no guard of its own.
 	// Call it in the same transaction as the guarded bulk transition that returned these ids:
 	// that transition's row locks keep the runs unchanged until this write commits with it.
-	async bulkSetLatestStateTransitionId(runs: NonEmptyArray<{ id: string; stateTransitionId: string }>): Promise<void> {
-		const valueRows = runs.map((run, index) => {
+	async bulkSetLatestStateTransitionId(
+		runs: NonEmptyArray<{ filter: { namespaceId: NamespaceId; id: string }; update: { stateTransitionId: string } }>
+	): Promise<void> {
+		const valueRows = runs.map(({ filter, update }, index) => {
 			if (index === 0) {
-				return sql`(${run.id}::text, ${run.stateTransitionId}::text)`;
+				return sql`(${filter.namespaceId}::text, ${filter.id}::text, ${update.stateTransitionId}::text)`;
 			}
-			return sql`(${run.id}, ${run.stateTransitionId})`;
+			return sql`(${filter.namespaceId}, ${filter.id}, ${update.stateTransitionId})`;
 		});
 
 		await db
@@ -585,20 +677,23 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.set({
 				latestStateTransitionId: sql`v.state_transition_id`,
 			})
-			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, state_transition_id)`)
-			.where(sql`${workflowRun.id} = v.id`);
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(namespace_id, id, state_transition_id)`)
+			.where(sql`${workflowRun.namespaceId} = v.namespace_id AND ${workflowRun.id} = v.id`);
 	},
 
-	async getRunCount(scheduleId: string): Promise<number> {
-		const result = await db.select({ count: count() }).from(workflowRun).where(eq(workflowRun.scheduleId, scheduleId));
+	async getRunCount(namespaceId: NamespaceId, scheduleId: string): Promise<number> {
+		const result = await db
+			.select({ count: count() })
+			.from(workflowRun)
+			.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.scheduleId, scheduleId)));
 		return result[0]?.count ?? 0;
 	},
 
-	async getRunCounts(scheduleIds: NonEmptyArray<string>): Promise<Map<string, number>> {
+	async getRunCounts(namespaceId: NamespaceId, scheduleIds: NonEmptyArray<string>): Promise<Map<string, number>> {
 		const rows = await db
 			.select({ scheduleId: workflowRun.scheduleId, count: count() })
 			.from(workflowRun)
-			.where(inArray(workflowRun.scheduleId, scheduleIds))
+			.where(and(eq(workflowRun.namespaceId, namespaceId), inArray(workflowRun.scheduleId, scheduleIds)))
 			.groupBy(workflowRun.scheduleId);
 
 		const map = new Map<string, number>();

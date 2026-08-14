@@ -75,7 +75,7 @@ export async function queueScheduledRuns(
 
 	const [stateTransitions, workflows] = await Promise.all([
 		repos.stateTransition.getByIds(stateTransitionIds as NonEmptyArray<string>),
-		repos.workflow.getByIdsGlobal(context, workflowIds),
+		repos.workflow.getByIds(context, workflowIds),
 	]);
 	const stateTransitionsById = new Map(stateTransitions.map((transition) => [transition.id, transition]));
 	const workflowsById = new Map(workflows.map((workflow) => [workflow.id, workflow]));
@@ -156,7 +156,11 @@ async function processChunk(
 	}
 
 	const insertedOutboxEntries: WorkflowRunOutboxRowInsertPending[] = await repos.transaction(async (txRepos) => {
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued("scheduled", workflowRunUpdates);
+		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
+			context,
+			"scheduled",
+			workflowRunUpdates
+		);
 		if (!isNonEmptyArray(transitionedRunIds)) {
 			return [];
 		}

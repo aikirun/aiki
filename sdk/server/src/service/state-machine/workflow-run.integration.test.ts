@@ -52,13 +52,15 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				})
 			).rejects.toThrow(WorkflowRunRevisionConflictError);
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "running",
-					revision: revisionWhenClaimed,
-					attempts: attemptsWhenClaimed,
+					run: expect.objectContaining({
+						id: runId,
+						status: "running",
+						revision: revisionWhenClaimed,
+						attempts: attemptsWhenClaimed,
+					}),
 				})
 			);
 		}));
@@ -85,13 +87,15 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				attempts: attemptsWhenClaimed,
 			});
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "completed",
-					revision: result.revision,
-					attempts: result.attempts,
+					run: expect.objectContaining({
+						id: runId,
+						status: "completed",
+						revision: result.revision,
+						attempts: result.attempts,
+					}),
 					state: { status: "completed", output: { receipt: "r-1" } },
 				})
 			);
@@ -118,13 +122,15 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				attempts: attemptsWhenClaimed,
 			});
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "paused",
-					revision: result.revision,
-					attempts: result.attempts,
+					run: expect.objectContaining({
+						id: runId,
+						status: "paused",
+						revision: result.revision,
+						attempts: result.attempts,
+					}),
 					state: { status: "paused" },
 				})
 			);
@@ -150,13 +156,15 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				})
 			).rejects.toThrow(InvalidWorkflowRunStateTransitionError);
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "running",
-					revision: revisionWhenClaimed,
-					attempts: attemptsWhenClaimed,
+					run: expect.objectContaining({
+						id: runId,
+						status: "running",
+						revision: revisionWhenClaimed,
+						attempts: attemptsWhenClaimed,
+					}),
 				})
 			);
 		}));
@@ -198,13 +206,15 @@ describe("WorkflowRunStateMachine attempt counting", () => {
 				attempts: attemptsWhenClaimed,
 			});
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "awaiting_retry",
-					revision: result.revision,
-					attempts: result.attempts,
+					run: expect.objectContaining({
+						id: runId,
+						status: "awaiting_retry",
+						revision: result.revision,
+						attempts: result.attempts,
+					}),
 				})
 			);
 		}));
@@ -243,13 +253,15 @@ describe("WorkflowRunStateMachine attempt counting", () => {
 				attempts: attemptsWhenClaimed + 1,
 			});
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "queued",
-					revision: result.revision,
-					attempts: result.attempts,
+					run: expect.objectContaining({
+						id: runId,
+						status: "queued",
+						revision: result.revision,
+						attempts: result.attempts,
+					}),
 					state: { status: "queued", reason: "retry" },
 				})
 			);
@@ -277,13 +289,15 @@ describe("WorkflowRunStateMachine attempt counting", () => {
 				attempts: attemptsWhenClaimed,
 			});
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "queued",
-					revision: result.revision,
-					attempts: result.attempts,
+					run: expect.objectContaining({
+						id: runId,
+						status: "queued",
+						revision: result.revision,
+						attempts: result.attempts,
+					}),
 					state: { status: "queued", reason: "task_retry" },
 				})
 			);
@@ -310,13 +324,15 @@ describe("WorkflowRunStateMachine attempt counting", () => {
 				attempts: attemptsWhenScheduled,
 			});
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "queued",
-					revision: result.revision,
-					attempts: result.attempts,
+					run: expect.objectContaining({
+						id: runId,
+						status: "queued",
+						revision: result.revision,
+						attempts: result.attempts,
+					}),
 					state: { status: "queued", reason: "new" },
 				})
 			);
@@ -352,13 +368,15 @@ describe("WorkflowRunStateMachine sleep lifecycle", () => {
 			const sleeps = await repos.sleep.listByWorkflowRunId(runId);
 			expect(sleeps).toEqual([expect.objectContaining({ workflowRunId: runId, name: "nap", status: "sleeping" })]);
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "sleeping",
-					revision: result.revision,
-					attempts: result.attempts,
+					run: expect.objectContaining({
+						id: runId,
+						status: "sleeping",
+						revision: result.revision,
+						attempts: result.attempts,
+					}),
 					state: { status: "sleeping", sleepName: "nap", wakeupAt: sleepStartedAt + 60_000 },
 				})
 			);
@@ -508,11 +526,13 @@ describe("WorkflowRunStateMachine redelivery", () => {
 				state: { status: "scheduled", scheduledInMs: 0, reason: "redelivery" },
 			});
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "scheduled",
+					run: expect.objectContaining({
+						id: runId,
+						status: "scheduled",
+					}),
 					state: expect.objectContaining({ status: "scheduled", reason: "redelivery" }),
 				})
 			);
@@ -542,11 +562,13 @@ describe("WorkflowRunStateMachine redelivery", () => {
 				}
 			);
 
-			const run = await repos.workflowRun.getByIdWithState(context.namespaceId, runId);
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 			expect(run).toEqual(
 				expect.objectContaining({
-					id: runId,
-					status: "queued",
+					run: expect.objectContaining({
+						id: runId,
+						status: "queued",
+					}),
 					state: { status: "queued", reason: "redelivery" },
 				})
 			);
