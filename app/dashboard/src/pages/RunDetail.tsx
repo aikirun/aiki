@@ -420,7 +420,7 @@ export function RunDetail() {
 						<span style={{ display: "inline-flex", alignItems: "center", minHeight: 22 }}>v{currentRun.versionId}</span>
 					</Meta>
 
-					{currentRun.options?.reference && (
+					{currentRun.referenceId && (
 						<Meta label="Reference">
 							<span
 								style={{
@@ -430,12 +430,12 @@ export function RunDetail() {
 									fontWeight: 700,
 									maxWidth: 160,
 								}}
-								title={currentRun.options.reference.id}
+								title={currentRun.referenceId}
 							>
 								<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-									{currentRun.options.reference.id}
+									{currentRun.referenceId}
 								</span>
-								<CopyButton text={currentRun.options.reference.id} />
+								<CopyButton text={currentRun.referenceId} />
 							</span>
 						</Meta>
 					)}

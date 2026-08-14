@@ -5,10 +5,9 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { Schedule, ScheduledWorkflowStartOptions, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
+import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
 import {
 	NON_TERMINAL_WORKFLOW_RUN_STATUSES,
-	type WorkflowReference,
 	type WorkflowRunId,
 	type WorkflowRunStateCancelled,
 	type WorkflowRunStateQueued,
@@ -168,7 +167,7 @@ async function processOverlapAllowSchedules(
 				status: "queued",
 				input: schedule.workflowRunInput,
 				inputHash: schedule.workflowRunInputHash,
-				options: scheduledRunOptions(schedule, referenceId),
+				options: schedule.workflowRunOptions,
 				referenceId,
 				latestStateTransitionId: stateTransitionId,
 			});
@@ -269,7 +268,7 @@ async function processOverlapSkipSchedules(
 			status: "queued",
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
-			options: scheduledRunOptions(schedule, referenceId),
+			options: schedule.workflowRunOptions,
 			referenceId,
 			latestStateTransitionId: stateTransitionId,
 		});
@@ -370,7 +369,7 @@ async function processOverlapCancelPreviousSchedules(
 			status: "queued",
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
-			options: scheduledRunOptions(schedule, referenceId),
+			options: schedule.workflowRunOptions,
 			referenceId,
 			latestStateTransitionId: stateTransitionId,
 		});
@@ -473,17 +472,6 @@ async function processOverlapCancelPreviousSchedules(
 	if (deps.publisher && isNonEmptyArray(insertedOutboxEntries)) {
 		await publishOutboxEntries(context, deps.repos, deps.publisher, insertedOutboxEntries, republishBackoff);
 	}
-}
-
-function scheduledRunOptions(
-	schedule: DueSchedule,
-	referenceId: string
-): ScheduledWorkflowStartOptions & { reference: WorkflowReference } {
-	return {
-		reference: { id: referenceId },
-		retry: schedule.workflowRunOptions?.retry,
-		pool: schedule.workflowRunOptions?.pool,
-	};
 }
 
 async function fetchActiveRunsBySchedule(

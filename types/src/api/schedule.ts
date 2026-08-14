@@ -1,11 +1,6 @@
-import type {
-	Schedule,
-	ScheduleActivateOptions,
-	ScheduledWorkflowStartOptions,
-	ScheduleSpec,
-	ScheduleStatus,
-} from "../schedule";
+import type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } from "../schedule";
 import type { WorkflowSource } from "../workflow";
+import type { WorkflowRunOptions } from "../workflow/run";
 
 export interface ScheduleApi {
 	activateV1: (_: ScheduleActivateRequestV1) => Promise<ScheduleActivateResponseV1>;
@@ -23,7 +18,7 @@ export interface ScheduleActivateRequestV1 {
 	workflowRunInput?: unknown;
 	spec: ScheduleSpec;
 	options?: ScheduleActivateOptions;
-	workflowRunOptions?: ScheduledWorkflowStartOptions;
+	workflowRunOptions?: WorkflowRunOptions;
 }
 
 export interface ScheduleActivateResponseV1 {

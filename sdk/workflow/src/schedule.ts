@@ -2,14 +2,9 @@ import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
-import type {
-	ScheduleActivateOptions,
-	ScheduledWorkflowStartOptions,
-	ScheduleId,
-	ScheduleOverlapPolicy,
-	ScheduleSpec,
-} from "@aikirun/types/schedule";
+import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, ScheduleSpec } from "@aikirun/types/schedule";
 import { INTERNAL } from "@aikirun/types/symbols";
+import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 
 import type { EventsDefinition } from "./run/event";
 import type { WorkflowVersion } from "./workflow-version";
@@ -37,7 +32,7 @@ export interface ScheduleHandle {
 }
 
 type ScheduleBuilderActivateOptions = ScheduleActivateOptions & {
-	workflowRun?: ScheduledWorkflowStartOptions;
+	workflowRun?: WorkflowRunOptions;
 };
 
 export interface ScheduleBuilder {

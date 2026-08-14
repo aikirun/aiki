@@ -5,15 +5,9 @@ import { stableStringify } from "@aikirun/lib/json";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { ScheduleActivateRequestV1, ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type {
-	Schedule,
-	ScheduleConflictPolicy,
-	ScheduledWorkflowStartOptions,
-	ScheduleId,
-	ScheduleSpec,
-	ScheduleStatus,
-} from "@aikirun/types/schedule";
+import type { Schedule, ScheduleId, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 import CronExpressionParser from "cron-parser";
 import { ulid } from "ulidx";
 
@@ -174,7 +168,6 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 							workflowRunInputHash,
 							definitionHash,
 							referenceId: undefined,
-							conflictPolicy: options?.reference?.conflictPolicy,
 							workflowRunOptions,
 							nextRunAt,
 						});
@@ -215,7 +208,6 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 					{ id: existingNonReferencedSchedule.id, referenceId: null },
 					{
 						referenceId,
-						conflictPolicy: options?.reference?.conflictPolicy ?? null,
 						status: "active",
 						nextRunAt,
 					}
@@ -233,7 +225,6 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 				workflowRunInputHash,
 				definitionHash,
 				referenceId,
-				conflictPolicy: options?.reference?.conflictPolicy,
 				workflowRunOptions,
 				nextRunAt,
 			});
@@ -353,8 +344,7 @@ async function createSchedule(
 		workflowRunInputHash: string;
 		definitionHash: string;
 		referenceId: string | undefined;
-		conflictPolicy: ScheduleConflictPolicy | undefined | null;
-		workflowRunOptions: ScheduledWorkflowStartOptions | undefined;
+		workflowRunOptions: WorkflowRunOptions | undefined;
 		nextRunAt: TimestampMs;
 	}
 ): Promise<ScheduleRow> {
@@ -373,7 +363,6 @@ async function createSchedule(
 		workflowRunInputHash: params.workflowRunInputHash,
 		definitionHash: params.definitionHash,
 		referenceId: params.referenceId,
-		conflictPolicy: params.conflictPolicy,
 		workflowRunOptions: params.workflowRunOptions,
 		nextRunAt: params.nextRunAt,
 	});
@@ -393,9 +382,7 @@ export function scheduleRowToDomain(
 		status: schedule.status,
 		spec,
 		workflowRunInput: schedule.workflowRunInput,
-		options: schedule.referenceId
-			? { reference: { id: schedule.referenceId, conflictPolicy: schedule.conflictPolicy ?? undefined } }
-			: undefined,
+		referenceId: schedule.referenceId ?? undefined,
 		workflowRunOptions: schedule.workflowRunOptions ?? undefined,
 		createdAt: schedule.createdAt,
 		updatedAt: schedule.updatedAt,

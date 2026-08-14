@@ -1,9 +1,5 @@
-import {
-	SCHEDULE_STATUSES,
-	type Schedule,
-	type ScheduledWorkflowStartOptions,
-	type ScheduleStatus,
-} from "@aikirun/types/schedule";
+import { SCHEDULE_STATUSES, type Schedule, type ScheduleStatus } from "@aikirun/types/schedule";
+import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 import { useQueryClient } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
@@ -149,7 +145,7 @@ function fmtDelay(ms: number): string {
 	return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`;
 }
 
-function retrySummary(retry: NonNullable<ScheduledWorkflowStartOptions["retry"]>): string {
+function retrySummary(retry: NonNullable<WorkflowRunOptions["retry"]>): string {
 	switch (retry.type) {
 		case "never":
 			return "never";
@@ -560,7 +556,7 @@ function ScheduleRow({
 								</span>
 								<CopyButton text={schedule.id} />
 							</span>
-							{showRef && schedule.options?.reference?.id && (
+							{showRef && schedule.referenceId && (
 								<>
 									<span style={{ fontSize: 10, color: "var(--t1)", fontWeight: 700, marginLeft: -2, marginRight: 2 }}>
 										•
@@ -576,11 +572,11 @@ function ScheduleRow({
 												whiteSpace: "nowrap",
 												maxWidth: 120,
 											}}
-											title={schedule.options.reference.id}
+											title={schedule.referenceId}
 										>
-											REF: {schedule.options.reference.id}
+											REF: {schedule.referenceId}
 										</span>
-										<CopyButton text={schedule.options.reference.id} />
+										<CopyButton text={schedule.referenceId} />
 									</span>
 								</>
 							)}
@@ -662,9 +658,7 @@ function ScheduleRow({
 					{/* Metadata row */}
 					<div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 12 }}>
 						<Meta label="ID" value={schedule.id} copyable />
-						{schedule.options?.reference?.id && (
-							<Meta label="Reference" value={schedule.options.reference.id} copyable />
-						)}
+						{schedule.referenceId && <Meta label="Reference" value={schedule.referenceId} copyable />}
 						<Meta label="Type" value={schedule.spec.type} />
 						{schedule.spec.type === "cron" && <Meta label="Expression" value={schedule.spec.expression} />}
 						{schedule.spec.type === "cron" && schedule.spec.timezone && (

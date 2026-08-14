@@ -1,19 +1,12 @@
-import {
-	SCHEDULE_CONFLICT_POLICIES,
-	SCHEDULE_OVERLAP_POLICIES,
-	SCHEDULE_STATUSES,
-	SCHEDULE_TYPES,
-	type ScheduledWorkflowStartOptions,
-} from "@aikirun/types/schedule";
+import { SCHEDULE_OVERLAP_POLICIES, SCHEDULE_STATUSES, SCHEDULE_TYPES } from "@aikirun/types/schedule";
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
 	CHILD_WORKFLOW_RUN_WAIT_STATUSES,
 	EVENT_WAIT_STATUSES,
 	SLEEP_STATUSES,
 	TERMINAL_WORKFLOW_RUN_STATUSES,
-	WORKFLOW_RUN_CONFLICT_POLICIES,
 	WORKFLOW_RUN_STATUSES,
-	type WorkflowStartOptions,
+	type WorkflowRunOptions,
 } from "@aikirun/types/workflow/run";
 import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition";
 import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
@@ -39,11 +32,9 @@ export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
 export const scheduleStatusEnum = pgEnum("schedule_status", SCHEDULE_STATUSES);
 export const scheduleTypeEnum = pgEnum("schedule_type", SCHEDULE_TYPES);
 export const scheduleOverlapPolicyEnum = pgEnum("schedule_overlap_policy", SCHEDULE_OVERLAP_POLICIES);
-export const scheduleConflictPolicyEnum = pgEnum("schedule_conflict_policy", SCHEDULE_CONFLICT_POLICIES);
 
 export const workflowRunStatusEnum = pgEnum("workflow_run_status", WORKFLOW_RUN_STATUSES);
 export const terminalWorkflowRunStatusEnum = pgEnum("terminal_workflow_run_status", TERMINAL_WORKFLOW_RUN_STATUSES);
-export const workflowRunConflictPolicyEnum = pgEnum("workflow_run_conflict_policy", WORKFLOW_RUN_CONFLICT_POLICIES);
 
 export const taskStatusEnum = pgEnum("task_status", TASK_STATUSES);
 
@@ -99,9 +90,8 @@ export const schedule = pgTable(
 		definitionHash: text("definition_hash").notNull(),
 
 		referenceId: text("reference_id"),
-		conflictPolicy: scheduleConflictPolicyEnum("conflict_policy"),
 
-		workflowRunOptions: jsonb("workflow_run_options").$type<ScheduledWorkflowStartOptions>(),
+		workflowRunOptions: jsonb("workflow_run_options").$type<WorkflowRunOptions>(),
 
 		lastOccurrence: timestampMs("last_occurrence"),
 		nextRunAt: timestampMs("next_run_at"),
@@ -142,10 +132,9 @@ export const workflowRun = pgTable(
 
 		input: jsonb("input"),
 		inputHash: text("input_hash").notNull(),
-		options: jsonb("options").$type<WorkflowStartOptions>(),
+		options: jsonb("options").$type<WorkflowRunOptions>(),
 
 		referenceId: text("reference_id"),
-		conflictPolicy: workflowRunConflictPolicyEnum("conflict_policy"),
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
 		scheduledAt: timestampMs("scheduled_at"),

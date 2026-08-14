@@ -52,11 +52,14 @@ export interface WorkflowReference {
 	conflictPolicy?: WorkflowRunConflictPolicy;
 }
 
-export interface WorkflowStartOptions {
+export interface WorkflowRunOptions {
 	retry?: RetryStrategy;
+	pool?: string;
+}
+
+export interface WorkflowStartOptions extends WorkflowRunOptions {
 	trigger?: TriggerStrategy;
 	reference?: WorkflowReference;
-	pool?: string;
 }
 
 export type WorkflowDefinitionStartOptions = Pick<WorkflowStartOptions, "retry">;
@@ -265,7 +268,8 @@ export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	stateTransitionId: string;
 	input?: Input;
 	inputHash: string;
-	options?: WorkflowStartOptions;
+	referenceId?: string;
+	options?: WorkflowRunOptions;
 	attempts: number;
 	state: WorkflowRunState<Output>;
 	// TODO:
