@@ -227,7 +227,7 @@ async function transitionStateInTx(
 
 	const result = await txRepos.workflowRun.getByIdWithState(
 		{ namespaceId, id: runId },
-		{ forUpdate: request.type === "pessimistic" }
+		request.type === "pessimistic" ? { lock: "update" } : undefined
 	);
 	if (!result) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);

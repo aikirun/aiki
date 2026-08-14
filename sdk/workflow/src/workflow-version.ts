@@ -35,7 +35,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
-import { type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
+import { isWorkflowRunRevisionConflictError, type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
 import { validateWithSchema } from "./run/schema-validation";
 
@@ -213,14 +213,23 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		}
 
 		const pool = parentRun.options.pool;
-		const { id: newRunId } = await client.api.workflowRun.createV1({
-			name: this.name,
-			versionId: this.versionId,
-			input,
-			inputHash,
-			parentWorkflowRunId: parentRun.id,
-			options: pool === undefined ? startOptions : { ...startOptions, pool },
-		});
+		let newRunId: string | undefined;
+		try {
+			const response = await client.api.workflowRun.createV1({
+				name: this.name,
+				versionId: this.versionId,
+				input,
+				inputHash,
+				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
+				options: pool === undefined ? startOptions : { ...startOptions, pool },
+			});
+			newRunId = response.id;
+		} catch (err) {
+			if (isWorkflowRunRevisionConflictError(err)) {
+				throw new WorkflowRunRevisionConflictError(parentRun.id);
+			}
+			throw err;
+		}
 		const { run: newRun } = await client.api.workflowRun.getByIdV1({ id: newRunId });
 
 		const logger = parentRun.logger.child({
