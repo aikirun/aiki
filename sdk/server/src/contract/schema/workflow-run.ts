@@ -28,14 +28,14 @@ export const workflowOptionsSchema = type({
 
 export const workflowRunStateScheduledSchema = type({
 	status: "'scheduled'",
-	scheduledAt: "number > 0",
 	reason: "'new'",
+	scheduledAt: "number > 0",
 })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'wakeup_early'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'resumption'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'event'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'child_workflow'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'redelivery'" });
+	.or({ status: "'scheduled'", reason: "'wakeup_early'", scheduledAt: "number > 0" })
+	.or({ status: "'scheduled'", reason: "'resumption'", scheduledAt: "number > 0" })
+	.or({ status: "'scheduled'", reason: "'event'", scheduledAt: "number > 0" })
+	.or({ status: "'scheduled'", reason: "'child_workflow'", scheduledAt: "number > 0" })
+	.or({ status: "'scheduled'", reason: "'redelivery'", scheduledAt: "number > 0" });
 
 const workflowRunQueuedReasonSchema = type(
 	"'new' | 'retry' | 'task_retry' | 'wakeup' | 'wakeup_early' | 'resumption' | 'event' | 'event_wait_timeout' | 'child_workflow' | 'child_workflow_wait_timeout' | 'recovery' | 'redelivery'"
@@ -69,20 +69,20 @@ export const workflowRunStateAwaitingEventSchema = type({
 export const workflowRunStateAwaitingRetrySchema = type({
 	status: "'awaiting_retry'",
 	cause: "'task'",
-	nextAttemptAt: "number > 0",
 	taskId: "string > 0",
+	nextAttemptAt: "number > 0",
 })
 	.or({
 		status: "'awaiting_retry'",
 		cause: "'child_workflow'",
-		nextAttemptAt: "number > 0",
 		childWorkflowRunId: "string > 0",
+		nextAttemptAt: "number > 0",
 	})
 	.or({
 		status: "'awaiting_retry'",
 		cause: "'self'",
-		nextAttemptAt: "number > 0",
 		error: serializedErrorSchema,
+		nextAttemptAt: "number > 0",
 	});
 
 export const workflowRunStateAwaitingChildWorkflowSchema = type({
@@ -156,7 +156,7 @@ const childWorkflowRunInfoSchema = type({
 	waits: type({ "['cancelled'|'completed'|'failed']": childWorkflowRunWaitSchema.array() }),
 });
 
-export const workflowRunSchema = type({
+export const workflowRunRecordSchema = type({
 	id: "string > 0",
 	name: "string > 0",
 	versionId: "string > 0",
@@ -176,63 +176,17 @@ export const workflowRunSchema = type({
 	"parentWorkflowRunId?": "string > 0 | undefined",
 });
 
-export const workflowRunStateScheduledRequestOptimisticSchema = type({
-	status: "'scheduled'",
-	scheduledInMs: "number.integer >= 0",
-	reason: "'event'",
-}).or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'child_workflow'" });
+const workflowRunStateScheduledRequestSchema = workflowRunStateScheduledSchema
+	.omit("scheduledAt")
+	.and({ scheduledInMs: "number.integer >= 0" });
 
-export const workflowRunStateScheduledRequestPessimisticSchema = type({
-	status: "'scheduled'",
-	scheduledInMs: "number.integer >= 0",
-	reason: "'new'",
-})
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'wakeup_early'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'resumption'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'redelivery'" });
-
-export const workflowRunStateSleepingRequestSchema = type({
-	status: "'sleeping'",
-	sleepName: "string > 0",
-	durationMs: "number > 0",
+export const workflowRunStateScheduledRequestPessimisticSchema = workflowRunStateScheduledRequestSchema.extract({
+	reason: "'new' | 'wakeup_early' | 'resumption' | 'redelivery'",
 });
 
-export const workflowRunStateAwaitingEventRequestSchema = type({
-	status: "'awaiting_event'",
-	eventName: "string > 0",
-	"timeoutInMs?": "number.integer > 0 | undefined",
-});
-
-export const workflowRunStateAwaitingRetryRequestSchema = type({
-	status: "'awaiting_retry'",
-	cause: "'task'",
-	taskId: "string > 0",
-	nextAttemptInMs: "number.integer > 0",
-})
-	.or({
-		status: "'awaiting_retry'",
-		cause: "'child_workflow'",
-		childWorkflowRunId: "string > 0",
-		nextAttemptInMs: "number.integer > 0",
-	})
-	.or({
-		status: "'awaiting_retry'",
-		cause: "'self'",
-		error: serializedErrorSchema,
-		nextAttemptInMs: "number.integer > 0",
-	});
-
-export const workflowRunStateAwaitingChildWorkflowRequestSchema = type({
-	status: "'awaiting_child_workflow'",
-	childWorkflowRunId: "string > 0",
-	childWorkflowRunStatus: terminalWorkflowRunStatusSchema,
-	"timeoutInMs?": "number.integer > 0 | undefined",
-});
-
-export const workflowRunStateCompletedRequestSchema = type({
-	status: "'completed'",
-	"output?": "unknown",
-});
+export const workflowRunStateScheduledRequestOptimisticSchema = workflowRunStateScheduledRequestSchema.exclude(
+	workflowRunStateScheduledRequestPessimisticSchema
+);
 
 export const listChildRunsRequestSchema = type({
 	parentRunId: "string > 0",

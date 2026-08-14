@@ -31,7 +31,13 @@ import type {
 	WorkflowRunStateCancelled,
 	WorkflowRunStateScheduledByNew,
 } from "@aikirun/types/workflow/run";
-import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
+import type {
+	TaskInfo,
+	TaskState,
+	TaskStateDiscarded,
+	TaskStateRunning,
+	TaskStatus,
+} from "@aikirun/types/workflow/task";
 import { monotonicFactory, ulid } from "ulidx";
 
 import { WorkflowRunConflictError } from "../errors";
@@ -372,10 +378,9 @@ export const createWorkflowRunService = ({
 					"aiki.state": request.state,
 				});
 
-				const runningState: TaskState = {
+				const runningState: TaskStateRunning = {
 					status: "running",
 					attempts: 1,
-					input: request.input,
 				};
 
 				const finalState: TaskState =
@@ -416,7 +421,7 @@ export const createWorkflowRunService = ({
 				return;
 			}
 
-			const existingTaskRow = await txRepos.task.getById(request.taskId);
+			const existingTaskRow = await txRepos.task.getById({ id: request.taskId, workflowRunId: runId });
 			if (!existingTaskRow) {
 				throw new NotFoundError(`Task not found: ${request.taskId}`);
 			}
@@ -445,11 +450,14 @@ export const createWorkflowRunService = ({
 				state: finalState,
 			});
 
-			await txRepos.task.update(existingTaskRow.id, {
-				status: finalState.status,
-				attempts: finalState.attempts,
-				latestStateTransitionId: finalTransitionId,
-			});
+			await txRepos.task.update(
+				{ id: existingTaskRow.id, workflowRunId: runId },
+				{
+					status: finalState.status,
+					attempts: finalState.attempts,
+					latestStateTransitionId: finalTransitionId,
+				}
+			);
 		});
 	},
 

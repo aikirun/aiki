@@ -15,8 +15,8 @@ export const namespaceRequestContextFactory = Factory.define<NamespaceRequestCon
 	headers: new Headers(),
 	method: "POST",
 	url: "test://request",
-	organizationId: "org" as OrganizationId,
-	namespaceId: "ns" as NamespaceId,
+	organizationId: ulid() as OrganizationId,
+	namespaceId: ulid() as NamespaceId,
 }));
 
 export const daemonContextFactory = Factory.define<DaemonContext>(() => ({

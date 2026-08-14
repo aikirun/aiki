@@ -39,10 +39,10 @@ import { stateTransitionSchema } from "../schema/state-transition";
 import {
 	taskInfoSchema,
 	taskOptionsSchema,
-	taskStateAwaitingRetryRequestSchema,
-	taskStateCompletedRequestSchema,
+	taskStateAwaitingRetrySchema,
+	taskStateCompletedSchema,
 	taskStateFailedSchema,
-	taskStateRunningRequestSchema,
+	taskStateRunningSchema,
 } from "../schema/task";
 import { workflowSourceSchema } from "../schema/workflow";
 import {
@@ -51,13 +51,13 @@ import {
 	listChildRunsRequestSchema,
 	listChildRunsResponseSchema,
 	workflowOptionsSchema,
-	workflowRunSchema,
+	workflowRunRecordSchema,
 	workflowRunSetTaskStateRequestSchema,
-	workflowRunStateAwaitingChildWorkflowRequestSchema,
-	workflowRunStateAwaitingEventRequestSchema,
-	workflowRunStateAwaitingRetryRequestSchema,
+	workflowRunStateAwaitingChildWorkflowSchema,
+	workflowRunStateAwaitingEventSchema,
+	workflowRunStateAwaitingRetrySchema,
 	workflowRunStateCancelledSchema,
-	workflowRunStateCompletedRequestSchema,
+	workflowRunStateCompletedSchema,
 	workflowRunStateFailedSchema,
 	workflowRunStatePausedSchema,
 	workflowRunStateQueuedSchema,
@@ -65,7 +65,8 @@ import {
 	workflowRunStateScheduledRequestOptimisticSchema,
 	workflowRunStateScheduledRequestPessimisticSchema,
 	workflowRunStateSchema,
-	workflowRunStateSleepingRequestSchema,
+	workflowRunStateSleepingSchema,
+	workflowRunStateStalledSchema,
 	workflowRunStatusSchema,
 } from "../schema/workflow-run";
 
@@ -128,7 +129,7 @@ const getByIdV1: ContractProcedure<WorkflowRunGetByIdRequestV1, WorkflowRunGetBy
 	)
 	.output(
 		type({
-			run: workflowRunSchema,
+			run: workflowRunRecordSchema,
 		})
 	);
 
@@ -145,7 +146,7 @@ const getByReferenceIdV1: ContractProcedure<
 	)
 	.output(
 		type({
-			run: workflowRunSchema,
+			run: workflowRunRecordSchema,
 		})
 	);
 
@@ -184,21 +185,30 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 			type({
 				type: "'optimistic'",
 				id: "string > 0",
+				expectedRevision: "number.integer >= 0",
 				state: workflowRunStateScheduledRequestOptimisticSchema
 					.or(workflowRunStateQueuedSchema)
 					.or(workflowRunStateRunningSchema)
-					.or(workflowRunStateSleepingRequestSchema)
-					.or(workflowRunStateAwaitingEventRequestSchema)
-					.or(workflowRunStateAwaitingRetryRequestSchema)
-					.or(workflowRunStateAwaitingChildWorkflowRequestSchema)
-					.or(workflowRunStateCompletedRequestSchema)
+					.or(workflowRunStateSleepingSchema.omit("wakeupAt").and({ durationMs: "number > 0" }))
+					.or(
+						workflowRunStateAwaitingEventSchema
+							.omit("timeoutAt")
+							.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
+					)
+					.or(workflowRunStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }))
+					.or(
+						workflowRunStateAwaitingChildWorkflowSchema
+							.omit("timeoutAt")
+							.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
+					)
+					.or(workflowRunStateCompletedSchema.omit("output").and({ "output?": "unknown" }))
 					.or(workflowRunStateFailedSchema),
-				expectedRevision: "number.integer >= 0",
 			}).or({
 				type: "'pessimistic'",
 				id: "string > 0",
 				state: workflowRunStateScheduledRequestPessimisticSchema
 					.or(workflowRunStatePausedSchema)
+					.or(workflowRunStateStalledSchema)
 					.or(workflowRunStateCancelledSchema),
 			})
 		)
@@ -220,7 +230,8 @@ const transitionTaskStateV1: ContractProcedure<
 			id: "string > 0",
 			taskName: "string > 0",
 			"options?": taskOptionsSchema,
-			taskState: taskStateRunningRequestSchema,
+			"input?": "unknown",
+			taskState: taskStateRunningSchema.omit("attempts"),
 			expectedWorkflowRunRevision: "number.integer >= 0",
 		})
 			.or({
@@ -228,13 +239,13 @@ const transitionTaskStateV1: ContractProcedure<
 				id: "string > 0",
 				taskId: "string > 0",
 				"options?": taskOptionsSchema,
-				taskState: taskStateRunningRequestSchema,
+				taskState: taskStateRunningSchema,
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				taskId: "string > 0",
-				taskState: taskStateCompletedRequestSchema,
+				taskState: taskStateCompletedSchema.omit("output").and({ "output?": "unknown" }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
@@ -246,7 +257,7 @@ const transitionTaskStateV1: ContractProcedure<
 			.or({
 				id: "string > 0",
 				taskId: "string > 0",
-				taskState: taskStateAwaitingRetryRequestSchema,
+				taskState: taskStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 	)

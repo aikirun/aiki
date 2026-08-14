@@ -5,6 +5,7 @@ import type {
 	WorkflowListVersionsRequestV1,
 } from "@aikirun/types/api/workflow";
 import type { WorkflowRunListRequestV1, WorkflowRunListTransitionsRequestV1 } from "@aikirun/types/api/workflow-run";
+import type { TaskInfo } from "@aikirun/types/workflow/task";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { namespaceAuthedClient, organizationAuthedClient } from "./client";
@@ -59,6 +60,17 @@ export function useWorkflowRun(
 		queryFn: () => namespaceAuthedClient.workflowRun.getByIdV1({ id }),
 		enabled: !!id,
 		refetchInterval: options?.refetchInterval,
+	});
+}
+
+// The task's status and attempts from the polled run record are part of the key:
+// every task transition changes at least one of them, so a poll that observes a
+// change refetches the detail, and an unchanged task never refetches.
+export function useTask(task: TaskInfo) {
+	return useQuery({
+		queryKey: ["task", task.id, task.state.status, task.state.attempts],
+		queryFn: () => namespaceAuthedClient.task.getByIdV1({ id: task.id }),
+		placeholderData: keepPreviousData,
 	});
 }
 

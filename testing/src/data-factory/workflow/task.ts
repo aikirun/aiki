@@ -1,14 +1,12 @@
 import type { TaskInfo, TaskStateCompleted, TaskStateFailed, TaskStateRunning } from "@aikirun/types/workflow/task";
 import { Factory } from "fishery";
 
-export const runningTaskInfoFactory = Factory.define<TaskInfo & { state: TaskStateRunning<unknown> }>(
-	({ sequence }) => ({
-		id: `task-${sequence}`,
-		name: "task",
-		inputHash: "hash",
-		state: { status: "running", attempts: 1, input: undefined },
-	})
-);
+export const runningTaskInfoFactory = Factory.define<TaskInfo & { state: TaskStateRunning }>(({ sequence }) => ({
+	id: `task-${sequence}`,
+	name: "task",
+	inputHash: "hash",
+	state: { status: "running", attempts: 1 },
+}));
 
 export const failedTaskInfoFactory = Factory.define<TaskInfo & { state: TaskStateFailed }>(({ sequence }) => ({
 	id: `task-${sequence}`,

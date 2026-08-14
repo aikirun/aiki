@@ -53,7 +53,6 @@ describe("createCancelChildRunsV1", () => {
 
 			const runningListNonTerminalChildrenTask = runningTaskInfoFactory.build({
 				name: LIST_NON_TERMINAL_CHILDREN_TASK_NAME,
-				state: { input: parentRunId },
 			});
 			const completedListNonTerminalChildrenTask = completedTaskInfoFactory.build({
 				id: runningListNonTerminalChildrenTask.id,
@@ -62,7 +61,6 @@ describe("createCancelChildRunsV1", () => {
 			});
 			const runningCancelRunsTask = runningTaskInfoFactory.build({
 				name: CANCEL_RUNS_TASK_NAME,
-				state: { input: nonTerminalChildRunIds },
 			});
 			const completedCancelRunsTask = completedTaskInfoFactory.build({
 				id: runningCancelRunsTask.id,
@@ -98,9 +96,10 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
+						input: parentRunId,
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
-						taskState: runningListNonTerminalChildrenTask.state,
+						taskState: { status: runningListNonTerminalChildrenTask.state.status },
 						id: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -118,9 +117,10 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
+						input: nonTerminalChildRunIds,
 						taskName: runningCancelRunsTask.name,
 						options: {},
-						taskState: runningCancelRunsTask.state,
+						taskState: { status: runningCancelRunsTask.state.status },
 						id: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -158,7 +158,6 @@ describe("createCancelChildRunsV1", () => {
 
 			const runningListNonTerminalChildrenTask = runningTaskInfoFactory.build({
 				name: LIST_NON_TERMINAL_CHILDREN_TASK_NAME,
-				state: { input: parentRunId },
 			});
 			const completedListNonTerminalChildrenTask = completedTaskInfoFactory.build({
 				id: runningListNonTerminalChildrenTask.id,
@@ -194,9 +193,10 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
+						input: parentRunId,
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
-						taskState: runningListNonTerminalChildrenTask.state,
+						taskState: { status: runningListNonTerminalChildrenTask.state.status },
 						id: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},

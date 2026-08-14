@@ -11,7 +11,7 @@ timerPriorityQueueTestSuite({ describe, test, expect }, async (fn) => {
 		const redisClient = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
 		redisClient.on("error", () => {});
 		try {
-			const timersKey = "aiki:timers";
+			const timersKey = "aiki:timers:test";
 			await redisClient.del(timersKey, `${timersKey}:signal`);
 			const queue = redisTimerPriorityQueue(
 				redisClient,

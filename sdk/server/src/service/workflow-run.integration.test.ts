@@ -1,4 +1,5 @@
 import { hashInput } from "@aikirun/lib/crypto";
+import { NotFoundError } from "@aikirun/lib/error";
 import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
@@ -16,7 +17,8 @@ import {
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { seedClaimedRun } from "../testing/run-seed";
+import { seedClaimedRun } from "../testing/seed/run";
+import { seedRunningTask } from "../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
@@ -70,6 +72,28 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					}),
 				})
 			);
+		}));
+
+	test("returns the run's tasks", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const { service } = createService(repos);
+			const run = await service.getWorkflowRunById(context, runId);
+			expect(Object.values(run.tasks)).toEqual([
+				[
+					{
+						id: taskInfo.id,
+						name: taskInfo.name,
+						state: { status: "running", attempts: 1 },
+						inputHash: taskInfo.inputHash,
+					},
+				],
+			]);
 		}));
 });
 
@@ -261,7 +285,8 @@ describe("WorkflowRunService cancelByIds", () => {
 				id: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
 				taskName: "charge-card",
-				taskState: { status: "running", attempts: 1, input: { amountCents: 1250 } },
+				input: { amountCents: 1250 },
+				taskState: { status: "running" },
 			});
 
 			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"])).toBeEmpty();
@@ -310,5 +335,87 @@ describe("WorkflowRunService cancelByIds", () => {
 				],
 				total: 2,
 			});
+		}));
+});
+
+describe("WorkflowRunService setTaskState", () => {
+	test("does not set the state of a task belonging to another run", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const otherNamespaceContext = namespaceRequestContextFactory.build({ namespaceId: "other-ns" as NamespaceId });
+			const victimTaskSeed = await seedRunningTask({
+				namespaceRequestContext: otherNamespaceContext,
+				repos,
+				publisher,
+			});
+			const victimRowBefore = await repos.task.getById({
+				id: victimTaskSeed.taskInfo.id,
+				workflowRunId: victimTaskSeed.runId,
+			});
+
+			// The attacker holds a perfectly valid run of their own; only the task is foreign.
+			const attackerRunSeed = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const { service } = createService(repos);
+			expect(
+				service.setTaskState(context, {
+					type: "existing",
+					id: attackerRunSeed.runId,
+					taskId: victimTaskSeed.taskInfo.id,
+					state: { status: "completed", output: "hijacked" },
+				})
+			).rejects.toBeInstanceOf(NotFoundError);
+
+			expect(await repos.task.getById({ id: victimTaskSeed.taskInfo.id, workflowRunId: victimTaskSeed.runId })).toEqual(
+				victimRowBefore
+			);
+		}));
+});
+
+describe("WorkflowRunService listWorkflowRunTransitions", () => {
+	test("lists a task's transitions with their stored states", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const taskStateMachine = createTaskStateMachineService({ repos });
+			await taskStateMachine.transitionState(context, {
+				type: "retry",
+				id: runId,
+				expectedWorkflowRunRevision: revisionWhenClaimed,
+				taskId: taskInfo.id,
+				taskState: { status: "running", attempts: 2 },
+			});
+
+			const { service } = createService(repos);
+			const { transitions } = await service.listWorkflowRunTransitions(context, {
+				id: runId,
+				sort: { order: "asc" },
+			});
+			const taskTransitions = transitions.filter((transition) => transition.type === "task");
+			expect(taskTransitions).toEqual([
+				{
+					id: expect.any(String),
+					createdAt: expect.any(Number),
+					type: "task",
+					attempt: 1,
+					taskId: taskInfo.id,
+					taskState: { status: "running", attempts: 1 },
+				},
+				{
+					id: expect.any(String),
+					createdAt: expect.any(Number),
+					type: "task",
+					attempt: 2,
+					taskId: taskInfo.id,
+					taskState: { status: "running", attempts: 2 },
+				},
+			]);
 		}));
 });

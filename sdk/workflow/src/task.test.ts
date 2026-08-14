@@ -76,7 +76,7 @@ describe("task", () => {
 					const input = "info@aiki.run";
 					const output = "Sent to info@aiki.run";
 
-					const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name, state: { input } });
+					const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
 					const completedTaskInfo = completedTaskInfoFactory.build({
 						id: runningTaskInfo.id,
 						name: sendEmail.name,
@@ -87,9 +87,10 @@ describe("task", () => {
 						.once(
 							{
 								type: "create",
+								input,
 								taskName: sendEmail.name,
 								options: {},
-								taskState: runningTaskInfo.state,
+								taskState: { status: "running" },
 								id: runRecord.id,
 								expectedWorkflowRunRevision: runRecord.revision,
 							},
@@ -131,7 +132,7 @@ describe("task", () => {
 				const input = { cardId: "card-1" };
 				const output = "charged";
 
-				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name, state: { input } });
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: chargeCard.name,
@@ -142,9 +143,10 @@ describe("task", () => {
 					.once(
 						{
 							type: "create",
+							input,
 							taskName: chargeCard.name,
 							options: { retry },
-							taskState: runningTaskInfo.state,
+							taskState: { status: "running" },
 							id: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
@@ -179,15 +181,16 @@ describe("task", () => {
 				});
 
 				const input = { cardId: "card-1" };
-				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name, state: { input } });
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 
 				client.api.workflowRun.transitionTaskStateV1
 					.once(
 						{
 							type: "create",
+							input,
 							taskName: chargeCard.name,
 							options: { retry },
-							taskState: runningTaskInfo.state,
+							taskState: { status: "running" },
 							id: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
@@ -224,15 +227,16 @@ describe("task", () => {
 				});
 
 				const input = { cardId: "card-1" };
-				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name, state: { input } });
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 
 				client.api.workflowRun.transitionTaskStateV1
 					.once(
 						{
 							type: "create",
+							input,
 							taskName: chargeCard.name,
 							options: {},
-							taskState: runningTaskInfo.state,
+							taskState: { status: "running" },
 							id: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
@@ -436,7 +440,7 @@ describe("task", () => {
 				const output = "sent";
 				const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
 
-				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name, state: { input } });
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: sendEmail.name,
@@ -447,9 +451,10 @@ describe("task", () => {
 					.once(
 						{
 							type: "create",
+							input,
 							taskName: sendEmail.name,
 							options: { retry },
-							taskState: runningTaskInfo.state,
+							taskState: { status: "running" },
 							id: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},

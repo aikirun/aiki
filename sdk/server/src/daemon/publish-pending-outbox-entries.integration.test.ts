@@ -7,7 +7,7 @@ import { withFakeClock } from "../testing/clock";
 import { pendingWorkflowRunOutboxRowFactory } from "../testing/data-factory/infra/workflow-run-outbox";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createDaemonHarness } from "../testing/harness";
-import { seedQueuedRun } from "../testing/run-seed";
+import { seedQueuedRun } from "../testing/seed/run";
 
 const withHarness = createDaemonHarness();
 

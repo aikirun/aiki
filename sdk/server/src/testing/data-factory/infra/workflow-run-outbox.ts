@@ -5,7 +5,7 @@ import type { WorkflowRunOutboxRowInsertPending } from "../../../infra/db/types/
 
 export const pendingWorkflowRunOutboxRowFactory = Factory.define<WorkflowRunOutboxRowInsertPending>(() => ({
 	id: ulid(),
-	namespaceId: "ns",
+	namespaceId: ulid(),
 	workflowRunId: ulid(),
 	workflowSource: "user",
 	workflowName: "sync-inventory",

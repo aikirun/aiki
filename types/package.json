@@ -8,6 +8,10 @@
 			"types": "./dist/api/schedule.d.ts",
 			"import": "./dist/api/schedule.js"
 		},
+		"./api/task": {
+			"types": "./dist/api/task.d.ts",
+			"import": "./dist/api/task.js"
+		},
 		"./api/workflow": {
 			"types": "./dist/api/workflow.d.ts",
 			"import": "./dist/api/workflow.js"

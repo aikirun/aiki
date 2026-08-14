@@ -10,8 +10,10 @@ import type { TaskInfo } from "@aikirun/types/workflow/task";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useTask } from "../../api/hooks";
 import { TASK_STATUS_COLORS, TASK_STATUS_GLYPHS, WORKFLOW_RUN_STATUS_COLORS } from "../../constants/status-colors";
 import { CopyButton } from "../common/CopyButton";
+import { DataBlock } from "../common/DataBlock";
 import { StatusBadge } from "../common/StatusBadge";
 
 interface ExecutionTabProps {
@@ -146,14 +148,6 @@ function SectionHeader({ label }: { label: string }) {
 
 // ── Task card ─────────────────────────────────────────────────────────────────
 
-function taskHasExpandableData(task: TaskInfo): boolean {
-	const s = task.state;
-	if (s.status === "completed") return s.output !== undefined;
-	if (s.status === "failed" || s.status === "awaiting_retry") return true;
-	if (s.status === "running") return s.input !== undefined;
-	return false;
-}
-
 const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; scrollTo: boolean }) {
 	const [isOpen, setIsOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
@@ -163,31 +157,27 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 	const textColor = colorEntry.text;
 	const glyph = TASK_STATUS_GLYPHS[task.state.status];
 	const attempts = task.state.attempts;
-	const canExpand = taskHasExpandableData(task);
 
 	useEffect(() => {
-		if (scrollTo && ref.current && canExpand) {
+		if (scrollTo && ref.current) {
 			ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
 			setIsOpen(true);
 		}
-	}, [scrollTo, canExpand]);
+	}, [scrollTo]);
 
 	return (
 		<div ref={ref} id={`task-${task.id}`} style={{ scrollMarginTop: 16 }}>
+			{/* biome-ignore lint/a11y/useSemanticElements: the header nests CopyButtons, which a native <button> cannot contain */}
 			<div
-				{...(canExpand
-					? {
-							role: "button",
-							tabIndex: 0,
-							onClick: () => setIsOpen(!isOpen),
-							onKeyDown: (e: React.KeyboardEvent) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									setIsOpen(!isOpen);
-								}
-							},
-						}
-					: {})}
+				role="button"
+				tabIndex={0}
+				onClick={() => setIsOpen(!isOpen)}
+				onKeyDown={(e: React.KeyboardEvent) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						setIsOpen(!isOpen);
+					}
+				}}
 				style={{
 					display: "flex",
 					alignItems: "center",
@@ -196,7 +186,7 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 					background: "var(--s1)",
 					border: "1px solid var(--b0)",
 					borderRadius: isOpen ? "8px 8px 0 0" : 8,
-					cursor: canExpand ? "pointer" : "default",
+					cursor: "pointer",
 					transition: "all .12s",
 				}}
 			>
@@ -243,10 +233,10 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 					</div>
 				</div>
 
-				{canExpand && <ChevronIcon open={isOpen} />}
+				<ChevronIcon open={isOpen} />
 			</div>
 
-			{isOpen && canExpand && (
+			{isOpen && (
 				<div
 					style={{
 						background: "var(--s2)",
@@ -256,27 +246,51 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 						padding: "10px 14px",
 					}}
 				>
-					<TaskOutput task={task} color={color} />
+					<TaskDetail task={task} color={color} />
 				</div>
 			)}
 		</div>
 	);
 });
 
-function TaskOutput({ task, color }: { task: TaskInfo; color: string }) {
-	const state = task.state;
-	let text: string;
-	if (state.status === "completed") {
-		text = state.output !== undefined ? JSON.stringify(state.output, null, 2) : "(no output)";
-	} else if (state.status === "failed") {
-		text = state.error.message || "Unknown error";
-	} else if (state.status === "running") {
-		text = state.input !== undefined ? JSON.stringify(state.input, null, 2) : "Executing…";
-	} else {
-		state.status satisfies "awaiting_retry";
-		text = `Error: ${state.error.message}\nRetrying…`;
+// Task payloads are not part of the run record; the full detail is fetched per
+// task when the card is opened.
+function TaskDetail({ task, color }: { task: TaskInfo; color: string }) {
+	const { data, isPending, isError } = useTask(task);
+
+	if (isPending) {
+		return <TaskText color={color} text="Loading…" />;
+	}
+	if (isError || !data) {
+		return <TaskText color={color} text="Failed to load task" />;
 	}
 
+	const { input, options, state } = data.task;
+
+	let outcome: { label: string; text: string } | undefined;
+	if (state.status === "completed") {
+		outcome = {
+			label: "Output",
+			text: state.output !== undefined ? JSON.stringify(state.output, null, 2) : "(no output)",
+		};
+	} else if (state.status === "failed") {
+		outcome = { label: "Error", text: state.error.message || "Unknown error" };
+	} else if (state.status === "awaiting_retry") {
+		outcome = { label: "Error", text: `${state.error.message}\nRetrying…` };
+	} else {
+		state.status satisfies "running" | "discarded";
+	}
+
+	return (
+		<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+			<DataBlock label="Input" text={input !== undefined ? JSON.stringify(input, null, 2) : "(no input)"} />
+			{outcome && <DataBlock label={outcome.label} text={outcome.text} color={color} />}
+			{options && <DataBlock label="Options" text={JSON.stringify(options, null, 2)} />}
+		</div>
+	);
+}
+
+function TaskText({ text, color }: { text: string; color: string }) {
 	return (
 		<pre
 			style={{
@@ -693,21 +707,7 @@ function EventWaitRow({ wait }: { wait: EventWait<unknown> }) {
 						</span>
 					)}
 				</div>
-				{isReceived && wait.data !== undefined && (
-					<pre
-						style={{
-							fontFamily: "var(--mono)",
-							fontSize: 10.5,
-							color: "var(--t1)",
-							lineHeight: 1.5,
-							whiteSpace: "pre-wrap",
-							wordBreak: "break-word",
-							margin: 0,
-						}}
-					>
-						{JSON.stringify(wait.data, null, 2)}
-					</pre>
-				)}
+				{isReceived && wait.data !== undefined && <DataBlock text={JSON.stringify(wait.data, null, 2)} />}
 			</div>
 		</div>
 	);

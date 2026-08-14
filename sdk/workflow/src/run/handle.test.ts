@@ -137,7 +137,7 @@ describe("workflowRunHandle", () => {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
-					taskState: { status: "running", attempts: 1, input: undefined },
+					taskState: { status: "running" },
 				};
 				client.api.workflowRun.transitionTaskStateV1.rejectsOnce(
 					{ ...request, id: record.id, expectedWorkflowRunRevision: 5 },
@@ -156,7 +156,7 @@ describe("workflowRunHandle", () => {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
-					taskState: { status: "running", attempts: 1, input: undefined },
+					taskState: { status: "running" },
 				};
 				client.api.workflowRun.transitionTaskStateV1.rejectsOnce(
 					{ ...request, id: record.id, expectedWorkflowRunRevision: 5 },
