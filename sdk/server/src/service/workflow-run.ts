@@ -479,9 +479,8 @@ async function createWorkflowRunInTx(
 		status: "scheduled",
 		input,
 		inputHash,
-		options,
+		options: options && { retry: options.retry, pool: options.pool },
 		referenceId,
-		conflictPolicy: options?.reference?.conflictPolicy,
 		latestStateTransitionId: transitionId,
 		scheduledAt: scheduledAt as TimestampMs,
 	});
@@ -559,6 +558,7 @@ async function getWorkflowRun(
 		stateTransitionId: runRow.latestStateTransitionId,
 		input: runRow.input,
 		inputHash: runRow.inputHash,
+		referenceId: runRow.referenceId ?? undefined,
 		options: runRow.options !== null ? runRow.options : undefined,
 		attempts: runRow.attempts,
 		state: latestTransition.state as WorkflowRunState,

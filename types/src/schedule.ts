@@ -1,5 +1,5 @@
 import type { WorkflowSource } from "./workflow";
-import type { WorkflowStartOptions } from "./workflow/run";
+import type { WorkflowRunOptions } from "./workflow/run";
 
 export type ScheduleId = string & { _brand: "schedule_id" };
 
@@ -38,8 +38,6 @@ export interface ScheduleReference {
 	conflictPolicy?: ScheduleConflictPolicy;
 }
 
-export type ScheduledWorkflowStartOptions = Pick<WorkflowStartOptions, "retry" | "pool">;
-
 export interface ScheduleActivateOptions {
 	reference?: ScheduleReference;
 }
@@ -52,8 +50,8 @@ export interface Schedule {
 	status: ScheduleStatus;
 	spec: ScheduleSpec;
 	workflowRunInput?: unknown;
-	options?: ScheduleActivateOptions;
-	workflowRunOptions?: ScheduledWorkflowStartOptions;
+	referenceId?: string;
+	workflowRunOptions?: WorkflowRunOptions;
 	createdAt: number;
 	updatedAt: number;
 	lastOccurrence?: number;

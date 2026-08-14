@@ -19,11 +19,14 @@ const workflowReferenceSchema = type({
 	"conflictPolicy?": "'error' | 'return_existing' | undefined",
 });
 
-export const workflowOptionsSchema = type({
-	"reference?": workflowReferenceSchema,
-	"trigger?": triggerStrategySchema,
+export const workflowRunOptionsSchema = type({
 	"pool?": "string | undefined",
 	"retry?": retryStrategySchema,
+});
+
+export const workflowStartOptionsSchema = workflowRunOptionsSchema.and({
+	"reference?": workflowReferenceSchema,
+	"trigger?": triggerStrategySchema,
 });
 
 export const workflowRunStateScheduledSchema = type({
@@ -166,7 +169,8 @@ export const workflowRunRecordSchema = type({
 	stateTransitionId: "string > 0",
 	"input?": "unknown",
 	inputHash: "string > 0",
-	"options?": workflowOptionsSchema.or("undefined"),
+	"referenceId?": "string > 0 | undefined",
+	"options?": workflowRunOptionsSchema.or("undefined"),
 	attempts: "number.integer >= 0",
 	state: workflowRunStateSchema,
 	tasks: type({ "[string]": taskInfoSchema.array() }),

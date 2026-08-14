@@ -19,12 +19,12 @@ import { type } from "arktype";
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 import {
 	scheduleActivateOptionsSchema,
-	scheduledWorkflowStartOptionsSchema,
 	scheduleSchema,
 	scheduleSpecSchema,
 	scheduleStatusSchema,
 	scheduleWorkflowFilterSchema,
 } from "../schema/schedule";
+import { workflowRunOptionsSchema } from "../schema/workflow-run";
 
 const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateResponseV1> = oc
 	.input(
@@ -34,7 +34,7 @@ const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateR
 			"workflowRunInput?": "unknown",
 			spec: scheduleSpecSchema,
 			"options?": scheduleActivateOptionsSchema.or("undefined"),
-			"workflowRunOptions?": scheduledWorkflowStartOptionsSchema.or("undefined"),
+			"workflowRunOptions?": workflowRunOptionsSchema.or("undefined"),
 		})
 	)
 	.output(

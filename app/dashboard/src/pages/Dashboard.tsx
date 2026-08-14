@@ -400,7 +400,7 @@ function ScheduleRow({ schedule, runCount }: { schedule: Schedule; runCount: num
 	const canResume = schedule.status === "paused";
 	const canDeactivate = schedule.status !== "inactive";
 
-	const referenceId = schedule.options?.reference?.id;
+	const referenceId = schedule.referenceId;
 
 	return (
 		<tr className="hover:bg-slate-50 transition-colors">

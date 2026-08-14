@@ -39,7 +39,6 @@ import {
 	cancelByIdsResponseSchema,
 	listChildRunsRequestSchema,
 	listChildRunsResponseSchema,
-	workflowOptionsSchema,
 	workflowRunRecordSchema,
 	workflowRunStateAwaitingChildWorkflowSchema,
 	workflowRunStateAwaitingEventSchema,
@@ -56,6 +55,7 @@ import {
 	workflowRunStateSleepingSchema,
 	workflowRunStateStalledSchema,
 	workflowRunStatusSchema,
+	workflowStartOptionsSchema,
 } from "../schema/workflow-run";
 
 const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
@@ -158,7 +158,7 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 			"input?": "unknown",
 			inputHash: "string > 0",
 			"parentWorkflowRunId?": "string > 0 | undefined",
-			"options?": workflowOptionsSchema,
+			"options?": workflowStartOptionsSchema,
 		})
 	)
 	.output(
