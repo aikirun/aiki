@@ -1,19 +1,17 @@
 import { streamChunks } from "@aikirun/lib/async";
-import { isNonEmptyArray } from "@aikirun/lib/collection/array";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import type { Repositories } from "../infra/db/types";
+import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import type { DaemonContext } from "../middleware/context";
 
-type Repos = Pick<Repositories, "workflowRunOutbox" | "workflowRun" | "stateTransition" | "transaction">;
-
 export interface RecoverOverdueOutboxEntriesDeps {
-	repos: Repos;
+	repos: Repositories;
 }
 
 const advanceClaimedCursor = createKeysetStreamCursorAdvancer<{ id: string; claimedAt: TimestampMs }>({
@@ -52,41 +50,7 @@ export async function recoverOverdueOutboxEntries(
 			continue;
 		}
 
-		await repos.transaction(async (txRepos) => {
-			const releasedRuns = await txRepos.workflowRun.bulkReleaseToQueued(context, runIds);
-
-			if (isNonEmptyArray(releasedRuns)) {
-				const stateTransitionEntries: StateTransitionRowInsert[] = [];
-				const stateTransitionUpdates: {
-					filter: { namespaceId: NamespaceId; id: string };
-					update: { stateTransitionId: string };
-				}[] = [];
-
-				for (const run of releasedRuns) {
-					const stateTransitionId = ulid();
-					stateTransitionEntries.push({
-						id: stateTransitionId,
-						workflowRunId: run.id,
-						type: "workflow_run",
-						status: "queued",
-						attempt: run.attempts,
-						state: { status: "queued", reason: "recovery" } satisfies WorkflowRunStateQueued,
-					});
-					stateTransitionUpdates.push({
-						filter: { namespaceId: run.namespaceId as NamespaceId, id: run.id },
-						update: { stateTransitionId },
-					});
-				}
-
-				if (isNonEmptyArray(stateTransitionEntries) && isNonEmptyArray(stateTransitionUpdates)) {
-					await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-					await txRepos.workflowRun.bulkSetLatestStateTransitionId(stateTransitionUpdates);
-				}
-			}
-
-			await txRepos.workflowRunOutbox.returnToPending(entryIds, "claimed");
-		});
-
+		await repos.transaction(async (txRepos) => releaseStaleClaimsInTx(context, { entryIds, runIds }, txRepos));
 		context.logger.debug("Recovered stale claimed outbox entries", { "aiki.count": staleEntries.length });
 	}
 
@@ -105,4 +69,46 @@ export async function recoverOverdueOutboxEntries(
 		await repos.workflowRunOutbox.returnToPending(entryIds, "published");
 		context.logger.debug("Recovered publishable outbox entries", { "aiki.count": publishableEntries.length });
 	}
+}
+
+async function releaseStaleClaimsInTx(
+	context: DaemonContext,
+	params: {
+		entryIds: NonEmptyArray<string>;
+		runIds: NonEmptyArray<string>;
+	},
+	txRepos: TxRepositories
+): Promise<void> {
+	const releasedRuns = await txRepos.workflowRun.bulkReleaseToQueued(context, params.runIds);
+
+	if (isNonEmptyArray(releasedRuns)) {
+		const stateTransitionEntries: StateTransitionRowInsert[] = [];
+		const stateTransitionUpdates: {
+			filter: { namespaceId: NamespaceId; id: string };
+			update: { stateTransitionId: string };
+		}[] = [];
+
+		for (const run of releasedRuns) {
+			const stateTransitionId = ulid();
+			stateTransitionEntries.push({
+				id: stateTransitionId,
+				workflowRunId: run.id,
+				type: "workflow_run",
+				status: "queued",
+				attempt: run.attempts,
+				state: { status: "queued", reason: "recovery" } satisfies WorkflowRunStateQueued,
+			});
+			stateTransitionUpdates.push({
+				filter: { namespaceId: run.namespaceId as NamespaceId, id: run.id },
+				update: { stateTransitionId },
+			});
+		}
+
+		if (isNonEmptyArray(stateTransitionEntries) && isNonEmptyArray(stateTransitionUpdates)) {
+			await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+			await txRepos.workflowRun.bulkSetLatestStateTransitionId(stateTransitionUpdates);
+		}
+	}
+
+	await txRepos.workflowRunOutbox.returnToPending(params.entryIds, "claimed");
 }

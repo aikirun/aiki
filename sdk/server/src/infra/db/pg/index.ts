@@ -8,7 +8,7 @@ import { createTaskRepository } from "./repository/task";
 import { createWorkflowRepository } from "./repository/workflow";
 import { createWorkflowRunRepository } from "./repository/workflow-run";
 import { createWorkflowRunOutboxRepository } from "./repository/workflow-run-outbox";
-import type { Repositories } from "../types";
+import type { Repositories, TxRepositories } from "../types";
 
 const createRepos = (db: PgDb): Omit<Repositories, "transaction"> => ({
 	workflowRun: createWorkflowRunRepository(db),
@@ -26,8 +26,8 @@ export function createPgRepos(client: PgClient): Repositories {
 	const db = createPgHandle(client);
 	return {
 		...createRepos(db),
-		async transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T> {
-			return db.transaction(async (tx) => fn(createRepos(tx)));
+		async transaction<T>(fn: (txRepos: TxRepositories) => Promise<T>): Promise<T> {
+			return db.transaction(async (tx) => fn(createRepos(tx) as TxRepositories));
 		},
 	};
 }

@@ -3,7 +3,7 @@ import { asNonEmptyArray, isNonEmptyArray } from "@aikirun/lib/collection/array"
 import type { TaskStateDiscarded } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import type { Repositories } from "../infra/db/types";
+import type { TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 
 type DiscardableTaskStatus = "running" | "awaiting_retry" | "failed";
@@ -11,7 +11,7 @@ type DiscardableTaskStatus = "running" | "awaiting_retry" | "failed";
 export async function discardStaleTasks(
 	workflowRunIds: string | NonEmptyArray<string>,
 	staleStatuses: NonEmptyArray<DiscardableTaskStatus>,
-	txRepos: Pick<Repositories, "task" | "stateTransition">
+	txRepos: TxRepositories
 ): Promise<void> {
 	const staleTasks = await txRepos.task.listByWorkflowRunIdsAndStatuses(workflowRunIds, staleStatuses);
 	if (!isNonEmptyArray(staleTasks)) {

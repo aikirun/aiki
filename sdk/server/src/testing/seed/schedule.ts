@@ -18,14 +18,10 @@ export async function seedActiveSchedule(
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 
 	const scheduleService = createScheduleService({ repos });
-	const { schedule } = await scheduleService.activateSchedule(
-		namespaceRequestContext,
-		namespaceRequestContext.namespaceId,
-		{
-			...seededSchedule,
-			workflowName: overrides?.workflowName ?? seededSchedule.workflowName,
-		}
-	);
+	const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
+		...seededSchedule,
+		workflowName: overrides?.workflowName ?? seededSchedule.workflowName,
+	});
 
 	return { schedule };
 }

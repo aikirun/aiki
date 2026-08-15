@@ -6,7 +6,7 @@ export function createScheduleRouter(scheduleService: ScheduleService) {
 
 	return os.router({
 		activateV1: os.activateV1.handler(async ({ input: request, context }) => {
-			return scheduleService.activateSchedule(context, context.namespaceId, request);
+			return scheduleService.activateSchedule(context.namespaceId, request);
 		}),
 
 		getByIdV1: os.getByIdV1.handler(async ({ input: request, context }) => {

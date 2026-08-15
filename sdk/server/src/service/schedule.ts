@@ -12,9 +12,8 @@ import CronExpressionParser from "cron-parser";
 import { ulid } from "ulidx";
 
 import { ScheduleConflictError } from "../errors";
-import type { Repositories } from "../infra/db/types";
+import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleRow } from "../infra/db/types/schedule";
-import type { Context } from "../middleware/context";
 
 export function getReferenceId(scheduleId: string, occurrence: number) {
 	return `schedule:${scheduleId}:${occurrence}`;
@@ -99,7 +98,7 @@ export function getNextOccurrence(spec: ScheduleSpec, anchor: number): number {
 }
 
 export interface ScheduleServiceDeps {
-	repos: Pick<Repositories, "schedule" | "workflow" | "workflowRun" | "transaction">;
+	repos: Repositories;
 }
 
 export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
@@ -119,11 +118,11 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 	},
 
 	async activateSchedule(
-		_context: Context,
 		namespaceId: NamespaceId,
 		request: ScheduleActivateRequestV1
 	): Promise<{ schedule: Schedule }> {
-		const { workflowName, workflowVersionId, workflowRunInput, spec, options, workflowRunOptions } = request;
+		const { workflowName, workflowVersionId, workflowRunInput, workflowRunOptions, spec } = request;
+		const workflowRunInputHash = await hashInput(workflowRunInput);
 		const definitionHash = await sha256Async(
 			stableStringify({
 				workflowName,
@@ -133,103 +132,9 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 				workflowRunOptions,
 			})
 		);
-		const referenceId = options?.reference?.id;
-		const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
-		const workflowRunInputHash = await hashInput(workflowRunInput);
-
-		return repos.transaction(async (txRepos) => {
-			const workflowRow = await txRepos.workflow.getOrCreate({
-				namespaceId,
-				name: workflowName as WorkflowName,
-				versionId: workflowVersionId as WorkflowVersionId,
-				source: "user",
-			});
-
-			const workflowInfo = { workflowSource: workflowRow.source, workflowName, workflowVersionId };
-			const now = Date.now();
-			const nextRunAt = getNextOccurrence(spec, now) as TimestampMs;
-
-			if (!referenceId) {
-				const existingScheduleByDefinition = await txRepos.schedule.get(namespaceId, { definitionHash });
-
-				const schedule = existingScheduleByDefinition
-					? existingScheduleByDefinition.status === "active"
-						? existingScheduleByDefinition
-						: await reactivateSchedule(txRepos.schedule, {
-								namespaceId,
-								scheduleId: existingScheduleByDefinition.id as ScheduleId,
-								nextRunAt,
-							})
-					: await createSchedule(txRepos.schedule, {
-							namespaceId,
-							workflowId: workflowRow.id,
-							spec,
-							workflowRunInput,
-							workflowRunInputHash,
-							definitionHash,
-							referenceId: undefined,
-							workflowRunOptions,
-							nextRunAt,
-						});
-
-				return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
-			}
-
-			const existingScheduleByReference = await txRepos.schedule.get(namespaceId, { referenceId });
-			if (existingScheduleByReference) {
-				if (existingScheduleByReference.definitionHash !== definitionHash) {
-					if (conflictPolicy === "error") {
-						throw new ScheduleConflictError({ definitionHash, referenceId });
-					}
-					conflictPolicy satisfies "return_existing";
-					return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
-				}
-
-				const schedule =
-					existingScheduleByReference.status === "active"
-						? existingScheduleByReference
-						: await reactivateSchedule(txRepos.schedule, {
-								namespaceId,
-								scheduleId: existingScheduleByReference.id as ScheduleId,
-								nextRunAt,
-							});
-
-				return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
-			}
-
-			// Reference id is free, but the definition may already exist.
-			const existingNonReferencedSchedule = await txRepos.schedule.get(namespaceId, {
-				definitionHash,
-				referenceId: null,
-			});
-			if (existingNonReferencedSchedule) {
-				const schedule = await txRepos.schedule.update(
-					namespaceId,
-					{ id: existingNonReferencedSchedule.id, referenceId: null },
-					{
-						referenceId,
-						status: "active",
-						nextRunAt,
-					}
-				);
-				if (schedule) {
-					return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
-				}
-			}
-
-			const schedule = await createSchedule(txRepos.schedule, {
-				namespaceId,
-				workflowId: workflowRow.id,
-				spec,
-				workflowRunInput,
-				workflowRunInputHash,
-				definitionHash,
-				referenceId,
-				workflowRunOptions,
-				nextRunAt,
-			});
-			return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
-		});
+		return repos.transaction(async (txRepos) =>
+			activateScheduleInTx(namespaceId, request, { workflowRunInputHash, definitionHash }, txRepos)
+		);
 	},
 
 	async getScheduleById(namespaceId: NamespaceId, id: string) {
@@ -315,6 +220,114 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 });
 
 export type ScheduleService = ReturnType<typeof createScheduleService>;
+
+async function activateScheduleInTx(
+	namespaceId: NamespaceId,
+	request: ScheduleActivateRequestV1,
+	hashes: {
+		workflowRunInputHash: string;
+		definitionHash: string;
+	},
+	txRepos: TxRepositories
+) {
+	const { workflowName, workflowVersionId, workflowRunInput, workflowRunOptions, spec, options } = request;
+	const { workflowRunInputHash, definitionHash } = hashes;
+
+	const referenceId = options?.reference?.id;
+	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
+
+	const workflowRow = await txRepos.workflow.getOrCreate({
+		namespaceId,
+		name: workflowName as WorkflowName,
+		versionId: workflowVersionId as WorkflowVersionId,
+		source: "user",
+	});
+
+	const workflowInfo = { workflowSource: workflowRow.source, workflowName, workflowVersionId };
+	const now = Date.now();
+	const nextRunAt = getNextOccurrence(spec, now) as TimestampMs;
+
+	if (!referenceId) {
+		const existingScheduleByDefinition = await txRepos.schedule.get(namespaceId, { definitionHash });
+
+		const schedule = existingScheduleByDefinition
+			? existingScheduleByDefinition.status === "active"
+				? existingScheduleByDefinition
+				: await reactivateSchedule(txRepos.schedule, {
+						namespaceId,
+						scheduleId: existingScheduleByDefinition.id as ScheduleId,
+						nextRunAt,
+					})
+			: await createSchedule(txRepos.schedule, {
+					namespaceId,
+					workflowId: workflowRow.id,
+					spec,
+					workflowRunInput,
+					workflowRunInputHash,
+					definitionHash,
+					referenceId: undefined,
+					workflowRunOptions,
+					nextRunAt,
+				});
+
+		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
+	}
+
+	const existingScheduleByReference = await txRepos.schedule.get(namespaceId, { referenceId });
+	if (existingScheduleByReference) {
+		if (existingScheduleByReference.definitionHash !== definitionHash) {
+			if (conflictPolicy === "error") {
+				throw new ScheduleConflictError({ definitionHash, referenceId });
+			}
+			conflictPolicy satisfies "return_existing";
+			return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
+		}
+
+		const schedule =
+			existingScheduleByReference.status === "active"
+				? existingScheduleByReference
+				: await reactivateSchedule(txRepos.schedule, {
+						namespaceId,
+						scheduleId: existingScheduleByReference.id as ScheduleId,
+						nextRunAt,
+					});
+
+		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
+	}
+
+	// Reference id is free, but the definition may already exist.
+	const existingNonReferencedSchedule = await txRepos.schedule.get(namespaceId, {
+		definitionHash,
+		referenceId: null,
+	});
+	if (existingNonReferencedSchedule) {
+		const schedule = await txRepos.schedule.update(
+			namespaceId,
+			{ id: existingNonReferencedSchedule.id, referenceId: null },
+			{
+				referenceId,
+				status: "active",
+				nextRunAt,
+			}
+		);
+		if (schedule) {
+			return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
+		}
+	}
+
+	const schedule = await createSchedule(txRepos.schedule, {
+		namespaceId,
+		workflowId: workflowRow.id,
+		spec,
+		workflowRunInput,
+		workflowRunInputHash,
+		definitionHash,
+		referenceId,
+		workflowRunOptions,
+		nextRunAt,
+	});
+	return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
+}
 
 async function reactivateSchedule(
 	repo: Repositories["schedule"],

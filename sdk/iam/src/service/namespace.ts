@@ -12,11 +12,11 @@ import {
 	type OrganizationSessionRequestContext,
 } from "../context";
 import type { NamespaceInfo, NamespaceMemberInfo, NamespaceMemberInput } from "../contract/schema/namespace";
-import type { Repositories } from "../infra/db/types";
+import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { NamespaceRow } from "../infra/db/types/namespace";
 
 export interface NamespaceServiceDeps {
-	repos: Pick<Repositories, "namespace" | "apiKey" | "session" | "transaction">;
+	repos: Repositories;
 	apiKeyCache?: Cache<ApiKeyAuthorizationInfo>;
 }
 
@@ -25,19 +25,7 @@ export const createNamespaceService = ({ repos, apiKeyCache }: NamespaceServiceD
 		context: OrganizationManagerSessionRequestContext,
 		params: { name: string }
 	): Promise<NamespaceRow> {
-		return repos.transaction(async (txRepos) => {
-			const createdNamespace = await txRepos.namespace.create({
-				name: params.name,
-				organizationId: context.organizationId,
-			});
-			await txRepos.namespace.createMember({
-				id: ulid(),
-				namespaceId: createdNamespace.id,
-				userId: context.userId,
-				role: "admin",
-			});
-			return createdNamespace;
-		});
+		return repos.transaction(async (txRepos) => createNamespaceWithMemberInTx(context, params, txRepos));
 	},
 
 	async listNamespaces(context: OrganizationSessionRequestContext): Promise<NamespaceInfo[]> {
@@ -96,9 +84,7 @@ export const createNamespaceService = ({ repos, apiKeyCache }: NamespaceServiceD
 		members: NonEmptyArray<NamespaceMemberInput>
 	): Promise<void> {
 		if (isNonEmptyArray(members)) {
-			await repos.transaction(async (txRepos) => {
-				await txRepos.namespace.upsertMembers(namespaceId, members);
-			});
+			await repos.transaction(async (txRepos) => setMembershipInTx(_context, namespaceId, members, txRepos));
 		}
 	},
 
@@ -121,16 +107,9 @@ export const createNamespaceService = ({ repos, apiKeyCache }: NamespaceServiceD
 		context: OrganizationManagerSessionRequestContext,
 		namespaceId: NamespaceId
 	): Promise<void> {
-		const revokedKeyHashes = await repos.transaction(async (txRepos) => {
-			const activeNamespaceCount = await txRepos.namespace.countActiveByOrganizationForUpdate(context.organizationId);
-			if (activeNamespaceCount <= 1) {
-				throw new ValidationError("Cannot delete the last namespace");
-			}
-			await txRepos.namespace.softDelete(namespaceId);
-			await txRepos.session.clearActiveByNamespaceId(namespaceId);
-			return txRepos.apiKey.revokeByNamespace(namespaceId);
-		});
-
+		const revokedKeyHashes = await repos.transaction(async (txRepos) =>
+			softDeleteNamespaceByIdInTx(context, namespaceId, txRepos)
+		);
 		if (apiKeyCache && isNonEmptyArray(revokedKeyHashes)) {
 			fireAndForget(apiKeyCache.invalidate(revokedKeyHashes), (_error) => {});
 		}
@@ -138,3 +117,44 @@ export const createNamespaceService = ({ repos, apiKeyCache }: NamespaceServiceD
 });
 
 export type NamespaceService = ReturnType<typeof createNamespaceService>;
+
+async function createNamespaceWithMemberInTx(
+	context: OrganizationManagerSessionRequestContext,
+	params: { name: string },
+	txRepos: TxRepositories
+) {
+	const createdNamespace = await txRepos.namespace.create({
+		name: params.name,
+		organizationId: context.organizationId,
+	});
+	await txRepos.namespace.createMember({
+		id: ulid(),
+		namespaceId: createdNamespace.id,
+		userId: context.userId,
+		role: "admin",
+	});
+	return createdNamespace;
+}
+
+async function setMembershipInTx(
+	_context: OrganizationSessionRequestContext,
+	namespaceId: NamespaceId,
+	members: NonEmptyArray<NamespaceMemberInput>,
+	txRepos: TxRepositories
+) {
+	await txRepos.namespace.upsertMembers(namespaceId, members);
+}
+
+async function softDeleteNamespaceByIdInTx(
+	context: OrganizationManagerSessionRequestContext,
+	namespaceId: NamespaceId,
+	txRepos: TxRepositories
+) {
+	const activeNamespaceCount = await txRepos.namespace.countActiveByOrganizationForUpdate(context.organizationId);
+	if (activeNamespaceCount <= 1) {
+		throw new ValidationError("Cannot delete the last namespace");
+	}
+	await txRepos.namespace.softDelete(namespaceId);
+	await txRepos.session.clearActiveByNamespaceId(namespaceId);
+	return txRepos.apiKey.revokeByNamespace(namespaceId);
+}

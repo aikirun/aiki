@@ -17,7 +17,7 @@ import { isTerminalWorkflowRunStatus, isWorkflowRunScheduledReason } from "@aiki
 import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
-import type { Repositories } from "../../infra/db/types";
+import type { Repositories, TxRepositories } from "../../infra/db/types";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import type { ChildRunCanceller } from "../cancel-child-runs";
 import { discardStaleTasks } from "../discard-stale-tasks";
@@ -184,13 +184,8 @@ export function assertIsValidWorkflowRunStateTransition(
 	}
 }
 
-type TxRepos = Pick<
-	Repositories,
-	"workflowRun" | "workflow" | "stateTransition" | "sleep" | "task" | "childWorkflowRunWait" | "workflowRunOutbox"
->;
-
 export interface WorkflowRunStateMachineDeps {
-	repos: TxRepos & Pick<Repositories, "transaction">;
+	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
 }
 
@@ -198,7 +193,7 @@ export const createWorkflowRunStateMachine = ({ repos, childRunCanceller }: Work
 	async transitionState(
 		context: NamespaceRequestContext,
 		request: WorkflowRunTransitionStateRequestV1,
-		txRepos?: TxRepos
+		txRepos?: TxRepositories
 	): Promise<WorkflowRunTransitionStateResponseV1> {
 		const response = txRepos
 			? await transitionStateInTx(context, request, childRunCanceller, txRepos)
@@ -220,7 +215,7 @@ async function transitionStateInTx(
 	context: NamespaceRequestContext,
 	request: WorkflowRunTransitionStateRequestV1,
 	childRunCanceller: ChildRunCanceller,
-	txRepos: TxRepos
+	txRepos: TxRepositories
 ): Promise<WorkflowRunTransitionStateResponseV1> {
 	const namespaceId = context.namespaceId;
 	const runId = request.id as WorkflowRunId;
@@ -326,7 +321,7 @@ async function transitionStateInTx(
 	return { revision: newRevision, state: toState, attempts };
 }
 
-async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: number, txRepos: TxRepos) {
+async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: number, txRepos: TxRepositories) {
 	const activeSleep = await txRepos.sleep.getActiveByWorkflowRunIdAndName(runId, sleepName);
 	if (!activeSleep) {
 		return;
@@ -343,7 +338,7 @@ async function childWorkflowRunWaitNotNeeded(
 	runId: WorkflowRunId,
 	toState: WorkflowRunStateAwaitingChildWorkflow,
 	now: number,
-	txRepos: TxRepos
+	txRepos: TxRepositories
 ) {
 	const childRunId = toState.childWorkflowRunId as WorkflowRunId;
 	const childRunResult = await txRepos.workflowRun.getByIdWithState({ namespaceId, id: childRunId });
@@ -382,7 +377,7 @@ async function updateWorkflowRun(
 	toState: WorkflowRunState,
 	stateTransitionId: string,
 	attempts: number,
-	txRepos: TxRepos
+	txRepos: TxRepositories
 ): Promise<number> {
 	const updates: Record<string, unknown> = {
 		status: toState.status,
@@ -438,7 +433,7 @@ async function notifyParentOfStateChangeIfNecessary(
 	},
 	now: number,
 	childRunCanceller: ChildRunCanceller,
-	txRepos: TxRepos
+	txRepos: TxRepositories
 ): Promise<void> {
 	const parentRunResult = await txRepos.workflowRun.getByIdWithState({
 		namespaceId: context.namespaceId,

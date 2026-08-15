@@ -12,7 +12,7 @@ import { computeRank, extractRankPriority } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 
 export interface PublishPendingOutboxEntriesDeps {
-	repos: Pick<Repositories, "workflowRunOutbox">;
+	repos: Repositories;
 	publisher: Publisher;
 }
 
@@ -46,7 +46,7 @@ export async function publishPendingOutboxEntries(
 
 export async function publishOutboxEntries(
 	{ logger }: DaemonContext,
-	repos: Pick<Repositories, "workflowRunOutbox">,
+	repos: Repositories,
 	publisher: Publisher,
 	entries: NonEmptyArray<WorkflowRunOutboxRowPending | WorkflowRunOutboxRowInsertPending>,
 	republishBackoff: RepublishBackoff

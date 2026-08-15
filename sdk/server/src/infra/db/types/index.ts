@@ -18,5 +18,11 @@ export interface Repositories {
 	eventWait: EventWaitRepository;
 	childWorkflowRunWait: ChildWorkflowRunWaitRepository;
 	workflowRunOutbox: WorkflowRunOutboxRepository;
-	transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T>;
+	transaction<T>(fn: (txRepos: TxRepositories) => Promise<T>): Promise<T>;
 }
+
+declare const inTransaction: unique symbol;
+
+export type TxRepositories = Omit<Repositories, "transaction"> & {
+	readonly [inTransaction]: true;
+};

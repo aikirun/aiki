@@ -18,7 +18,7 @@ import {
 	TaskStateConflictError,
 	WorkflowRunRevisionConflictError,
 } from "../../errors";
-import type { Repositories } from "../../infra/db/types";
+import type { Repositories, TxRepositories } from "../../infra/db/types";
 import type { NamespaceRequestContext } from "../../middleware/context";
 
 const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
@@ -50,14 +50,14 @@ export function assertIsValidTaskStateTransition(
 }
 
 export interface TaskStateMachineDeps {
-	repos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox" | "transaction">;
+	repos: Repositories;
 }
 
 export const createTaskStateMachine = ({ repos }: TaskStateMachineDeps) => ({
 	async transitionState(
 		context: NamespaceRequestContext,
 		request: TaskTransitionStateRequestV1,
-		txRepos?: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
+		txRepos?: TxRepositories
 	): Promise<TaskInfo> {
 		if (txRepos) {
 			return transitionStateInTx(context, request, txRepos);
@@ -72,7 +72,7 @@ export type TaskStateMachine = ReturnType<typeof createTaskStateMachine>;
 async function transitionStateInTx(
 	{ namespaceId, logger }: NamespaceRequestContext,
 	request: TaskTransitionStateRequestV1,
-	txRepos: Pick<Repositories, "workflowRun" | "task" | "stateTransition" | "workflowRunOutbox">
+	txRepos: TxRepositories
 ): Promise<TaskInfo> {
 	const runId = request.workflowRunId as WorkflowRunId;
 	const run = await txRepos.workflowRun.getById({ namespaceId, id: runId }, { lock: "share" });

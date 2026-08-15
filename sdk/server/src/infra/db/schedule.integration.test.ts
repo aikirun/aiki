@@ -8,7 +8,7 @@ import { seedActiveSchedule } from "../../testing/seed/schedule";
 
 const withHarness = createServiceHarness();
 
-async function getScheduleRow(repos: Pick<Repositories, "schedule">, namespaceId: NamespaceId, id: string) {
+async function getScheduleRow(repos: Repositories, namespaceId: NamespaceId, id: string) {
 	const schedule = await repos.schedule.get(namespaceId, { id });
 	if (!schedule) {
 		throw new Error(`Schedule not found: ${id}`);

@@ -46,7 +46,7 @@ function isValidKeyFormat(key: string): boolean {
 }
 
 export interface ApiKeyServiceDeps {
-	repos: Pick<Repositories, "apiKey">;
+	repos: Repositories;
 	cache?: Cache<ApiKeyAuthorizationInfo>;
 }
 

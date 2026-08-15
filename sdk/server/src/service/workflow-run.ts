@@ -34,7 +34,7 @@ import { ulid } from "ulidx";
 
 import type { WorkflowRunStateMachine } from "./state-machine/workflow-run";
 import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
-import type { Repositories } from "../infra/db/types";
+import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { EventWaitRow, EventWaitRowInsert } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
@@ -43,17 +43,7 @@ import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-chil
 import { discardStaleTasks } from "../service/discard-stale-tasks";
 
 export interface WorkflowRunServiceDeps {
-	repos: Pick<
-		Repositories,
-		| "workflowRun"
-		| "workflow"
-		| "stateTransition"
-		| "task"
-		| "sleep"
-		| "eventWait"
-		| "childWorkflowRunWait"
-		| "transaction"
-	>;
+	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunStateMachine: WorkflowRunStateMachine;
 }
@@ -224,44 +214,9 @@ export const createWorkflowRunService = ({
 		data: unknown,
 		reference: EventReference | undefined
 	): Promise<void> {
-		return repos.transaction(async (txRepos) => {
-			const result = await txRepos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
-			if (!result) {
-				throw new NotFoundError(`Workflow run not found: ${runId}`);
-			}
-			const { run, state } = result;
-
-			const eventWaitEntry: EventWaitRowInsert = {
-				id: ulid(),
-				workflowRunId: runId,
-				name: eventName,
-				status: "received",
-				referenceId: reference?.id,
-				data,
-			};
-			if (propsRequiredNonNull(eventWaitEntry, "referenceId")) {
-				await txRepos.eventWait.upsert(eventWaitEntry);
-			} else {
-				await txRepos.eventWait.insert(eventWaitEntry);
-			}
-
-			if (run.status !== "awaiting_event") {
-				return;
-			}
-
-			if (state.status === "awaiting_event" && state.eventName === eventName) {
-				await workflowRunStateMachine.transitionState(
-					context,
-					{
-						type: "optimistic",
-						id: runId,
-						state: { status: "scheduled", scheduledInMs: 0, reason: "event" },
-						expectedRevision: run.revision,
-					},
-					txRepos
-				);
-			}
-		});
+		return repos.transaction(async (txRepos) =>
+			sendEventToWorkflowRunInTx(context, runId, eventName, data, reference, txRepos, workflowRunStateMachine)
+		);
 	},
 
 	async resolveRunIdsByReferences(
@@ -337,59 +292,13 @@ export const createWorkflowRunService = ({
 		};
 	},
 
-	async cancelByIds({ namespaceId, logger }: NamespaceRequestContext, request: WorkflowRunCancelByIdsRequestV1) {
+	async cancelByIds(context: NamespaceRequestContext, request: WorkflowRunCancelByIdsRequestV1) {
 		const ids = request.ids;
 		if (!isNonEmptyArray(ids)) {
 			return { cancelledIds: [] };
 		}
 
-		return repos.transaction(async (txRepos) => {
-			const cancelledRuns = await txRepos.workflowRun.bulkTransitionToCancelledInNamespace(namespaceId, ids);
-			if (!isNonEmptyArray(cancelledRuns)) {
-				return { cancelledIds: [] };
-			}
-			const cancelledRunIds = cancelledRuns.map((run) => run.id) as NonEmptyArray<string>;
-
-			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
-			await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, Date.now() as TimestampMs);
-			await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
-
-			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
-			const cancelledRunStateTransitionUpdates: {
-				filter: { namespaceId: NamespaceId; id: string };
-				update: { stateTransitionId: string };
-			}[] = [];
-			const cancelledRunsMeta: CancelledRunMeta[] = [];
-
-			for (const run of cancelledRuns) {
-				const stateTransitionId = ulid();
-				cancelStateTransitionEntries.push({
-					id: stateTransitionId,
-					workflowRunId: run.id,
-					type: "workflow_run",
-					status: "cancelled",
-					attempt: run.attempts,
-					state: { status: "cancelled", reason: "Cancelled" } satisfies WorkflowRunStateCancelled,
-				});
-				cancelledRunStateTransitionUpdates.push({ filter: { namespaceId, id: run.id }, update: { stateTransitionId } });
-				cancelledRunsMeta.push({
-					namespaceId,
-					id: run.id,
-					pool: run.options?.pool,
-				});
-			}
-
-			if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionUpdates)) {
-				await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
-				await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionUpdates);
-			}
-
-			if (isNonEmptyArray(cancelledRunsMeta)) {
-				await childRunCanceller.cancel(cancelledRunsMeta, txRepos, logger);
-			}
-
-			return { cancelledIds: cancelledRunIds };
-		});
+		return repos.transaction(async (txRepos) => cancelByIdsInTx(context, ids, txRepos, childRunCanceller));
 	},
 
 	async hasTerminated(context: NamespaceRequestContext, runId: string, afterStateTransitionId: string) {
@@ -409,7 +318,7 @@ export type WorkflowRunService = ReturnType<typeof createWorkflowRunService>;
 async function createWorkflowRunInTx(
 	{ namespaceId, logger }: NamespaceRequestContext,
 	request: WorkflowRunCreateRequestV1,
-	txRepos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">
+	txRepos: TxRepositories
 ): Promise<WorkflowRunId> {
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
@@ -502,12 +411,112 @@ async function createWorkflowRunInTx(
 	return runId;
 }
 
+async function sendEventToWorkflowRunInTx(
+	context: NamespaceRequestContext,
+	runId: WorkflowRunId,
+	eventName: string,
+	data: unknown,
+	reference: EventReference | undefined,
+	txRepos: TxRepositories,
+	workflowRunStateMachine: WorkflowRunStateMachine
+) {
+	const result = await txRepos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+	if (!result) {
+		throw new NotFoundError(`Workflow run not found: ${runId}`);
+	}
+	const { run, state } = result;
+
+	const eventWaitEntry: EventWaitRowInsert = {
+		id: ulid(),
+		workflowRunId: runId,
+		name: eventName,
+		status: "received",
+		referenceId: reference?.id,
+		data,
+	};
+	if (propsRequiredNonNull(eventWaitEntry, "referenceId")) {
+		await txRepos.eventWait.upsert(eventWaitEntry);
+	} else {
+		await txRepos.eventWait.insert(eventWaitEntry);
+	}
+
+	if (run.status !== "awaiting_event") {
+		return;
+	}
+
+	if (state.status === "awaiting_event" && state.eventName === eventName) {
+		await workflowRunStateMachine.transitionState(
+			context,
+			{
+				type: "optimistic",
+				id: runId,
+				state: { status: "scheduled", scheduledInMs: 0, reason: "event" },
+				expectedRevision: run.revision,
+			},
+			txRepos
+		);
+	}
+}
+
+async function cancelByIdsInTx(
+	{ namespaceId, logger }: NamespaceRequestContext,
+	ids: NonEmptyArray<string>,
+	txRepos: TxRepositories,
+	childRunCanceller: ChildRunCanceller
+) {
+	const cancelledRuns = await txRepos.workflowRun.bulkTransitionToCancelledInNamespace(namespaceId, ids);
+	if (!isNonEmptyArray(cancelledRuns)) {
+		return { cancelledIds: [] };
+	}
+	const cancelledRunIds = cancelledRuns.map((run) => run.id) as NonEmptyArray<string>;
+
+	await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+	await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, Date.now() as TimestampMs);
+	await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
+
+	const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
+	const cancelledRunStateTransitionUpdates: {
+		filter: { namespaceId: NamespaceId; id: string };
+		update: { stateTransitionId: string };
+	}[] = [];
+	const cancelledRunsMeta: CancelledRunMeta[] = [];
+
+	for (const run of cancelledRuns) {
+		const stateTransitionId = ulid();
+		cancelStateTransitionEntries.push({
+			id: stateTransitionId,
+			workflowRunId: run.id,
+			type: "workflow_run",
+			status: "cancelled",
+			attempt: run.attempts,
+			state: { status: "cancelled", reason: "Cancelled" } satisfies WorkflowRunStateCancelled,
+		});
+		cancelledRunStateTransitionUpdates.push({ filter: { namespaceId, id: run.id }, update: { stateTransitionId } });
+		cancelledRunsMeta.push({
+			namespaceId,
+			id: run.id,
+			pool: run.options?.pool,
+		});
+	}
+
+	if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionUpdates)) {
+		await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
+		await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionUpdates);
+	}
+
+	if (isNonEmptyArray(cancelledRunsMeta)) {
+		await childRunCanceller.cancel(cancelledRunsMeta, txRepos, logger);
+	}
+
+	return { cancelledIds: cancelledRunIds };
+}
+
 type WorkflowRunWithWorkflowAndState = NonNullable<
 	Awaited<ReturnType<Repositories["workflowRun"]["getByIdWithWorkflowAndState"]>>
 >;
 
 async function getWorkflowRun(
-	repos: WorkflowRunServiceDeps["repos"],
+	repos: Repositories,
 	namespaceId: NamespaceId,
 	{ run, workflow, state }: WorkflowRunWithWorkflowAndState
 ): Promise<WorkflowRunRecord> {

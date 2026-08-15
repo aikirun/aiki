@@ -6,7 +6,7 @@ import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 
 export interface WorkflowRunOutboxServiceDeps {
-	repos: Pick<Repositories, "workflowRunOutbox">;
+	repos: Repositories;
 }
 
 export const createWorkflowRunOutboxService = ({ repos }: WorkflowRunOutboxServiceDeps) => ({

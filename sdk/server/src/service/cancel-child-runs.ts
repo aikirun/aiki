@@ -12,7 +12,7 @@ import {
 } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
-import type { Repositories } from "../infra/db/types";
+import type { TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRowInsert } from "../infra/db/types/workflow";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
@@ -24,16 +24,12 @@ export interface CancelledRunMeta {
 }
 
 export const createChildRunCanceller = () => ({
-	async cancel(
-		runs: NonEmptyArray<CancelledRunMeta>,
-		repos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">,
-		logger: Logger
-	): Promise<void> {
+	async cancel(runs: NonEmptyArray<CancelledRunMeta>, txRepos: TxRepositories, logger: Logger): Promise<void> {
 		if (!isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
 			return;
 		}
 
-		const runIdsHavingChildren = await repos.workflowRun.hasChildRuns(runs, NON_TERMINAL_WORKFLOW_RUN_STATUSES);
+		const runIdsHavingChildren = await txRepos.workflowRun.hasChildRuns(runs, NON_TERMINAL_WORKFLOW_RUN_STATUSES);
 		if (runIdsHavingChildren.size === 0) {
 			return;
 		}
@@ -65,7 +61,7 @@ export const createChildRunCanceller = () => ({
 			return;
 		}
 
-		const workflows = await repos.workflow.getOrCreateBulk(workflowEntries);
+		const workflows = await txRepos.workflow.getOrCreateBulk(workflowEntries);
 		const workflowsByNamespaceId = new Map(workflows.map((workflow) => [workflow.namespaceId, workflow]));
 
 		const now = Date.now();
@@ -119,8 +115,8 @@ export const createChildRunCanceller = () => ({
 		}
 
 		if (isNonEmptyArray(workflowRunEntries) && isNonEmptyArray(stateTransitionEntries)) {
-			await repos.workflowRun.insert(workflowRunEntries);
-			await repos.stateTransition.appendBatch(stateTransitionEntries);
+			await txRepos.workflowRun.insert(workflowRunEntries);
+			await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 		}
 	},
 });

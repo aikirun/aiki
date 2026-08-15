@@ -8,7 +8,7 @@ describe("ScheduleService activateSchedule", () => {
 	test("persists the cron timezone", () =>
 		withHarness(async ({ context, repos }) => {
 			const scheduleService = createScheduleService({ repos });
-			const { schedule } = await scheduleService.activateSchedule(context, context.namespaceId, {
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
 				workflowRunInput: { region: "eu-west" },

@@ -15,7 +15,7 @@ import {
 import { ulid } from "ulidx";
 
 import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
-import type { Repositories } from "../infra/db/types";
+import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleOccurrenceUpdate } from "../infra/db/types/schedule";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
@@ -28,7 +28,7 @@ import { discardStaleTasks } from "../service/discard-stale-tasks";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "../service/schedule";
 
 export interface ProcessImminentRecurringRunsDeps {
-	repos: Pick<Repositories, "workflowRun" | "stateTransition" | "schedule" | "workflowRunOutbox" | "transaction">;
+	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
 	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
@@ -137,7 +137,7 @@ export async function queueRecurringRuns(
 
 async function processOverlapAllowSchedules(
 	context: DaemonContext,
-	repos: ProcessImminentRecurringRunsDeps["repos"],
+	repos: Repositories,
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
 	publisher: Publisher | undefined,
@@ -214,21 +214,33 @@ async function processOverlapAllowSchedules(
 		return;
 	}
 
-	await repos.transaction(async (txRepos) => {
-		await txRepos.workflowRun.insert(workflowRunEntries);
-		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-		await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
-		await txRepos.workflowRunOutbox.createBatch(outboxEntries);
-	});
+	await repos.transaction(async (txRepos) =>
+		insertRecurringRunsInTx({ workflowRunEntries, stateTransitionEntries, scheduleUpdates, outboxEntries }, txRepos)
+	);
 
 	if (publisher) {
 		await publishOutboxEntries(context, repos, publisher, outboxEntries, republishBackoff);
 	}
 }
 
+async function insertRecurringRunsInTx(
+	entries: {
+		workflowRunEntries: NonEmptyArray<WorkflowRunRowInsert>;
+		stateTransitionEntries: NonEmptyArray<StateTransitionRowInsert>;
+		scheduleUpdates: NonEmptyArray<ScheduleOccurrenceUpdate>;
+		outboxEntries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>;
+	},
+	txRepos: TxRepositories
+): Promise<void> {
+	await txRepos.workflowRun.insert(entries.workflowRunEntries);
+	await txRepos.stateTransition.appendBatch(entries.stateTransitionEntries);
+	await txRepos.schedule.bulkUpdateOccurrence(entries.scheduleUpdates);
+	await txRepos.workflowRunOutbox.createBatch(entries.outboxEntries);
+}
+
 async function processOverlapSkipSchedules(
 	context: DaemonContext,
-	repos: ProcessImminentRecurringRunsDeps["repos"],
+	repos: Repositories,
 	schedules: NonEmptyArray<DueSchedule>,
 	now: number,
 	publisher: Publisher | undefined,
@@ -306,22 +318,38 @@ async function processOverlapSkipSchedules(
 		return;
 	}
 
-	const insertedOutboxEntries: WorkflowRunOutboxRowInsertPending[] = await repos.transaction(async (txRepos) => {
-		if (isNonEmptyArray(workflowRunEntries) && isNonEmptyArray(stateTransitionEntries)) {
-			await txRepos.workflowRun.insert(workflowRunEntries);
-			await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-		}
-		await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
-		if (!isNonEmptyArray(outboxEntries)) {
-			return [];
-		}
-		await txRepos.workflowRunOutbox.createBatch(outboxEntries);
-		return outboxEntries;
-	});
+	const insertedOutboxEntries = await repos.transaction(async (txRepos) =>
+		insertRunsAndAdvanceSchedulesInTx(
+			{ workflowRunEntries, stateTransitionEntries, scheduleUpdates, outboxEntries },
+			txRepos
+		)
+	);
 
 	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
 		await publishOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
 	}
+}
+
+async function insertRunsAndAdvanceSchedulesInTx(
+	entries: {
+		workflowRunEntries: WorkflowRunRowInsert[];
+		stateTransitionEntries: StateTransitionRowInsert[];
+		scheduleUpdates: NonEmptyArray<ScheduleOccurrenceUpdate>;
+		outboxEntries: WorkflowRunOutboxRowInsertPending[];
+	},
+	txRepos: TxRepositories
+): Promise<WorkflowRunOutboxRowInsertPending[]> {
+	const { workflowRunEntries, stateTransitionEntries, scheduleUpdates, outboxEntries } = entries;
+	if (isNonEmptyArray(workflowRunEntries) && isNonEmptyArray(stateTransitionEntries)) {
+		await txRepos.workflowRun.insert(workflowRunEntries);
+		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+	}
+	await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
+	if (!isNonEmptyArray(outboxEntries)) {
+		return [];
+	}
+	await txRepos.workflowRunOutbox.createBatch(outboxEntries);
+	return outboxEntries;
 }
 
 async function processOverlapCancelPreviousSchedules(
@@ -411,80 +439,115 @@ async function processOverlapCancelPreviousSchedules(
 		return;
 	}
 
-	const insertedOutboxEntries: WorkflowRunOutboxRowInsertPending[] = await deps.repos.transaction(async (txRepos) => {
-		// To escape the race condition that might arise when a concurrent actor moves the runId to non cancellable state,
-		// we should only insert cancellation state transitions if the cancellation occurred, otherwise, we'll have dangling transitions
-
-		// Step 1: Cancel active runs (without setting latestStateTransitionId)
-		const cancelledRuns = isNonEmptyArray(runIdsToCancel)
-			? await txRepos.workflowRun.bulkTransitionToCancelled(context, runIdsToCancel)
-			: [];
-		const cancelledRunIds = cancelledRuns.map((run) => run.id);
-
-		// Step 2: Discard in-flight tasks and outbox entries for the cancelled runs, then insert
-		// cancel state transitions only for actually cancelled runs and set latestStateTransitionId
-		if (isNonEmptyArray(cancelledRunIds)) {
-			await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
-			await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now as TimestampMs);
-			await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
-
-			const cancelledRunIdsSet = new Set(cancelledRunIds);
-			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
-			const cancelledRunStateTransitionIdUpdates: {
-				filter: { namespaceId: NamespaceId; id: string };
-				update: { stateTransitionId: string };
-			}[] = [];
-			const cancelledRuns: CancelledRunMeta[] = [];
-
-			for (const run of runsToCancel) {
-				if (!cancelledRunIdsSet.has(run.id)) {
-					continue;
-				}
-				const stateTransitionId = ulid();
-				cancelStateTransitionEntries.push({
-					id: stateTransitionId,
-					workflowRunId: run.id,
-					type: "workflow_run",
-					status: "cancelled",
-					attempt: run.attempts,
-					state: { status: "cancelled", reason: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
-				});
-				cancelledRunStateTransitionIdUpdates.push({
-					filter: { namespaceId: run.namespaceId, id: run.id },
-					update: { stateTransitionId },
-				});
-				cancelledRuns.push({ namespaceId: run.namespaceId, id: run.id, pool: run.pool });
-			}
-
-			if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionIdUpdates)) {
-				await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
-				await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionIdUpdates);
-			}
-			if (isNonEmptyArray(cancelledRuns)) {
-				await deps.childRunCanceller.cancel(cancelledRuns, txRepos, context.logger);
-			}
-		}
-
-		// Step 3: Create new workflow runs, their state transitions, and outbox entries
-		await txRepos.workflowRun.insert(newWorkflowRunEntries);
-		await txRepos.stateTransition.appendBatch(newRunStateTransitionEntries);
-		await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
-		if (!isNonEmptyArray(newOutboxEntries)) {
-			return [];
-		}
-		await txRepos.workflowRunOutbox.createBatch(newOutboxEntries);
-		return newOutboxEntries;
-	});
+	const insertedOutboxEntries = await deps.repos.transaction(async (txRepos) =>
+		cancelPreviousAndInsertRunsInTx(
+			context,
+			deps.childRunCanceller,
+			now,
+			{
+				runIdsToCancel,
+				runsToCancel,
+				newWorkflowRunEntries,
+				newRunStateTransitionEntries,
+				scheduleUpdates,
+				newOutboxEntries,
+			},
+			txRepos
+		)
+	);
 
 	if (deps.publisher && isNonEmptyArray(insertedOutboxEntries)) {
 		await publishOutboxEntries(context, deps.repos, deps.publisher, insertedOutboxEntries, republishBackoff);
 	}
 }
 
-async function fetchActiveRunsBySchedule(
-	repos: ProcessImminentRecurringRunsDeps["repos"],
-	schedules: NonEmptyArray<DueSchedule>
-) {
+async function cancelPreviousAndInsertRunsInTx(
+	context: DaemonContext,
+	childRunCanceller: ChildRunCanceller,
+	now: number,
+	entries: {
+		runIdsToCancel: string[];
+		runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; pool?: string }>;
+		newWorkflowRunEntries: NonEmptyArray<WorkflowRunRowInsert>;
+		newRunStateTransitionEntries: NonEmptyArray<StateTransitionRowInsert>;
+		scheduleUpdates: NonEmptyArray<ScheduleOccurrenceUpdate>;
+		newOutboxEntries: WorkflowRunOutboxRowInsertPending[];
+	},
+	txRepos: TxRepositories
+): Promise<WorkflowRunOutboxRowInsertPending[]> {
+	const {
+		runIdsToCancel,
+		runsToCancel,
+		newWorkflowRunEntries,
+		newRunStateTransitionEntries,
+		scheduleUpdates,
+		newOutboxEntries,
+	} = entries;
+	// To escape the race condition that might arise when a concurrent actor moves the runId to non cancellable state,
+	// we should only insert cancellation state transitions if the cancellation occurred, otherwise, we'll have dangling transitions
+
+	// Step 1: Cancel active runs (without setting latestStateTransitionId)
+	const cancelledRuns = isNonEmptyArray(runIdsToCancel)
+		? await txRepos.workflowRun.bulkTransitionToCancelled(context, runIdsToCancel)
+		: [];
+	const cancelledRunIds = cancelledRuns.map((run) => run.id);
+
+	// Step 2: Discard in-flight tasks and outbox entries for the cancelled runs, then insert
+	// cancel state transitions only for actually cancelled runs and set latestStateTransitionId
+	if (isNonEmptyArray(cancelledRunIds)) {
+		await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+		await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now as TimestampMs);
+		await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
+
+		const cancelledRunIdsSet = new Set(cancelledRunIds);
+		const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
+		const cancelledRunStateTransitionIdUpdates: {
+			filter: { namespaceId: NamespaceId; id: string };
+			update: { stateTransitionId: string };
+		}[] = [];
+		const cancelledRuns: CancelledRunMeta[] = [];
+
+		for (const run of runsToCancel) {
+			if (!cancelledRunIdsSet.has(run.id)) {
+				continue;
+			}
+			const stateTransitionId = ulid();
+			cancelStateTransitionEntries.push({
+				id: stateTransitionId,
+				workflowRunId: run.id,
+				type: "workflow_run",
+				status: "cancelled",
+				attempt: run.attempts,
+				state: { status: "cancelled", reason: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
+			});
+			cancelledRunStateTransitionIdUpdates.push({
+				filter: { namespaceId: run.namespaceId, id: run.id },
+				update: { stateTransitionId },
+			});
+			cancelledRuns.push({ namespaceId: run.namespaceId, id: run.id, pool: run.pool });
+		}
+
+		if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionIdUpdates)) {
+			await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
+			await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionIdUpdates);
+		}
+		if (isNonEmptyArray(cancelledRuns)) {
+			await childRunCanceller.cancel(cancelledRuns, txRepos, context.logger);
+		}
+	}
+
+	// Step 3: Create new workflow runs, their state transitions, and outbox entries
+	await txRepos.workflowRun.insert(newWorkflowRunEntries);
+	await txRepos.stateTransition.appendBatch(newRunStateTransitionEntries);
+	await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
+	if (!isNonEmptyArray(newOutboxEntries)) {
+		return [];
+	}
+	await txRepos.workflowRunOutbox.createBatch(newOutboxEntries);
+	return newOutboxEntries;
+}
+
+async function fetchActiveRunsBySchedule(repos: Repositories, schedules: NonEmptyArray<DueSchedule>) {
 	const workflowAndReferenceIdPairs: { namespaceId: NamespaceId; workflowId: string; referenceId: string }[] = [];
 	const schedulesByWorkflowAndReferenceId = new Map<string, Map<string, DueSchedule>>();
 

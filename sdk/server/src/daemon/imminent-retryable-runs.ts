@@ -7,7 +7,7 @@ import type { WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
-import type { Repositories } from "../infra/db/types";
+import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRow } from "../infra/db/types/workflow";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
@@ -18,13 +18,8 @@ import { streamTimers } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
 
-type Repos = Pick<
-	Repositories,
-	"workflowRun" | "stateTransition" | "task" | "workflow" | "workflowRunOutbox" | "transaction"
->;
-
 export interface ProcessImminentRetryableRunsDeps {
-	repos: Repos;
+	repos: Repositories;
 	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
 }
@@ -61,7 +56,7 @@ export async function processImminentRetryableRuns(
 
 export async function queueRetryableRuns(
 	context: DaemonContext,
-	repos: Repos,
+	repos: Repositories,
 	publisher: Publisher | undefined,
 	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
@@ -84,7 +79,7 @@ export async function queueRetryableRuns(
 
 async function processChunk(
 	context: DaemonContext,
-	repos: Repos,
+	repos: Repositories,
 	publisher: Publisher | undefined,
 	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
@@ -139,41 +134,57 @@ async function processChunk(
 		return;
 	}
 
-	const insertedOutboxEntries: WorkflowRunOutboxRowInsertPending[] = await repos.transaction(async (txRepos) => {
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
-			context,
-			"awaiting_retry",
-			workflowRunUpdates,
-			{
-				incrementAttempts: true,
-			}
-		);
-		if (!isNonEmptyArray(transitionedRunIds)) {
-			return [];
-		}
-
-		await discardStaleTasks(transitionedRunIds, ["running", "awaiting_retry", "failed"], txRepos);
-
-		let stateTransitionEntriesToInsert = stateTransitionEntries;
-		let outboxEntriesToInsert = outboxEntries;
-		if (transitionedRunIds.length !== stateTransitionEntries.length) {
-			const transitionedRunIdsSet = new Set(transitionedRunIds);
-			stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
-				transitionedRunIdsSet.has(entry.workflowRunId)
-			);
-			outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
-		}
-
-		if (!isNonEmptyArray(stateTransitionEntriesToInsert) || !isNonEmptyArray(outboxEntriesToInsert)) {
-			return [];
-		}
-
-		await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
-		await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
-		return outboxEntriesToInsert;
-	});
+	const insertedOutboxEntries = await repos.transaction(async (txRepos) =>
+		transitionToQueuedInTx(context, { workflowRunUpdates, stateTransitionEntries, outboxEntries }, txRepos)
+	);
 
 	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
 		await publishOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
 	}
+}
+
+async function transitionToQueuedInTx(
+	context: DaemonContext,
+	entries: {
+		workflowRunUpdates: NonEmptyArray<{
+			filter: { id: string; revision: number };
+			update: { stateTransitionId: string };
+		}>;
+		stateTransitionEntries: StateTransitionRowInsert[];
+		outboxEntries: WorkflowRunOutboxRowInsertPending[];
+	},
+	txRepos: TxRepositories
+): Promise<WorkflowRunOutboxRowInsertPending[]> {
+	const { workflowRunUpdates, stateTransitionEntries, outboxEntries } = entries;
+	const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
+		context,
+		"awaiting_retry",
+		workflowRunUpdates,
+		{
+			incrementAttempts: true,
+		}
+	);
+	if (!isNonEmptyArray(transitionedRunIds)) {
+		return [];
+	}
+
+	await discardStaleTasks(transitionedRunIds, ["running", "awaiting_retry", "failed"], txRepos);
+
+	let stateTransitionEntriesToInsert = stateTransitionEntries;
+	let outboxEntriesToInsert = outboxEntries;
+	if (transitionedRunIds.length !== stateTransitionEntries.length) {
+		const transitionedRunIdsSet = new Set(transitionedRunIds);
+		stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
+			transitionedRunIdsSet.has(entry.workflowRunId)
+		);
+		outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
+	}
+
+	if (!isNonEmptyArray(stateTransitionEntriesToInsert) || !isNonEmptyArray(outboxEntriesToInsert)) {
+		return [];
+	}
+
+	await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
+	await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
+	return outboxEntriesToInsert;
 }

@@ -10,11 +10,11 @@ import type { TaskId, TaskRecord, TaskState, TaskStateRunning } from "@aikirun/t
 import { monotonicFactory, ulid } from "ulidx";
 
 import { TaskStateConflictError } from "../errors";
-import type { Repositories } from "../infra/db/types";
+import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 
 export interface TaskServiceDeps {
-	repos: Pick<Repositories, "task" | "workflowRun" | "stateTransition" | "transaction">;
+	repos: Repositories;
 }
 
 const monotonicUlid = monotonicFactory();
@@ -52,7 +52,7 @@ async function setNewTaskStateInTx(
 	context: NamespaceRequestContext,
 	request: TaskSetStateRequestNew,
 	inputHash: string,
-	txRepos: Pick<Repositories, "task" | "workflowRun" | "stateTransition">
+	txRepos: TxRepositories
 ): Promise<void> {
 	const { namespaceId, logger } = context;
 	const runId = request.workflowRunId as WorkflowRunId;
@@ -117,7 +117,7 @@ async function setNewTaskStateInTx(
 async function setExistingTaskStateInTx(
 	context: NamespaceRequestContext,
 	request: TaskSetStateRequestExisting,
-	txRepos: Pick<Repositories, "task" | "workflowRun" | "stateTransition">
+	txRepos: TxRepositories
 ): Promise<void> {
 	const { namespaceId, logger } = context;
 	const runId = request.workflowRunId as WorkflowRunId;

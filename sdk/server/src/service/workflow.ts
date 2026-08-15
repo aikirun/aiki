@@ -11,7 +11,7 @@ import type { Repositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 
 export interface WorkflowServiceDeps {
-	repos: Pick<Repositories, "workflow" | "workflowRun">;
+	repos: Repositories;
 }
 
 export const createWorkflowService = ({ repos }: WorkflowServiceDeps) => ({

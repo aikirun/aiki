@@ -7,7 +7,7 @@ import type { WorkflowRunState, WorkflowRunStateQueued } from "@aikirun/types/wo
 import { ulid } from "ulidx";
 
 import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
-import type { Repositories } from "../infra/db/types";
+import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ChildWorkflowRunWaitRowInsert } from "../infra/db/types/child-workflow-run-wait";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRow } from "../infra/db/types/workflow";
@@ -18,13 +18,8 @@ import type { Ranked } from "../lib/rank";
 import { streamTimers } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 
-type Repos = Pick<
-	Repositories,
-	"workflowRun" | "stateTransition" | "childWorkflowRunWait" | "workflow" | "workflowRunOutbox" | "transaction"
->;
-
 export interface ProcessImminentChildRunWaitTimedOutRunsDeps {
-	repos: Repos;
+	repos: Repositories;
 	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
 }
@@ -61,7 +56,7 @@ export async function processImminentChildRunWaitTimedOutRuns(
 
 export async function queueChildRunWaitTimedOutRuns(
 	context: DaemonContext,
-	repos: Repos,
+	repos: Repositories,
 	publisher: Publisher | undefined,
 	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
@@ -95,7 +90,7 @@ export async function queueChildRunWaitTimedOutRuns(
 
 async function processChunk(
 	context: DaemonContext,
-	repos: Repos,
+	repos: Repositories,
 	publisher: Publisher | undefined,
 	republishBackoff: RepublishBackoff,
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
@@ -171,45 +166,66 @@ async function processChunk(
 		return;
 	}
 
-	const insertedOutboxEntries: WorkflowRunOutboxRowInsertPending[] = await repos.transaction(async (txRepos) => {
-		const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
+	const insertedOutboxEntries = await repos.transaction(async (txRepos) =>
+		transitionToQueuedInTx(
 			context,
-			"awaiting_child_workflow",
-			workflowRunUpdates
-		);
-		if (!isNonEmptyArray(transitionedRunIds)) {
-			return [];
-		}
-
-		let childRunWaitEntriesToInsert = childRunWaitEntries;
-		let stateTransitionEntriesToInsert = stateTransitionEntries;
-		let outboxEntriesToInsert = outboxEntries;
-		if (transitionedRunIds.length !== stateTransitionEntries.length) {
-			const transitionedRunIdsSet = new Set(transitionedRunIds);
-			childRunWaitEntriesToInsert = childRunWaitEntries.filter((entry) =>
-				transitionedRunIdsSet.has(entry.parentWorkflowRunId)
-			);
-			stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
-				transitionedRunIdsSet.has(entry.workflowRunId)
-			);
-			outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
-		}
-
-		if (
-			!isNonEmptyArray(childRunWaitEntriesToInsert) ||
-			!isNonEmptyArray(stateTransitionEntriesToInsert) ||
-			!isNonEmptyArray(outboxEntriesToInsert)
-		) {
-			return [];
-		}
-
-		await txRepos.childWorkflowRunWait.insert(childRunWaitEntriesToInsert);
-		await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
-		await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
-		return outboxEntriesToInsert;
-	});
+			{ workflowRunUpdates, childRunWaitEntries, stateTransitionEntries, outboxEntries },
+			txRepos
+		)
+	);
 
 	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
 		await publishOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
 	}
+}
+
+async function transitionToQueuedInTx(
+	context: DaemonContext,
+	entries: {
+		workflowRunUpdates: NonEmptyArray<{
+			filter: { id: string; revision: number };
+			update: { stateTransitionId: string };
+		}>;
+		childRunWaitEntries: ChildWorkflowRunWaitRowInsert[];
+		stateTransitionEntries: StateTransitionRowInsert[];
+		outboxEntries: WorkflowRunOutboxRowInsertPending[];
+	},
+	txRepos: TxRepositories
+): Promise<WorkflowRunOutboxRowInsertPending[]> {
+	const { workflowRunUpdates, childRunWaitEntries, stateTransitionEntries, outboxEntries } = entries;
+	const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
+		context,
+		"awaiting_child_workflow",
+		workflowRunUpdates
+	);
+	if (!isNonEmptyArray(transitionedRunIds)) {
+		return [];
+	}
+
+	let childRunWaitEntriesToInsert = childRunWaitEntries;
+	let stateTransitionEntriesToInsert = stateTransitionEntries;
+	let outboxEntriesToInsert = outboxEntries;
+	if (transitionedRunIds.length !== stateTransitionEntries.length) {
+		const transitionedRunIdsSet = new Set(transitionedRunIds);
+		childRunWaitEntriesToInsert = childRunWaitEntries.filter((entry) =>
+			transitionedRunIdsSet.has(entry.parentWorkflowRunId)
+		);
+		stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
+			transitionedRunIdsSet.has(entry.workflowRunId)
+		);
+		outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
+	}
+
+	if (
+		!isNonEmptyArray(childRunWaitEntriesToInsert) ||
+		!isNonEmptyArray(stateTransitionEntriesToInsert) ||
+		!isNonEmptyArray(outboxEntriesToInsert)
+	) {
+		return [];
+	}
+
+	await txRepos.childWorkflowRunWait.insert(childRunWaitEntriesToInsert);
+	await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
+	await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
+	return outboxEntriesToInsert;
 }
