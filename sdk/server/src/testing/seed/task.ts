@@ -29,18 +29,23 @@ export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePubli
 	return { ...seeded, taskInfo, taskInput: seededTask.input };
 }
 
-export async function seedCompletedTask(deps: SeedRunDeps & { publisher: FakePublisher }) {
+export async function seedCompletedTask(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	overrides?: { output: unknown }
+) {
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedRunningTask({ ...deps, namespaceRequestContext });
+
+	const output = overrides ? overrides.output : seededTask.output;
 
 	const taskStateMachine = createTaskStateMachine({ repos });
 	const taskInfo = await taskStateMachine.transitionState(namespaceRequestContext, {
 		id: seeded.taskInfo.id,
 		workflowRunId: seeded.runId,
 		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-		taskState: { status: "completed", attempts: 1, output: seededTask.output },
+		taskState: { status: "completed", attempts: 1, output },
 	});
 
-	return { ...seeded, taskInfo };
+	return { ...seeded, taskInfo, taskOutput: output };
 }
