@@ -19,7 +19,7 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"ioredis": "^5.4.1"
+		"ioredis": "^6.0.0"
 	},
 	"devDependencies": {
 		"@aikirun/lib": "workspace:*",
