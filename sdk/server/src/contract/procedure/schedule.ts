@@ -32,6 +32,7 @@ const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateR
 			workflowName: "string > 0",
 			workflowVersionId: "string > 0",
 			"workflowRunInput?": "unknown",
+			workflowRunInputHash: "string > 0",
 			spec: scheduleSpecSchema,
 			"options?": scheduleActivateOptionsSchema.or("undefined"),
 			"workflowRunOptions?": workflowRunOptionsSchema.or("undefined"),

@@ -1,3 +1,5 @@
+import { hashInput } from "@aikirun/lib/crypto";
+
 import { createScheduleService } from "./schedule";
 import { describe, expect, test } from "bun:test";
 import { createServiceHarness } from "../testing/harness";
@@ -8,10 +10,12 @@ describe("ScheduleService activateSchedule", () => {
 	test("persists the cron timezone", () =>
 		withHarness(async ({ context, repos }) => {
 			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
 			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput: { region: "eu-west" },
+				workflowRunInput,
+				workflowRunInputHash: await hashInput(workflowRunInput),
 				spec: { type: "cron", expression: "0 9 * * *", timezone: "Europe/Berlin" },
 			});
 
