@@ -2,6 +2,14 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.38.0
+
+A sleeping run can now be woken from the dashboard.
+
+### Web UI
+
+- **Wake a sleeping run.** A run's detail page shows a Wake action while the run is sleeping, alongside Pause, Requeue, and Cancel. It schedules the run immediately and cancels the pending sleep — the same early wakeup `handle.wakeup()` performs from the SDK.
+
 ## 0.37.1
 
 A completed task read back through `task.getByIdV1` lost its `output` key when the task completed without an output, which failed the response contract.
