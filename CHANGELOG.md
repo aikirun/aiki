@@ -2,6 +2,14 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.37.1
+
+A completed task read back through `task.getByIdV1` lost its `output` key when the task completed without an output, which failed the response contract.
+
+### Bug Fixes
+
+- **`task.getByIdV1` returns the `output` key on completed tasks.** The task read path returned the stored state column verbatim instead of normalizing it. Postgres drops `undefined` values on write, so a task that completed with no output came back as `{ status: "completed", attempts: 1 }` — no `output` key — and the response failed validation against the completed-state schema, which requires it. The state is now normalized on read, so `output` is present and `undefined`.
+
 ## 0.37.0
 
 This release cuts the delay between creating a run and a worker starting it, and hardens the writes that guard a run's ownership. A run parked for immediate pickup now hands its timer to the priority queue the moment its transaction commits instead of waiting for a poll tick, and the standalone server always runs such a queue — Redis-backed when `REDIS_URL` is set, in-process otherwise. Outbox delivery gains a lease and a backoff on every publish outcome, so replicas stop re-offering batches another replica is already sending. Tasks get their own API namespace, with input stored once on the task row and detail fetched on demand. Task, child-run, and schedule-occurrence writes are now compare-and-set, and a stalled run can finally be requeued. Two vocabulary changes run through the whole surface: `shard` is now `pool`, and `awake` is now `wakeup`. Database migrations `0013` through `0021` ship with this release.
