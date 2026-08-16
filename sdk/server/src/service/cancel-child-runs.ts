@@ -1,4 +1,4 @@
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import { asNonEmptyArray, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import type { Logger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
@@ -16,6 +16,7 @@ import type { TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRowInsert } from "../infra/db/types/workflow";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
+import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 
 export interface CancelledRunMeta {
 	namespaceId: NamespaceId;
@@ -23,7 +24,7 @@ export interface CancelledRunMeta {
 	pool: string | undefined;
 }
 
-export const createChildRunCanceller = () => ({
+export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimerQueue) => ({
 	async cancel(runs: NonEmptyArray<CancelledRunMeta>, txRepos: TxRepositories, logger: Logger): Promise<void> {
 		if (!isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
 			return;
@@ -117,6 +118,11 @@ export const createChildRunCanceller = () => ({
 		if (isNonEmptyArray(workflowRunEntries) && isNonEmptyArray(stateTransitionEntries)) {
 			await txRepos.workflowRun.insert(workflowRunEntries);
 			await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+
+			if (imminentRunTimerQueue) {
+				const imminentRuns = workflowRunEntries.map((entry) => ({ id: entry.id, scheduledAt: now }));
+				txRepos.onCommit(() => imminentRunTimerQueue.add(asNonEmptyArray(imminentRuns)));
+			}
 		}
 	},
 });

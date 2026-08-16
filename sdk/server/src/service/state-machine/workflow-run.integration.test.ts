@@ -1,4 +1,7 @@
+import { asConfigProvider } from "@aikirun/lib/config";
 import { NotFoundError } from "@aikirun/lib/error";
+import { noopLogger } from "@aikirun/lib/logger";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 
 import { createWorkflowRunStateMachine } from "./workflow-run";
 import { describe, expect, test } from "bun:test";
@@ -6,6 +9,8 @@ import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-ru
 import { processImminentSleepElapsedRuns } from "../../daemon/imminent-sleep-elapsed-runs";
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
 import type { Repositories } from "../../infra/db/types";
+import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
+import { computeRank } from "../../lib/rank";
 import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../../testing/harness";
@@ -16,8 +21,8 @@ const withHarness = createServiceHarness();
 
 const daemonContext = daemonContextFactory.build();
 
-function createStateMachine(repos: Repositories) {
-	return createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() });
+function createStateMachine(repos: Repositories, imminentRunTimerQueue?: ImminentRunTimerQueue) {
+	return createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller(), imminentRunTimerQueue });
 }
 
 describe("WorkflowRunStateMachine transition preconditions", () => {
@@ -592,5 +597,35 @@ describe("WorkflowRunStateMachine redelivery", () => {
 					state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" },
 				})
 			).rejects.toThrow(InvalidWorkflowRunStateTransitionError);
+		}));
+});
+
+describe("WorkflowRunStateMachine imminent run timers", () => {
+	test("a transition into scheduled adds the run's timer to the priority queue", () =>
+		withHarness(async ({ context, repos }) => {
+			const { runId } = await seedStalledRun({ namespaceRequestContext: context, repos });
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			const redeliveredAtMs = Date.now();
+			await withFakeClock(redeliveredAtMs, () =>
+				stateMachine.transitionState(context, {
+					type: "pessimistic",
+					id: runId,
+					state: { status: "scheduled", scheduledInMs: 0, reason: "redelivery" },
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: redeliveredAtMs }) },
+			]);
 		}));
 });

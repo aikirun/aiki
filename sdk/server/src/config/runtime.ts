@@ -46,42 +46,42 @@ export type ServerRuntimeConfigOverrides = DeepPartial<ServerRuntimeConfig>;
 export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 	daemons: {
 		imminentScheduledRuns: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
-			lookaheadWindowMs: 3_000,
+			lookaheadWindowMs: 30_000,
 		},
 		imminentSleepElapsedRuns: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
-			lookaheadWindowMs: 3_000,
+			lookaheadWindowMs: 30_000,
 		},
 		imminentRetryableRuns: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
-			lookaheadWindowMs: 3_000,
+			lookaheadWindowMs: 30_000,
 		},
 		imminentRetryableTasks: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
-			lookaheadWindowMs: 3_000,
+			lookaheadWindowMs: 30_000,
 		},
 		imminentEventWaitTimedOutRuns: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
-			lookaheadWindowMs: 3_000,
+			lookaheadWindowMs: 30_000,
 		},
 		imminentChildRunWaitTimedOutRuns: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
-			lookaheadWindowMs: 3_000,
+			lookaheadWindowMs: 30_000,
 		},
 		imminentRecurringRuns: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
-			lookaheadWindowMs: 3_000,
+			lookaheadWindowMs: 30_000,
 		},
 		publishPendingOutboxEntries: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
 			leaseDurationMs: 5_000,
 			republishBackoff: {
@@ -91,7 +91,7 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 			},
 		},
 		recoverOverdueOutboxEntries: {
-			intervalMs: 1_000,
+			intervalMs: 10_000,
 			limit: 1_000,
 			claimIdleTimeoutMs: DEFAULT_CLAIM_IDLE_TIMEOUT_MS,
 		},

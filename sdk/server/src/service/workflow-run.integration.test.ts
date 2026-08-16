@@ -1,5 +1,9 @@
+import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
+import { noopLogger } from "@aikirun/lib/logger";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
+import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 
@@ -8,6 +12,8 @@ import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./s
 import { describe, expect, test } from "bun:test";
 import { WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
+import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import { computeRank } from "../lib/rank";
 import type { NamespaceRequestContext } from "../middleware/context";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createWorkflowRunService } from "../service/workflow-run";
@@ -19,13 +25,37 @@ import { seedRunningTask } from "../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
-function createService(repos: Repositories) {
-	const childRunCanceller = createChildRunCanceller();
-	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller });
+function createService(repos: Repositories, imminentRunTimerQueue?: ImminentRunTimerQueue) {
+	const childRunCanceller = createChildRunCanceller(imminentRunTimerQueue);
+	const workflowRunStateMachine = createWorkflowRunStateMachine({
+		repos,
+		childRunCanceller,
+		imminentRunTimerQueue,
+	});
 	return {
-		service: createWorkflowRunService({ repos, childRunCanceller, workflowRunStateMachine }),
+		service: createWorkflowRunService({
+			repos,
+			childRunCanceller,
+			workflowRunStateMachine,
+			imminentRunTimerQueue,
+		}),
 		stateMachine: workflowRunStateMachine,
 	};
+}
+
+function createTimerPriorityQueue() {
+	return inMemoryTimerPriorityQueue()({ logger: noopLogger });
+}
+
+function createTestImminentRunTimerQueue(params: {
+	timerPriorityQueue: TimerPriorityQueue;
+	lookaheadWindowMs: number;
+}): ImminentRunTimerQueue {
+	return createImminentRunTimerQueue({
+		timerPriorityQueue: params.timerPriorityQueue,
+		configProvider: asConfigProvider(() => ({ lookaheadWindowMs: params.lookaheadWindowMs })),
+		logger: noopLogger,
+	});
 }
 
 describe("WorkflowRunService getWorkflowRunById", () => {
@@ -418,6 +448,127 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 					taskId: taskInfo.id,
 					taskState: { status: "running", attempts: 2 },
 				},
+			]);
+		}));
+});
+
+describe("WorkflowRunService imminent run timers", () => {
+	test("creating a due run adds its timer to the priority queue", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const createdAtMs = Date.now();
+			const runId = await withFakeClock(createdAtMs, () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input,
+					inputHash,
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: createdAtMs }) },
+			]);
+		}));
+
+	test("a run due beyond the lookahead window adds no timer", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const input = { orderId: "order-1" };
+			await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input,
+				inputHash: await hashInput(input),
+				options: { trigger: { type: "delayed", delayMs: 60_000 } },
+			});
+
+			expect(await timerPriorityQueue.peekNext()).toBeNull();
+		}));
+
+	test("returning an existing run from a reference adds no timer", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const request = {
+				name: "checkout",
+				versionId: "v1",
+				input,
+				inputHash,
+				options: { reference: { id: "order-ref-1" } },
+			};
+			const createdAtMs = Date.now();
+			const runId = await withFakeClock(createdAtMs, () => service.createWorkflowRun(context, request));
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: createdAtMs }) },
+			]);
+
+			const existingRunId = await service.createWorkflowRun(context, request);
+			expect(existingRunId).toBe(runId);
+
+			expect(await timerPriorityQueue.peekNext()).toBeNull();
+		}));
+
+	test("cancelling a parent with a live child adds the cancellation run's timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const childInput = { orderId: "order-9" };
+			const childInputHash = await hashInput(childInput);
+			const childCreatedAtMs = Date.now();
+			const childRunId = await withFakeClock(childCreatedAtMs, () =>
+				service.createWorkflowRun(context, {
+					name: parent.workflowName,
+					versionId: parent.workflowVersionId,
+					input: childInput,
+					inputHash: childInputHash,
+					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
+				})
+			);
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: childRunId, rank: computeRank({ dueAt: childCreatedAtMs }) },
+			]);
+
+			const cancelledAtMs = childCreatedAtMs + 5;
+			await withFakeClock(cancelledAtMs, () => service.cancelByIds(context, { ids: [parent.runId] }));
+
+			const scheduledRuns = await repos.workflowRun.listByFilters(
+				{ namespaceId: context.namespaceId, status: ["scheduled"] },
+				10,
+				0,
+				{ order: "asc" }
+			);
+			const cancellationRun = scheduledRuns.rows.find((row) => row.id !== childRunId);
+			if (!cancellationRun) {
+				throw new Error("cancel-child-runs run was not scheduled");
+			}
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: cancellationRun.id, rank: computeRank({ dueAt: cancelledAtMs }) },
 			]);
 		}));
 });

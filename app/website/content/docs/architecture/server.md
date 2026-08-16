@@ -50,23 +50,25 @@ The runtime's daemons drive workflow state transitions:
 
 The publish daemon runs only when a publisher is configured; without one, workers claim work directly from the outbox. Recovery runs unconditionally — a crashed worker's claim is released after `claimIdleTimeoutMs` either way (see [Workflow Run Claims](./workflow-run-claims.md)).
 
-By default, due work is detected by periodic database scans. Configuring a **timer priority queue** (`@aikirun/redis`) promotes near-term timers into a sorted queue that fires them with sub-second precision. The bundled standalone server always runs one: in-process by default, Redis-backed when `REDIS_URL` is set. With multiple server instances, prefer Redis — the shared queue hands each timer to exactly one instance, where per-instance in-process queues wake every instance for every timer (correctness is not affected, but work is duplicated). The queue is disposable acceleration state — the database keeps every deadline, and the scans repopulate the queue after a restart.
+By default, due work is detected by periodic database scans, so pickup latency is the scan interval. Configuring a **timer priority queue** (`@aikirun/memory` in-process, `@aikirun/redis` shared) promotes near-term timers into a sorted queue that fires them with sub-second precision — embedded servers should configure at least the in-process one. The request path feeds the queue too: creating a run — or waking a parked one — enqueues its timer immediately when the run is due soon, so a run meant to start now doesn't wait for the next scan. The bundled standalone server always runs one: in-process by default, Redis-backed when `REDIS_URL` is set. With multiple server instances, prefer Redis — the shared queue hands each timer to exactly one instance, where per-instance in-process queues wake every instance for every timer (correctness is not affected, but work is duplicated). The queue is disposable acceleration state — the database keeps every deadline, and the scans repopulate the queue after a restart.
 
 ## Configuration
 
 Embedded, the server is configured by composition:
 
 ```typescript
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { database, server } from "@aikirun/server";
 
 const aikiServer = server({
   db: database({ provider: "pg", url: databaseUrl }),
+  timerPriorityQueue: inMemoryTimerPriorityQueue(),
 });
 
 const runtimeHandle = aikiServer.runtime.start();
 ```
 
-Optional pieces plug in the same way — `cache`, `iam` (multi-tenancy and auth), and the Redis-backed runtime adapters:
+Optional pieces plug in the same way — `cache`, `iam` (multi-tenancy and auth), and the Redis-backed adapters:
 
 ```typescript
 import { redisPublisher, redisTimerPriorityQueue } from "@aikirun/redis";
@@ -76,9 +78,9 @@ const redis = new Redis("redis://localhost:6379");
 
 const aikiServer = server({
   db: database({ provider: "pg", url: databaseUrl }),
+  timerPriorityQueue: redisTimerPriorityQueue(redis, "aiki:timers"),
   runtime: {
     publisher: redisPublisher(redis),
-    timerPriorityQueue: redisTimerPriorityQueue(redis, "aiki:timers"),
   },
 });
 ```
