@@ -196,9 +196,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 	}
 
 	public stop(): Promise<void> {
-		if (!this.stopPromise) {
-			this.stopPromise = this._stop();
-		}
+		this.stopPromise ??= this._stop();
 		return this.stopPromise;
 	}
 

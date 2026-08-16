@@ -8,10 +8,7 @@ export function database(config: DatabaseConfig): CreateDatabase {
 	let createDbPromise: Promise<Database> | undefined;
 
 	const createDbFn = () => {
-		if (createDbPromise) {
-			return createDbPromise;
-		}
-		createDbPromise = (async () => {
+		createDbPromise ??= (async () => {
 			switch (config.provider) {
 				case "pg": {
 					const postgres = await importPostgres();

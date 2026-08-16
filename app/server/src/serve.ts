@@ -57,16 +57,14 @@ export async function startAppServer({ config }: { config: AppServerConfig }): P
 
 	let shutdownPromise: Promise<void> | undefined;
 	const shutdown = () => {
-		if (!shutdownPromise) {
-			shutdownPromise = (async () => {
-				if (redis) {
-					redis.close();
-				}
-				await runtimeHandle.stop();
-				await db.close();
-				process.exit(0);
-			})();
-		}
+		shutdownPromise ??= (async () => {
+			if (redis) {
+				redis.close();
+			}
+			await runtimeHandle.stop();
+			await db.close();
+			process.exit(0);
+		})();
 		return shutdownPromise;
 	};
 

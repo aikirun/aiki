@@ -143,9 +143,7 @@ function createRuntimeHandle(params: {
 	return {
 		id,
 		stop(): Promise<void> {
-			if (!stopPromise) {
-				stopPromise = _stop();
-			}
+			stopPromise ??= _stop();
 			return stopPromise;
 		},
 	};
