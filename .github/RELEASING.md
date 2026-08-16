@@ -8,8 +8,8 @@
    button on the Release workflow in the Actions tab. There is no version input
    — it comes from the committed `types/package.json`.
 
-The workflow runs a **verify** step before creating any side effects. Only when that step passes
-does it create tags, make deployments or publish artefacts.
+The workflow runs **verify**, **integration-test** and **image-smoke-test** before creating any side
+effects. Only when all three pass does it create tags, make deployments or publish artefacts.
 Re-running a failed release workflow is safe: the tag step no-ops on a matching commit, docker image pushes overwrite, and npm publish skips already-published packages.
 If new commit have been added to `main` since the last release but the version has not been bumped
 in code, the **verify** step will block the release.

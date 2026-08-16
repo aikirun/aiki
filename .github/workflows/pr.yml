@@ -46,3 +46,8 @@ jobs:
 
   integration-test:
     uses: ./.github/workflows/integration-test.yml
+
+  image-smoke-test:
+    uses: ./.github/workflows/image-smoke-test.yml
+    with:
+      write-cache: ${{ github.event_name == 'push' }}

@@ -4,8 +4,9 @@ name: Release
 # this workflow (gh workflow run release.yml, or the Run workflow button). The
 # version comes from the committed types/package.json — there is no input.
 #
-# verify runs first; only when it passes does the tag job create and push v<version>. 
-# A failed verify creates no tag, so a bad release leaves nothing to clean up. 
+# verify, integration-test and image-smoke-test all run first; only when every one of
+# them passes does the tag job create and push v<version>. A failed check creates no
+# tag, so a bad release leaves nothing to clean up.
 # npm packages are published after the hosted server and dashboard are redeployed,
 # so the user never installs an sdk exepcting features the hosted server doesn't support.
 
@@ -124,13 +125,18 @@ jobs:
   integration-test:
     uses: ./.github/workflows/integration-test.yml
 
-  # The first side effect: the tag records that this commit passed verify. It is
-  # created before any image or package ships, so every downstream artifact
+  image-smoke-test:
+    uses: ./.github/workflows/image-smoke-test.yml
+    with:
+      write-cache: true
+
+  # The first side effect: the tag records that this commit passed every check. It
+  # is created before any image or package ships, so every downstream artifact
   # corresponds to a real tag. verify already failed the run if the tag exists at
   # a different commit, so here a tag that exists is a heal re-run at this same
   # commit — skip it — and otherwise we create.
   tag:
-    needs: [verify, integration-test]
+    needs: [verify, integration-test, image-smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     environment: release
@@ -163,6 +169,8 @@ jobs:
           git tag -a "$tag" -m "$tag" "$GITHUB_SHA"
           git push origin "$tag"
 
+  # The images that ship. image-smoke-test already built and exercised the amd64
+  # leg, so this reuses that layer cache and only pays for arm64 under emulation.
   images:
     needs: [verify, tag]
     runs-on: ubuntu-latest
@@ -188,28 +196,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build for smoke test
-        if: matrix.image != 'server'
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64
-          load: true
-          tags: aikirun/${{ matrix.image }}:smoke
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,scope=${{ matrix.image }},mode=max
-
-      - name: Smoke test dashboard nginx config
-        if: matrix.image == 'dashboard'
-        run: docker run --rm -e AIKI_SERVER_UPSTREAM_URL=http://127.0.0.1:9850 aikirun/dashboard:smoke nginx -t
-
-      - name: Smoke test cli package resolution
-        if: matrix.image == 'cli'
-        run: |
-          docker run --rm -e DATABASE_PROVIDER=pg aikirun/cli:smoke migrate list --package server
-          docker run --rm -e DATABASE_PROVIDER=pg aikirun/cli:smoke migrate list --package iam
 
       - name: Build and push
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
