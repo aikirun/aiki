@@ -213,6 +213,7 @@ export function RunDetail() {
 	const canPause = ["scheduled", "queued", "running"].includes(status);
 	const canResume = status === "paused";
 	const canRequeue = status === "stalled";
+	const canWake = status === "sleeping";
 
 	const executionCount = tasks.length + childRunCount;
 
@@ -374,6 +375,23 @@ export function RunDetail() {
 												type: "pessimistic",
 												id: currentRun.id,
 												state: { status: "scheduled", scheduledInMs: 0, reason: "redelivery" },
+											})
+										)
+									}
+								/>
+							)}
+							{canWake && (
+								<ActionBtn
+									label="Wake"
+									color="#818CF8"
+									textColor="var(--accent-indigo)"
+									loading={actionLoading === "wake"}
+									onClick={() =>
+										handleAction("wake", () =>
+											namespaceAuthedClient.workflowRun.transitionStateV1({
+												type: "pessimistic",
+												id: currentRun.id,
+												state: { status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" },
 											})
 										)
 									}
