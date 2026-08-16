@@ -2,6 +2,209 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.37.0
+
+This release cuts the delay between creating a run and a worker starting it, and hardens the writes that guard a run's ownership. A run parked for immediate pickup now hands its timer to the priority queue the moment its transaction commits instead of waiting for a poll tick, and the standalone server always runs such a queue — Redis-backed when `REDIS_URL` is set, in-process otherwise. Outbox delivery gains a lease and a backoff on every publish outcome, so replicas stop re-offering batches another replica is already sending. Tasks get their own API namespace, with input stored once on the task row and detail fetched on demand. Task, child-run, and schedule-occurrence writes are now compare-and-set, and a stalled run can finally be requeued. Two vocabulary changes run through the whole surface: `shard` is now `pool`, and `awake` is now `wakeup`. Database migrations `0013` through `0021` ship with this release.
+
+### Breaking Changes
+
+- **`shard` renamed to `pool`.** A named group of workers is a pool, not a shard — nothing is partitioned by key. Migration 0014 renames the outbox column and converts the key in stored run and schedule options.
+
+  ```typescript
+  // Before
+  await orderWorkflowV1.with().opt("shard", "us-east").start(client, input);
+  myWorker.start(client, { shards: ["us-east"] });
+
+  // After
+  await orderWorkflowV1.with().opt("pool", "gpu").start(client, input);
+  myWorker.start(client, { pools: ["gpu"] });
+  ```
+
+  Custom publishers and subscribers are affected too: `ReadyWorkflowRun.shard` is now `pool`, `SubscriberContext.shards` is now `pools`, and the claim request's `shards` filter is now `pools`.
+
+- **`handle.awake()` renamed to `handle.wakeup()`.** The lexeme is unified on "wakeup" across the surface: the sleeping state's `awakeAt` is now `wakeupAt`, and the scheduled reason `awake_early` is now `wakeup_early`. Migrations 0013 and 0015 rename the columns and convert the stored state JSON.
+
+  ```typescript
+  // Before
+  await handle.awake();
+  if (run.state.status === "sleeping") console.log(run.state.awakeAt);
+
+  // After
+  await handle.wakeup();
+  if (run.state.status === "sleeping") console.log(run.state.wakeupAt);
+  ```
+
+- **Task write endpoints moved to the task API.** `workflowRun.transitionTaskStateV1` is now `task.transitionStateV1` and `workflowRun.setTaskStateV1` is now `task.setStateV1`. In the new requests `id` names the task and `workflowRunId` names the run. The request and response types moved from `@aikirun/types/workflow/task` to `@aikirun/types/api/task`.
+
+  ```typescript
+  // Before
+  await client.api.workflowRun.transitionTaskStateV1({ type: "retry", id: runId, taskId, expectedWorkflowRunRevision, taskState });
+
+  // After
+  await client.api.task.transitionStateV1({ type: "retry", id: taskId, workflowRunId, expectedWorkflowRunRevision, taskState });
+  ```
+
+- **`TaskStateRunning` no longer carries `input`**, and `TaskState` is generic over `Output` only. Task input is written once to the task row instead of into every running-state transition; a create request carries `input` and `inputHash` at the top level and no `attempts` (the server sets the first attempt to 1), and a retry request carries no input. The run record and the transitions listing no longer include task input — read it with `task.getByIdV1`.
+
+  ```typescript
+  // Before
+  interface TaskStateRunning<Input> { status: "running"; attempts: number; input: Input }
+
+  // After
+  interface TaskStateRunning { status: "running"; attempts: number }
+  ```
+
+- **Run record collections are flat.** The one-field wrapper types are gone; each collection is a `Record<string, T[]>` keyed by address, and a child run's per-status waits live under `waits`.
+
+  ```typescript
+  // Before
+  Object.values(run.taskQueues).flatMap((queue) => queue.tasks);
+  child.childWorkflowRunWaitQueues["completed"].childWorkflowRunWaits;
+
+  // After
+  Object.values(run.tasks).flat();
+  child.waits["completed"];
+  ```
+
+  `sleepQueues` → `sleeps`, `eventWaitQueues` → `eventWaits`, `childWorkflowRunQueues` → `childWorkflowRuns`. Migration 0016 renames the matching tables (`sleep_queue` → `sleep`, `event_wait_queue` → `event_wait`, `child_workflow_run_wait_queue` → `child_workflow_run_wait`).
+
+- **Run options are split into what the run keeps and what the create call consumes.** `WorkflowRunOptions` holds `retry` and `pool` — the values read for the rest of the run's life. `WorkflowStartOptions` extends it with `trigger` and `reference`, which the create call turns into `scheduledAt` and a `reference_id` column. The row and the record now store only `WorkflowRunOptions`, and both runs and schedules expose the reference as a plain `referenceId`. `ScheduledWorkflowStartOptions` is deleted — a schedule stores the same `WorkflowRunOptions` for the runs it mints.
+
+  ```typescript
+  // Before
+  run.options?.reference?.id;
+  schedule.options?.reference?.id;
+
+  // After
+  run.referenceId;
+  schedule.referenceId;
+  ```
+
+  The migration drops the `conflict_policy` column from both `workflow_run` and `schedule` (nothing read it) and strips `reference` and `trigger` from stored run options.
+
+- **Creating a child run must present the parent's revision**, and input hashing moved to the caller. Naming a parent without proving your view of it no longer typechecks, so a worker that has already lost the run cannot create children.
+
+  ```typescript
+  // Before
+  await client.api.workflowRun.createV1({ name, versionId, input, parentWorkflowRunId });
+
+  // After
+  await client.api.workflowRun.createV1({ name, versionId, input, inputHash, parent: { workflowRunId, expectedRevision } });
+  ```
+
+- **Scheduled and queued reasons changed.** `WorkflowRunScheduledReason` drops `retry`, `task_retry`, and `wakeup` — nothing produced them and the validator rejected them from every origin — and gains `redelivery`. `WorkflowRunQueuedReason` gains `event_wait_timeout` and `child_workflow_wait_timeout`, so a wait that times out no longer claims an event arrived. Renames across both unions: `resume` → `resumption`, `awake` → `wakeup`, `awake_early` → `wakeup_early`, `recovered` → `recovery`. The optimistic scheduled transition request narrows to reasons `event | child_workflow`, and `stalled` moves from the optimistic to the pessimistic branch of `transitionStateV1`. Migration 0015 converts the reasons already stored in the transition history.
+
+- **The state machine rejects `stalled → queued`.** Every path into `queued` mints the run's outbox row in the same transaction, so honoring the direct edge would have produced a queued run with no row — invisible to publish, claim, recovery, and the retention sweep alike. Requeueing a stalled run is `stalled → scheduled` with reason `redelivery`.
+
+- **`Publisher` contract changed** — only relevant if you implement a custom queue adapter. `publishReadyRuns` is now `publishRuns`, and each result bucket is an object wrapping its `runs` array so a bucket can later carry facts about itself without breaking implementations again.
+
+  ```typescript
+  // Before
+  publishReadyRuns(runs): Promise<PublishRunsResult>;
+  type PublishRunsResultBucket = Array<{ run: ReadyWorkflowRun }>;
+
+  // After
+  publishRuns(runs): Promise<PublishRunsResult>;
+  interface PublishRunsResultBucket { runs: Array<{ run: ReadyWorkflowRun }> }
+  ```
+
+- **`TimerPriorityQueue` contract changed** — only relevant if you implement a custom timer queue. The contract now speaks one currency, rank: a `TimerEntry` no longer carries `dueAt`, and a wake carries the batch's minimum rank. `null` replaces the `0` sentinel, since rank `0` is a real value.
+
+  ```typescript
+  // Before
+  interface TimerEntry { type: TimerType; id: string; dueAt: number; rank: number }
+  popDue(maxRank: number, limit: number): Promise<DueTimer[]>;
+  peekNextRank(): Promise<number | null>;
+  createSignalWaiter(): TimerSignalWaiter;                    // wait(): Promise<number>
+
+  // After
+  interface TimerEntry { type: TimerType; id: string; rank: number }
+  popDue(params: { maxRank: number; limit: number }): Promise<DueTimer[]>;
+  peekNext(): Promise<{ rank: number } | null>;
+  createWaiter(): TimerPriorityQueueWaiter;                   // wait(): Promise<{ rank: number } | null>
+  ```
+
+  Closing a waiter is now part of the contract: it resolves a parked wait with `null`. `TimerPriorityQueueContext.signal` is optional.
+
+- **`timerPriorityQueue` moved from `ServerRuntimeParams` to `ServerParams`**, so the request handler and the runtime share one queue and both halves can enqueue.
+
+  ```typescript
+  // Before
+  server({ db, runtime: { publisher, timerPriorityQueue } });
+
+  // After
+  server({ db, timerPriorityQueue, runtime: { publisher } });
+  ```
+
+- **Redis configuration is a single URL.** `REDIS_HOST`, `REDIS_PORT`, and `REDIS_PASSWORD` are replaced by `REDIS_URL`, whose presence is also the enable toggle — previously setting only `REDIS_PASSWORD` left the server silently running without Redis. Host, port, password, and db index all ride the URL, and TLS comes free through the `rediss://` scheme.
+
+  ```typescript
+  // Before
+  redisSubscriber({ host, port, password, db });
+
+  // After
+  redisSubscriber({ url: "redis://:password@host:6379/0" });
+  ```
+
+- **Server runtime config: the publish daemon is renamed and the polling cadence relaxed.** `daemons.publishReadyRuns` is now `daemons.publishPendingOutboxEntries`, gaining `leaseDurationMs` (default 5s) and `republishBackoff.declinedBackoffMs` (default 30s). Default daemon intervals move from 1s to 10s and promoter lookaheads from 3s to 30s, because the request path now carries the latency — **a deployment with no timer priority queue will see slower pickup**; configure a queue or tighten the intervals. `StartDaemonsDeps.workflowRunPublisher` is now `publisher`.
+
+- **Workflow identity now includes its source.** `source` (`user` or `system`) travels with name and version through the outbox, the claim request, the dispatch queue name, and the SDK registry, so Aiki's own workflows can no longer collide with yours. The dispatch queue name gains a source segment (`order-processing:1.0.0` → `user:order-processing:1.0.0`), the claim request sends a source per workflow, the schedule response returns one, and registry methods (`add`, `addMany`, `remove`, `removeMany`, `get`) take a source as their first argument. **The `aiki:` name prefix is gone** — source does the separating. Migration 0018 adds the outbox column, backfills it through each row's run, and rebuilds the claim index.
+
+  Two consequences on upgrade: runs sitting in the old queue keys are returned to pending by the recovery daemon and republished under the new keys, and in-flight cancellation-cascade runs stall, because their rows still name `aiki:cancel-child-runs`. Renaming those rows would make them deliverable and then fail them on replay — a task's identity includes its name — so stalling is the better failure.
+
+- **`WorkflowRunConflictError` renamed to `WorkflowRunReferenceConflictError`.** The conflict is on the run's reference, not the run.
+
+- **`WorkflowRunListChildRunsRequestV1` fields renamed:** `parentRunId` → `id`, `status` → `childRunStatus`.
+
+- **Executor-plumbing barrel exports removed from `@aikirun/workflow`:** `createEventSenders`, `createEventWaiters`, `workflowRunHandle`, `createReplayManifest`, and `createSleeper`. They had no consumers outside the package.
+
+### New Features
+
+- **A task API namespace with on-demand detail.** `task.getByIdV1({ id })` returns the task record — input from the row, options, and the latest state — in one query that joins the task to its run and to its latest transition. Because task input now lives on the task row, a *finished* task's input is readable for the first time; previously it was buried in the running state and dropped at the first terminal transition.
+- **Requeue a stalled run.** Requeue rides the scheduled route the same way Resume does: `stalled → scheduled`, due immediately, reason `redelivery`. The scheduled-runs producer then promotes the run and mints a fresh `pending` outbox row, so the producers remain the only writers of outbox rows and the requeued run gets the full `maxAgeMs` again — a new delivery episode, not a resumed one. It charges no execution attempt.
+- **The standalone server always runs a timer priority queue** — Redis-backed when `REDIS_URL` is set, in-process otherwise. Previously the choice was Redis or nothing, and a no-Redis deployment fired every timer (sleeps, retries, schedules, wait timeouts) up to one scan interval late. Multi-instance deployments should still use Redis: per-instance in-process queues hold the same timers, so all instances wake at the deadline and one transition wins while the rest match nothing — correct, but duplicated.
+- **Eager creation-time promotion of imminent runs.** The request that parks a due-soon run already knows what the poll would later rediscover, so the parking write hands the timer to the priority queue itself and the poll becomes a backstop. Pickup drops from a poll tick to under 100ms. The add fires strictly after commit — a rolled-back run must not wake the consumer — via a new `onCommit` hook on transaction repositories, and is not awaited, because a failed add costs latency only. Runs due beyond a lookahead window are skipped; the window is the new `ServerHandlerConfig.imminentRuns.lookaheadWindowMs` (default 30s) on `ServerHandlerParams.config`.
+- **An exportable timer priority queue conformance suite.** The tests that define what the server expects from a queue now ship from `@aikirun/testing/infra/timer` as `timerPriorityQueueTestSuite`, taking the caller's test framework and a per-test lifecycle combinator as arguments. bun:test, vitest, and jest all satisfy the `{ describe, test, expect }` shape structurally. Aiki's own in-memory and Redis adapters bind it in their own packages, so the published tests and the enforced tests cannot drift. It certifies pop ordering, due cutoffs, and waiter wake semantics — not durability, reconnects, or concurrent consumers, which stay the implementer's job.
+- **`WorkflowRunRecord` exposes `source`,** and schedules return their workflow's source. The activate request still does not take one: the server pins new schedules to `user`, so a client cannot write into Aiki's half of the namespace.
+
+### Web UI
+
+- **Task cards fetch their detail on open.** Every card expands now, showing Input, Output or Error, and Options. The detail query's key includes the task's status and attempts from the polled run record, so an open card refetches exactly when the poll sees the task change, and an unchanged task never refetches.
+- **A Requeue button on the run page,** shown for stalled runs beside Cancel.
+- **The timeline tells a wait timeout from an arrival** using the new `event_wait_timeout` and `child_workflow_wait_timeout` reasons, instead of joining the wait record to work it out. Rows written before the split are still classified the old way.
+- Reference badges on runs and schedules read the new `referenceId` field, and the schedule metadata row shows **Pool** where it showed Shard.
+
+### Improvements
+
+- **A publish pass leases the rows it takes.** Every server replica scanned the same pending outbox rows on every tick and offered the same runs to the broker. The revision compare-and-set made the duplicates harmless, but each one was a wasted broker send, and a pass that died mid-send left nothing behind to time a retry against. A pass now marks the rows it took as not due again for `leaseDurationMs` (default 5s) before offering them, so the other replicas skip them. Nothing has to repossess an expired lease — the row simply becomes due again, and the duplicate send that follows is absorbed the same way it always was.
+- **A backed-off row costs the delivery scan nothing.** The scan has to do two things at once: skip rows whose retry time has not arrived, and take the first N of the rest in dispatch order. A timestamp column could serve one or the other, not both — so with the broker down, every tick walked the entire pending set just to skip it. The retry time is now stored in the same units as the dispatch order (`next_publish_attempt_at` becomes `next_publish_attempt_rank`, migration 0017), which lets one index serve both: the scan reads from the front, everything it meets is due and already in order, and it stops at the limit. The row's own `rank` is left untouched, so a broker backoff can never reorder a run or hide it from the workers that poll for work directly.
+- **Every publish outcome now schedules its retry.** Previously only `published` wrote anything, so a `deferred`, `failed`, or `declined` row was re-offered on the very next tick: failing publishes had no backoff, and the retry time a transport returned for a deferred run was ignored. `deferred` now honors the transport's time, `failed` follows the age-derived curve, and `declined` waits a fixed `declinedBackoffMs` — a decline is a routing gap that clears by external change, not a struggling dependency to back off from.
+- **The timer queue wakes the consumer only on a new earliest.** A timer that is not the new front is already covered by the wake the consumer has scheduled, so backstop re-adds — the bulk of all adds — now stay silent, removing a wake plus a round-trip each on the Redis adapter.
+- **Polling daemons keep a minimum gap and jitter it.** A tick that runs longer than the interval used to leave a negative delay, so the daemon scanned again immediately — hitting the database hardest exactly when it was slowest. The floor is 20% of the interval and the jitter is ±10%, which also drifts daemons that started together out of lockstep.
+- **A checked run revision is pinned through commit.** Task transitions and child creation check the revision without incrementing it, so they now hold a share lock on the run row until commit. The share lock does not block other checkers — parallel task writes in one session still proceed together — and only blocks a run transition, which writes the run row exclusively.
+- **Reading a run record takes 6 queries in 2 steps** instead of 11 in 5: the header joins run, workflow, and latest state, and each collection read joins its own states. The cancel, stall, and release updates return the values they already knew instead of re-reading rows inside their own transaction, and every query selects only the columns its callers use.
+- **Namespace filters live in the repository.** Namespaced methods take a filter object that includes the namespace (`getById({ namespaceId, id })`) so it cannot be forgotten, and cross-namespace methods take a `DaemonContext` first, so only daemons can call them.
+
+### Bug Fixes
+
+- **A cron schedule's timezone is now stored.** It was accepted by the API and hashed into the definition, but the table had no column for it, so every read rebuilt the spec without it and the daemon parsed the expression in the server's default zone. Nothing failed; the schedule just fired at the wrong time. A new nullable `cron_timezone` column fixes it going forward — existing rows cannot be backfilled, because the value was never stored, and keep firing in the server's default zone until re-activated.
+- **Two impossible schedule rows no longer become dangerous specs.** A cron row with no expression used to read back as `expression: ""`, which throws inside the daemon, and an interval row with no interval as `everyMs: 0`, which blocks the occurrence computation loop. A check constraint now pairs each schedule type with its spec columns, and the row-to-domain mapper throws on a missing column instead of defaulting.
+- **A stalled schedule pass can no longer un-skip an occurrence.** The occurrence update matched on the schedule id alone, so a pass that computed a `nextRunAt` and then stalled could commit it after a later pass had already moved the schedule forward — leaving the schedule due again and, if the active run finished first, creating a run for an occurrence the `skip` overlap policy had already dropped. Each update now carries the `nextRunAt` it read and applies only if the row still holds it.
+- **Task writes no longer overwrite each other from stale reads.** Each writer — the task state machine, `setTaskState`, and the stale-task discard on cancel/stall/retry — read a task, validated the transition, then wrote with a filter of `(id, workflowRunId)`, which applied regardless of what the row held by then; a discard could land on a task that had just completed. `(status, attempts)` is a complete version key for a task (the only transition that keeps the status is a retry, which bumps attempts), so every write now carries the read-time pair and throws `TaskStateConflictError` (409) when it matches nothing. The discard path appends history only for the ids it actually discarded.
+- **A task can no longer be read or written across tenants.** The task write endpoints verified the caller's run but then fetched the task by bare id, so a caller holding any run of their own could transition a foreign tenant's task. The repository methods now require `workflowRunId` alongside `id`, and `getByIdV1` joins through the run filtered by the caller's namespace, making a foreign task indistinguishable from a missing one.
+- **Cancelling runs by id no longer touches other namespaces.** The ids fed a namespace-blind bulk update, while the read that appends the cancel transition was namespace-scoped — so a foreign run ended up cancelled with its latest recorded transition still describing the old state. The daemon path that cancels by its own query keeps a global variant.
+- **Cancelling a run finalizes its active sleep.** The `sleeping → cancelled` transition now cancels the sleep row the same way an early wakeup does, and both bulk cancel paths do the same beside their task and outbox cleanup.
+- **`waitForStatus` honors its timeout as wall-clock time.** The budget was approximated as `ceil(timeout / interval)` poll attempts, so API latency stretched the wait past what was asked for. The loop now tracks a deadline, caps its last sleep to the remaining budget so exactly one final poll happens at the deadline, and logs and tolerates a failed poll instead of ending the wait.
+- **Blocking Redis connections gate their first command on the ready handshake.** The timer waiter's duplicated connection and the subscriber's connection both disable the offline queue, so a command sent before the connection's first ready event failed instead of queueing — every server boot logged a transient `Due timers consumer failed, will retry`. Only the first command is gated; a mid-run drop still fails fast into the caller's retry loop.
+- **Timers popped from the priority queue are deduplicated** before the consumer acts on them.
+
+### Documentation
+
+- **New Stalled Runs architecture page** — what stalling means, why nothing retries it automatically, how to requeue, and the `maxAgeMs` knob. The run-states list gains its missing `stalled` entry and the server daemon table its missing retention-sweep row.
+- The Sharding section is now **Worker Pools**, framed around which part of your fleet should execute a workflow rather than partitioning.
+- Redis docs, compose files, and env examples document the single `REDIS_URL` variable. The Redis adapter README's quick-start example, which passed the subscriber factory to itself, now shows a valid call.
+- CONTRIBUTING documents the full integration-test service setup: `bun run test:integration` now always needs a local Redis, where previously only one CI matrix row did.
+
 ## 0.36.0
 
 This release reworks how the server delivers ready runs to workers and how it gives up on runs it cannot deliver. Delivery now flows through a single claimable state: a recovery daemon returns in-flight outbox rows to the claimable pool and releases a dead worker's run back to `queued`, while a run that stays undelivered past a configurable age moves to a new `stalled` state instead of being re-offered on a timer without end. Broker re-publishing now backs off by the run's age rather than retrying on every poll. The release also renames several server daemons and worker config keys for clarity, and closes a database connection that leaked on shutdown.
