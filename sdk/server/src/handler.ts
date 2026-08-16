@@ -1,15 +1,20 @@
+import { asConfigProvider, type ConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
 import { UnauthorizedError } from "@aikirun/lib/error";
 import { SENTINEL_ULID } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
+import { merge } from "@aikirun/lib/object";
 import type { ApiAuthorizer, Iam, IamContext } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
 import type { Database } from "@aikirun/types/infra/db";
+import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { RPCHandler } from "@orpc/server/fetch";
 
 import type { Capabilities } from "./capabilities";
+import { defaultServerHandlerConfig, type ServerHandlerConfig, type ServerHandlerConfigOverrides } from "./config";
 import { createRepos } from "./infra/db/repo";
+import { createImminentRunTimerQueue } from "./infra/timer/imminent-run-timer-queue";
 import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
 import { createNamespaceAuthedRouter } from "./router/index";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
@@ -27,12 +32,34 @@ export interface CreateHandlerParams {
 	logger: Logger;
 	iam?: Iam;
 	cache?: CreateCache;
+	timerPriorityQueue?: CreateTimerPriorityQueue;
+	config?: ServerHandlerConfigOverrides | CreatePassiveConfigProvider<ServerHandlerConfig>;
 }
 
 export async function createHandler(params: CreateHandlerParams) {
-	const { logger, iam } = params;
+	const { logger, iam, config: configParam } = params;
 	const repos = await createRepos(params.db);
-	const childRunCanceller = createChildRunCanceller();
+
+	let configProvider: ConfigProvider<ServerHandlerConfig>;
+	if (typeof configParam === "function") {
+		configProvider = configParam({ logger: logger.child({ "aiki.component": "config-provider" }) });
+	} else {
+		const config = merge(defaultServerHandlerConfig, configParam);
+		configProvider = asConfigProvider(() => config);
+	}
+
+	const timerPriorityQueue = params.timerPriorityQueue?.({
+		logger: logger.child({ "aiki.component": "timer-priority-queue" }),
+	});
+	const imminentRunTimerQueue =
+		timerPriorityQueue &&
+		createImminentRunTimerQueue({
+			timerPriorityQueue,
+			configProvider: configProvider.scope("imminentRuns"),
+			logger,
+		});
+
+	const childRunCanceller = createChildRunCanceller(imminentRunTimerQueue);
 
 	const apiAuthorizer = (iam?.api ?? noopApiAuthorizer)({ logger });
 	const dashboardIam = iam?.dashboard?.({ logger });
@@ -40,12 +67,14 @@ export async function createHandler(params: CreateHandlerParams) {
 	const workflowRunStateMachine = createWorkflowRunStateMachine({
 		repos,
 		childRunCanceller,
+		imminentRunTimerQueue,
 	});
 	const taskStateMachine = createTaskStateMachine({ repos });
 	const workflowRunService = createWorkflowRunService({
 		repos,
 		childRunCanceller,
 		workflowRunStateMachine,
+		imminentRunTimerQueue,
 	});
 	const workflowService = createWorkflowService({ repos });
 	const scheduleService = createScheduleService({ repos });

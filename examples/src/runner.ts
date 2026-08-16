@@ -84,7 +84,8 @@ async function setup(): Promise<Setup> {
 
 		const aiki = server({
 			db: database(loadDatabaseConfig()),
-			runtime: { publisher: queue.publisher, timerPriorityQueue },
+			timerPriorityQueue,
+			runtime: { publisher: queue.publisher },
 		});
 		const runtimeHandle = aiki.runtime.start();
 

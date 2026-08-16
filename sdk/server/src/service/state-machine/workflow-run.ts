@@ -18,6 +18,7 @@ import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
 import type { Repositories, TxRepositories } from "../../infra/db/types";
+import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import type { ChildRunCanceller } from "../cancel-child-runs";
 import { discardStaleTasks } from "../discard-stale-tasks";
@@ -187,18 +188,23 @@ export function assertIsValidWorkflowRunStateTransition(
 export interface WorkflowRunStateMachineDeps {
 	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
+	imminentRunTimerQueue?: ImminentRunTimerQueue;
 }
 
-export const createWorkflowRunStateMachine = ({ repos, childRunCanceller }: WorkflowRunStateMachineDeps) => ({
+export const createWorkflowRunStateMachine = ({
+	repos,
+	childRunCanceller,
+	imminentRunTimerQueue,
+}: WorkflowRunStateMachineDeps) => ({
 	async transitionState(
 		context: NamespaceRequestContext,
 		request: WorkflowRunTransitionStateRequestV1,
 		txRepos?: TxRepositories
 	): Promise<WorkflowRunTransitionStateResponseV1> {
 		const response = txRepos
-			? await transitionStateInTx(context, request, childRunCanceller, txRepos)
+			? await transitionStateInTx(context, request, childRunCanceller, txRepos, imminentRunTimerQueue)
 			: await repos.transaction(async (newTxRepos) =>
-					transitionStateInTx(context, request, childRunCanceller, newTxRepos)
+					transitionStateInTx(context, request, childRunCanceller, newTxRepos, imminentRunTimerQueue)
 				);
 		context.logger.info("Workflow state transition", {
 			"aiki.runId": request.id,
@@ -215,7 +221,8 @@ async function transitionStateInTx(
 	context: NamespaceRequestContext,
 	request: WorkflowRunTransitionStateRequestV1,
 	childRunCanceller: ChildRunCanceller,
-	txRepos: TxRepositories
+	txRepos: TxRepositories,
+	imminentRunTimerQueue?: ImminentRunTimerQueue
 ): Promise<WorkflowRunTransitionStateResponseV1> {
 	const namespaceId = context.namespaceId;
 	const runId = request.id as WorkflowRunId;
@@ -297,6 +304,10 @@ async function transitionStateInTx(
 	});
 
 	const newRevision = await updateWorkflowRun(context, runId, request, toState, stateTransitionId, attempts, txRepos);
+
+	if (imminentRunTimerQueue && toState.status === "scheduled") {
+		txRepos.onCommit(() => imminentRunTimerQueue.add([{ id: runId, scheduledAt: toState.scheduledAt }]));
+	}
 
 	if (toState.status === "cancelled") {
 		await discardStaleTasks(runId, ["running", "awaiting_retry"], txRepos);

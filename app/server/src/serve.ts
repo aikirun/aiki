@@ -20,6 +20,7 @@ export async function startAppServer({ config }: { config: AppServerConfig }): P
 	const aiki = server({
 		db,
 		logger,
+		timerPriorityQueue: redis ? redisTimerPriorityQueue(redis.client, "aiki:timers") : inMemoryTimerPriorityQueue(),
 		handler: {
 			cache,
 			iam:
@@ -35,7 +36,6 @@ export async function startAppServer({ config }: { config: AppServerConfig }): P
 		},
 		runtime: {
 			publisher: redis ? redisPublisher(redis.client) : undefined,
-			timerPriorityQueue: redis ? redisTimerPriorityQueue(redis.client, "aiki:timers") : inMemoryTimerPriorityQueue(),
 		},
 	});
 

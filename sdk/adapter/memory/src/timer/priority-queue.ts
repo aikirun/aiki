@@ -37,7 +37,7 @@ function compareTimerItems(a: TimerHeapItem, b: TimerHeapItem): number {
 /**
  * In-process TimerPriorityQueue backed by a min-heap and an internal signal queue.
  *
- * Returns a factory for creating the sorted set.
+ * Returns a factory for creating the queue.
  *
  * State is allocated once per call to `inMemoryTimerPriorityQueue()` and persists
  * for the lifetime of the returned factory. Every factory invocation returns a

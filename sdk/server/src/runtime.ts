@@ -8,6 +8,7 @@ import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 import { defaultServerRuntimeConfig, type ServerRuntimeConfig, type ServerRuntimeConfigOverrides } from "./config";
 import { startDaemons } from "./daemon";
 import { createRepos } from "./infra/db/repo";
+import { createImminentRunTimerQueue } from "./infra/timer/imminent-run-timer-queue";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 
 export interface StartRuntimeParams {
@@ -26,7 +27,6 @@ export interface StartedRuntime {
 
 export async function startRuntime(params: StartRuntimeParams): Promise<StartedRuntime> {
 	const { logger, signal, config: configParam } = params;
-	const childRunCanceller = createChildRunCanceller();
 
 	let configProvider: ConfigProvider<ServerRuntimeConfig>;
 	if (typeof configParam === "function") {
@@ -35,6 +35,22 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 		const config = merge(defaultServerRuntimeConfig, configParam);
 		configProvider = asConfigProvider(() => config);
 	}
+
+	const timerPriorityQueue = params.timerPriorityQueue?.({
+		logger: logger.child({ "aiki.component": "timer-priority-queue" }),
+		signal,
+	});
+
+	const childRunCanceller = createChildRunCanceller(
+		timerPriorityQueue &&
+			createImminentRunTimerQueue({
+				timerPriorityQueue,
+				configProvider: asConfigProvider(() => ({
+					lookaheadWindowMs: configProvider.config.daemons.imminentScheduledRuns.lookaheadWindowMs,
+				})),
+				logger,
+			})
+	);
 
 	const repos = await createRepos(params.db);
 
@@ -46,10 +62,7 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 			logger: logger.child({ "aiki.component": "publisher" }),
 			signal,
 		}),
-		timerPriorityQueue: params.timerPriorityQueue?.({
-			logger: logger.child({ "aiki.component": "timer-priority-queue" }),
-			signal,
-		}),
+		timerPriorityQueue,
 		childRunCanceller,
 	});
 

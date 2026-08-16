@@ -27,7 +27,19 @@ export function createPgRepos(client: PgClient): Repositories {
 	return {
 		...createRepos(db),
 		async transaction<T>(fn: (txRepos: TxRepositories) => Promise<T>): Promise<T> {
-			return db.transaction(async (tx) => fn(createRepos(tx) as TxRepositories));
+			const effects: Array<() => void> = [];
+			const result = await db.transaction(async (tx) => {
+				const txRepos = Object.assign(createRepos(tx), {
+					onCommit: (effect: () => void): void => {
+						effects.push(effect);
+					},
+				}) as TxRepositories;
+				return fn(txRepos);
+			});
+			for (const effect of effects) {
+				effect();
+			}
+			return result;
 		},
 	};
 }

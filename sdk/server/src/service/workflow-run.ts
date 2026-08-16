@@ -38,6 +38,7 @@ import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { EventWaitRow, EventWaitRowInsert } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 import type { NamespaceRequestContext } from "../middleware/context";
 import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
@@ -46,18 +47,22 @@ export interface WorkflowRunServiceDeps {
 	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
 	workflowRunStateMachine: WorkflowRunStateMachine;
+	imminentRunTimerQueue?: ImminentRunTimerQueue;
 }
 
 export const createWorkflowRunService = ({
 	repos,
 	childRunCanceller,
 	workflowRunStateMachine,
+	imminentRunTimerQueue,
 }: WorkflowRunServiceDeps) => ({
 	async createWorkflowRun(
 		context: NamespaceRequestContext,
 		request: WorkflowRunCreateRequestV1
 	): Promise<WorkflowRunId> {
-		return repos.transaction(async (txRepos) => createWorkflowRunInTx(context, request, txRepos));
+		return repos.transaction(async (txRepos) =>
+			createWorkflowRunInTx(context, request, txRepos, imminentRunTimerQueue)
+		);
 	},
 
 	async getWorkflowRunById(context: NamespaceRequestContext, id: string): Promise<WorkflowRunRecord> {
@@ -318,7 +323,8 @@ export type WorkflowRunService = ReturnType<typeof createWorkflowRunService>;
 async function createWorkflowRunInTx(
 	{ namespaceId, logger }: NamespaceRequestContext,
 	request: WorkflowRunCreateRequestV1,
-	txRepos: TxRepositories
+	txRepos: TxRepositories,
+	imminentRunTimerQueue?: ImminentRunTimerQueue
 ): Promise<WorkflowRunId> {
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
@@ -399,6 +405,10 @@ async function createWorkflowRunInTx(
 		attempt: 1,
 		state,
 	});
+
+	if (imminentRunTimerQueue) {
+		txRepos.onCommit(() => imminentRunTimerQueue.add([{ id: runId, scheduledAt }]));
+	}
 
 	logger.info("Created workflow run", {
 		"aiki.workflowName": name,

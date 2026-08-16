@@ -25,4 +25,9 @@ declare const inTransaction: unique symbol;
 
 export type TxRepositories = Omit<Repositories, "transaction"> & {
 	readonly [inTransaction]: true;
+	/**
+	 * Runs `effect` after this transaction commits; a rollback drops it without
+	 * running.
+	 */
+	onCommit(effect: () => void): void;
 };
