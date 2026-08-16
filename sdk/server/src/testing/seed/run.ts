@@ -1,6 +1,7 @@
 import { hashInput } from "@aikirun/lib/crypto";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
+import type { WorkflowStartOptions } from "@aikirun/types/workflow/run";
 
 import { defaultServerRuntimeConfig } from "../../config/runtime";
 import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-runs";
@@ -15,6 +16,8 @@ import { withFakeClock } from "../clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../data-factory/middleware/context";
 
 const seededWorkflow = { source: "user", name: "ship-orders", versionId: "v2" } as const;
+
+const seededRunOutput = { receiptId: "rcp-3" } as const;
 
 const publishPendingOutboxEntriesDaemonConfig = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
 
@@ -35,19 +38,19 @@ export interface SeedRunDeps {
 	namespaceRequestContext?: NamespaceRequestContext;
 }
 
-export async function seedScheduledRun(deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">) {
-	return _seedScheduledRun(deps, undefined);
+interface SeedRunOverrides {
+	options?: WorkflowStartOptions;
 }
 
 export async function seedPooledScheduledRun(deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">) {
 	const pool = "warehouse-eu";
-	const seeded = await _seedScheduledRun(deps, pool);
+	const seeded = await seedScheduledRun(deps, { options: { pool } });
 	return { ...seeded, pool };
 }
 
-async function _seedScheduledRun(
+export async function seedScheduledRun(
 	deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">,
-	pool: string | undefined
+	overrides?: SeedRunOverrides
 ) {
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
@@ -59,27 +62,23 @@ async function _seedScheduledRun(
 		versionId: seededWorkflow.versionId,
 		input,
 		inputHash: await hashInput(input),
-		options: pool ? { pool } : undefined,
+		options: overrides?.options,
 	});
 
 	return { runId, revisionWhenScheduled: 0, attemptsWhenScheduled: 1 };
 }
 
-export async function seedQueuedRun(deps: SeedRunDeps) {
-	return _seedQueuedRun(deps, undefined);
-}
-
 export async function seedPooledQueuedRun(deps: SeedRunDeps) {
 	const pool = "warehouse-eu";
-	const seeded = await _seedQueuedRun(deps, pool);
+	const seeded = await seedQueuedRun(deps, { options: { pool } });
 	return { ...seeded, pool };
 }
 
-async function _seedQueuedRun(deps: SeedRunDeps, pool: string | undefined) {
+export async function seedQueuedRun(deps: SeedRunDeps, overrides?: SeedRunOverrides) {
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 
-	const { runId } = await _seedScheduledRun({ repos, namespaceRequestContext }, pool);
+	const { runId } = await seedScheduledRun({ repos, namespaceRequestContext }, overrides);
 
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 
@@ -125,16 +124,37 @@ export async function claimRun(deps: { context: NamespaceRequestContext; repos: 
 	return { revisionWhenClaimed: claim.revision, attemptsWhenClaimed: claim.attempts };
 }
 
-export async function seedClaimedRun(deps: SeedRunDeps & { publisher: FakePublisher }) {
+export async function seedClaimedRun(deps: SeedRunDeps & { publisher: FakePublisher }, overrides?: SeedRunOverrides) {
 	const { repos, publisher } = deps;
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
-	const seeded = await seedQueuedRun(deps);
+	const seeded = await seedQueuedRun(deps, overrides);
 
 	await publishPendingOutboxEntries(daemonContext, { repos, publisher }, publishPendingOutboxEntriesDaemonConfig);
 
 	const claim = await claimRun({ context: namespaceRequestContext, repos, runId: seeded.runId });
 	return { ...seeded, ...claim };
+}
+
+export async function seedCompletedRun(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	overrides?: SeedRunOverrides & { output?: unknown }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
+
+	const output = overrides && "output" in overrides ? overrides.output : seededRunOutput;
+
+	const services = createServices(repos);
+	await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+		type: "optimistic",
+		id: seeded.runId,
+		state: { status: "completed", output },
+		expectedRevision: seeded.revisionWhenClaimed,
+	});
+
+	return { ...seeded, runOutput: output };
 }
 
 export async function seedPublishedRun(deps: SeedRunDeps & { publisher: FakePublisher }) {

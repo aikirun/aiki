@@ -110,9 +110,6 @@ export function toWorkflowRunState(raw: unknown): WorkflowRunState {
 
 export function toTaskState(raw: unknown): TaskState {
 	const state = raw as Record<string, unknown>;
-	if (state.status === "running" && !("input" in state)) {
-		state.input = undefined;
-	}
 	if (state.status === "completed" && !("output" in state)) {
 		state.output = undefined;
 	}

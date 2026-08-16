@@ -5,6 +5,25 @@ import { seedCompletedTask, seedRunningTask } from "../../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
+describe("task repository state reads", () => {
+	test("getByIdWithState returns a completed state carrying the output key", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { taskInfo } = await seedCompletedTask(
+				{
+					namespaceRequestContext: context,
+					repos,
+					publisher,
+				},
+				{ output: undefined }
+			);
+
+			const row = await repos.task.getByIdWithState(context.namespaceId, taskInfo.id);
+
+			expect(row?.state).toContainKey("output");
+			expect(row?.state).toEqual({ status: "completed", attempts: 1, output: undefined });
+		}));
+});
+
 describe("task repository compare-and-swap guards", () => {
 	test("update leaves the task untouched when the expected status does not match", () =>
 		withHarness(async ({ context, repos, publisher }) => {

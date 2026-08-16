@@ -51,7 +51,8 @@ export const createTaskRepository = (db: PgDb) => ({
 			.where(and(eq(workflowRun.namespaceId, namespaceId), eq(task.id, id)))
 			.limit(1);
 
-		return result[0] ?? null;
+		const row = result[0];
+		return row ? { ...row, state: toTaskState(row.state) } : null;
 	},
 
 	async update(

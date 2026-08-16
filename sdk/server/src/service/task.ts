@@ -33,7 +33,7 @@ export const createTaskService = ({ repos }: TaskServiceDeps) => ({
 			input: task.input,
 			inputHash: task.inputHash,
 			options: task.options !== null ? task.options : undefined,
-			state: task.state as TaskState,
+			state: task.state,
 		};
 	},
 
