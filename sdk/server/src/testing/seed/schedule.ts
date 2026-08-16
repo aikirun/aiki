@@ -1,3 +1,5 @@
+import { hashInput } from "@aikirun/lib/crypto";
+
 import type { Repositories } from "../../infra/db/types";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import { createScheduleService } from "../../service/schedule";
@@ -21,6 +23,7 @@ export async function seedActiveSchedule(
 	const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
 		...seededSchedule,
 		workflowName: overrides?.workflowName ?? seededSchedule.workflowName,
+		workflowRunInputHash: await hashInput(seededSchedule.workflowRunInput),
 	});
 
 	return { schedule };

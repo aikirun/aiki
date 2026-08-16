@@ -1,5 +1,5 @@
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
-import { hashInput, sha256Async } from "@aikirun/lib/crypto";
+import { sha256Async } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import { stableStringify } from "@aikirun/lib/json";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
@@ -121,20 +121,17 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 		namespaceId: NamespaceId,
 		request: ScheduleActivateRequestV1
 	): Promise<{ schedule: Schedule }> {
-		const { workflowName, workflowVersionId, workflowRunInput, workflowRunOptions, spec } = request;
-		const workflowRunInputHash = await hashInput(workflowRunInput);
+		const { workflowName, workflowVersionId, workflowRunInputHash, workflowRunOptions, spec } = request;
 		const definitionHash = await sha256Async(
 			stableStringify({
 				workflowName,
 				workflowVersionId,
 				spec,
-				workflowRunInput,
+				workflowRunInputHash,
 				workflowRunOptions,
 			})
 		);
-		return repos.transaction(async (txRepos) =>
-			activateScheduleInTx(namespaceId, request, { workflowRunInputHash, definitionHash }, txRepos)
-		);
+		return repos.transaction(async (txRepos) => activateScheduleInTx(namespaceId, request, definitionHash, txRepos));
 	},
 
 	async getScheduleById(namespaceId: NamespaceId, id: string) {
@@ -224,14 +221,11 @@ export type ScheduleService = ReturnType<typeof createScheduleService>;
 async function activateScheduleInTx(
 	namespaceId: NamespaceId,
 	request: ScheduleActivateRequestV1,
-	hashes: {
-		workflowRunInputHash: string;
-		definitionHash: string;
-	},
+	definitionHash: string,
 	txRepos: TxRepositories
 ) {
-	const { workflowName, workflowVersionId, workflowRunInput, workflowRunOptions, spec, options } = request;
-	const { workflowRunInputHash, definitionHash } = hashes;
+	const { workflowName, workflowVersionId, workflowRunInput, workflowRunInputHash, workflowRunOptions, spec, options } =
+		request;
 
 	const referenceId = options?.reference?.id;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";

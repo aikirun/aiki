@@ -1,3 +1,4 @@
+import { hashInput } from "@aikirun/lib/crypto";
 import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
@@ -66,6 +67,7 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 		...args: Input extends void ? [] : [Input]
 	): Promise<ScheduleHandle> {
 		const workflowRunInput = args[0];
+		const workflowRunInputHash = await hashInput(workflowRunInput);
 		const { workflowRun: workflowRunOptions, ...scheduleOptions } = options;
 
 		let scheduleSpec: ScheduleSpec;
@@ -84,6 +86,7 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 			workflowVersionId: workflow.versionId,
 			spec: scheduleSpec,
 			workflowRunInput,
+			workflowRunInputHash,
 			options: scheduleOptions,
 			workflowRunOptions,
 		});
