@@ -1,11 +1,10 @@
 import { isNonEmptyArray } from "@aikirun/lib/collection/array";
-import { sha256Async } from "@aikirun/lib/crypto";
+import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
-import { stableStringify } from "@aikirun/lib/json";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { ScheduleActivateRequestV1, ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { Schedule, ScheduleId, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
+import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 import CronExpressionParser from "cron-parser";
@@ -121,17 +120,8 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 		namespaceId: NamespaceId,
 		request: ScheduleActivateRequestV1
 	): Promise<{ schedule: Schedule }> {
-		const { workflowName, workflowVersionId, workflowRunInputHash, workflowRunOptions, spec } = request;
-		const definitionHash = await sha256Async(
-			stableStringify({
-				workflowName,
-				workflowVersionId,
-				spec,
-				workflowRunInputHash,
-				workflowRunOptions,
-			})
-		);
-		return repos.transaction(async (txRepos) => activateScheduleInTx(namespaceId, request, definitionHash, txRepos));
+		const definition = await hashScheduleDefinitions(request);
+		return repos.transaction(async (txRepos) => activateScheduleInTx(namespaceId, request, definition, txRepos));
 	},
 
 	async getScheduleById(namespaceId: NamespaceId, id: string) {
@@ -218,14 +208,38 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 
 export type ScheduleService = ReturnType<typeof createScheduleService>;
 
+async function hashScheduleDefinitions(request: ScheduleActivateRequestV1): Promise<{
+	currentHash: string;
+	candidateHashes: string[];
+}> {
+	const { workflowName, workflowVersionId, workflowRunInputHash, workflowRunOptions, spec } = request;
+	const hashDefinition = (inputHash: string) =>
+		hashInput({
+			workflowName,
+			workflowVersionId,
+			spec,
+			workflowRunInputHash: inputHash,
+			workflowRunOptions,
+		});
+
+	const [currentHash, ...deprecatedHashes] = await Promise.all([
+		hashDefinition(workflowRunInputHash.value),
+		...(workflowRunInputHash.deprecatedValues ?? []).map(hashDefinition),
+	]);
+
+	return { currentHash, candidateHashes: Array.from(new Set([currentHash].concat(deprecatedHashes))) };
+}
+
 async function activateScheduleInTx(
 	namespaceId: NamespaceId,
 	request: ScheduleActivateRequestV1,
-	definitionHash: string,
+	definition: { currentHash: string; candidateHashes: string[] },
 	txRepos: TxRepositories
 ) {
 	const { workflowName, workflowVersionId, workflowRunInput, workflowRunInputHash, workflowRunOptions, spec, options } =
 		request;
+	const definitionHash = definition.currentHash;
+	const workflowRunInputHashValue = workflowRunInputHash.value;
 
 	const referenceId = options?.reference?.id;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
@@ -242,22 +256,24 @@ async function activateScheduleInTx(
 	const nextRunAt = getNextOccurrence(spec, now) as TimestampMs;
 
 	if (!referenceId) {
-		const existingScheduleByDefinition = await txRepos.schedule.get(namespaceId, { definitionHash });
+		const existingScheduleByDefinition = await txRepos.schedule.get(namespaceId, {
+			definitionHashes: definition.candidateHashes,
+		});
 
 		const schedule = existingScheduleByDefinition
-			? existingScheduleByDefinition.status === "active"
-				? existingScheduleByDefinition
-				: await reactivateSchedule(txRepos.schedule, {
-						namespaceId,
-						scheduleId: existingScheduleByDefinition.id as ScheduleId,
-						nextRunAt,
-					})
+			? await reuseSchedule(txRepos.schedule, {
+					namespaceId,
+					existing: existingScheduleByDefinition,
+					workflowRunInputHash: workflowRunInputHashValue,
+					definitionHash,
+					nextRunAt,
+				})
 			: await createSchedule(txRepos.schedule, {
 					namespaceId,
 					workflowId: workflowRow.id,
 					spec,
 					workflowRunInput,
-					workflowRunInputHash,
+					workflowRunInputHash: workflowRunInputHashValue,
 					definitionHash,
 					referenceId: undefined,
 					workflowRunOptions,
@@ -269,7 +285,7 @@ async function activateScheduleInTx(
 
 	const existingScheduleByReference = await txRepos.schedule.get(namespaceId, { referenceId });
 	if (existingScheduleByReference) {
-		if (existingScheduleByReference.definitionHash !== definitionHash) {
+		if (!definition.candidateHashes.includes(existingScheduleByReference.definitionHash)) {
 			if (conflictPolicy === "error") {
 				throw new ScheduleConflictError({ definitionHash, referenceId });
 			}
@@ -277,23 +293,23 @@ async function activateScheduleInTx(
 			return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
 		}
 
-		const schedule =
-			existingScheduleByReference.status === "active"
-				? existingScheduleByReference
-				: await reactivateSchedule(txRepos.schedule, {
-						namespaceId,
-						scheduleId: existingScheduleByReference.id as ScheduleId,
-						nextRunAt,
-					});
+		const schedule = await reuseSchedule(txRepos.schedule, {
+			namespaceId,
+			existing: existingScheduleByReference,
+			workflowRunInputHash: workflowRunInputHashValue,
+			definitionHash,
+			nextRunAt,
+		});
 
 		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 	}
 
 	// Reference id is free, but the definition may already exist.
 	const existingNonReferencedSchedule = await txRepos.schedule.get(namespaceId, {
-		definitionHash,
+		definitionHashes: definition.candidateHashes,
 		referenceId: null,
 	});
+
 	if (existingNonReferencedSchedule) {
 		const schedule = await txRepos.schedule.update(
 			namespaceId,
@@ -302,8 +318,11 @@ async function activateScheduleInTx(
 				referenceId,
 				status: "active",
 				nextRunAt,
+				workflowRunInputHash: workflowRunInputHashValue,
+				definitionHash,
 			}
 		);
+
 		if (schedule) {
 			return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 		}
@@ -314,30 +333,58 @@ async function activateScheduleInTx(
 		workflowId: workflowRow.id,
 		spec,
 		workflowRunInput,
-		workflowRunInputHash,
+		workflowRunInputHash: workflowRunInputHashValue,
 		definitionHash,
 		referenceId,
 		workflowRunOptions,
 		nextRunAt,
 	});
+
 	return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 }
 
-async function reactivateSchedule(
+async function reuseSchedule(
 	repo: Repositories["schedule"],
-	params: { namespaceId: NamespaceId; scheduleId: ScheduleId; nextRunAt: TimestampMs }
-): Promise<ScheduleRow> {
-	const updatedRow = await repo.update(
-		params.namespaceId,
-		{ id: params.scheduleId },
-		{
-			status: "active",
-			nextRunAt: params.nextRunAt,
-		}
-	);
-	if (!updatedRow) {
-		throw new NotFoundError(`Schedule not found: ${params.scheduleId}`);
+	params: {
+		namespaceId: NamespaceId;
+		existing: ScheduleRow;
+		workflowRunInputHash: string;
+		definitionHash: string;
+		nextRunAt: TimestampMs;
 	}
+): Promise<ScheduleRow> {
+	const needsActivation = params.existing.status !== "active";
+	const hashesChanged =
+		params.existing.workflowRunInputHash !== params.workflowRunInputHash ||
+		params.existing.definitionHash !== params.definitionHash;
+
+	if (!needsActivation && !hashesChanged) {
+		return params.existing;
+	}
+
+	const updates: {
+		status?: "active";
+		nextRunAt?: TimestampMs;
+		workflowRunInputHash?: string;
+		definitionHash?: string;
+	} = {};
+
+	if (needsActivation) {
+		updates.status = "active";
+		updates.nextRunAt = params.nextRunAt;
+	}
+
+	if (hashesChanged) {
+		updates.workflowRunInputHash = params.workflowRunInputHash;
+		updates.definitionHash = params.definitionHash;
+	}
+
+	const updatedRow = await repo.update(params.namespaceId, { id: params.existing.id }, updates);
+
+	if (!updatedRow) {
+		throw new NotFoundError(`Schedule not found: ${params.existing.id}`);
+	}
+
 	return updatedRow;
 }
 

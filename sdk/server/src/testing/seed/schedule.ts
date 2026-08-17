@@ -23,7 +23,7 @@ export async function seedActiveSchedule(
 	const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
 		...seededSchedule,
 		workflowName: overrides?.workflowName ?? seededSchedule.workflowName,
-		workflowRunInputHash: await hashInput(seededSchedule.workflowRunInput),
+		workflowRunInputHash: { value: await hashInput(seededSchedule.workflowRunInput) },
 	});
 
 	return { schedule };

@@ -22,13 +22,13 @@ const intervalScheduleActivateRequest = intervalScheduleActivateRequestFactory.p
 	workflowName: syncInventoryWorkflow.name,
 	workflowVersionId: syncInventoryWorkflow.versionId,
 	workflowRunInput,
-	workflowRunInputHash,
+	workflowRunInputHash: { value: workflowRunInputHash },
 });
 const cronScheduleActivateRequest = cronScheduleActivateRequestFactory.params({
 	workflowName: syncInventoryWorkflow.name,
 	workflowVersionId: syncInventoryWorkflow.versionId,
 	workflowRunInput,
-	workflowRunInputHash,
+	workflowRunInputHash: { value: workflowRunInputHash },
 });
 
 describe("schedule", () => {

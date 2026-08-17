@@ -10,6 +10,7 @@ export default defineConfig({
 		iam: "src/iam.ts",
 		"infra/cache": "src/infra/cache.ts",
 		"infra/db": "src/infra/db.ts",
+		"infra/hash": "src/infra/hash.ts",
 		"infra/queue/index": "src/infra/queue/index.ts",
 		"infra/timer": "src/infra/timer.ts",
 		namespace: "src/namespace.ts",

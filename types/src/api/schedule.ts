@@ -1,3 +1,4 @@
+import type { InputHash } from "../infra/hash";
 import type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } from "../schedule";
 import type { WorkflowSource } from "../workflow";
 import type { WorkflowRunOptions } from "../workflow/run";
@@ -16,7 +17,7 @@ export interface ScheduleActivateRequestV1 {
 	workflowName: string;
 	workflowVersionId: string;
 	workflowRunInput?: unknown;
-	workflowRunInputHash: string;
+	workflowRunInputHash: InputHash;
 	spec: ScheduleSpec;
 	options?: ScheduleActivateOptions;
 	workflowRunOptions?: WorkflowRunOptions;

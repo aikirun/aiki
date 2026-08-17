@@ -67,7 +67,7 @@ export function schedule(params: ScheduleParams): ScheduleDefinition {
 		...args: Input extends void ? [] : [Input]
 	): Promise<ScheduleHandle> {
 		const workflowRunInput = args[0];
-		const workflowRunInputHash = await hashInput(workflowRunInput);
+		const workflowRunInputHash = { value: await hashInput(workflowRunInput) };
 		const { workflowRun: workflowRunOptions, ...scheduleOptions } = options;
 
 		let scheduleSpec: ScheduleSpec;
