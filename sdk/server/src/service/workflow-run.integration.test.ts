@@ -10,7 +10,7 @@ import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { createTaskStateMachine } from "./state-machine/task";
 import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./state-machine/workflow-run";
 import { describe, expect, test } from "bun:test";
-import { WorkflowRunRevisionConflictError } from "../errors";
+import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 import { computeRank } from "../lib/rank";
@@ -69,7 +69,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				name: "checkout",
 				versionId: "v1",
 				input,
-				inputHash,
+				inputHash: { value: inputHash },
 				options: { pool: "eu-west" },
 			});
 
@@ -363,7 +363,7 @@ describe("WorkflowRunService cancelByIds", () => {
 					name: parent.workflowName,
 					versionId: parent.workflowVersionId,
 					input: childInput,
-					inputHash: await hashInput(childInput),
+					inputHash: { value: await hashInput(childInput) },
 					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 				})
 			).rejects.toThrow(WorkflowRunRevisionConflictError);
@@ -381,7 +381,7 @@ describe("WorkflowRunService cancelByIds", () => {
 				name: parent.workflowName,
 				versionId: parent.workflowVersionId,
 				input: childInput,
-				inputHash: await hashInput(childInput),
+				inputHash: { value: await hashInput(childInput) },
 				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 			});
 
@@ -452,6 +452,78 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 		}));
 });
 
+describe("WorkflowRunService createWorkflowRun reference matching", () => {
+	test("returns the existing run when the stored hash is the current value", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const request = {
+				name: "checkout",
+				versionId: "v1",
+				input,
+				inputHash: { value: inputHash },
+				options: { reference: { id: "order-ref-1" } },
+			};
+
+			const runId = await service.createWorkflowRun(context, request);
+
+			expect(await service.createWorkflowRun(context, request)).toBe(runId);
+		}));
+
+	test("returns the existing run when the stored hash is a deprecated value", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const previousHash = "previous-hash";
+			const currentHash = await hashInput(input);
+			const options = { reference: { id: "order-ref-1" } };
+
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input,
+				inputHash: { value: previousHash },
+				options,
+			});
+
+			const matchedRunId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input,
+				inputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				options,
+			});
+
+			expect(matchedRunId).toBe(runId);
+		}));
+
+	test("rejects when the stored hash is neither the current value nor a deprecated value", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const options = { reference: { id: "order-ref-1" } };
+
+			await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input,
+				inputHash: { value: "previous-hash" },
+				options,
+			});
+
+			expect(
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input,
+					inputHash: { value: await hashInput(input) },
+					options,
+				})
+			).rejects.toThrow(WorkflowRunReferenceConflictError);
+		}));
+});
+
 describe("WorkflowRunService imminent run timers", () => {
 	test("creating a due run adds its timer to the priority queue", () =>
 		withHarness(async ({ context, repos }) => {
@@ -469,7 +541,7 @@ describe("WorkflowRunService imminent run timers", () => {
 					name: "checkout",
 					versionId: "v1",
 					input,
-					inputHash,
+					inputHash: { value: inputHash },
 				})
 			);
 
@@ -491,7 +563,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				name: "checkout",
 				versionId: "v1",
 				input,
-				inputHash: await hashInput(input),
+				inputHash: { value: await hashInput(input) },
 				options: { trigger: { type: "delayed", delayMs: 60_000 } },
 			});
 
@@ -512,7 +584,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				name: "checkout",
 				versionId: "v1",
 				input,
-				inputHash,
+				inputHash: { value: inputHash },
 				options: { reference: { id: "order-ref-1" } },
 			};
 			const createdAtMs = Date.now();
@@ -545,7 +617,7 @@ describe("WorkflowRunService imminent run timers", () => {
 					name: parent.workflowName,
 					versionId: parent.workflowVersionId,
 					input: childInput,
-					inputHash: childInputHash,
+					inputHash: { value: childInputHash },
 					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 				})
 			);

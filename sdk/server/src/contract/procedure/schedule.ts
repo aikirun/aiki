@@ -17,6 +17,7 @@ import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
+import { inputHashSchema } from "../schema/hash";
 import {
 	scheduleActivateOptionsSchema,
 	scheduleSchema,
@@ -32,10 +33,7 @@ const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateR
 			workflowName: "string > 0",
 			workflowVersionId: "string > 0",
 			"workflowRunInput?": "unknown",
-			workflowRunInputHash: {
-				value: "string > 0",
-				"deprecatedValues?": type("string > 0").array().or("undefined"),
-			},
+			workflowRunInputHash: inputHashSchema,
 			spec: scheduleSpecSchema,
 			"options?": scheduleActivateOptionsSchema.or("undefined"),
 			"workflowRunOptions?": workflowRunOptionsSchema.or("undefined"),

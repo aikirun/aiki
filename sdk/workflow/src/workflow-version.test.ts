@@ -552,7 +552,7 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("world");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "world", inputHash, options: {} },
+					{ name: "greet", versionId: "1.0.0", input: "world", inputHash: { value: inputHash }, options: {} },
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -581,7 +581,7 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("WORLD");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "WORLD", inputHash, options: {} },
+					{ name: "greet", versionId: "1.0.0", input: "WORLD", inputHash: { value: inputHash }, options: {} },
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -626,7 +626,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: "world",
-						inputHash,
+						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
 					},
 					{ id: newRunRecord.id }
@@ -652,7 +652,13 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("world");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "world", inputHash, options: { retry: { type: "never" } } },
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: "world",
+						inputHash: { value: inputHash },
+						options: { retry: { type: "never" } },
+					},
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -678,7 +684,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: "world",
-						inputHash,
+						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
 					},
 					{ id: newRunRecord.id }
@@ -706,7 +712,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: "world",
-						inputHash,
+						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, pool: "eu-west" },
 					},
 					{ id: newRunRecord.id }
@@ -737,7 +743,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: "payload",
-						inputHash,
+						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},
@@ -766,7 +772,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: "payload",
-						inputHash,
+						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},
@@ -793,7 +799,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: "payload",
-						inputHash,
+						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { pool: "eu-west" },
 					},
@@ -917,7 +923,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: "PAYLOAD",
-						inputHash,
+						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},
