@@ -21,12 +21,12 @@ import {
 import type { Repositories, TxRepositories } from "../../infra/db/types";
 import type { NamespaceRequestContext } from "../../middleware/context";
 
-const validTaskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
-	running: ["running", "awaiting_retry", "completed", "failed"],
-	awaiting_retry: ["running"],
-	completed: [],
-	failed: [],
-	discarded: [],
+const validTaskStatusTransitions: Record<TaskStatus, Set<TaskStatus>> = {
+	running: new Set(["running", "awaiting_retry", "completed", "failed"]),
+	awaiting_retry: new Set(["running"]),
+	completed: new Set([]),
+	failed: new Set([]),
+	discarded: new Set([]),
 };
 
 export function assertIsValidTaskStateTransition(
@@ -44,7 +44,7 @@ export function assertIsValidTaskStateTransition(
 	}
 
 	const allowedDestinations = validTaskStatusTransitions[from];
-	if (!allowedDestinations.includes(to)) {
+	if (!allowedDestinations.has(to)) {
 		throw new InvalidTaskStateTransitionError(runId, { taskId, from, to });
 	}
 }
