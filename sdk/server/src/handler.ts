@@ -1,5 +1,5 @@
 import { asConfigProvider, type ConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
-import { UnauthorizedError } from "@aikirun/lib/error";
+import { asAikiError } from "@aikirun/lib/error";
 import { SENTINEL_ULID } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
 import { merge } from "@aikirun/lib/object";
@@ -103,8 +103,9 @@ export async function createHandler(params: CreateHandlerParams) {
 			try {
 				context = await createNamespaceRequestContext({ request, logger, authorizer: apiAuthorizer });
 			} catch (err) {
-				if (err instanceof UnauthorizedError) {
-					return new Response(err.message, { status: 401 });
+				const aikiError = asAikiError(err);
+				if (aikiError) {
+					return new Response(aikiError.message, { status: aikiError.status });
 				}
 				logger.error("Unhandled error", { err });
 				return new Response("Internal Server Error", { status: 500 });

@@ -1,8 +1,12 @@
+import { AikiError } from "@aikirun/lib/error";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type { TaskId, TaskName, TaskStatus } from "@aikirun/types/workflow/task";
 
-export class WorkflowRunRevisionConflictError extends Error {
+export class WorkflowRunRevisionConflictError extends AikiError {
+	readonly code = "WORKFLOW_RUN_REVISION_CONFLICT";
+	readonly status = 409;
+
 	public readonly workflowRunId: WorkflowRunId;
 	public readonly expectedRevision: number;
 
@@ -14,7 +18,10 @@ export class WorkflowRunRevisionConflictError extends Error {
 	}
 }
 
-export class InvalidWorkflowRunStateTransitionError extends Error {
+export class InvalidWorkflowRunStateTransitionError extends AikiError {
+	readonly code = "BAD_REQUEST";
+	readonly status = 400;
+
 	public readonly workflowRunId: WorkflowRunId;
 	public readonly from: WorkflowRunStatus;
 	public readonly to: WorkflowRunStatus;
@@ -32,7 +39,10 @@ export class InvalidWorkflowRunStateTransitionError extends Error {
 	}
 }
 
-export class InvalidTaskStateTransitionError extends Error {
+export class InvalidTaskStateTransitionError extends AikiError {
+	readonly code = "BAD_REQUEST";
+	readonly status = 400;
+
 	public readonly workflowRunId: WorkflowRunId;
 	public readonly taskData:
 		| { taskId: TaskId; from: TaskStatus; to: TaskStatus }
@@ -53,7 +63,10 @@ export class InvalidTaskStateTransitionError extends Error {
 	}
 }
 
-export class TaskStateConflictError extends Error {
+export class TaskStateConflictError extends AikiError {
+	readonly code = "TASK_STATE_CONFLICT";
+	readonly status = 409;
+
 	public readonly workflowRunId: WorkflowRunId;
 	public readonly taskId: TaskId;
 	public readonly expectedStatus: TaskStatus;
@@ -71,7 +84,10 @@ export class TaskStateConflictError extends Error {
 	}
 }
 
-export class ScheduleConflictError extends Error {
+export class ScheduleConflictError extends AikiError {
+	readonly code = "SCHEDULE_CONFLICT";
+	readonly status = 409;
+
 	public readonly definitionHash: string;
 	public readonly referenceId?: string;
 
@@ -87,7 +103,10 @@ export class ScheduleConflictError extends Error {
 	}
 }
 
-export class WorkflowRunReferenceConflictError extends Error {
+export class WorkflowRunReferenceConflictError extends AikiError {
+	readonly code = "WORKFLOW_RUN_REFERENCE_CONFLICT";
+	readonly status = 409;
+
 	public readonly workflowName: WorkflowName;
 	public readonly workflowVersionId: WorkflowVersionId;
 	public readonly referenceId: string;
