@@ -21,7 +21,7 @@ import {
 import type { Repositories, TxRepositories } from "../../infra/db/types";
 import type { NamespaceRequestContext } from "../../middleware/context";
 
-const validTaskStatusTransitions: Record<TaskStatus, Set<TaskStatus>> = {
+const validTaskStatusTransitions: Record<TaskStatus, ReadonlySet<TaskStatus>> = {
 	running: new Set(["running", "awaiting_retry", "completed", "failed"]),
 	awaiting_retry: new Set(["running"]),
 	completed: new Set([]),
