@@ -29,7 +29,7 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 	const getConfigProvider = (): ConfigProvider<EndpointConfig> => {
 		if (!configProvider) {
 			if (typeof configParam === "function") {
-				configProvider = configParam({ logger: logger.child({ "aiki.component": "config-provider" }) });
+				configProvider = configParam({ logger: logger.child({ "aiki.subComponent": "config-provider" }) });
 			} else {
 				const config = merge(defaultEndpointConfig, configParam);
 				configProvider = asConfigProvider(() => config);

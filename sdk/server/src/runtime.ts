@@ -26,18 +26,20 @@ export interface StartedRuntime {
 }
 
 export async function startRuntime(params: StartRuntimeParams): Promise<StartedRuntime> {
-	const { logger, signal, config: configParam } = params;
+	const { logger: loggerParam, signal, config: configParam } = params;
+
+	const logger = loggerParam.child({ "aiki.component": "server-runtime" });
 
 	let configProvider: ConfigProvider<ServerRuntimeConfig>;
 	if (typeof configParam === "function") {
-		configProvider = configParam({ logger: logger.child({ "aiki.component": "config-provider" }), signal });
+		configProvider = configParam({ logger: logger.child({ "aiki.subComponent": "config-provider" }), signal });
 	} else {
 		const config = merge(defaultServerRuntimeConfig, configParam);
 		configProvider = asConfigProvider(() => config);
 	}
 
 	const timerPriorityQueue = params.timerPriorityQueue?.({
-		logger: logger.child({ "aiki.component": "timer-priority-queue" }),
+		logger: logger.child({ "aiki.subComponent": "timer-priority-queue" }),
 		signal,
 	});
 
@@ -59,7 +61,7 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 		configProvider,
 		signal,
 		publisher: params.publisher?.({
-			logger: logger.child({ "aiki.component": "publisher" }),
+			logger: logger.child({ "aiki.subComponent": "publisher" }),
 			signal,
 		}),
 		timerPriorityQueue,

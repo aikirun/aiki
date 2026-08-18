@@ -123,7 +123,7 @@ function createOrganizationHandler(
 				const repos = await createRepos(db);
 				const authService = await getAuthService();
 				const apiKeyCache = params.cache?.<ApiKeyAuthorizationInfo>({
-					logger: logger.child({ "aiki.component": "cache.apiKeyAuth" }),
+					logger: logger.child({ "aiki.subComponent": "cache-api-key-auth" }),
 					keyPrefix: "api_key:",
 				});
 				const apiKeyService = createApiKeyService({ repos, cache: apiKeyCache });

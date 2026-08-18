@@ -54,7 +54,7 @@ function createApiKeyAuthorizer(params: ApiAuthorizerKeyParams, { logger }: IamC
 				const apiKeyService = createApiKeyService({
 					repos,
 					cache: params.cache?.<ApiKeyAuthorizationInfo>({
-						logger: logger.child({ "aiki.component": "cache.apiKeyAuth" }),
+						logger: logger.child({ "aiki.subComponent": "cache-api-key-auth" }),
 						keyPrefix: "api_key:",
 					}),
 				});

@@ -159,7 +159,10 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 
 		const configParam = this.params.config;
 		if (typeof configParam === "function") {
-			this.configProvider = configParam({ logger: this.logger.child({ "aiki.component": "config-provider" }), signal });
+			this.configProvider = configParam({
+				logger: this.logger.child({ "aiki.subComponent": "config-provider" }),
+				signal,
+			});
 		} else {
 			const config = merge(defaultWorkerConfig, configParam);
 			this.configProvider = asConfigProvider(() => config);
@@ -170,7 +173,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			workerId: this.id,
 			workflows: workflowsMeta,
 			pools: this.startOptions.pools,
-			logger: this.logger.child({ "aiki.subscriber": "primary" }),
+			logger: this.logger.child({ "aiki.subComponent": "primary-subscriber" }),
 			signal,
 		});
 
@@ -183,7 +186,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 				workerId: this.id,
 				workflows: workflowsMeta,
 				pools: this.startOptions.pools,
-				logger: this.logger.child({ "aiki.subscriber": "backup" }),
+				logger: this.logger.child({ "aiki.subComponent": "backup-subscriber" }),
 				signal,
 			});
 		}

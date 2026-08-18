@@ -37,19 +37,21 @@ export interface CreateHandlerParams {
 }
 
 export async function createHandler(params: CreateHandlerParams) {
-	const { logger, iam, config: configParam } = params;
+	const { logger: loggerParam, iam, config: configParam } = params;
 	const repos = await createRepos(params.db);
+
+	const logger = loggerParam.child({ "aiki.component": "server-handler" });
 
 	let configProvider: ConfigProvider<ServerHandlerConfig>;
 	if (typeof configParam === "function") {
-		configProvider = configParam({ logger: logger.child({ "aiki.component": "config-provider" }) });
+		configProvider = configParam({ logger: logger.child({ "aiki.subComponent": "config-provider" }) });
 	} else {
 		const config = merge(defaultServerHandlerConfig, configParam);
 		configProvider = asConfigProvider(() => config);
 	}
 
 	const timerPriorityQueue = params.timerPriorityQueue?.({
-		logger: logger.child({ "aiki.component": "timer-priority-queue" }),
+		logger: logger.child({ "aiki.subComponent": "timer-priority-queue" }),
 	});
 	const imminentRunTimerQueue =
 		timerPriorityQueue &&
