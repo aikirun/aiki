@@ -63,6 +63,7 @@ export const taskSetStateRequestSchema = type({
 	workflowRunId: "string > 0",
 	taskName: "string > 0",
 	"input?": "unknown",
+	inputHash: "string > 0",
 	state: taskStateCompletedSchema.or(taskStateFailedSchema).omit("attempts"),
 }).or({
 	type: "'existing'",

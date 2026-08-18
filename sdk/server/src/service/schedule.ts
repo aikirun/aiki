@@ -214,6 +214,7 @@ async function hashScheduleDefinitions(request: ScheduleActivateRequestV1): Prom
 }> {
 	const { workflowName, workflowVersionId, workflowRunInputHash, workflowRunOptions, spec } = request;
 	const hashDefinition = (inputHash: string) =>
+		// insecure hashing is safe here as workflowRunInputHash already has keyed hashing
 		hashInput({
 			workflowName,
 			workflowVersionId,

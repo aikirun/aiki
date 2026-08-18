@@ -56,6 +56,7 @@ function createTestWorkflowRun(
 				claimRefreshIntervalMs: 30_000,
 				maxInlineWaitMs: options.maxInlineWaitMs ?? 10,
 			})),
+			hasher: hashInput,
 		},
 	};
 }

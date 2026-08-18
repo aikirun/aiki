@@ -1,4 +1,4 @@
-import { hashInput, sha256, sha256Async } from "./hash";
+import { hashInput, plainHasher, sha256, sha256Async } from "./hash";
 import { describe, expect, test } from "bun:test";
 
 const helloHash = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
@@ -41,5 +41,18 @@ describe("hashInput", () => {
 		const result1 = await hashInput({ name: "alice" });
 		const result2 = await hashInput({ name: "bob" });
 		expect(result1).not.toBe(result2);
+	});
+});
+
+describe("plainHasher", () => {
+	test("wraps hashInput as an InputHash value", async () => {
+		const input = { name: "alice" };
+		const expectedValue = await hashInput(input);
+		expect(await plainHasher(input)).toEqual({ value: expectedValue });
+	});
+
+	test("for always returns hashInput", async () => {
+		expect(await plainHasher.for("any-stored-hash")).toBe(hashInput);
+		expect(await plainHasher.for("another-stored-hash")).toBe(hashInput);
 	});
 });

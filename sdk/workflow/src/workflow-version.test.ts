@@ -52,6 +52,7 @@ function createTestWorkflowRun(
 			handle,
 			replayManifest: createReplayManifest(record),
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
+			hasher: hashInput,
 		},
 	};
 }
@@ -744,6 +745,39 @@ describe("creating a workflow run", () => {
 						versionId: "1.0.0",
 						input: "payload",
 						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("hashes the child input with the parent run's hasher, not the client's", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				parentRun[INTERNAL].hasher = async () => "run-bound-hash";
+				client[INTERNAL].hasher = Object.assign(async () => ({ value: "client-hash" }), {
+					for: async () => async () => "client-bound-hash",
+				});
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: "payload",
+						inputHash: { value: "run-bound-hash" },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},

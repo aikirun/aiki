@@ -38,6 +38,7 @@ function createTestWorkflowRun(
 			handle,
 			replayManifest: createReplayManifest(record),
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
+			hasher: hashInput,
 		},
 	};
 }

@@ -1,6 +1,7 @@
 import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Duration } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
+import type { BoundHasher } from "@aikirun/types/infra/hash";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { ReplayManifest, SleepResult, WorkflowRunId, WorkflowRunOptions } from "@aikirun/types/workflow/run";
@@ -22,5 +23,6 @@ export interface WorkflowRun<Input, Context, TEvents extends EventsDefinition = 
 		handle: WorkflowRunHandle<Input, unknown, Context, TEvents>;
 		replayManifest: ReplayManifest;
 		configProvider: ConfigProvider<WorkflowExecutionConfig>;
+		hasher: BoundHasher;
 	};
 }
