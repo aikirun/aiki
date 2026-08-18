@@ -202,7 +202,7 @@ describe("workflowRunHandle", () => {
 				const handle = workflowRunHandle(client, record);
 
 				client.api.workflowRun.transitionStateV1.once(
-					{ type: "pessimistic", id: record.id, state: { status: "cancelled", reason: "operator stopped it" } },
+					{ type: "pessimistic", id: record.id, state: { status: "cancelled", explanation: "operator stopped it" } },
 					{ revision: 3, state: { status: "cancelled" }, attempts: record.attempts }
 				);
 

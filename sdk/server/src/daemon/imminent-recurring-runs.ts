@@ -518,7 +518,7 @@ async function cancelPreviousAndInsertRunsInTx(
 				type: "workflow_run",
 				status: "cancelled",
 				attempt: run.attempts,
-				state: { status: "cancelled", reason: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
+				state: { status: "cancelled", explanation: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
 			});
 			cancelledRunStateTransitionIdUpdates.push({
 				filter: { namespaceId: run.namespaceId, id: run.id },

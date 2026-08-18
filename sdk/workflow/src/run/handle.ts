@@ -140,7 +140,7 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 		options: WorkflowRunWaitOptions<true, true>
 	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
 
-	cancel: (reason?: string) => Promise<void>;
+	cancel: (explanation?: string) => Promise<void>;
 
 	pause: () => Promise<void>;
 
@@ -316,8 +316,8 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 		return { success: false, cause: "aborted" };
 	}
 
-	public async cancel(reason?: string): Promise<void> {
-		await this.transitionState({ status: "cancelled", reason });
+	public async cancel(explanation?: string): Promise<void> {
+		await this.transitionState({ status: "cancelled", explanation });
 		this.logger.info("Workflow cancelled");
 	}
 

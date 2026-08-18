@@ -101,7 +101,7 @@ export const workflowRunStateStalledSchema = type({
 
 export const workflowRunStateCancelledSchema = type({
 	status: "'cancelled'",
-	"reason?": "string > 0 | undefined",
+	"explanation?": "string > 0 | undefined",
 });
 
 export const workflowRunStateCompletedSchema = type({

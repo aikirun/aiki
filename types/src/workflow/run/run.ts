@@ -68,7 +68,7 @@ interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;
 }
 
-export const WORKFLOW_RUN_SCHEDULED_REASON = [
+export const WORKFLOW_RUN_SCHEDULED_REASONS = [
 	"new",
 	"wakeup_early",
 	"resumption",
@@ -76,10 +76,10 @@ export const WORKFLOW_RUN_SCHEDULED_REASON = [
 	"child_workflow",
 	"redelivery",
 ] as const;
-export type WorkflowRunScheduledReason = (typeof WORKFLOW_RUN_SCHEDULED_REASON)[number];
+export type WorkflowRunScheduledReason = (typeof WORKFLOW_RUN_SCHEDULED_REASONS)[number];
 
 export function isWorkflowRunScheduledReason(reason: string): reason is WorkflowRunScheduledReason {
-	for (const scheduledReason of WORKFLOW_RUN_SCHEDULED_REASON) {
+	for (const scheduledReason of WORKFLOW_RUN_SCHEDULED_REASONS) {
 		if (reason === scheduledReason) {
 			return true;
 		}
@@ -208,7 +208,7 @@ export interface WorkflowRunStateStalled extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
 	status: "cancelled";
-	reason?: string;
+	explanation?: string;
 }
 
 export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {

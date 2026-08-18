@@ -188,7 +188,7 @@ describe("childWorkflowRunHandle", () => {
 			const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, childWaits({}), client.logger);
 
 			client.api.workflowRun.transitionStateV1.once(
-				{ type: "pessimistic", id: childRecord.id, state: { status: "cancelled", reason: "stop it" } },
+				{ type: "pessimistic", id: childRecord.id, state: { status: "cancelled", explanation: "stop it" } },
 				{ revision: 3, state: { status: "cancelled" }, attempts: childRecord.attempts }
 			);
 
