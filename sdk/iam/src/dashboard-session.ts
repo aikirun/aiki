@@ -1,4 +1,4 @@
-import { UnauthorizedError } from "@aikirun/lib/error";
+import { asAikiError, UnauthorizedError } from "@aikirun/lib/error";
 import type {
 	CreateDashboardAuthenticator,
 	CreateDashboardIam,
@@ -136,8 +136,9 @@ function createOrganizationHandler(
 					try {
 						authorization = await authorizeOrganizationSession(authService, repos.organization, request);
 					} catch (err) {
-						if (err instanceof UnauthorizedError) {
-							return new Response(err.message, { status: 401 });
+						const aikiError = asAikiError(err);
+						if (aikiError) {
+							return new Response(aikiError.message, { status: aikiError.status });
 						}
 						logger.error("Unhandled error", { err });
 						return new Response("Internal Server Error", { status: 500 });
