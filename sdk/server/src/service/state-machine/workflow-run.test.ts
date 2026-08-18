@@ -3,7 +3,7 @@ import { workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow
 import type { WorkflowRunStateRequest } from "@aikirun/types/api/workflow-run";
 import {
 	WORKFLOW_RUN_QUEUED_REASON,
-	WORKFLOW_RUN_SCHEDULED_REASON,
+	WORKFLOW_RUN_SCHEDULED_REASONS,
 	WORKFLOW_RUN_STATUSES,
 	type WorkflowRunId,
 	type WorkflowRunStatus,
@@ -59,7 +59,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 		failed: { awaiting_retry: {} },
 	};
 
-	const possibleReasons = Array.from(new Set([...WORKFLOW_RUN_SCHEDULED_REASON, ...WORKFLOW_RUN_QUEUED_REASON]));
+	const possibleReasons = Array.from(new Set([...WORKFLOW_RUN_SCHEDULED_REASONS, ...WORKFLOW_RUN_QUEUED_REASON]));
 
 	for (const fromStatus of WORKFLOW_RUN_STATUSES) {
 		describe(`from ${fromStatus}`, () => {
@@ -97,6 +97,9 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 					test(`declines to ${toStatus} (${reason})`, () => {
 						expect(() => attemptTransition(fromStatus, { status: toStatus, reason })).toThrow(
 							InvalidWorkflowRunStateTransitionError
+						);
+						expect(() => attemptTransition(fromStatus, { status: toStatus, reason })).toThrow(
+							`${reason} reason not allowed`
 						);
 					});
 				}

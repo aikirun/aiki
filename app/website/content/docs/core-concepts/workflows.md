@@ -214,7 +214,7 @@ The handle returned from `.start()` provides:
 | `events` | Send events to the workflow |
 | `refresh()` | Refresh run data from the server |
 | `waitForStatus(status)` | Wait for a terminal status (`completed`, `failed`, `cancelled`) |
-| `cancel(reason?)` | Cancel the workflow run |
+| `cancel(explanation?)` | Cancel the workflow run |
 | `pause()` | Pause the workflow |
 | `resume()` | Resume a paused workflow |
 | `wakeup()` | Wake a sleeping workflow |

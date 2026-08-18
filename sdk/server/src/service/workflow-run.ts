@@ -499,7 +499,7 @@ async function cancelByIdsInTx(
 			type: "workflow_run",
 			status: "cancelled",
 			attempt: run.attempts,
-			state: { status: "cancelled", reason: "Cancelled" } satisfies WorkflowRunStateCancelled,
+			state: { status: "cancelled" } satisfies WorkflowRunStateCancelled,
 		});
 		cancelledRunStateTransitionUpdates.push({ filter: { namespaceId, id: run.id }, update: { stateTransitionId } });
 		cancelledRunsMeta.push({

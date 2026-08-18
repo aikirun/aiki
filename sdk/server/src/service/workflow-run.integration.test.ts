@@ -146,7 +146,7 @@ describe("WorkflowRunService cancelByIds", () => {
 						revision: revisionWhenClaimed + 1,
 						attempts: attemptsWhenClaimed,
 					}),
-					state: { status: "cancelled", reason: "Cancelled" },
+					state: { status: "cancelled" },
 				})
 			);
 		}));
@@ -213,7 +213,7 @@ describe("WorkflowRunService cancelByIds", () => {
 						id: runId,
 						status: "cancelled",
 					}),
-					state: { status: "cancelled", reason: "Cancelled" },
+					state: { status: "cancelled" },
 				})
 			);
 

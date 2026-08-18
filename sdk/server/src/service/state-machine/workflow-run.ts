@@ -13,7 +13,7 @@ import type {
 	WorkflowRunStateAwaitingChildWorkflow,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
-import { isTerminalWorkflowRunStatus, isWorkflowRunScheduledReason } from "@aikirun/types/workflow/run";
+import { isTerminalWorkflowRunStatus, WORKFLOW_RUN_SCHEDULED_REASONS } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
@@ -23,155 +23,71 @@ import type { NamespaceRequestContext } from "../../middleware/context";
 import type { ChildRunCanceller } from "../cancel-child-runs";
 import { discardStaleTasks } from "../discard-stale-tasks";
 
-type StateTransitionValidation = { allowed: true } | { allowed: false; reason?: string };
+type StateTransitionValidation<Status extends WorkflowRunStatus> =
+	Extract<WorkflowRunStateRequest, { status: Status }> extends { reason: `${infer Reason}` }
+		? { reason: Reason | ReadonlySet<Reason> }
+		: true;
 
 const workflowRunStateTransitionValidator: Record<
 	WorkflowRunStatus,
-	(to: WorkflowRunStateRequest) => StateTransitionValidation
+	Partial<{ [ToStatus in WorkflowRunStatus]: StateTransitionValidation<ToStatus> }>
 > = {
-	scheduled: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["queued", "paused", "cancelled"];
-		return (to) => {
-			if (!allowedDestinations.includes(to.status)) {
-				return { allowed: false };
-			}
-			if (to.status === "queued" && !isWorkflowRunScheduledReason(to.reason)) {
-				return { allowed: false, reason: "Only scheduled reasons allowed" };
-			}
-			return { allowed: true };
-		};
-	})(),
-
-	queued: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["running", "paused", "cancelled", "failed", "stalled"];
-		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
-	})(),
-
-	running: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = [
-			"queued",
-			"running",
-			"paused",
-			"sleeping",
-			"awaiting_event",
-			"awaiting_retry",
-			"awaiting_child_workflow",
-			"cancelled",
-			"completed",
-			"failed",
-		];
-		return (to) => {
-			if (!allowedDestinations.includes(to.status)) {
-				return { allowed: false };
-			}
-			if (to.status === "queued" && to.reason !== "task_retry") {
-				return { allowed: false, reason: "Only task_retry run allowed" };
-			}
-			return { allowed: true };
-		};
-	})(),
-
-	paused: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
-		return (to) => {
-			if (!allowedDestinations.includes(to.status)) {
-				return { allowed: false };
-			}
-			if (to.status === "scheduled" && to.reason !== "resumption") {
-				return { allowed: false, reason: "Only resumption run allowed" };
-			}
-			return { allowed: true };
-		};
-	})(),
-
-	sleeping: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "queued", "cancelled"];
-		return (to) => {
-			if (!allowedDestinations.includes(to.status)) {
-				return { allowed: false };
-			}
-			if (to.status === "scheduled" && to.reason !== "wakeup_early") {
-				return { allowed: false, reason: "Only wakeup_early run allowed" };
-			}
-			if (to.status === "queued" && to.reason !== "wakeup") {
-				return { allowed: false, reason: "Only wakeup run allowed" };
-			}
-			return { allowed: true };
-		};
-	})(),
-
-	awaiting_event: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "queued", "cancelled"];
-		return (to) => {
-			if (!allowedDestinations.includes(to.status)) {
-				return { allowed: false };
-			}
-			if (to.status === "scheduled" && to.reason !== "event") {
-				return { allowed: false, reason: "Only event received run allowed" };
-			}
-			if (to.status === "queued" && to.reason !== "event_wait_timeout") {
-				return { allowed: false, reason: "Only event_wait_timeout run allowed" };
-			}
-			return { allowed: true };
-		};
-	})(),
-
-	awaiting_retry: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["queued", "cancelled"];
-		return (to) => {
-			if (!allowedDestinations.includes(to.status)) {
-				return { allowed: false };
-			}
-			if (to.status === "queued" && to.reason !== "retry") {
-				return { allowed: false, reason: "Only retry run allowed" };
-			}
-			return { allowed: true };
-		};
-	})(),
-
-	awaiting_child_workflow: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "queued", "cancelled"];
-		return (to) => {
-			if (!allowedDestinations.includes(to.status)) {
-				return { allowed: false };
-			}
-			if (to.status === "scheduled" && to.reason !== "child_workflow") {
-				return { allowed: false, reason: "Only child workflow triggered run allowed" };
-			}
-			if (to.status === "queued" && to.reason !== "child_workflow_wait_timeout") {
-				return { allowed: false, reason: "Only child_workflow_wait_timeout run allowed" };
-			}
-			return { allowed: true };
-		};
-	})(),
-
-	stalled: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["scheduled", "cancelled"];
-		return (to) => {
-			if (!allowedDestinations.includes(to.status)) {
-				return { allowed: false };
-			}
-			if (to.status === "scheduled" && to.reason !== "redelivery") {
-				return { allowed: false, reason: "Only redelivery allowed" };
-			}
-			return { allowed: true };
-		};
-	})(),
-
-	cancelled: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = [];
-		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
-	})(),
-
-	completed: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = [];
-		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
-	})(),
-
-	failed: (() => {
-		const allowedDestinations: WorkflowRunStatus[] = ["awaiting_retry"];
-		return (to) => ({ allowed: allowedDestinations.includes(to.status) });
-	})(),
+	scheduled: {
+		queued: { reason: new Set(WORKFLOW_RUN_SCHEDULED_REASONS) },
+		paused: true,
+		cancelled: true,
+	},
+	queued: {
+		running: true,
+		paused: true,
+		cancelled: true,
+		failed: true,
+		stalled: true,
+	},
+	running: {
+		queued: { reason: "task_retry" },
+		running: true,
+		paused: true,
+		sleeping: true,
+		awaiting_event: true,
+		awaiting_retry: true,
+		awaiting_child_workflow: true,
+		cancelled: true,
+		completed: true,
+		failed: true,
+	},
+	paused: {
+		scheduled: { reason: "resumption" },
+		cancelled: true,
+	},
+	sleeping: {
+		scheduled: { reason: "wakeup_early" },
+		queued: { reason: "wakeup" },
+		cancelled: true,
+	},
+	awaiting_event: {
+		scheduled: { reason: "event" },
+		queued: { reason: "event_wait_timeout" },
+		cancelled: true,
+	},
+	awaiting_retry: {
+		queued: { reason: "retry" },
+		cancelled: true,
+	},
+	awaiting_child_workflow: {
+		scheduled: { reason: "child_workflow" },
+		queued: { reason: "child_workflow_wait_timeout" },
+		cancelled: true,
+	},
+	stalled: {
+		scheduled: { reason: "redelivery" },
+		cancelled: true,
+	},
+	cancelled: {},
+	completed: {},
+	failed: {
+		awaiting_retry: true,
+	},
 };
 
 export function assertIsValidWorkflowRunStateTransition(
@@ -179,10 +95,29 @@ export function assertIsValidWorkflowRunStateTransition(
 	from: WorkflowRunState,
 	to: WorkflowRunStateRequest
 ) {
-	const result = workflowRunStateTransitionValidator[from.status](to);
-	if (!result.allowed) {
-		throw new InvalidWorkflowRunStateTransitionError(runId, from.status, to.status, result.reason);
+	const validator = workflowRunStateTransitionValidator[from.status][to.status];
+	if (validator) {
+		if (typeof validator === "boolean") {
+			validator satisfies true;
+			return;
+		}
+		if ("reason" in validator && "reason" in to) {
+			const allowedReasons: string | ReadonlySet<string> = validator.reason;
+			const isValidReason =
+				typeof allowedReasons === "string" ? allowedReasons === to.reason : allowedReasons.has(to.reason);
+			if (isValidReason) {
+				return;
+			}
+			throw new InvalidWorkflowRunStateTransitionError(
+				runId,
+				from.status,
+				to.status,
+				`${to.reason} reason not allowed`
+			);
+		}
 	}
+
+	throw new InvalidWorkflowRunStateTransitionError(runId, from.status, to.status);
 }
 
 export interface WorkflowRunStateMachineDeps {
