@@ -1,6 +1,6 @@
 import type { Logger } from "@aikirun/lib/logger";
 
-export interface InputHash {
+export interface Hash {
 	value: string;
 	/** Prior hashes that still identify this definition. */
 	deprecatedValues?: string[];
@@ -11,7 +11,7 @@ export interface HasherContext {
 }
 
 export interface Hasher {
-	(input: unknown): Promise<InputHash>;
+	(input: unknown): Promise<Hash>;
 	for(hash: string): Promise<BoundHasher | null>;
 }
 

@@ -3,7 +3,7 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { ScheduleApi } from "./api/schedule";
 import type { TaskApi } from "./api/task";
 import type { WorkflowRunApi } from "./api/workflow-run";
-import type { CreateHasher, Hasher } from "./infra/hash";
+import type { CreateHasher, Hasher } from "./infra/hasher";
 import { INTERNAL } from "./symbols";
 import type { WorkflowRunRecord } from "./workflow/run";
 

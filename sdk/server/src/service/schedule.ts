@@ -237,10 +237,9 @@ async function activateScheduleInTx(
 	definition: { currentHash: string; candidateHashes: string[] },
 	txRepos: TxRepositories
 ) {
-	const { workflowName, workflowVersionId, workflowRunInput, workflowRunInputHash, workflowRunOptions, spec, options } =
-		request;
+	const { workflowName, workflowVersionId, workflowRunInput, workflowRunOptions, spec, options } = request;
 	const definitionHash = definition.currentHash;
-	const workflowRunInputHashValue = workflowRunInputHash.value;
+	const workflowRunInputHash = request.workflowRunInputHash.value;
 
 	const referenceId = options?.reference?.id;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
@@ -265,7 +264,7 @@ async function activateScheduleInTx(
 			? await reuseSchedule(txRepos.schedule, {
 					namespaceId,
 					existing: existingScheduleByDefinition,
-					workflowRunInputHash: workflowRunInputHashValue,
+					workflowRunInputHash: workflowRunInputHash,
 					definitionHash,
 					nextRunAt,
 				})
@@ -274,7 +273,7 @@ async function activateScheduleInTx(
 					workflowId: workflowRow.id,
 					spec,
 					workflowRunInput,
-					workflowRunInputHash: workflowRunInputHashValue,
+					workflowRunInputHash: workflowRunInputHash,
 					definitionHash,
 					referenceId: undefined,
 					workflowRunOptions,
@@ -297,7 +296,7 @@ async function activateScheduleInTx(
 		const schedule = await reuseSchedule(txRepos.schedule, {
 			namespaceId,
 			existing: existingScheduleByReference,
-			workflowRunInputHash: workflowRunInputHashValue,
+			workflowRunInputHash: workflowRunInputHash,
 			definitionHash,
 			nextRunAt,
 		});
@@ -319,7 +318,7 @@ async function activateScheduleInTx(
 				referenceId,
 				status: "active",
 				nextRunAt,
-				workflowRunInputHash: workflowRunInputHashValue,
+				workflowRunInputHash: workflowRunInputHash,
 				definitionHash,
 			}
 		);
@@ -334,7 +333,7 @@ async function activateScheduleInTx(
 		workflowId: workflowRow.id,
 		spec,
 		workflowRunInput,
-		workflowRunInputHash: workflowRunInputHashValue,
+		workflowRunInputHash: workflowRunInputHash,
 		definitionHash,
 		referenceId,
 		workflowRunOptions,

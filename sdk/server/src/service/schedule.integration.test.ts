@@ -142,4 +142,38 @@ describe("ScheduleService activateSchedule", () => {
 
 			expect(matched.id).toBe(created.id);
 		}));
+
+	test("stores the current input hash after matching a referenced schedule via a deprecated value", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const spec = { type: "interval" as const, everyMs: 60_000 };
+			const previousHash = "previous-hash";
+			const currentHash = await hashInput(workflowRunInput);
+			const options = { reference: { id: "invoices-eu-west" } };
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput,
+				workflowRunInputHash: { value: previousHash },
+				spec,
+				options,
+			});
+			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+			expect(stored).toEqual(expect.objectContaining({ workflowRunInputHash: previousHash }));
+
+			await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput,
+				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				spec,
+				options,
+			});
+
+			const migrated = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+			expect(migrated).toEqual(expect.objectContaining({ id: schedule.id, workflowRunInputHash: currentHash }));
+			expect(migrated?.definitionHash).not.toBe(stored?.definitionHash);
+		}));
 });

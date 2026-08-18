@@ -13,7 +13,6 @@ import type {
 	WorkflowRunListTransitionsRequestV1,
 	WorkflowRunReference,
 } from "@aikirun/types/api/workflow-run";
-import type { InputHash } from "@aikirun/types/infra/hash";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
@@ -351,7 +350,9 @@ async function createWorkflowRunInTx(
 			referenceId,
 		});
 		if (existingRun) {
-			if (!inputHashIdentifies(inputHash, existingRun.inputHash)) {
+			const hashCandidates = [inputHash.value, ...(inputHash.deprecatedValues ?? [])];
+
+			if (!hashCandidates.includes(existingRun.inputHash)) {
 				const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 				if (conflictPolicy === "error") {
 					throw new WorkflowRunReferenceConflictError(name, versionId, referenceId);
@@ -754,12 +755,4 @@ function buildChildWorkflowRunsByAddress(
 	}
 
 	return childRunsByAddress;
-}
-
-function inputHashIdentifies(inputHash: InputHash, stored: string): boolean {
-	if (stored === inputHash.value) {
-		return true;
-	}
-
-	return inputHash.deprecatedValues?.includes(stored) ?? false;
 }
