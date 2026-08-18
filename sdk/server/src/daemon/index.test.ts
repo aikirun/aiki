@@ -5,17 +5,7 @@ import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 
-import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
-import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
-import { processImminentRecurringRuns } from "./imminent-recurring-runs";
-import { processImminentRetryableRuns } from "./imminent-retryable-runs";
-import { processImminentRetryableTasks } from "./imminent-retryable-tasks";
-import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
-import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { pollingDaemon, startDaemons } from "./index";
-import { publishPendingOutboxEntries } from "./publish-pending-outbox-entries";
-import { recoverOverdueOutboxEntries } from "./recover-overdue-outbox-entries";
-import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
@@ -198,15 +188,15 @@ describe("startDaemons", () => {
 	}
 
 	const baseDaemonNames = [
-		processImminentScheduledRuns.name,
-		processImminentSleepElapsedRuns.name,
-		processImminentRetryableRuns.name,
-		processImminentRetryableTasks.name,
-		processImminentEventWaitTimedOutRuns.name,
-		processImminentChildRunWaitTimedOutRuns.name,
-		processImminentRecurringRuns.name,
-		recoverOverdueOutboxEntries.name,
-		stallUndeliverableRuns.name,
+		"processImminentScheduledRuns",
+		"processImminentSleepElapsedRuns",
+		"processImminentRetryableRuns",
+		"processImminentRetryableTasks",
+		"processImminentEventWaitTimedOutRuns",
+		"processImminentChildRunWaitTimedOutRuns",
+		"processImminentRecurringRuns",
+		"recoverOverdueOutboxEntries",
+		"stallUndeliverableRuns",
 	];
 
 	test("mounts every polling daemon on start", async () => {
@@ -229,7 +219,7 @@ describe("startDaemons", () => {
 			publisher: {} as unknown as Publisher,
 		});
 
-		expect(seenDaemonNames).toEqual(baseDaemonNames.concat(publishPendingOutboxEntries.name));
+		expect(seenDaemonNames).toEqual(baseDaemonNames.concat("publishPendingOutboxEntries"));
 
 		abortController.abort();
 		await daemons;
