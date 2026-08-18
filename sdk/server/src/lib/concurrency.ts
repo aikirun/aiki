@@ -34,7 +34,7 @@ export async function runConcurrently<Item, TContext extends Context>(
 			try {
 				await fn(next.value, spanCtx);
 			} catch (err) {
-				if (!firstError) {
+				if (firstError === null) {
 					firstError = err;
 				}
 				if (failFast) {
