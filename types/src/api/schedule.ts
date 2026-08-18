@@ -16,6 +16,7 @@ export interface ScheduleActivateRequestV1 {
 	workflowName: string;
 	workflowVersionId: string;
 	workflowRunInput?: unknown;
+	workflowRunInputHash: string;
 	spec: ScheduleSpec;
 	options?: ScheduleActivateOptions;
 	workflowRunOptions?: WorkflowRunOptions;

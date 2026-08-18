@@ -1,3 +1,4 @@
+import { hashInput } from "@aikirun/lib/crypto";
 import { withFakeClient } from "@aikirun/testing/client";
 import {
 	cronScheduleActivateRequestFactory,
@@ -14,15 +15,20 @@ const syncInventoryWorkflow = workflow({ name: "sync-inventory" }).v<{ warehouse
 	handler: async () => {},
 });
 
+const workflowRunInput = { warehouseId: "wh-1" };
+const workflowRunInputHash = await hashInput(workflowRunInput);
+
 const intervalScheduleActivateRequest = intervalScheduleActivateRequestFactory.params({
 	workflowName: syncInventoryWorkflow.name,
 	workflowVersionId: syncInventoryWorkflow.versionId,
-	workflowRunInput: { warehouseId: "wh-1" },
+	workflowRunInput,
+	workflowRunInputHash,
 });
 const cronScheduleActivateRequest = cronScheduleActivateRequestFactory.params({
 	workflowName: syncInventoryWorkflow.name,
 	workflowVersionId: syncInventoryWorkflow.versionId,
-	workflowRunInput: { warehouseId: "wh-1" },
+	workflowRunInput,
+	workflowRunInputHash,
 });
 
 describe("schedule", () => {
