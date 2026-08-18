@@ -225,7 +225,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		handle: UnknownWorkflowRunHandle,
 		inputHash: string,
 		unconsumedManifestEntries: UnconsumedManifestEntries
-	) {
+	): Promise<never> {
 		run.logger.error("Replay divergence", {
 			"aiki.taskName": this.name,
 			"aiki.inputHash": inputHash,
