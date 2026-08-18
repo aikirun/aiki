@@ -1,6 +1,5 @@
 import { delay } from "@aikirun/lib/async";
 import type { ConfigProvider } from "@aikirun/lib/config";
-import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
 import {
@@ -123,6 +122,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		...args: Input extends void ? [] : [Input]
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
+		const hasher = run[INTERNAL].hasher;
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const inputRaw = args[0];
@@ -132,7 +132,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			: (inputRaw as Input);
 		const input =
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
-		const inputHash = await hashInput(input);
+		const inputHash = await hasher(input);
 		const address = getCompositeId<TaskAddress>({ name: this.name, referenceId: inputHash });
 
 		const replayManifest = run[INTERNAL].replayManifest;

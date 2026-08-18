@@ -1,4 +1,3 @@
-import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import type {
 	TaskSetStateRequestExisting,
@@ -39,8 +38,7 @@ export const createTaskService = ({ repos }: TaskServiceDeps) => ({
 
 	async setTaskState(context: NamespaceRequestContext, request: TaskSetStateRequestV1): Promise<void> {
 		if (request.type === "new") {
-			const inputHash = await hashInput(request.input);
-			return repos.transaction(async (txRepos) => setNewTaskStateInTx(context, request, inputHash, txRepos));
+			return repos.transaction(async (txRepos) => setNewTaskStateInTx(context, request, txRepos));
 		}
 		return repos.transaction(async (txRepos) => setExistingTaskStateInTx(context, request, txRepos));
 	},
@@ -51,7 +49,6 @@ export type TaskService = ReturnType<typeof createTaskService>;
 async function setNewTaskStateInTx(
 	context: NamespaceRequestContext,
 	request: TaskSetStateRequestNew,
-	inputHash: string,
 	txRepos: TxRepositories
 ): Promise<void> {
 	const { namespaceId, logger } = context;
@@ -88,7 +85,7 @@ async function setNewTaskStateInTx(
 		status: targetState.status,
 		attempts: 1,
 		input: request.input,
-		inputHash: inputHash,
+		inputHash: request.inputHash,
 		options: null,
 		latestStateTransitionId: targetStateTransitionId,
 	});

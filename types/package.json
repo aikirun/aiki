@@ -36,6 +36,10 @@
 			"types": "./dist/infra/db.d.ts",
 			"import": "./dist/infra/db.js"
 		},
+		"./infra/hash": {
+			"types": "./dist/infra/hash.d.ts",
+			"import": "./dist/infra/hash.js"
+		},
 		"./infra/queue": {
 			"types": "./dist/infra/queue/index.d.ts",
 			"import": "./dist/infra/queue/index.js"

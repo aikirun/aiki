@@ -61,7 +61,7 @@ export async function seedScheduledRun(
 		name: seededWorkflow.name,
 		versionId: seededWorkflow.versionId,
 		input,
-		inputHash: await hashInput(input),
+		inputHash: { value: await hashInput(input) },
 		options: overrides?.options,
 	});
 

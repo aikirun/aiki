@@ -350,7 +350,9 @@ async function createWorkflowRunInTx(
 			referenceId,
 		});
 		if (existingRun) {
-			if (existingRun.inputHash !== inputHash) {
+			const hashCandidates = [inputHash.value, ...(inputHash.deprecatedValues ?? [])];
+
+			if (!hashCandidates.includes(existingRun.inputHash)) {
 				const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 				if (conflictPolicy === "error") {
 					throw new WorkflowRunReferenceConflictError(name, versionId, referenceId);
@@ -384,7 +386,7 @@ async function createWorkflowRunInTx(
 		parentWorkflowRunId: parent?.workflowRunId,
 		status: "scheduled",
 		input,
-		inputHash,
+		inputHash: inputHash.value,
 		options: options && { retry: options.retry, pool: options.pool },
 		referenceId,
 		latestStateTransitionId: transitionId,

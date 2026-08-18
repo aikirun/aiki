@@ -1,4 +1,3 @@
-import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
 import {
 	type ObjectBuilder,
@@ -125,6 +124,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
 		let input = args[0];
+		const hasher = client[INTERNAL].hasher;
 		const schema = this.params.schema?.input;
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(input);
@@ -136,7 +136,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			input = schemaValidationResult.value;
 		}
 
-		const inputHash = await hashInput(input);
+		const inputHash = await hasher(input);
 		const { id } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
@@ -178,13 +178,15 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			: inputRaw;
 		const input =
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
-		const inputHash = await hashInput(input);
+		// we should use a parent hasher instead of the client to enforce consistency
+		const hasher = parentRun[INTERNAL].hasher;
+		const inputHash = { value: await hasher(input) };
 
 		const referenceId = startOptions.reference?.id;
 		const address = getCompositeId<WorkflowRunAddress>({
 			name: this.name,
 			versionId: this.versionId,
-			referenceId: referenceId ?? inputHash,
+			referenceId: referenceId ?? inputHash.value,
 		});
 		const replayManifest = parentRun[INTERNAL].replayManifest;
 
@@ -209,7 +211,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				);
 			}
 
-			await this.throwNonDeterminismError(parentRun, parentRunHandle, inputHash, referenceId, replayManifest);
+			await this.throwNonDeterminismError(parentRun, parentRunHandle, inputHash.value, referenceId, replayManifest);
 		}
 
 		const pool = parentRun.options.pool;

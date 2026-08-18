@@ -52,6 +52,7 @@ function createTestWorkflowRun(
 			handle,
 			replayManifest: createReplayManifest(record),
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
+			hasher: hashInput,
 		},
 	};
 }
@@ -552,7 +553,7 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("world");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "world", inputHash, options: {} },
+					{ name: "greet", versionId: "1.0.0", input: "world", inputHash: { value: inputHash }, options: {} },
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -581,7 +582,7 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("WORLD");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "WORLD", inputHash, options: {} },
+					{ name: "greet", versionId: "1.0.0", input: "WORLD", inputHash: { value: inputHash }, options: {} },
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -626,7 +627,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: "world",
-						inputHash,
+						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
 					},
 					{ id: newRunRecord.id }
@@ -652,7 +653,13 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("world");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "world", inputHash, options: { retry: { type: "never" } } },
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: "world",
+						inputHash: { value: inputHash },
+						options: { retry: { type: "never" } },
+					},
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -678,7 +685,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: "world",
-						inputHash,
+						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
 					},
 					{ id: newRunRecord.id }
@@ -706,7 +713,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: "world",
-						inputHash,
+						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, pool: "eu-west" },
 					},
 					{ id: newRunRecord.id }
@@ -737,7 +744,40 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: "payload",
-						inputHash,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("hashes the child input with the parent run's hasher, not the client's", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				parentRun[INTERNAL].hasher = async () => "run-bound-hash";
+				client[INTERNAL].hasher = Object.assign(async () => ({ value: "client-hash" }), {
+					for: async () => async () => "client-bound-hash",
+				});
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: "payload",
+						inputHash: { value: "run-bound-hash" },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},
@@ -766,7 +806,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: "payload",
-						inputHash,
+						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},
@@ -793,7 +833,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: "payload",
-						inputHash,
+						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { pool: "eu-west" },
 					},
@@ -917,7 +957,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: "PAYLOAD",
-						inputHash,
+						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
 					},

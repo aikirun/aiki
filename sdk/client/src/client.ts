@@ -1,3 +1,4 @@
+import { plainHasher } from "@aikirun/lib/crypto";
 import { createConsoleLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client, ClientParams, EmbeddedClientParams, RemoteClientParams } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -35,6 +36,7 @@ export function client<Context = null>(params: RemoteClientParams<Context>): Cli
 export function client<Context = null>(params: EmbeddedClientParams<Context>): Client<Context>;
 export function client<Context = null>(params: ClientParams<Context>): Client<Context> {
 	const logger = params.logger ?? createConsoleLogger();
+	const hasher = params.hasher?.({ logger }) ?? plainHasher;
 
 	const rpcLink = isEmbeddedParams(params)
 		? new RPCLink({
@@ -64,6 +66,7 @@ export function client<Context = null>(params: ClientParams<Context>): Client<Co
 		logger,
 		[INTERNAL]: {
 			context: params.context,
+			hasher,
 		},
 	};
 }

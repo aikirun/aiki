@@ -32,6 +32,7 @@ import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
+import { inputHashSchema } from "../schema/hash";
 import { stateTransitionSchema } from "../schema/state-transition";
 import { workflowSourceSchema } from "../schema/workflow";
 import {
@@ -156,7 +157,7 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 			name: "string > 0",
 			versionId: "string > 0",
 			"input?": "unknown",
-			inputHash: "string > 0",
+			inputHash: inputHashSchema,
 			"parent?": type({ workflowRunId: "string > 0", expectedRevision: "number.integer >= 0" }).or("undefined"),
 			"options?": workflowStartOptionsSchema,
 		})

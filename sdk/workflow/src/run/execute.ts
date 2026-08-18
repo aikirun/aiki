@@ -94,6 +94,15 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 		const createContext = client[INTERNAL].context;
 		const context = createContext ? createContext(workflowRun) : null;
+		const hasher = await client[INTERNAL].hasher.for(workflowRun.inputHash);
+
+		if (!hasher) {
+			logger.error("Failed to determine the bound hasher for the workflow run. Check hasher configuration.", {
+				workflowRunId,
+			});
+
+			return false;
+		}
 
 		await workflowVersion[INTERNAL].handler(
 			{
@@ -109,6 +118,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 					handle,
 					replayManifest: createReplayManifest(workflowRun),
 					configProvider,
+					hasher,
 				},
 			},
 			workflowRun.input
@@ -127,6 +137,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		}
 
 		logger.error("Unexpected error during workflow execution", { err });
+
 		return false;
 	} finally {
 		for (const interval of intervals) {

@@ -1,5 +1,6 @@
 import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
 
+import type { Hash } from "../infra/hasher";
 import type { WorkflowSource } from "../workflow";
 import type {
 	WorkflowRunRecord,
@@ -104,7 +105,7 @@ export interface WorkflowRunCreateRequestV1 {
 	name: string;
 	versionId: string;
 	input?: unknown;
-	inputHash: string;
+	inputHash: Hash;
 	parent?: {
 		workflowRunId: string;
 		expectedRevision: number;

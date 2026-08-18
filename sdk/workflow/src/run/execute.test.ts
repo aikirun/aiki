@@ -188,6 +188,29 @@ describe("executeWorkflowRun", () => {
 			expect(capturedInput).toEqual({ orderId: "o1" });
 		}));
 
+	test("returns false when no hasher is bound for the run's input hash", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build();
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
+			});
+			client[INTERNAL].hasher = Object.assign(async () => ({ value: "unused" }), {
+				for: async () => null,
+			});
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
 	describe("claim refresh", () => {
 		test("keeps the claim alive by refreshing it while the handler runs", () =>
 			withFakeClient(async (client) => {

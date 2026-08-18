@@ -99,15 +99,15 @@ export const createScheduleRepository = (db: PgDb) => ({
 
 	async get(
 		namespaceId: NamespaceId,
-		filter: { id?: string; definitionHash?: string; referenceId?: string | null }
+		filter: { id?: string; definitionHashes?: string[]; referenceId?: string | null }
 	): Promise<ScheduleRow | null> {
 		const conditions = [eq(schedule.namespaceId, namespaceId)];
 
 		if (filter.id) {
 			conditions.push(eq(schedule.id, filter.id));
 		}
-		if (filter.definitionHash) {
-			conditions.push(eq(schedule.definitionHash, filter.definitionHash));
+		if (filter.definitionHashes && filter.definitionHashes.length > 0) {
+			conditions.push(inArray(schedule.definitionHash, filter.definitionHashes));
 		}
 		if (filter.referenceId !== undefined) {
 			if (filter.referenceId === null) {
@@ -122,6 +122,7 @@ export const createScheduleRepository = (db: PgDb) => ({
 			.from(schedule)
 			.where(and(...conditions))
 			.limit(1);
+
 		return result[0] ?? null;
 	},
 

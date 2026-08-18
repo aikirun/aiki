@@ -82,6 +82,7 @@ export interface TaskSetStateRequestNew {
 	workflowRunId: string;
 	taskName: string;
 	input?: unknown;
+	inputHash: string;
 	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
 }
 

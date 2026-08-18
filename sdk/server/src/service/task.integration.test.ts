@@ -70,6 +70,37 @@ describe("TaskService getTaskById", () => {
 });
 
 describe("TaskService setTaskState", () => {
+	test("creates a new task with the request's input hash and terminal state", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const input = { sku: "SKU-42", quantity: 3 };
+			const inputHash = "request-input-hash";
+			const output = { reservationId: "rsv-1" };
+
+			const taskService = createTaskService({ repos });
+			await taskService.setTaskState(context, {
+				type: "new",
+				workflowRunId: runId,
+				taskName: "reserve-inventory",
+				input,
+				inputHash,
+				state: { status: "completed", output },
+			});
+
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					name: "reserve-inventory",
+					inputHash,
+					state: { status: "completed", attempts: 1, output },
+				}),
+			]);
+		}));
+
 	test("does not set the state of a task belonging to another run", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const otherNamespaceContext = namespaceRequestContextFactory.build({ namespaceId: "other-ns" as NamespaceId });
