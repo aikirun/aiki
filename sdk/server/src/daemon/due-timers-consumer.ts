@@ -108,7 +108,7 @@ async function dueTimersConsumerLoop(
 					}
 				}
 
-				const context = createDaemonContext({ name: "processDueTimers", logger, signal });
+				const context = createDaemonContext({ name: "process-due-timers", logger, signal });
 				const next = () =>
 					timerPriorityQueue.popDue({
 						maxRank: computeRank({ dueAt: Date.now() }),

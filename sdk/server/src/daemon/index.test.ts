@@ -25,7 +25,7 @@ describe("pollingDaemon", () => {
 		deps: Deps
 	): Promise<void> {
 		const { start } = pollingDaemon(noopLogger, signal, asConfigProvider(getConfig));
-		return start(fn, deps, (config) => config);
+		return start(fn, "test-daemon", deps, (config) => config);
 	}
 
 	test("ticks repeatedly until the signal aborts", async () => {
@@ -188,15 +188,15 @@ describe("startDaemons", () => {
 	}
 
 	const baseDaemonNames = [
-		"processImminentScheduledRuns",
-		"processImminentSleepElapsedRuns",
-		"processImminentRetryableRuns",
-		"processImminentRetryableTasks",
-		"processImminentEventWaitTimedOutRuns",
-		"processImminentChildRunWaitTimedOutRuns",
-		"processImminentRecurringRuns",
-		"recoverOverdueOutboxEntries",
-		"stallUndeliverableRuns",
+		"process-imminent-scheduled-runs",
+		"process-imminent-sleep-elapsed-runs",
+		"process-imminent-retryable-runs",
+		"process-imminent-retryable-tasks",
+		"process-imminent-event-wait-timed-out-runs",
+		"process-imminent-child-run-wait-timed-out-runs",
+		"process-imminent-recurring-runs",
+		"recover-overdue-outbox-entries",
+		"stall-undeliverable-runs",
 	];
 
 	test("mounts every polling daemon on start", async () => {
@@ -219,7 +219,7 @@ describe("startDaemons", () => {
 			publisher: {} as unknown as Publisher,
 		});
 
-		expect(seenDaemonNames).toEqual(baseDaemonNames.concat("publishPendingOutboxEntries"));
+		expect(seenDaemonNames).toEqual(baseDaemonNames.concat("publish-pending-outbox-entries"));
 
 		abortController.abort();
 		await daemons;
