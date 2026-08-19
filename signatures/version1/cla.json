@@ -1,1 +1,12 @@
-{"signedContributors":[]}
+{
+  "signedContributors": [
+    {
+      "name": "net-folade",
+      "id": 148221490,
+      "comment_id": 5342375581,
+      "created_at": "2026-08-19T12:53:19Z",
+      "repoId": 966458244,
+      "pullRequestNo": 162
+    }
+  ]
+}
