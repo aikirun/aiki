@@ -41,13 +41,13 @@ Want the web dashboard against your embedded server? Serve it separately — see
 Hosting Aiki as infrastructure means running two components:
 
 - **Server** — the Aiki server. Needs `DATABASE_URL`.
+- **Dashboard** — the web UI, a single-page app that talks to the server.
 
 However you run the server, applications connect the same way:
+
 ```typescript
 const aikiClient = client({ url: "http://localhost:9850" });
 ```
-
-- **Dashboard** — the web UI, a single-page app that talks to the server.
 
 Before the server starts, apply the schema. This one-off **migration step** applies the server package's migrations, plus the iam package's when the server runs with auth (`AIKI_SERVER_AUTH_SECRET`). It needs `DATABASE_URL`, and is safe to repeat: run it on a fresh database or when an aiki upgrade ships new migrations. Already-applied migrations are skipped.
 
