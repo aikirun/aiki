@@ -140,6 +140,21 @@ handled for you on commit. A pre-push hook type-checks your changes with
 it first regenerates the docs types. Commits stay fast so you can freely save
 work in progress.
 
+## Contributor License Agreement
+
+Your first pull request needs a one-time agreement to the
+[Contributor License Agreement](.github/CLA.md). A bot will comment with instructions;
+reply with the phrase it gives you and the check goes green. You are asked once, and it covers everything you contribute afterwards — and anything you
+contributed before.
+
+**You keep the copyright in your work.** You are granting Aiki a licence to use
+it, including the right to distribute it under different terms in future. You
+remain free to use your own contributions anywhere else.
+
+If your employer owns the code you write — which is what many employment
+contracts say, including for work done on your own time — your personal signature is not enough. Point them at the [Corporate CLA](.github/CCLA.md) and email
+oluwafemi.shobande@aiki.run.
+
 ## TODO — planned additions to this guide
 
 - **PR creation guidance.** Add a [`.github/PULL_REQUEST_TEMPLATE.md`](.github)
