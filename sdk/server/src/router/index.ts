@@ -28,6 +28,7 @@ export function createNamespaceAuthedRouter(deps: NamespaceAuthedRouterDeps) {
 		}),
 		workflow: createWorkflowRouter(deps.workflowService),
 		workflowRun: createWorkflowRunRouter({
+			eventService: deps.eventService,
 			workflowRunService: deps.workflowRunService,
 			workflowRunStateMachine: deps.workflowRunStateMachine,
 			workflowRunOutboxService: deps.workflowRunOutboxService,

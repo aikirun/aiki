@@ -24,11 +24,7 @@ const publishPendingOutboxEntriesDaemonConfig = defaultServerRuntimeConfig.daemo
 function createServices(repos: Repositories) {
 	const childRunCanceller = createChildRunCanceller();
 	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller });
-	const workflowRun = createWorkflowRunService({
-		repos,
-		childRunCanceller,
-		workflowRunStateMachine,
-	});
+	const workflowRun = createWorkflowRunService({ repos, childRunCanceller });
 	return { workflowRun, workflowRunStateMachine };
 }
 

@@ -2,7 +2,12 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
-import type { WorkflowRunId, WorkflowRunOptions, WorkflowRunStatus } from "@aikirun/types/workflow/run";
+import type {
+	WorkflowRunId,
+	WorkflowRunOptions,
+	WorkflowRunState,
+	WorkflowRunStatus,
+} from "@aikirun/types/workflow/run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
@@ -21,6 +26,14 @@ type WorkflowRunRowUpdate = Partial<
 		"status" | "attempts" | "latestStateTransitionId" | "scheduledAt" | "wakeupAt" | "timeoutAt" | "nextAttemptAt"
 	>
 >;
+
+export type WorkflowRunWithState = {
+	run: Pick<
+		WorkflowRunRow,
+		"id" | "status" | "revision" | "attempts" | "latestStateTransitionId" | "parentWorkflowRunId" | "options"
+	>;
+	state: WorkflowRunState;
+};
 
 export interface WorkflowRunMeta {
 	id: string;
@@ -90,7 +103,10 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result[0] ?? null;
 	},
 
-	async getByIdWithState(filter: { namespaceId: NamespaceId; id: string }, options?: { lock?: "update" }) {
+	async getByIdWithState(
+		filter: { namespaceId: NamespaceId; id: string },
+		options?: { lock?: "update" }
+	): Promise<WorkflowRunWithState | null> {
 		const query = db
 			.select({
 				run: {

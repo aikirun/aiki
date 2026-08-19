@@ -18,6 +18,7 @@ import { createImminentRunTimerQueue } from "./infra/timer/imminent-run-timer-qu
 import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
 import { createNamespaceAuthedRouter } from "./router/index";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
+import { createEventService } from "./service/event";
 import { createScheduleService } from "./service/schedule";
 import { createTaskStateMachine } from "./service/state-machine/task";
 import { createWorkflowRunStateMachine } from "./service/state-machine/workflow-run";
@@ -75,12 +76,12 @@ export async function createHandler(params: CreateHandlerParams) {
 	const workflowRunService = createWorkflowRunService({
 		repos,
 		childRunCanceller,
-		workflowRunStateMachine,
 		imminentRunTimerQueue,
 	});
 	const workflowService = createWorkflowService({ repos });
 	const scheduleService = createScheduleService({ repos });
 	const taskService = createTaskService({ repos });
+	const eventService = createEventService({ repos, workflowRunStateMachine });
 	const workflowRunOutboxService = createWorkflowRunOutboxService({ repos });
 
 	const namespaceAuthedRouter = createNamespaceAuthedRouter({
@@ -90,6 +91,7 @@ export async function createHandler(params: CreateHandlerParams) {
 		taskService,
 		workflowService,
 		scheduleService,
+		eventService,
 		workflowRunOutboxService,
 	});
 

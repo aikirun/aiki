@@ -36,7 +36,6 @@ function createService(repos: Repositories, imminentRunTimerQueue?: ImminentRunT
 		service: createWorkflowRunService({
 			repos,
 			childRunCanceller,
-			workflowRunStateMachine,
 			imminentRunTimerQueue,
 		}),
 		stateMachine: workflowRunStateMachine,

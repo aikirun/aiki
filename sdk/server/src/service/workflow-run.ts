@@ -2,7 +2,6 @@ import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/arr
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { NotFoundError } from "@aikirun/lib/error";
 import { getCompositeId } from "@aikirun/lib/id";
-import { propsRequiredNonNull } from "@aikirun/lib/object";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunCancelByIdsRequestV1,
@@ -18,7 +17,6 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ChildWorkflowRunInfo,
 	ChildWorkflowRunWait,
-	EventReference,
 	EventWait,
 	Sleep,
 	TerminalWorkflowRunState,
@@ -32,10 +30,9 @@ import type {
 import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import type { WorkflowRunStateMachine } from "./state-machine/workflow-run";
 import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
-import type { EventWaitRow, EventWaitRowInsert } from "../infra/db/types/event-wait";
+import type { EventWaitRow } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
@@ -46,14 +43,12 @@ import { discardStaleTasks } from "../service/discard-stale-tasks";
 export interface WorkflowRunServiceDeps {
 	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
-	workflowRunStateMachine: WorkflowRunStateMachine;
 	imminentRunTimerQueue?: ImminentRunTimerQueue;
 }
 
 export const createWorkflowRunService = ({
 	repos,
 	childRunCanceller,
-	workflowRunStateMachine,
 	imminentRunTimerQueue,
 }: WorkflowRunServiceDeps) => ({
 	async createWorkflowRun(
@@ -210,18 +205,6 @@ export const createWorkflowRunService = ({
 			}),
 			total,
 		};
-	},
-
-	async sendEventToWorkflowRun(
-		context: NamespaceRequestContext,
-		runId: WorkflowRunId,
-		eventName: string,
-		data: unknown,
-		reference: EventReference | undefined
-	): Promise<void> {
-		return repos.transaction(async (txRepos) =>
-			sendEventToWorkflowRunInTx(context, runId, eventName, data, reference, txRepos, workflowRunStateMachine)
-		);
 	},
 
 	async resolveRunIdsByReferences(
@@ -421,53 +404,6 @@ async function createWorkflowRunInTx(
 	});
 
 	return runId;
-}
-
-async function sendEventToWorkflowRunInTx(
-	context: NamespaceRequestContext,
-	runId: WorkflowRunId,
-	eventName: string,
-	data: unknown,
-	reference: EventReference | undefined,
-	txRepos: TxRepositories,
-	workflowRunStateMachine: WorkflowRunStateMachine
-) {
-	const result = await txRepos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
-	if (!result) {
-		throw new NotFoundError(`Workflow run not found: ${runId}`);
-	}
-	const { run, state } = result;
-
-	const eventWaitEntry: EventWaitRowInsert = {
-		id: ulid(),
-		workflowRunId: runId,
-		name: eventName,
-		status: "received",
-		referenceId: reference?.id,
-		data,
-	};
-	if (propsRequiredNonNull(eventWaitEntry, "referenceId")) {
-		await txRepos.eventWait.upsert(eventWaitEntry);
-	} else {
-		await txRepos.eventWait.insert(eventWaitEntry);
-	}
-
-	if (run.status !== "awaiting_event") {
-		return;
-	}
-
-	if (state.status === "awaiting_event" && state.eventName === eventName) {
-		await workflowRunStateMachine.transitionState(
-			context,
-			{
-				type: "optimistic",
-				id: runId,
-				state: { status: "scheduled", scheduledInMs: 0, reason: "event" },
-				expectedRevision: run.revision,
-			},
-			txRepos
-		);
-	}
 }
 
 async function cancelByIdsInTx(

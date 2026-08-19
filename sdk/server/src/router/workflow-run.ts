@@ -2,11 +2,13 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { namespaceAuthedImplementer } from "./implementer";
 import { runConcurrently } from "../lib/concurrency";
+import type { EventService } from "../service/event";
 import type { WorkflowRunStateMachine } from "../service/state-machine/workflow-run";
 import type { WorkflowRunService } from "../service/workflow-run";
 import type { WorkflowRunOutboxService } from "../service/workflow-run-outbox";
 
 export interface WorkflowRunRouterDeps {
+	eventService: EventService;
 	workflowRunService: WorkflowRunService;
 	workflowRunStateMachine: WorkflowRunStateMachine;
 	workflowRunOutboxService: WorkflowRunOutboxService;
@@ -14,7 +16,7 @@ export interface WorkflowRunRouterDeps {
 
 export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 	const os = namespaceAuthedImplementer.workflowRun;
-	const { workflowRunService, workflowRunStateMachine, workflowRunOutboxService } = deps;
+	const { eventService, workflowRunService, workflowRunStateMachine, workflowRunOutboxService } = deps;
 
 	return os.router({
 		listV1: os.listV1.handler(async ({ input: request, context }) => {
@@ -55,13 +57,12 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 
 		sendEventV1: os.sendEventV1.handler(async ({ input: request, context }) => {
 			const runId = request.id as WorkflowRunId;
-			await workflowRunService.sendEventToWorkflowRun(
-				context,
+			await eventService.sendEventToWorkflowRun(context, {
 				runId,
-				request.eventName,
-				request.data,
-				request.options?.reference
-			);
+				eventName: request.eventName,
+				data: request.data,
+				reference: request.options?.reference,
+			});
 		}),
 
 		multicastEventV1: os.multicastEventV1.handler(async ({ input: request, context }) => {
@@ -69,7 +70,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 			const { eventName, data, options } = request;
 
 			await runConcurrently(context, runIds, async (runId, spanCtx) => {
-				await workflowRunService.sendEventToWorkflowRun(spanCtx, runId, eventName, data, options?.reference);
+				await eventService.sendEventToWorkflowRun(spanCtx, { runId, eventName, data, reference: options?.reference });
 			});
 		}),
 
@@ -78,7 +79,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 			const { eventName, data, options } = request;
 
 			await runConcurrently(context, runIds, async (runId, spanCtx) => {
-				await workflowRunService.sendEventToWorkflowRun(spanCtx, runId, eventName, data, options?.reference);
+				await eventService.sendEventToWorkflowRun(spanCtx, { runId, eventName, data, reference: options?.reference });
 			});
 		}),
 
