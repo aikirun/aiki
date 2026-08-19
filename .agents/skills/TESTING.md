@@ -47,6 +47,9 @@ Before writing any test, study the exemplars for its tier and match their idioms
   chosen to defeat a specific wrong implementation. "Rank 1 is due under a pinned clock"
   needs no comment. Where pinning is genuinely impossible, a comment saying why the premise
   holds is the floor.
+- Don't assert a premise the test itself authored two lines up. Asserting an input back to
+  yourself is ceremony; where the value's origin is what matters, a one-line comment
+  attributing it to its source carries it.
 - Waits ride event signals, never polling loops or sized sleeps. The one legitimate fixed wait
   is an absence check: wait a window, assert nothing changed.
 - The signal primitive is `createBinaryLatch` (`lib/src/async/latch.ts`), not a hand-rolled
@@ -99,6 +102,10 @@ Before writing any test, study the exemplars for its tier and match their idioms
   fakes and harnesses. The same split holds in the `@aikirun/testing` package: factory exports are
   namespaced `@aikirun/testing/data-factory/*`, while the fakes stay at `@aikirun/testing/client`
   and `@aikirun/testing/infra/queue`.
+- A seed is a lifecycle prefix — stop at the exact stage the test needs. Reaching a state by
+  running a longer seed and transitioning back out of it hides which stage the behavior actually
+  depends on. When no seed stops where the test needs it to, add one (`seedScheduledRun` is
+  create-only, with the promoter left out) rather than contorting an existing one.
 
 ## Assertions
 
@@ -123,6 +130,10 @@ Before writing any test, study the exemplars for its tier and match their idioms
   ordering only against reads whose own query carries the `ORDER BY`.
 - Merge related equality fields into one `objectContaining` (include ids). An ordered comparison
   (`toBeGreaterThan`) gets its own assertion line — no asymmetric ordering matcher exists.
+- Review step: grep every new or edited test file for `[0]`. Each hit is either inside an
+  `expect` (rewrite as a whole-array matcher compare with an independently-sourced expected
+  value) or a capture (precede with `toHaveLength`). Run it over every file a subagent
+  delivered, not just the largest one.
 - Timestamps in expectations are exact values, never `expect.any(Number)`. Presence-only
   survives a dropped duration or a seconds/ms mix-up. Capture an instant, freeze the clock
   around the one mutating call, and assert the arithmetic
@@ -207,6 +218,36 @@ Before writing any test, study the exemplars for its tier and match their idioms
   is a function that performs the action and the loop just calls it — the refreshClaim guard
   table's cells are the seed functions themselves. A data cell that forces the loop to branch
   on the case puts per-case knowledge in the wrong place.
+- Type a case table per key with a mapped type —
+  `{ [S in Exclude<Union, transformed>]: Extract<Request, { status: S }> }` — not a uniform
+  `Record<Exclude<…>, Request>`. The mapped form keeps each entry's precise member type, so
+  `toEqual(entry)` typechecks without widening. Name the parts valid/accepts/declines
+  (`validTransitions`, `validDestination`, `validReason`) and derive the rejects as the
+  `=== undefined` complement of the legality table.
+- Exhaustiveness extends to secondary axes. For each guarded destination, loop the full reason
+  union and assert every non-valid reason is declined — not one representative wrong reason.
+- When the code under test reads only a couple of fields, feed it a minimal typed literal with
+  one cast at the seam (`attemptTransition(from, { status, reason? })`). A per-case request
+  builder that has to know every variant is the sign that the test is following the
+  implementation instead of the behavior; deleting it beats making it exhaustive.
+- A guarded write's test payload must be a write a real caller would produce from the stale read
+  the filter encodes. `{ status: "completed", attempts: 2 }` against a read of `attempts: 1`
+  implies that completing increments attempts, which nothing does — a fabricated payload makes
+  the reader doubt semantics that don't exist.
+- For a multi-predicate compare-and-set, each mismatch test moves exactly one predicate and
+  holds the rest at their read-time values, so a failure names which predicate did the work.
+- Repository tests exercise the interface, not the race story. Author the mismatching filter
+  value directly (`readValue - 60_000`) and leave two-party choreography to the suite of the
+  component that races. Their comments follow the same package-audience rule as
+  TYPESCRIPT.md §5: repository tests don't explain themselves in daemon vocabulary.
+- When a bulk method's SET clause writes a small fixed set of columns, assert exactly those
+  columns against authored values rather than capturing the row before the write. The write
+  surface is the assertion surface, and the premise stays visible in the test.
+- A fixture name is a claim, and it has to hold at every use site. `NO_CLAIM_GOES_STALE_MS`
+  stopped being true the moment a test made a claim stale under it; the honest name was
+  `ONE_HOUR_MS`.
+- Two tests that look alike must each kill a distinct mutant, and you should be able to say
+  which one. If you can't name it, the second test is noise.
 
 ## Concurrency
 
