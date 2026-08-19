@@ -1,6 +1,6 @@
 import { AikiError } from "@aikirun/lib/error";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRunId, WorkflowRunStatus } from "@aikirun/types/workflow/run";
+import type { TerminalWorkflowRunStatus, WorkflowRunId, WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type { TaskId, TaskName, TaskStatus } from "@aikirun/types/workflow/task";
 
 export class WorkflowRunRevisionConflictError extends AikiError {
@@ -36,6 +36,21 @@ export class InvalidWorkflowRunStateTransitionError extends AikiError {
 		this.from = from;
 		this.to = to;
 		this.reason = reason;
+	}
+}
+
+export class WorkflowRunTerminatedError extends AikiError {
+	readonly code = "WORKFLOW_RUN_TERMINATED";
+	readonly status = 409;
+
+	public readonly workflowRunId: WorkflowRunId;
+	public readonly runStatus: TerminalWorkflowRunStatus;
+
+	constructor(workflowRunId: WorkflowRunId, runStatus: TerminalWorkflowRunStatus) {
+		super(`Workflow ${workflowRunId} is ${runStatus}; it accepts no further writes`);
+		this.name = "WorkflowRunTerminatedError";
+		this.workflowRunId = workflowRunId;
+		this.runStatus = runStatus;
 	}
 }
 

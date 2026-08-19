@@ -120,6 +120,25 @@ export async function claimRun(deps: { context: NamespaceRequestContext; repos: 
 	return { revisionWhenClaimed: claim.revision, attemptsWhenClaimed: claim.attempts };
 }
 
+export async function completeRun(deps: {
+	context: NamespaceRequestContext;
+	repos: Repositories;
+	runId: string;
+	expectedRevision: number;
+}) {
+	const { context, repos, runId, expectedRevision } = deps;
+	const services = createServices(repos);
+
+	const completion = await services.workflowRunStateMachine.transitionState(context, {
+		type: "optimistic",
+		id: runId,
+		state: { status: "completed", output: seededRunOutput },
+		expectedRevision,
+	});
+
+	return { revisionWhenCompleted: completion.revision };
+}
+
 export async function seedClaimedRun(deps: SeedRunDeps & { publisher: FakePublisher }, overrides?: SeedRunOverrides) {
 	const { repos, publisher } = deps;
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();

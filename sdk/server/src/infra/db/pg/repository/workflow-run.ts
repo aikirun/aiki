@@ -94,7 +94,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 
 	async getById(filter: { namespaceId: NamespaceId; id: string }, options?: { lock?: "share" }) {
 		const query = db
-			.select({ id: workflowRun.id, revision: workflowRun.revision })
+			.select({ id: workflowRun.id, revision: workflowRun.revision, status: workflowRun.status })
 			.from(workflowRun)
 			.where(and(eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)))
 			.limit(1);

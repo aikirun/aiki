@@ -3,11 +3,12 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 
 import { createTaskStateMachine } from "./state-machine/task";
 import { describe, expect, test } from "bun:test";
+import { InvalidTaskStateTransitionError, WorkflowRunTerminatedError } from "../errors";
 import { createTaskService } from "../service/task";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { seedClaimedRun } from "../testing/seed/run";
-import { seedRunningTask } from "../testing/seed/task";
+import { completeRun, seedClaimedRun, seedCompletedRun } from "../testing/seed/run";
+import { seedCompletedTask, seedRunningTask } from "../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
@@ -134,5 +135,111 @@ describe("TaskService setTaskState", () => {
 			expect(await repos.task.getById({ id: victimTaskSeed.taskInfo.id, workflowRunId: victimTaskSeed.runId })).toEqual(
 				victimRowBefore
 			);
+		}));
+
+	test("does not create a task on a run that has already finished", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId } = await seedCompletedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const taskService = createTaskService({ repos });
+			expect(
+				taskService.setTaskState(context, {
+					type: "new",
+					workflowRunId: runId,
+					taskName: "reserve-inventory",
+					input: { sku: "SKU-42", quantity: 3 },
+					inputHash: "request-input-hash",
+					state: { status: "completed", output: { reservationId: "rsv-1" } },
+				})
+			).rejects.toBeInstanceOf(WorkflowRunTerminatedError);
+
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([]);
+		}));
+
+	test("does not set an existing task's state on a run that has already finished", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			await completeRun({ context, repos, runId, expectedRevision: revisionWhenClaimed });
+			const taskRowBefore = await repos.task.getById({ id: taskInfo.id, workflowRunId: runId });
+			expect(taskRowBefore).toEqual(expect.objectContaining({ id: taskInfo.id, status: "running" }));
+
+			const taskService = createTaskService({ repos });
+			expect(
+				taskService.setTaskState(context, {
+					type: "existing",
+					id: taskInfo.id,
+					workflowRunId: runId,
+					state: { status: "completed", output: { reservationId: "rsv-1" } },
+				})
+			).rejects.toBeInstanceOf(WorkflowRunTerminatedError);
+
+			expect(await repos.task.getById({ id: taskInfo.id, workflowRunId: runId })).toEqual(taskRowBefore);
+		}));
+
+	test("does not reopen a task that already reached a terminal state", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedCompletedTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			const taskRowBefore = await repos.task.getById({ id: taskInfo.id, workflowRunId: runId });
+			expect(taskRowBefore).toEqual(expect.objectContaining({ id: taskInfo.id, status: "completed" }));
+
+			const taskService = createTaskService({ repos });
+			expect(
+				taskService.setTaskState(context, {
+					type: "existing",
+					id: taskInfo.id,
+					workflowRunId: runId,
+					state: { status: "failed", error: { name: "Error", message: "boom" } },
+				})
+			).rejects.toBeInstanceOf(InvalidTaskStateTransitionError);
+
+			expect(await repos.task.getById({ id: taskInfo.id, workflowRunId: runId })).toEqual(taskRowBefore);
+		}));
+
+	test("does not resolve a task that is waiting for its retry", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const taskStateMachine = createTaskStateMachine({ repos });
+			await taskStateMachine.transitionState(context, {
+				id: taskInfo.id,
+				workflowRunId: runId,
+				expectedWorkflowRunRevision: revisionWhenClaimed,
+				taskState: {
+					status: "awaiting_retry",
+					attempts: 1,
+					error: { name: "Error", message: "boom" },
+					nextAttemptInMs: 60_000,
+				},
+			});
+			const taskRowBefore = await repos.task.getById({ id: taskInfo.id, workflowRunId: runId });
+			expect(taskRowBefore).toEqual(expect.objectContaining({ id: taskInfo.id, status: "awaiting_retry" }));
+
+			const taskService = createTaskService({ repos });
+			expect(
+				taskService.setTaskState(context, {
+					type: "existing",
+					id: taskInfo.id,
+					workflowRunId: runId,
+					state: { status: "failed", error: { name: "Error", message: "boom" } },
+				})
+			).rejects.toBeInstanceOf(InvalidTaskStateTransitionError);
+
+			expect(await repos.task.getById({ id: taskInfo.id, workflowRunId: runId })).toEqual(taskRowBefore);
 		}));
 });
