@@ -4,11 +4,12 @@ import type {
 	TaskSetStateRequestNew,
 	TaskSetStateRequestV1,
 } from "@aikirun/types/api/task";
-import type { WorkflowRunId } from "@aikirun/types/workflow/run";
-import type { TaskId, TaskRecord, TaskState, TaskStateRunning } from "@aikirun/types/workflow/task";
+import { isTerminalWorkflowRunStatus, type WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { TaskId, TaskName, TaskRecord, TaskState, TaskStateRunning } from "@aikirun/types/workflow/task";
 import { monotonicFactory, ulid } from "ulidx";
 
-import { TaskStateConflictError } from "../errors";
+import { assertIsValidTaskStateTransition } from "./state-machine/task";
+import { TaskStateConflictError, WorkflowRunTerminatedError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { NamespaceRequestContext } from "../middleware/context";
 
@@ -38,35 +39,40 @@ export const createTaskService = ({ repos }: TaskServiceDeps) => ({
 
 	async setTaskState(context: NamespaceRequestContext, request: TaskSetStateRequestV1): Promise<void> {
 		if (request.type === "new") {
-			return repos.transaction(async (txRepos) => setNewTaskStateInTx(context, request, txRepos));
+			const taskId = await repos.transaction(async (txRepos) => setNewTaskStateInTx(context, request, txRepos));
+			context.logger.info("New task state set", {
+				"aiki.taskId": taskId,
+				"aiki.state": request.state,
+			});
+			return;
 		}
-		return repos.transaction(async (txRepos) => setExistingTaskStateInTx(context, request, txRepos));
+		await repos.transaction(async (txRepos) => setExistingTaskStateInTx(context, request, txRepos));
+		context.logger.info("Existing task state set", {
+			"aiki.taskId": request.id,
+			"aiki.state": request.state,
+		});
 	},
 });
 
 export type TaskService = ReturnType<typeof createTaskService>;
 
 async function setNewTaskStateInTx(
-	context: NamespaceRequestContext,
+	{ namespaceId }: NamespaceRequestContext,
 	request: TaskSetStateRequestNew,
 	txRepos: TxRepositories
-): Promise<void> {
-	const { namespaceId, logger } = context;
+): Promise<TaskId> {
 	const runId = request.workflowRunId as WorkflowRunId;
 	const run = await txRepos.workflowRun.getById({ namespaceId, id: runId }, { lock: "share" });
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
+	if (isTerminalWorkflowRunStatus(run.status)) {
+		throw new WorkflowRunTerminatedError(runId, run.status);
+	}
 
-	const taskId = ulid();
+	const taskId = ulid() as TaskId;
 	const runningStateTransitionId = monotonicUlid();
 	const targetStateTransitionId = monotonicUlid();
-
-	logger.info("Setting task state (new task)", {
-		"aiki.runId": runId,
-		"aiki.taskId": taskId,
-		"aiki.state": request.state,
-	});
 
 	const runningState: TaskStateRunning = {
 		status: "running",
@@ -109,18 +115,22 @@ async function setNewTaskStateInTx(
 			state: targetState,
 		},
 	]);
+
+	return taskId;
 }
 
 async function setExistingTaskStateInTx(
-	context: NamespaceRequestContext,
+	{ namespaceId }: NamespaceRequestContext,
 	request: TaskSetStateRequestExisting,
 	txRepos: TxRepositories
 ): Promise<void> {
-	const { namespaceId, logger } = context;
 	const runId = request.workflowRunId as WorkflowRunId;
 	const run = await txRepos.workflowRun.getById({ namespaceId, id: runId }, { lock: "share" });
 	if (!run) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
+	}
+	if (isTerminalWorkflowRunStatus(run.status)) {
+		throw new WorkflowRunTerminatedError(runId, run.status);
 	}
 
 	const existingTaskRow = await txRepos.task.getById({ id: request.id, workflowRunId: runId });
@@ -128,11 +138,13 @@ async function setExistingTaskStateInTx(
 		throw new NotFoundError(`Task not found: ${request.id}`);
 	}
 
-	logger.info("Setting task state (existing task)", {
-		"aiki.runId": runId,
-		"aiki.taskId": request.id,
-		"aiki.state": request.state,
-	});
+	assertIsValidTaskStateTransition(
+		runId,
+		existingTaskRow.name as TaskName,
+		existingTaskRow.id as TaskId,
+		existingTaskRow.status,
+		request.state.status
+	);
 
 	const attempts = existingTaskRow.attempts;
 
