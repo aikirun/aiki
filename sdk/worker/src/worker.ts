@@ -80,7 +80,11 @@ export interface WorkerStartOptions {
 }
 
 export interface Worker {
-	with(): WorkerBuilder;
+	/** Sets one start option and returns a copy of {@link Worker}. The original is unchanged. */
+	with<Path extends PathFromObject<WorkerStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkerStartOptions, Path>
+	): Worker;
 	start: <Context>(client: Client<Context>) => WorkerHandle;
 }
 
@@ -90,19 +94,24 @@ export interface WorkerHandle {
 }
 
 class WorkerImpl implements Worker {
-	constructor(private readonly params: WorkerParams) {}
+	private readonly startOptionsBuilder: ObjectBuilder<WorkerStartOptions>;
 
-	public with(): WorkerBuilder {
-		const startOptionsOverrider = objectOverrider<WorkerStartOptions>({});
-		return createWorkerBuilder(this, startOptionsOverrider());
+	constructor(
+		private readonly params: WorkerParams,
+		startOptionsBuilder?: ObjectBuilder<WorkerStartOptions>
+	) {
+		this.startOptionsBuilder = startOptionsBuilder ?? objectOverrider<WorkerStartOptions>({})();
+	}
+
+	public with<Path extends PathFromObject<WorkerStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkerStartOptions, Path>
+	): Worker {
+		return new WorkerImpl(this.params, this.startOptionsBuilder.with(path, value));
 	}
 
 	public start<Context>(client: Client<Context>): WorkerHandle {
-		return this.startWithOptions(client, {});
-	}
-
-	public startWithOptions<Context>(client: Client<Context>, startOptions: WorkerStartOptions): WorkerHandle {
-		return new WorkerHandleImpl(client, this.params, startOptions);
+		return new WorkerHandleImpl(client, this.params, this.startOptionsBuilder.build());
 	}
 }
 
@@ -461,27 +470,4 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			this.availableCapacityLatch.signal();
 		}
 	}
-}
-
-export interface WorkerBuilder {
-	opt<Path extends PathFromObject<WorkerStartOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<WorkerStartOptions, Path>
-	): WorkerBuilder;
-	start: Worker["start"];
-}
-
-function createWorkerBuilder(
-	worker: WorkerImpl,
-	startOptionsBuilder: ObjectBuilder<WorkerStartOptions>
-): WorkerBuilder {
-	return {
-		opt(path, value) {
-			return createWorkerBuilder(worker, startOptionsBuilder.with(path, value));
-		},
-
-		start(client) {
-			return worker.startWithOptions(client, startOptionsBuilder.build());
-		},
-	};
 }

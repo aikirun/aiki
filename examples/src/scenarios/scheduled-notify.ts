@@ -12,10 +12,12 @@ const everyTenSeconds = schedule({
 
 await runWithWorker([notify], async (client) => {
 	const scheduleHandle = await everyTenSeconds
-		.with()
-		.opt("reference.id", "my-correlation-rgwee")
-		.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
-		.activate(client, notify, "This is a reminder");
+		.with("reference.id", "my-correlation-rgwee")
+		.activate(
+			client,
+			notify.with("retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 }),
+			"This is a reminder"
+		);
 	await delay(20_000);
 	await scheduleHandle.pause();
 });

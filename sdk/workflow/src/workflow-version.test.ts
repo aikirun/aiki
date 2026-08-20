@@ -641,7 +641,7 @@ describe("creating a workflow run", () => {
 	});
 
 	describe("with", () => {
-		test("overrides the definition start options via opt", () =>
+		test("overrides the definition start options", () =>
 			withFakeClient(async (client) => {
 				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
 					async handler(_run, name: string) {
@@ -664,40 +664,12 @@ describe("creating a workflow run", () => {
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
 
-				const handle = await workflowVersion.with().opt("retry", { type: "never" }).start(client, "world");
+				const handle = await workflowVersion.with("retry", { type: "never" }).start(client, "world");
 
 				expect(handle.run.id).toBe(newRunRecord.id);
 			}));
 
-		test("starts from the definition start options when no overrides are given", () =>
-			withFakeClient(async (client) => {
-				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
-					async handler(_run, name: string) {
-						return name;
-					},
-					retry: { type: "fixed", maxAttempts: 3, delayMs: 100 },
-				});
-				const newRunRecord = runningWorkflowRunRecordFactory.build();
-				const inputHash = await hashInput("world");
-
-				client.api.workflowRun.createV1.once(
-					{
-						name: "greet",
-						versionId: "1.0.0",
-						input: "world",
-						inputHash: { value: inputHash },
-						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
-					},
-					{ id: newRunRecord.id }
-				);
-				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
-
-				const handle = await workflowVersion.with().start(client, "world");
-
-				expect(handle.run.id).toBe(newRunRecord.id);
-			}));
-
-		test("merges opt overrides with the definition start options", () =>
+		test("merges overrides with the definition start options", () =>
 			withFakeClient(async (client) => {
 				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
 					async handler(_run, name: string) {
@@ -720,7 +692,7 @@ describe("creating a workflow run", () => {
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
 
-				const handle = await workflowVersion.with().opt("pool", "eu-west").start(client, "world");
+				const handle = await workflowVersion.with("pool", "eu-west").start(client, "world");
 
 				expect(handle.run.id).toBe(newRunRecord.id);
 			}));

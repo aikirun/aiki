@@ -95,8 +95,7 @@ Prevent duplicate event delivery using a reference ID:
 
 ```typescript
 await handle.events.paymentReceived
-	.with()
-	.opt("reference.id", "payment-txn_abc123")
+	.with("reference.id", "payment-txn_abc123")
 	.send({ transactionId: "txn_abc123", amount: 99.99 });
 ```
 
@@ -174,14 +173,12 @@ Events with the same reference ID are silently deduplicated - duplicates are ign
 ```typescript
 // First send - event delivered
 await handle.events.paymentReceived
-	.with()
-	.opt("reference.id", "payment-123")
+	.with("reference.id", "payment-123")
 	.send({ transactionId: "txn_abc" });
 
 // Second send with same reference ID - silently ignored
 await handle.events.paymentReceived
-	.with()
-	.opt("reference.id", "payment-123")
+	.with("reference.id", "payment-123")
 	.send({ transactionId: "txn_abc" });
 ```
 

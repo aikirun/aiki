@@ -111,8 +111,7 @@ Prevent duplicate executions using a reference ID:
 
 ```typescript
 const handle = await workflowVersion
-	.with()
-	.opt("reference.id", "order-123")
+	.with("reference.id", "order-123")
 	.start(aikiClient, { orderId: "order-123" });
 ```
 

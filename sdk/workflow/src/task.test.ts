@@ -476,7 +476,7 @@ describe("task", () => {
 						{ taskInfo: completedTaskInfo }
 					);
 
-				expect(await sendEmail.with().opt("retry", retry).start(run, input)).toBe(output);
+				expect(await sendEmail.with("retry", retry).start(run, input)).toBe(output);
 			}));
 	});
 });
