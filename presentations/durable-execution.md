@@ -676,8 +676,8 @@ await run.sleep({ hours: 1 });
 
 ```typescript
 async function placeOrder(orderId, items) {
-  await processOrderV1.with()
-    .opt("reference", { id: orderId })
+  await processOrderV1
+    .with("reference", { id: orderId })
     .start(aikiClient, orderId);
   return { orderId, message: "Complete payment within 30 minutes" };
 }

@@ -57,4 +57,9 @@ export type { Task, TaskParams } from "./task";
 export { task } from "./task";
 export type { Workflow, WorkflowParams } from "./workflow";
 export { workflow } from "./workflow";
-export type { AnyWorkflowVersion, WorkflowVersion, WorkflowVersionParams } from "./workflow-version";
+export type {
+	AnyWorkflowVersion,
+	WorkflowVersion,
+	WorkflowVersionParams,
+	WorkflowVersionStart,
+} from "./workflow-version";

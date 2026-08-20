@@ -92,31 +92,38 @@ export interface TaskParams<Input, Output> {
 
 export interface Task<Input, Output> {
 	name: TaskName;
-	with(): TaskBuilder<Input, Output>;
+	/** Sets one start option and returns a copy of {@link Task}. The original is unchanged. */
+	with<Path extends PathFromObject<TaskStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<TaskStartOptions, Path>
+	): Task<Input, Output>;
 	start: (run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]) => Promise<Output>;
 }
 
 class TaskImpl<Input, Output> implements Task<Input, Output> {
 	public readonly name: TaskName;
+	private readonly startOptionsBuilder: ObjectBuilder<TaskStartOptions>;
 
-	constructor(private readonly params: TaskParams<Input, Output>) {
+	constructor(
+		private readonly params: TaskParams<Input, Output>,
+		startOptionsBuilder?: ObjectBuilder<TaskStartOptions>
+	) {
 		this.name = params.name as TaskName;
+		this.startOptionsBuilder = startOptionsBuilder ?? objectOverrider<TaskStartOptions>({ retry: this.params.retry })();
 	}
 
-	private definitionStartOptions(): TaskStartOptions {
-		return this.params.retry === undefined ? {} : { retry: this.params.retry };
-	}
-
-	public with(): TaskBuilder<Input, Output> {
-		const startOptionsOverrider = objectOverrider(this.definitionStartOptions());
-		return createTaskBuilder(this, startOptionsOverrider());
+	public with<Path extends PathFromObject<TaskStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<TaskStartOptions, Path>
+	): Task<Input, Output> {
+		return new TaskImpl(this.params, this.startOptionsBuilder.with(path, value));
 	}
 
 	public async start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
-		return this.startWithOptions(run, this.definitionStartOptions(), ...args);
+		return this.startWithOptions(run, this.startOptionsBuilder.build(), ...args);
 	}
 
-	public async startWithOptions(
+	private async startWithOptions(
 		run: UnknownWorkflowRun,
 		startOptions: TaskStartOptions,
 		...args: Input extends void ? [] : [Input]
@@ -373,27 +380,4 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			throw new TaskFailedError(taskId, attempts, "Task retry not allowed");
 		}
 	}
-}
-
-export interface TaskBuilder<Input, Output> {
-	opt<Path extends PathFromObject<TaskStartOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<TaskStartOptions, Path>
-	): TaskBuilder<Input, Output>;
-	start: Task<Input, Output>["start"];
-}
-
-function createTaskBuilder<Input, Output>(
-	task: TaskImpl<Input, Output>,
-	startOptionsBuilder: ObjectBuilder<TaskStartOptions>
-): TaskBuilder<Input, Output> {
-	return {
-		opt(path, value) {
-			return createTaskBuilder(task, startOptionsBuilder.with(path, value));
-		},
-
-		start(run, ...args) {
-			return task.startWithOptions(run, startOptionsBuilder.build(), ...args);
-		},
-	};
 }

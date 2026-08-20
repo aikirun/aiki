@@ -136,14 +136,47 @@ Schemas work with any validation library that implements [Standard Schema](https
 
 **Why use output schemas?** For child workflows, cached outputs are validated against the schema. If the cached shape doesn't match, the parent workflow fails immediately. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
 
+## Workflow Options
+
+`with()` sets one option and returns a copy, leaving the original untouched. Chain it to set several:
+
+```typescript
+const configured = orderWorkflowV1
+	.with("pool", "gpu")
+	.with("retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 });
+```
+
+The paths are strings, but they are type checked. `with()` takes only paths that exist on the options, and the value has to match the type at that path — your editor completes the paths, and anything else fails to compile:
+
+```typescript
+orderWorkflowV1.with("reference.id", "order-123");   // ✅︎
+orderWorkflowV1.with("reference.di", "order-123");   // ❌ no such option
+orderWorkflowV1.with("reference.id", 123);           // ❌ reference.id is a string
+```
+
+Look at what each option answers and they fall into two groups.
+
+`retry` answers "if this fails, try three more times". `pool` answers "run on this kind of workers". Answers like those fit any run — the one you start now, or one that goes next Tuesday. Set one and you get back something you can go on starting as often as you like.
+
+`reference` answers "this particular run is order-123" - a second run cannot be referenced as order-123. `trigger` answers "execute this particular run five minutes from now" - scheduled runs are triggered on a pre-configured cadence. Both are about one particular run — which one it is, when it goes. Set one and you get back a single start — you can `start()` it, and that is all.
+
+The difference is important because some things make or execute many runs out of one workflow: a schedule fires a run every tick, a worker executes whatever runs turn up. Hand either of them a single start and it will not compile:
+
+```typescript
+const oneOff = orderWorkflowV1.with("reference.id", "order-123");
+
+await oneOff.start(client, { orderId: "123" });        // ✅︎ fine
+await hourlySync.activate(client, oneOff);             // ❌ does not compile
+worker({ workflows: [oneOff] });                       // ❌ does not compile
+```
+
 ## Worker Pools
 
 Route workflows to a named worker pool when only part of your fleet should execute them — a fleet with special hardware, a fleet dedicated to one tenant, or a regional deployment:
 
 ```typescript
 const handle = await orderWorkflowV1
-	.with()
-	.opt("pool", "gpu")
+	.with("pool", "gpu")
 	.start(client, { orderId: "123" });
 ```
 
@@ -176,8 +209,7 @@ Use reference IDs for idempotent workflow starts:
 
 ```typescript
 const handle = await orderWorkflowV1
-	.with()
-	.opt("reference.id", "order-123")
+	.with("reference.id", "order-123")
 	.start(client, { orderId: "123" });
 ```
 
@@ -336,8 +368,7 @@ Use reference IDs to ensure idempotent child workflow creation:
 
 ```typescript
 const childHandle = await childWorkflowV1
-	.with()
-	.opt("reference.id", `process-user-${input.userId}`)
+	.with("reference.id", `process-user-${input.userId}`)
 	.startAsChild(run, { userId: input.userId });
 ```
 
@@ -350,14 +381,12 @@ When starting a child workflow multiple times with the same reference ID but dif
 ```typescript
 // Default: "error" - fails the parent workflow
 const childHandle = await childWorkflowV1
-	.with()
-	.opt("reference.id", "unique-id")
+	.with("reference.id", "unique-id")
 	.startAsChild(run, input);
 
 // Alternative: "return_existing" - returns the existing child run
 const childHandle = await childWorkflowV1
-	.with()
-	.opt("reference", { id: "unique-id", conflictPolicy: "return_existing" })
+	.with("reference", { id: "unique-id", conflictPolicy: "return_existing" })
 	.startAsChild(run, input);
 ```
 

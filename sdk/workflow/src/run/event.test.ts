@@ -175,7 +175,12 @@ describe("createEventSenders", () => {
 				{ orderShipped: event<{ trackingId: string }>() },
 				client.logger
 			);
-			client.api.workflowRun.sendEventV1.once({ id: "run-1", eventName: "orderShipped", data: { trackingId: "T1" } });
+			client.api.workflowRun.sendEventV1.once({
+				id: "run-1",
+				eventName: "orderShipped",
+				data: { trackingId: "T1" },
+				options: {},
+			});
 
 			await senders.orderShipped.send({ trackingId: "T1" });
 		}));
@@ -188,7 +193,7 @@ describe("createEventSenders", () => {
 				{ note: event({ schema: appendBangSchema }) },
 				client.logger
 			);
-			client.api.workflowRun.sendEventV1.once({ id: "run-1", eventName: "note", data: "raw!" });
+			client.api.workflowRun.sendEventV1.once({ id: "run-1", eventName: "note", data: "raw!", options: {} });
 
 			await senders.note.send("raw");
 		}));
@@ -220,7 +225,7 @@ describe("createEventSenders", () => {
 				options: { reference: { id: "ref-1" } },
 			});
 
-			await senders.orderShipped.with().opt("reference.id", "ref-1").send({ trackingId: "T1" });
+			await senders.orderShipped.with("reference.id", "ref-1").send({ trackingId: "T1" });
 		}));
 });
 
@@ -237,6 +242,7 @@ describe("createEventMulticasters", () => {
 				ids: ["run-1", "run-2"],
 				eventName: "orderShipped",
 				data: { trackingId: "T1" },
+				options: {},
 			});
 
 			await multicasters.orderShipped.send(client, ["run-1", "run-2"], { trackingId: "T1" });
@@ -251,6 +257,7 @@ describe("createEventMulticasters", () => {
 				ids: ["run-1"],
 				eventName: "orderShipped",
 				data: { trackingId: "T1" },
+				options: {},
 			});
 
 			await multicasters.orderShipped.send(client, "run-1", { trackingId: "T1" });
@@ -277,6 +284,7 @@ describe("createEventMulticasters", () => {
 				],
 				eventName: "orderShipped",
 				data: { trackingId: "T1" },
+				options: {},
 			});
 
 			await multicasters.orderShipped.sendByReferenceId(client, ["ref-1", "ref-2"], { trackingId: "T1" });
@@ -291,6 +299,7 @@ describe("createEventMulticasters", () => {
 				references: [{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" }],
 				eventName: "orderShipped",
 				data: { trackingId: "T1" },
+				options: {},
 			});
 
 			await multicasters.orderShipped.sendByReferenceId(client, "ref-1", { trackingId: "T1" });
@@ -326,6 +335,6 @@ describe("createEventMulticasters", () => {
 				options: { reference: { id: "ref-1" } },
 			});
 
-			await multicasters.orderShipped.with().opt("reference.id", "ref-1").send(client, "run-1", { trackingId: "T1" });
+			await multicasters.orderShipped.with("reference.id", "ref-1").send(client, "run-1", { trackingId: "T1" });
 		}));
 });

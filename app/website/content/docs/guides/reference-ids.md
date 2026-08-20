@@ -23,7 +23,7 @@ When starting workflows, you can provide a reference ID:
 ```typescript
 // Start a workflow with a reference ID
 const handle = await orderWorkflowV1
-  .with().opt("reference.id", "order-123")
+  .with("reference.id", "order-123")
   .start(client, { orderId: "order-123", items: [...] });
 
 // You can now look up this workflow using "order-123"
@@ -38,12 +38,12 @@ By default, Aiki throws an error when you try to start a workflow with a referen
 ```typescript
 // Default behavior: throw error on conflict
 const handle = await orderWorkflowV1
-  .with().opt("reference", { id: "order-123-process", conflictPolicy: "error" })
+  .with("reference", { id: "order-123-process", conflictPolicy: "error" })
   .start(client, { orderId: "order-123", items: [...] });
 
 // Alternative: return existing run on conflict
 const handle = await orderWorkflowV1
-  .with().opt("reference", { id: "order-123-process", conflictPolicy: "return_existing" })
+  .with("reference", { id: "order-123-process", conflictPolicy: "return_existing" })
   .start(client, { orderId: "order-123", items: [...] });
 
 // With "return_existing", duplicate calls return the same workflow run
@@ -57,15 +57,13 @@ When sending events to a workflow, you can provide a reference ID to prevent dup
 ```typescript
 // Send an event with a reference ID
 await handle.events.approved
-  .with()
-  .opt("reference.id", "approval-123")
+  .with("reference.id", "approval-123")
   .send({ by: "manager@example.com" });
 
 // If the same event is sent again with the same reference ID,
 // it will be silently ignored (no error, no duplicate)
 await handle.events.approved
-  .with()
-  .opt("reference.id", "approval-123")
+  .with("reference.id", "approval-123")
   .send({ by: "manager@example.com" }); // Ignored - duplicate
 
 // Without options, use send directly
@@ -80,8 +78,7 @@ When activating schedules, you can provide a reference ID for explicit identity:
 
 ```typescript
 const handle = await dailyReport
-	.with()
-	.opt("reference", {
+	.with("reference", {
 		id: "tenant-acme-daily-report",
 		conflictPolicy: "error",
 	})

@@ -16,9 +16,9 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ReplayManifest,
-	WorkflowDefinitionStartOptions,
 	WorkflowRunAddress,
 	WorkflowRunId,
+	WorkflowRunOptions,
 	WorkflowRunRecord,
 	WorkflowRunStateFailed,
 	WorkflowStartOptions,
@@ -53,7 +53,23 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 	versionId: WorkflowVersionId;
 	events: EventMulticasters<TEvents>;
 
-	with(): WorkflowBuilder<Input, Output, Context, TEvents>;
+	/**
+	 * Sets one option and returns a copy. The original is unchanged.
+	 *
+	 * Which type comes back depends on what the option answers. `retry` answers "if this fails, try
+	 * three more times"; `pool` answers "run on this kind of workers". Answers like those fit any
+	 * run, so setting one — see {@link WorkflowRunOptions} — returns a {@link WorkflowVersion}, which
+	 * you can go on starting as often as you like.
+	 *
+	 * `reference` answers "this particular run is order-123"; `trigger` answers "execute this particular run five minutes from now".
+	 * Both are about one particular run, so setting one returns a {@link WorkflowVersionStart}:
+	 * that single start, and nothing else. Anything that mints or executes many runs from one version
+	 * e.g. a schedule or a worker, will not accept {@link WorkflowVersionStart}.
+	 */
+	with<Path extends PathFromObject<WorkflowStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
+	): WorkflowVersionWith<Path, Input, Output, Context, TEvents>;
 
 	start(
 		client: Client<Context>,
@@ -75,8 +91,31 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 	[INTERNAL]: {
 		eventsDefinition: TEvents;
 		handler: (run: WorkflowRun<Input, Context, TEvents>, input: Input) => Promise<void>;
-		definitionStartOptions: () => WorkflowDefinitionStartOptions;
+		runOptions: () => WorkflowRunOptions;
 	};
+}
+
+/** Which of the two types {@link WorkflowVersion.with} gives back, decided by the option you set. */
+export type WorkflowVersionWith<Path, Input, Output, Context, TEvents extends EventsDefinition> =
+	Path extends PathFromObject<WorkflowRunOptions>
+		? WorkflowVersion<Input, Output, Context, TEvents>
+		: WorkflowVersionStart<Input, Output, Context, TEvents>;
+
+/**
+ * A {@link WorkflowVersion} pinned to one start.
+ *
+ * You get one by setting an option about one particular run — `reference` names the run, `trigger`
+ * says when it goes. Everything a version can do is still here save one thing: a schedule
+ * or a worker will not take it. A schedule creates its own starts, one per tick, and has no use for
+ * yours; a worker never starts anything at all — it executes runs that already exist, carrying the
+ * options recorded on them when they were created.
+ */
+export interface WorkflowVersionStart<Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition>
+	extends Omit<WorkflowVersion<Input, Output, Context, TEvents>, typeof INTERNAL | "with"> {
+	with<Path extends PathFromObject<WorkflowStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
+	): WorkflowVersionStart<Input, Output, Context, TEvents>;
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: I want any workflow
@@ -87,38 +126,50 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 {
 	public readonly events: EventMulticasters<TEvents>;
 	public readonly [INTERNAL]: WorkflowVersion<Input, Output, Context, TEvents>[typeof INTERNAL];
+	private readonly startOptionsBuilder: ObjectBuilder<WorkflowStartOptions>;
 
 	constructor(
 		public readonly name: WorkflowName,
 		public readonly versionId: WorkflowVersionId,
-		private readonly params: WorkflowVersionParams<Input, Output, Context, TEvents>
+		private readonly params: WorkflowVersionParams<Input, Output, Context, TEvents>,
+		startOptionsBuilder?: ObjectBuilder<WorkflowStartOptions>
 	) {
 		const eventsDefinition = this.params.events ?? ({} as TEvents);
 		this.events = createEventMulticasters(this.name, this.versionId, eventsDefinition);
+		this.startOptionsBuilder =
+			startOptionsBuilder ?? objectOverrider<WorkflowStartOptions>({ retry: this.params.retry })();
 		this[INTERNAL] = {
 			eventsDefinition,
 			handler: this.handler.bind(this),
-			definitionStartOptions: this.definitionStartOptions.bind(this),
+			runOptions: this.runOptions.bind(this),
 		};
 	}
 
-	private definitionStartOptions(): WorkflowDefinitionStartOptions {
-		return { retry: this.params.retry };
+	private runOptions(): WorkflowRunOptions {
+		const { retry, pool } = this.startOptionsBuilder.build();
+		return { retry, pool };
 	}
 
-	public with(): WorkflowBuilder<Input, Output, Context, TEvents> {
-		const startOptionsOverrider = objectOverrider<WorkflowStartOptions>(this.definitionStartOptions());
-		return createWorkflowBuilder(this, startOptionsOverrider());
+	public with<Path extends PathFromObject<WorkflowStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
+	): WorkflowVersionWith<Path, Input, Output, Context, TEvents> {
+		return new WorkflowVersionImpl(
+			this.name,
+			this.versionId,
+			this.params,
+			this.startOptionsBuilder.with(path, value)
+		) as WorkflowVersionWith<Path, Input, Output, Context, TEvents>;
 	}
 
 	public async start(
 		client: Client<Context>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
-		return this.startWithOptions(client, this.definitionStartOptions(), ...args);
+		return this.startWithOptions(client, this.startOptionsBuilder.build(), ...args);
 	}
 
-	public async startWithOptions(
+	private async startWithOptions(
 		client: Client<Context>,
 		startOptions: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
@@ -158,10 +209,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		parentRun: WorkflowRun<unknown, Context, EventsDefinition>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>> {
-		return this.startAsChildWithOptions(parentRun, this.definitionStartOptions(), ...args);
+		return this.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);
 	}
 
-	public async startAsChildWithOptions(
+	private async startAsChildWithOptions(
 		parentRun: WorkflowRun<unknown, Context, EventsDefinition>,
 		startOptions: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
@@ -420,40 +471,4 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			error: createSerializableError(err),
 		};
 	}
-}
-
-export interface WorkflowBuilder<Input, Output, Context, TEvents extends EventsDefinition> {
-	opt<Path extends PathFromObject<WorkflowStartOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<WorkflowStartOptions, Path>
-	): WorkflowBuilder<Input, Output, Context, TEvents>;
-
-	start(
-		client: Client<Context>,
-		...args: Input extends void ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
-
-	startAsChild<ParentInput, ParentEvents extends EventsDefinition>(
-		parentRun: WorkflowRun<ParentInput, Context, ParentEvents>,
-		...args: Input extends void ? [] : [Input]
-	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>>;
-}
-
-function createWorkflowBuilder<Input, Output, Context, TEvents extends EventsDefinition>(
-	workflowVersion: WorkflowVersionImpl<Input, Output, Context, TEvents>,
-	startOptionsBuilder: ObjectBuilder<WorkflowStartOptions>
-): WorkflowBuilder<Input, Output, Context, TEvents> {
-	return {
-		opt(path, value) {
-			return createWorkflowBuilder(workflowVersion, startOptionsBuilder.with(path, value));
-		},
-
-		start(client, ...args) {
-			return workflowVersion.startWithOptions(client, startOptionsBuilder.build(), ...args);
-		},
-
-		startAsChild(parentRun, ...args) {
-			return workflowVersion.startAsChildWithOptions(parentRun, startOptionsBuilder.build(), ...args);
-		},
-	};
 }

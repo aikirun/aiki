@@ -5,6 +5,7 @@ import {
 	intervalScheduleActivateRequestFactory,
 } from "@aikirun/testing/data-factory/api/schedule";
 import { cronScheduleFactory, intervalScheduleFactory } from "@aikirun/testing/data-factory/schedule";
+import type { Client } from "@aikirun/types/client";
 import type { ScheduleId } from "@aikirun/types/schedule";
 
 import { schedule } from "./schedule";
@@ -81,8 +82,8 @@ describe("schedule", () => {
 			}));
 	});
 
-	describe("with builder", () => {
-		test("opt sets the options sent to activate", () =>
+	describe("with", () => {
+		test("sets the options sent to activate", () =>
 			withFakeClient(async (client) => {
 				client.api.schedule.activateV1.once(
 					intervalScheduleActivateRequest.build({
@@ -92,8 +93,7 @@ describe("schedule", () => {
 				);
 
 				await schedule({ type: "interval", every: { seconds: 1 } })
-					.with()
-					.opt("reference.id", "ref-1")
+					.with("reference.id", "ref-1")
 					.activate(client, syncInventoryWorkflow, { warehouseId: "wh-1" });
 			}));
 	});
@@ -104,26 +104,7 @@ describe("schedule", () => {
 			retry: { type: "fixed", maxAttempts: 5, delayMs: 300 },
 		});
 
-		test("opt carries retry and pool to every fired run", () =>
-			withFakeClient(async (client) => {
-				client.api.schedule.activateV1.once(
-					intervalScheduleActivateRequest.build({
-						workflowRunOptions: {
-							retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 },
-							pool: "eu",
-						},
-					}),
-					{ schedule: intervalScheduleFactory.build() }
-				);
-
-				await schedule({ type: "interval", every: { seconds: 1 } })
-					.with()
-					.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
-					.opt("workflowRun.pool", "eu")
-					.activate(client, syncInventoryWorkflow, { warehouseId: "wh-1" });
-			}));
-
-		test("carries the workflow's declared retry default when the schedule sets no overrides", () =>
+		test("carries the workflow's declared retry default", () =>
 			withFakeClient(async (client) => {
 				client.api.schedule.activateV1.once(
 					intervalScheduleActivateRequest.build({
@@ -137,7 +118,7 @@ describe("schedule", () => {
 				});
 			}));
 
-		test("a schedule retry override replaces the workflow's declared default", () =>
+		test("carries the workflow's own overrides to every fired run", () =>
 			withFakeClient(async (client) => {
 				client.api.schedule.activateV1.once(
 					intervalScheduleActivateRequest.build({
@@ -149,11 +130,33 @@ describe("schedule", () => {
 					{ schedule: intervalScheduleFactory.build() }
 				);
 
-				await schedule({ type: "interval", every: { seconds: 1 } })
-					.with()
-					.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
-					.opt("workflowRun.pool", "eu")
-					.activate(client, retryingSyncInventoryWorkflow, { warehouseId: "wh-1" });
+				await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					syncInventoryWorkflow
+						.with("retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
+						.with("pool", "eu"),
+					{ warehouseId: "wh-1" }
+				);
+			}));
+
+		test("a workflow override replaces its declared default", () =>
+			withFakeClient(async (client) => {
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequest.build({
+						workflowRunOptions: { retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 } },
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
+
+				await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					retryingSyncInventoryWorkflow.with("retry", {
+						type: "exponential",
+						maxAttempts: 3,
+						baseDelayMs: 1_000,
+					}),
+					{ warehouseId: "wh-1" }
+				);
 			}));
 	});
 
@@ -204,3 +207,20 @@ describe("schedule", () => {
 			}));
 	});
 });
+
+// Compile-time guarantees, never executed. Each `@ts-expect-error` fails the build if its error stops
+// being reported, so they hold the run/start option split in place.
+async function _startConfiguredWorkflowIsNotSchedulable(client: Client<null>) {
+	await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+		client,
+		// @ts-expect-error a schedule mints many runs, so a workflow bound to one start cannot back one
+		syncInventoryWorkflow.with("reference.id", "one-off"),
+		{ warehouseId: "wh-1" }
+	);
+
+	await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+		client,
+		syncInventoryWorkflow.with("pool", "gpu"),
+		{ warehouseId: "wh-1" }
+	);
+}

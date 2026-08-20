@@ -104,7 +104,7 @@ Overlap policies are evaluated per schedule instance, not globally. If you activ
 
 ## Run Options
 
-A workflow definition can declare default start options, such as its `retry` strategy. A schedule sets the start options for the runs it fires:
+A schedule fires runs of the workflow you hand to `activate()`, and those runs carry that workflow's options — whatever it declared at definition time, plus anything you set via `with()`. Configure the workflow, not the schedule:
 
 ```typescript
 const hourlySync = schedule({
@@ -112,14 +112,17 @@ const hourlySync = schedule({
 	every: { hours: 1 },
 });
 
-await hourlySync
-	.with()
-	.opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 })
-	.opt("workflowRun.pool", "foo-bar")
-	.activate(client, inventorySyncV1);
+await hourlySync.activate(
+	client,
+	inventorySyncV1
+		.with("retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 })
+		.with("pool", "foo-bar")
+);
 ```
 
-Only `retry` and `pool` can be set: a scheduled run's reference ID and trigger are the schedule's to control, not the caller's. Run options are part of a schedule's identity, so changing them is a different schedule — or, with a [reference ID](#reference-ids), a conflict.
+Only `retry` and `pool` travel this way. `reference` or `trigger` answers something about one particular run — which run it is, when execution begins — and a schedule fires a fresh run every tick, so passing a workflow that carries either will not compile. See [Workflow Options](./workflows.md#workflow-options).
+
+Run options are part of a schedule's identity, so changing them is a different schedule — or, with a [reference ID](#reference-ids), a conflict.
 
 ## Idempotent Activation
 
@@ -133,8 +136,7 @@ By default, schedule identity is derived from a hash of the workflow name, versi
 
 ```typescript
 const handle = await dailyReport
-	.with()
-	.opt("reference.id", "tenant-acme-daily-report")
+	.with("reference.id", "tenant-acme-daily-report")
 	.activate(client, reportWorkflowV1, { tenantId: "acme" });
 ```
 
@@ -146,8 +148,7 @@ When activating a schedule with a reference ID that already identifies a schedul
 
 ```typescript
 const handle = await dailyReport
-	.with()
-	.opt("reference", {
+	.with("reference", {
 		id: "my-schedule",
 		conflictPolicy: "error",
 	})

@@ -62,8 +62,6 @@ export interface WorkflowStartOptions extends WorkflowRunOptions {
 	reference?: WorkflowReference;
 }
 
-export type WorkflowDefinitionStartOptions = Pick<WorkflowStartOptions, "retry">;
-
 interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;
 }

@@ -4,7 +4,6 @@ import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfVa
 import type { Client } from "@aikirun/types/client";
 import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, ScheduleSpec } from "@aikirun/types/schedule";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 
 import type { EventsDefinition } from "./run/event";
 import type { WorkflowVersion } from "./workflow-version";
@@ -31,15 +30,17 @@ export interface ScheduleHandle {
 	deactivate(): Promise<void>;
 }
 
-type ScheduleBuilderActivateOptions = ScheduleActivateOptions & {
-	workflowRun?: WorkflowRunOptions;
-};
-
-export interface ScheduleBuilder {
-	opt<Path extends PathFromObject<ScheduleBuilderActivateOptions>>(
+export interface ScheduleDefinition {
+	/**
+	 * Sets one option and returns a copy of {@link ScheduleDefinition}. The original is unchanged.
+	 *
+	 * These describe the schedule itself. What the runs it fires carry comes from the workflow you
+	 * hand to {@link ScheduleDefinition.activate} — configure that with its own `with`.
+	 */
+	with<Path extends PathFromObject<ScheduleActivateOptions>>(
 		path: Path,
-		value: TypeOfValueAtPath<ScheduleBuilderActivateOptions, Path>
-	): ScheduleBuilder;
+		value: TypeOfValueAtPath<ScheduleActivateOptions, Path>
+	): ScheduleDefinition;
 
 	activate<Input, Output, Context, TEvents extends EventsDefinition>(
 		client: Client<Context>,
@@ -48,99 +49,75 @@ export interface ScheduleBuilder {
 	): Promise<ScheduleHandle>;
 }
 
-export type ScheduleDefinition = ScheduleParams & {
-	with(): ScheduleBuilder;
-
-	activate<Input, Output, Context, TEvents extends EventsDefinition>(
-		client: Client<Context>,
-		workflow: WorkflowVersion<Input, Output, Context, TEvents>,
-		...args: Input extends void ? [] : [Input]
-	): Promise<ScheduleHandle>;
-};
-
 export function schedule(params: ScheduleParams): ScheduleDefinition {
-	async function activateWithOptions<Input, Output, Context, TEvents extends EventsDefinition>(
-		client: Client<Context>,
-		workflow: WorkflowVersion<Input, Output, Context, TEvents>,
-		options: ScheduleBuilderActivateOptions,
-		...args: Input extends void ? [] : [Input]
-	): Promise<ScheduleHandle> {
-		const workflowRunInput = args[0];
-		const hasher = client[INTERNAL].hasher;
-		const workflowRunInputHash = await hasher(workflowRunInput);
-		const { workflowRun: workflowRunOptions, ...scheduleOptions } = options;
+	return createSchedule(params, objectOverrider<ScheduleActivateOptions>({})());
+}
 
-		let scheduleSpec: ScheduleSpec;
-		if (params.type === "interval") {
-			const { every, ...rest } = params;
-			scheduleSpec = {
-				...rest,
-				everyMs: toMilliseconds(every),
-			};
-		} else {
-			scheduleSpec = params;
-		}
+function createSchedule(
+	params: ScheduleParams,
+	optionsBuilder: ObjectBuilder<ScheduleActivateOptions>
+): ScheduleDefinition {
+	return {
+		with: (path, value) => createSchedule(params, optionsBuilder.with(path, value)),
 
-		const { schedule } = await client.api.schedule.activateV1({
-			workflowName: workflow.name,
-			workflowVersionId: workflow.versionId,
-			spec: scheduleSpec,
-			workflowRunInput,
-			workflowRunInputHash,
-			options: scheduleOptions,
-			workflowRunOptions,
-		});
-		client.logger.info("Schedule activated", {
-			"aiki.scheduleSpec": scheduleSpec,
-			"aiki.workflowName": workflow.name,
-			"aiki.workflowVersionId": workflow.versionId,
-			"aiki.scheduleReferenceId": scheduleOptions.reference?.id,
-		});
+		activate: (client, workflow, ...args) =>
+			activateWithOptions(client, workflow, params, optionsBuilder.build(), ...args),
+	};
+}
 
-		const scheduleId = schedule.id as ScheduleId;
+async function activateWithOptions<Input, Output, Context, TEvents extends EventsDefinition>(
+	client: Client<Context>,
+	workflow: WorkflowVersion<Input, Output, Context, TEvents>,
+	params: ScheduleParams,
+	options: ScheduleActivateOptions,
+	...args: Input extends void ? [] : [Input]
+): Promise<ScheduleHandle> {
+	const workflowRunInput = args[0];
+	const hasher = client[INTERNAL].hasher;
+	const workflowRunInputHash = await hasher(workflowRunInput);
 
-		return {
-			id: scheduleId,
-
-			pause: async () => {
-				await client.api.schedule.pauseV1({ id: scheduleId });
-			},
-
-			resume: async () => {
-				await client.api.schedule.resumeV1({ id: scheduleId });
-			},
-
-			deactivate: async () => {
-				await client.api.schedule.deactivateV1({ id: scheduleId });
-			},
+	let scheduleSpec: ScheduleSpec;
+	if (params.type === "interval") {
+		const { every, ...rest } = params;
+		scheduleSpec = {
+			...rest,
+			everyMs: toMilliseconds(every),
 		};
+	} else {
+		scheduleSpec = params;
 	}
 
-	// The builder threads its .opt() calls as a function so they can be applied at activate, once the
-	// workflow (and thus its default run options) is known.
-	function createBuilder(
-		apply: (builder: ObjectBuilder<ScheduleBuilderActivateOptions>) => ObjectBuilder<ScheduleBuilderActivateOptions>
-	): ScheduleBuilder {
-		return {
-			opt: (path, value) => createBuilder((builder) => apply(builder).with(path, value)),
+	const { schedule: activatedSchedule } = await client.api.schedule.activateV1({
+		workflowName: workflow.name,
+		workflowVersionId: workflow.versionId,
+		spec: scheduleSpec,
+		workflowRunInput,
+		workflowRunInputHash,
+		options,
+		workflowRunOptions: workflow[INTERNAL].runOptions(),
+	});
+	client.logger.info("Schedule activated", {
+		"aiki.scheduleSpec": scheduleSpec,
+		"aiki.workflowName": workflow.name,
+		"aiki.workflowVersionId": workflow.versionId,
+		"aiki.scheduleReferenceId": options.reference?.id,
+	});
 
-			async activate(client, workflow, ...args) {
-				const base: ScheduleBuilderActivateOptions = { workflowRun: workflow[INTERNAL].definitionStartOptions() };
-				const activateOptions = apply(objectOverrider(base)()).build();
-				return activateWithOptions(client, workflow, activateOptions, ...args);
-			},
-		};
-	}
+	const scheduleId = activatedSchedule.id as ScheduleId;
 
 	return {
-		...params,
+		id: scheduleId,
 
-		with(): ScheduleBuilder {
-			return createBuilder((builder) => builder);
+		pause: async () => {
+			await client.api.schedule.pauseV1({ id: scheduleId });
 		},
 
-		async activate(client, workflow, ...args) {
-			return createBuilder((builder) => builder).activate(client, workflow, ...args);
+		resume: async () => {
+			await client.api.schedule.resumeV1({ id: scheduleId });
+		},
+
+		deactivate: async () => {
+			await client.api.schedule.deactivateV1({ id: scheduleId });
 		},
 	};
 }
