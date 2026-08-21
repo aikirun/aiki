@@ -133,7 +133,7 @@ export async function completeRun(deps: {
 	const completion = await services.workflowRunStateMachine.transitionState(context, {
 		type: "optimistic",
 		id: runId,
-		state: { status: "completed", output: seededRunOutput },
+		state: { status: "completed", output: { encodedValue: seededRunOutput } },
 		expectedRevision,
 	});
 
