@@ -1,4 +1,3 @@
-import { noopCodec } from "@aikirun/codec";
 import { runOnInterval } from "@aikirun/lib/async";
 import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
@@ -96,10 +95,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		const createContext = client[INTERNAL].context;
 		const context = createContext ? createContext(workflowRun) : null;
 		const hasher = await client[INTERNAL].hasher.for(workflowRun.inputHash);
-
-		// system workflows shouldn't have a client codec applied
-		const codec =
-			workflowRun.source !== "system" && workflowRun.clientCodec === "applied" ? client[INTERNAL].codec : noopCodec;
+		const codec = handle[INTERNAL].codec;
 
 		if (!hasher) {
 			logger.error("Failed to determine the bound hasher for the workflow run. Check hasher configuration.", {

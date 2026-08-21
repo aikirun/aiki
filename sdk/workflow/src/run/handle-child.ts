@@ -150,8 +150,7 @@ function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefini
 				return {
 					success: true,
 					state: await decodeWaitResultState<Status, Output>(
-						parentRunHandle[INTERNAL].client,
-						run,
+						handle[INTERNAL].codec,
 						existingChildWorkflowRunWait.childWorkflowRunState
 					),
 				};

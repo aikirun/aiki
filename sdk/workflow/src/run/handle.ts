@@ -1,4 +1,3 @@
-import { noopCodec } from "@aikirun/codec";
 import { delay } from "@aikirun/lib/async";
 import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
@@ -7,6 +6,7 @@ import type { DistributiveOmit } from "@aikirun/lib/object";
 import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
 import type { WorkflowRunStateRequest, WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { ApiClient, Client } from "@aikirun/types/client";
+import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
 	TerminalWorkflowRunStatus,
@@ -17,6 +17,7 @@ import type {
 import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
+import { configureCodec } from "./codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
 export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
@@ -151,6 +152,7 @@ export interface WorkflowRunHandle<_Input, Output, Context, TEvents extends Even
 
 	[INTERNAL]: {
 		client: Client<Context>;
+		codec: Codec;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (
 			request: DistributiveOmit<TaskTransitionStateRequestV1, "workflowRunId" | "expectedWorkflowRunRevision">
@@ -188,15 +190,12 @@ export type WorkflowRunWaitResult<
 	  };
 
 export async function decodeWaitResultState<Status extends TerminalWorkflowRunStatus, Output>(
-	client: Client<unknown>,
-	run: WorkflowRunRecord,
+	codec: Codec,
 	state: WorkflowRunState
 ): Promise<WorkflowRunWaitResultSuccess<Status, Output>> {
 	if (state.status !== "completed") {
 		return state as WorkflowRunWaitResultSuccess<Status, Output>;
 	}
-
-	const codec = run.source !== "system" && run.clientCodec === "applied" ? client[INTERNAL].codec : noopCodec;
 
 	return {
 		status: "completed",
@@ -222,6 +221,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 
 		this[INTERNAL] = {
 			client,
+			codec: configureCodec(this._run.source, this._run.clientCodec, client[INTERNAL].codec),
 			transitionState: this.transitionState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
@@ -299,7 +299,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 				if (this._run.state.status === expectedStatus) {
 					return {
 						success: true,
-						state: await decodeWaitResultState<Status, Output>(this[INTERNAL].client, this._run, this._run.state),
+						state: await decodeWaitResultState<Status, Output>(this[INTERNAL].codec, this._run.state),
 					};
 				}
 
