@@ -188,13 +188,12 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		}
 
 		const inputHash = await hasher(input);
-		const clientCodec = client[INTERNAL].codecConfigured ? "applied" : "none";
 		const { id } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
 			input: await client[INTERNAL].codec.encode(input),
 			inputHash,
-			clientCodec,
+			clientCodec: client[INTERNAL].clientCodec,
 			options: startOptions,
 		});
 

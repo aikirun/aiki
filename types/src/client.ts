@@ -6,7 +6,7 @@ import type { WorkflowRunApi } from "./api/workflow-run";
 import type { Codec, CreateCodec } from "./infra/codec";
 import type { CreateHasher, Hasher } from "./infra/hasher";
 import { INTERNAL } from "./symbols";
-import type { WorkflowRunRecord } from "./workflow/run";
+import type { ClientCodec, WorkflowRunRecord } from "./workflow/run";
 
 interface BaseClientParams<Context = null> {
 	logger?: Logger;
@@ -33,7 +33,7 @@ export interface Client<Context = null> {
 		context?: (run: WorkflowRunRecord) => Context | Promise<Context>;
 		hasher: Hasher;
 		codec: Codec;
-		codecConfigured: boolean;
+		clientCodec: ClientCodec;
 	};
 }
 

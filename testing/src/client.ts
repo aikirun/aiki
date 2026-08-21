@@ -207,7 +207,7 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 		[INTERNAL]: {
 			hasher: plainHasher,
 			codec: noopCodec,
-			codecConfigured: false,
+			clientCodec: "none",
 			...(options.context ? { context: options.context } : {}),
 		},
 

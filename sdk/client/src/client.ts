@@ -70,7 +70,7 @@ export function client<Context = null>(params: ClientParams<Context>): Client<Co
 			context: params.context,
 			hasher,
 			codec,
-			codecConfigured: !!params.codec,
+			clientCodec: params.codec ? "applied" : "none",
 		},
 	};
 }
