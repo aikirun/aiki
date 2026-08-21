@@ -9,7 +9,7 @@ This example starts a 14-day free trial, then suspends the workflow waiting for 
 You need Node.js 18+ (or Bun 1.0+) and a PostgreSQL database. Install the SDK and apply the db migrations — the two commands below, covered in full in [Installation](./installation.md).
 
 ```package-install
-@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server postgres
 ```
 
 <Tabs groupId="runtime" persist items={["Node", "Bun"]}>
@@ -30,6 +30,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
 
 </Tab>
 </Tabs>
+
+The Node commands use [tsx](https://tsx.is) to run TypeScript directly, and `app.ts` uses ES modules with top-level `await`. Install tsx and set the module type before you start:
+
+```bash
+npm install -D tsx
+npm pkg set type=module
+```
 
 Build the app in three pieces. They live in one file, `app.ts` — the complete listing is at the end.
 
