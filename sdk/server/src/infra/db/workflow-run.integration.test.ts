@@ -19,7 +19,7 @@ describe("workflow run repository state reads", () => {
 			const row = await repos.workflowRun.getByIdWithWorkflowAndState({ namespaceId: context.namespaceId, id: runId });
 
 			expect(row?.state).toContainKey("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: { encodedValue: undefined } });
 		}));
 
 	test("getByIdWithState returns a completed state carrying the output key", () =>
@@ -36,7 +36,7 @@ describe("workflow run repository state reads", () => {
 			const row = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 
 			expect(row?.state).toContainKey("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: { encodedValue: undefined } });
 		}));
 
 	test("getByReferenceWithWorkflowAndState returns a completed state carrying the output key", () =>
@@ -60,6 +60,6 @@ describe("workflow run repository state reads", () => {
 			});
 
 			expect(row?.state).toContainKey("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: { encodedValue: undefined } });
 		}));
 });

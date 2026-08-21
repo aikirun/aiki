@@ -43,6 +43,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 			"options?": taskOptionsSchema,
 			"input?": "unknown",
 			inputHash: "string > 0",
+			clientCodec: "'applied' | 'none'",
 			expectedWorkflowRunRevision: "number.integer >= 0",
 		})
 			.or({

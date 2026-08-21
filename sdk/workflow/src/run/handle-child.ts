@@ -13,22 +13,22 @@ import {
 } from "@aikirun/types/workflow/run";
 
 import type { EventsDefinition } from "./event";
-import {
-	type WorkflowRunHandle,
-	type WorkflowRunWaitResult,
-	type WorkflowRunWaitResultSuccess,
-	workflowRunHandle,
-} from "./handle";
+import { decodeWaitResultState, type WorkflowRunHandle, type WorkflowRunWaitResult, workflowRunHandle } from "./handle";
 
 export function childWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
-	run: WorkflowRunRecord<Input, Output>,
+	run: WorkflowRunRecord,
 	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
 	waits: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]>,
 	logger: Logger,
 	eventsDefinition?: TEvents
 ): ChildWorkflowRunHandle<Input, Output, Context, TEvents> {
-	const handle = workflowRunHandle(client, run, eventsDefinition, logger);
+	const handle = workflowRunHandle(client, run, eventsDefinition, logger) as WorkflowRunHandle<
+		Input,
+		Output,
+		Context,
+		TEvents
+	>;
 
 	return {
 		run: handle.run,
@@ -149,7 +149,11 @@ function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefini
 			if (childWorkflowRunStatus === expectedStatus) {
 				return {
 					success: true,
-					state: existingChildWorkflowRunWait.childWorkflowRunState as WorkflowRunWaitResultSuccess<Status, Output>,
+					state: await decodeWaitResultState<Status, Output>(
+						parentRunHandle[INTERNAL].client,
+						run,
+						existingChildWorkflowRunWait.childWorkflowRunState
+					),
 				};
 			}
 

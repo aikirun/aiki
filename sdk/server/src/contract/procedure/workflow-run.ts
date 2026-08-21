@@ -38,6 +38,7 @@ import { workflowSourceSchema } from "../schema/workflow";
 import {
 	cancelByIdsRequestSchema,
 	cancelByIdsResponseSchema,
+	encodedPayloadSchema,
 	listChildRunsRequestSchema,
 	listChildRunsResponseSchema,
 	workflowRunRecordSchema,
@@ -156,8 +157,9 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 		type({
 			name: "string > 0",
 			versionId: "string > 0",
-			"input?": "unknown",
+			input: encodedPayloadSchema,
 			inputHash: inputHashSchema,
+			clientCodec: "'applied' | 'none'",
 			"parent?": type({ workflowRunId: "string > 0", expectedRevision: "number.integer >= 0" }).or("undefined"),
 			"options?": workflowStartOptionsSchema,
 		})
@@ -190,7 +192,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 							.omit("timeoutAt")
 							.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
 					)
-					.or(workflowRunStateCompletedSchema.omit("output").and({ "output?": "unknown" }))
+					.or(workflowRunStateCompletedSchema)
 					.or(workflowRunStateFailedSchema),
 			}).or({
 				type: "'pessimistic'",

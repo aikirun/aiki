@@ -86,6 +86,7 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 				namespaceId: parentRun.namespaceId,
 				workflowId: workflow.id,
 				status: "scheduled",
+				clientCodec: "none",
 				input: parentRun.id,
 				inputHash,
 				options: {

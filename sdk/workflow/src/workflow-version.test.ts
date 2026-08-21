@@ -41,6 +41,7 @@ function createTestWorkflowRun(
 		id: record.id as WorkflowRunId,
 		name: record.name as WorkflowName,
 		versionId: record.versionId as WorkflowVersionId,
+		source: record.source,
 		options: record.options ?? {},
 		logger: client.logger,
 		sleep: () => {
@@ -53,6 +54,8 @@ function createTestWorkflowRun(
 			replayManifest: createReplayManifest(record),
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
 			hasher: hashInput,
+			codec: client[INTERNAL].codec,
+			clientCodec: record.clientCodec,
 		},
 	};
 }
@@ -217,12 +220,12 @@ describe("workflow version execution", () => {
 							{
 								type: "optimistic",
 								id: runRecord.id,
-								state: { status: "completed", output: "done" },
+								state: { status: "completed", output: { encodedValue: "done" } },
 								expectedRevision: runRecord.revision,
 							},
 							{
 								revision: runRecord.revision,
-								state: { status: "completed", output: "done" },
+								state: { status: "completed", output: { encodedValue: "done" } },
 								attempts: runRecord.attempts,
 							}
 						);
@@ -263,12 +266,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "completed", output: "DONE" },
+							state: { status: "completed", output: { encodedValue: "DONE" } },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "completed", output: "DONE" },
+							state: { status: "completed", output: { encodedValue: "DONE" } },
 							attempts: runRecord.attempts,
 						}
 					);
@@ -356,6 +359,8 @@ describe("workflow version execution", () => {
 					.once(
 						{
 							type: "create",
+							clientCodec: "none",
+							input: { encodedValue: undefined },
 							inputHash,
 							taskName: chargeCard.name,
 							options: {},
@@ -429,6 +434,8 @@ describe("workflow version execution", () => {
 					.once(
 						{
 							type: "create",
+							clientCodec: "none",
+							input: { encodedValue: undefined },
 							inputHash,
 							taskName: chargeCard.name,
 							options: {},
@@ -553,7 +560,14 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("world");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "world", inputHash: { value: inputHash }, options: {} },
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: { encodedValue: "world" },
+						clientCodec: "none",
+						inputHash: { value: inputHash },
+						options: {},
+					},
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -582,7 +596,14 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("WORLD");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "WORLD", inputHash: { value: inputHash }, options: {} },
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: { encodedValue: "WORLD" },
+						clientCodec: "none",
+						inputHash: { value: inputHash },
+						options: {},
+					},
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -626,7 +647,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "greet",
 						versionId: "1.0.0",
-						input: "world",
+						input: { encodedValue: "world" },
+						clientCodec: "none",
 						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
 					},
@@ -656,7 +678,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "greet",
 						versionId: "1.0.0",
-						input: "world",
+						input: { encodedValue: "world" },
+						clientCodec: "none",
 						inputHash: { value: inputHash },
 						options: { retry: { type: "never" } },
 					},
@@ -684,7 +707,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "greet",
 						versionId: "1.0.0",
-						input: "world",
+						input: { encodedValue: "world" },
+						clientCodec: "none",
 						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, pool: "eu-west" },
 					},
@@ -715,7 +739,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: { encodedValue: "payload" },
+						clientCodec: "none",
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -748,7 +773,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: { encodedValue: "payload" },
+						clientCodec: "none",
 						inputHash: { value: "run-bound-hash" },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -777,7 +803,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: { encodedValue: "payload" },
+						clientCodec: "none",
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -804,7 +831,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: { encodedValue: "payload" },
+						clientCodec: "none",
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { pool: "eu-west" },
@@ -928,7 +956,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "PAYLOAD",
+						input: { encodedValue: "PAYLOAD" },
+						clientCodec: "none",
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},

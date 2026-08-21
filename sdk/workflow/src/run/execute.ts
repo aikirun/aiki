@@ -1,3 +1,4 @@
+import { noopCodec } from "@aikirun/codec";
 import { runOnInterval } from "@aikirun/lib/async";
 import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
@@ -96,6 +97,10 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		const context = createContext ? createContext(workflowRun) : null;
 		const hasher = await client[INTERNAL].hasher.for(workflowRun.inputHash);
 
+		// system workflows shouldn't have a client codec applied
+		const codec =
+			workflowRun.source !== "system" && workflowRun.clientCodec === "applied" ? client[INTERNAL].codec : noopCodec;
+
 		if (!hasher) {
 			logger.error("Failed to determine the bound hasher for the workflow run. Check hasher configuration.", {
 				workflowRunId,
@@ -109,6 +114,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				id: workflowRunId,
 				name: workflowRun.name as WorkflowName,
 				versionId: workflowRun.versionId as WorkflowVersionId,
+				source: workflowRun.source,
 				options: workflowRun.options ?? {},
 				logger,
 				sleep: createSleeper(handle, logger),
@@ -119,9 +125,11 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 					replayManifest: createReplayManifest(workflowRun),
 					configProvider,
 					hasher,
+					codec,
+					clientCodec: workflowRun.clientCodec,
 				},
 			},
-			workflowRun.input
+			workflowRun.input.encodedValue === undefined ? undefined : await codec.decode(workflowRun.input)
 		);
 
 		return true;

@@ -8,6 +8,8 @@ import { taskInfoSchema } from "./task";
 import { triggerStrategySchema } from "./trigger";
 import { workflowSourceSchema } from "./workflow";
 
+export const encodedPayloadSchema = type({ encodedValue: "unknown" });
+
 export const workflowRunStatusSchema = type(
 	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_child_workflow' | 'stalled' | 'cancelled' | 'failed' | 'completed'"
 );
@@ -106,7 +108,7 @@ export const workflowRunStateCancelledSchema = type({
 
 export const workflowRunStateCompletedSchema = type({
 	status: "'completed'",
-	output: "unknown",
+	output: encodedPayloadSchema,
 });
 
 export const workflowRunStateFailedSchema = type({
@@ -167,8 +169,9 @@ export const workflowRunRecordSchema = type({
 	createdAt: "number > 0",
 	revision: "number >= 0",
 	stateTransitionId: "string > 0",
-	"input?": "unknown",
+	input: encodedPayloadSchema,
 	inputHash: "string > 0",
+	clientCodec: "'applied' | 'none'",
 	"referenceId?": "string > 0 | undefined",
 	"options?": workflowRunOptionsSchema.or("undefined"),
 	attempts: "number.integer >= 0",

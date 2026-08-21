@@ -1,3 +1,4 @@
+import { noopCodec } from "@aikirun/codec";
 import { plainHasher } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client } from "@aikirun/types/client";
@@ -205,8 +206,11 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 		logger: noopLogger,
 		[INTERNAL]: {
 			hasher: plainHasher,
+			codec: noopCodec,
+			codecConfigured: false,
 			...(options.context ? { context: options.context } : {}),
 		},
+
 		verify,
 	};
 }

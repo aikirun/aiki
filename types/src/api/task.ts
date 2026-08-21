@@ -1,5 +1,6 @@
 import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
 
+import type { ClientCodec } from "../workflow";
 import type {
 	TaskInfo,
 	TaskRecord,
@@ -35,6 +36,7 @@ export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateB
 	options?: TaskStartOptions;
 	input?: unknown;
 	inputHash: string;
+	clientCodec: ClientCodec;
 }
 
 export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {

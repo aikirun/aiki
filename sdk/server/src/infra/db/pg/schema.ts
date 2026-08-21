@@ -2,6 +2,7 @@ import { SCHEDULE_OVERLAP_POLICIES, SCHEDULE_STATUSES, SCHEDULE_TYPES } from "@a
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
 	CHILD_WORKFLOW_RUN_WAIT_STATUSES,
+	CLIENT_CODECS,
 	EVENT_WAIT_STATUSES,
 	SLEEP_STATUSES,
 	TERMINAL_WORKFLOW_RUN_STATUSES,
@@ -35,6 +36,7 @@ export const scheduleOverlapPolicyEnum = pgEnum("schedule_overlap_policy", SCHED
 
 export const workflowRunStatusEnum = pgEnum("workflow_run_status", WORKFLOW_RUN_STATUSES);
 export const terminalWorkflowRunStatusEnum = pgEnum("terminal_workflow_run_status", TERMINAL_WORKFLOW_RUN_STATUSES);
+export const clientCodecEnum = pgEnum("client_codec", CLIENT_CODECS);
 
 export const taskStatusEnum = pgEnum("task_status", TASK_STATUSES);
 
@@ -77,6 +79,7 @@ export const schedule = pgTable(
 		workflowId: text("workflow_id").notNull(),
 
 		status: scheduleStatusEnum("status").notNull(),
+		clientCodec: clientCodecEnum("client_codec").notNull(),
 
 		type: scheduleTypeEnum("type").notNull(),
 		cronExpression: text("cron_expression"),
@@ -127,6 +130,7 @@ export const workflowRun = pgTable(
 		parentWorkflowRunId: text("parent_workflow_run_id"),
 
 		status: workflowRunStatusEnum("status").notNull(),
+		clientCodec: clientCodecEnum("client_codec").notNull(),
 		revision: integer("revision").notNull().default(0),
 		attempts: integer("attempts").notNull().default(1),
 
@@ -190,6 +194,7 @@ export const task = pgTable(
 		workflowRunId: text("workflow_run_id").notNull(),
 
 		status: taskStatusEnum("status").notNull(),
+		clientCodec: clientCodecEnum("client_codec").notNull(),
 		attempts: integer("attempts").notNull(),
 
 		input: jsonb("input"),

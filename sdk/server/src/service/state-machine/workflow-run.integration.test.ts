@@ -51,7 +51,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
-					state: { status: "completed", output: { receipt: "r-1" } },
+					state: { status: "completed", output: { encodedValue: { receipt: "r-1" } } },
 					// The pre-claim revision: exactly what a fenced-out worker would still hold.
 					expectedRevision: revisionWhenClaimed - 1,
 				})
@@ -82,13 +82,13 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			const result = await stateMachine.transitionState(context, {
 				type: "optimistic",
 				id: runId,
-				state: { status: "completed", output: { receipt: "r-1" } },
+				state: { status: "completed", output: { encodedValue: { receipt: "r-1" } } },
 				expectedRevision: revisionWhenClaimed,
 			});
 
 			expect(result).toEqual({
 				revision: revisionWhenClaimed + 1,
-				state: { status: "completed", output: { receipt: "r-1" } },
+				state: { status: "completed", output: { encodedValue: { receipt: "r-1" } } },
 				attempts: attemptsWhenClaimed,
 			});
 
@@ -101,7 +101,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 						revision: result.revision,
 						attempts: result.attempts,
 					}),
-					state: { status: "completed", output: { receipt: "r-1" } },
+					state: { status: "completed", output: { encodedValue: { receipt: "r-1" } } },
 				})
 			);
 		}));

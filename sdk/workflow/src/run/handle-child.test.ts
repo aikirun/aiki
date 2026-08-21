@@ -26,7 +26,11 @@ describe("childWorkflowRunHandle", () => {
 				const parentHandle = workflowRunHandle(client, parentRecord);
 				const waits = childWaits({
 					completed: [
-						{ status: "completed", completedAt: 0, childWorkflowRunState: { status: "completed", output: "done" } },
+						{
+							status: "completed",
+							completedAt: 0,
+							childWorkflowRunState: { status: "completed", output: { encodedValue: "done" } },
+						},
 					],
 				});
 				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, waits, client.logger);
@@ -152,7 +156,11 @@ describe("childWorkflowRunHandle", () => {
 				const parentHandle = workflowRunHandle(client, parentRecord);
 				const waits = childWaits({
 					completed: [
-						{ status: "completed", completedAt: 0, childWorkflowRunState: { status: "completed", output: "first" } },
+						{
+							status: "completed",
+							completedAt: 0,
+							childWorkflowRunState: { status: "completed", output: { encodedValue: "first" } },
+						},
 						{
 							status: "completed",
 							completedAt: 0,
