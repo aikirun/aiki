@@ -1,3 +1,4 @@
+import { noopCodec } from "@aikirun/codec";
 import { delay } from "@aikirun/lib/async";
 import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
@@ -17,7 +18,6 @@ import type {
 import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
-import { configureCodec } from "./codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
 export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
@@ -219,9 +219,13 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 		this.api = client.api;
 		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger);
 
+		// System workflows should not use the client codec — always fall back to noop.
+		const codec =
+			this._run.source !== "system" && this._run.clientCodec === "applied" ? client[INTERNAL].codec : noopCodec;
+
 		this[INTERNAL] = {
 			client,
-			codec: configureCodec(this._run.source, this._run.clientCodec, client[INTERNAL].codec),
+			codec,
 			transitionState: this.transitionState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
