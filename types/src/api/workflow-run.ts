@@ -17,7 +17,7 @@ import type {
 	WorkflowRunStatus,
 	WorkflowStartOptions,
 } from "../workflow/run";
-import type { EventSendOptions } from "../workflow/run/event";
+import type { EventMulticastResult, EventSendOptions } from "../workflow/run/event";
 import type { StateTransition } from "../workflow/state-transition";
 import type { TaskStatus } from "../workflow/task";
 
@@ -30,8 +30,10 @@ export interface WorkflowRunApi {
 	transitionStateV1: (_: WorkflowRunTransitionStateRequestV1) => Promise<WorkflowRunTransitionStateResponseV1>;
 	listTransitionsV1: (_: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
 	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<void>;
-	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<void>;
-	multicastEventByReferenceV1: (_: WorkflowRunMulticastEventByReferenceRequestV1) => Promise<void>;
+	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<WorkflowRunMulticastEventResponseV1>;
+	multicastEventByReferenceV1: (
+		_: WorkflowRunMulticastEventByReferenceRequestV1
+	) => Promise<WorkflowRunMulticastEventResponseV1>;
 	listChildRunsV1: (_: WorkflowRunListChildRunsRequestV1) => Promise<WorkflowRunListChildRunsResponseV1>;
 	cancelByIdsV1: (_: WorkflowRunCancelByIdsRequestV1) => Promise<WorkflowRunCancelByIdsResponseV1>;
 	claimReadyV1: (_: WorkflowRunClaimReadyRequestV1) => Promise<WorkflowRunClaimReadyResponseV1>;
@@ -231,6 +233,8 @@ export interface WorkflowRunMulticastEventByReferenceRequestV1 {
 	data?: unknown;
 	options?: EventSendOptions;
 }
+
+export type WorkflowRunMulticastEventResponseV1 = EventMulticastResult;
 
 export interface WorkflowRunListChildRunsRequestV1 {
 	id: string;

@@ -8,6 +8,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
+	EventMulticastResult,
 	EventName,
 	EventSendOptions,
 	EventWait,
@@ -100,12 +101,12 @@ export interface EventMulticaster<Data> {
 		client: Client<Context>,
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	) => Promise<void>;
+	) => Promise<EventMulticastResult>;
 	sendByReferenceId<Context>(
 		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	): Promise<void>;
+	): Promise<EventMulticastResult>;
 }
 
 export function createEventWaiters<TEvents extends EventsDefinition>(
@@ -276,7 +277,7 @@ function createEventMulticaster<Data>(
 		client: Client<Context>,
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	): Promise<void> {
+	): Promise<EventMulticastResult> {
 		let data = args[0];
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(data);
@@ -295,12 +296,12 @@ function createEventMulticaster<Data>(
 
 		const runIds = Array.isArray(runId) ? runId : [runId];
 		if (!isNonEmptyArray(runIds)) {
-			return;
+			return { sentIds: [], failedIds: [] };
 		}
 
 		const options = optionsBuilder.build();
 
-		await client.api.workflowRun.multicastEventV1({
+		const result = await client.api.workflowRun.multicastEventV1({
 			ids: runIds,
 			eventName,
 			data,
@@ -310,17 +311,20 @@ function createEventMulticaster<Data>(
 		client.logger.info("Multicasted event to workflows", {
 			"aiki.workflowName": workflowName,
 			"aiki.workflowVersionId": workflowVersionId,
-			"aiki.workflowRunIds": runIds,
+			"aiki.sentWorkflowRunIds": result.sentIds,
+			"aiki.failedWorkflowRunIds": result.failedIds,
 			"aiki.eventName": eventName,
 			...(options?.reference ? { "aiki.eventReferenceId": options.reference.id } : {}),
 		});
+
+		return result;
 	}
 
 	async function sendByReferenceId<Context>(
 		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	): Promise<void> {
+	): Promise<EventMulticastResult> {
 		let data = args[0];
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(data);
@@ -339,12 +343,12 @@ function createEventMulticaster<Data>(
 
 		const referenceIds = Array.isArray(referenceId) ? referenceId : [referenceId];
 		if (!isNonEmptyArray(referenceIds)) {
-			return;
+			return { sentIds: [], failedIds: [] };
 		}
 
 		const options = optionsBuilder.build();
 
-		await client.api.workflowRun.multicastEventByReferenceV1({
+		const result = await client.api.workflowRun.multicastEventByReferenceV1({
 			references: referenceIds.map((referenceId) => ({
 				name: workflowName,
 				versionId: workflowVersionId,
@@ -359,9 +363,13 @@ function createEventMulticaster<Data>(
 			"aiki.workflowName": workflowName,
 			"aiki.workflowVersionId": workflowVersionId,
 			"aiki.referenceIds": referenceIds,
+			"aiki.sentWorkflowRunIds": result.sentIds,
+			"aiki.failedWorkflowRunIds": result.failedIds,
 			"aiki.eventName": eventName,
 			...(options?.reference ? { "aiki.eventReferenceId": options.reference.id } : {}),
 		});
+
+		return result;
 	}
 
 	return {

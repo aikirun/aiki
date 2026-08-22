@@ -35,6 +35,11 @@ export interface EventSendOptions {
 	reference?: EventReference;
 }
 
+export interface EventMulticastResult {
+	sentIds: string[];
+	failedIds: string[];
+}
+
 export interface EventReference {
 	id: string;
 }

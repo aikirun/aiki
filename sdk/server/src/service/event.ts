@@ -1,11 +1,12 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
-import type { EventReference, WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { EventMulticastResult, EventReference, WorkflowRunId } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import type { WorkflowRunStateMachine } from "./state-machine/workflow-run";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { EventWaitRowInsert } from "../infra/db/types/event-wait";
+import { runConcurrently } from "../lib/concurrency";
 import type { NamespaceRequestContext } from "../middleware/context";
 
 export interface EventServiceDeps {
@@ -26,6 +27,35 @@ export const createEventService = ({ repos, workflowRunStateMachine }: EventServ
 		return repos.transaction(async (txRepos) =>
 			sendEventToWorkflowRunInTx(context, params, txRepos, workflowRunStateMachine)
 		);
+	},
+
+	async multicastEventToWorkflowRuns(
+		context: NamespaceRequestContext,
+		params: {
+			runIds: WorkflowRunId[];
+			eventName: string;
+			data: unknown;
+			reference: EventReference | undefined;
+		}
+	): Promise<EventMulticastResult> {
+		const { runIds, eventName, data, reference } = params;
+
+		const sentIds: string[] = [];
+		const failedIds: string[] = [];
+
+		await runConcurrently(context, runIds, async (runId, spanCtx) => {
+			try {
+				await repos.transaction(async (txRepos) =>
+					sendEventToWorkflowRunInTx(spanCtx, { runId, eventName, data, reference }, txRepos, workflowRunStateMachine)
+				);
+				sentIds.push(runId);
+			} catch (err) {
+				spanCtx.logger.warn("Failed to send event to workflow run", { "aiki.runId": runId, err });
+				failedIds.push(runId);
+			}
+		});
+
+		return { sentIds, failedIds };
 	},
 });
 
