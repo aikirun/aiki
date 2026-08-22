@@ -213,3 +213,8 @@ export const cancelByIdsRequestSchema = type({
 export const cancelByIdsResponseSchema = type({
 	cancelledIds: type("string > 0").array(),
 });
+
+export const multicastEventResponseSchema = type({
+	sentIds: type("string > 0").array(),
+	failedIds: type("string > 0").array(),
+});

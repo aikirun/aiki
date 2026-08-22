@@ -182,6 +182,52 @@ export async function seedPublishedRun(deps: SeedRunDeps & { publisher: FakePubl
 	return seeded;
 }
 
+export async function seedAwaitingEventRun(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params: { eventName: string }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
+
+	const services = createServices(repos);
+	const parked = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+		type: "optimistic",
+		id: seeded.runId,
+		state: { status: "awaiting_event", eventName: params.eventName },
+		expectedRevision: seeded.revisionWhenClaimed,
+	});
+
+	return { ...seeded, eventName: params.eventName, revisionWhenParked: parked.revision };
+}
+
+export async function seedSleepingRun(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params: { sleepName: string; durationMs: number }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
+
+	const services = createServices(repos);
+	const sleepStartedAt = Date.now() as TimestampMs;
+	const asleep = await withFakeClock(sleepStartedAt, () =>
+		services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+			type: "optimistic",
+			id: seeded.runId,
+			state: { status: "sleeping", sleepName: params.sleepName, durationMs: params.durationMs },
+			expectedRevision: seeded.revisionWhenClaimed,
+		})
+	);
+
+	return {
+		...seeded,
+		sleepName: params.sleepName,
+		wakeupAt: (sleepStartedAt + params.durationMs) as TimestampMs,
+		revisionWhenAsleep: asleep.revision,
+	};
+}
+
 export async function seedStalledRun(deps: SeedRunDeps) {
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const seeded = await withFakeClock(1 as TimestampMs, () => seedQueuedRun(deps));

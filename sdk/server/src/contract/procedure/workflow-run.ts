@@ -24,6 +24,7 @@ import type {
 	WorkflowRunListTransitionsResponseV1,
 	WorkflowRunMulticastEventByReferenceRequestV1,
 	WorkflowRunMulticastEventRequestV1,
+	WorkflowRunMulticastEventResponseV1,
 	WorkflowRunSendEventRequestV1,
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
@@ -40,6 +41,7 @@ import {
 	cancelByIdsResponseSchema,
 	listChildRunsRequestSchema,
 	listChildRunsResponseSchema,
+	multicastEventResponseSchema,
 	workflowRunRecordSchema,
 	workflowRunStateAwaitingChildWorkflowSchema,
 	workflowRunStateAwaitingEventSchema,
@@ -241,7 +243,7 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, void> = oc
 	)
 	.output(type("undefined"));
 
-const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, void> = oc
+const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, WorkflowRunMulticastEventResponseV1> = oc
 	.input(
 		type({
 			ids: type("string > 0").array().atLeastLength(1).atMostLength(10),
@@ -252,9 +254,12 @@ const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, vo
 			},
 		})
 	)
-	.output(type("undefined"));
+	.output(multicastEventResponseSchema);
 
-const multicastEventByReferenceV1: ContractProcedure<WorkflowRunMulticastEventByReferenceRequestV1, void> = oc
+const multicastEventByReferenceV1: ContractProcedure<
+	WorkflowRunMulticastEventByReferenceRequestV1,
+	WorkflowRunMulticastEventResponseV1
+> = oc
 	.input(
 		type({
 			references: type({
@@ -272,7 +277,7 @@ const multicastEventByReferenceV1: ContractProcedure<WorkflowRunMulticastEventBy
 			},
 		})
 	)
-	.output(type("undefined"));
+	.output(multicastEventResponseSchema);
 
 const listChildRunsV1: ContractProcedure<WorkflowRunListChildRunsRequestV1, WorkflowRunListChildRunsResponseV1> = oc
 	.input(listChildRunsRequestSchema)

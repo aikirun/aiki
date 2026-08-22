@@ -238,14 +238,20 @@ describe("createEventMulticasters", () => {
 			const multicasters = createEventMulticasters(workflowName, versionId, {
 				orderShipped: event<{ trackingId: string }>(),
 			});
-			client.api.workflowRun.multicastEventV1.once({
-				ids: ["run-1", "run-2"],
-				eventName: "orderShipped",
-				data: { trackingId: "T1" },
-				options: {},
-			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1", "run-2"],
+					eventName: "orderShipped",
+					data: { trackingId: "T1" },
+					options: {},
+				},
+				{ sentIds: ["run-1", "run-2"], failedIds: [] }
+			);
 
-			await multicasters.orderShipped.send(client, ["run-1", "run-2"], { trackingId: "T1" });
+			expect(await multicasters.orderShipped.send(client, ["run-1", "run-2"], { trackingId: "T1" })).toEqual({
+				sentIds: ["run-1", "run-2"],
+				failedIds: [],
+			});
 		}));
 
 	test("wraps a single run id in an array", () =>
@@ -253,12 +259,15 @@ describe("createEventMulticasters", () => {
 			const multicasters = createEventMulticasters(workflowName, versionId, {
 				orderShipped: event<{ trackingId: string }>(),
 			});
-			client.api.workflowRun.multicastEventV1.once({
-				ids: ["run-1"],
-				eventName: "orderShipped",
-				data: { trackingId: "T1" },
-				options: {},
-			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1"],
+					eventName: "orderShipped",
+					data: { trackingId: "T1" },
+					options: {},
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
 
 			await multicasters.orderShipped.send(client, "run-1", { trackingId: "T1" });
 		}));
@@ -269,7 +278,10 @@ describe("createEventMulticasters", () => {
 				orderShipped: event<{ trackingId: string }>(),
 			});
 
-			expect(await multicasters.orderShipped.send(client, [], { trackingId: "T1" })).toBeUndefined();
+			expect(await multicasters.orderShipped.send(client, [], { trackingId: "T1" })).toEqual({
+				sentIds: [],
+				failedIds: [],
+			});
 		}));
 
 	test("multicasts by reference id, tagging each with the workflow name and version", () =>
@@ -277,17 +289,22 @@ describe("createEventMulticasters", () => {
 			const multicasters = createEventMulticasters(workflowName, versionId, {
 				orderShipped: event<{ trackingId: string }>(),
 			});
-			client.api.workflowRun.multicastEventByReferenceV1.once({
-				references: [
-					{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" },
-					{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-2" },
-				],
-				eventName: "orderShipped",
-				data: { trackingId: "T1" },
-				options: {},
-			});
+			client.api.workflowRun.multicastEventByReferenceV1.once(
+				{
+					references: [
+						{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" },
+						{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-2" },
+					],
+					eventName: "orderShipped",
+					data: { trackingId: "T1" },
+					options: {},
+				},
+				{ sentIds: ["run-1", "run-2"], failedIds: [] }
+			);
 
-			await multicasters.orderShipped.sendByReferenceId(client, ["ref-1", "ref-2"], { trackingId: "T1" });
+			expect(
+				await multicasters.orderShipped.sendByReferenceId(client, ["ref-1", "ref-2"], { trackingId: "T1" })
+			).toEqual({ sentIds: ["run-1", "run-2"], failedIds: [] });
 		}));
 
 	test("wraps a single reference id in an array", () =>
@@ -295,12 +312,15 @@ describe("createEventMulticasters", () => {
 			const multicasters = createEventMulticasters(workflowName, versionId, {
 				orderShipped: event<{ trackingId: string }>(),
 			});
-			client.api.workflowRun.multicastEventByReferenceV1.once({
-				references: [{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" }],
-				eventName: "orderShipped",
-				data: { trackingId: "T1" },
-				options: {},
-			});
+			client.api.workflowRun.multicastEventByReferenceV1.once(
+				{
+					references: [{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" }],
+					eventName: "orderShipped",
+					data: { trackingId: "T1" },
+					options: {},
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
 
 			await multicasters.orderShipped.sendByReferenceId(client, "ref-1", { trackingId: "T1" });
 		}));
@@ -311,7 +331,31 @@ describe("createEventMulticasters", () => {
 				orderShipped: event<{ trackingId: string }>(),
 			});
 
-			expect(await multicasters.orderShipped.sendByReferenceId(client, [], { trackingId: "T1" })).toBeUndefined();
+			expect(await multicasters.orderShipped.sendByReferenceId(client, [], { trackingId: "T1" })).toEqual({
+				sentIds: [],
+				failedIds: [],
+			});
+		}));
+
+	test("reports the runs the server could not reach alongside the ones it did", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1", "run-2", "run-3"],
+					eventName: "orderShipped",
+					data: { trackingId: "T1" },
+					options: {},
+				},
+				{ sentIds: ["run-1", "run-3"], failedIds: ["run-2"] }
+			);
+
+			expect(await multicasters.orderShipped.send(client, ["run-1", "run-2", "run-3"], { trackingId: "T1" })).toEqual({
+				sentIds: ["run-1", "run-3"],
+				failedIds: ["run-2"],
+			});
 		}));
 
 	test("throws SchemaValidationError and sends nothing when the data fails the schema", () =>
@@ -328,12 +372,15 @@ describe("createEventMulticasters", () => {
 			const multicasters = createEventMulticasters(workflowName, versionId, {
 				orderShipped: event<{ trackingId: string }>(),
 			});
-			client.api.workflowRun.multicastEventV1.once({
-				ids: ["run-1"],
-				eventName: "orderShipped",
-				data: { trackingId: "T1" },
-				options: { reference: { id: "ref-1" } },
-			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1"],
+					eventName: "orderShipped",
+					data: { trackingId: "T1" },
+					options: { reference: { id: "ref-1" } },
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
 
 			await multicasters.orderShipped.with("reference.id", "ref-1").send(client, "run-1", { trackingId: "T1" });
 		}));
