@@ -191,8 +191,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		const { id } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
-			input,
+			input: await client[INTERNAL].codec.encode(input),
 			inputHash,
+			clientCodec: client[INTERNAL].clientCodec,
 			options: startOptions,
 		});
 
@@ -254,7 +255,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 				return childWorkflowRunHandle(
 					client,
-					existingRun as WorkflowRunRecord<Input, Output>,
+					existingRun as WorkflowRunRecord,
 					parentRun[INTERNAL].handle,
 					existingRunInfo.waits,
 					logger,
@@ -271,8 +272,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			const response = await client.api.workflowRun.createV1({
 				name: this.name,
 				versionId: this.versionId,
-				input,
+				input: await parentRun[INTERNAL].codec.encode(input),
 				inputHash,
+				clientCodec: parentRun[INTERNAL].clientCodec,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
 				options: pool === undefined ? startOptions : { ...startOptions, pool },
 			});
@@ -295,7 +297,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		return childWorkflowRunHandle(
 			client,
-			newRun as WorkflowRunRecord<Input, Output>,
+			newRun as WorkflowRunRecord,
 			parentRun[INTERNAL].handle,
 			{
 				cancelled: [],
@@ -351,7 +353,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			versionId: this.versionId,
 			referenceId,
 		});
-		return workflowRunHandle(client, run as WorkflowRunRecord<Input, Output>, this[INTERNAL].eventsDefinition);
+		return workflowRunHandle(client, run as WorkflowRunRecord, this[INTERNAL].eventsDefinition);
 	}
 
 	private async handler(run: WorkflowRun<Input, Context, TEvents>, input: Input): Promise<void> {
@@ -367,7 +369,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		const output = await this.tryExecuteWorkflow(input, run, retryStrategy);
 
-		await transitionState({ status: "completed", output });
+		await transitionState({ status: "completed", output: await run[INTERNAL].codec.encode(output) });
 		logger.info("Workflow complete");
 	}
 

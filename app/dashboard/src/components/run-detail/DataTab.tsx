@@ -12,7 +12,7 @@ export function DataTab({ run }: DataTabProps) {
 
 	const stateColor = isCompleted ? "#34D399" : isFailed ? "#F87171" : "var(--t1)";
 
-	const inputJson = run.input !== undefined ? JSON.stringify(run.input, null, 2) : "void";
+	const inputJson = run.input.encodedValue !== undefined ? JSON.stringify(run.input, null, 2) : "void";
 	const stateJson = JSON.stringify(run.state, null, 2);
 	const optionsJson = run.options ? JSON.stringify(run.options, null, 2) : undefined;
 

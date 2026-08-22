@@ -4,6 +4,7 @@ import type { SerializableError } from "@aikirun/lib/serializable";
 import type { EventWait } from "./event";
 import type { Sleep } from "./sleep";
 import type { TriggerStrategy } from "./trigger";
+import type { EncodedPayload } from "../../infra/codec";
 import type { TaskInfo } from "../task";
 import type { WorkflowSource } from "../workflow";
 
@@ -46,6 +47,9 @@ export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status i
 
 export const WORKFLOW_RUN_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type WorkflowRunConflictPolicy = (typeof WORKFLOW_RUN_CONFLICT_POLICIES)[number];
+
+export const CLIENT_CODECS = ["applied", "none"] as const;
+export type ClientCodec = (typeof CLIENT_CODECS)[number];
 
 export interface WorkflowReference {
 	id: string;
@@ -209,9 +213,9 @@ export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
 	explanation?: string;
 }
 
-export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {
+export interface WorkflowRunStateCompleted extends WorkflowRunStateBase {
 	status: "completed";
-	output: Output;
+	output: EncodedPayload;
 }
 
 interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
@@ -252,11 +256,11 @@ export type WorkflowRunStateInComplete =
 	| WorkflowRunStateCancelled
 	| WorkflowRunStateFailed;
 
-export type WorkflowRunState<Output = unknown> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
+export type WorkflowRunState = WorkflowRunStateInComplete | WorkflowRunStateCompleted;
 
 export type TerminalWorkflowRunState = Extract<WorkflowRunState, { status: "cancelled" | "completed" | "failed" }>;
 
-export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
+export interface WorkflowRunRecord {
 	id: string;
 	name: string;
 	versionId: string;
@@ -264,12 +268,13 @@ export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	createdAt: number;
 	revision: number;
 	stateTransitionId: string;
-	input?: Input;
+	input: EncodedPayload;
 	inputHash: string;
+	clientCodec: ClientCodec;
 	referenceId?: string;
 	options?: WorkflowRunOptions;
 	attempts: number;
-	state: WorkflowRunState<Output>;
+	state: WorkflowRunState;
 	// TODO:
 	// for workflows with a large number of tasks/sleeps/eventWaits/childWorkflowRuns,
 	// prefetching all results might be problematic.

@@ -27,6 +27,7 @@ function createTestWorkflowRun(
 		id: record.id as WorkflowRunId,
 		name: record.name as WorkflowName,
 		versionId: record.versionId as WorkflowVersionId,
+		source: record.source,
 		options: record.options ?? {},
 		logger: client.logger,
 		sleep: () => {
@@ -39,6 +40,8 @@ function createTestWorkflowRun(
 			replayManifest: createReplayManifest(record),
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
 			hasher: hashInput,
+			codec: client[INTERNAL].codec,
+			clientCodec: record.clientCodec,
 		},
 	};
 }
@@ -86,12 +89,12 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "optimistic",
 						id: runRecord.id,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: { encodedValue: undefined } },
 						expectedRevision: runRecord.revision,
 					},
 					{
 						revision: runRecord.revision,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: { encodedValue: undefined } },
 						attempts: runRecord.attempts,
 					}
 				);
@@ -100,7 +103,8 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
-						input: parentRunId,
+						clientCodec: "none",
+						input: { encodedValue: parentRunId },
 						inputHash: parentRunIdInputHash,
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
@@ -112,7 +116,11 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						id: runningListNonTerminalChildrenTask.id,
-						taskState: completedListNonTerminalChildrenTask.state,
+						taskState: {
+							status: "completed",
+							attempts: 1,
+							output: { encodedValue: nonTerminalChildRunIds },
+						},
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -121,7 +129,8 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
-						input: nonTerminalChildRunIds,
+						clientCodec: "none",
+						input: { encodedValue: nonTerminalChildRunIds },
 						inputHash: nonTerminalChildRunIdsInputHash,
 						taskName: runningCancelRunsTask.name,
 						options: {},
@@ -133,7 +142,11 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						id: runningCancelRunsTask.id,
-						taskState: completedCancelRunsTask.state,
+						taskState: {
+							status: "completed",
+							attempts: 1,
+							output: { encodedValue: nonTerminalChildRunIds },
+						},
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -184,12 +197,12 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "optimistic",
 						id: runRecord.id,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: { encodedValue: undefined } },
 						expectedRevision: runRecord.revision,
 					},
 					{
 						revision: runRecord.revision,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: { encodedValue: undefined } },
 						attempts: runRecord.attempts,
 					}
 				);
@@ -198,7 +211,8 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
-						input: parentRunId,
+						clientCodec: "none",
+						input: { encodedValue: parentRunId },
 						inputHash: parentRunIdInputHash,
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
@@ -210,7 +224,11 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						id: runningListNonTerminalChildrenTask.id,
-						taskState: completedListNonTerminalChildrenTask.state,
+						taskState: {
+							status: "completed",
+							attempts: 1,
+							output: { encodedValue: [] },
+						},
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},

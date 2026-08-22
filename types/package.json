@@ -32,6 +32,10 @@
 			"types": "./dist/infra/cache.d.ts",
 			"import": "./dist/infra/cache.js"
 		},
+		"./infra/codec": {
+			"types": "./dist/infra/codec.d.ts",
+			"import": "./dist/infra/codec.js"
+		},
 		"./infra/db": {
 			"types": "./dist/infra/db.d.ts",
 			"import": "./dist/infra/db.js"

@@ -408,6 +408,7 @@ async function createSchedule(
 		namespaceId: params.namespaceId,
 		workflowId: params.workflowId,
 		status: "active",
+		clientCodec: "none",
 		type: spec.type,
 		cronExpression: spec.type === "cron" ? spec.expression : null,
 		cronTimezone: spec.type === "cron" ? (spec.timezone ?? null) : null,

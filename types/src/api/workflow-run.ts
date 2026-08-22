@@ -1,7 +1,8 @@
-import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
+import type { DistributiveOmit } from "@aikirun/lib/object";
 
+import type { EncodedPayload } from "../infra/codec";
 import type { Hash } from "../infra/hasher";
-import type { WorkflowSource } from "../workflow";
+import type { ClientCodec, WorkflowSource } from "../workflow";
 import type {
 	WorkflowRunRecord,
 	WorkflowRunState,
@@ -106,8 +107,9 @@ export interface WorkflowRunGetStateResponseV1 {
 export interface WorkflowRunCreateRequestV1 {
 	name: string;
 	versionId: string;
-	input?: unknown;
+	input: EncodedPayload;
 	inputHash: Hash;
+	clientCodec: ClientCodec;
 	parent?: {
 		workflowRunId: string;
 		expectedRevision: number;
@@ -142,7 +144,7 @@ export type WorkflowRunStateAwaitingChildWorkflowRequest = DistributiveOmit<
 	timeoutInMs?: number;
 };
 
-export type WorkflowRunStateCompletedRequest = OptionalProp<WorkflowRunStateCompleted<unknown>, "output">;
+export type WorkflowRunStateCompletedRequest = WorkflowRunStateCompleted;
 
 export type WorkflowRunStateRequest =
 	| Exclude<

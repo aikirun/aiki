@@ -165,6 +165,7 @@ async function processOverlapAllowSchedules(
 				workflowId: schedule.workflowId,
 				scheduleId: schedule.id,
 				status: "queued",
+				clientCodec: "none",
 				input: schedule.workflowRunInput,
 				inputHash: schedule.workflowRunInputHash,
 				options: schedule.workflowRunOptions,
@@ -272,12 +273,14 @@ async function processOverlapSkipSchedules(
 		const stateTransitionId = ulid();
 		const referenceId = getReferenceId(schedule.id, occurrence);
 
+		// TODO: check if decoded/hashing needed here?
 		workflowRunEntries.push({
 			id: runId,
 			namespaceId: schedule.namespaceId,
 			workflowId: schedule.workflowId,
 			scheduleId: schedule.id,
 			status: "queued",
+			clientCodec: "none",
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,
@@ -395,6 +398,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowId: schedule.workflowId,
 			scheduleId: schedule.id,
 			status: "queued",
+			clientCodec: "none",
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,

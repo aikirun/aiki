@@ -1,7 +1,7 @@
 {
-	"name": "@aikirun/client",
+	"name": "@aikirun/codec",
 	"version": "0.38.0",
-	"description": "Client SDK for Aiki - connect to the server, start workflows, and manage execution",
+	"description": "Codec adapters for Aiki - identity and encryption codecs for client payload encoding",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -18,12 +18,7 @@
 		"build": "tsup"
 	},
 	"dependencies": {
-		"@aikirun/codec": "workspace:*",
-		"@aikirun/types": "workspace:*",
-		"@orpc/client": "^1.9.3"
-	},
-	"devDependencies": {
-		"@aikirun/lib": "workspace:*"
+		"@aikirun/types": "workspace:*"
 	},
 	"publishConfig": {
 		"access": "public"

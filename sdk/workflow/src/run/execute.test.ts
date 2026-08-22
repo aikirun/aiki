@@ -1,3 +1,4 @@
+import { noopCodec } from "@aikirun/codec";
 import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { withFakeClient } from "@aikirun/testing/client";
@@ -169,9 +170,18 @@ describe("executeWorkflowRun", () => {
 			}));
 	});
 
-	test("invokes the handler with the run input", () =>
+	test("invokes the handler with the run input decoded by the client's codec", () =>
 		withFakeClient(async (client) => {
-			const workflowRun = runningWorkflowRunRecordFactory.build({ input: { orderId: "o1" } });
+			const encodedInput = { encodedValue: { encoded: true } };
+			const decodedInput = { orderId: "o1" };
+			client[INTERNAL].codec = {
+				encode: async (payload) => ({ encodedValue: payload }),
+				decode: async (payload) => {
+					expect(payload).toEqual(encodedInput);
+					return decodedInput;
+				},
+			};
+			const workflowRun = runningWorkflowRunRecordFactory.build({ input: encodedInput, clientCodec: "applied" });
 			let capturedInput: unknown;
 			const workflowVersion = fakeWorkflowVersion(async (_run, input) => {
 				capturedInput = input;
@@ -185,7 +195,67 @@ describe("executeWorkflowRun", () => {
 				configProvider,
 			});
 
-			expect(capturedInput).toEqual({ orderId: "o1" });
+			expect(capturedInput).toEqual(decodedInput);
+		}));
+
+	test("passes the client's codec on the run", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientCodec: "applied" });
+			let capturedCodec: unknown;
+			const workflowVersion = fakeWorkflowVersion(async (run) => {
+				capturedCodec = run[INTERNAL].codec;
+			});
+
+			await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(capturedCodec).toBe(client[INTERNAL].codec);
+		}));
+
+	test("uses the noop codec for system-sourced runs even when clientCodec is applied", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({
+				source: "system",
+				clientCodec: "applied",
+			});
+			let capturedCodec: unknown;
+			const workflowVersion = fakeWorkflowVersion(async (run) => {
+				capturedCodec = run[INTERNAL].codec;
+			});
+
+			await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(capturedCodec).toBe(noopCodec);
+		}));
+
+	test("invokes the handler with the run source", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ source: "system" });
+			let capturedSource: unknown;
+			const workflowVersion = fakeWorkflowVersion(async (run) => {
+				capturedSource = run.source;
+			});
+
+			await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(capturedSource).toBe("system");
 		}));
 
 	test("returns false when no hasher is bound for the run's input hash", () =>

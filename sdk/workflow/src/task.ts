@@ -13,6 +13,7 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Serializable } from "@aikirun/lib/serializable";
 import { createSerializableError } from "@aikirun/lib/serializable";
+import type { EncodedPayload } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { UnconsumedManifestEntries, WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
@@ -130,6 +131,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	): Promise<Output> {
 		const handle = run[INTERNAL].handle;
 		const hasher = run[INTERNAL].hasher;
+		const codec = run[INTERNAL].codec;
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const inputRaw = args[0];
@@ -160,8 +162,9 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			type: "create",
 			taskName: this.name,
 			options: startOptions,
-			input,
+			input: await codec.encode(input),
 			inputHash,
+			clientCodec: run[INTERNAL].clientCodec,
 		});
 
 		const logger = run.logger.child({
@@ -183,7 +186,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
-			taskState: { status: "completed", attempts: lastAttempt, output },
+			taskState: { status: "completed", attempts: lastAttempt, output: await codec.encode(output) },
 		});
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
 
@@ -200,7 +203,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return existingTaskState.output as Output;
+			return (await run[INTERNAL].codec.decode(existingTaskState.output as EncodedPayload)) as Output;
 		}
 
 		if (existingTaskState.status === "failed") {
@@ -283,7 +286,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
-			taskState: { status: "completed", attempts: lastAttempt, output },
+			taskState: { status: "completed", attempts: lastAttempt, output: await run[INTERNAL].codec.encode(output) },
 		});
 		logger.info("Task complete", { "aiki.attempts": lastAttempt });
 

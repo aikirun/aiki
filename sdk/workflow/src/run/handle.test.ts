@@ -47,7 +47,7 @@ describe("workflowRunHandle", () => {
 
 				const refreshed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: initial.id }),
-					state: { status: "completed", output: "done" },
+					state: { status: "completed", output: { encodedValue: "done" } },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: initial.id }, { run: refreshed });
 
@@ -117,6 +117,7 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
+					clientCodec: "none",
 				};
 				client.api.task.transitionStateV1.once(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
@@ -138,6 +139,7 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
+					clientCodec: "none",
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
@@ -157,6 +159,7 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
+					clientCodec: "none",
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
@@ -280,7 +283,7 @@ describe("workflowRunHandle", () => {
 				);
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
-					state: { status: "completed", output: "done" },
+					state: { status: "completed", output: { encodedValue: "done" } },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
@@ -319,7 +322,7 @@ describe("workflowRunHandle", () => {
 					.once({ id: record.id, afterStateTransitionId: "t1" }, { terminated: true, latestStateTransitionId: "t2" });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
-					state: { status: "completed", output: 42 },
+					state: { status: "completed", output: { encodedValue: 42 } },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 

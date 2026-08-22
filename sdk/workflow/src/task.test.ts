@@ -32,6 +32,10 @@ import { createReplayManifest } from "./run/replay-manifest";
 import { task } from "./task";
 import { describe, expect, test } from "bun:test";
 
+function encoded<T>(value: T): { encodedValue: T } {
+	return { encodedValue: value };
+}
+
 function createTestWorkflowRun(
 	client: Client,
 	record: WorkflowRunRecord,
@@ -42,6 +46,7 @@ function createTestWorkflowRun(
 		id: record.id as WorkflowRunId,
 		name: record.name as WorkflowName,
 		versionId: record.versionId as WorkflowVersionId,
+		source: record.source,
 		options: record.options ?? {},
 		logger: client.logger,
 		sleep: () => {
@@ -57,6 +62,8 @@ function createTestWorkflowRun(
 				maxInlineWaitMs: options.maxInlineWaitMs ?? 10,
 			})),
 			hasher: hashInput,
+			codec: client[INTERNAL].codec,
+			clientCodec: record.clientCodec,
 		},
 	};
 }
@@ -82,14 +89,15 @@ describe("task", () => {
 					const completedTaskInfo = completedTaskInfoFactory.build({
 						id: runningTaskInfo.id,
 						name: sendEmail.name,
-						state: { output },
+						state: { output: encoded(output) },
 					});
 
 					client.api.task.transitionStateV1
 						.once(
 							{
 								type: "create",
-								input,
+								clientCodec: "none",
+								input: encoded(input),
 								inputHash,
 								taskName: sendEmail.name,
 								options: {},
@@ -111,6 +119,68 @@ describe("task", () => {
 					expect(await sendEmail.start(run, input)).toBe(output);
 				}));
 		}
+
+		test("encodes task input and output before sending them to the server", () =>
+			withFakeClient(async (client) => {
+				const input = "info@aiki.run";
+				const output = "Sent to info@aiki.run";
+				const encodedInput = { encodedValue: { encodedInput: true } };
+				const encodedOutput = { encodedValue: { encodedOutput: true } };
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						if (payload === input) {
+							return encodedInput;
+						}
+						if (payload === output) {
+							return encodedOutput;
+						}
+						return { encodedValue: payload };
+					},
+					decode: async (payload) => payload.encodedValue,
+				};
+
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+				});
+
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const completedTaskInfo = completedTaskInfoFactory.build({
+					id: runningTaskInfo.id,
+					name: sendEmail.name,
+					state: { output: encodedOutput },
+				});
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							clientCodec: "none",
+							input: encodedInput,
+							inputHash,
+							taskName: sendEmail.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							taskState: completedTaskInfo.state,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: completedTaskInfo }
+					);
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+			}));
 
 		test("retries in-memory when the delay is within the max inline wait, recording no extra transition", () =>
 			withFakeClient(async (client) => {
@@ -139,14 +209,15 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: chargeCard.name,
-					state: { attempts: 2, output },
+					state: { attempts: 2, output: encoded(output) },
 				});
 
 				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
-							input,
+							clientCodec: "none",
+							input: encoded(input),
 							inputHash,
 							taskName: chargeCard.name,
 							options: { retry },
@@ -191,7 +262,8 @@ describe("task", () => {
 					.once(
 						{
 							type: "create",
-							input,
+							clientCodec: "none",
+							input: encoded(input),
 							inputHash,
 							taskName: chargeCard.name,
 							options: { retry },
@@ -238,7 +310,8 @@ describe("task", () => {
 					.once(
 						{
 							type: "create",
-							input,
+							clientCodec: "none",
+							input: encoded(input),
 							inputHash,
 							taskName: chargeCard.name,
 							options: {},
@@ -280,13 +353,53 @@ describe("task", () => {
 
 				const inputHash = await hashInput(input);
 				const address = getCompositeId({ name: sendEmail.name, referenceId: inputHash });
-				const recordedTask = completedTaskInfoFactory.build({ name: sendEmail.name, state: { output } });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: sendEmail.name,
+					state: { output: encoded(output) },
+				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					tasks: { [address]: [recordedTask] },
 				});
 				const run = createTestWorkflowRun(client, runRecord);
 
 				expect(await sendEmail.start(run, input)).toBe(output);
+				expect(handlerCalls).toBe(0);
+			}));
+
+		test("decodes recorded output when replaying a completed task", () =>
+			withFakeClient(async (client) => {
+				const encodedOutput = { encodedValue: { encoded: true } };
+				const decodedOutput = "previously-sent";
+				client[INTERNAL].codec = {
+					encode: async (payload) => ({ encodedValue: payload }),
+					decode: async (payload) => {
+						expect(payload).toEqual(encodedOutput);
+						return decodedOutput;
+					},
+				};
+
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "freshly-sent";
+					},
+				});
+
+				const input = { to: "info@aiki.run" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: sendEmail.name, referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: sendEmail.name,
+					state: { output: encodedOutput },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [recordedTask] },
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				expect(await sendEmail.start(run, input)).toBe(decodedOutput);
 				expect(handlerCalls).toBe(0);
 			}));
 
@@ -316,7 +429,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: sendEmail.name, referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: sendEmail.name,
-					state: { output: recordedOutput },
+					state: { output: encoded(recordedOutput) },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					tasks: { [address]: [recordedTask] },
@@ -450,14 +563,15 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: sendEmail.name,
-					state: { output },
+					state: { output: encoded(output) },
 				});
 
 				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
-							input,
+							clientCodec: "none",
+							input: encoded(input),
 							inputHash,
 							taskName: sendEmail.name,
 							options: { retry },

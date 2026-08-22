@@ -1,3 +1,4 @@
+import { noopCodec } from "@aikirun/codec";
 import { delay } from "@aikirun/lib/async";
 import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
@@ -6,6 +7,7 @@ import type { DistributiveOmit } from "@aikirun/lib/object";
 import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
 import type { WorkflowRunStateRequest, WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { ApiClient, Client } from "@aikirun/types/client";
+import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
 	TerminalWorkflowRunStatus,
@@ -27,21 +29,21 @@ export function workflowRunHandle<Input, Output, Context, TEvents extends Events
 
 export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
-	run: WorkflowRunRecord<Input, Output>,
+	run: WorkflowRunRecord,
 	eventsDefinition?: TEvents,
 	logger?: Logger
 ): WorkflowRunHandle<Input, Output, Context, TEvents>;
 
 export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
-	runOrId: WorkflowRunId | WorkflowRunRecord<Input, Output>,
+	runOrId: WorkflowRunId | WorkflowRunRecord,
 	eventsDefinition?: TEvents,
 	logger?: Logger
 ): WorkflowRunHandle<Input, Output, Context, TEvents> | Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
 	if (typeof runOrId === "string") {
 		const runId = runOrId;
 		return (async () => {
-			const run = (await client.api.workflowRun.getByIdV1({ id: runId })).run as WorkflowRunRecord<Input, Output>;
+			const run = (await client.api.workflowRun.getByIdV1({ id: runId })).run as WorkflowRunRecord;
 			return new WorkflowRunHandleImpl(
 				client,
 				run,
@@ -70,8 +72,8 @@ export function workflowRunHandle<Input, Output, Context, TEvents extends Events
 	);
 }
 
-export interface WorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> {
-	run: Readonly<WorkflowRunRecord<Input, Output>>;
+export interface WorkflowRunHandle<_Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> {
+	run: Readonly<WorkflowRunRecord>;
 
 	events: EventSenders<TEvents>;
 
@@ -150,6 +152,7 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 
 	[INTERNAL]: {
 		client: Client<Context>;
+		codec: Codec;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (
 			request: DistributiveOmit<TaskTransitionStateRequestV1, "workflowRunId" | "expectedWorkflowRunRevision">
@@ -164,10 +167,12 @@ export interface WorkflowRunWaitOptions<Timed extends boolean, Abortable extends
 	signal?: Abortable extends true ? AbortSignal : never;
 }
 
-export type WorkflowRunWaitResultSuccess<Status extends TerminalWorkflowRunStatus, Output> = Extract<
-	WorkflowRunState<Output>,
-	{ status: Status }
->;
+export type WorkflowRunWaitResultSuccess<
+	Status extends TerminalWorkflowRunStatus,
+	Output = unknown,
+> = Status extends "completed"
+	? { status: "completed"; output: Output }
+	: Extract<WorkflowRunState, { status: Status }>;
 
 export type WorkflowRunWaitResult<
 	Status extends TerminalWorkflowRunStatus,
@@ -184,6 +189,20 @@ export type WorkflowRunWaitResult<
 			state: WorkflowRunWaitResultSuccess<Status, Output>;
 	  };
 
+export async function decodeWaitResultState<Status extends TerminalWorkflowRunStatus, Output>(
+	codec: Codec,
+	state: WorkflowRunState
+): Promise<WorkflowRunWaitResultSuccess<Status, Output>> {
+	if (state.status !== "completed") {
+		return state as WorkflowRunWaitResultSuccess<Status, Output>;
+	}
+
+	return {
+		status: "completed",
+		output: (await codec.decode(state.output)) as Output,
+	} as WorkflowRunWaitResultSuccess<Status, Output>;
+}
+
 class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefinition>
 	implements WorkflowRunHandle<Input, Output, Context, TEvents>
 {
@@ -193,29 +212,34 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 
 	constructor(
 		client: Client<Context>,
-		private _run: WorkflowRunRecord<Input, Output>,
+		private _run: WorkflowRunRecord,
 		eventsDefinition: TEvents,
 		private readonly logger: Logger
 	) {
 		this.api = client.api;
 		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger);
 
+		// System workflows should not use the client codec — always fall back to noop.
+		const codec =
+			this._run.source !== "system" && this._run.clientCodec === "applied" ? client[INTERNAL].codec : noopCodec;
+
 		this[INTERNAL] = {
 			client,
+			codec,
 			transitionState: this.transitionState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
 		};
 	}
 
-	public get run(): Readonly<WorkflowRunRecord<Input, Output>> {
+	public get run(): Readonly<WorkflowRunRecord> {
 		return this._run;
 	}
 
 	public async refresh() {
 		// TODO: when chunking is implemented, refresh should load only data after it's cursor
 		const { run: currentRun } = await this.api.workflowRun.getByIdV1({ id: this.run.id });
-		this._run = currentRun as WorkflowRunRecord<Input, Output>;
+		this._run = currentRun as WorkflowRunRecord;
 	}
 
 	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
@@ -279,7 +303,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 				if (this._run.state.status === expectedStatus) {
 					return {
 						success: true,
-						state: this._run.state as WorkflowRunWaitResultSuccess<Status, Output>,
+						state: await decodeWaitResultState<Status, Output>(this[INTERNAL].codec, this._run.state),
 					};
 				}
 
@@ -363,7 +387,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 				});
 			}
 			this._run.revision = response.revision;
-			this._run.state = response.state as WorkflowRunState<Output>;
+			this._run.state = response.state as WorkflowRunState;
 			this._run.attempts = response.attempts;
 		} catch (err) {
 			if (isWorkflowRunRevisionConflictError(err)) {

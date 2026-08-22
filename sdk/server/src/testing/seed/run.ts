@@ -56,8 +56,9 @@ export async function seedScheduledRun(
 	const runId = await services.workflowRun.createWorkflowRun(namespaceRequestContext, {
 		name: seededWorkflow.name,
 		versionId: seededWorkflow.versionId,
-		input,
+		input: { encodedValue: input },
 		inputHash: { value: await hashInput(input) },
+		clientCodec: "none",
 		options: overrides?.options,
 	});
 
@@ -132,7 +133,7 @@ export async function completeRun(deps: {
 	const completion = await services.workflowRunStateMachine.transitionState(context, {
 		type: "optimistic",
 		id: runId,
-		state: { status: "completed", output: seededRunOutput },
+		state: { status: "completed", output: { encodedValue: seededRunOutput } },
 		expectedRevision,
 	});
 
@@ -159,7 +160,8 @@ export async function seedCompletedRun(
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
 
-	const output = overrides && "output" in overrides ? overrides.output : seededRunOutput;
+	const output =
+		overrides && "output" in overrides ? { encodedValue: overrides.output } : { encodedValue: seededRunOutput };
 
 	const services = createServices(repos);
 	await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
@@ -169,7 +171,7 @@ export async function seedCompletedRun(
 		expectedRevision: seeded.revisionWhenClaimed,
 	});
 
-	return { ...seeded, runOutput: output };
+	return { ...seeded, runOutput: output.encodedValue };
 }
 
 export async function seedPublishedRun(deps: SeedRunDeps & { publisher: FakePublisher }) {

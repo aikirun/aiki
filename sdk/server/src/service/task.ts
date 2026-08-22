@@ -89,6 +89,7 @@ async function setNewTaskStateInTx(
 		name: request.taskName,
 		workflowRunId: runId,
 		status: targetState.status,
+		clientCodec: "none",
 		attempts: 1,
 		input: request.input,
 		inputHash: request.inputHash,

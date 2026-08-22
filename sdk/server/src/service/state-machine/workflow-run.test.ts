@@ -203,16 +203,11 @@ describe("convertDurationToTimestamp", () => {
 	});
 
 	test("completed with an output: keeps the output", () => {
-		expect(convertDurationToTimestamp({ status: "completed", output: { orderId: "order-7" } }, now)).toEqual({
+		expect(
+			convertDurationToTimestamp({ status: "completed", output: { encodedValue: { orderId: "order-7" } } }, now)
+		).toEqual({
 			status: "completed",
-			output: { orderId: "order-7" },
-		});
-	});
-
-	test("completed without an output: normalizes output to undefined", () => {
-		expect(convertDurationToTimestamp({ status: "completed" }, now)).toEqual({
-			status: "completed",
-			output: undefined,
+			output: { encodedValue: { orderId: "order-7" } },
 		});
 	});
 

@@ -95,6 +95,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		const createContext = client[INTERNAL].context;
 		const context = createContext ? createContext(workflowRun) : null;
 		const hasher = await client[INTERNAL].hasher.for(workflowRun.inputHash);
+		const codec = handle[INTERNAL].codec;
 
 		if (!hasher) {
 			logger.error("Failed to determine the bound hasher for the workflow run. Check hasher configuration.", {
@@ -109,6 +110,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				id: workflowRunId,
 				name: workflowRun.name as WorkflowName,
 				versionId: workflowRun.versionId as WorkflowVersionId,
+				source: workflowRun.source,
 				options: workflowRun.options ?? {},
 				logger,
 				sleep: createSleeper(handle, logger),
@@ -119,9 +121,11 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 					replayManifest: createReplayManifest(workflowRun),
 					configProvider,
 					hasher,
+					codec,
+					clientCodec: workflowRun.clientCodec,
 				},
 			},
-			workflowRun.input
+			workflowRun.input.encodedValue === undefined ? undefined : await codec.decode(workflowRun.input)
 		);
 
 		return true;
