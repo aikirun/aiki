@@ -300,20 +300,22 @@ const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
 
 ### Waiting for Child Completion
 
-To wait for a child workflow to complete, call `waitForStatus()` on the child handle:
+To wait for a child workflow to finish, call `wait()` on the child handle. The wait
+resolves when the child reaches any terminal status (`completed`, `failed`, or
+`cancelled`), and the result carries the state the child ended in:
 
 ```typescript
 const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
 	async handler(run, input) {
 		const childHandle = await childWorkflowV1.startAsChild(run, { userId: input.userId });
 
-		// Parent suspends until child completes
-		const result = await childHandle.waitForStatus("completed");
+		// Parent suspends until the child finishes
+		const { state } = await childHandle.wait();
 
-		if (result.success) {
-			return { childOutput: result.state.output };
+		if (state.status === "completed") {
+			return { childOutput: state.output };
 		} else {
-			throw new Error(`Child failed: ${result.cause}`);
+			throw new Error(`Child ended ${state.status}`);
 		}
 	},
 });
@@ -322,12 +324,12 @@ const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
 You can also wait with a timeout:
 
 ```typescript
-const result = await childHandle.waitForStatus("completed", {
+const result = await childHandle.wait({
 	timeout: { hours: 1 },
 });
 
-if (result.timeout) {
-	// Child didn't complete within 1 hour
+if (!result.success) {
+	// Child didn't finish within 1 hour
 }
 ```
 
@@ -347,11 +349,11 @@ const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
 			sendNotificationV1.startAsChild(run, { userId: input.userId }),
 		]);
 
-		// Wait for all to complete
+		// Wait for all to finish
 		const [userResult, orderResult, notifyResult] = await Promise.all([
-			userHandle.waitForStatus("completed"),
-			orderHandle.waitForStatus("completed"),
-			notifyHandle.waitForStatus("completed"),
+			userHandle.wait(),
+			orderHandle.wait(),
+			notifyHandle.wait(),
 		]);
 
 		return {

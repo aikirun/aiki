@@ -1,6 +1,6 @@
 import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import { isNonEmptyArray, partitionArray } from "@aikirun/lib/collection/array";
+import { asNonEmptyArray, isNonEmptyArray, partitionArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
@@ -24,6 +24,7 @@ import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import { computeRank } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
+import { deliverTerminatedSignalToParentRun, type TerminatedChildRun } from "../service/deliver-terminated-signals";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
 import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "../service/schedule";
 
@@ -443,7 +444,7 @@ async function processOverlapCancelPreviousSchedules(
 		cancelPreviousAndInsertRunsInTx(
 			context,
 			deps.childRunCanceller,
-			now,
+			now as TimestampMs,
 			{
 				runIdsToCancel,
 				runsToCancel,
@@ -464,7 +465,7 @@ async function processOverlapCancelPreviousSchedules(
 async function cancelPreviousAndInsertRunsInTx(
 	context: DaemonContext,
 	childRunCanceller: ChildRunCanceller,
-	now: number,
+	now: TimestampMs,
 	entries: {
 		runIdsToCancel: string[];
 		runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; pool?: string }>;
@@ -490,27 +491,30 @@ async function cancelPreviousAndInsertRunsInTx(
 	const cancelledRuns = isNonEmptyArray(runIdsToCancel)
 		? await txRepos.workflowRun.bulkTransitionToCancelled(context, runIdsToCancel)
 		: [];
-	const cancelledRunIds = cancelledRuns.map((run) => run.id);
+	const cancelledRunsById = new Map(cancelledRuns.map((run) => [run.id, run]));
 
 	// Step 2: Discard in-flight tasks and outbox entries for the cancelled runs, then insert
 	// cancel state transitions only for actually cancelled runs and set latestStateTransitionId
-	if (isNonEmptyArray(cancelledRunIds)) {
+	if (cancelledRunsById.size) {
+		const cancelledRunIds = asNonEmptyArray(Array.from(cancelledRunsById.keys()));
 		await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
-		await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now as TimestampMs);
+		await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now);
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
-		const cancelledRunIdsSet = new Set(cancelledRunIds);
 		const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
 		const cancelledRunStateTransitionIdUpdates: {
 			filter: { namespaceId: NamespaceId; id: string };
 			update: { stateTransitionId: string };
 		}[] = [];
-		const cancelledRuns: CancelledRunMeta[] = [];
+		const cancelledRunsMeta: CancelledRunMeta[] = [];
+		const cancelledRunsHavingParent: TerminatedChildRun[] = [];
 
 		for (const run of runsToCancel) {
-			if (!cancelledRunIdsSet.has(run.id)) {
+			const cancelledRun = cancelledRunsById.get(run.id);
+			if (!cancelledRun) {
 				continue;
 			}
+
 			const stateTransitionId = ulid();
 			cancelStateTransitionEntries.push({
 				id: stateTransitionId,
@@ -524,15 +528,28 @@ async function cancelPreviousAndInsertRunsInTx(
 				filter: { namespaceId: run.namespaceId, id: run.id },
 				update: { stateTransitionId },
 			});
-			cancelledRuns.push({ namespaceId: run.namespaceId, id: run.id, pool: run.pool });
+			cancelledRunsMeta.push({ namespaceId: run.namespaceId, id: run.id, pool: run.pool });
+
+			if (cancelledRun.parentWorkflowRunId !== null) {
+				cancelledRunsHavingParent.push({
+					namespaceId: run.namespaceId,
+					id: run.id,
+					latestStateTransitionId: stateTransitionId,
+					parentWorkflowRunId: cancelledRun.parentWorkflowRunId,
+					status: "cancelled",
+				});
+			}
 		}
 
 		if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionIdUpdates)) {
 			await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
 			await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionIdUpdates);
 		}
-		if (isNonEmptyArray(cancelledRuns)) {
-			await childRunCanceller.cancel(cancelledRuns, txRepos, context.logger);
+		if (isNonEmptyArray(cancelledRunsHavingParent)) {
+			await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, context.logger);
+		}
+		if (isNonEmptyArray(cancelledRunsMeta)) {
+			await childRunCanceller.cancel(cancelledRunsMeta, txRepos, context.logger);
 		}
 	}
 

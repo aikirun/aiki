@@ -1,0 +1,5 @@
+ALTER TABLE "child_workflow_run_wait" DROP CONSTRAINT "chk_child_workflow_run_wait_timeout_requires_timed_out_at";--> statement-breakpoint
+ALTER TABLE "child_workflow_run_wait" DROP CONSTRAINT "chk_child_workflow_run_wait_completed_invariants";--> statement-breakpoint
+UPDATE "child_workflow_run_wait" SET "child_workflow_run_status" = NULL WHERE "status" = 'timeout';--> statement-breakpoint
+ALTER TABLE "child_workflow_run_wait" ADD CONSTRAINT "chk_child_workflow_run_wait_timeout_invariants" CHECK ("child_workflow_run_wait"."status" != 'timeout' OR ("child_workflow_run_wait"."timed_out_at" IS NOT NULL AND "child_workflow_run_wait"."child_workflow_run_status" IS NULL AND "child_workflow_run_wait"."child_workflow_run_state_transition_id" IS NULL));--> statement-breakpoint
+ALTER TABLE "child_workflow_run_wait" ADD CONSTRAINT "chk_child_workflow_run_wait_completed_invariants" CHECK ("child_workflow_run_wait"."status" != 'completed' OR ("child_workflow_run_wait"."completed_at" IS NOT NULL AND "child_workflow_run_wait"."child_workflow_run_state_transition_id" IS NOT NULL AND "child_workflow_run_wait"."child_workflow_run_status" IS NOT NULL));

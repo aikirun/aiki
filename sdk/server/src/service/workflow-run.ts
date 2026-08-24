@@ -16,11 +16,10 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ChildWorkflowRunInfo,
-	ChildWorkflowRunWait,
+	ChildWorkflowRunWaits,
 	EventWait,
 	Sleep,
 	TerminalWorkflowRunState,
-	TerminalWorkflowRunStatus,
 	WorkflowRunId,
 	WorkflowRunRecord,
 	WorkflowRunState,
@@ -32,12 +31,15 @@ import { ulid } from "ulidx";
 
 import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
+import type { ChildRunWaitWithState } from "../infra/db/types/child-workflow-run-wait";
 import type { EventWaitRow } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { ChildRunWithWorkflow, WorkflowRunWithWorkflowAndState } from "../infra/db/types/workflow-run";
 import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 import type { NamespaceRequestContext } from "../middleware/context";
 import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
+import { deliverTerminatedSignalToParentRun, type TerminatedChildRun } from "../service/deliver-terminated-signals";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
 
 export interface WorkflowRunServiceDeps {
@@ -407,19 +409,21 @@ async function createWorkflowRunInTx(
 }
 
 async function cancelByIdsInTx(
-	{ namespaceId, logger }: NamespaceRequestContext,
+	context: NamespaceRequestContext,
 	ids: NonEmptyArray<string>,
 	txRepos: TxRepositories,
 	childRunCanceller: ChildRunCanceller
 ) {
+	const { namespaceId, logger } = context;
 	const cancelledRuns = await txRepos.workflowRun.bulkTransitionToCancelledInNamespace(namespaceId, ids);
 	if (!isNonEmptyArray(cancelledRuns)) {
 		return { cancelledIds: [] };
 	}
 	const cancelledRunIds = cancelledRuns.map((run) => run.id) as NonEmptyArray<string>;
 
+	const now = Date.now() as TimestampMs;
 	await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
-	await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, Date.now() as TimestampMs);
+	await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now);
 	await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
 	const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -428,6 +432,7 @@ async function cancelByIdsInTx(
 		update: { stateTransitionId: string };
 	}[] = [];
 	const cancelledRunsMeta: CancelledRunMeta[] = [];
+	const cancelledRunsHavingParent: TerminatedChildRun[] = [];
 
 	for (const run of cancelledRuns) {
 		const stateTransitionId = ulid();
@@ -445,11 +450,24 @@ async function cancelByIdsInTx(
 			id: run.id,
 			pool: run.options?.pool,
 		});
+		if (run.parentWorkflowRunId !== null) {
+			cancelledRunsHavingParent.push({
+				namespaceId,
+				id: run.id,
+				latestStateTransitionId: stateTransitionId,
+				parentWorkflowRunId: run.parentWorkflowRunId,
+				status: "cancelled",
+			});
+		}
 	}
 
 	if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionUpdates)) {
 		await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
 		await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionUpdates);
+	}
+
+	if (isNonEmptyArray(cancelledRunsHavingParent)) {
+		await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, logger);
 	}
 
 	if (isNonEmptyArray(cancelledRunsMeta)) {
@@ -459,15 +477,19 @@ async function cancelByIdsInTx(
 	return { cancelledIds: cancelledRunIds };
 }
 
-type WorkflowRunWithWorkflowAndState = NonNullable<
-	Awaited<ReturnType<Repositories["workflowRun"]["getByIdWithWorkflowAndState"]>>
->;
-
 async function getWorkflowRun(
 	repos: Repositories,
 	namespaceId: NamespaceId,
 	{ run, workflow, state }: WorkflowRunWithWorkflowAndState
 ): Promise<WorkflowRunRecord> {
+	// The run row (carrying signalSequence) is must be read before these rows.
+	// A signal landing between the two reads then shows up in the read event_wait/child_workflow_run_wait
+	// rows but not in the read signalSequence (it will be stale).
+	// A park request using using the stale signalSequence simply reschedules — safe.
+	// In the reverse order i.e. these rows being read before the run row, the signalSequence
+	// will be current but there will be no corresponding event_wait/child_workflow_run_wait rows is
+	// catastrophic because the wait would find no rows to replay against, then attempt park, which succeeds
+	// because the expectedSignalSequence matches, therefore, sleeping through a signal that is already recorded.
 	const [taskRows, sleepRows, eventWaitRows, childRunRows, childWorkflowRunWaitRows] = await Promise.all([
 		repos.task.listByWorkflowRunIdWithState(run.id),
 		repos.sleep.listByWorkflowRunId(run.id as WorkflowRunId),
@@ -608,25 +630,19 @@ function buildEventWaitsByName(eventWaitRows: EventWaitRow[]): Record<string, Ev
 }
 
 function buildChildWorkflowRunsByAddress(
-	childRuns: Awaited<ReturnType<Repositories["workflowRun"]["getChildRunsWithWorkflow"]>>,
-	childRunWaits: Awaited<ReturnType<Repositories["childWorkflowRunWait"]["listByParentRunIdWithChildState"]>>
+	childRuns: ChildRunWithWorkflow[],
+	childRunWaits: ChildRunWaitWithState[]
 ): Record<string, ChildWorkflowRunInfo[]> {
-	const waitsByChildRunId = new Map<WorkflowRunId, Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]>>();
+	const waitsByChildRunId = new Map<WorkflowRunId, ChildWorkflowRunWaits>();
 
 	for (const childRunWait of childRunWaits) {
 		const childRunId = childRunWait.childWorkflowRunId as WorkflowRunId;
 
 		let waits = waitsByChildRunId.get(childRunId);
 		if (!waits) {
-			waits = {
-				cancelled: [],
-				completed: [],
-				failed: [],
-			};
+			waits = { timeouts: [] };
 			waitsByChildRunId.set(childRunId, waits);
 		}
-
-		const { childWorkflowRunStatus } = childRunWait;
 
 		switch (childRunWait.status) {
 			case "completed": {
@@ -638,11 +654,7 @@ function buildChildWorkflowRunsByAddress(
 					throw new Error(`Child workflow run wait ${childRunWait.id} completed but no child run state`);
 				}
 
-				waits[childWorkflowRunStatus].push({
-					status: childRunWait.status,
-					completedAt: completedAt,
-					childWorkflowRunState: childWorkflowRunState as TerminalWorkflowRunState,
-				});
+				waits.terminal = { state: childWorkflowRunState as TerminalWorkflowRunState, completedAt };
 				break;
 			}
 			case "timeout": {
@@ -651,10 +663,7 @@ function buildChildWorkflowRunsByAddress(
 					throw new Error(`Child workflow run wait ${childRunWait.id} timed out but no timedOutAt timestamp`);
 				}
 
-				waits[childWorkflowRunStatus].push({
-					status: childRunWait.status,
-					timedOutAt: timedOutAt,
-				});
+				waits.timeouts.push({ timedOutAt });
 				break;
 			}
 			default:
@@ -676,11 +685,7 @@ function buildChildWorkflowRunsByAddress(
 			name: childWorkflow.name,
 			versionId: childWorkflow.versionId,
 			inputHash: childRun.inputHash,
-			waits: waitsByChildRunId.get(childRun.id as WorkflowRunId) ?? {
-				cancelled: [],
-				completed: [],
-				failed: [],
-			},
+			waits: waitsByChildRunId.get(childRun.id as WorkflowRunId) ?? { timeouts: [] },
 		};
 
 		const addressChildRuns = childRunsByAddress[childRunAddress];

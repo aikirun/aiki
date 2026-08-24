@@ -1,7 +1,6 @@
 import { SCHEDULE_OVERLAP_POLICIES, SCHEDULE_STATUSES, SCHEDULE_TYPES } from "@aikirun/types/schedule";
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
-	CHILD_WORKFLOW_RUN_WAIT_STATUSES,
 	EVENT_WAIT_STATUSES,
 	SLEEP_STATUSES,
 	TERMINAL_WORKFLOW_RUN_STATUSES,
@@ -25,6 +24,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { timestampMs } from "./timestamp";
+import { CHILD_WORKFLOW_RUN_WAIT_STATUSES } from "../constants/child-workflow-run-wait";
 import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../constants/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
@@ -321,7 +321,7 @@ export const childWorkflowRunWait = pgTable(
 		id: text("id").primaryKey(),
 		parentWorkflowRunId: text("parent_workflow_run_id").notNull(),
 		childWorkflowRunId: text("child_workflow_run_id").notNull(),
-		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status").notNull(),
+		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status"),
 
 		status: childWorkflowRunWaitStatusEnum("status").notNull(),
 		completedAt: timestampMs("completed_at"),
@@ -350,11 +350,11 @@ export const childWorkflowRunWait = pgTable(
 		index("idx_child_workflow_run_wait_parent_id").on(table.parentWorkflowRunId, table.id),
 		check(
 			"chk_child_workflow_run_wait_completed_invariants",
-			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL)`
+			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NOT NULL)`
 		),
 		check(
-			"chk_child_workflow_run_wait_timeout_requires_timed_out_at",
-			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
+			"chk_child_workflow_run_wait_timeout_invariants",
+			sql`${table.status} != 'timeout' OR (${table.timedOutAt} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NULL AND ${table.childWorkflowRunStateTransitionId} IS NULL)`
 		),
 	]
 );

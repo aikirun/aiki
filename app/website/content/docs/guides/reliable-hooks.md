@@ -11,12 +11,12 @@ const orderWithHooks = workflow({ name: "order-with-hooks" });
 
 const orderWithHooksV1 = orderWithHooks.v("1.0.0", {
 	async handler(run, input: { orderId: string }) {
-		// Run main workflow and wait for completion
+		// Run main workflow and wait for it to finish
 		const handle = await orderWorkflowV1.startAsChild(run, input);
-		const result = await handle.waitForStatus("completed");
+		const { state } = await handle.wait();
 
-		if (!result.success) {
-			throw new Error(`Order workflow failed: ${result.cause}`);
+		if (state.status !== "completed") {
+			throw new Error(`Order workflow ended ${state.status}`);
 		}
 
 		// Run hook
@@ -24,7 +24,7 @@ const orderWithHooksV1 = orderWithHooks.v("1.0.0", {
 			orderId: input.orderId,
 		});
 
-		return result.state.output;
+		return state.output;
 	},
 });
 ```

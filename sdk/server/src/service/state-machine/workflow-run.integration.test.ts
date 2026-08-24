@@ -2,7 +2,8 @@ import { asConfigProvider } from "@aikirun/lib/config";
 import { NotFoundError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
-import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { WorkflowRunTransitionStateRequestV1 } from "@aikirun/types/api/workflow-run";
+import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { createWorkflowRunStateMachine } from "./workflow-run";
 import { describe, expect, test } from "bun:test";
@@ -714,7 +715,6 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 					state: {
 						status: "awaiting_child_workflow",
 						childWorkflowRunId: child.runId,
-						childWorkflowRunStatus: "completed",
 					},
 					expectedRevision: parent.revisionWhenClaimed,
 					expectedSignalSequence: 0,
@@ -776,10 +776,13 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 			]);
 		}));
 
-	test("a park on a child already at the awaited status schedules the run immediately", () =>
+	test("a park on an already terminal child schedules the run immediately", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
-			const child = await seedCompletedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedCompletedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
 
 			const stateMachine = createStateMachine(repos);
 			const parkedAt = Date.now();
@@ -790,9 +793,9 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 					state: {
 						status: "awaiting_child_workflow",
 						childWorkflowRunId: child.runId,
-						childWorkflowRunStatus: "completed",
 					},
 					expectedRevision: parent.revisionWhenClaimed,
+					// The sequence the parent's worker read before the child finished.
 					expectedSignalSequence: 0,
 				})
 			);
@@ -803,6 +806,129 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 				attempts: parent.attemptsWhenClaimed,
 			});
 		}));
+});
+
+describe("WorkflowRunStateMachine child terminal signals", () => {
+	const terminalTransitionByStatus = {
+		completed: {
+			request: (id: string, expectedRevision: number) =>
+				({
+					type: "optimistic",
+					id,
+					state: { status: "completed", output: { receiptId: "child-receipt-9" } },
+					expectedRevision,
+				}) as const,
+			expectedChildState: { status: "completed", output: { receiptId: "child-receipt-9" } },
+		},
+		failed: {
+			request: (id: string, expectedRevision: number) =>
+				({
+					type: "optimistic",
+					id,
+					state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+					expectedRevision,
+				}) as const,
+			expectedChildState: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+		},
+		cancelled: {
+			request: (id: string) => ({ type: "pessimistic", id, state: { status: "cancelled" } }) as const,
+			expectedChildState: { status: "cancelled" },
+		},
+	} satisfies Record<
+		TerminalWorkflowRunStatus,
+		{
+			request: (id: string, expectedRevision: number) => WorkflowRunTransitionStateRequestV1;
+			expectedChildState: unknown;
+		}
+	>;
+
+	for (const [status, { request, expectedChildState }] of Object.entries(terminalTransitionByStatus)) {
+		test(`a child reaching ${status} writes the wait row`, () =>
+			withHarness(async ({ context, repos, publisher }) => {
+				const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+				const child = await seedClaimedRun(
+					{ namespaceRequestContext: context, repos, publisher },
+					{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+				);
+
+				const stateMachine = createStateMachine(repos);
+				await stateMachine.transitionState(context, request(child.runId, child.revisionWhenClaimed));
+
+				expect(await repos.childWorkflowRunWait.listByParentRunIdWithChildState(parent.runId)).toEqual([
+					expect.objectContaining({
+						parentWorkflowRunId: parent.runId,
+						childWorkflowRunId: child.runId,
+						childWorkflowRunStatus: status,
+						status: "completed",
+						childWorkflowRunState: expectedChildState,
+					}),
+				]);
+			}));
+
+		test(`a child reaching ${status} bumps its parent's signal sequence`, () =>
+			withHarness(async ({ context, repos, publisher }) => {
+				const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+				const child = await seedClaimedRun(
+					{ namespaceRequestContext: context, repos, publisher },
+					{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+				);
+
+				const stateMachine = createStateMachine(repos);
+				await stateMachine.transitionState(context, request(child.runId, child.revisionWhenClaimed));
+
+				const parentRecord = await repos.workflowRun.getByIdWithState({
+					namespaceId: context.namespaceId,
+					id: parent.runId,
+				});
+				expect(parentRecord).toEqual(
+					expect.objectContaining({
+						run: expect.objectContaining({
+							id: parent.runId,
+							revision: parent.revisionWhenClaimed,
+							signalSequence: 1,
+						}),
+						state: { status: "running" },
+					})
+				);
+			}));
+
+		test(`a child reaching ${status} wakes a parent parked on it`, () =>
+			withHarness(async ({ context, repos, publisher }) => {
+				const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+				const child = await seedClaimedRun(
+					{ namespaceRequestContext: context, repos, publisher },
+					{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+				);
+
+				const stateMachine = createStateMachine(repos);
+				const parked = await stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: parent.runId,
+					state: {
+						status: "awaiting_child_workflow",
+						childWorkflowRunId: child.runId,
+					},
+					expectedRevision: parent.revisionWhenClaimed,
+					expectedSignalSequence: 0,
+				});
+
+				const childTerminatedAt = Date.now();
+				await withFakeClock(childTerminatedAt, () =>
+					stateMachine.transitionState(context, request(child.runId, child.revisionWhenClaimed))
+				);
+
+				const parentRun = await repos.workflowRun.getByIdWithState({
+					namespaceId: context.namespaceId,
+					id: parent.runId,
+				});
+				expect(parentRun).toEqual(
+					expect.objectContaining({
+						run: expect.objectContaining({ id: parent.runId, status: "scheduled", revision: parked.revision + 1 }),
+						state: { status: "scheduled", reason: "child_workflow", scheduledAt: childTerminatedAt },
+					})
+				);
+			}));
+	}
 });
 
 describe("WorkflowRunStateMachine imminent run timers", () => {

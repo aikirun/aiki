@@ -1,6 +1,6 @@
 import type {
 	ChildWorkflowRunInfo,
-	ChildWorkflowRunWaitCompleted,
+	ChildWorkflowRunWaits,
 	EventWait,
 	Sleep,
 	TerminalWorkflowRunStatus,
@@ -312,13 +312,11 @@ function TaskText({ text, color }: { text: string; color: string }) {
 
 function resolveChildStatus(child: ChildWorkflowRunInfo): {
 	status: TerminalWorkflowRunStatus | "running";
-	resolvedWait: ChildWorkflowRunWaitCompleted | null;
+	resolvedWait: TerminalChildWait | null;
 } {
-	for (const terminalStatus of ["completed", "failed", "cancelled"] as const) {
-		const wait = child.waits[terminalStatus][0];
-		if (wait?.status === "completed") {
-			return { status: terminalStatus, resolvedWait: wait };
-		}
+	const terminal = child.waits.terminal;
+	if (terminal) {
+		return { status: terminal.state.status, resolvedWait: terminal };
 	}
 	return { status: "running", resolvedWait: null };
 }
@@ -475,8 +473,10 @@ function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; 
 	);
 }
 
-function ChildWorkflowResolvedPre({ wait }: { wait: ChildWorkflowRunWaitCompleted }) {
-	const childState = wait.childWorkflowRunState;
+type TerminalChildWait = NonNullable<ChildWorkflowRunWaits["terminal"]>;
+
+function ChildWorkflowResolvedPre({ wait }: { wait: TerminalChildWait }) {
+	const childState = wait.state;
 
 	if (childState.status === "completed" && childState.output !== undefined) {
 		return (

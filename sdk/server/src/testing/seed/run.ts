@@ -36,6 +36,7 @@ export interface SeedRunDeps {
 
 interface SeedRunOverrides {
 	options?: WorkflowStartOptions;
+	parent?: { workflowRunId: string; expectedRevision: number };
 }
 
 export async function seedPooledScheduledRun(deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">) {
@@ -59,6 +60,7 @@ export async function seedScheduledRun(
 		input,
 		inputHash: { value: await hashInput(input) },
 		options: overrides?.options,
+		parent: overrides?.parent,
 	});
 
 	return { runId, revisionWhenScheduled: 0, attemptsWhenScheduled: 1 };

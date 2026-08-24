@@ -1,4 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
 import type { WorkflowRunStateRequest } from "@aikirun/types/api/workflow-run";
 import {
@@ -109,7 +110,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 });
 
 describe("convertDurationToTimestamp", () => {
-	const now = 1_000;
+	const now = 1_000 as TimestampMs;
 
 	test("scheduled: scheduledInMs becomes an absolute scheduledAt", () => {
 		expect(convertDurationToTimestamp({ status: "scheduled", reason: "event", scheduledInMs: 500 }, now)).toEqual({
@@ -176,7 +177,6 @@ describe("convertDurationToTimestamp", () => {
 				{
 					status: "awaiting_child_workflow",
 					childWorkflowRunId: "child-1",
-					childWorkflowRunStatus: "completed",
 					timeoutInMs: 500,
 				},
 				now
@@ -184,21 +184,16 @@ describe("convertDurationToTimestamp", () => {
 		).toEqual({
 			status: "awaiting_child_workflow",
 			childWorkflowRunId: "child-1",
-			childWorkflowRunStatus: "completed",
 			timeoutAt: 1_500,
 		});
 	});
 
 	test("awaiting_child_workflow without a timeout: passes through with no timeoutAt", () => {
 		expect(
-			convertDurationToTimestamp(
-				{ status: "awaiting_child_workflow", childWorkflowRunId: "child-1", childWorkflowRunStatus: "completed" },
-				now
-			)
+			convertDurationToTimestamp({ status: "awaiting_child_workflow", childWorkflowRunId: "child-1" }, now)
 		).toEqual({
 			status: "awaiting_child_workflow",
 			childWorkflowRunId: "child-1",
-			childWorkflowRunStatus: "completed",
 		});
 	});
 

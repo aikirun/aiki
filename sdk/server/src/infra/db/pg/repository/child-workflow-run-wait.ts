@@ -1,3 +1,4 @@
+import type { WorkflowRunState } from "@aikirun/types/workflow";
 import { eq, getTableColumns } from "drizzle-orm";
 
 import { toWorkflowRunState } from "./state-transition";
@@ -7,13 +8,17 @@ import { childWorkflowRunWait, stateTransition } from "../schema";
 export type ChildWorkflowRunWaitRow = typeof childWorkflowRunWait.$inferSelect;
 export type ChildWorkflowRunWaitRowInsert = typeof childWorkflowRunWait.$inferInsert;
 
+export type ChildRunWaitWithState = ChildWorkflowRunWaitRow & {
+	childWorkflowRunState: WorkflowRunState | null;
+};
+
 export const createChildWorkflowRunWaitRepository = (db: PgDb) => ({
 	async insert(input: ChildWorkflowRunWaitRowInsert | ChildWorkflowRunWaitRowInsert[]): Promise<void> {
 		const values = Array.isArray(input) ? input : [input];
 		await db.insert(childWorkflowRunWait).values(values);
 	},
 
-	async listByParentRunIdWithChildState(parentRunId: string) {
+	async listByParentRunIdWithChildState(parentRunId: string): Promise<ChildRunWaitWithState[]> {
 		// TODO: explore loading in chunks
 		const rows = await db
 			.select({

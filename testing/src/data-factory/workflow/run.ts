@@ -26,7 +26,6 @@ export const workflowRunStateByStatus: {
 	awaiting_child_workflow: {
 		status: "awaiting_child_workflow",
 		childWorkflowRunId: "child-1",
-		childWorkflowRunStatus: "completed",
 	},
 	stalled: { status: "stalled" },
 	cancelled: { status: "cancelled" },
@@ -40,9 +39,7 @@ export const childWorkflowRunInfoFactory = Factory.define<ChildWorkflowRunInfo>(
 	versionId: "1.0.0",
 	inputHash: "hash",
 	waits: {
-		cancelled: [],
-		completed: [],
-		failed: [],
+		timeouts: [],
 	},
 }));
 

@@ -91,7 +91,6 @@ export const workflowRunStateAwaitingRetrySchema = type({
 export const workflowRunStateAwaitingChildWorkflowSchema = type({
 	status: "'awaiting_child_workflow'",
 	childWorkflowRunId: "string > 0",
-	childWorkflowRunStatus: terminalWorkflowRunStatusSchema,
 	"timeoutAt?": "number > 0 | undefined",
 });
 
@@ -142,21 +141,20 @@ export const terminalWorkflowRunStateSchema = workflowRunStateCancelledSchema
 	.or(workflowRunStateCompletedSchema)
 	.or(workflowRunStateFailedSchema);
 
-const childWorkflowRunWaitSchema = type({
-	status: "'completed'",
-	completedAt: "number > 0",
-	childWorkflowRunState: terminalWorkflowRunStateSchema,
-}).or({
-	status: "'timeout'",
-	timedOutAt: "number > 0",
-});
-
 const childWorkflowRunInfoSchema = type({
 	id: "string > 0",
 	name: "string > 0",
 	versionId: "string > 0",
 	inputHash: "string > 0",
-	waits: type({ "['cancelled'|'completed'|'failed']": childWorkflowRunWaitSchema.array() }),
+	waits: type({
+		timeouts: type({
+			timedOutAt: "number > 0",
+		}).array(),
+		"terminal?": type({
+			state: terminalWorkflowRunStateSchema,
+			completedAt: "number > 0",
+		}).or("undefined"),
+	}),
 });
 
 export const workflowRunRecordSchema = type({

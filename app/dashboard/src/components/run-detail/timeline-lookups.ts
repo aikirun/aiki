@@ -121,34 +121,15 @@ export function buildTimelineLookups(
 					const prev = transitions[j];
 					if (prev.type === "workflow_run" && prev.state.status === "awaiting_child_workflow") {
 						const childId = prev.state.childWorkflowRunId;
-						const waitForStatus = prev.state.childWorkflowRunStatus;
 						context.scheduledByChildWorkflowRunId = childId;
 						if (reason === "child_workflow_wait_timeout") {
 							context.childWorkflowTimedOut = true;
 							break;
 						}
-						// The wait row carries the child's terminal status; it also classifies rows written
-						// before the reason split, whose timed-out waits are labelled "child_workflow".
-						const childInfo = childWorkflowById.get(childId);
-						const waits = childInfo?.waits[waitForStatus];
-						if (waits && waits.length > 0) {
-							let waitIndex = 0;
-							for (let k = 0; k < j; k++) {
-								const t2 = transitions[k];
-								if (
-									t2.type === "workflow_run" &&
-									t2.state.status === "awaiting_child_workflow" &&
-									t2.state.childWorkflowRunId === childId
-								) {
-									waitIndex++;
-								}
-							}
-							const result = waits[waitIndex];
-							if (result?.status === "completed") {
-								context.childWorkflowStatus = result.childWorkflowRunState.status;
-							} else if (result?.status === "timeout") {
-								context.childWorkflowTimedOut = true;
-							}
+						// A wake means the child reached a terminal state; the terminal wait carries it.
+						const terminal = childWorkflowById.get(childId)?.waits.terminal;
+						if (terminal) {
+							context.childWorkflowStatus = terminal.state.status;
 						}
 						break;
 					}
