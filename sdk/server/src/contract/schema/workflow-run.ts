@@ -166,6 +166,7 @@ export const workflowRunRecordSchema = type({
 	source: workflowSourceSchema,
 	createdAt: "number > 0",
 	revision: "number >= 0",
+	signalSequence: "number.integer >= 0",
 	stateTransitionId: "string > 0",
 	"input?": "unknown",
 	inputHash: "string > 0",

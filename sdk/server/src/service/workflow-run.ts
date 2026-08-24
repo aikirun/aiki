@@ -483,6 +483,7 @@ async function getWorkflowRun(
 		source: workflow.source,
 		createdAt: run.createdAt,
 		revision: run.revision,
+		signalSequence: run.signalSequence,
 		stateTransitionId: run.latestStateTransitionId,
 		input: run.input,
 		inputHash: run.inputHash,

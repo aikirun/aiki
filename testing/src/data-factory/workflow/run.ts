@@ -53,6 +53,7 @@ const baseWorkflowRunRecord = (sequence: number): Omit<WorkflowRunRecord, "state
 	source: "user",
 	createdAt: 0,
 	revision: 0,
+	signalSequence: 0,
 	stateTransitionId: "transition",
 	inputHash: "hash",
 	attempts: 1,

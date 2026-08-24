@@ -18,6 +18,7 @@ import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
 import type { Repositories, TxRepositories } from "../../infra/db/types";
+import type { UpdateWorkflowRunParams } from "../../infra/db/types/workflow-run";
 import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import type { ChildRunCanceller } from "../cancel-child-runs";
@@ -177,7 +178,7 @@ async function transitionStateInTx(
 		throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
 	}
 
-	const now = Date.now();
+	const now = Date.now() as TimestampMs;
 	let toState = convertDurationToTimestamp(request.state, now);
 
 	if (fromState.status === "sleeping" && (toState.status === "scheduled" || toState.status === "cancelled")) {
@@ -229,6 +230,19 @@ async function transitionStateInTx(
 	}
 
 	const stateTransitionId = ulid();
+
+	const updatedRun = await updateWorkflowRun(
+		context,
+		runId,
+		request,
+		toState,
+		stateTransitionId,
+		attempts,
+		now,
+		txRepos
+	);
+	toState = updatedRun.state;
+
 	await txRepos.stateTransition.append({
 		id: stateTransitionId,
 		workflowRunId: runId,
@@ -237,8 +251,6 @@ async function transitionStateInTx(
 		attempt: attempts,
 		state: toState,
 	});
-
-	const newRevision = await updateWorkflowRun(context, runId, request, toState, stateTransitionId, attempts, txRepos);
 
 	if (imminentRunTimerQueue && toState.status === "scheduled") {
 		txRepos.onCommit(() => imminentRunTimerQueue.add([{ id: runId, scheduledAt: toState.scheduledAt }]));
@@ -264,7 +276,7 @@ async function transitionStateInTx(
 		);
 	}
 
-	return { revision: newRevision, state: toState, attempts };
+	return { revision: updatedRun.revision, state: toState, attempts };
 }
 
 async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: number, txRepos: TxRepositories) {
@@ -323,49 +335,108 @@ async function updateWorkflowRun(
 	toState: WorkflowRunState,
 	stateTransitionId: string,
 	attempts: number,
+	now: TimestampMs,
 	txRepos: TxRepositories
-): Promise<number> {
-	const updates: Record<string, unknown> = {
-		status: toState.status,
-		attempts,
-		latestStateTransitionId: stateTransitionId,
-		scheduledAt: null,
-		wakeupAt: null,
-		timeoutAt: null,
-		nextAttemptAt: null,
-	};
-	if (toState.status === "scheduled") {
-		updates.scheduledAt = toState.scheduledAt as TimestampMs;
-	} else if (toState.status === "sleeping") {
-		updates.wakeupAt = toState.wakeupAt as TimestampMs;
-	} else if (
-		(toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") &&
-		toState.timeoutAt !== undefined
-	) {
-		updates.timeoutAt = toState.timeoutAt as TimestampMs;
-	} else if (toState.status === "awaiting_retry") {
-		updates.nextAttemptAt = toState.nextAttemptAt as TimestampMs;
-	}
+): Promise<{ revision: number; state: WorkflowRunState }> {
+	const { namespaceId } = context;
 
-	if (request.type === "optimistic") {
-		const result = await txRepos.workflowRun.update(
-			{
-				namespaceId: context.namespaceId,
+	if (toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") {
+		if (request.type !== "optimistic" || !("expectedSignalSequence" in request)) {
+			// The request contract makes this impossible.
+			throw new Error(`Wait transition without expectedSignalSequence for run: ${runId}`);
+		}
+
+		const result = await txRepos.workflowRun.update({
+			waitForSignal: true,
+			filter: {
+				namespaceId,
 				id: runId,
 				revision: request.expectedRevision,
+				signalSequence: request.expectedSignalSequence,
 			},
-			updates
-		);
+			updates: {
+				attempts,
+				latestStateTransitionId: stateTransitionId,
+				onSignalSequenceMatch: {
+					status: toState.status,
+					timeoutAt: toState.timeoutAt !== undefined ? (toState.timeoutAt as TimestampMs) : null,
+				},
+				onSignalSequenceMismatch: { status: "scheduled", scheduledAt: now as TimestampMs },
+			},
+		});
 		if (!result) {
 			throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
 		}
-		return result.revision;
+
+		if (result.signalSequence !== request.expectedSignalSequence) {
+			// TODO: gather metrics on false re-schedules.
+			// This can happen when sequence was moved by an unrelated signal like an
+			// event different from the one we attempted to wait on.
+			// My bet is that these are rare occurrences, but if they bite, we'll need
+			// find a solution, possibly querying the db to see if a re-schedule can be skipped.
+			if (toState.status === "awaiting_event") {
+				return {
+					revision: result.revision,
+					state: { status: "scheduled", reason: "event", scheduledAt: now },
+				};
+			} else {
+				toState.status satisfies "awaiting_child_workflow";
+				return {
+					revision: result.revision,
+					state: { status: "scheduled", reason: "child_workflow", scheduledAt: now },
+				};
+			}
+		}
+
+		return { revision: result.revision, state: toState };
+	}
+
+	let updates: Extract<UpdateWorkflowRunParams, { waitForSignal: false }>["updates"];
+	if (toState.status === "scheduled") {
+		updates = {
+			status: toState.status,
+			attempts,
+			latestStateTransitionId: stateTransitionId,
+			scheduledAt: toState.scheduledAt as TimestampMs,
+		};
+	} else if (toState.status === "sleeping") {
+		updates = {
+			status: toState.status,
+			attempts,
+			latestStateTransitionId: stateTransitionId,
+			wakeupAt: toState.wakeupAt as TimestampMs,
+		};
+	} else if (toState.status === "awaiting_retry") {
+		updates = {
+			status: toState.status,
+			attempts,
+			latestStateTransitionId: stateTransitionId,
+			nextAttemptAt: toState.nextAttemptAt as TimestampMs,
+		};
 	} else {
-		const result = await txRepos.workflowRun.update({ namespaceId: context.namespaceId, id: runId }, updates);
+		updates = { status: toState.status, attempts, latestStateTransitionId: stateTransitionId };
+	}
+
+	if (request.type === "optimistic") {
+		const result = await txRepos.workflowRun.update({
+			waitForSignal: false,
+			filter: { namespaceId, id: runId, revision: request.expectedRevision },
+			updates,
+		});
+		if (!result) {
+			throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
+		}
+		return { revision: result.revision, state: toState };
+	} else {
+		const result = await txRepos.workflowRun.update({
+			waitForSignal: false,
+			filter: { namespaceId, id: runId },
+			updates,
+		});
 		if (!result) {
 			throw new NotFoundError(`Workflow run not found: ${runId}`);
 		}
-		return result.revision;
+		return { revision: result.revision, state: toState };
 	}
 }
 

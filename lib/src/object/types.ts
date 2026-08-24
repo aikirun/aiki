@@ -53,6 +53,32 @@ declare const _requireAtLeastOnePropTypeTests: [
 	>,
 ];
 
+export type AtMostOneProp<T, Keys extends keyof T = keyof T> =
+	| {
+			[K in Keys]-?: { [P in K]: T[K] } & { [P in Exclude<Keys, K>]?: never };
+	  }[Keys]
+	| Partial<Record<Keys, never>>;
+declare const _requireAtMostOnePropTypeTests: [
+	ExpectTrue<
+		Equal<
+			AtMostOneProp<{ a: string; b: number; c: boolean }>,
+			| { a: string; b: undefined; c: undefined }
+			| { a: undefined; b: number; c: undefined }
+			| { a: undefined; b: undefined; c: boolean }
+			| { a: undefined; b: undefined; c: undefined }
+		>
+	>,
+	ExpectTrue<
+		Equal<
+			AtMostOneProp<{ a?: string; b: number | null; c: boolean }>,
+			| { a: string | undefined; b: undefined; c: undefined }
+			| { a: undefined; b: number | null; c: undefined }
+			| { a: undefined; b: undefined; c: boolean }
+			| { a: undefined; b: undefined; c: undefined }
+		>
+	>,
+];
+
 type IsSubtype<SubT, SuperT> = SubT extends SuperT ? true : false;
 
 type IsUnion<T, Copy = T> = T extends unknown ? ([Copy] extends [T] ? false : true) : never;

@@ -124,6 +124,8 @@ function createStatusWaiter<Input, Output, Context, TEvents extends EventsDefini
 		expectedStatus: Status,
 		options?: ChildWorkflowRunWaitOptions<boolean>
 	): Promise<WorkflowRunWaitResult<Status, Output, boolean, false>> {
+		// TODO: refresh first? like how event waits do it
+
 		const nextIndex = nextIndexByStatus[expectedStatus];
 
 		const { run } = handle;

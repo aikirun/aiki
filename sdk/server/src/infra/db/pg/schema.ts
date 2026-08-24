@@ -128,6 +128,7 @@ export const workflowRun = pgTable(
 
 		status: workflowRunStatusEnum("status").notNull(),
 		revision: integer("revision").notNull().default(0),
+		signalSequence: integer("signal_sequence").notNull().default(0),
 		attempts: integer("attempts").notNull().default(1),
 
 		input: jsonb("input"),
