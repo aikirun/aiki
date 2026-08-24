@@ -202,7 +202,6 @@ export type WorkflowRunStateAwaitingRetry =
 export interface WorkflowRunStateAwaitingChildWorkflow extends WorkflowRunStateBase {
 	status: "awaiting_child_workflow";
 	childWorkflowRunId: string;
-	childWorkflowRunStatus: TerminalWorkflowRunStatus;
 	timeoutAt?: number;
 }
 
@@ -260,7 +259,10 @@ export type WorkflowRunStateInComplete =
 
 export type WorkflowRunState<Output = unknown> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
 
-export type TerminalWorkflowRunState = Extract<WorkflowRunState, { status: "cancelled" | "completed" | "failed" }>;
+export type TerminalWorkflowRunState<Output = unknown> = Extract<
+	WorkflowRunState<Output>,
+	{ status: "cancelled" | "completed" | "failed" }
+>;
 
 export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	id: string;
@@ -295,25 +297,15 @@ export interface ChildWorkflowRunInfo {
 	name: string;
 	versionId: string;
 	inputHash: string;
-	waits: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWait[]>;
+	waits: ChildWorkflowRunWaits;
 }
 
-export const CHILD_WORKFLOW_RUN_WAIT_STATUSES = ["completed", "timeout"] as const;
-export type ChildWorkflowRunWaitStatus = (typeof CHILD_WORKFLOW_RUN_WAIT_STATUSES)[number];
-
-export interface ChildWorkflowRunWaitBase {
-	status: ChildWorkflowRunWaitStatus;
+export interface ChildWorkflowRunWaits {
+	timeouts: {
+		timedOutAt: number;
+	}[];
+	terminal?: {
+		state: TerminalWorkflowRunState;
+		completedAt: number;
+	};
 }
-
-export interface ChildWorkflowRunWaitCompleted extends ChildWorkflowRunWaitBase {
-	status: "completed";
-	completedAt: number;
-	childWorkflowRunState: TerminalWorkflowRunState;
-}
-
-export interface ChildWorkflowRunWaitTimeout extends ChildWorkflowRunWaitBase {
-	status: "timeout";
-	timedOutAt: number;
-}
-
-export type ChildWorkflowRunWait = ChildWorkflowRunWaitCompleted | ChildWorkflowRunWaitTimeout;

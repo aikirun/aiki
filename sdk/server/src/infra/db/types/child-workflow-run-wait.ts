@@ -1,4 +1,5 @@
 export type {
+	ChildRunWaitWithState,
 	ChildWorkflowRunWaitRepository,
 	ChildWorkflowRunWaitRow,
 	ChildWorkflowRunWaitRowInsert,

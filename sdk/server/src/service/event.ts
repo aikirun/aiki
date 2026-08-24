@@ -81,8 +81,8 @@ async function sendEventToWorkflowRunInTx(
 	const { runId, eventName, data, reference } = params;
 	const { namespaceId } = context;
 
-	// acquire lock on run row so that the wakeup is never lost if the current status is running
-	// but there is a concurrent state transition moving it to awaiting_event
+	// acquire lock on run row so that the wakeup is never lost if its current status
+	// is running but there is a concurrent state transition moving it to awaiting_event
 	const runWithState = await txRepos.workflowRun.incrementSignalSequence({ namespaceId, id: runId });
 	if (!runWithState) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);

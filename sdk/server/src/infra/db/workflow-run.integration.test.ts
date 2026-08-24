@@ -23,7 +23,7 @@ describe("workflow run repository state reads", () => {
 				{ output: undefined }
 			);
 
-			const row = await repos.workflowRun.getByIdWithWorkflowAndState({ namespaceId: context.namespaceId, id: runId });
+			const row = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 
 			expect(row?.state).toContainKey("output");
 			expect(row?.state).toEqual({ status: "completed", output: undefined });

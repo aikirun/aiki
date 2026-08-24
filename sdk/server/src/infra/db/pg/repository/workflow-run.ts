@@ -15,6 +15,7 @@ import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import { toWorkflowRunState } from "./state-transition";
+import type { WorkflowRow } from "./workflow";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
@@ -47,9 +48,41 @@ export type UpdateWorkflowRunParams =
 export type WorkflowRunWithState = {
 	run: Pick<
 		WorkflowRunRow,
-		"id" | "status" | "revision" | "attempts" | "latestStateTransitionId" | "parentWorkflowRunId" | "options"
+		| "id"
+		| "status"
+		| "revision"
+		| "signalSequence"
+		| "attempts"
+		| "latestStateTransitionId"
+		| "options"
+		| "parentWorkflowRunId"
 	>;
 	state: WorkflowRunState;
+};
+
+export type WorkflowRunWithWorkflowAndState = {
+	run: Pick<
+		WorkflowRunRow,
+		| "id"
+		| "createdAt"
+		| "revision"
+		| "signalSequence"
+		| "attempts"
+		| "latestStateTransitionId"
+		| "input"
+		| "inputHash"
+		| "referenceId"
+		| "options"
+		| "parentWorkflowRunId"
+		| "scheduleId"
+	>;
+	workflow: Pick<WorkflowRow, "name" | "versionId" | "source">;
+	state: WorkflowRunState;
+};
+
+export type ChildRunWithWorkflow = {
+	run: Pick<WorkflowRunRow, "id" | "inputHash" | "referenceId">;
+	workflow: Pick<WorkflowRow, "name" | "versionId">;
 };
 
 export interface WorkflowRunMeta {
@@ -124,10 +157,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return result[0] ?? null;
 	},
 
-	async incrementSignalSequence(filter: {
-		namespaceId: NamespaceId;
-		id: WorkflowRunId;
-	}): Promise<{ run: Pick<WorkflowRunRow, "status" | "revision" | "signalSequence">; state: WorkflowRunState } | null> {
+	async incrementSignalSequence(filter: { namespaceId: NamespaceId; id: WorkflowRunId }) {
 		const result = await db
 			.update(workflowRun)
 			.set({ signalSequence: sql`${workflowRun.signalSequence} + 1` })
@@ -153,6 +183,32 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			return null;
 		}
 		return { run: row.run, state: toWorkflowRunState(row.state) };
+	},
+
+	async bulkIncrementSignalSequence(runs: NonEmptyArray<{ namespaceId: NamespaceId; id: WorkflowRunId }>) {
+		// Locked in id order so concurrent bulk deliveries acquire the same rows the same way.
+		const sortedRuns = [...runs].sort((a, b) => (a.id < b.id ? -1 : 1));
+		const valueRows = sortedRuns.map(({ namespaceId, id }, index) => {
+			if (index === 0) {
+				return sql`(${namespaceId}::text, ${id}::text)`;
+			}
+			return sql`(${namespaceId}, ${id})`;
+		});
+
+		return db
+			.update(workflowRun)
+			.set({ signalSequence: sql`${workflowRun.signalSequence} + 1` })
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(namespace_id, id)`)
+			.where(and(sql`${workflowRun.namespaceId} = v.namespace_id`, sql`${workflowRun.id} = v.id`))
+			.returning({
+				id: workflowRun.id,
+				namespaceId: workflowRun.namespaceId,
+				status: workflowRun.status,
+				revision: workflowRun.revision,
+				signalSequence: workflowRun.signalSequence,
+				attempts: workflowRun.attempts,
+				latestStateTransitionId: workflowRun.latestStateTransitionId,
+			});
 	},
 
 	async exists(namespaceId: NamespaceId, id: string): Promise<boolean> {
@@ -185,10 +241,11 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 					id: workflowRun.id,
 					status: workflowRun.status,
 					revision: workflowRun.revision,
+					signalSequence: workflowRun.signalSequence,
 					attempts: workflowRun.attempts,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
-					parentWorkflowRunId: workflowRun.parentWorkflowRunId,
 					options: workflowRun.options,
+					parentWorkflowRunId: workflowRun.parentWorkflowRunId,
 				},
 				state: stateTransition.state,
 			})
@@ -205,7 +262,10 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return { run: row.run, state: toWorkflowRunState(row.state) };
 	},
 
-	async getByIdWithWorkflowAndState(filter: { namespaceId: NamespaceId; id: string }) {
+	async getByIdWithWorkflowAndState(filter: {
+		namespaceId: NamespaceId;
+		id: string;
+	}): Promise<WorkflowRunWithWorkflowAndState | null> {
 		const result = await db
 			.select({
 				run: {
@@ -321,7 +381,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.limit(10_000);
 	},
 
-	async getChildRunsWithWorkflow(filter: { namespaceId: NamespaceId; id: string }) {
+	async getChildRunsWithWorkflow(filter: { namespaceId: NamespaceId; id: string }): Promise<ChildRunWithWorkflow[]> {
 		// TODO: explore loading in chunks
 		return db
 			.select({
@@ -630,6 +690,46 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.limit(limit);
 	},
 
+	async bulkTransitionToScheduled(
+		fromStatus: WaitingForSignalWorkflowRunStatus,
+		scheduledAt: TimestampMs,
+		runs: NonEmptyArray<{
+			filter: { namespaceId: NamespaceId; id: string; revision: number };
+			update: { stateTransitionId: string };
+		}>
+	): Promise<string[]> {
+		const valueRows = runs.map(({ filter, update }, index) => {
+			if (index === 0) {
+				return sql`(${filter.namespaceId}::text, ${filter.id}::text, ${filter.revision}::integer, ${update.stateTransitionId}::text)`;
+			}
+			return sql`(${filter.namespaceId}, ${filter.id}, ${filter.revision}, ${update.stateTransitionId})`;
+		});
+
+		const result = await db
+			.update(workflowRun)
+			.set({
+				status: "scheduled",
+				revision: sql`${workflowRun.revision} + 1`,
+				scheduledAt,
+				wakeupAt: null,
+				timeoutAt: null,
+				nextAttemptAt: null,
+				latestStateTransitionId: sql`v.state_transition_id`,
+			})
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(namespace_id, id, revision, state_transition_id)`)
+			.where(
+				and(
+					eq(workflowRun.status, fromStatus),
+					sql`${workflowRun.namespaceId} = v.namespace_id`,
+					sql`${workflowRun.id} = v.id`,
+					sql`${workflowRun.revision} = v.revision`
+				)
+			)
+			.returning({ id: workflowRun.id });
+
+		return result.map((row) => row.id);
+	},
+
 	async bulkTransitionToQueued(
 		_context: DaemonContext,
 		fromStatus: "scheduled" | "sleeping" | "awaiting_retry" | "awaiting_event" | "awaiting_child_workflow" | "running",
@@ -686,7 +786,12 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 					inArray(workflowRun.status, NON_TERMINAL_WORKFLOW_RUN_STATUSES)
 				)
 			)
-			.returning({ id: workflowRun.id, attempts: workflowRun.attempts, options: workflowRun.options });
+			.returning({
+				id: workflowRun.id,
+				attempts: workflowRun.attempts,
+				options: workflowRun.options,
+				parentWorkflowRunId: workflowRun.parentWorkflowRunId,
+			});
 
 		return result;
 	},
@@ -708,6 +813,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				namespaceId: workflowRun.namespaceId,
 				attempts: workflowRun.attempts,
 				options: workflowRun.options,
+				parentWorkflowRunId: workflowRun.parentWorkflowRunId,
 			});
 
 		return result;

@@ -169,6 +169,20 @@
 			"when": 1787395980116,
 			"tag": "0023_dashing_phil_sheldon",
 			"breakpoints": true
+		},
+		{
+			"idx": 25,
+			"version": "7",
+			"when": 1787565412838,
+			"tag": "0025_small_tiger_shark",
+			"breakpoints": true
+		},
+		{
+			"idx": 26,
+			"version": "7",
+			"when": 1787581975349,
+			"tag": "0026_blue_stone_men",
+			"breakpoints": true
 		}
 	]
 }

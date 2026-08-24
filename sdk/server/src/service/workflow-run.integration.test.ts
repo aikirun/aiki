@@ -220,6 +220,126 @@ describe("WorkflowRunService cancelByIds", () => {
 			expect(sleeps).toEqual([expect.objectContaining({ name: "nap", status: "cancelled", cancelledAt })]);
 		}));
 
+	test("cancelling a child writes the terminal wait row", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const { service } = createService(repos);
+			await service.cancelByIds(context, { ids: [child.runId] });
+
+			expect(await repos.childWorkflowRunWait.listByParentRunIdWithChildState(parent.runId)).toEqual([
+				expect.objectContaining({
+					parentWorkflowRunId: parent.runId,
+					childWorkflowRunId: child.runId,
+					childWorkflowRunStatus: "cancelled",
+					status: "completed",
+					childWorkflowRunState: { status: "cancelled" },
+				}),
+			]);
+		}));
+
+	test("cancelling a child bumps its parent's signal sequence", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const { service } = createService(repos);
+			await service.cancelByIds(context, { ids: [child.runId] });
+
+			const parentRecord = await repos.workflowRun.getByIdWithState({
+				namespaceId: context.namespaceId,
+				id: parent.runId,
+			});
+			expect(parentRecord).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: parent.runId,
+						revision: parent.revisionWhenClaimed,
+						signalSequence: 1,
+					}),
+					state: { status: "running" },
+				})
+			);
+		}));
+
+	test("cancelling two children together bumps their parent once", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const firstChild = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+			const secondChild = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const { service } = createService(repos);
+			await service.cancelByIds(context, { ids: [firstChild.runId, secondChild.runId] });
+
+			const parentRecord = await repos.workflowRun.getByIdWithState({
+				namespaceId: context.namespaceId,
+				id: parent.runId,
+			});
+			expect(parentRecord).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: parent.runId,
+						revision: parent.revisionWhenClaimed,
+						signalSequence: 1,
+					}),
+					state: { status: "running" },
+				})
+			);
+		}));
+
+	test("cancelling a child wakes a parent parked on it", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const { service, stateMachine } = createService(repos);
+			const parked = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: parent.runId,
+				state: {
+					status: "awaiting_child_workflow",
+					childWorkflowRunId: child.runId,
+				},
+				expectedRevision: parent.revisionWhenClaimed,
+				expectedSignalSequence: 0,
+			});
+
+			const cancelledAt = Date.now();
+			await withFakeClock(cancelledAt, () => service.cancelByIds(context, { ids: [child.runId] }));
+
+			const parentRun = await repos.workflowRun.getByIdWithState({
+				namespaceId: context.namespaceId,
+				id: parent.runId,
+			});
+			expect(parentRun).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: parent.runId,
+						status: "scheduled",
+						revision: parked.revision + 1,
+						signalSequence: 1,
+					}),
+					state: { status: "scheduled", reason: "child_workflow", scheduledAt: cancelledAt },
+				})
+			);
+		}));
+
 	Object.entries({
 		cancelled: (context, stateMachine, seed) =>
 			stateMachine.transitionState(context, {

@@ -239,10 +239,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			versionId: this.versionId,
 			referenceId: referenceId ?? inputHash.value,
 		});
-		const replayManifest = parentRun[INTERNAL].replayManifest;
+		const parentRunReplayManifest = parentRun[INTERNAL].replayManifest;
 
-		if (replayManifest.hasUnconsumedEntries()) {
-			const existingRunInfo = replayManifest.consumeNextChildWorkflowRun(address);
+		if (parentRunReplayManifest.hasUnconsumedEntries()) {
+			const existingRunInfo = parentRunReplayManifest.consumeNextChildWorkflowRun(address);
 			if (existingRunInfo) {
 				const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
 
@@ -262,7 +262,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				);
 			}
 
-			await this.throwNonDeterminismError(parentRun, parentRunHandle, inputHash.value, referenceId, replayManifest);
+			await this.throwNonDeterminismError(
+				parentRun,
+				parentRunHandle,
+				inputHash.value,
+				referenceId,
+				parentRunReplayManifest
+			);
 		}
 
 		const pool = parentRun.options.pool;
@@ -297,11 +303,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			client,
 			newRun as WorkflowRunRecord<Input, Output>,
 			parentRun[INTERNAL].handle,
-			{
-				cancelled: [],
-				completed: [],
-				failed: [],
-			},
+			{ timeouts: [] },
 			logger,
 			this[INTERNAL].eventsDefinition
 		);
@@ -312,9 +314,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
 		inputHash: string,
 		referenceId: string | undefined,
-		manifest: ReplayManifest
+		parentRunReplayManifest: ReplayManifest
 	): Promise<never> {
-		const unconsumedManifestEntries = manifest.getUnconsumedEntries();
+		const unconsumedManifestEntries = parentRunReplayManifest.getUnconsumedEntries();
 
 		const logMeta: Record<string, unknown> = {
 			"aiki.workflowName": this.name,
