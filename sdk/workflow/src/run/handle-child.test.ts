@@ -87,6 +87,7 @@ describe("childWorkflowRunHandle", () => {
 							childWorkflowRunStatus: "completed",
 						},
 						expectedRevision: 0,
+						expectedSignalSequence: 0,
 					},
 					{ revision: 1, state: workflowRunStateByStatus.awaiting_child_workflow, attempts: parentRecord.attempts }
 				);
@@ -112,6 +113,7 @@ describe("childWorkflowRunHandle", () => {
 							timeoutInMs: 300_000,
 						},
 						expectedRevision: 0,
+						expectedSignalSequence: 0,
 					},
 					{ revision: 1, state: workflowRunStateByStatus.awaiting_child_workflow, attempts: parentRecord.attempts }
 				);
@@ -138,6 +140,7 @@ describe("childWorkflowRunHandle", () => {
 							childWorkflowRunStatus: "completed",
 						},
 						expectedRevision: 0,
+						expectedSignalSequence: 0,
 					},
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);

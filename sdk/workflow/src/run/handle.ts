@@ -354,6 +354,14 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 					id: this.run.id,
 					state: targetState,
 				});
+			} else if (targetState.status === "awaiting_event" || targetState.status === "awaiting_child_workflow") {
+				response = await this.api.workflowRun.transitionStateV1({
+					type: "optimistic",
+					id: this.run.id,
+					state: targetState,
+					expectedRevision: this.run.revision,
+					expectedSignalSequence: this.run.signalSequence,
+				});
 			} else {
 				response = await this.api.workflowRun.transitionStateV1({
 					type: "optimistic",

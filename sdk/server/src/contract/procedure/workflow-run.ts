@@ -177,31 +177,40 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 				type: "'optimistic'",
 				id: "string > 0",
 				expectedRevision: "number.integer >= 0",
-				state: workflowRunStateScheduledRequestOptimisticSchema
-					.or(workflowRunStateQueuedSchema)
-					.or(workflowRunStateRunningSchema)
-					.or(workflowRunStateSleepingSchema.omit("wakeupAt").and({ durationMs: "number > 0" }))
-					.or(
-						workflowRunStateAwaitingEventSchema
-							.omit("timeoutAt")
-							.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
-					)
-					.or(workflowRunStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }))
-					.or(
-						workflowRunStateAwaitingChildWorkflowSchema
-							.omit("timeoutAt")
-							.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
-					)
-					.or(workflowRunStateCompletedSchema.omit("output").and({ "output?": "unknown" }))
-					.or(workflowRunStateFailedSchema),
-			}).or({
-				type: "'pessimistic'",
-				id: "string > 0",
-				state: workflowRunStateScheduledRequestPessimisticSchema
-					.or(workflowRunStatePausedSchema)
-					.or(workflowRunStateStalledSchema)
-					.or(workflowRunStateCancelledSchema),
 			})
+				.and(
+					type({
+						state: workflowRunStateScheduledRequestOptimisticSchema
+							.or(workflowRunStateQueuedSchema)
+							.or(workflowRunStateRunningSchema)
+							.or(workflowRunStateSleepingSchema.omit("wakeupAt").and({ durationMs: "number > 0" }))
+							.or(
+								workflowRunStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" })
+							)
+							.or(workflowRunStateCompletedSchema.omit("output").and({ "output?": "unknown" }))
+							.or(workflowRunStateFailedSchema),
+					}).or({
+						expectedSignalSequence: "number.integer >= 0",
+						state: workflowRunStateAwaitingEventSchema
+							.omit("timeoutAt")
+							.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
+							.or(
+								workflowRunStateAwaitingChildWorkflowSchema
+									.omit("timeoutAt")
+									.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
+							),
+					})
+				)
+				.or(
+					type({
+						type: "'pessimistic'",
+						id: "string > 0",
+						state: workflowRunStateScheduledRequestPessimisticSchema
+							.or(workflowRunStatePausedSchema)
+							.or(workflowRunStateStalledSchema)
+							.or(workflowRunStateCancelledSchema),
+					})
+				)
 		)
 		.output(
 			type({

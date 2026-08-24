@@ -1,9 +1,15 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
-import type { EventMulticastResult, EventReference, WorkflowRunId } from "@aikirun/types/workflow/run";
+import {
+	type EventMulticastResult,
+	type EventReference,
+	isTerminalWorkflowRunStatus,
+	type WorkflowRunId,
+} from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import type { WorkflowRunStateMachine } from "./state-machine/workflow-run";
+import { WorkflowRunTerminatedError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { EventWaitRowInsert } from "../infra/db/types/event-wait";
 import { runConcurrently } from "../lib/concurrency";
@@ -73,11 +79,18 @@ async function sendEventToWorkflowRunInTx(
 	workflowRunStateMachine: WorkflowRunStateMachine
 ) {
 	const { runId, eventName, data, reference } = params;
-	const runWithState = await txRepos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+	const { namespaceId } = context;
+
+	// acquire lock on run row so that the wakeup is never lost if the current status is running
+	// but there is a concurrent state transition moving it to awaiting_event
+	const runWithState = await txRepos.workflowRun.incrementSignalSequence({ namespaceId, id: runId });
 	if (!runWithState) {
 		throw new NotFoundError(`Workflow run not found: ${runId}`);
 	}
 	const { run, state } = runWithState;
+	if (isTerminalWorkflowRunStatus(run.status)) {
+		throw new WorkflowRunTerminatedError(runId, run.status);
+	}
 
 	const eventWaitEntry: EventWaitRowInsert = {
 		id: ulid(),

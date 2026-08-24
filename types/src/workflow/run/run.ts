@@ -44,6 +44,12 @@ export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status i
 	return false;
 }
 
+/**
+ * The statuses a run can rest at while waiting for something external it to arrive, so a write into
+ * one is guarded on the signal sequence.
+ */
+export type WaitingForSignalWorkflowRunStatus = "awaiting_event" | "awaiting_child_workflow";
+
 export const WORKFLOW_RUN_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type WorkflowRunConflictPolicy = (typeof WORKFLOW_RUN_CONFLICT_POLICIES)[number];
 
@@ -263,6 +269,7 @@ export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	source: WorkflowSource;
 	createdAt: number;
 	revision: number;
+	signalSequence: number;
 	stateTransitionId: string;
 	input?: Input;
 	inputHash: string;

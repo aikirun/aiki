@@ -3,6 +3,7 @@ import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
 import type { Hash } from "../infra/hasher";
 import type { WorkflowSource } from "../workflow";
 import type {
+	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStateAwaitingChildWorkflow,
@@ -164,12 +165,6 @@ export type WorkflowRunStateRequest =
 	| WorkflowRunStateAwaitingChildWorkflowRequest
 	| WorkflowRunStateCompletedRequest;
 
-interface WorkflowRunTransitionStateRequestBase {
-	type: "optimistic" | "pessimistic";
-	id: string;
-	state: WorkflowRunStateRequest;
-}
-
 type WorkflowRunStateRequestOptimistic = Exclude<WorkflowRunStateRequest, WorkflowRunStateRequestPessimistic>;
 
 type WorkflowRunStateRequestPessimistic =
@@ -178,14 +173,23 @@ type WorkflowRunStateRequestPessimistic =
 	| WorkflowRunStateStalled
 	| WorkflowRunStateCancelled;
 
-export interface WorkflowRunTransitionStateRequestOptimistic extends WorkflowRunTransitionStateRequestBase {
+export type WorkflowRunTransitionStateRequestOptimistic = {
 	type: "optimistic";
+	id: string;
 	expectedRevision: number;
-	state: WorkflowRunStateRequestOptimistic;
-}
+} & (
+	| {
+			state: Extract<WorkflowRunStateRequestOptimistic, { status: WaitingForSignalWorkflowRunStatus }>;
+			expectedSignalSequence: number;
+	  }
+	| {
+			state: Exclude<WorkflowRunStateRequestOptimistic, { status: WaitingForSignalWorkflowRunStatus }>;
+	  }
+);
 
-export interface WorkflowRunTransitionStateRequestPessimistic extends WorkflowRunTransitionStateRequestBase {
+export interface WorkflowRunTransitionStateRequestPessimistic {
 	type: "pessimistic";
+	id: string;
 	state: WorkflowRunStateRequestPessimistic;
 }
 

@@ -92,6 +92,7 @@ describe("createEventWaiters", () => {
 					id: record.id,
 					state: { status: "awaiting_event", eventName: "orderShipped" },
 					expectedRevision: 0,
+					expectedSignalSequence: 0,
 				},
 				{ revision: 1, state: workflowRunStateByStatus.awaiting_event, attempts: record.attempts }
 			);
@@ -113,6 +114,7 @@ describe("createEventWaiters", () => {
 					id: record.id,
 					state: { status: "awaiting_event", eventName: "orderShipped", timeoutInMs: 30_000 },
 					expectedRevision: 0,
+					expectedSignalSequence: 0,
 				},
 				{ revision: 1, state: workflowRunStateByStatus.awaiting_event, attempts: record.attempts }
 			);
@@ -134,6 +136,7 @@ describe("createEventWaiters", () => {
 					id: record.id,
 					state: { status: "awaiting_event", eventName: "orderShipped" },
 					expectedRevision: 0,
+					expectedSignalSequence: 0,
 				},
 				{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 			);

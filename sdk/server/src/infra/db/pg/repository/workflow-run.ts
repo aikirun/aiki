@@ -1,8 +1,10 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { AtMostOneProp } from "@aikirun/lib/object";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
 import type {
+	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunId,
 	WorkflowRunOptions,
 	WorkflowRunState,
@@ -20,12 +22,27 @@ import { stateTransition, workflow, workflowRun } from "../schema";
 
 export type WorkflowRunRow = typeof workflowRun.$inferSelect;
 export type WorkflowRunRowInsert = typeof workflowRun.$inferInsert;
-type WorkflowRunRowUpdate = Partial<
-	Pick<
-		WorkflowRunRowInsert,
-		"status" | "attempts" | "latestStateTransitionId" | "scheduledAt" | "wakeupAt" | "timeoutAt" | "nextAttemptAt"
-	>
->;
+
+export type UpdateWorkflowRunParams =
+	| {
+			waitForSignal: true;
+			filter: { namespaceId: NamespaceId; id: WorkflowRunId; revision: number; signalSequence: number };
+			updates: {
+				attempts: number;
+				latestStateTransitionId: string;
+				onSignalSequenceMatch: { status: WaitingForSignalWorkflowRunStatus; timeoutAt: TimestampMs | null };
+				onSignalSequenceMismatch: { status: "scheduled"; scheduledAt: TimestampMs };
+			};
+	  }
+	| {
+			waitForSignal: false;
+			filter: { namespaceId: NamespaceId; id: WorkflowRunId; revision?: number };
+			updates: {
+				status: Exclude<WorkflowRunStatus, WaitingForSignalWorkflowRunStatus>;
+				attempts: number;
+				latestStateTransitionId: string;
+			} & AtMostOneProp<{ scheduledAt: TimestampMs; wakeupAt: TimestampMs; nextAttemptAt: TimestampMs }>;
+	  };
 
 export type WorkflowRunWithState = {
 	run: Pick<
@@ -55,32 +72,87 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		await db.insert(workflowRun).values(values);
 	},
 
-	async update(
-		filter: { namespaceId: NamespaceId; id: WorkflowRunId; revision?: number },
-		updates: WorkflowRunRowUpdate
-	): Promise<{ revision: number } | undefined> {
+	async update(params: UpdateWorkflowRunParams): Promise<{ revision: number; signalSequence: number } | null> {
+		const { filter } = params;
 		const conditions = [eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)];
 		if (filter.revision !== undefined) {
 			conditions.push(eq(workflowRun.revision, filter.revision));
 		}
 
-		const whereClause = and(...conditions);
+		if (params.waitForSignal) {
+			const { filter, updates } = params;
+			const { onSignalSequenceMatch, onSignalSequenceMismatch } = updates;
+			const signalSequenceMatches = sql`${workflowRun.signalSequence} = ${filter.signalSequence}`;
+			const timeoutAtIso =
+				onSignalSequenceMatch.timeoutAt === null ? null : new Date(onSignalSequenceMatch.timeoutAt).toISOString();
+			const scheduledAtIso = new Date(onSignalSequenceMismatch.scheduledAt).toISOString();
 
+			const result = await db
+				.update(workflowRun)
+				.set({
+					revision: sql`${workflowRun.revision} + 1`,
+					attempts: updates.attempts,
+					latestStateTransitionId: updates.latestStateTransitionId,
+					status: sql`CASE WHEN ${signalSequenceMatches} THEN ${onSignalSequenceMatch.status}::workflow_run_status ELSE ${onSignalSequenceMismatch.status}::workflow_run_status END`,
+					timeoutAt: sql`CASE WHEN ${signalSequenceMatches} THEN ${timeoutAtIso}::timestamptz ELSE NULL END`,
+					scheduledAt: sql`CASE WHEN ${signalSequenceMatches} THEN NULL ELSE ${scheduledAtIso}::timestamptz END`,
+					wakeupAt: null,
+					nextAttemptAt: null,
+				})
+				.where(and(...conditions))
+				.returning({ revision: workflowRun.revision, signalSequence: workflowRun.signalSequence });
+
+			return result[0] ?? null;
+		}
+
+		const { updates } = params;
 		const result = await db
 			.update(workflowRun)
 			.set({
-				...updates,
 				revision: sql`${workflowRun.revision} + 1`,
+				status: updates.status,
+				attempts: updates.attempts,
+				latestStateTransitionId: updates.latestStateTransitionId,
+				timeoutAt: null,
+				scheduledAt: "scheduledAt" in updates ? updates.scheduledAt : null,
+				wakeupAt: "wakeupAt" in updates ? updates.wakeupAt : null,
+				nextAttemptAt: "nextAttemptAt" in updates ? updates.nextAttemptAt : null,
 			})
-			.where(whereClause)
-			.returning({ revision: workflowRun.revision });
+			.where(and(...conditions))
+			.returning({ revision: workflowRun.revision, signalSequence: workflowRun.signalSequence });
 
-		const revision = result[0]?.revision;
-		if (revision === undefined) {
-			return undefined;
+		return result[0] ?? null;
+	},
+
+	async incrementSignalSequence(filter: {
+		namespaceId: NamespaceId;
+		id: WorkflowRunId;
+	}): Promise<{ run: Pick<WorkflowRunRow, "status" | "revision" | "signalSequence">; state: WorkflowRunState } | null> {
+		const result = await db
+			.update(workflowRun)
+			.set({ signalSequence: sql`${workflowRun.signalSequence} + 1` })
+			.from(stateTransition)
+			.where(
+				and(
+					eq(workflowRun.namespaceId, filter.namespaceId),
+					eq(workflowRun.id, filter.id),
+					eq(stateTransition.id, workflowRun.latestStateTransitionId)
+				)
+			)
+			.returning({
+				run: {
+					status: workflowRun.status,
+					revision: workflowRun.revision,
+					signalSequence: workflowRun.signalSequence,
+				},
+				state: stateTransition.state,
+			});
+
+		const row = result[0];
+		if (!row) {
+			return null;
 		}
-
-		return { revision };
+		return { run: row.run, state: toWorkflowRunState(row.state) };
 	},
 
 	async exists(namespaceId: NamespaceId, id: string): Promise<boolean> {
@@ -130,7 +202,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		if (!row) {
 			return null;
 		}
-		return { ...row, state: toWorkflowRunState(row.state) };
+		return { run: row.run, state: toWorkflowRunState(row.state) };
 	},
 
 	async getByIdWithWorkflowAndState(filter: { namespaceId: NamespaceId; id: string }) {
@@ -140,6 +212,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 					id: workflowRun.id,
 					createdAt: workflowRun.createdAt,
 					revision: workflowRun.revision,
+					signalSequence: workflowRun.signalSequence,
 					attempts: workflowRun.attempts,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
 					input: workflowRun.input,
@@ -162,7 +235,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		if (!row) {
 			return null;
 		}
-		return { ...row, state: toWorkflowRunState(row.state) };
+		return { run: row.run, workflow: row.workflow, state: toWorkflowRunState(row.state) };
 	},
 
 	async getByReferenceWithWorkflowAndState(filter: {
@@ -178,6 +251,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 					id: workflowRun.id,
 					createdAt: workflowRun.createdAt,
 					revision: workflowRun.revision,
+					signalSequence: workflowRun.signalSequence,
 					attempts: workflowRun.attempts,
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
 					input: workflowRun.input,
@@ -208,7 +282,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		if (!row) {
 			return null;
 		}
-		return { ...row, state: toWorkflowRunState(row.state) };
+		return { run: row.run, workflow: row.workflow, state: toWorkflowRunState(row.state) };
 	},
 
 	async listByIdsAndStatus(_context: DaemonContext, ids: NonEmptyArray<string>, status: WorkflowRunStatus) {

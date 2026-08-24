@@ -196,6 +196,7 @@ export async function seedAwaitingEventRun(
 		id: seeded.runId,
 		state: { status: "awaiting_event", eventName: params.eventName },
 		expectedRevision: seeded.revisionWhenClaimed,
+		expectedSignalSequence: 0,
 	});
 
 	return { ...seeded, eventName: params.eventName, revisionWhenParked: parked.revision };
