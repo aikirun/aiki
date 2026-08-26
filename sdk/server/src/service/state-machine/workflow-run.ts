@@ -263,7 +263,8 @@ async function transitionStateInTx(
 			],
 			now,
 			txRepos,
-			context.logger
+			context.logger,
+			imminentRunTimerQueue
 		);
 	}
 

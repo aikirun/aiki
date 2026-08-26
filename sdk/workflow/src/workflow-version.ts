@@ -256,7 +256,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					client,
 					existingRun as WorkflowRunRecord<Input, Output>,
 					parentRun[INTERNAL].handle,
-					existingRunInfo.waits,
 					logger,
 					this[INTERNAL].eventsDefinition
 				);
@@ -303,7 +302,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			client,
 			newRun as WorkflowRunRecord<Input, Output>,
 			parentRun[INTERNAL].handle,
-			{ timeouts: [] },
 			logger,
 			this[INTERNAL].eventsDefinition
 		);

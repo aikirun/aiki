@@ -300,6 +300,35 @@ describe("WorkflowRunService cancelByIds", () => {
 			);
 		}));
 
+	test("cancelling a child adds the woken parent's timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service, stateMachine } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+			await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: parent.runId,
+				state: { status: "awaiting_child_workflow", childWorkflowRunId: child.runId },
+				expectedRevision: parent.revisionWhenClaimed,
+				expectedSignalSequence: 0,
+			});
+
+			const cancelledAt = Date.now();
+			await withFakeClock(cancelledAt, () => service.cancelByIds(context, { ids: [child.runId] }));
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: parent.runId, rank: computeRank({ dueAt: cancelledAt }) },
+			]);
+		}));
+
 	test("cancelling a child wakes a parent parked on it", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });

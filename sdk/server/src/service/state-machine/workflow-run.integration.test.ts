@@ -1,3 +1,4 @@
+import { createBinaryLatch } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { NotFoundError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
@@ -10,12 +11,12 @@ import { describe, expect, test } from "bun:test";
 import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "../../daemon/imminent-sleep-elapsed-runs";
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
-import type { Repositories } from "../../infra/db/types";
+import type { Repositories, TxRepositories } from "../../infra/db/types";
 import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
 import { computeRank } from "../../lib/rank";
 import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
-import { createServiceHarness } from "../../testing/harness";
+import { createServiceHarness, withRepos } from "../../testing/harness";
 import { claimRun, seedClaimedRun, seedCompletedRun, seedScheduledRun, seedStalledRun } from "../../testing/seed/run";
 import { createChildRunCanceller } from "../cancel-child-runs";
 import { createEventService } from "../event";
@@ -604,6 +605,83 @@ describe("WorkflowRunStateMachine redelivery", () => {
 });
 
 describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
+	test("an event committing between the park's read and its guarded write reschedules instead of parking", () =>
+		withHarness(async ({ context, repos, publisher }) =>
+			withRepos(async (secondaryRepos) => {
+				const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+					namespaceRequestContext: context,
+					repos,
+					publisher,
+				});
+
+				const parkReachedGuardedWrite = createBinaryLatch();
+				const eventCommitted = createBinaryLatch();
+
+				const stateMachine = createStateMachine(repos);
+				const parkedAt = Date.now();
+				const result = await withFakeClock(parkedAt, async () => {
+					// The park pauses at its guarded write, after its read and revision precheck
+					// have passed — the window the send lands in.
+					const parkPromise = repos.transaction(async (txRepos) => {
+						const pausingTxRepos: TxRepositories = {
+							...txRepos,
+							workflowRun: {
+								...txRepos.workflowRun,
+								update: async (params) => {
+									parkReachedGuardedWrite.signal();
+									await eventCommitted.wait();
+									return txRepos.workflowRun.update(params);
+								},
+							},
+						};
+
+						return stateMachine.transitionState(
+							context,
+							{
+								type: "optimistic",
+								id: runId,
+								state: { status: "awaiting_event", eventName: "paymentReceived" },
+								expectedRevision: revisionWhenClaimed,
+								expectedSignalSequence: 0,
+							},
+							pausingTxRepos
+						);
+					});
+					await parkReachedGuardedWrite.wait();
+
+					await createEventService({
+						repos: secondaryRepos,
+						workflowRunStateMachine: createStateMachine(secondaryRepos),
+					}).sendEventToWorkflowRun(context, {
+						runId: runId as WorkflowRunId,
+						eventName: "paymentReceived",
+						data: { amount: 25 },
+						reference: undefined,
+					});
+					eventCommitted.signal();
+
+					return parkPromise;
+				});
+
+				expect(result).toEqual({
+					revision: revisionWhenClaimed + 1,
+					state: { status: "scheduled", reason: "event", scheduledAt: parkedAt },
+					attempts: attemptsWhenClaimed,
+				});
+
+				const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+				expect(run).toEqual(
+					expect.objectContaining({
+						run: expect.objectContaining({ id: runId, status: "scheduled", revision: result.revision }),
+						state: { status: "scheduled", reason: "event", scheduledAt: parkedAt },
+					})
+				);
+				expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
+					expect.objectContaining({ workflowRunId: runId, name: "paymentReceived", status: "received" }),
+				]);
+			})
+		));
+
 	test("a park with the run's current signal sequence parks it", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
@@ -892,7 +970,7 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 				);
 			}));
 
-		test(`a child reaching ${status} wakes a parent parked on it`, () =>
+		test(`a child reaching ${status} wakes a parent parked on it and adds its timer to the priority queue`, () =>
 			withHarness(async ({ context, repos, publisher }) => {
 				const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
 				const child = await seedClaimedRun(
@@ -900,7 +978,15 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 					{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
 				);
 
-				const stateMachine = createStateMachine(repos);
+				const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+				const stateMachine = createStateMachine(
+					repos,
+					createImminentRunTimerQueue({
+						timerPriorityQueue,
+						configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+						logger: noopLogger,
+					})
+				);
 				const parked = await stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: parent.runId,
@@ -927,6 +1013,9 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 						state: { status: "scheduled", reason: "child_workflow", scheduledAt: childTerminatedAt },
 					})
 				);
+				expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+					{ type: "scheduled", id: parent.runId, rank: computeRank({ dueAt: childTerminatedAt }) },
+				]);
 			}));
 	}
 });

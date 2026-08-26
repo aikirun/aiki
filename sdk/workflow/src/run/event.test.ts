@@ -45,7 +45,6 @@ describe("createEventWaiters", () => {
 			});
 			const definition = { orderShipped: event<{ trackingId: string }>() };
 			const handle = workflowRunHandle(client, record, definition);
-			client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: record });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -59,7 +58,6 @@ describe("createEventWaiters", () => {
 			});
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
-			client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: record });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -73,7 +71,6 @@ describe("createEventWaiters", () => {
 			});
 			const definition = { orderShipped: event({ schema: appendBangSchema }) };
 			const handle = workflowRunHandle(client, record, definition);
-			client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: record });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -85,7 +82,6 @@ describe("createEventWaiters", () => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
-			client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: record });
 			client.api.workflowRun.transitionStateV1.once(
 				{
 					type: "optimistic",
@@ -107,7 +103,6 @@ describe("createEventWaiters", () => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
-			client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: record });
 			client.api.workflowRun.transitionStateV1.once(
 				{
 					type: "optimistic",
@@ -129,7 +124,6 @@ describe("createEventWaiters", () => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
-			client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: record });
 			client.api.workflowRun.transitionStateV1.rejectsOnce(
 				{
 					type: "optimistic",
@@ -158,9 +152,6 @@ describe("createEventWaiters", () => {
 			});
 			const definition = { orderShipped: event<string>() };
 			const handle = workflowRunHandle(client, record, definition);
-			client.api.workflowRun.getByIdV1
-				.once({ id: record.id }, { run: record })
-				.once({ id: record.id }, { run: record });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 

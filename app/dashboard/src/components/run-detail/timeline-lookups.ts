@@ -1,4 +1,4 @@
-import type { ChildWorkflowRunInfo, EventWait, Sleep } from "@aikirun/types/workflow/run";
+import type { ChildWorkflowRunInfo, ChildWorkflowRunWaits, EventWait, Sleep } from "@aikirun/types/workflow/run";
 import type { StateTransition } from "@aikirun/types/workflow/state-transition";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
@@ -33,6 +33,7 @@ export function buildTimelineLookups(
 	eventWaits: Record<string, EventWait<unknown>[]>,
 	sleeps: Record<string, Sleep[]>,
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>,
+	childWorkflowRunWaits: Record<string, ChildWorkflowRunWaits>,
 	taskById: Map<string, TaskInfo>
 ): TimelineLookups {
 	const childWorkflowById = new Map<string, ChildWorkflowRunInfo>();
@@ -127,7 +128,7 @@ export function buildTimelineLookups(
 							break;
 						}
 						// A wake means the child reached a terminal state; the terminal wait carries it.
-						const terminal = childWorkflowById.get(childId)?.waits.terminal;
+						const terminal = childWorkflowRunWaits[childId]?.terminal;
 						if (terminal) {
 							context.childWorkflowStatus = terminal.state.status;
 						}

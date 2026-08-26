@@ -288,6 +288,7 @@ export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	sleeps: Record<string, Sleep[]>;
 	eventWaits: Record<string, EventWait<unknown>[]>;
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo[]>;
+	childWorkflowRunWaits: Record<string, ChildWorkflowRunWaits>;
 	parentWorkflowRunId?: string;
 	scheduleId?: string;
 }
@@ -297,7 +298,6 @@ export interface ChildWorkflowRunInfo {
 	name: string;
 	versionId: string;
 	inputHash: string;
-	waits: ChildWorkflowRunWaits;
 }
 
 export interface ChildWorkflowRunWaits {

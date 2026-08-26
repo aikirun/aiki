@@ -170,6 +170,7 @@ export function RunDetail() {
 			currentRun.eventWaits,
 			currentRun.sleeps,
 			childWorkflowRuns,
+			currentRun.childWorkflowRunWaits,
 			taskById
 		);
 	}, [transitions?.transitions, currentRun, childWorkflowRuns, taskById]);

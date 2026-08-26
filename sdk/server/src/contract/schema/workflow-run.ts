@@ -146,15 +146,16 @@ const childWorkflowRunInfoSchema = type({
 	name: "string > 0",
 	versionId: "string > 0",
 	inputHash: "string > 0",
-	waits: type({
-		timeouts: type({
-			timedOutAt: "number > 0",
-		}).array(),
-		"terminal?": type({
-			state: terminalWorkflowRunStateSchema,
-			completedAt: "number > 0",
-		}).or("undefined"),
-	}),
+});
+
+const childWorkflowRunWaitsSchema = type({
+	timeouts: type({
+		timedOutAt: "number > 0",
+	}).array(),
+	"terminal?": type({
+		state: terminalWorkflowRunStateSchema,
+		completedAt: "number > 0",
+	}).or("undefined"),
 });
 
 export const workflowRunRecordSchema = type({
@@ -176,6 +177,7 @@ export const workflowRunRecordSchema = type({
 	sleeps: type({ "[string]": sleepSchema.array() }),
 	eventWaits: type({ "[string]": eventWaitSchema.array() }),
 	childWorkflowRuns: type({ "[string]": childWorkflowRunInfoSchema.array() }),
+	childWorkflowRunWaits: type({ "[string]": childWorkflowRunWaitsSchema }),
 	"parentWorkflowRunId?": "string > 0 | undefined",
 });
 
