@@ -20,7 +20,7 @@
   .btn-p:hover { background: #5d3a83; color: #ffffff; }
   .btn-s:hover { border-color: rgba(23,23,26,0.28); color: #17171a; }
   .cell:hover { background: #faf8fc; }
-  .card:hover, .tile:hover { border-color: rgba(118,75,162,0.35); box-shadow: 0 10px 26px -14px rgba(118,75,162,0.35); }
+  .card:hover { border-color: rgba(118,75,162,0.35); box-shadow: 0 10px 26px -14px rgba(118,75,162,0.35); }
   .submit:hover { background: #000000; }
   .tab { background: transparent; color: #74737f; border: none; border-bottom: 2px solid transparent; padding: 13px 16px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px; cursor: pointer; white-space: nowrap; }
   .tab.on { background: rgba(255,255,255,0.05); color: #e8e6ea; border-bottom-color: #b78ce0; }
@@ -33,6 +33,16 @@
   @media (min-width: 1120px) { #hero-grid { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); } }
   @media (min-width: 620px) { #grid-orch, #grid-dura, #grid-infra { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 940px) { #grid-orch { grid-template-columns: repeat(3, minmax(0, 1fr)); } #grid-dura, #grid-infra { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  #topo-matrix, .topo-row { grid-template-columns: minmax(0, 1fr); }
+  #topo-axis, #topo-head { display: none; }
+  #topo-body { grid-template-rows: auto auto; }
+  @media (min-width: 620px) { .topo-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 780px) {
+    #topo-matrix { grid-template-columns: 118px minmax(0, 1fr); }
+    #topo-body { grid-template-rows: 26px 1fr 1fr; }
+    #topo-axis { display: grid; }
+    #topo-head { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
 </style>
 </head>
 <body>
@@ -210,8 +220,8 @@
       <p style="margin: 0; font-size: 15px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">The Aiki server — the orchestrator — is a library. Run it entirely inside your app, or as a separate service with pull-based workers, serverless endpoints, or both — workflow code is identical either way. <span style="color: #17171a; font-weight: 600;">Where things run is configuration, not architecture.</span> In every shape, execution happens in your infrastructure.</p>
     </div>
 
-    <div style="display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 14px;">
-      <div style="display: grid; grid-template-rows: 26px 1fr 1fr; gap: 14px;">
+    <div id="topo-matrix" style="display: grid; gap: 14px;">
+      <div id="topo-axis" style="grid-template-rows: 26px 1fr 1fr; gap: 14px;">
         <div></div>
         <div style="display: flex; align-items: center; justify-content: flex-end;">
           <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #86868d; writing-mode: vertical-rl; transform: rotate(180deg);">Embedded</span>
@@ -221,13 +231,13 @@
         </div>
       </div>
 
-      <div style="display: grid; grid-template-rows: 26px 1fr 1fr; gap: 14px; min-width: 0;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+      <div id="topo-body" style="display: grid; gap: 14px; min-width: 0;">
+        <div id="topo-head" style="gap: 14px;">
           <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #86868d;">Pull — workers</span>
           <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #86868d;">Push — endpoints</span>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="topo-row" style="display: grid; gap: 14px;">
           <div class="card" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 18px; min-width: 0; transition: border-color .16s ease, box-shadow .16s ease;">
             <div style="position: relative; background: rgba(23,23,26,0.032); border-radius: 12px; padding: 27px 12px 13px; align-self: flex-start; max-width: 100%;">
               <span style="position: absolute; top: 10px; left: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #aeadb4;">your infrastructure</span>
@@ -283,7 +293,7 @@
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="topo-row" style="display: grid; gap: 14px;">
           <div class="card" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 18px; min-width: 0; transition: border-color .16s ease, box-shadow .16s ease;">
             <div style="position: relative; background: rgba(23,23,26,0.032); border-radius: 12px; padding: 27px 12px 13px; align-self: flex-start; max-width: 100%;">
               <span style="position: absolute; top: 10px; left: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #aeadb4;">your infrastructure</span>
@@ -380,22 +390,22 @@
       <h2 style="margin: 0; font-size: 38px; line-height: 1.05; letter-spacing: -0.036em; font-weight: 800; max-width: 560px;">Infrastructure is optional.</h2>
       <p style="margin: 4px 0 0; font-size: 16px; line-height: 1.6; color: #5c5c64; max-width: 60ch; text-wrap: pretty;">What you run depends on what you need — nothing more.</p>
     </div>
-    <div id="grid-infra" style="display: grid; gap: 20px;">
-      <div class="tile" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; padding: 26px 22px 28px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); display: flex; flex-direction: column; gap: 10px; transition: border-color .16s ease, box-shadow .16s ease;">
-        <h3 style="margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.022em;">Zero infrastructure</h3>
-        <p style="margin: 0; font-size: 14.5px; line-height: 1.6; color: #5c5c64; text-wrap: pretty;">One process, a SQLite file. Durable workflows with no external services.</p>
+    <div id="grid-infra" style="display: grid; gap: 1px; background: rgba(23,23,26,0.1); border: 1px solid rgba(23,23,26,0.1); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(23,23,26,0.04);">
+      <div class="cell" style="background: #ffffff; padding: 28px 26px 32px; display: flex; flex-direction: column; gap: 10px; transition: background .16s ease;">
+        <h3 style="margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.018em;">Zero infrastructure</h3>
+        <p style="margin: 0; font-size: 14.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">One process, a SQLite file. Durable workflows with no external services.</p>
       </div>
-      <div class="tile" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; padding: 26px 22px 28px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); display: flex; flex-direction: column; gap: 10px; transition: border-color .16s ease, box-shadow .16s ease;">
-        <h3 style="margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.022em;">Shared state</h3>
-        <p style="margin: 0; font-size: 14.5px; line-height: 1.6; color: #5c5c64; text-wrap: pretty;">Postgres, when you want multiple server instances or a shared database.</p>
+      <div class="cell" style="background: #ffffff; padding: 28px 26px 32px; display: flex; flex-direction: column; gap: 10px; transition: background .16s ease;">
+        <h3 style="margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.018em;">Shared state</h3>
+        <p style="margin: 0; font-size: 14.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">Postgres, when you want multiple server instances or a shared database.</p>
       </div>
-      <div class="tile" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; padding: 26px 22px 28px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); display: flex; flex-direction: column; gap: 10px; transition: border-color .16s ease, box-shadow .16s ease;">
-        <h3 style="margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.022em;">Accelerated distribution</h3>
-        <p style="margin: 0; font-size: 14.5px; line-height: 1.6; color: #5c5c64; text-wrap: pretty;">Plug in Redis — or any transport — to speed up work distribution across your workers.</p>
+      <div class="cell" style="background: #ffffff; padding: 28px 26px 32px; display: flex; flex-direction: column; gap: 10px; transition: background .16s ease;">
+        <h3 style="margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.018em;">Accelerated distribution</h3>
+        <p style="margin: 0; font-size: 14.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">Plug in Redis — or any transport — to speed up work distribution across your workers.</p>
       </div>
-      <div class="tile" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; padding: 26px 22px 28px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); display: flex; flex-direction: column; gap: 10px; transition: border-color .16s ease, box-shadow .16s ease;">
-        <h3 style="margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.022em;">Fully distributed</h3>
-        <p style="margin: 0; font-size: 14.5px; line-height: 1.6; color: #5c5c64; text-wrap: pretty;">Standalone server, worker pools, serverless endpoints — in any combination.</p>
+      <div class="cell" style="background: #ffffff; padding: 28px 26px 32px; display: flex; flex-direction: column; gap: 10px; transition: background .16s ease;">
+        <h3 style="margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.018em;">Fully distributed</h3>
+        <p style="margin: 0; font-size: 14.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">Standalone server, worker pools, serverless endpoints — in any combination.</p>
       </div>
     </div>
     <p style="margin: 26px 0 0; font-size: 14px; line-height: 1.6; color: #86868d; max-width: 74ch; text-wrap: pretty;">These combine in any way you like — a standalone server on a SQLite file driving dozens of workers is a perfectly ordinary production setup.</p>
