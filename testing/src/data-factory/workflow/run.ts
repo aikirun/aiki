@@ -38,9 +38,6 @@ export const childWorkflowRunInfoFactory = Factory.define<ChildWorkflowRunInfo>(
 	name: "child-run",
 	versionId: "1.0.0",
 	inputHash: "hash",
-	waits: {
-		timeouts: [],
-	},
 }));
 
 const baseWorkflowRunRecord = (sequence: number): Omit<WorkflowRunRecord, "state"> => ({
@@ -58,6 +55,7 @@ const baseWorkflowRunRecord = (sequence: number): Omit<WorkflowRunRecord, "state
 	sleeps: {},
 	eventWaits: {},
 	childWorkflowRuns: {},
+	childWorkflowRunWaits: {},
 });
 
 export const baseWorkflowRunRecordFactory = Factory.define<Omit<WorkflowRunRecord, "state">>(({ sequence }) =>

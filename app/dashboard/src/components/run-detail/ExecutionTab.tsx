@@ -93,7 +93,12 @@ export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
 				<>
 					<SectionHeader label="Child Workflows" />
 					{childWorkflows.map((child) => (
-						<ChildWorkflowCard key={child.id} child={child} isAwaited={child.id === awaitingChildId} />
+						<ChildWorkflowCard
+							key={child.id}
+							child={child}
+							waits={run.childWorkflowRunWaits[child.id]}
+							isAwaited={child.id === awaitingChildId}
+						/>
 					))}
 				</>
 			)}
@@ -310,11 +315,11 @@ function TaskText({ text, color }: { text: string; color: string }) {
 
 // ── Child workflows ───────────────────────────────────────────────────────────
 
-function resolveChildStatus(child: ChildWorkflowRunInfo): {
+function resolveChildStatus(waits: ChildWorkflowRunWaits | undefined): {
 	status: TerminalWorkflowRunStatus | "running";
 	resolvedWait: TerminalChildWait | null;
 } {
-	const terminal = child.waits.terminal;
+	const terminal = waits?.terminal;
 	if (terminal) {
 		return { status: terminal.state.status, resolvedWait: terminal };
 	}
@@ -335,8 +340,16 @@ function childStatusGlyph(status: TerminalWorkflowRunStatus | "running"): string
 	return "⑂";
 }
 
-function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; isAwaited: boolean }) {
-	const { status, resolvedWait } = resolveChildStatus(child);
+function ChildWorkflowCard({
+	child,
+	waits,
+	isAwaited,
+}: {
+	child: ChildWorkflowRunInfo;
+	waits: ChildWorkflowRunWaits | undefined;
+	isAwaited: boolean;
+}) {
+	const { status, resolvedWait } = resolveChildStatus(waits);
 	const { tint: color, text: textColor } = childStatusColor(status);
 	const glyph = childStatusGlyph(status);
 	const hasResolvedOutput = resolvedWait !== null;

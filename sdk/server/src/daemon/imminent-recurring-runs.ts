@@ -546,7 +546,9 @@ async function cancelPreviousAndInsertRunsInTx(
 			await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionIdUpdates);
 		}
 		if (isNonEmptyArray(cancelledRunsHavingParent)) {
-			await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, context.logger);
+			// No imminent timer queue: schedule occurrences have no parents today, so this wakes
+			// nobody. If occurrences ever gain parents, thread the queue through the daemon deps.
+			await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, context.logger, undefined);
 		}
 		if (isNonEmptyArray(cancelledRunsMeta)) {
 			await childRunCanceller.cancel(cancelledRunsMeta, txRepos, context.logger);

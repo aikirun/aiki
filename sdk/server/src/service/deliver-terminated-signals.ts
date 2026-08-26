@@ -12,6 +12,7 @@ import { ulid } from "ulidx";
 
 import type { TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 
 export interface TerminatedChildRun {
 	namespaceId: NamespaceId;
@@ -31,7 +32,8 @@ export async function deliverTerminatedSignalToParentRun(
 	runs: NonEmptyArray<TerminatedChildRun>,
 	now: TimestampMs,
 	txRepos: TxRepositories,
-	logger: Logger
+	logger: Logger,
+	imminentRunTimerQueue: ImminentRunTimerQueue | undefined
 ): Promise<void> {
 	await txRepos.childWorkflowRunWait.insert(
 		runs.map((run) => ({
@@ -128,6 +130,12 @@ export async function deliverTerminatedSignalToParentRun(
 	}
 	if (isNonEmptyArray(parentRunStateTransitionEntriesToInsert)) {
 		await txRepos.stateTransition.appendBatch(parentRunStateTransitionEntriesToInsert);
+	}
+
+	if (imminentRunTimerQueue) {
+		txRepos.onCommit(() =>
+			imminentRunTimerQueue.add(asNonEmptyArray(scheduledParentRunIds.map((id) => ({ id, scheduledAt: now }))))
+		);
 	}
 
 	logger.info("Woke parents parked on terminal children", { "aiki.parentRunIds": scheduledParentRunIds });

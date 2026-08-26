@@ -1,10 +1,13 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
+import type { FakePublisher } from "@aikirun/testing/infra/queue";
 import type { WaitingForSignalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import type { Repositories } from "./types";
 import type { DueWorkflowRun } from "./types/workflow-run";
 import { describe, expect, test } from "bun:test";
+import type { NamespaceRequestContext } from "../../middleware/context";
+import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../../testing/harness";
 import { seedAwaitingEventRun, seedClaimedRun, seedCompletedRun } from "../../testing/seed/run";
@@ -452,5 +455,121 @@ describe("incrementSignalSequence", () => {
 					id: "run-missing" as WorkflowRunId,
 				})
 			).toBeNull();
+		}));
+});
+
+// Seeds a claimed run with its ulid minted at the frozen `mintedAtMs` — later instants mint
+// larger ids, pinning the id order the cursor walk depends on — then parks it on a child wait
+// due at `timeoutAt`.
+async function parkRunOnChildWait(
+	deps: { context: NamespaceRequestContext; repos: Repositories; publisher: FakePublisher },
+	params: { mintedAtMs: TimestampMs; timeoutAt: TimestampMs }
+): Promise<string> {
+	const { context, repos, publisher } = deps;
+	const { runId, revisionWhenClaimed } = await withFakeClock(params.mintedAtMs, () =>
+		seedClaimedRun({ namespaceRequestContext: context, repos, publisher })
+	);
+
+	await repos.workflowRun.update({
+		waitForSignal: true,
+		filter: {
+			namespaceId: context.namespaceId,
+			id: runId as WorkflowRunId,
+			revision: revisionWhenClaimed,
+			signalSequence: 0,
+		},
+		updates: {
+			attempts: 1,
+			latestStateTransitionId: ulid(),
+			onSignalSequenceMatch: { status: "awaiting_child_workflow", timeoutAt: params.timeoutAt },
+			onSignalSequenceMismatch: { status: "scheduled", scheduledAt: Date.now() as TimestampMs },
+		},
+	});
+
+	return runId;
+}
+
+describe("listChildRunWaitTimedOutRuns cursor paging", () => {
+	test("resumes past the frontier to later deadlines", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const deps = { context, repos, publisher };
+			const runA = await parkRunOnChildWait(deps, {
+				mintedAtMs: 1_000 as TimestampMs,
+				timeoutAt: 1_000_000 as TimestampMs,
+			});
+			const runB = await parkRunOnChildWait(deps, {
+				mintedAtMs: 2_000 as TimestampMs,
+				timeoutAt: 2_000_000 as TimestampMs,
+			});
+			const runC = await parkRunOnChildWait(deps, {
+				mintedAtMs: 3_000 as TimestampMs,
+				timeoutAt: 3_000_000 as TimestampMs,
+			});
+
+			const daemonContext = daemonContextFactory.build();
+			const before = 3_000_000 as TimestampMs;
+
+			expect(await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, before, 2)).toEqual([
+				expect.objectContaining({ id: runA, dueAt: 1_000_000 }),
+				expect.objectContaining({ id: runB, dueAt: 2_000_000 }),
+			]);
+
+			expect(
+				await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, before, 2, {
+					order: 2_000_000,
+					id: runB,
+					maxSeenId: runB,
+				})
+			).toEqual([expect.objectContaining({ id: runC, dueAt: 3_000_000 })]);
+		}));
+
+	test("splits deadline ties by id across pages", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const deps = { context, repos, publisher };
+			const sharedDeadline = 1_000_000 as TimestampMs;
+			const runA = await parkRunOnChildWait(deps, { mintedAtMs: 1_000 as TimestampMs, timeoutAt: sharedDeadline });
+			const runB = await parkRunOnChildWait(deps, { mintedAtMs: 2_000 as TimestampMs, timeoutAt: sharedDeadline });
+
+			const daemonContext = daemonContextFactory.build();
+
+			expect(await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, sharedDeadline, 1)).toEqual([
+				expect.objectContaining({ id: runA, dueAt: sharedDeadline }),
+			]);
+
+			expect(
+				await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, sharedDeadline, 1, {
+					order: sharedDeadline,
+					id: runA,
+					maxSeenId: runA,
+				})
+			).toEqual([expect.objectContaining({ id: runB, dueAt: sharedDeadline })]);
+		}));
+
+	test("returns a run behind the frontier when its id is newer than any seen", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const deps = { context, repos, publisher };
+			// Already-walked bystander: due behind the frontier with an id below maxSeenId, so
+			// the late-insert clause must not resurrect it.
+			await parkRunOnChildWait(deps, { mintedAtMs: 1_000 as TimestampMs, timeoutAt: 1_000_000 as TimestampMs });
+			const runB = await parkRunOnChildWait(deps, {
+				mintedAtMs: 2_000 as TimestampMs,
+				timeoutAt: 2_000_000 as TimestampMs,
+			});
+			// Minted after the walk passed its deadline: due behind the frontier, ulid above
+			// maxSeenId — the late insert the third clause exists for.
+			const lateRun = await parkRunOnChildWait(deps, {
+				mintedAtMs: 3_000 as TimestampMs,
+				timeoutAt: 1_500_000 as TimestampMs,
+			});
+
+			const daemonContext = daemonContextFactory.build();
+
+			expect(
+				await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, 3_000_000 as TimestampMs, 10, {
+					order: 2_000_000,
+					id: runB,
+					maxSeenId: runB,
+				})
+			).toEqual([expect.objectContaining({ id: lateRun, dueAt: 1_500_000 })]);
 		}));
 });

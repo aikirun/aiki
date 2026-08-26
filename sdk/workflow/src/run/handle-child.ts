@@ -4,7 +4,6 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
-	type ChildWorkflowRunWaits,
 	type TerminalWorkflowRunState,
 	type WorkflowRunId,
 	type WorkflowRunRecord,
@@ -19,7 +18,6 @@ export function childWorkflowRunHandle<Input, Output, Context, TEvents extends E
 	client: Client<Context>,
 	run: WorkflowRunRecord<Input, Output>,
 	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
-	parentRunWaitsOnChild: ChildWorkflowRunWaits,
 	logger: Logger,
 	eventsDefinition?: TEvents
 ): ChildWorkflowRunHandle<Input, Output, Context, TEvents> {
@@ -29,7 +27,7 @@ export function childWorkflowRunHandle<Input, Output, Context, TEvents extends E
 		run: handle.run,
 		events: handle.events,
 		refresh: handle.refresh.bind(handle),
-		wait: createWaiter(handle, parentRunHandle, parentRunWaitsOnChild, logger),
+		wait: createWaiter(handle, parentRunHandle, logger),
 		cancel: handle.cancel.bind(handle),
 		pause: handle.pause.bind(handle),
 		resume: handle.resume.bind(handle),
@@ -98,7 +96,6 @@ export type ChildWorkflowRunWaitResult<Output, Timed extends boolean> = Timed ex
 function createWaiter<Input, Output, Context, TEvents extends EventsDefinition>(
 	handle: WorkflowRunHandle<Input, Output, Context, TEvents>,
 	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
-	parentRunWaitsOnChild: ChildWorkflowRunWaits,
 	logger: Logger
 ) {
 	let nextTimeoutIndex = 0;
@@ -109,11 +106,10 @@ function createWaiter<Input, Output, Context, TEvents extends EventsDefinition>(
 	async function wait(
 		options?: ChildWorkflowRunWaitOptions<boolean>
 	): Promise<ChildWorkflowRunWaitResult<Output, boolean>> {
-		// TODO: refresh first? like how event waits do it
-
 		const { run } = handle;
+		const waits = parentRunHandle.run.childWorkflowRunWaits[run.id] ?? { timeouts: [] };
 
-		const timedOutWait = parentRunWaitsOnChild.timeouts[nextTimeoutIndex];
+		const timedOutWait = waits.timeouts[nextTimeoutIndex];
 		if (timedOutWait) {
 			nextTimeoutIndex++;
 
@@ -124,7 +120,7 @@ function createWaiter<Input, Output, Context, TEvents extends EventsDefinition>(
 			};
 		}
 
-		const { terminal } = parentRunWaitsOnChild;
+		const { terminal } = waits;
 		if (terminal) {
 			return {
 				success: true,

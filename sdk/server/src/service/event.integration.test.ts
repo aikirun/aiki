@@ -1,10 +1,15 @@
+import { asConfigProvider } from "@aikirun/lib/config";
 import { NotFoundError } from "@aikirun/lib/error";
+import { noopLogger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { createWorkflowRunStateMachine } from "./state-machine/workflow-run";
 import { describe, expect, test } from "bun:test";
 import type { Repositories } from "../infra/db/types";
+import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import { computeRank } from "../lib/rank";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createEventService } from "../service/event";
 import { withFakeClock } from "../testing/clock";
@@ -13,9 +18,9 @@ import { seedAwaitingEventRun, seedClaimedRun, seedSleepingRun } from "../testin
 
 const withHarness = createServiceHarness();
 
-function createService(repos: Repositories) {
+function createService(repos: Repositories, imminentRunTimerQueue?: ImminentRunTimerQueue) {
 	const childRunCanceller = createChildRunCanceller();
-	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller });
+	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller, imminentRunTimerQueue });
 	return createEventService({ repos, workflowRunStateMachine });
 }
 
@@ -128,6 +133,38 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 					state: { status: "scheduled", reason: "event", scheduledAt: sentAt },
 				})
 			);
+		}));
+
+	test("adds the woken run's timer to the priority queue", () =>
+		withHarness(async ({ repos, context, publisher }) => {
+			const { runId } = await seedAwaitingEventRun(
+				{ repos, namespaceRequestContext: context, publisher },
+				{ eventName: "orderShipped" }
+			);
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const eventService = createService(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			const sentAt = Date.now() as TimestampMs;
+			await withFakeClock(sentAt, () =>
+				eventService.sendEventToWorkflowRun(context, {
+					runId: runId as WorkflowRunId,
+					eventName: "orderShipped",
+					data: { trackingId: "TRK-1" },
+					reference: undefined,
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: sentAt }) },
+			]);
 		}));
 
 	test("leaves a run parked on a different event name parked", () =>

@@ -288,7 +288,9 @@ export const createWorkflowRunService = ({
 			return { cancelledIds: [] };
 		}
 
-		return repos.transaction(async (txRepos) => cancelByIdsInTx(context, ids, txRepos, childRunCanceller));
+		return repos.transaction(async (txRepos) =>
+			cancelByIdsInTx(context, ids, txRepos, childRunCanceller, imminentRunTimerQueue)
+		);
 	},
 
 	async hasTerminated(context: NamespaceRequestContext, runId: string, afterStateTransitionId: string) {
@@ -412,7 +414,8 @@ async function cancelByIdsInTx(
 	context: NamespaceRequestContext,
 	ids: NonEmptyArray<string>,
 	txRepos: TxRepositories,
-	childRunCanceller: ChildRunCanceller
+	childRunCanceller: ChildRunCanceller,
+	imminentRunTimerQueue?: ImminentRunTimerQueue
 ) {
 	const { namespaceId, logger } = context;
 	const cancelledRuns = await txRepos.workflowRun.bulkTransitionToCancelledInNamespace(namespaceId, ids);
@@ -467,7 +470,7 @@ async function cancelByIdsInTx(
 	}
 
 	if (isNonEmptyArray(cancelledRunsHavingParent)) {
-		await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, logger);
+		await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, logger, imminentRunTimerQueue);
 	}
 
 	if (isNonEmptyArray(cancelledRunsMeta)) {
@@ -516,7 +519,8 @@ async function getWorkflowRun(
 		tasks: buildTasksByAddress(taskRows),
 		sleeps: buildSleepsByName(sleepRows),
 		eventWaits: buildEventWaitsByName(eventWaitRows),
-		childWorkflowRuns: buildChildWorkflowRunsByAddress(childRunRows, childWorkflowRunWaitRows),
+		childWorkflowRuns: buildChildWorkflowRunsByAddress(childRunRows),
+		childWorkflowRunWaits: buildChildWorkflowRunWaitsByRunId(childWorkflowRunWaitRows),
 		parentWorkflowRunId: run.parentWorkflowRunId ?? undefined,
 		scheduleId: run.scheduleId ?? undefined,
 	};
@@ -629,19 +633,18 @@ function buildEventWaitsByName(eventWaitRows: EventWaitRow[]): Record<string, Ev
 	return eventWaitsByName;
 }
 
-function buildChildWorkflowRunsByAddress(
-	childRuns: ChildRunWithWorkflow[],
+function buildChildWorkflowRunWaitsByRunId(
 	childRunWaits: ChildRunWaitWithState[]
-): Record<string, ChildWorkflowRunInfo[]> {
-	const waitsByChildRunId = new Map<WorkflowRunId, ChildWorkflowRunWaits>();
+): Record<string, ChildWorkflowRunWaits> {
+	const waitsByChildRunId: Record<string, ChildWorkflowRunWaits> = {};
 
 	for (const childRunWait of childRunWaits) {
-		const childRunId = childRunWait.childWorkflowRunId as WorkflowRunId;
+		const childRunId = childRunWait.childWorkflowRunId;
 
-		let waits = waitsByChildRunId.get(childRunId);
+		let waits = waitsByChildRunId[childRunId];
 		if (!waits) {
 			waits = { timeouts: [] };
-			waitsByChildRunId.set(childRunId, waits);
+			waitsByChildRunId[childRunId] = waits;
 		}
 
 		switch (childRunWait.status) {
@@ -671,6 +674,10 @@ function buildChildWorkflowRunsByAddress(
 		}
 	}
 
+	return waitsByChildRunId;
+}
+
+function buildChildWorkflowRunsByAddress(childRuns: ChildRunWithWorkflow[]): Record<string, ChildWorkflowRunInfo[]> {
 	const childRunsByAddress: Record<string, ChildWorkflowRunInfo[]> = {};
 
 	for (const { run: childRun, workflow: childWorkflow } of childRuns) {
@@ -685,7 +692,6 @@ function buildChildWorkflowRunsByAddress(
 			name: childWorkflow.name,
 			versionId: childWorkflow.versionId,
 			inputHash: childRun.inputHash,
-			waits: waitsByChildRunId.get(childRun.id as WorkflowRunId) ?? { timeouts: [] },
 		};
 
 		const addressChildRuns = childRunsByAddress[childRunAddress];
