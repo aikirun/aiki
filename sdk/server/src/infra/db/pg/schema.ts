@@ -294,6 +294,13 @@ export const eventWait = pgTable(
 		status: eventWaitStatusEnum("status").notNull(),
 		referenceId: text("reference_id"),
 
+		// The run's signal_sequence at the moment this row was written. Rows are handed to
+		// the workflow's waits in this order: the value is assigned under the run's row
+		// lock, so it is exactly the order the server accepted the sends — ids order only
+		// down to the millisecond and can invert two sends that land close together on
+		// different server replicas. Timeout rows sit in the same ordered queue as received
+		// rows, so they carry it too. It also lets a worker fetch just the rows written
+		// after the copy it loaded, the same catch-up the child wait column below serves.
 		signalSequence: integer("signal_sequence").notNull(),
 
 		data: jsonb("data"),
@@ -331,6 +338,14 @@ export const childWorkflowRunWait = pgTable(
 
 		childWorkflowRunStateTransitionId: text("child_workflow_run_state_transition_id"),
 
+		// The parent run's signal_sequence at the moment this row was written. A child can
+		// finish while its parent is executing, so a row can land that the parent's loaded
+		// copy of this table lacks; the value lets the parent fetch just the rows written
+		// after its copy, instead of re-reading everything. A timeout row cannot land that
+		// way — it is written only while the parent is parked, and the parent re-reads
+		// everything when it wakes — so there is nothing to catch up on, and it stays null.
+		signalSequence: integer("signal_sequence"),
+
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
@@ -352,11 +367,11 @@ export const childWorkflowRunWait = pgTable(
 		index("idx_child_workflow_run_wait_parent_id").on(table.parentWorkflowRunId, table.id),
 		check(
 			"chk_child_workflow_run_wait_completed_invariants",
-			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NOT NULL)`
+			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NOT NULL AND ${table.signalSequence} IS NOT NULL)`
 		),
 		check(
 			"chk_child_workflow_run_wait_timeout_invariants",
-			sql`${table.status} != 'timeout' OR (${table.timedOutAt} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NULL AND ${table.childWorkflowRunStateTransitionId} IS NULL)`
+			sql`${table.status} != 'timeout' OR (${table.timedOutAt} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NULL AND ${table.childWorkflowRunStateTransitionId} IS NULL AND ${table.signalSequence} IS NULL)`
 		),
 	]
 );

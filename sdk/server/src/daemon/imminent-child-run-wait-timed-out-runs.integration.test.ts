@@ -112,6 +112,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 					childWorkflowRunStatus: null,
 					childWorkflowRunStateTransitionId: null,
 					childWorkflowRunState: null,
+					signalSequence: null,
 				}),
 			]);
 		}));
