@@ -35,18 +35,6 @@ export async function deliverTerminatedSignalToParentRun(
 	logger: Logger,
 	imminentRunTimerQueue: ImminentRunTimerQueue | undefined
 ): Promise<void> {
-	await txRepos.childWorkflowRunWait.insert(
-		runs.map((run) => ({
-			id: ulid(),
-			parentWorkflowRunId: run.parentWorkflowRunId,
-			childWorkflowRunId: run.id,
-			childWorkflowRunStatus: run.status,
-			status: "completed",
-			completedAt: now,
-			childWorkflowRunStateTransitionId: run.latestStateTransitionId,
-		}))
-	);
-
 	const parentsRunsById = new Map<WorkflowRunId, { namespaceId: NamespaceId; id: WorkflowRunId }>();
 	for (const run of runs) {
 		const parentRunId = run.parentWorkflowRunId as WorkflowRunId;
@@ -58,6 +46,28 @@ export async function deliverTerminatedSignalToParentRun(
 	// is running but there is a concurrent state transition moving it to awaiting_child_workflow
 	const incrementedParentsRuns = await txRepos.workflowRun.bulkIncrementSignalSequence(
 		asNonEmptyArray(Array.from(parentsRunsById.values()))
+	);
+
+	// The bump comes first so its returned value can stamp the rows: siblings in one
+	// batch share their parent's stamp.
+	const incrementedParentRunsById = new Map(incrementedParentsRuns.map((run) => [run.id, run]));
+	await txRepos.childWorkflowRunWait.insert(
+		runs.map((run) => {
+			const incrementedParentRun = incrementedParentRunsById.get(run.parentWorkflowRunId);
+			if (!incrementedParentRun) {
+				throw new Error(`Parent run not found: ${run.parentWorkflowRunId}`);
+			}
+			return {
+				id: ulid(),
+				parentWorkflowRunId: run.parentWorkflowRunId,
+				childWorkflowRunId: run.id,
+				childWorkflowRunStatus: run.status,
+				status: "completed",
+				completedAt: now,
+				childWorkflowRunStateTransitionId: run.latestStateTransitionId,
+				signalSequence: incrementedParentRun.signalSequence,
+			};
+		})
 	);
 
 	const parkedParentsRuns = incrementedParentsRuns.filter((parent) => parent.status === "awaiting_child_workflow");

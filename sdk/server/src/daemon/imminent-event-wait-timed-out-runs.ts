@@ -231,10 +231,10 @@ async function transitionToQueuedInTx(
 			}))
 		)
 	);
-	const incrementedRunsByRunId = new Map(incrementedRuns.map((run) => [run.id, run]));
+	const incrementedRunsById = new Map(incrementedRuns.map((run) => [run.id, run]));
 	const sequenceStampedEventWaitEntries = eventWaitEntriesToInsert.map((entry) => {
-		const incrementedRun = incrementedRunsByRunId.get(entry.workflowRunId);
-		if (incrementedRun === undefined) {
+		const incrementedRun = incrementedRunsById.get(entry.workflowRunId);
+		if (!incrementedRun) {
 			throw new Error(`Run not found: ${entry.workflowRunId}`);
 		}
 		return { ...entry, signalSequence: incrementedRun.signalSequence };

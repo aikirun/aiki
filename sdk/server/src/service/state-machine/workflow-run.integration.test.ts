@@ -939,6 +939,7 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 						childWorkflowRunStatus: status,
 						status: "completed",
 						childWorkflowRunState: expectedChildState,
+						signalSequence: 1,
 					}),
 				]);
 			}));

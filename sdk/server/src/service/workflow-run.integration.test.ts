@@ -298,6 +298,24 @@ describe("WorkflowRunService cancelByIds", () => {
 					state: { status: "running" },
 				})
 			);
+			// Both siblings were delivered by the one bump, so their rows share its stamp.
+			// The bulk cancellation decides which child's row is written first, so the set
+			// is compared sorted rather than in listing order.
+			const waitRows = await repos.childWorkflowRunWait.listByParentRunIdWithChildState(parent.runId);
+			expect(
+				waitRows
+					.map((row) => ({
+						childWorkflowRunId: row.childWorkflowRunId,
+						status: row.status,
+						signalSequence: row.signalSequence,
+					}))
+					.sort((a, b) => (a.childWorkflowRunId < b.childWorkflowRunId ? -1 : 1))
+			).toEqual(
+				[
+					{ childWorkflowRunId: firstChild.runId, status: "completed" as const, signalSequence: 1 },
+					{ childWorkflowRunId: secondChild.runId, status: "completed" as const, signalSequence: 1 },
+				].sort((a, b) => (a.childWorkflowRunId < b.childWorkflowRunId ? -1 : 1))
+			);
 		}));
 
 	test("cancelling a child adds the woken parent's timer to the priority queue", () =>
