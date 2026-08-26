@@ -8,9 +8,9 @@ await runWithWorker([notify], async (client) => {
 	const handle = await notify
 		.with("trigger", { type: "delayed", delay: { seconds: 5 } })
 		.start(client, "It's a good day");
-	const result = await handle.waitForStatus("completed");
+	const result = await handle.wait();
 
-	if (result.success) {
+	if (result.state.status === "completed") {
 		const elapsed = Date.now() - startedAt;
 		client.logger.info("Delayed workflow completed", { elapsedMs: elapsed, output: result.state.output });
 	}

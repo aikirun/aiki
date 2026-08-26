@@ -8,7 +8,7 @@ import type { WorkflowRunStateRequest, WorkflowRunTransitionStateResponseV1 } fr
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
-	TerminalWorkflowRunStatus,
+	TerminalWorkflowRunState,
 	WorkflowRunId,
 	WorkflowRunRecord,
 	WorkflowRunState,
@@ -80,65 +80,47 @@ export interface WorkflowRunHandle<Input, Output, Context, TEvents extends Event
 	/**
 	 * Waits for the workflow run to reach a terminal status by polling.
 	 *
+	 * Any terminal status (`completed`, `failed`, or `cancelled`) resolves the wait.
+	 *
 	 * Returns a result object:
-	 * - `{ success: true, state }` - workflow reached the expected status
-	 * - `{ success: false, cause }` - workflow did not reach status
+	 * - `{ success: true, state }` - the run reached a terminal status; `state.status` says which
+	 * - `{ success: false, cause: "timeout" }` - the wall-clock timeout elapsed (only when a
+	 *   timeout option is provided); a final poll happens at the deadline before the wait gives up
+	 * - `{ success: false, cause: "aborted" }` - the abort signal triggered (only when a signal
+	 *   option is provided)
 	 *
-	 * Possible failure causes:
-	 * - `"run_terminated"` - workflow reached a terminal state other than expected
-	 * - `"timeout"` - the wall-clock timeout elapsed (only when timeout option provided);
-	 *   a final poll happens at the deadline before the wait gives up
-	 * - `"aborted"` - abort signal triggered (only when signal option provided)
-	 *
-	 * @param status - The target status to wait for
 	 * @param options - Optional configuration for polling interval, timeout, and abort signal
 	 *
 	 * @example
-	 * // Wait indefinitely until completed or the workflow reaches another terminal state
-	 * const result = await handle.waitForStatus("completed");
-	 * if (result.success) {
+	 * // Wait indefinitely until the run terminates
+	 * const result = await handle.wait();
+	 * if (result.state.status === "completed") {
 	 *   console.log(result.state.output);
 	 * } else {
-	 *   console.log(`Workflow terminated: ${result.cause}`);
+	 *   console.log(`Run ended ${result.state.status}`);
 	 * }
 	 *
 	 * @example
 	 * // Wait with a timeout
-	 * const result = await handle.waitForStatus("completed", {
-	 *   timeout: { seconds: 30 }
-	 * });
-	 * if (result.success) {
+	 * const result = await handle.wait({ timeout: { seconds: 30 } });
+	 * if (!result.success) {
+	 *   console.log("Timed out waiting for the run");
+	 * } else if (result.state.status === "completed") {
 	 *   console.log(result.state.output);
-	 * } else if (result.cause === "timeout") {
-	 *   console.log("Timed out waiting for completion");
 	 * }
 	 *
 	 * @example
 	 * // Wait with an abort signal
 	 * const controller = new AbortController();
-	 * const result = await handle.waitForStatus("completed", {
-	 *   signal: controller.signal
-	 * });
+	 * const result = await handle.wait({ signal: controller.signal });
 	 * if (!result.success) {
 	 *   console.log(`Wait ended: ${result.cause}`);
 	 * }
 	 */
-	waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options?: WorkflowRunWaitOptions<false, false>
-	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
-	waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options: WorkflowRunWaitOptions<true, false>
-	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
-	waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options: WorkflowRunWaitOptions<false, true>
-	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
-	waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options: WorkflowRunWaitOptions<true, true>
-	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
+	wait(options?: WorkflowRunWaitOptions<false, false>): Promise<WorkflowRunWaitResult<Output, false, false>>;
+	wait(options: WorkflowRunWaitOptions<true, false>): Promise<WorkflowRunWaitResult<Output, true, false>>;
+	wait(options: WorkflowRunWaitOptions<false, true>): Promise<WorkflowRunWaitResult<Output, false, true>>;
+	wait(options: WorkflowRunWaitOptions<true, true>): Promise<WorkflowRunWaitResult<Output, true, true>>;
 
 	cancel: (explanation?: string) => Promise<void>;
 
@@ -164,25 +146,23 @@ export interface WorkflowRunWaitOptions<Timed extends boolean, Abortable extends
 	signal?: Abortable extends true ? AbortSignal : never;
 }
 
-export type WorkflowRunWaitResultSuccess<Status extends TerminalWorkflowRunStatus, Output> = Extract<
-	WorkflowRunState<Output>,
-	{ status: Status }
->;
-
-export type WorkflowRunWaitResult<
-	Status extends TerminalWorkflowRunStatus,
-	Output,
-	Timed extends boolean,
-	Abortable extends boolean,
-> =
-	| {
-			success: false;
-			cause: "run_terminated" | (Timed extends true ? "timeout" : never) | (Abortable extends true ? "aborted" : never);
-	  }
-	| {
+export type WorkflowRunWaitResult<Output, Timed extends boolean, Abortable extends boolean> = [
+	Timed,
+	Abortable,
+] extends [false, false]
+	? {
 			success: true;
-			state: WorkflowRunWaitResultSuccess<Status, Output>;
-	  };
+			state: TerminalWorkflowRunState<Output>;
+		}
+	:
+			| {
+					success: true;
+					state: TerminalWorkflowRunState<Output>;
+			  }
+			| {
+					success: false;
+					cause: (Timed extends true ? "timeout" : never) | (Abortable extends true ? "aborted" : never);
+			  };
 
 class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefinition>
 	implements WorkflowRunHandle<Input, Output, Context, TEvents>
@@ -218,37 +198,25 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 		this._run = currentRun as WorkflowRunRecord<Input, Output>;
 	}
 
-	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
+	public async wait(
 		options?: WorkflowRunWaitOptions<false, false>
-	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
+	): Promise<WorkflowRunWaitResult<Output, false, false>>;
 
-	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options: WorkflowRunWaitOptions<true, false>
-	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
+	public async wait(options: WorkflowRunWaitOptions<true, false>): Promise<WorkflowRunWaitResult<Output, true, false>>;
 
-	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options: WorkflowRunWaitOptions<false, true>
-	): Promise<WorkflowRunWaitResult<Status, Output, false, true>>;
+	public async wait(options: WorkflowRunWaitOptions<false, true>): Promise<WorkflowRunWaitResult<Output, false, true>>;
 
-	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options: WorkflowRunWaitOptions<true, true>
-	): Promise<WorkflowRunWaitResult<Status, Output, true, true>>;
+	public async wait(options: WorkflowRunWaitOptions<true, true>): Promise<WorkflowRunWaitResult<Output, true, true>>;
 
-	public async waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
+	public async wait(
 		options?: WorkflowRunWaitOptions<boolean, boolean>
-	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
-		return this.waitForStatusByPolling(status, options);
+	): Promise<WorkflowRunWaitResult<Output, boolean, boolean>> {
+		return this.waitByPolling(options);
 	}
 
-	private async waitForStatusByPolling<Status extends TerminalWorkflowRunStatus>(
-		expectedStatus: Status,
+	private async waitByPolling(
 		options?: WorkflowRunWaitOptions<boolean, boolean>
-	): Promise<WorkflowRunWaitResult<Status, Output, boolean, boolean>> {
+	): Promise<WorkflowRunWaitResult<Output, boolean, boolean>> {
 		const signal = options?.signal;
 		const intervalMs = options?.interval ? toMilliseconds(options.interval) : 1_000;
 		const timeoutAt = options?.timeout ? Date.now() + toMilliseconds(options.timeout) : undefined;
@@ -271,19 +239,13 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 			}
 
 			if (terminated) {
+				// Terminal states have no exits, so a run reported terminated is terminated
+				// forever: the refreshed state is a terminal state.
 				await this.refresh();
-
-				// TODO: If the run transitions from failed -> awaiting_retry between the refresh and this check,
-				// a wrong response will be sent to the caller i.e. { success: false, cause: "run_terminated" }.
-				// The correct response should be { success: true, state }
-				if (this._run.state.status === expectedStatus) {
-					return {
-						success: true,
-						state: this._run.state as WorkflowRunWaitResultSuccess<Status, Output>,
-					};
-				}
-
-				return { success: false, cause: "run_terminated" };
+				return {
+					success: true,
+					state: this._run.state as TerminalWorkflowRunState<Output>,
+				};
 			}
 
 			if (finalPoll) {

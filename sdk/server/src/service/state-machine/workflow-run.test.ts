@@ -57,7 +57,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 		stalled: { scheduled: { reasons: ["redelivery"] }, cancelled: {} },
 		cancelled: {},
 		completed: {},
-		failed: { awaiting_retry: {} },
+		failed: {},
 	};
 
 	const possibleReasons = Array.from(new Set([...WORKFLOW_RUN_SCHEDULED_REASONS, ...WORKFLOW_RUN_QUEUED_REASON]));

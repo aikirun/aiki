@@ -23,7 +23,7 @@ const handle = await orderWorkflowV1.start(aikiClient, {
 	orderId: "order-123",
 });
 
-const result = await handle.waitForStatus("completed");
+const result = await handle.wait();
 ```
 
 ## Documentation

@@ -94,7 +94,7 @@ const handle = await trialV1.start(aikiClient, { userId: "user-123" });
 
 // Simulate the payment arriving
 await handle.events.paymentReceived.send();
-await handle.waitForStatus("completed");
+await handle.wait();
 
 await workerHandle.stop();
 await runtimeHandle.stop();

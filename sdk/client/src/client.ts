@@ -29,7 +29,7 @@ const EMBEDDED_BASE_URL = "aiki://embedded/api";
  * const aikiClient = client({ handler: aiki.handler });
  *
  * const handle = await myWorkflow.start(aikiClient, { email: "user@example.com" });
- * const result = await handle.waitForStatus("completed", { timeout: { seconds: 60 } });
+ * const result = await handle.wait({ timeout: { seconds: 60 } });
  * ```
  */
 export function client<Context = null>(params: RemoteClientParams<Context>): Client<Context>;

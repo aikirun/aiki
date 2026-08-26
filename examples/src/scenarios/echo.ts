@@ -12,5 +12,5 @@ await runWithWorker([echoV1], async (client) => {
 	await delay(5_000);
 	await handle.events.ping.send({ message: "Another Ping" });
 
-	await handle.waitForStatus("completed");
+	await handle.wait();
 });

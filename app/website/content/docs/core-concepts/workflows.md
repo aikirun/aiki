@@ -196,12 +196,12 @@ const handle = await workflowVersion.start(client, {
 console.log("Started:", handle.run.id);
 console.log("Status:", handle.run.state.status);
 
-// Wait for completion
-const result = await handle.waitForStatus("completed");
-if (result.success) {
+// Wait for the run to finish
+const result = await handle.wait();
+if (result.state.status === "completed") {
 	console.log("Output:", result.state.output);
 } else {
-	console.log("Failed:", result.cause);
+	console.log("Ended with:", result.state.status);
 }
 ```
 
@@ -245,25 +245,26 @@ The handle returned from `.start()` provides:
 | `run` | The workflow run data (id, state, input, output, etc.) |
 | `events` | Send events to the workflow |
 | `refresh()` | Refresh run data from the server |
-| `waitForStatus(status)` | Wait for a terminal status (`completed`, `failed`, `cancelled`) |
+| `wait()` | Wait for a terminal status (`completed`, `failed`, `cancelled`) |
 | `cancel(explanation?)` | Cancel the workflow run |
 | `pause()` | Pause the workflow |
 | `resume()` | Resume a paused workflow |
 | `wakeup()` | Wake a sleeping workflow |
 
-#### Waiting for Status
+#### Waiting for the Run to Finish
 
-The `waitForStatus()` method returns a result object:
+The `wait()` method resolves when the run reaches any terminal status; the state says
+which one. With a timeout, the result can also report that the timeout elapsed:
 
 ```typescript
-const result = await handle.waitForStatus("completed");
+const result = await handle.wait({ timeout: { minutes: 5 } });
 
-if (result.success) {
-	// Workflow reached the requested status
+if (!result.success) {
+	console.log("Timed out waiting for the run");
+} else if (result.state.status === "completed") {
 	console.log("Output:", result.state.output);
 } else {
-	// Workflow reached a different terminal status
-	console.log("Ended with:", result.cause);
+	console.log("Ended with:", result.state.status);
 }
 ```
 
