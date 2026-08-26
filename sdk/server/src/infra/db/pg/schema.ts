@@ -294,6 +294,8 @@ export const eventWait = pgTable(
 		status: eventWaitStatusEnum("status").notNull(),
 		referenceId: text("reference_id"),
 
+		signalSequence: integer("signal_sequence").notNull(),
+
 		data: jsonb("data"),
 
 		timedOutAt: timestampMs("timed_out_at"),
@@ -307,7 +309,7 @@ export const eventWait = pgTable(
 			foreignColumns: [workflowRun.id],
 		}),
 		uniqueIndex("uqidx_event_wait_workflow_run_name_reference").on(table.workflowRunId, table.name, table.referenceId),
-		index("idx_event_wait_workflow_run_id").on(table.workflowRunId, table.id),
+		index("idx_event_wait_workflow_run_signal_sequence_id").on(table.workflowRunId, table.signalSequence, table.id),
 		check(
 			"chk_event_wait_timeout_requires_timed_out_at",
 			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`

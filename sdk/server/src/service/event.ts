@@ -98,6 +98,7 @@ async function sendEventToWorkflowRunInTx(
 		name: eventName,
 		status: "received",
 		referenceId: reference?.id,
+		signalSequence: run.signalSequence,
 		data,
 	};
 	if (propsRequiredNonNull(eventWaitEntry, "referenceId")) {

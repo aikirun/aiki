@@ -186,7 +186,7 @@ export async function seedPublishedRun(deps: SeedRunDeps & { publisher: FakePubl
 
 export async function seedAwaitingEventRun(
 	deps: SeedRunDeps & { publisher: FakePublisher },
-	params: { eventName: string }
+	params: { eventName: string; timeoutInMs?: number }
 ) {
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
@@ -196,7 +196,7 @@ export async function seedAwaitingEventRun(
 	const parked = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
 		id: seeded.runId,
-		state: { status: "awaiting_event", eventName: params.eventName },
+		state: { status: "awaiting_event", eventName: params.eventName, timeoutInMs: params.timeoutInMs },
 		expectedRevision: seeded.revisionWhenClaimed,
 		expectedSignalSequence: 0,
 	});

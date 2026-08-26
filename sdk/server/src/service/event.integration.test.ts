@@ -43,6 +43,7 @@ describe("EventService sendEventToWorkflowRun", () => {
 					status: "received",
 					data: { trackingId: "TRK-1" },
 					referenceId: null,
+					signalSequence: 1,
 				}),
 			]);
 		}));
@@ -70,8 +71,15 @@ describe("EventService sendEventToWorkflowRun", () => {
 					status: "received",
 					data: { trackingId: "TRK-1" },
 					referenceId: "carrier-callback-1",
+					// The deduplicated repeat send bumped the sequence but wrote no row; the
+					// first send's stamp survives.
+					signalSequence: 1,
 				}),
 			]);
+			// The bump is unconditional — it happens before the send can know it is a
+			// duplicate. The run's counter shows both sends; only the row shows one.
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run).toEqual(expect.objectContaining({ run: expect.objectContaining({ id: runId, signalSequence: 2 }) }));
 		}));
 
 	test("two sends without a reference record two waits", () =>
@@ -91,8 +99,18 @@ describe("EventService sendEventToWorkflowRun", () => {
 			await send("TRK-2");
 
 			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
-				expect.objectContaining({ name: "orderShipped", status: "received", data: { trackingId: "TRK-1" } }),
-				expect.objectContaining({ name: "orderShipped", status: "received", data: { trackingId: "TRK-2" } }),
+				expect.objectContaining({
+					name: "orderShipped",
+					status: "received",
+					data: { trackingId: "TRK-1" },
+					signalSequence: 1,
+				}),
+				expect.objectContaining({
+					name: "orderShipped",
+					status: "received",
+					data: { trackingId: "TRK-2" },
+					signalSequence: 2,
+				}),
 			]);
 		}));
 
