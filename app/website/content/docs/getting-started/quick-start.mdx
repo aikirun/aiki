@@ -100,7 +100,7 @@ Start the workflow, then simulate the payment so the run completes without the f
 const handle = await trialV1.start(aikiClient, { userId: "user-123" });
 
 await handle.events.paymentReceived.send();
-await handle.waitForStatus("completed");
+await handle.wait();
 
 console.log("Run completed");
 
@@ -108,7 +108,7 @@ await workerHandle.stop();
 await runtimeHandle.stop();
 ```
 
-> **Tip:** `waitForStatus` waits indefinitely by default. To bound it, pass a timeout: `await handle.waitForStatus("completed", { timeout: { seconds: 60 } })`.
+> **Tip:** `wait` waits indefinitely by default. To bound it, pass a timeout: `await handle.wait({ timeout: { seconds: 60 } })`.
 
 ## Run
 
@@ -192,7 +192,7 @@ const handle = await trialV1.start(aikiClient, { userId: "user-123" });
 
 // Simulate the payment arriving
 await handle.events.paymentReceived.send();
-await handle.waitForStatus("completed");
+await handle.wait();
 
 console.log("Run completed");
 

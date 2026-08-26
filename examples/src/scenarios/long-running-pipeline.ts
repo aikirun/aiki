@@ -8,8 +8,8 @@ await runWithWorker([longRunningPipelineV1], async (client) => {
 	// Wait for it to reach the approval stage, then approve
 	await delay(35_000);
 	await handle.events.approve.send({ approver: "admin@example.com" });
-	const result = await handle.waitForStatus("completed");
-	if (result.success) {
+	const result = await handle.wait();
+	if (result.state.status === "completed") {
 		client.logger.info("Pipeline complete", result.state.output);
 	}
 });

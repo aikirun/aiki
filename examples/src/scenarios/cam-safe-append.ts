@@ -9,10 +9,10 @@ await runWithWorker([cam.camAppendV1], async (client) => {
 	await delay(5_000);
 	cam.flags.append = true;
 	await handle.events.proceed.send();
-	const result = await handle.waitForStatus("completed");
-	const passed = result.success;
+	const result = await handle.wait();
+	const passed = result.state.status === "completed";
 	client.logger.info(`[CAM] Safe Append: ${passed ? "PASS" : "FAIL"}`, {
 		expected: "completed",
-		got: result.success ? "completed" : "failed",
+		got: result.state.status,
 	});
 });

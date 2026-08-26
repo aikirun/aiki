@@ -38,7 +38,7 @@ export function childWorkflowRunHandle<Input, Output, Context, TEvents extends E
 
 export type ChildWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> = Omit<
 	WorkflowRunHandle<Input, Output, Context, TEvents>,
-	"waitForStatus"
+	"wait"
 > & {
 	/**
 	 * Waits for the child workflow run to reach a terminal status.

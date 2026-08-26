@@ -81,9 +81,7 @@ const workflowRunStateTransitionValidator: Record<
 	},
 	cancelled: {},
 	completed: {},
-	failed: {
-		awaiting_retry: true,
-	},
+	failed: {},
 };
 
 export function assertIsValidWorkflowRunStateTransition(
