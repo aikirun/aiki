@@ -247,6 +247,7 @@ export function RunDetail() {
 						display: "flex",
 						alignItems: "flex-start",
 						justifyContent: "space-between",
+						flexWrap: "wrap",
 						gap: 12,
 						marginBottom: 8,
 					}}
@@ -258,7 +259,9 @@ export function RunDetail() {
 							gap: 10,
 							flexWrap: "wrap",
 							minWidth: 0,
-							flex: 1,
+							// A real basis, not `flex: 1`: with a 0% basis this column shrinks to a
+							// sliver and the name breaks mid-word instead of the actions wrapping.
+							flex: "1 1 220px",
 						}}
 					>
 						<h1
@@ -272,7 +275,7 @@ export function RunDetail() {
 								minWidth: 0,
 								// A workflow name is one hyphenated token; without this it keeps its
 								// full width as the flex item shrinks and paints over the actions.
-								overflowWrap: "anywhere",
+								overflowWrap: "break-word",
 							}}
 						>
 							{currentRun.name}
@@ -502,7 +505,7 @@ export function RunDetail() {
 			)}
 
 			{/* Pill-style tabs */}
-			<div style={{ marginBottom: 12, maxWidth: "100%", overflowX: "auto" }}>
+			<div className="no-scrollbar" style={{ marginBottom: 12, maxWidth: "100%", overflowX: "auto" }}>
 				<div
 					style={{
 						display: "inline-flex",

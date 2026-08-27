@@ -381,7 +381,7 @@ function ChildWorkflowCard({
 				style={{
 					position: "relative",
 					display: "flex",
-					alignItems: "center",
+					alignItems: "flex-start",
 					gap: 10,
 					padding: "10px 14px",
 					minWidth: 0,
@@ -407,8 +407,8 @@ function ChildWorkflowCard({
 					{glyph}
 				</div>
 
-				<div style={{ flex: 1, minWidth: 0 }}>
-					<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+				<div style={{ flex: "1 1 auto", minWidth: 0 }}>
+					<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
 						{hasResolvedOutput ? (
 							<button
 								type="button"
@@ -425,12 +425,29 @@ function ChildWorkflowCard({
 									fontWeight: 600,
 									color: "var(--t0)",
 									textAlign: "left",
+									minWidth: 0,
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									whiteSpace: "nowrap",
+									maxWidth: "100%",
 								}}
 							>
 								{child.name}
 							</button>
 						) : (
-							<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 600, color: "var(--t0)" }}>
+							<span
+								style={{
+									fontFamily: "var(--mono)",
+									fontSize: 12,
+									fontWeight: 600,
+									color: "var(--t0)",
+									minWidth: 0,
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									whiteSpace: "nowrap",
+									maxWidth: "100%",
+								}}
+							>
 								{child.name}
 							</span>
 						)}
@@ -648,13 +665,28 @@ function EventRow({
 						{name}
 					</button>
 				) : (
-					<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 600, color: "var(--t0)" }}>{name}</span>
+					<span
+						style={{
+							fontFamily: "var(--mono)",
+							fontSize: 12,
+							fontWeight: 600,
+							color: "var(--t0)",
+							minWidth: 0,
+							overflow: "hidden",
+							textOverflow: "ellipsis",
+							whiteSpace: "nowrap",
+						}}
+					>
+						{name}
+					</span>
 				)}
 				{isWaiting && <span style={{ ...chipStatus("var(--accent-pink)"), fontSize: 9.5 }}>waiting</span>}
 				<span style={{ flex: 1 }} />
 				{isWaiting && timeoutAt !== undefined && <EventTimeoutCountdown timeoutAt={timeoutAt} />}
 				{hasWaits && (
-					<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)" }}>{waits.length} received</span>
+					<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap" }}>
+						{waits.length} received
+					</span>
 				)}
 				{hasWaits && <ChevronIcon open={isOpen} />}
 			</div>

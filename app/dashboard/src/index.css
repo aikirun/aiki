@@ -153,6 +153,16 @@ body {
 	background-position: center;
 }
 
+/* A control that scrolls to reveal a few tabs should not show a scrollbar track. */
+.no-scrollbar {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+
 ::-webkit-scrollbar {
 	width: 8px;
 	height: 8px;

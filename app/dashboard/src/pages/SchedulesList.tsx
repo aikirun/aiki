@@ -608,7 +608,7 @@ function ScheduleRow({
 						)}
 
 					{/* Action buttons */}
-					<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+					<div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
 						{schedule.status === "active" && (
 							<ActionBtn label="Pause" color="var(--accent-amber)" onClick={() => onAction("pause", schedule.id)} />
 						)}
@@ -622,11 +622,15 @@ function ScheduleRow({
 								onClick={() => onAction("deactivate", schedule.id)}
 							/>
 						)}
-						<div style={{ flex: 1 }} />
 						<button
 							type="button"
 							onClick={() => onViewRuns(schedule.id)}
-							style={{ ...btnTinted("var(--accent-sky)"), fontSize: 11.5, padding: "5px 12px" }}
+							style={{
+								...btnTinted("var(--accent-sky)"),
+								fontSize: 11.5,
+								padding: "5px 12px",
+								marginLeft: "auto",
+							}}
 						>
 							View runs <span style={{ fontSize: 13 }}>→</span>
 						</button>

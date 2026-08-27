@@ -69,18 +69,14 @@ export function RunsFilterBar({
 
 			{/* Row 2: Workflow name + optional version select */}
 			<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-				<div style={{ flex: 1, maxWidth: 220 }}>
+				<div style={{ flex: "1 1 auto", minWidth: 0 }}>
 					<WorkflowSearchInput value={workflowFilter} onChange={onWorkflowFilterChange} />
 				</div>
 				{hasVersions && (
 					<select
 						value={versionFilter}
 						onChange={(e) => onVersionFilterChange(e.target.value)}
-						style={{
-							...inputStyle,
-							width: "auto",
-							cursor: "pointer",
-						}}
+						style={{ ...inputStyle, width: "auto", flexShrink: 0, cursor: "pointer" }}
 					>
 						<option value="">All versions</option>
 						{versionsData.versions.map((v) => (
