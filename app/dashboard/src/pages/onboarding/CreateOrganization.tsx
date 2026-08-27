@@ -106,7 +106,7 @@ export function CreateOrganization() {
 				<button
 					type="submit"
 					disabled={isLoading || !name || !slug}
-					style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
+					style={{ background: "var(--accent)" }}
 					className="w-full py-3 px-4 text-white font-medium rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
 				>
 					{isLoading ? "Creating..." : "Create organization"}

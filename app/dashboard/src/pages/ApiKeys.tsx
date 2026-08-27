@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { organizationAuthedClient } from "../api/client";
 import { useApiKeys } from "../api/hooks";
 import { useAuth } from "../auth/AuthProvider";
+import { DataBlock } from "../components/common/DataBlock";
 import { RelativeTime } from "../components/common/RelativeTime";
+import { btnPrimary, eyebrow, primaryHover } from "../components/common/ui";
 import { API_KEY_STATUS_COLORS } from "../constants/status-colors";
 
 type PageState = { mode: "idle" } | { mode: "creating" } | { mode: "revealed"; key: string };
@@ -46,7 +48,9 @@ export function ApiKeys() {
 				{/* Section header row */}
 				<div className="flex items-start justify-between gap-4">
 					<div>
-						<h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--t0)" }}>API Keys</h2>
+						<h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, letterSpacing: "-0.022em", color: "var(--t0)" }}>
+							API Keys
+						</h2>
 						<p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
 							Scoped to the current namespace. Use in SDK client config.
 						</p>
@@ -55,18 +59,8 @@ export function ApiKeys() {
 						<button
 							type="button"
 							onClick={() => setState({ mode: "creating" })}
-							style={{
-								background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-								color: "#fff",
-								fontSize: 12,
-								fontWeight: 700,
-								padding: "7px 16px",
-								borderRadius: 7,
-								border: "none",
-								cursor: "pointer",
-								whiteSpace: "nowrap",
-								flexShrink: 0,
-							}}
+							style={{ ...btnPrimary(), fontSize: 12, padding: "7px 16px", flexShrink: 0 }}
+							{...primaryHover}
 						>
 							Create key
 						</button>
@@ -91,7 +85,7 @@ export function ApiKeys() {
 						{["a", "b", "c"].map((key) => (
 							<div
 								key={key}
-								style={{ height: 58, borderRadius: 8, background: "var(--s1)" }}
+								style={{ height: 58, borderRadius: "var(--r-control)", background: "var(--s1)" }}
 								className="animate-pulse"
 							/>
 						))}
@@ -100,8 +94,8 @@ export function ApiKeys() {
 					<div
 						style={{
 							background: "var(--s1)",
-							border: "1px solid rgba(255,255,255,0.04)",
-							borderRadius: 8,
+							border: "1px solid var(--b0)",
+							borderRadius: "var(--r-card)",
 							padding: "40px 16px",
 							textAlign: "center",
 						}}
@@ -121,42 +115,16 @@ export function ApiKeys() {
 			</div>
 
 			{/* Usage snippet */}
-			<div
-				style={{
-					background: "var(--s1)",
-					border: "1px solid rgba(255,255,255,0.04)",
-					borderRadius: 8,
-					padding: "12px 14px",
-				}}
-			>
-				<p
-					style={{
-						fontSize: 10,
-						fontWeight: 700,
-						letterSpacing: "0.08em",
-						color: "var(--t3)",
-						marginBottom: 8,
-						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
-					}}
-				>
-					USAGE
-				</p>
-				<pre
-					style={{
-						fontSize: 12,
-						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
-						color: "var(--t1)",
-						margin: 0,
-						overflowX: "auto",
-						lineHeight: 1.6,
-					}}
-				>{`import { client } from "@aikirun/client";
+			<DataBlock
+				lang="ts"
+				label="Usage"
+				text={`import { client } from "@aikirun/client";
 
 const aikiClient = client({
   url: "http://localhost:9850",
   apiKey: "YOUR_API_KEY",
-});`}</pre>
-			</div>
+});`}
+			/>
 		</div>
 	);
 }
@@ -202,23 +170,12 @@ function CreateKeyInline({
 		<div
 			style={{
 				background: "var(--s1)",
-				border: "1px solid rgba(255,255,255,0.06)",
-				borderRadius: 8,
+				border: "1px solid var(--b0)",
+				borderRadius: "var(--r-card)",
 				padding: "14px 16px",
 			}}
 		>
-			<p
-				style={{
-					fontSize: 10,
-					fontWeight: 700,
-					letterSpacing: "0.08em",
-					color: "var(--t3)",
-					marginBottom: 10,
-					fontFamily: "IBM Plex Mono, ui-monospace, monospace",
-				}}
-			>
-				NEW API KEY
-			</p>
+			<p style={{ ...eyebrow(), margin: "0 0 12px" }}>New API key</p>
 			<form onSubmit={handleSubmit}>
 				<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 					<input
@@ -230,8 +187,8 @@ function CreateKeyInline({
 						style={{
 							flex: 1,
 							background: "var(--s2)",
-							border: "1px solid rgba(255,255,255,0.08)",
-							borderRadius: 6,
+							border: "1px solid var(--b1)",
+							borderRadius: "var(--r-chip)",
 							padding: "8px 12px",
 							fontSize: 12,
 							color: "var(--t0)",
@@ -243,12 +200,12 @@ function CreateKeyInline({
 						type="submit"
 						disabled={!name.trim() || isCreating}
 						style={{
-							background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+							background: "var(--accent)",
 							color: "#fff",
 							fontSize: 12,
 							fontWeight: 700,
 							padding: "8px 14px",
-							borderRadius: 6,
+							borderRadius: "var(--r-chip)",
 							border: "none",
 							cursor: !name.trim() || isCreating ? "not-allowed" : "pointer",
 							opacity: !name.trim() || isCreating ? 0.5 : 1,
@@ -272,7 +229,7 @@ function CreateKeyInline({
 						Cancel
 					</button>
 				</div>
-				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 8 }}>{error}</p>}
+				{error && <p style={{ fontSize: 11, color: "var(--accent-red)", marginTop: 8 }}>{error}</p>}
 			</form>
 		</div>
 	);
@@ -290,20 +247,20 @@ function KeyRevealInline({ apiKey, onDismiss }: { apiKey: string; onDismiss: () 
 	return (
 		<div
 			style={{
-				background: "rgba(226, 163, 54, 0.06)",
-				border: "1px solid rgba(226, 163, 54, 0.2)",
-				borderRadius: 8,
+				background: "color-mix(in srgb, var(--accent-amber) var(--tint-mix), transparent)",
+				border: "1px solid color-mix(in srgb, var(--accent-amber) var(--edge-mix), transparent)",
+				borderRadius: "var(--r-panel)",
 				padding: "14px 16px",
 			}}
 		>
-			<p style={{ fontSize: 12, color: "#E2A336", marginBottom: 12, lineHeight: 1.5 }}>
+			<p style={{ fontSize: 12, color: "var(--accent-amber)", marginBottom: 12, lineHeight: 1.5 }}>
 				Copy this key now — it won't be shown again.
 			</p>
 			<div
 				style={{
 					background: "var(--s2)",
-					border: "1px solid rgba(255,255,255,0.04)",
-					borderRadius: 6,
+					border: "1px solid var(--b0)",
+					borderRadius: "var(--r-chip)",
 					padding: "10px 12px",
 					display: "flex",
 					alignItems: "center",
@@ -315,7 +272,7 @@ function KeyRevealInline({ apiKey, onDismiss }: { apiKey: string; onDismiss: () 
 					style={{
 						flex: 1,
 						fontSize: 12,
-						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+						fontFamily: "var(--mono)",
 						color: "var(--t0)",
 						wordBreak: "break-all",
 						userSelect: "all",
@@ -327,13 +284,13 @@ function KeyRevealInline({ apiKey, onDismiss }: { apiKey: string; onDismiss: () 
 					type="button"
 					onClick={handleCopy}
 					style={{
-						background: copied ? "rgba(52, 211, 153, 0.12)" : "rgba(255,255,255,0.06)",
+						background: copied ? "color-mix(in srgb, var(--accent-green) var(--tint-mix), transparent)" : "var(--b0)",
 						border: "none",
-						borderRadius: 5,
+						borderRadius: "var(--r-chip)",
 						padding: "5px 10px",
 						fontSize: 11,
 						fontWeight: 600,
-						color: copied ? "#34D399" : "var(--t1)",
+						color: copied ? "var(--accent-green)" : "var(--t1)",
 						cursor: "pointer",
 						whiteSpace: "nowrap",
 						flexShrink: 0,
@@ -395,8 +352,8 @@ function ApiKeyRow({
 		<div
 			style={{
 				background: "var(--s1)",
-				border: "1px solid rgba(255,255,255,0.04)",
-				borderRadius: 8,
+				border: "1px solid var(--b0)",
+				borderRadius: "var(--r-card)",
 				padding: "10px 14px",
 				display: "flex",
 				alignItems: "center",
@@ -443,7 +400,7 @@ function ApiKeyRow({
 					<span
 						style={{
 							fontSize: 10,
-							fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+							fontFamily: "var(--mono)",
 							color: "var(--t3)",
 						}}
 					>
@@ -460,7 +417,7 @@ function ApiKeyRow({
 				</div>
 			</div>
 
-			{error && <span style={{ fontSize: 11, color: "#F87171", flexShrink: 0 }}>{error}</span>}
+			{error && <span style={{ fontSize: 11, color: "var(--accent-red)", flexShrink: 0 }}>{error}</span>}
 
 			{canManage && apiKey.status === "active" && (
 				<button
@@ -469,12 +426,12 @@ function ApiKeyRow({
 					disabled={isRevoking}
 					style={{
 						background: "none",
-						border: "1px solid rgba(248, 113, 113, 0.25)",
-						borderRadius: 6,
+						border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
+						borderRadius: "var(--r-chip)",
 						padding: "4px 10px",
 						fontSize: 11,
 						fontWeight: 600,
-						color: "#F87171",
+						color: "var(--accent-red)",
 						cursor: isRevoking ? "not-allowed" : "pointer",
 						opacity: isRevoking ? 0.5 : 1,
 						whiteSpace: "nowrap",

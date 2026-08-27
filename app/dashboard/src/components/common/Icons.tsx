@@ -1,5 +1,8 @@
+import type { CSSProperties } from "react";
+
 interface IconProps {
 	className?: string;
+	style?: CSSProperties;
 }
 
 export function BackArrowIcon({ className = "w-5 h-5" }: IconProps) {
@@ -109,9 +112,9 @@ export function CopyIcon({ className = "w-4 h-4" }: IconProps) {
 	);
 }
 
-export function CheckIcon({ className = "w-4 h-4" }: IconProps) {
+export function CheckIcon({ className = "w-4 h-4", style }: IconProps) {
 	return (
-		<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+		<svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
 		</svg>
 	);

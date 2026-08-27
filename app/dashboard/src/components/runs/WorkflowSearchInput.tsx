@@ -65,18 +65,21 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 					display: "flex",
 					alignItems: "center",
 					gap: 6,
-					padding: "5px 9px",
-					minHeight: 30,
-					background: "var(--s1)",
-					border: `1px solid ${isOpen ? "var(--s3)" : "var(--b0)"}`,
-					borderRadius: 6,
+					padding: "7px 11px",
+					minHeight: 33,
+					background: isOpen ? "var(--s1)" : "var(--s2)",
+					border: `1px solid ${isOpen ? "var(--accent-tint-border)" : "transparent"}`,
+					borderRadius: "var(--r-control)",
+					boxShadow: isOpen ? "0 0 0 3px var(--accent-tint)" : "none",
 					cursor: "text",
-					transition: "border-color 0.15s",
+					transition: "background-color .16s ease, border-color .16s ease, box-shadow .16s ease",
 				}}
 			>
 				{value && !isOpen ? (
 					<div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
-						<span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 500, color: "var(--t0)" }}>{value}</span>
+						<span style={{ fontSize: 11.5, fontFamily: "var(--mono)", fontWeight: 500, color: "var(--t0)" }}>
+							{value}
+						</span>
 						<button
 							type="button"
 							onClick={(e) => {
@@ -115,9 +118,9 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 							background: "none",
 							border: "none",
 							outline: "none",
-							color: "var(--t1)",
+							color: "var(--t0)",
 							fontSize: 11.5,
-							fontFamily: "monospace",
+							fontFamily: "var(--mono)",
 							padding: "1px 0",
 						}}
 					/>
@@ -132,12 +135,12 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 						top: "calc(100% + 3px)",
 						left: 0,
 						right: 0,
-						background: "var(--s2)",
+						background: "var(--s1)",
 						border: "1px solid var(--b0)",
-						borderRadius: 7,
-						padding: 3,
+						borderRadius: "var(--r-panel)",
+						padding: 4,
 						zIndex: 50,
-						boxShadow: "0 8px 24px rgba(0,0,0,.5)",
+						boxShadow: "0 12px 28px -12px var(--shadow), var(--shadow-card)",
 						maxHeight: 180,
 						overflow: "auto",
 					}}
@@ -152,13 +155,13 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 								width: "100%",
 								textAlign: "left",
 								padding: "6px 10px",
-								borderRadius: 5,
-								fontSize: 12,
-								fontFamily: "monospace",
-								color: wf.name === value ? "var(--t0)" : "var(--t1)",
-								background: wf.name === value ? "var(--s3)" : "transparent",
+								borderRadius: "var(--r-chip)",
+								fontSize: 11.5,
+								fontFamily: "var(--mono)",
+								color: wf.name === value ? "var(--accent-ink)" : "var(--t1)",
+								background: wf.name === value ? "var(--accent-tint)" : "transparent",
 								cursor: "pointer",
-								transition: "background 0.1s",
+								transition: "background .12s ease, color .12s ease",
 								border: "none",
 							}}
 						>

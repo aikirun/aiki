@@ -2,8 +2,9 @@ import type { StateTransition } from "@aikirun/types/workflow/state-transition";
 import { Link } from "react-router-dom";
 
 import type { ScheduledContext, TimelineLookups } from "./timeline-lookups";
-import { TASK_STATUS_COLORS, WORKFLOW_RUN_STATUS_COLORS } from "../../constants/status-colors";
+import { edge, TASK_STATUS_COLORS, WORKFLOW_RUN_STATUS_COLORS } from "../../constants/status-colors";
 import { WORKFLOW_STATUS_CONFIG } from "../../constants/workflow-status";
+import { card, eyebrow } from "../common/ui";
 
 interface TimelineTabProps {
 	transitions: StateTransition[];
@@ -91,18 +92,11 @@ function AttemptGroup({
 		<div style={{ marginBottom: 16 }}>
 			{/* Attempt header */}
 			<div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-				<span
-					style={{
-						fontSize: 11,
-						fontWeight: 700,
-						color: isLatest ? "var(--t0)" : "var(--t2)",
-						whiteSpace: "nowrap",
-					}}
-				>
+				<span style={{ ...eyebrow(isLatest ? "var(--accent-ink)" : "var(--t3)"), whiteSpace: "nowrap" }}>
 					Attempt {attempt.number}
 				</span>
 				<div style={{ flex: 1, height: 1, background: "var(--b0)" }} />
-				<span style={{ fontSize: 10, fontFamily: "monospace", color: "var(--t3)", whiteSpace: "nowrap" }}>
+				<span style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--t3)", whiteSpace: "nowrap" }}>
 					{timeRange}
 				</span>
 			</div>
@@ -171,7 +165,7 @@ function ScheduledContextInfo({ ctx, color }: { ctx: ScheduledContext; color: st
 	if (ctx.scheduledByChildWorkflowRunId) {
 		const outcome = ctx.childWorkflowTimedOut ? "timed out" : (ctx.childWorkflowStatus ?? "resolved");
 		parts.push(
-			<span key="child" style={{ ...contextStyle, color: "#C084FC" }}>
+			<span key="child" style={{ ...contextStyle, color: "var(--accent-purple)" }}>
 				child{" "}
 				<ChildWorkflowLink id={ctx.scheduledByChildWorkflowRunId}>
 					{shortId(ctx.scheduledByChildWorkflowRunId)}
@@ -197,7 +191,7 @@ function TimelineItem({
 	if (transition.type === "workflow_run") {
 		const { status } = transition.state;
 		const config = WORKFLOW_STATUS_CONFIG[status];
-		const color = WORKFLOW_RUN_STATUS_COLORS[status]?.tint ?? "var(--t3)";
+		const color = WORKFLOW_RUN_STATUS_COLORS[status] ?? "var(--t3)";
 		const isRunning = status === "running";
 
 		let reason: string | undefined;
@@ -234,7 +228,7 @@ function TimelineItem({
 		}
 
 		return (
-			<div style={{ position: "relative", marginBottom: 4 }}>
+			<div style={{ position: "relative", marginBottom: 6 }}>
 				<Dot color={color} isRunning={isRunning} />
 				<Card
 					time={fmtTime(transition.createdAt)}
@@ -252,7 +246,7 @@ function TimelineItem({
 
 	if (transition.type === "task") {
 		const { status } = transition.taskState;
-		const color = TASK_STATUS_COLORS[status]?.tint ?? "var(--t3)";
+		const color = TASK_STATUS_COLORS[status] ?? "var(--t3)";
 		const taskId = transition.taskId;
 
 		const taskName = lookups?.taskById.get(taskId)?.name;
@@ -266,7 +260,7 @@ function TimelineItem({
 				: undefined;
 
 		return (
-			<div style={{ position: "relative", marginBottom: 4 }}>
+			<div style={{ position: "relative", marginBottom: 6 }}>
 				<Dot color={color} isRunning={status === "running"} />
 				<Card
 					time={fmtTime(transition.createdAt)}
@@ -274,7 +268,7 @@ function TimelineItem({
 						<span>
 							<Link
 								to="?tab=execution"
-								style={{ ...inlineLinkStyle, fontFamily: "monospace", color: "var(--t3)", fontSize: 10 }}
+								style={{ ...inlineLinkStyle, fontFamily: "var(--mono)", color: "var(--t3)", fontSize: 10 }}
 							>
 								{taskName ?? shortId(taskId)}
 							</Link>{" "}
@@ -305,7 +299,7 @@ function Dot({ color, isRunning }: { color: string; isRunning: boolean }) {
 				borderRadius: "50%",
 				background: color,
 				border: "2px solid var(--bg)",
-				boxShadow: `0 0 0 1px ${color}30`,
+				boxShadow: `0 0 0 1px ${edge(color)}`,
 			}}
 		/>
 	);
@@ -315,10 +309,8 @@ function Card({ content, time }: { content: React.ReactNode; time: string }) {
 	return (
 		<div
 			style={{
-				padding: "8px 12px",
-				background: "var(--s1)",
-				border: "1px solid var(--b0)",
-				borderRadius: 8,
+				...card,
+				padding: "9px 14px",
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "space-between",
@@ -326,7 +318,9 @@ function Card({ content, time }: { content: React.ReactNode; time: string }) {
 			}}
 		>
 			<span style={{ fontSize: 12 }}>{content}</span>
-			<span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap", flexShrink: 0 }}>
+			<span
+				style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap", flexShrink: 0 }}
+			>
 				{time}
 			</span>
 		</div>
@@ -337,15 +331,7 @@ function TimelineSkeleton() {
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 			{["a", "b", "c", "d"].map((key) => (
-				<div
-					key={key}
-					style={{
-						height: 36,
-						background: "var(--s1)",
-						borderRadius: 8,
-						opacity: 0.5,
-					}}
-				/>
+				<div key={key} style={{ ...card, height: 36, opacity: 0.5 }} />
 			))}
 		</div>
 	);

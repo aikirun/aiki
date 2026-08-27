@@ -46,26 +46,32 @@ function CapabilitiesError({ error }: { error: unknown }) {
 				alignItems: "center",
 				justifyContent: "center",
 				padding: 24,
-				fontFamily: "system-ui, sans-serif",
+				fontFamily: "var(--sans)",
+				background: "var(--bg)",
+				color: "var(--t0)",
 			}}
 		>
 			<div style={{ maxWidth: 420, textAlign: "center" }}>
-				<h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>Unable to reach Aiki server</h1>
-				<p style={{ fontSize: 13, color: "#888", lineHeight: 1.5, marginBottom: 12 }}>
+				<h1 style={{ margin: "0 0 12px", fontSize: 24, fontWeight: 800, letterSpacing: "-0.038em" }}>
+					Unable to reach Aiki server
+				</h1>
+				<p style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.6, marginBottom: 12 }}>
 					Could not load server capabilities from <code>{AIKI_SERVER_URL}</code>
 				</p>
-				<p style={{ fontSize: 13, color: "#888", lineHeight: 1.5, marginBottom: 16 }}>
+				<p style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.6, marginBottom: 16 }}>
 					When this dashboard is on a different origin from the server, ensure the dashboard is built with{" "}
 					<code>VITE_AIKI_SERVER_URL</code> set to the server's URL, and the server's <code>CORS_ORIGINS</code> allows
 					this dashboard's origin.
 				</p>
 				<pre
 					style={{
+						fontFamily: "var(--mono)",
 						fontSize: 11,
-						background: "#f5f5f5",
-						padding: 8,
-						borderRadius: 4,
-						color: "#444",
+						background: "var(--code-bg)",
+						border: "1px solid var(--code-border)",
+						padding: "10px 12px",
+						borderRadius: "var(--r-panel)",
+						color: "var(--code-fg)",
 						overflow: "auto",
 						textAlign: "left",
 						display: "inline-block",

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { card } from "../common/ui";
+
 interface AuthLayoutProps {
 	children: ReactNode;
 	title: string;
@@ -13,6 +15,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
 			style={{
 				minHeight: "100vh",
 				background: "var(--bg)",
+				backgroundImage: "linear-gradient(90deg, var(--grid-rule) 1px, transparent 1px)",
+				backgroundSize: "116px 100%",
+				backgroundPosition: "center",
 				display: "flex",
 				flexDirection: "column",
 				alignItems: "center",
@@ -37,21 +42,18 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
 						<circle cx="50" cy="72.5" r="9" fill="var(--bg)" />
 					</g>
 				</svg>
-				<span style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.03em", color: "var(--t0)" }}>aiki</span>
+				<span style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.04em", color: "var(--t0)" }}>aiki</span>
 			</Link>
 
 			<div style={{ width: "100%", maxWidth: 400 }}>
-				<div
-					style={{
-						background: "var(--s1)",
-						border: "1px solid var(--b0)",
-						borderRadius: 12,
-						padding: 32,
-					}}
-				>
+				<div style={{ ...card, padding: 32 }}>
 					<div style={{ textAlign: "center", marginBottom: 28 }}>
-						<h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--t0)", letterSpacing: "-0.03em" }}>{title}</h1>
-						{subtitle && <p style={{ marginTop: 8, fontSize: 13, color: "var(--t2)" }}>{subtitle}</p>}
+						<h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--t0)", letterSpacing: "-0.038em" }}>
+							{title}
+						</h1>
+						{subtitle && (
+							<p style={{ margin: "8px 0 0", fontSize: 13.5, lineHeight: 1.55, color: "var(--t2)" }}>{subtitle}</p>
+						)}
 					</div>
 					{children}
 				</div>

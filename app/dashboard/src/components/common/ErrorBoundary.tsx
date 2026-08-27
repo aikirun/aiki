@@ -1,6 +1,8 @@
 import type { ErrorInfo, ReactNode } from "react";
 import { Component } from "react";
 
+import { btnPrimary, card, primaryHover } from "./ui";
+
 interface Props {
 	children: ReactNode;
 }
@@ -32,21 +34,43 @@ export class ErrorBoundary extends Component<Props, State> {
 	render() {
 		if (this.state.hasError) {
 			return (
-				<div className="min-h-screen bg-surface-bg flex items-center justify-center p-4">
-					<div className="bg-surface-s1 border border-surface-s3 rounded-xl p-8 max-w-md w-full text-center">
-						<h1 className="text-2xl font-bold text-t-0 mb-2">Something went wrong</h1>
-						<p className="text-t-2 mb-6">An unexpected error occurred. Please try reloading the page.</p>
+				<div
+					style={{
+						minHeight: "100vh",
+						background: "var(--bg)",
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "center",
+						padding: 16,
+					}}
+				>
+					<div style={{ ...card, padding: 32, maxWidth: 440, width: "100%", textAlign: "center" }}>
+						<h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.038em", color: "var(--t0)" }}>
+							Something went wrong
+						</h1>
+						<p style={{ margin: "10px 0 22px", fontSize: 14, lineHeight: 1.6, color: "var(--t2)" }}>
+							An unexpected error occurred. Reload the page to try again.
+						</p>
 						{this.state.error && (
-							<pre className="bg-surface-s2 rounded-lg p-3 text-xs text-left text-status-failed mb-6 overflow-x-auto">
+							<pre
+								style={{
+									background: "var(--code-bg)",
+									border: "1px solid var(--code-border)",
+									borderRadius: "var(--r-panel)",
+									padding: "12px 14px",
+									margin: "0 0 22px",
+									fontFamily: "var(--mono)",
+									fontSize: 11.5,
+									lineHeight: 1.7,
+									textAlign: "left",
+									color: "var(--on-code-red)",
+									overflowX: "auto",
+								}}
+							>
 								{this.state.error.message}
 							</pre>
 						)}
-						<button
-							type="button"
-							onClick={this.handleReload}
-							style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
-							className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium hover:opacity-90 transition-opacity"
-						>
+						<button type="button" onClick={this.handleReload} style={btnPrimary()} {...primaryHover}>
 							<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path
 									strokeLinecap="round"

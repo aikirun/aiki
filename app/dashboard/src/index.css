@@ -1,83 +1,169 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * The dashboard shares its visual language with the marketing site (app/website).
+ * Light is the primary theme and takes the site's palette verbatim: warm paper,
+ * near-black ink, violet accent. Dark is derived from the site's own dark code
+ * panel and its syntax palette, so both themes read as one product.
+ */
+
 :root {
-	--bg: #18171b;
-	--s1: #201f24;
-	--s2: #28272c;
-	--s3: #323136;
+	--sans: "Archivo", system-ui, -apple-system, sans-serif;
+	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-	--t0: #f2ede4;
-	--t1: #d4d0c8;
-	--t2: #ccc8bf;
-	--t3: #a39e95;
+	/* Radius scale — cards read soft, controls read crisp */
+	--r-card: 14px;
+	--r-panel: 10px;
+	--r-control: 7px;
+	--r-chip: 6px;
 
-	--amber: #a78bfa;
+	/* Surfaces */
+	--bg: #f8f8f5;
+	--s1: #ffffff;
+	--s2: #f2f2ef;
+	--s3: #e9e8e2;
 
-	/* Border token — sits between s2 and s3 */
-	--b0: #2e2d33;
+	/* Ink */
+	--t0: #17171a;
+	--t1: #3f3f47;
+	--t2: #5c5c64;
+	--t3: #74747c;
 
-	--accent-green: #34d399;
-	--accent-amber: #fbbf24;
-	--accent-red: #f87171;
-	--accent-indigo: #818cf8;
-	--accent-sky: #38bdf8;
-	--accent-gray: #9ca3af;
-	--accent-purple: #c084fc;
-	--accent-pink: #f472b6;
-	--accent-orange: #fb923c;
+	/* Hairlines — b0 encloses, b1 is a stronger edge, b-sep divides rows inside a card */
+	--b0: #e5e4de;
+	--b1: rgba(23, 23, 26, 0.1);
+	--b-sep: rgba(23, 23, 26, 0.06);
 
-	--shadow: rgba(0, 0, 0, 0.4);
+	/* Accent. --accent fills, --accent-ink writes. */
+	--accent: #764ba2;
+	--accent-hover: #5d3a83;
+	--accent-ink: #5d3a83;
+	--accent-tint: rgba(118, 75, 162, 0.1);
+	--accent-tint-border: rgba(118, 75, 162, 0.22);
+	--accent-wash: #faf8fc;
+	--accent-glow: rgba(118, 75, 162, 0.24);
+
+	/* Status */
+	--accent-green: #2f7d55;
+	--accent-red: #c03a2b;
+	--accent-amber: #94600f;
+	--accent-sky: #2b6fa8;
+	--accent-indigo: #5551ab;
+	--accent-gray: #6b6b72;
+	--accent-purple: #764ba2;
+	--accent-pink: #ab4478;
+	--accent-orange: #ad5518;
+
+	/* How far a status colour is mixed toward the surface for chip fills and edges. */
+	--tint-mix: 11%;
+	--edge-mix: 26%;
+
+	--shadow: rgba(23, 23, 26, 0.08);
+	--shadow-card: 0 1px 2px rgba(23, 23, 26, 0.04);
+	--shadow-lift: 0 10px 26px -14px rgba(118, 75, 162, 0.35);
+
+	/* Code panels are dark in both themes — lifted from the site's code blocks. */
+	--code-bg: #16161b;
+	--code-fg: #d7d6de;
+	--code-key: #8ab4e8;
+	--code-str: #d9b48a;
+	--code-kw: #b78ce0;
+	--code-comment: #8b8794;
+	--code-border: rgba(255, 255, 255, 0.07);
+
+	/* Status colours legible on the dark code panel — identical in both themes. */
+	--on-code-green: #6bd6a0;
+	--on-code-red: #f0857a;
+	--on-code-amber: #e0b464;
+	--on-code-gray: #a5a1ae;
+	--on-code-muted: #8b8794;
+
+	/* Vertical hairline rule that fills the page gutters, as on the site. */
+	--grid-rule: rgba(23, 23, 26, 0.032);
 }
 
-[data-theme="light"] {
-	--bg: #f7f7f8;
-	--s1: #ffffff;
-	--s2: #f0f0f2;
-	--s3: #e5e5e8;
+[data-theme="dark"] {
+	--bg: #0c0c10;
+	--s1: #1b1b23;
+	--s2: #24242d;
+	--s3: #2f2f39;
 
-	--t0: #18181b;
-	--t1: #27272a;
-	--t2: #3f3f46;
-	--t3: #71717a;
+	--t0: #e8e6ea;
+	--t1: #d7d6de;
+	--t2: #a3a1ac;
+	--t3: #7e7d8a;
 
-	--amber: #7c3aed;
+	--b0: #2d2d37;
+	--b1: rgba(255, 255, 255, 0.1);
+	--b-sep: rgba(255, 255, 255, 0.07);
 
-	--b0: #e4e4e7;
+	--accent: #764ba2;
+	--accent-hover: #8659b8;
+	--accent-ink: #b78ce0;
+	--accent-tint: rgba(183, 140, 224, 0.14);
+	--accent-tint-border: rgba(183, 140, 224, 0.28);
+	--accent-wash: #1c1a22;
+	--accent-glow: rgba(118, 75, 162, 0.4);
 
-	--accent-green: #047857;
-	--accent-amber: #b45309;
-	--accent-red: #dc2626;
-	--accent-indigo: #4f46e5;
-	--accent-sky: #0369a1;
-	--accent-gray: #4b5563;
-	--accent-purple: #7c3aed;
-	--accent-pink: #db2777;
-	--accent-orange: #ea580c;
+	--accent-green: #6bd6a0;
+	--accent-red: #f0857a;
+	--accent-amber: #e0b464;
+	--accent-sky: #8ab4e8;
+	--accent-indigo: #9a9ae8;
+	--accent-gray: #a5a1ae;
+	--accent-purple: #b78ce0;
+	--accent-pink: #e394bb;
+	--accent-orange: #e39a6a;
 
-	--shadow: rgba(0, 0, 0, 0.08);
+	--tint-mix: 16%;
+	--edge-mix: 32%;
+
+	--shadow: rgba(0, 0, 0, 0.4);
+	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+	--shadow-lift: 0 10px 26px -14px rgba(0, 0, 0, 0.7);
+
+	--code-bg: #08080b;
+	--code-border: rgba(255, 255, 255, 0.06);
+
+	--grid-rule: rgba(255, 255, 255, 0.035);
+}
+
+html {
+	font-family: var(--sans);
 }
 
 body {
+	margin: 0;
 	background-color: var(--bg);
 	color: var(--t0);
+	font-family: var(--sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling for dark theme */
+/*
+ * Gutters carry the site's vertical rules. Content sits on cards above it, so the
+ * pattern only shows in the empty margins — which is the point.
+ */
+.app-canvas {
+	background-image: linear-gradient(90deg, var(--grid-rule) 1px, transparent 1px);
+	background-size: 116px 100%;
+	background-position: center;
+}
+
 ::-webkit-scrollbar {
 	width: 8px;
 	height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-	background: var(--s1);
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-	background: var(--s3);
+	background: var(--b0);
 	border-radius: 4px;
 }
 
@@ -85,14 +171,26 @@ body {
 	background: var(--t3);
 }
 
-/* Placeholder color */
-input::placeholder {
+/*
+ * Inputs hold machine text (IDs, names), so the value is monospaced — but the
+ * placeholder is a prose label and belongs in the display face.
+ */
+input::placeholder,
+textarea::placeholder {
 	color: var(--t3);
+	font-family: var(--sans);
+	font-size: 12.5px;
+	letter-spacing: 0;
 }
 
-/* Selection color */
 ::selection {
-	background-color: rgba(167, 139, 250, 0.3);
+	background-color: rgba(118, 75, 162, 0.18);
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent-ink);
+	outline-offset: 2px;
+	border-radius: 2px;
 }
 
 @keyframes blink {
@@ -107,6 +205,7 @@ input::placeholder {
 .anim-blink {
 	animation: blink 2s ease-in-out infinite;
 }
+
 @keyframes fadein {
 	from {
 		opacity: 0;
@@ -120,4 +219,64 @@ input::placeholder {
 .anim-in {
 	animation: fadein 0.2s ease-out forwards;
 	opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.anim-blink,
+	.anim-in {
+		animation: none;
+		opacity: 1;
+	}
+	/* Components set their transitions inline, so only !important can reach them. */
+	*,
+	*::before,
+	*::after {
+		/* biome-ignore lint/complexity/noImportantStyles: must override inline transitions */
+		transition-duration: 0.01ms !important;
+	}
+}
+
+/*
+ * Rows inside a list card are divided by an inset hairline that is lighter than the
+ * card's own edge. A full-bleed rule runs into the border and reads as a seam
+ * rather than a divider.
+ */
+.list-rows > * + * {
+	position: relative;
+}
+
+/*
+ * A row is one action plus a few incidental controls. The action is a real link or
+ * button on the row's title, and `row-target` stretches its hit area across the whole
+ * row — so the copy buttons stay siblings rather than nesting inside another control.
+ * The target must stay statically positioned so its ::after resolves against the row.
+ */
+.row-target {
+	position: static;
+}
+
+.row-target::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+}
+
+/* Row hover belongs in CSS: a JS handler would make a static container interactive. */
+.list-row {
+	background: var(--s1);
+	transition: background-color 0.16s ease;
+}
+
+.list-row:hover {
+	background: var(--accent-wash);
+}
+
+.list-rows > * + *::before {
+	content: "";
+	position: absolute;
+	inset: 0 18px auto;
+	height: 1px;
+	background: var(--b-sep);
+	pointer-events: none;
 }
