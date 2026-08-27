@@ -154,5 +154,5 @@ function _startConfiguredWorkflowIsNotRegistrable() {
 	// @ts-expect-error a worker executes many runs, so a workflow bound to one start cannot be registered
 	workflowRegistry().add("user", ordersV1.with("trigger", { type: "delayed", delay: { seconds: 5 } }));
 
-	workflowRegistry().add("user", ordersV1.with("pool", "gpu"));
+	workflowRegistry().add("user", ordersV1.with("pool", "tenant-acme"));
 }

@@ -220,7 +220,7 @@ async function _startConfiguredWorkflowIsNotSchedulable(client: Client<null>) {
 
 	await schedule({ type: "interval", every: { seconds: 1 } }).activate(
 		client,
-		syncInventoryWorkflow.with("pool", "gpu"),
+		syncInventoryWorkflow.with("pool", "tenant-acme"),
 		{ warehouseId: "wh-1" }
 	);
 }

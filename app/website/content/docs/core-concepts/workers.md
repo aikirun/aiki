@@ -52,7 +52,7 @@ const handle2 = worker2.start(aikiClient);
 
 **Specialize workers** by registering different workflows on different workers. Each worker only handles the workflows it knows about.
 
-**Split fleets by capability, tenant, or region** using `pools`. A worker with `pools: ["gpu"]` only processes workflow runs routed to that pool.
+**Split fleets by capability, tenant, or region** using `pools`. A worker with `pools: ["tenant-acme"]` only processes workflow runs routed to that pool.
 
 ## Graceful Shutdown
 

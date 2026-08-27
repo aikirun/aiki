@@ -142,7 +142,7 @@ Schemas work with any validation library that implements [Standard Schema](https
 
 ```typescript
 const configured = orderWorkflowV1
-	.with("pool", "gpu")
+	.with("pool", "tenant-acme")
 	.with("retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 });
 ```
 
@@ -176,11 +176,11 @@ Route workflows to a named worker pool when only part of your fleet should execu
 
 ```typescript
 const handle = await orderWorkflowV1
-	.with("pool", "gpu")
+	.with("pool", "tenant-acme")
 	.start(client, { orderId: "123" });
 ```
 
-Workers must be configured to serve the same pool. A workflow routed to `"gpu"` will only be picked up by workers with `pools: ["gpu"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
+Workers must be configured to serve the same pool. A workflow routed to `"tenant-acme"` will only be picked up by workers with `pools: ["tenant-acme"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
 
 ## Starting Workflows
 
