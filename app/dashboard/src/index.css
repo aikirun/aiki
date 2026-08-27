@@ -272,6 +272,29 @@ body {
 	opacity: 0;
 }
 
+/* Three tabs in one pill; it takes the width of its labels on a desktop. */
+.tabbar {
+	display: inline-flex;
+}
+
+/*
+ * On a phone it spans the card above it instead, each tab taking an equal share —
+ * one control the width of the page rather than a short box against a wide card,
+ * and three targets big enough for a thumb.
+ */
+@media (max-width: 640px) {
+	.tabbar {
+		display: flex;
+		/* Below the width of its three labels the pill grows and the row scrolls,
+		   rather than the last tab painting outside the pill's own border. */
+		min-width: max-content;
+	}
+
+	.tabbar > button {
+		flex: 1;
+	}
+}
+
 /* The rail's scrim fades up rather than appearing all at once. */
 @keyframes scrimin {
 	from {

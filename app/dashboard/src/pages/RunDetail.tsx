@@ -512,9 +512,10 @@ export function RunDetail() {
 
 			{/* Pill-style tabs */}
 			<div className="no-scrollbar" style={{ marginBottom: 12, maxWidth: "100%", overflowX: "auto" }}>
+				{/* `display` lives in the stylesheet so a phone can spread the pill to full width. */}
 				<div
+					className="tabbar"
 					style={{
-						display: "inline-flex",
 						flexWrap: "nowrap",
 						background: "var(--s1)",
 						border: "1px solid var(--b0)",
