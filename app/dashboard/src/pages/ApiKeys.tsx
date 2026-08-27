@@ -190,7 +190,7 @@ function CreateKeyInline({
 							border: "1px solid var(--b1)",
 							borderRadius: "var(--r-chip)",
 							padding: "8px 12px",
-							fontSize: 12,
+							fontSize: "var(--field-size)",
 							color: "var(--t0)",
 							outline: "none",
 							fontFamily: "inherit",

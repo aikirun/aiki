@@ -77,7 +77,9 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 			>
 				{value && !isOpen ? (
 					<div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
-						<span style={{ fontSize: 11.5, fontFamily: "var(--mono)", fontWeight: 500, color: "var(--t0)" }}>
+						<span
+							style={{ fontSize: "var(--field-size)", fontFamily: "var(--mono)", fontWeight: 500, color: "var(--t0)" }}
+						>
 							{value}
 						</span>
 						<button
@@ -119,7 +121,7 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 							border: "none",
 							outline: "none",
 							color: "var(--t0)",
-							fontSize: 11.5,
+							fontSize: "var(--field-size)",
 							fontFamily: "var(--mono)",
 							padding: "1px 0",
 						}}

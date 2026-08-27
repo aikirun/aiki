@@ -13,6 +13,13 @@
 	--sans: "Archivo", system-ui, -apple-system, sans-serif;
 	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
+	/*
+	 * Form controls read at these sizes on a pointer device. Touch devices override
+	 * them below — see the note there.
+	 */
+	--field-size: 11.5px;
+	--field-size-lg: 13.5px;
+
 	/* Radius scale — cards read soft, controls read crisp */
 	--r-card: 14px;
 	--r-panel: 10px;
@@ -189,8 +196,27 @@ input::placeholder,
 textarea::placeholder {
 	color: var(--t3);
 	font-family: var(--sans);
-	font-size: 12.5px;
+	font-size: inherit;
 	letter-spacing: 0;
+}
+
+/*
+ * iOS Safari zooms the page when a focused control's text is under 16px, and never
+ * zooms back out — leaving the app stuck at the wrong scale, where pinching near the
+ * top of a pane triggers pull-to-refresh instead. Touch devices get a 16px control
+ * face so the zoom never fires; pointer devices keep the compact one.
+ */
+@media (hover: none) and (pointer: coarse) {
+	:root {
+		--field-size: 16px;
+		--field-size-lg: 16px;
+	}
+}
+
+/* An overscroll at the top of a pane should not reload the page. */
+html,
+body {
+	overscroll-behavior-y: contain;
 }
 
 ::selection {

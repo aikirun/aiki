@@ -147,7 +147,7 @@ export const inputStyle: CSSProperties = {
 	borderRadius: "var(--r-control)",
 	padding: "8px 11px",
 	fontFamily: "var(--mono)",
-	fontSize: 11.5,
+	fontSize: "var(--field-size)",
 	color: "var(--t0)",
 	outline: "none",
 	width: "100%",

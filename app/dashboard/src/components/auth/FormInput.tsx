@@ -23,7 +23,7 @@ export function FormInput({ label, error, id, ...props }: FormInputProps) {
 					background: "var(--s2)",
 					border: `1px solid ${error ? "var(--accent-red)" : "transparent"}`,
 					borderRadius: "var(--r-control)",
-					fontSize: 13.5,
+					fontSize: "var(--field-size-lg)",
 					color: "var(--t0)",
 					outline: "none",
 					fontFamily: "var(--sans)",

@@ -685,7 +685,7 @@ function MemberRow({
 							border: "1px solid var(--b1)",
 							borderRadius: "var(--r-chip)",
 							padding: "3px 8px",
-							fontSize: 11,
+							fontSize: "var(--field-size)",
 							color: "var(--t1)",
 							cursor: isUpdating ? "not-allowed" : "pointer",
 							fontFamily: "inherit",
@@ -1040,7 +1040,7 @@ function NamespaceRow({
 													border: "1px solid var(--b0)",
 													borderRadius: "var(--r-chip)",
 													padding: "3px 7px",
-													fontSize: 10.5,
+													fontSize: "var(--field-size)",
 													color: "var(--t1)",
 													cursor: isSaving ? "not-allowed" : "pointer",
 													fontFamily: "var(--sans)",
@@ -1108,7 +1108,6 @@ function NamespaceRow({
 										style={{
 											...inputStyle,
 											flex: 1,
-											fontSize: 11,
 											padding: "4px 8px",
 										}}
 									>
@@ -1125,7 +1124,6 @@ function NamespaceRow({
 										style={{
 											...inputStyle,
 											width: 80,
-											fontSize: 11,
 											padding: "4px 8px",
 										}}
 									>
@@ -1318,7 +1316,7 @@ function getOrgType(activeOrganization: { slug: string }, orgData: FullOrganizat
 const inputStyle: React.CSSProperties = {
 	...sharedInputStyle,
 	fontFamily: "var(--sans)",
-	fontSize: 12.5,
+	fontSize: "var(--field-size)",
 	padding: "8px 12px",
 	width: "auto",
 };

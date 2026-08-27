@@ -12,7 +12,7 @@
   /* Page gutter shrinks on small screens; sections reference it inline. */
   :root { --gut: 36px; }
   html { scroll-behavior: smooth; }
-  body { margin: 0; background: #f8f8f5; color: #17171a; font-family: 'Archivo', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; overscroll-behavior-y: contain; background: #f8f8f5; color: #17171a; font-family: 'Archivo', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   a { color: #764ba2; text-decoration: none; }
   a:hover { color: #5d3a83; }
   ::selection { background: rgba(118,75,162,0.18); }
@@ -433,7 +433,7 @@
       <div style="display: flex; flex-direction: column; gap: 12px;">
         <div id="signup-done" style="display: none; background: rgba(255,255,255,0.14); border-radius: 10px; padding: 20px; font-size: 15px; line-height: 1.55;"></div>
         <form id="waitlist" style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <input id="waitlist-email" type="email" required placeholder="you@company.com" style="flex: 1; min-width: 200px; background: #ffffff; border: none; border-radius: 9px; padding: 14px 16px; color: #17171a; font-family: 'Archivo', system-ui, sans-serif; font-size: 15px;">
+          <input id="waitlist-email" type="email" required placeholder="you@company.com" style="flex: 1; min-width: 200px; background: #ffffff; border: none; border-radius: 9px; padding: 14px 16px; color: #17171a; font-family: 'Archivo', system-ui, sans-serif; font-size: 16px;">
           <button class="submit" id="waitlist-submit" type="submit" style="background: #16161b; color: #ffffff; border: none; border-radius: 9px; padding: 14px 26px; font-family: 'Archivo', system-ui, sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;">Join waitlist</button>
         </form>
         <span id="waitlist-error" style="font-size: 12.5px; color: rgba(255,255,255,0.85); min-height: 16px;"></span>
