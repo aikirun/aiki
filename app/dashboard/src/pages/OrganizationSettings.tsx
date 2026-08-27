@@ -930,7 +930,13 @@ function NamespaceRow({
 
 	return (
 		<div>
-			<div style={rowStyle}>
+			<div
+				style={{
+					...rowStyle,
+					borderRadius: showMembers ? "var(--r-chip) var(--r-chip) 0 0" : "var(--r-chip)",
+					borderBottom: showMembers ? "none" : rowStyle.border,
+				}}
+			>
 				<div style={{ flex: 1, minWidth: 0 }}>
 					<span style={{ display: "flex", alignItems: "center", gap: 6 }}>
 						<span
@@ -989,7 +995,15 @@ function NamespaceRow({
 				</div>
 			</div>
 			{showMembers && canViewMembers && (
-				<div style={{ padding: "8px 12px 10px" }}>
+				<div
+					style={{
+						background: "var(--s2)",
+						border: "1px solid var(--b0)",
+						borderTop: "1px solid var(--b0)",
+						borderRadius: "0 0 var(--r-chip) var(--r-chip)",
+						padding: "10px 12px 12px",
+					}}
+				>
 					{membersLoading ? (
 						<span style={{ fontSize: 11, color: "var(--t3)" }}>Loading...</span>
 					) : (
@@ -1010,14 +1024,14 @@ function NamespaceRow({
 												onChange={(e) => handleRoleChange(m.userId, e.target.value as NamespaceRole)}
 												disabled={isSaving}
 												style={{
-													background: "var(--s2)",
-													border: "1px solid var(--b1)",
+													background: "var(--s1)",
+													border: "1px solid var(--b0)",
 													borderRadius: "var(--r-chip)",
-													padding: "2px 6px",
-													fontSize: 10,
+													padding: "3px 7px",
+													fontSize: 10.5,
 													color: "var(--t1)",
 													cursor: isSaving ? "not-allowed" : "pointer",
-													fontFamily: "inherit",
+													fontFamily: "var(--sans)",
 												}}
 											>
 												<option value="admin">admin</option>

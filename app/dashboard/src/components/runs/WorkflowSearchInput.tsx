@@ -141,8 +141,11 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 						padding: 4,
 						zIndex: 50,
 						boxShadow: "0 12px 28px -12px var(--shadow), var(--shadow-card)",
-						maxHeight: 180,
-						overflow: "auto",
+						// Whole rows plus half of the next, so a clipped list reads as scrollable
+						// rather than cut off. Rows are 29px tall (6px padding + 17px line).
+						maxHeight: 6 * 29 + 14 + 8,
+						overflowY: "auto",
+						overscrollBehavior: "contain",
 					}}
 				>
 					{data.workflows.map((wf) => (

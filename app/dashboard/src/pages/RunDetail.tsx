@@ -242,16 +242,37 @@ export function RunDetail() {
 				}}
 			>
 				{/* Top row: name + pill + actions */}
-				<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-					<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
+				<div
+					style={{
+						display: "flex",
+						alignItems: "flex-start",
+						justifyContent: "space-between",
+						gap: 12,
+						marginBottom: 8,
+					}}
+				>
+					<div
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 10,
+							flexWrap: "wrap",
+							minWidth: 0,
+							flex: 1,
+						}}
+					>
 						<h1
 							style={{
 								margin: 0,
-								fontSize: 26,
+								fontSize: "clamp(20px, 3.4vw, 26px)",
 								fontWeight: 800,
 								color: "var(--t0)",
 								letterSpacing: "-0.038em",
 								lineHeight: 1.1,
+								minWidth: 0,
+								// A workflow name is one hyphenated token; without this it keeps its
+								// full width as the flex item shrinks and paints over the actions.
+								overflowWrap: "anywhere",
 							}}
 						>
 							{currentRun.name}
@@ -481,10 +502,11 @@ export function RunDetail() {
 			)}
 
 			{/* Pill-style tabs */}
-			<div style={{ marginBottom: 12 }}>
+			<div style={{ marginBottom: 12, maxWidth: "100%", overflowX: "auto" }}>
 				<div
 					style={{
 						display: "inline-flex",
+						flexWrap: "nowrap",
 						background: "var(--s1)",
 						border: "1px solid var(--b0)",
 						borderRadius: "var(--r-card)",
@@ -512,6 +534,7 @@ export function RunDetail() {
 									fontWeight: 500,
 									letterSpacing: "0.02em",
 									padding: "6px 14px",
+									whiteSpace: "nowrap",
 									cursor: "pointer",
 									transition: "background .14s ease, color .14s ease",
 								}}
