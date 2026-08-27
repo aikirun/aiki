@@ -1,4 +1,3 @@
-import { noopCodec } from "@aikirun/codec";
 import { delay } from "@aikirun/lib/async";
 import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
@@ -7,7 +6,7 @@ import type { DistributiveOmit } from "@aikirun/lib/object";
 import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
 import type { WorkflowRunStateRequest, WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { ApiClient, Client } from "@aikirun/types/client";
-import type { Codec } from "@aikirun/types/infra/codec";
+import type { Codec, EncodedPayload } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
 	TerminalWorkflowRunStatus,
@@ -19,6 +18,12 @@ import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from 
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
+
+/** Identity codec used when the client codec must not apply (system runs / codec none). */
+const noopCodec: Codec = {
+	encode: async (payload: unknown): Promise<EncodedPayload> => ({ encodedValue: payload }),
+	decode: async (payload: EncodedPayload): Promise<unknown> => payload.encodedValue,
+};
 
 export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,

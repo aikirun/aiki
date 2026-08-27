@@ -1,12 +1,17 @@
-import { noopCodec } from "@aikirun/codec";
 import { plainHasher } from "@aikirun/lib/crypto";
 import { createConsoleLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client, ClientParams, EmbeddedClientParams, RemoteClientParams } from "@aikirun/types/client";
+import type { Codec, EncodedPayload } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
 const EMBEDDED_BASE_URL = "aiki://embedded/api";
+
+const noopCodec: Codec = {
+	encode: async (payload: unknown): Promise<EncodedPayload> => ({ encodedValue: payload }),
+	decode: async (payload: EncodedPayload): Promise<unknown> => payload.encodedValue,
+};
 
 /**
  * Creates an Aiki client.

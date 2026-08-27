@@ -12,7 +12,6 @@
 		"sdk/client",
 		"sdk/endpoint",
 		"sdk/adapter/http",
-		"sdk/adapter/codec",
 		"sdk/adapter/memory",
 		"sdk/adapter/redis",
 		"sdk/iam",

@@ -1,11 +1,16 @@
-import { noopCodec } from "@aikirun/codec";
 import { plainHasher } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client } from "@aikirun/types/client";
+import type { Codec, EncodedPayload } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
 
 import { expect, type Mock, mock } from "bun:test";
+
+const noopCodec: Codec = {
+	encode: async (payload: unknown): Promise<EncodedPayload> => ({ encodedValue: payload }),
+	decode: async (payload: EncodedPayload): Promise<unknown> => payload.encodedValue,
+};
 
 type MockEndpoint<Args extends unknown[], Return> = Mock<(...args: Args) => Return> & {
 	/**

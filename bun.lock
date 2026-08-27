@@ -127,13 +127,6 @@
         "postgres": "^3.4.8",
       },
     },
-    "sdk/adapter/codec": {
-      "name": "@aikirun/codec",
-      "version": "0.38.0",
-      "dependencies": {
-        "@aikirun/types": "workspace:*",
-      },
-    },
     "sdk/adapter/http": {
       "name": "@aikirun/http",
       "version": "0.38.0",
@@ -171,7 +164,6 @@
       "name": "@aikirun/client",
       "version": "0.38.0",
       "dependencies": {
-        "@aikirun/codec": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@orpc/client": "^1.9.3",
       },
@@ -267,7 +259,6 @@
       "name": "@aikirun/workflow",
       "version": "0.38.0",
       "dependencies": {
-        "@aikirun/codec": "workspace:*",
         "@aikirun/types": "workspace:*",
         "@standard-schema/spec": "^1.1.0",
       },
@@ -280,7 +271,6 @@
       "name": "@aikirun/testing",
       "version": "0.38.0",
       "dependencies": {
-        "@aikirun/codec": "workspace:*",
         "@aikirun/types": "workspace:*",
         "fishery": "^2.4.0",
       },
@@ -306,8 +296,6 @@
     "@aikirun/cli": ["@aikirun/cli@workspace:cli"],
 
     "@aikirun/client": ["@aikirun/client@workspace:sdk/client"],
-
-    "@aikirun/codec": ["@aikirun/codec@workspace:sdk/adapter/codec"],
 
     "@aikirun/endpoint": ["@aikirun/endpoint@workspace:sdk/endpoint"],
 

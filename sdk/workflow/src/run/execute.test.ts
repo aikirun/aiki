@@ -1,8 +1,8 @@
-import { noopCodec } from "@aikirun/codec";
 import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
+import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
@@ -223,7 +223,7 @@ describe("executeWorkflowRun", () => {
 				source: "system",
 				clientCodec: "applied",
 			});
-			let capturedCodec: unknown;
+			let capturedCodec: Codec | undefined;
 			const workflowVersion = fakeWorkflowVersion(async (run) => {
 				capturedCodec = run[INTERNAL].codec;
 			});
@@ -236,7 +236,11 @@ describe("executeWorkflowRun", () => {
 				configProvider,
 			});
 
-			expect(capturedCodec).toBe(noopCodec);
+			expect(capturedCodec).toBeDefined();
+			expect(capturedCodec).not.toBe(client[INTERNAL].codec);
+			const payload = { value: 1 };
+			expect(await capturedCodec?.encode(payload)).toEqual({ encodedValue: payload });
+			expect(await capturedCodec?.decode({ encodedValue: payload })).toBe(payload);
 		}));
 
 	test("invokes the handler with the run source", () =>

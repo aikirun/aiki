@@ -246,7 +246,7 @@ jobs:
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
         run: |
-          for dir in types sdk/server sdk/client sdk/workflow sdk/worker sdk/endpoint sdk/iam sdk/adapter/redis sdk/adapter/codec; do
+          for dir in types sdk/server sdk/client sdk/workflow sdk/worker sdk/endpoint sdk/iam sdk/adapter/redis; do
             name="$(jq -r .name "$dir/package.json")"
             if npm view "$name@$VERSION" version > /dev/null 2>&1; then
               echo "$name@$VERSION already published; skipping"

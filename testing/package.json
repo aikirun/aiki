@@ -15,7 +15,6 @@
 		"./data-factory/workflow/task": "./src/data-factory/workflow/task.ts"
 	},
 	"dependencies": {
-		"@aikirun/codec": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"fishery": "^2.4.0"
 	},

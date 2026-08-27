@@ -18,7 +18,6 @@
 		"build": "tsup"
 	},
 	"dependencies": {
-		"@aikirun/codec": "workspace:*",
 		"@aikirun/types": "workspace:*",
 		"@orpc/client": "^1.9.3"
 	},
