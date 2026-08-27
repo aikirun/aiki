@@ -671,10 +671,7 @@ function MemberRow({
 
 	return (
 		<div style={rowStyle}>
-			<div style={{ flex: 1, minWidth: 0 }}>
-				<span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--t0)" }}>{member.user.name}</span>
-				<span style={{ fontSize: 11, color: "var(--t3)", marginLeft: 6 }}>({member.user.email})</span>
-			</div>
+			<Identity name={member.user.name} email={member.user.email} />
 			<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
 				{isOwner || !canManage ? (
 					<Badge>{member.role}</Badge>
@@ -775,11 +772,22 @@ function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; on
 
 	return (
 		<div style={rowStyle}>
-			<div style={{ flex: 1, minWidth: 0 }}>
-				<span style={{ fontSize: 12.5, color: "var(--t1)" }}>{invitation.email}</span>
+			<div style={{ flex: "1 1 190px", minWidth: 0 }}>
+				<div
+					style={{
+						fontSize: 12.5,
+						color: "var(--t1)",
+						overflow: "hidden",
+						textOverflow: "ellipsis",
+						whiteSpace: "nowrap",
+					}}
+					title={invitation.email}
+				>
+					{invitation.email}
+				</div>
+				<div style={{ fontSize: 11, color: "var(--t3)" }}>as {invitation.role}</div>
 				{error && <p style={{ fontSize: 11, color: "var(--accent-red)", marginTop: 4 }}>{error}</p>}
 			</div>
-			<span style={{ fontSize: 11, color: "var(--t3)", marginRight: 8, flexShrink: 0 }}>as {invitation.role}</span>
 			<button
 				type="button"
 				onClick={handleCopyLink}
@@ -790,7 +798,7 @@ function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; on
 					padding: "3px 10px",
 					fontSize: 11,
 					fontWeight: 600,
-					color: isCopied ? "#4ADE80" : "var(--t1)",
+					color: isCopied ? "var(--accent-green)" : "var(--t1)",
 					cursor: "pointer",
 					whiteSpace: "nowrap",
 					flexShrink: 0,
@@ -937,8 +945,8 @@ function NamespaceRow({
 					borderBottom: showMembers ? "none" : rowStyle.border,
 				}}
 			>
-				<div style={{ flex: 1, minWidth: 0 }}>
-					<span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+				<div style={{ flex: "1 1 130px", minWidth: 0 }}>
+					<span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
 						<span
 							style={{
 								width: 7,
@@ -953,7 +961,11 @@ function NamespaceRow({
 								fontSize: 12.5,
 								fontFamily: "var(--mono)",
 								color: "var(--t1)",
+								overflow: "hidden",
+								textOverflow: "ellipsis",
+								whiteSpace: "nowrap",
 							}}
+							title={namespace.name}
 						>
 							{namespace.name}
 						</span>
@@ -1012,13 +1024,13 @@ function NamespaceRow({
 								<p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 8 }}>No members</p>
 							)}
 							{nsMembers?.map((m) => (
-								<div key={m.userId} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-									<span style={{ flex: 1, fontSize: 11, color: "var(--t1)" }}>
-										{m.name || m.email}
-										{m.name && <span style={{ color: "var(--t3)", marginLeft: 4 }}>({m.email})</span>}
-									</span>
+								<div
+									key={m.userId}
+									style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}
+								>
+									<Identity name={m.name} email={m.email} />
 									{isNsAdmin ? (
-										<>
+										<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
 											<select
 												value={m.role}
 												onChange={(e) => handleRoleChange(m.userId, e.target.value as NamespaceRole)}
@@ -1041,7 +1053,7 @@ function NamespaceRow({
 											<DangerButton onClick={() => handleRemoveMember(m.userId)} disabled={isSaving}>
 												Remove
 											</DangerButton>
-										</>
+										</div>
 									) : (
 										<Badge>{m.role}</Badge>
 									)}
@@ -1325,7 +1337,48 @@ const rowStyle: React.CSSProperties = {
 	display: "flex",
 	alignItems: "center",
 	gap: 8,
+	// Identity is elastic, the controls are not; without wrapping they get pushed
+	// off the row on a narrow screen.
+	flexWrap: "wrap",
 };
+
+/**
+ * Name over email, each truncating on its own line. Inline `name (email)` cannot
+ * shrink below the email's width, so on a phone it either overlaps the row's
+ * controls or shoves them off the edge.
+ */
+function Identity({ name, email }: { name?: string; email: string }) {
+	return (
+		<div style={{ flex: "1 1 190px", minWidth: 0 }}>
+			{name && (
+				<div
+					style={{
+						fontSize: 12.5,
+						fontWeight: 600,
+						color: "var(--t0)",
+						overflow: "hidden",
+						textOverflow: "ellipsis",
+						whiteSpace: "nowrap",
+					}}
+				>
+					{name}
+				</div>
+			)}
+			<div
+				style={{
+					fontSize: 11,
+					color: "var(--t3)",
+					overflow: "hidden",
+					textOverflow: "ellipsis",
+					whiteSpace: "nowrap",
+				}}
+				title={email}
+			>
+				{email}
+			</div>
+		</div>
+	);
+}
 
 const inlineFormContainerStyle: React.CSSProperties = {
 	background: "var(--s2)",
