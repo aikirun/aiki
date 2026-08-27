@@ -2,6 +2,78 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.39.0
+
+This release closes the race that could lose a wake-up signal on a waiting run, collapses the option builders into a single `with`, and lets a client bring its own input hasher. A run now carries a signal sequence, every write into a waiting state is guarded on it, and a terminal child run signals its parent the moment it finishes. `waitForStatus` becomes `wait`, resolving on whichever terminal status the run reaches. The dashboard and the website now share one design language. Six database migrations (`0022` through `0028`) ship with this release.
+
+### Breaking Changes
+
+- **The option builders collapsed into `with`.** Everything that took `.with().opt(path, value)` — workflow versions, tasks, workers, schedules, event senders, event multicasters — now takes `.with(path, value)` directly. Each call sets one option and returns a copy; the original is unchanged.
+
+  ```typescript
+  // Before
+  await notify.with().opt("trigger", { type: "delayed", delay: { seconds: 5 } }).start(client, input);
+
+  // After
+  await notify.with("trigger", { type: "delayed", delay: { seconds: 5 } }).start(client, input);
+  ```
+
+  The builder types (`WorkflowBuilder`, `TaskBuilder`, `WorkerBuilder`, `ScheduleBuilder`, `EventSenderBuilder`, `EventMulticasterBuilder`) are gone. Setting an option about one particular run (`reference`, `trigger`) on a workflow version returns a `WorkflowVersionStart` — that single start and nothing else. A schedule or a worker will not accept it: a schedule mints its own starts, and a worker executes runs that already exist.
+
+- **Schedules no longer take `workflowRun.*` option paths.** A schedule's `with` sets `ScheduleActivateOptions` only. The runs it fires carry the options of the workflow version handed to `activate` — configure those with the workflow's own `with`.
+
+- **`waitForStatus` is now `wait`, and any terminal status resolves it.** On run handles and child-run handles. There is no target status argument and no `"run_terminated"` outcome — the result carries the terminal state, and `state.status` says which. Without `timeout` or `signal` options the wait always succeeds, so you can go straight to the state.
+
+  ```typescript
+  // Before
+  const result = await handle.waitForStatus("completed");
+  if (result.success) console.log(result.state.output);
+
+  // After
+  const result = await handle.wait();
+  if (result.state.status === "completed") console.log(result.state.output);
+  ```
+
+- **Manual task writes are completion-only.** `task.setStateV1` writes a completed or failed state onto an existing task named by `id`; the `type: "new"` variant that minted a task on the fly is gone, along with `TaskSetStateRequestNew` and `TaskSetStateRequestExisting`. The write is validated against the task state machine and rejected once the run itself has terminated.
+
+- **The cancelled state's `reason` is now `explanation`.** On `WorkflowRunStateCancelled`.
+
+- **Run records carry their waits differently.** `WorkflowRunRecord` gains `signalSequence` and a record-level `childWorkflowRunWaits` map keyed by child run id; `ChildWorkflowRunInfo.waits` and the `ChildWorkflowRunWait*` types are gone. This affects code reading run records directly.
+
+- **The API contract moved to hash objects and sequence guards.** `workflowRun.createV1` and `schedule.activateV1` take a `Hash` (`{ value, deprecatedValues? }`) instead of a string, `activateV1` requires `workflowRunInputHash` (the client computes it now), a `transitionStateV1` into a waiting state requires `expectedSignalSequence`, and the multicast procedures return a result body. Upgrade the server and SDKs together.
+
+- **Renamed and removed types.** `WORKFLOW_RUN_SCHEDULED_REASON` is now `WORKFLOW_RUN_SCHEDULED_REASONS`, `WorkflowDefinitionStartOptions` is gone (a version's defaults are plain `WorkflowRunOptions`), and `TerminalWorkflowRunState` takes an `Output` type parameter.
+
+### New Features
+
+- **Bring your own input hasher.** `client({ hasher })` accepts a custom hasher for workflow and task input hashing; the built-in SHA-256 hasher remains the default. A `Hash` can carry `deprecatedValues` — prior hashes that still identify the same definition — and the server accepts a deprecated hash when starting a run or activating a schedule, so a hash algorithm can change without breaking replay or run deduplication. A worker resolves the hasher bound to each run's recorded hash before executing it.
+
+- **Event multicast reports per-run outcomes.** `events.<name>.send(...)` and `sendByReferenceId(...)` on a workflow version resolve with `{ sentIds, failedIds }` instead of `void`, so one unreachable run no longer hides which of the others got the event.
+
+### Web UI
+
+- **The dashboard wears the marketing site's design language.** New theme, typography, sidebar, and status treatment, and a reworked execution tab on the run detail page. Routes are unchanged; a set of dead components was removed along the way.
+
+- **The website landing page was redesigned**, and the dashboard demo was re-recorded on the new design — shipped as mp4/webm with a poster instead of a 7 MB gif.
+
+### Improvements
+
+- **Errors carry their own code and status.** SDK errors extend a new `AikiError` base with a stable `code` (`NOT_FOUND`, `CONFLICT`, …) and an HTTP `status`; `asAikiError(err)` narrows an unknown error to one. Server error handlers map them uniformly.
+
+- **Terminal child runs signal their parents.** A delivery service wakes a waiting parent the moment its child reaches a terminal state, instead of the parent discovering it on its next poll.
+
+- **Daemon names are pinned.** Daemons register kebab-case names (`process-imminent-scheduled-runs`, …) instead of inferring them from function names, so log and metric labels survive bundling. Worker logger metadata now separates `component` from `subComponent`.
+
+### Bug Fixes
+
+- **Lost wake-ups on event and child waits.** A signal landing while a run was writing its `awaiting_event` or `awaiting_child_workflow` state could be swallowed, parking the run until its timeout. Every write into a waiting state is now guarded on the run's signal sequence, so a concurrent signal forces the write to retry and observe it.
+
+- **`runConcurrently` throws even when its first error settles as `null`.** Errors that cannot propagate to the caller are logged instead of vanishing.
+
+### Documentation
+
+- The workflows doc gains a state-transition table and an explanation of how cancellation behaves. The repository now has a Contributor License Agreement with a CI check.
+
 ## 0.38.0
 
 A sleeping run can now be woken from the dashboard.
@@ -32,8 +104,8 @@ This release cuts the delay between creating a run and a worker starting it, and
   myWorker.start(client, { shards: ["us-east"] });
 
   // After
-  await orderWorkflowV1.with().opt("pool", "gpu").start(client, input);
-  myWorker.start(client, { pools: ["gpu"] });
+  await orderWorkflowV1.with().opt("pool", "us-east").start(client, input);
+  myWorker.start(client, { pools: ["us-east"] });
   ```
 
   Custom publishers and subscribers are affected too: `ReadyWorkflowRun.shard` is now `pool`, `SubscriberContext.shards` is now `pools`, and the claim request's `shards` filter is now `pools`.
