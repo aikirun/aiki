@@ -573,26 +573,27 @@ export function RunDetail() {
 }
 
 function RunDetailSkeleton() {
+	// Every bar is capped at the width of its card and the metadata row wraps, so a
+	// phone gets the shape of the page it is waiting for rather than bars running
+	// out through the side of every box.
+	const bar = { background: "var(--s2)", borderRadius: "var(--r-chip)", maxWidth: "100%" };
+
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-			<div style={{ height: 30, background: "var(--s2)", borderRadius: "var(--r-control)", width: 80 }} />
+			<div style={{ ...bar, height: 30, borderRadius: "var(--r-control)", width: 80 }} />
 			<div style={{ ...card, padding: "22px var(--pad-card) 20px" }}>
-				<div
-					style={{ height: 24, background: "var(--s2)", borderRadius: "var(--r-chip)", width: 200, marginBottom: 12 }}
-				/>
-				<div
-					style={{ height: 14, background: "var(--s2)", borderRadius: "var(--r-chip)", width: 320, marginBottom: 16 }}
-				/>
-				<div style={{ display: "flex", gap: 20 }}>
+				<div style={{ ...bar, height: 24, width: 200, marginBottom: 12 }} />
+				<div style={{ ...bar, height: 14, width: 320, marginBottom: 16 }} />
+				<div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
 					{["a", "b", "c", "d", "e"].map((key) => (
 						<div key={key}>
-							<div style={{ height: 10, background: "var(--s2)", borderRadius: 3, width: 40, marginBottom: 6 }} />
-							<div style={{ height: 14, background: "var(--s2)", borderRadius: "var(--r-chip)", width: 70 }} />
+							<div style={{ ...bar, height: 10, borderRadius: 3, width: 40, marginBottom: 6 }} />
+							<div style={{ ...bar, height: 14, width: 70 }} />
 						</div>
 					))}
 				</div>
 			</div>
-			<div style={{ ...card, height: 36, width: 260 }} />
+			<div style={{ ...card, height: 36, width: 260, maxWidth: "100%" }} />
 			<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 				{["a", "b", "c"].map((key) => (
 					<div key={key} style={{ height: 48, background: "var(--s2)", borderRadius: 8 }} />
