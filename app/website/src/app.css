@@ -2,6 +2,108 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 
+/*
+ * The docs share their palette and type with the marketing page (public/index.html)
+ * and the dashboard (app/dashboard/src/index.css): warm paper, near-black ink, a
+ * violet accent, Archivo for prose and the system mono stack for code. Values here
+ * are the same literals those two use — keep the three in step when one changes.
+ */
+
+:root {
+	--font-sans: "Archivo", system-ui, -apple-system, sans-serif;
+	--font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+	--color-fd-background: #f8f8f5;
+	--color-fd-foreground: #17171a;
+	--color-fd-muted: #f2f2ef;
+	--color-fd-muted-foreground: #5c5c64;
+	--color-fd-popover: #ffffff;
+	--color-fd-popover-foreground: #17171a;
+	--color-fd-card: #ffffff;
+	--color-fd-card-foreground: #17171a;
+	--color-fd-border: rgba(23, 23, 26, 0.1);
+	--color-fd-primary: #764ba2;
+	--color-fd-primary-foreground: #ffffff;
+	--color-fd-secondary: #f2f2ef;
+	--color-fd-secondary-foreground: #17171a;
+	--color-fd-accent: rgba(118, 75, 162, 0.1);
+	--color-fd-accent-foreground: #5d3a83;
+	--color-fd-ring: #764ba2;
+	--color-fd-overlay: rgba(23, 23, 26, 0.2);
+}
+
+/* Derived from the site's own dark code panel, as the dashboard's dark theme is. */
+.dark {
+	--color-fd-background: #0c0c10;
+	--color-fd-foreground: #e8e6ea;
+	--color-fd-muted: #24242d;
+	--color-fd-muted-foreground: #a3a1ac;
+	--color-fd-popover: #1b1b23;
+	--color-fd-popover-foreground: #e8e6ea;
+	--color-fd-card: #1b1b23;
+	--color-fd-card-foreground: #e8e6ea;
+	--color-fd-border: #2d2d37;
+	--color-fd-primary: #b78ce0;
+	--color-fd-primary-foreground: #17171a;
+	--color-fd-secondary: #24242d;
+	--color-fd-secondary-foreground: #e8e6ea;
+	--color-fd-accent: rgba(183, 140, 224, 0.14);
+	--color-fd-accent-foreground: #b78ce0;
+	--color-fd-ring: #b78ce0;
+	--color-fd-overlay: rgba(0, 0, 0, 0.5);
+}
+
+/* The neutral preset re-greys these three for the dark sidebar; keep it on palette. */
+.dark #nd-sidebar {
+	--color-fd-muted: #1b1b23;
+	--color-fd-secondary: #24242d;
+	--color-fd-muted-foreground: #a3a1ac;
+}
+
+/*
+ * Headings carry the site's display treatment: heavy weight, tight tracking. The page
+ * title sits outside .prose, so both are addressed.
+ */
+.prose :is(h1, h2, h3, h4),
+article > h1 {
+	font-weight: 800;
+	letter-spacing: -0.032em;
+}
+
+article > h1 {
+	letter-spacing: -0.038em;
+}
+
+/*
+ * Body links keep the ink colour and carry the accent in the underline instead. The
+ * marketing page colours its links violet, but it has almost no inline prose links —
+ * in a page of them, a violet that close to the browser's visited-link purple reads
+ * as "already visited". Hover moves the accent into the text, where it is plainly a
+ * state rather than a history.
+ *
+ * Scoped to text containers: fumadocs wraps every heading in a permalink anchor, and
+ * a blanket `.prose a` would recolour the headings themselves.
+ */
+.prose :is(p, li, td, th, blockquote) a {
+	color: inherit;
+	text-decoration-line: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+	text-decoration-color: color-mix(in srgb, var(--color-fd-primary) 55%, transparent);
+	transition:
+		color 0.16s ease,
+		text-decoration-color 0.16s ease;
+}
+
+.prose :is(p, li, td, th, blockquote) a:hover {
+	color: var(--color-fd-primary);
+	text-decoration-color: var(--color-fd-primary);
+}
+
+::selection {
+	background-color: rgba(118, 75, 162, 0.18);
+}
+
 html {
 	scrollbar-gutter: stable;
 }
