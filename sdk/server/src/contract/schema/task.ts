@@ -59,14 +59,6 @@ export const taskRecordSchema = type({
 });
 
 export const taskSetStateRequestSchema = type({
-	type: "'new'",
-	workflowRunId: "string > 0",
-	taskName: "string > 0",
-	"input?": "unknown",
-	inputHash: "string > 0",
-	state: taskStateCompletedSchema.or(taskStateFailedSchema).omit("attempts"),
-}).or({
-	type: "'existing'",
 	id: "string > 0",
 	workflowRunId: "string > 0",
 	state: taskStateCompletedSchema.or(taskStateFailedSchema).omit("attempts"),

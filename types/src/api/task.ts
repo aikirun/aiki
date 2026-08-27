@@ -77,20 +77,8 @@ export interface TaskTransitionStateResponseV1 {
 	taskInfo: TaskInfo;
 }
 
-export interface TaskSetStateRequestNew {
-	type: "new";
-	workflowRunId: string;
-	taskName: string;
-	input?: unknown;
-	inputHash: string;
-	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
-}
-
-export interface TaskSetStateRequestExisting {
-	type: "existing";
+export interface TaskSetStateRequestV1 {
 	id: string;
 	workflowRunId: string;
 	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
 }
-
-export type TaskSetStateRequestV1 = TaskSetStateRequestNew | TaskSetStateRequestExisting;
