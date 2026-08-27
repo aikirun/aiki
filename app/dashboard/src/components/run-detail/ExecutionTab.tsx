@@ -454,41 +454,47 @@ function ChildWorkflowCard({
 						<span style={chipNeutral()}>v{child.versionId}</span>
 						{isAwaited && <span style={{ ...chipStatus("var(--accent-purple)"), fontSize: 9.5 }}>awaiting</span>}
 						{resolvedWait && <StatusBadge status={status as TerminalWorkflowRunStatus} size="sm" />}
+						{/*
+						 * The link travels with the chips rather than sitting opposite them:
+						 * held out to the right it takes its width off this column, and the
+						 * column is what the name and the two ids have to fit inside.
+						 */}
+						<Link
+							to={`/runs/${child.id}`}
+							onClick={(e) => e.stopPropagation()}
+							style={{
+								position: "relative",
+								zIndex: 1,
+								background: tint("var(--accent-sky)"),
+								border: `1px solid ${edge("var(--accent-sky)")}`,
+								color: "var(--accent-sky)",
+								fontFamily: "var(--sans)",
+								fontSize: 11.5,
+								fontWeight: 600,
+								padding: "4px 10px",
+								borderRadius: "var(--r-chip)",
+								textDecoration: "none",
+								whiteSpace: "nowrap",
+								flexShrink: 0,
+								display: "inline-flex",
+								alignItems: "center",
+								gap: 4,
+							}}
+						>
+							View run →
+						</Link>
 					</div>
-					<div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>{shortId(child.id)}</span>
+					<div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
+						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)", whiteSpace: "nowrap" }}>
+							{shortId(child.id)}
+						</span>
 						<CopyButton text={child.id} />
-						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>
+						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)", whiteSpace: "nowrap" }}>
 							· {shortId(child.inputHash)}
 						</span>
 						<CopyButton text={child.inputHash} />
 					</div>
 				</div>
-
-				<Link
-					to={`/runs/${child.id}`}
-					onClick={(e) => e.stopPropagation()}
-					style={{
-						position: "relative",
-						zIndex: 1,
-						background: tint("var(--accent-sky)"),
-						border: `1px solid ${edge("var(--accent-sky)")}`,
-						color: "var(--accent-sky)",
-						fontFamily: "var(--sans)",
-						fontSize: 11.5,
-						fontWeight: 600,
-						padding: "4px 10px",
-						borderRadius: "var(--r-chip)",
-						textDecoration: "none",
-						whiteSpace: "nowrap",
-						flexShrink: 0,
-						display: "inline-flex",
-						alignItems: "center",
-						gap: 4,
-					}}
-				>
-					View run →
-				</Link>
 
 				{hasResolvedOutput && <ChevronIcon open={isOpen} />}
 			</div>
@@ -581,7 +587,22 @@ function SleepRow({ name, sleeps }: { name: string; sleeps: Sleep[] }) {
 			>
 				<path d="M4 2h8M4 14h8M5 2v2.5a3 3 0 0 0 3 3 3 3 0 0 0 3-3V2M5 14v-2.5a3 3 0 0 1 3-3 3 3 0 0 1 3 3V14" />
 			</svg>
-			<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 600, color: "var(--t0)" }}>{name}</span>
+			<span
+				title={name}
+				style={{
+					fontFamily: "var(--mono)",
+					fontSize: 12,
+					fontWeight: 600,
+					color: "var(--t0)",
+					flex: "0 1 auto",
+					minWidth: 0,
+					overflow: "hidden",
+					textOverflow: "ellipsis",
+					whiteSpace: "nowrap",
+				}}
+			>
+				{name}
+			</span>
 			<span style={{ flex: 1 }} />
 			{wakeupAt !== undefined && <SleepCountdown wakeupAt={wakeupAt} />}
 		</div>
@@ -650,6 +671,7 @@ function EventRow({
 						className="row-target"
 						aria-expanded={isOpen}
 						onClick={() => setIsOpen(!isOpen)}
+						title={name}
 						style={{
 							background: "none",
 							border: "none",
@@ -660,17 +682,25 @@ function EventRow({
 							fontWeight: 600,
 							color: "var(--t0)",
 							textAlign: "left",
+							/* Shrinks and truncates rather than pushing the chevron out of the card. */
+							flex: "0 1 auto",
+							minWidth: 0,
+							overflow: "hidden",
+							textOverflow: "ellipsis",
+							whiteSpace: "nowrap",
 						}}
 					>
 						{name}
 					</button>
 				) : (
 					<span
+						title={name}
 						style={{
 							fontFamily: "var(--mono)",
 							fontSize: 12,
 							fontWeight: 600,
 							color: "var(--t0)",
+							flex: "0 1 auto",
 							minWidth: 0,
 							overflow: "hidden",
 							textOverflow: "ellipsis",

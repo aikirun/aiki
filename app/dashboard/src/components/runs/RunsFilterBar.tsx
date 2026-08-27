@@ -28,7 +28,9 @@ interface FilterInputProps {
 
 function FilterInput({ value, onChange, placeholder }: FilterInputProps) {
 	return (
-		<div style={{ flex: 1, minWidth: 120 }}>
+		// A 160px basis, not `flex: 1`: these fields either all share a row or all take
+		// one each, rather than two sharing while the third stretches to the full width.
+		<div style={{ flex: "1 1 160px", minWidth: 0 }}>
 			<input
 				type="text"
 				value={value}
@@ -68,15 +70,17 @@ export function RunsFilterBar({
 			</div>
 
 			{/* Row 2: Workflow name + optional version select */}
-			<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-				<div style={{ flex: "1 1 auto", minWidth: 0 }}>
+			<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+				{/* A real basis so the version select drops to its own line rather than
+				    squeezing the name field to a few characters. */}
+				<div style={{ flex: "1 1 200px", minWidth: 0 }}>
 					<WorkflowSearchInput value={workflowFilter} onChange={onWorkflowFilterChange} />
 				</div>
 				{hasVersions && (
 					<select
 						value={versionFilter}
 						onChange={(e) => onVersionFilterChange(e.target.value)}
-						style={{ ...inputStyle, width: "auto", flexShrink: 0, cursor: "pointer" }}
+						style={{ ...inputStyle, flex: "0 1 auto", width: "auto", minWidth: 0, cursor: "pointer" }}
 					>
 						<option value="">All versions</option>
 						{versionsData.versions.map((v) => (

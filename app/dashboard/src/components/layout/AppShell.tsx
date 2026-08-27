@@ -36,7 +36,7 @@ export function AppShell() {
 			<Sidebar />
 			<main className="app-canvas" style={{ flex: 1, overflowY: "auto" }}>
 				{activeNamespace || isSettingsRoute ? (
-					<div style={{ maxWidth: 780, margin: "0 auto", padding: "28px 32px 64px" }}>
+					<div style={{ maxWidth: 780, margin: "0 auto", padding: "28px var(--pad-page) 64px" }}>
 						<Outlet />
 					</div>
 				) : (

@@ -76,9 +76,22 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 				}}
 			>
 				{value && !isOpen ? (
-					<div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+					<div style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 auto", minWidth: 0 }}>
+						{/* A long workflow name truncates. Wrapping would make this field taller
+						    than the version select beside it and break the row's baseline. */}
 						<span
-							style={{ fontSize: "var(--field-size)", fontFamily: "var(--mono)", fontWeight: 500, color: "var(--t0)" }}
+							title={value}
+							style={{
+								flex: "1 1 auto",
+								minWidth: 0,
+								overflow: "hidden",
+								textOverflow: "ellipsis",
+								whiteSpace: "nowrap",
+								fontSize: "var(--field-size)",
+								fontFamily: "var(--mono)",
+								fontWeight: 500,
+								color: "var(--t0)",
+							}}
 						>
 							{value}
 						</span>
@@ -89,6 +102,7 @@ export function WorkflowSearchInput({ value, onChange }: WorkflowSearchInputProp
 								handleClear();
 							}}
 							style={{
+								flexShrink: 0,
 								cursor: "pointer",
 								color: "var(--t3)",
 								fontSize: 13,

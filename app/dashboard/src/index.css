@@ -20,6 +20,14 @@
 	--field-size: 11.5px;
 	--field-size-lg: 13.5px;
 
+	/*
+	 * The page's side padding, and the padding inside a page-width card. On a phone
+	 * these two together were taking 112px of a 390px screen, which is what forced
+	 * headers and action rows to wrap a line at a time.
+	 */
+	--pad-page: 32px;
+	--pad-card: 24px;
+
 	/* Radius scale — cards read soft, controls read crisp */
 	--r-card: 14px;
 	--r-panel: 10px;
@@ -213,6 +221,13 @@ textarea::placeholder {
 	}
 }
 
+@media (max-width: 640px) {
+	:root {
+		--pad-page: 14px;
+		--pad-card: 16px;
+	}
+}
+
 /* An overscroll at the top of a pane should not reload the page. */
 html,
 body {
@@ -257,9 +272,23 @@ body {
 	opacity: 0;
 }
 
+/* The rail's scrim fades up rather than appearing all at once. */
+@keyframes scrimin {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.scrim-in {
+	animation: scrimin 0.16s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.anim-blink,
-	.anim-in {
+	.anim-in,
+	.scrim-in {
 		animation: none;
 		opacity: 1;
 	}

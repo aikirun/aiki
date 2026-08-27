@@ -40,7 +40,9 @@ function FilterInput({
 	placeholder: string;
 }) {
 	return (
-		<div style={{ flex: 1, minWidth: 0 }}>
+		// A 160px basis, not `flex: 1`: these fields either all share a row or all take
+		// one each, rather than two sharing while the third stretches to the full width.
+		<div style={{ flex: "1 1 160px", minWidth: 0 }}>
 			<input
 				type="text"
 				value={value}
@@ -73,10 +75,23 @@ function ActionBtn({ label, color, onClick }: { label: string; color: string; on
 
 function Meta({ label, value, copyable }: { label: string; value: string | number; copyable?: boolean }) {
 	return (
-		<div>
+		// A full id is one unbroken token wider than a phone's card. Bounded by the
+		// row and allowed to break, it takes two lines instead of running off the edge.
+		<div style={{ minWidth: 0, maxWidth: "100%" }}>
 			<div style={{ ...fieldLabel(), marginBottom: 3 }}>{label}</div>
-			<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-				<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 500, color: "var(--t0)" }}>{value}</span>
+			<div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+				<span
+					style={{
+						fontFamily: "var(--mono)",
+						fontSize: 12,
+						fontWeight: 500,
+						color: "var(--t0)",
+						minWidth: 0,
+						overflowWrap: "break-word",
+					}}
+				>
+					{value}
+				</span>
 				{copyable && <CopyButton text={String(value)} />}
 			</div>
 		</div>
@@ -231,7 +246,7 @@ export function SchedulesList() {
 			<div
 				style={{ ...card, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}
 			>
-				<div style={{ display: "flex", gap: 8 }}>
+				<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
 					<FilterInput
 						value={idFilter}
 						onChange={(v) => {
@@ -249,8 +264,10 @@ export function SchedulesList() {
 						placeholder="Reference ID"
 					/>
 				</div>
-				<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-					<div style={{ flex: 1 }}>
+				<div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+					{/* A real basis so the version select drops to its own line rather than
+					    squeezing the name field to a few characters. */}
+					<div style={{ flex: "1 1 200px", minWidth: 0 }}>
 						<WorkflowSearchInput
 							value={workflowFilter}
 							onChange={(v) => {
@@ -267,7 +284,7 @@ export function SchedulesList() {
 								setVersionFilter(e.target.value);
 								updateParams({ version: e.target.value });
 							}}
-							style={{ ...inputStyle, width: "auto", cursor: "pointer" }}
+							style={{ ...inputStyle, flex: "0 1 auto", width: "auto", minWidth: 0, cursor: "pointer" }}
 						>
 							<option value="">All versions</option>
 							{versionsData.versions.map((v) => (
@@ -608,29 +625,40 @@ function ScheduleRow({
 						)}
 
 					{/* Action buttons */}
-					<div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-						{schedule.status === "active" && (
-							<ActionBtn label="Pause" color="var(--accent-amber)" onClick={() => onAction("pause", schedule.id)} />
-						)}
-						{schedule.status === "paused" && (
-							<ActionBtn label="Resume" color="var(--accent-green)" onClick={() => onAction("resume", schedule.id)} />
-						)}
-						{schedule.status !== "inactive" && (
-							<ActionBtn
-								label="Deactivate"
-								color="var(--accent-red)"
-								onClick={() => onAction("deactivate", schedule.id)}
-							/>
-						)}
+					{/*
+					 * The state actions travel together and "View runs" sits opposite them.
+					 * `space-between` rather than a margin on the last button: once the row
+					 * wraps, a margin would push "View runs" to the right of its own line,
+					 * out of line with the buttons above it.
+					 */}
+					<div
+						style={{
+							display: "flex",
+							gap: 6,
+							alignItems: "center",
+							flexWrap: "wrap",
+							justifyContent: "space-between",
+						}}
+					>
+						<div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+							{schedule.status === "active" && (
+								<ActionBtn label="Pause" color="var(--accent-amber)" onClick={() => onAction("pause", schedule.id)} />
+							)}
+							{schedule.status === "paused" && (
+								<ActionBtn label="Resume" color="var(--accent-green)" onClick={() => onAction("resume", schedule.id)} />
+							)}
+							{schedule.status !== "inactive" && (
+								<ActionBtn
+									label="Deactivate"
+									color="var(--accent-red)"
+									onClick={() => onAction("deactivate", schedule.id)}
+								/>
+							)}
+						</div>
 						<button
 							type="button"
 							onClick={() => onViewRuns(schedule.id)}
-							style={{
-								...btnTinted("var(--accent-sky)"),
-								fontSize: 11.5,
-								padding: "5px 12px",
-								marginLeft: "auto",
-							}}
+							style={{ ...btnTinted("var(--accent-sky)"), fontSize: 11.5, padding: "5px 12px" }}
 						>
 							View runs <span style={{ fontSize: 13 }}>→</span>
 						</button>

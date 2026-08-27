@@ -28,7 +28,7 @@ export function CopyButton({ text, title = "Copy", onDark = false }: CopyButtonP
 			type="button"
 			onClick={handleCopy}
 			className="p-1 transition-colors"
-			style={{ color: idle, borderRadius: 4, position: "relative", zIndex: 1 }}
+			style={{ color: idle, borderRadius: 4, position: "relative", zIndex: 1, flexShrink: 0 }}
 			onMouseEnter={(e) => {
 				e.currentTarget.style.color = active;
 			}}

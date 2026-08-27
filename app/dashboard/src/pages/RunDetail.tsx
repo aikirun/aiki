@@ -236,57 +236,53 @@ export function RunDetail() {
 			<div
 				style={{
 					...card,
-					padding: "22px 24px 20px",
+					padding: "22px var(--pad-card) 20px",
 					marginBottom: 16,
 					borderTop: `2px solid ${edge(statusColor)}`,
 				}}
 			>
-				{/* Top row: name + pill + actions */}
+				{/*
+				 * Name, status and actions. The status travels with the actions rather than
+				 * with the name: on a narrow card the name takes the first line on its own,
+				 * and status and actions share the second instead of each claiming a line.
+				 * The auto margin does the pushing — `space-between` alone would centre the
+				 * status between the two once all three sit on one line.
+				 */}
 				<div
 					style={{
 						display: "flex",
-						alignItems: "flex-start",
-						justifyContent: "space-between",
+						alignItems: "center",
 						flexWrap: "wrap",
 						gap: 12,
 						marginBottom: 8,
 					}}
 				>
-					<div
+					<h1
 						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 10,
-							flexWrap: "wrap",
+							margin: 0,
+							fontSize: "clamp(20px, 3.4vw, 26px)",
+							fontWeight: 800,
+							color: "var(--t0)",
+							letterSpacing: "-0.038em",
+							lineHeight: 1.1,
+							flex: "0 1 auto",
 							minWidth: 0,
-							// A real basis, not `flex: 1`: with a 0% basis this column shrinks to a
-							// sliver and the name breaks mid-word instead of the actions wrapping.
-							flex: "1 1 220px",
+							// A workflow name is one hyphenated token; without this it keeps its
+							// full width as the flex item shrinks and paints over the actions.
+							overflowWrap: "break-word",
 						}}
 					>
-						<h1
-							style={{
-								margin: 0,
-								fontSize: "clamp(20px, 3.4vw, 26px)",
-								fontWeight: 800,
-								color: "var(--t0)",
-								letterSpacing: "-0.038em",
-								lineHeight: 1.1,
-								minWidth: 0,
-								// A workflow name is one hyphenated token; without this it keeps its
-								// full width as the flex item shrinks and paints over the actions.
-								overflowWrap: "break-word",
-							}}
-						>
-							{currentRun.name}
-						</h1>
+						{currentRun.name}
+					</h1>
+
+					<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginRight: "auto" }}>
 						<StatusBadge status={status} size="md" />
 						{currentRun.parentWorkflowRunId && <span style={chipStatus("var(--accent-purple)")}>child</span>}
 					</div>
 
 					{/* Action buttons — only shown for non-terminal runs */}
 					{!isTerminal && (
-						<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 12 }}>
+						<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>
 							{canResume && (
 								<ActionBtn
 									label="Resume"
@@ -372,8 +368,18 @@ export function RunDetail() {
 				</div>
 
 				{/* Full ID */}
-				<div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14 }}>
-					<span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--t3)" }}>{currentRun.id}</span>
+				<div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14, minWidth: 0 }}>
+					<span
+						style={{
+							fontFamily: "var(--mono)",
+							fontSize: 11,
+							color: "var(--t3)",
+							minWidth: 0,
+							overflowWrap: "break-word",
+						}}
+					>
+						{currentRun.id}
+					</span>
 					<CopyButton text={currentRun.id} />
 				</div>
 
@@ -569,7 +575,7 @@ function RunDetailSkeleton() {
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 			<div style={{ height: 30, background: "var(--s2)", borderRadius: "var(--r-control)", width: 80 }} />
-			<div style={{ ...card, padding: "22px 24px 20px" }}>
+			<div style={{ ...card, padding: "22px var(--pad-card) 20px" }}>
 				<div
 					style={{ height: 24, background: "var(--s2)", borderRadius: "var(--r-chip)", width: 200, marginBottom: 12 }}
 				/>
