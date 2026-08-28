@@ -124,9 +124,9 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 					workflowSource,
 					workflowName,
 					workflowVersionId,
-					// computeRank(timeoutAt = EPOCH_MS + 1, default priority 9) = 2 * 10 + 9.
-					rank: 29,
-					nextPublishAttemptRank: 29,
+					// computeRank(timeoutAt = EPOCH_MS + 1, default priority 5) = 2 * 10 + 5.
+					rank: 25,
+					nextPublishAttemptRank: 25,
 				})
 			);
 		}));

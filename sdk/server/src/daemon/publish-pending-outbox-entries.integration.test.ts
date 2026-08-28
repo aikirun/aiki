@@ -107,9 +107,9 @@ describe("publishOutboxEntries — outcome writes", () => {
 					namespaceId: namespaceRequestContext.namespaceId,
 					workflowRunId: runId,
 				});
-				// computeRank(now + 30_000, 9) = (1_000_000 + 30_000) * 10 + 9.
+				// computeRank(now + 30_000, 5) = (1_000_000 + 30_000) * 10 + 5.
 				expect(publishedRow).toEqual(
-					expect.objectContaining({ id: outboxRowId, status: "published", nextPublishAttemptRank: 10_300_009 })
+					expect.objectContaining({ id: outboxRowId, status: "published", nextPublishAttemptRank: 10_300_005 })
 				);
 			});
 		}));
@@ -133,9 +133,9 @@ describe("publishOutboxEntries — outcome writes", () => {
 				namespaceId: namespaceRequestContext.namespaceId,
 				workflowRunId: runId,
 			});
-			// computeRank(7_777_777, 9) = 7_777_777 * 10 + 9.
+			// computeRank(7_777_777, 5) = 7_777_777 * 10 + 5.
 			expect(deferredRow).toEqual(
-				expect.objectContaining({ id: outboxRowId, status: "pending", nextPublishAttemptRank: 77_777_779 })
+				expect.objectContaining({ id: outboxRowId, status: "pending", nextPublishAttemptRank: 77_777_775 })
 			);
 		}));
 
@@ -240,9 +240,9 @@ describe("publishOutboxEntries — outcome writes", () => {
 					namespaceId: namespaceRequestContext.namespaceId,
 					workflowRunId: runId,
 				});
-				// computeRank(now + 15_000, 9) = (1_000_000 + 15_000) * 10 + 9.
+				// computeRank(now + 15_000, 5) = (1_000_000 + 15_000) * 10 + 5.
 				expect(declinedRow).toEqual(
-					expect.objectContaining({ id: outboxRowId, status: "pending", nextPublishAttemptRank: 10_150_009 })
+					expect.objectContaining({ id: outboxRowId, status: "pending", nextPublishAttemptRank: 10_150_005 })
 				);
 			});
 		}));
@@ -271,9 +271,9 @@ describe("publishOutboxEntries — outcome writes", () => {
 					namespaceId: namespaceRequestContext.namespaceId,
 					workflowRunId: runId,
 				});
-				// computeRank(now + leaseDurationMs, 9) = (1_000_000 + 5_000) * 10 + 9.
+				// computeRank(now + leaseDurationMs, 5) = (1_000_000 + 5_000) * 10 + 5.
 				expect(leasedRow).toEqual(
-					expect.objectContaining({ id: outboxRowId, status: "pending", nextPublishAttemptRank: 10_050_009 })
+					expect.objectContaining({ id: outboxRowId, status: "pending", nextPublishAttemptRank: 10_050_005 })
 				);
 			});
 		}));

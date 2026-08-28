@@ -18,7 +18,7 @@ import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import type { RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
-import { computeRank, extractRankDueAtMs, type Ranked } from "../lib/rank";
+import { computeRank, extractRankDueAtMs, PRIORITY_LEVELS, type Ranked } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 import { createDaemonContext } from "../middleware/context";
 import type { ChildRunCanceller } from "../service/cancel-child-runs";
@@ -111,7 +111,8 @@ async function dueTimersConsumerLoop(
 				const context = createDaemonContext({ name: "process-due-timers", logger, signal });
 				const next = () =>
 					timerPriorityQueue.popDue({
-						maxRank: computeRank({ dueAt: Date.now() }),
+						// The cutoff must cover every priority digit, so it takes the lowest priority, not the default.
+						maxRank: computeRank({ dueAt: Date.now(), priority: PRIORITY_LEVELS - 1 }),
 						limit: configProvider.config.limit,
 					});
 

@@ -69,8 +69,8 @@ describe("leaseDuePending — lease", () => {
 		withHarness(async ({ context, repos }) => {
 			const now = 1_000_000;
 			await withFakeClock(now, async () => {
-				// rank 15 carries priority digit 5.
-				const row = pendingWorkflowRunOutboxRowFactory.build({ rank: 15, nextPublishAttemptRank: 15 });
+				// rank 17 carries priority digit 7.
+				const row = pendingWorkflowRunOutboxRowFactory.build({ rank: 17, nextPublishAttemptRank: 17 });
 				await repos.workflowRunOutbox.createBatch([row]);
 
 				const leased = await repos.workflowRunOutbox.leaseDuePending(context, { leaseDurationMs: 3_000, limit: 100 });
@@ -80,8 +80,8 @@ describe("leaseDuePending — lease", () => {
 					namespaceId: row.namespaceId,
 					workflowRunId: row.workflowRunId,
 				});
-				// computeRank(now + leaseDurationMs, 5) = (1_000_000 + 3_000) * 10 + 5.
-				expect(leasedRow).toEqual(expect.objectContaining({ nextPublishAttemptRank: 10_030_005 }));
+				// computeRank(now + leaseDurationMs, 7) = (1_000_000 + 3_000) * 10 + 7.
+				expect(leasedRow).toEqual(expect.objectContaining({ nextPublishAttemptRank: 10_030_007 }));
 			});
 		}));
 });
@@ -97,8 +97,8 @@ describe("claim-path ignores nextPublishAttemptRank", () => {
 					repos,
 				});
 
-				// Back the row off beyond the due cutoff computeRank(now) = 10_000_009, as a
-				// deferred/failed outcome would.
+				// Back the row off beyond the due cutoff computeRank(now, lowest priority) = 10_000_009,
+				// as a deferred/failed outcome would.
 				await repos.workflowRunOutbox.setNextPublishAttemptRank([
 					{ id: outboxRowId, nextPublishAttemptRank: 20_000_000 },
 				]);
@@ -172,7 +172,7 @@ describe("setNextPublishAttemptRank — pending-only guard", () => {
 					workflowRunId: runId,
 				});
 				expect(claimedRow).toEqual(
-					expect.objectContaining({ id: outboxRowId, status: "claimed", nextPublishAttemptRank: 10_000_009 })
+					expect.objectContaining({ id: outboxRowId, status: "claimed", nextPublishAttemptRank: 10_000_005 })
 				);
 			});
 		}));
@@ -210,10 +210,10 @@ describe("returnToPending — delivery schedule reset", () => {
 					workflowRunId: runId,
 				});
 				expect(restoredRow).toEqual(
-					expect.objectContaining({ id: outboxRowId, status: "pending", nextPublishAttemptRank: 10_000_009 })
+					expect.objectContaining({ id: outboxRowId, status: "pending", nextPublishAttemptRank: 10_000_005 })
 				);
 
-				// The restored rank sits exactly at the due cutoff, so the delivery lease takes it.
+				// The restored rank sits within the due cutoff, so the delivery lease takes it.
 				const leased = await repos.workflowRunOutbox.leaseDuePending(context, { leaseDurationMs: 5_000, limit: 100 });
 				expect(leased).toEqual([expect.objectContaining({ id: outboxRowId })]);
 			});

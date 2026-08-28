@@ -3,11 +3,11 @@ import { describe, expect, test } from "bun:test";
 
 describe("computeRank", () => {
 	test("encodes the due time in the high digits and the priority in the low digit", () => {
-		expect(computeRank({ dueAt: 1_000, priority: 5 })).toBe(10_005);
+		expect(computeRank({ dueAt: 1_000, priority: 7 })).toBe(10_007);
 	});
 
-	test("defaults to the least priority digit", () => {
-		expect(computeRank({ dueAt: 1_000 })).toBe(10_009);
+	test("defaults to the mid-scale priority digit", () => {
+		expect(computeRank({ dueAt: 1_000 })).toBe(10_005);
 	});
 
 	test("an earlier due time outranks any later one regardless of priority", () => {
