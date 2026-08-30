@@ -109,7 +109,7 @@ export const schedule = pgTable(
 		uniqueIndex("uqidx_schedule_namespace_reference").on(table.namespaceId, table.referenceId),
 		index("idx_schedule_namespace_workflow").on(table.namespaceId, table.workflowId),
 		// TODO: how to prevent certain namespaces from starving others
-		index("idx_schedule_status_next_run_at_id").on(table.status, table.nextRunAt, table.id),
+		index("idx_schedule_due_active").on(table.nextRunAt, table.id).where(sql`${table.status} = 'active'`),
 		check(
 			"chk_schedule_spec_matches_type",
 			sql`(${table.type} = 'cron' AND ${table.cronExpression} IS NOT NULL AND ${table.intervalMs} IS NULL) OR (${table.type} = 'interval' AND ${table.intervalMs} > 0 AND ${table.cronExpression} IS NULL AND ${table.cronTimezone} IS NULL)`
@@ -163,7 +163,9 @@ export const workflowRun = pgTable(
 			columns: [table.parentWorkflowRunId],
 			foreignColumns: [table.id],
 		}),
-		uniqueIndex("uqidx_workflow_run_workflow_reference").on(table.workflowId, table.referenceId),
+		uniqueIndex("uqidx_workflow_run_workflow_reference")
+			.on(table.workflowId, table.referenceId)
+			.where(sql`${table.referenceId} IS NOT NULL`),
 
 		index("idx_workflow_run_namespace_id").on(table.namespaceId, table.id),
 		index("idx_workflow_run_namespace_status_id").on(table.namespaceId, table.status, table.id),
@@ -171,15 +173,26 @@ export const workflowRun = pgTable(
 		index("idx_workflow_run_workflow_id").on(table.workflowId, table.id),
 		index("idx_workflow_run_workflow_status_id").on(table.workflowId, table.status, table.id),
 
-		index("idx_workflow_run_schedule_namespace").on(table.scheduleId, table.namespaceId),
-		index("idx_workflow_run_parent_workflow_run_status").on(table.parentWorkflowRunId, table.status),
+		index("idx_workflow_run_schedule_namespace")
+			.on(table.scheduleId, table.namespaceId)
+			.where(sql`${table.scheduleId} IS NOT NULL`),
+		index("idx_workflow_run_parent_workflow_run_status")
+			.on(table.parentWorkflowRunId, table.status)
+			.where(sql`${table.parentWorkflowRunId} IS NOT NULL`),
 
 		// TODO: will adding an index on input hash make conflict resolution faster?
 
-		index("idx_workflow_run_status_scheduled_at_id").on(table.status, table.scheduledAt, table.id),
-		index("idx_workflow_run_status_wakeup_at_id").on(table.status, table.wakeupAt, table.id),
-		index("idx_workflow_run_status_timeout_at_id").on(table.status, table.timeoutAt, table.id),
-		index("idx_workflow_run_status_next_attempt_at_id").on(table.status, table.nextAttemptAt, table.id),
+		index("idx_workflow_run_due_scheduled").on(table.scheduledAt, table.id).where(sql`${table.status} = 'scheduled'`),
+		index("idx_workflow_run_due_sleeping").on(table.wakeupAt, table.id).where(sql`${table.status} = 'sleeping'`),
+		index("idx_workflow_run_due_awaiting_event")
+			.on(table.timeoutAt, table.id)
+			.where(sql`${table.status} = 'awaiting_event'`),
+		index("idx_workflow_run_due_awaiting_child_workflow")
+			.on(table.timeoutAt, table.id)
+			.where(sql`${table.status} = 'awaiting_child_workflow'`),
+		index("idx_workflow_run_due_awaiting_retry")
+			.on(table.nextAttemptAt, table.id)
+			.where(sql`${table.status} = 'awaiting_retry'`),
 	]
 );
 
@@ -211,7 +224,9 @@ export const task = pgTable(
 		}),
 		index("idx_task_workflow_run_id").on(table.workflowRunId, table.id),
 		index("idx_task_workflow_run_status").on(table.workflowRunId, table.status),
-		index("idx_task_status_next_attempt_at_workflow_run").on(table.status, table.nextAttemptAt, table.workflowRunId),
+		index("idx_task_due_awaiting_retry")
+			.on(table.nextAttemptAt, table.workflowRunId)
+			.where(sql`${table.status} = 'awaiting_retry'`),
 	]
 );
 
