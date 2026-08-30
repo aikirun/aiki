@@ -208,6 +208,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				signalSequence: workflowRun.signalSequence,
 				attempts: workflowRun.attempts,
 				latestStateTransitionId: workflowRun.latestStateTransitionId,
+				options: workflowRun.options,
 			});
 	},
 

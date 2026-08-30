@@ -83,7 +83,7 @@ export async function processImminentRecurringRuns(
 			const timers: TimerEntry[] = schedulesDueSoon.map((schedule) => ({
 				type: "recurring",
 				id: schedule.id,
-				rank: computeRank({ dueAt: schedule.nextRunAt }),
+				rank: computeRank({ dueAt: schedule.nextRunAt, priority: schedule.workflowRunOptions?.priority }),
 			}));
 			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
 			if (result.status === "failed") {
@@ -180,7 +180,7 @@ async function processOverlapAllowSchedules(
 				attempt: 1,
 				state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 			});
-			const rank = computeRank({ dueAt: occurrence });
+			const rank = computeRank({ dueAt: occurrence, priority: schedule.workflowRunOptions?.priority });
 			outboxEntries.push({
 				id: ulid(),
 				namespaceId: schedule.namespaceId,
@@ -293,7 +293,7 @@ async function processOverlapSkipSchedules(
 			attempt: 1,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
-		const rank = computeRank({ dueAt: occurrence });
+		const rank = computeRank({ dueAt: occurrence, priority: schedule.workflowRunOptions?.priority });
 		outboxEntries.push({
 			id: ulid(),
 			namespaceId: schedule.namespaceId,
@@ -363,7 +363,13 @@ async function processOverlapCancelPreviousSchedules(
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(deps.repos, schedules);
 
 	const runIdsToCancel: string[] = [];
-	const runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; pool?: string }> = [];
+	const runsToCancel: Array<{
+		id: string;
+		attempts: number;
+		namespaceId: NamespaceId;
+		pool?: string;
+		priority?: number;
+	}> = [];
 
 	const newWorkflowRunEntries: WorkflowRunRowInsert[] = [];
 	const newRunStateTransitionEntries: StateTransitionRowInsert[] = [];
@@ -410,7 +416,7 @@ async function processOverlapCancelPreviousSchedules(
 			attempt: 1,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
-		const rank = computeRank({ dueAt: occurrence });
+		const rank = computeRank({ dueAt: occurrence, priority: schedule.workflowRunOptions?.priority });
 		newOutboxEntries.push({
 			id: ulid(),
 			namespaceId: schedule.namespaceId,
@@ -468,7 +474,7 @@ async function cancelPreviousAndInsertRunsInTx(
 	now: TimestampMs,
 	entries: {
 		runIdsToCancel: string[];
-		runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; pool?: string }>;
+		runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; pool?: string; priority?: number }>;
 		newWorkflowRunEntries: NonEmptyArray<WorkflowRunRowInsert>;
 		newRunStateTransitionEntries: NonEmptyArray<StateTransitionRowInsert>;
 		scheduleUpdates: NonEmptyArray<ScheduleOccurrenceUpdate>;
@@ -528,7 +534,7 @@ async function cancelPreviousAndInsertRunsInTx(
 				filter: { namespaceId: run.namespaceId, id: run.id },
 				update: { stateTransitionId },
 			});
-			cancelledRunsMeta.push({ namespaceId: run.namespaceId, id: run.id, pool: run.pool });
+			cancelledRunsMeta.push({ namespaceId: run.namespaceId, id: run.id, pool: run.pool, priority: run.priority });
 
 			if (cancelledRun.parentWorkflowRunId !== null) {
 				cancelledRunsHavingParent.push({
@@ -589,7 +595,7 @@ async function fetchActiveRunsBySchedule(repos: Repositories, schedules: NonEmpt
 		schedulesByReferenceId.set(referenceId, schedule);
 	}
 
-	const activeRunsByScheduleId = new Map<string, { id: string; attempts: number; pool?: string }>();
+	const activeRunsByScheduleId = new Map<string, { id: string; attempts: number; pool?: string; priority?: number }>();
 
 	if (isNonEmptyArray(workflowAndReferenceIdPairs) && isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
 		const activeRuns = await repos.workflowRun.listByWorkflowAndReferenceIdPairs({
@@ -601,8 +607,12 @@ async function fetchActiveRunsBySchedule(repos: Repositories, schedules: NonEmpt
 			if (run.referenceId) {
 				const schedule = schedulesByWorkflowAndReferenceId.get(run.workflowId)?.get(run.referenceId);
 				if (schedule) {
-					const pool = run.options?.pool;
-					activeRunsByScheduleId.set(schedule.id, { id: run.id, attempts: run.attempts, pool });
+					activeRunsByScheduleId.set(schedule.id, {
+						id: run.id,
+						attempts: run.attempts,
+						pool: run.options?.pool,
+						priority: run.options?.priority,
+					});
 				}
 			}
 		}

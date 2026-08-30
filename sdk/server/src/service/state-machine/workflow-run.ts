@@ -240,12 +240,18 @@ async function transitionStateInTx(
 	});
 
 	if (imminentRunTimerQueue && toState.status === "scheduled") {
-		txRepos.onCommit(() => imminentRunTimerQueue.add([{ id: runId, scheduledAt: toState.scheduledAt }]));
+		txRepos.onCommit(() =>
+			imminentRunTimerQueue.add([{ id: runId, scheduledAt: toState.scheduledAt, priority: run.options?.priority }])
+		);
 	}
 
 	if (toState.status === "cancelled") {
 		await discardStaleTasks(runId, ["running", "awaiting_retry"], txRepos);
-		await childRunCanceller.cancel([{ namespaceId, id: runId, pool: run.options?.pool }], txRepos, context.logger);
+		await childRunCanceller.cancel(
+			[{ namespaceId, id: runId, pool: run.options?.pool, priority: run.options?.priority }],
+			txRepos,
+			context.logger
+		);
 	}
 
 	if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {

@@ -458,6 +458,40 @@ describe("incrementSignalSequence", () => {
 		}));
 });
 
+describe("bulkIncrementSignalSequence", () => {
+	test("bumps the sequence of each listed run and returns each run's options", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const prioritized = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ options: { priority: 2 } }
+			);
+			const plain = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			const rows = await repos.workflowRun.bulkIncrementSignalSequence([
+				{ namespaceId: context.namespaceId, id: prioritized.runId as WorkflowRunId },
+				{ namespaceId: context.namespaceId, id: plain.runId as WorkflowRunId },
+			]);
+
+			rows.sort((a, b) => (a.id < b.id ? -1 : 1));
+			expect(rows).toEqual([
+				expect.objectContaining({
+					id: prioritized.runId,
+					status: "running",
+					revision: prioritized.revisionWhenClaimed,
+					signalSequence: 1,
+					options: { priority: 2 },
+				}),
+				expect.objectContaining({
+					id: plain.runId,
+					status: "running",
+					revision: plain.revisionWhenClaimed,
+					signalSequence: 1,
+					options: null,
+				}),
+			]);
+		}));
+});
+
 // Seeds a claimed run with its ulid minted at the frozen `mintedAtMs` — later instants mint
 // larger ids, pinning the id order the cursor walk depends on — then parks it on a child wait
 // due at `timeoutAt`.

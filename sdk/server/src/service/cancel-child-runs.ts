@@ -22,6 +22,7 @@ export interface CancelledRunMeta {
 	namespaceId: NamespaceId;
 	id: string;
 	pool: string | undefined;
+	priority: number | undefined;
 }
 
 export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimerQueue) => ({
@@ -90,6 +91,7 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 				inputHash,
 				options: {
 					pool: parentRun.pool,
+					priority: parentRun.priority,
 					retry: {
 						type: "exponential",
 						maxAttempts: Number.MAX_SAFE_INTEGER,
@@ -120,7 +122,11 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 			await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 
 			if (imminentRunTimerQueue) {
-				const imminentRuns = workflowRunEntries.map((entry) => ({ id: entry.id, scheduledAt: now }));
+				const imminentRuns = workflowRunEntries.map((entry) => ({
+					id: entry.id,
+					scheduledAt: now,
+					priority: entry.options?.priority,
+				}));
 				txRepos.onCommit(() => imminentRunTimerQueue.add(asNonEmptyArray(imminentRuns)));
 			}
 		}

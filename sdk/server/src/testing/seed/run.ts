@@ -34,7 +34,7 @@ export interface SeedRunDeps {
 	namespaceRequestContext?: NamespaceRequestContext;
 }
 
-interface SeedRunOverrides {
+export interface SeedRunOverrides {
 	options?: WorkflowStartOptions;
 	parent?: { workflowRunId: string; expectedRevision: number };
 }
@@ -231,9 +231,9 @@ export async function seedSleepingRun(
 	};
 }
 
-export async function seedStalledRun(deps: SeedRunDeps) {
+export async function seedStalledRun(deps: SeedRunDeps, overrides?: SeedRunOverrides) {
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
-	const seeded = await withFakeClock(1 as TimestampMs, () => seedQueuedRun(deps));
+	const seeded = await withFakeClock(1 as TimestampMs, () => seedQueuedRun(deps, overrides));
 
 	await stallUndeliverableRuns(daemonContext, { repos: deps.repos }, { maxAgeMs: 60_000, limit: 100 });
 

@@ -1,6 +1,6 @@
 import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
+import { asNonEmptyArray, chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
@@ -24,7 +24,12 @@ export interface ProcessImminentRetryableTasksDeps {
 	timerPriorityQueue?: TimerPriorityQueue;
 }
 
-const advanceTaskCursor = createKeysetStreamCursorAdvancer<{ workflowRunId: string; dueAt: TimestampMs }>({
+interface RetryableTask {
+	workflowRunId: string;
+	dueAt: TimestampMs;
+}
+
+const advanceTaskCursor = createKeysetStreamCursorAdvancer<RetryableTask>({
 	getOrder: (entry) => entry.dueAt,
 	getId: (entry) => entry.workflowRunId,
 });
@@ -38,45 +43,35 @@ export async function processImminentRetryableTasks(
 	const dueBefore = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	let now = Date.now();
-	for await (const { whenTrue: tasksDueNow, whenFalse: tasksDueSoon } of streamChunks(
-		(cursor) => repos.task.listRetryableTasks(context, dueBefore, limit, cursor),
-		{
-			advanceCursor: advanceTaskCursor,
-			until: (chunk) => chunk.length < limit,
-			partition: (task: { workflowRunId: string; dueAt: TimestampMs }) => ({
-				meetsCondition: task.dueAt <= now,
-				item: task,
-			}),
-		}
-	)) {
-		if (isNonEmptyArray(tasksDueNow)) {
-			const runIds: string[] = [];
-			const rankByRunId = new Map<string, number>();
-			for (const { workflowRunId, dueAt } of tasksDueNow) {
-				runIds.push(workflowRunId);
-				rankByRunId.set(workflowRunId, computeRank({ dueAt }));
-			}
+	for await (const tasks of streamChunks((cursor) => repos.task.listRetryableTasks(context, dueBefore, limit, cursor), {
+		advanceCursor: advanceTaskCursor,
+		until: (chunk) => chunk.length < limit,
+	})) {
+		const runIds = asNonEmptyArray(tasks.map((task) => task.workflowRunId));
+		const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds, "running");
+		const runsById = new Map(runs.map((run) => [run.id, run]));
 
-			const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds as NonEmptyArray<string>, "running");
-			const rankedRuns: Ranked<WorkflowRunMeta>[] = [];
-			for (const run of runs) {
-				const rank = rankByRunId.get(run.id);
-				if (rank !== undefined) {
-					rankedRuns.push({ ...run, rank });
-				}
+		const rankedRuns: Ranked<WorkflowRunMeta>[] = [];
+		const timers: TimerEntry[] = [];
+		for (const { workflowRunId, dueAt } of tasks) {
+			const run = runsById.get(workflowRunId);
+			if (!run) {
+				continue;
 			}
-			if (isNonEmptyArray(rankedRuns)) {
-				await queueRetryableTasks(context, repos, publisher, republishBackoff, rankedRuns);
+			const rank = computeRank({ dueAt, priority: run.options?.priority });
+			if (dueAt <= now) {
+				rankedRuns.push({ ...run, rank });
+			} else {
+				timers.push({ type: "task_retry", id: workflowRunId, rank });
 			}
 		}
 
-		if (timerPriorityQueue && isNonEmptyArray(tasksDueSoon)) {
-			const timers: TimerEntry[] = tasksDueSoon.map((task) => ({
-				type: "task_retry",
-				id: task.workflowRunId,
-				rank: computeRank({ dueAt: task.dueAt }),
-			}));
-			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
+		if (isNonEmptyArray(rankedRuns)) {
+			await queueRetryableTasks(context, repos, publisher, republishBackoff, rankedRuns);
+		}
+
+		if (timerPriorityQueue && isNonEmptyArray(timers)) {
+			const result = await timerPriorityQueue.add(timers);
 			if (result.status === "failed") {
 				context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
 			}

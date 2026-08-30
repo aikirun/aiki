@@ -716,6 +716,32 @@ describe("WorkflowRunService imminent run timers", () => {
 			]);
 		}));
 
+	test("the created run's timer carries its priority", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const createdAtMs = Date.now();
+			const runId = await withFakeClock(createdAtMs, () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input,
+					inputHash: { value: inputHash },
+					options: { priority: 2 },
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: createdAtMs, priority: 2 }) },
+			]);
+		}));
+
 	test("a run due beyond the lookahead window adds no timer", () =>
 		withHarness(async ({ context, repos }) => {
 			const timerPriorityQueue = createTimerPriorityQueue();
@@ -808,5 +834,61 @@ describe("WorkflowRunService imminent run timers", () => {
 			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
 				{ type: "scheduled", id: cancellationRun.id, rank: computeRank({ dueAt: cancelledAtMs }) },
 			]);
+		}));
+
+	test("the cancellation run inherits the cancelled parent's priority", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ options: { priority: 2 } }
+			);
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			// The child carries no priority of its own: the cascade's priority can only come
+			// from the cancelled parent.
+			const childInput = { orderId: "order-9" };
+			const childRunId = await service.createWorkflowRun(context, {
+				name: parent.workflowName,
+				versionId: parent.workflowVersionId,
+				input: childInput,
+				inputHash: { value: await hashInput(childInput) },
+				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
+			});
+			await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 });
+
+			const cancelledAtMs = Date.now();
+			await withFakeClock(cancelledAtMs, () => service.cancelByIds(context, { ids: [parent.runId] }));
+
+			const scheduledRuns = await repos.workflowRun.listByFilters(
+				{ namespaceId: context.namespaceId, status: ["scheduled"] },
+				10,
+				0,
+				{ order: "asc" }
+			);
+			const cancellationRun = scheduledRuns.rows.find((row) => row.id !== childRunId);
+			if (!cancellationRun) {
+				throw new Error("cancel-child-runs run was not scheduled");
+			}
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: cancellationRun.id, rank: computeRank({ dueAt: cancelledAtMs, priority: 2 }) },
+			]);
+
+			const cancellationRunRecord = await repos.workflowRun.getByIdWithState({
+				namespaceId: context.namespaceId,
+				id: cancellationRun.id,
+			});
+			expect(cancellationRunRecord).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: cancellationRun.id,
+						options: expect.objectContaining({ priority: 2 }),
+					}),
+				})
+			);
 		}));
 });

@@ -23,12 +23,12 @@ export const createImminentRunTimerQueue = ({
 	 * promoter poll. Failures are logged and dropped: the poll is the backstop,
 	 * so a missed timer costs latency, never the run.
 	 */
-	add(runs: NonEmptyArray<{ id: string; scheduledAt: number }>): void {
+	add(runs: NonEmptyArray<{ id: string; scheduledAt: number; priority: number | undefined }>): void {
 		const dueBefore = Date.now() + configProvider.config.lookaheadWindowMs;
 		const timers: TimerEntry[] = [];
-		for (const { id, scheduledAt } of runs) {
+		for (const { id, scheduledAt, priority } of runs) {
 			if (scheduledAt <= dueBefore) {
-				timers.push({ type: "scheduled", id, rank: computeRank({ dueAt: scheduledAt }) });
+				timers.push({ type: "scheduled", id, rank: computeRank({ dueAt: scheduledAt, priority }) });
 			}
 		}
 		if (!isNonEmptyArray(timers)) {
