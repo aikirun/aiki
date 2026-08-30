@@ -144,7 +144,15 @@ export async function deliverTerminatedSignalToParentRun(
 
 	if (imminentRunTimerQueue) {
 		txRepos.onCommit(() =>
-			imminentRunTimerQueue.add(asNonEmptyArray(scheduledParentRunIds.map((id) => ({ id, scheduledAt: now }))))
+			imminentRunTimerQueue.add(
+				asNonEmptyArray(
+					scheduledParentRunIds.map((id) => ({
+						id,
+						scheduledAt: now,
+						priority: incrementedParentRunsById.get(id)?.options?.priority,
+					}))
+				)
+			)
 		);
 	}
 

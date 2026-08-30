@@ -61,6 +61,11 @@ export interface WorkflowReference {
 export interface WorkflowRunOptions {
 	retry?: RetryStrategy;
 	pool?: string;
+	/**
+	 * Integer 0 (highest) to 9 (lowest), default 5. Breaks dispatch ties between runs due in the
+	 * same millisecond; a run due earlier always dispatches first, whatever the priorities.
+	 */
+	priority?: number;
 }
 
 export interface WorkflowStartOptions extends WorkflowRunOptions {

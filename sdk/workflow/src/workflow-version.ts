@@ -146,8 +146,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	}
 
 	private runOptions(): WorkflowRunOptions {
-		const { retry, pool } = this.startOptionsBuilder.build();
-		return { retry, pool };
+		const { retry, pool, priority } = this.startOptionsBuilder.build();
+		return { retry, pool, priority };
 	}
 
 	public with<Path extends PathFromObject<WorkflowStartOptions>>(
@@ -270,7 +270,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			);
 		}
 
-		const pool = parentRun.options.pool;
 		let newRunId: string | undefined;
 		try {
 			const response = await client.api.workflowRun.createV1({
@@ -279,7 +278,11 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				input,
 				inputHash,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
-				options: pool === undefined ? startOptions : { ...startOptions, pool },
+				options: {
+					...startOptions,
+					pool: startOptions.pool ?? parentRun.options.pool,
+					priority: startOptions.priority ?? parentRun.options.priority,
+				},
 			});
 			newRunId = response.id;
 		} catch (err) {

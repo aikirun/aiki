@@ -8,6 +8,7 @@ import { computeRank, type Ranked } from "../lib/rank";
 interface Timer {
 	dueAt: TimestampMs;
 	id: string;
+	options?: { priority?: number } | null;
 }
 
 const advanceTimerStreamCursor = createKeysetStreamCursorAdvancer<Timer>({
@@ -28,7 +29,10 @@ export async function* streamTimers<Item extends Timer>(
 		until: options?.until,
 		partition: (timer) => {
 			const dueAt = timer.dueAt;
-			return { meetsCondition: dueAt <= now, item: { ...timer, rank: computeRank({ dueAt }) } };
+			return {
+				meetsCondition: dueAt <= now,
+				item: { ...timer, rank: computeRank({ dueAt, priority: timer.options?.priority }) },
+			};
 		},
 	})) {
 		yield { dueNow: whenTrue, dueSoon: whenFalse };

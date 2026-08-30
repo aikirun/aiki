@@ -374,7 +374,7 @@ async function createWorkflowRunInTx(
 		status: "scheduled",
 		input,
 		inputHash: inputHash.value,
-		options: options && { retry: options.retry, pool: options.pool },
+		options: options && { retry: options.retry, pool: options.pool, priority: options.priority },
 		referenceId,
 		latestStateTransitionId: transitionId,
 		scheduledAt: scheduledAt as TimestampMs,
@@ -396,7 +396,7 @@ async function createWorkflowRunInTx(
 	});
 
 	if (imminentRunTimerQueue) {
-		txRepos.onCommit(() => imminentRunTimerQueue.add([{ id: runId, scheduledAt }]));
+		txRepos.onCommit(() => imminentRunTimerQueue.add([{ id: runId, scheduledAt, priority: options?.priority }]));
 	}
 
 	logger.info("Created workflow run", {
@@ -452,6 +452,7 @@ async function cancelByIdsInTx(
 			namespaceId,
 			id: run.id,
 			pool: run.options?.pool,
+			priority: run.options?.priority,
 		});
 		if (run.parentWorkflowRunId !== null) {
 			cancelledRunsHavingParent.push({

@@ -1049,4 +1049,75 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: redeliveredAtMs }) },
 			]);
 		}));
+
+	test("a scheduled transition mints the run's timer with its priority", () =>
+		withHarness(async ({ context, repos }) => {
+			const { runId } = await seedStalledRun({ namespaceRequestContext: context, repos }, { options: { priority: 2 } });
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			const redeliveredAtMs = Date.now();
+			await withFakeClock(redeliveredAtMs, () =>
+				stateMachine.transitionState(context, {
+					type: "pessimistic",
+					id: runId,
+					state: { status: "scheduled", scheduledInMs: 0, reason: "redelivery" },
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: redeliveredAtMs, priority: 2 }) },
+			]);
+		}));
+
+	test("a parent's wakeup timer carries the parent's priority", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ options: { priority: 2 } }
+			);
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+			await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: parent.runId,
+				state: { status: "awaiting_child_workflow", childWorkflowRunId: child.runId },
+				expectedRevision: parent.revisionWhenClaimed,
+				expectedSignalSequence: 0,
+			});
+
+			const childTerminatedAt = Date.now();
+			await withFakeClock(childTerminatedAt, () =>
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: child.runId,
+					state: { status: "completed", output: { receiptId: "rcp-7" } },
+					expectedRevision: child.revisionWhenClaimed,
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: parent.runId, rank: computeRank({ dueAt: childTerminatedAt, priority: 2 }) },
+			]);
+		}));
 });
