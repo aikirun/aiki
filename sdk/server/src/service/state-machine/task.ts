@@ -143,7 +143,7 @@ async function transitionStateInTx(
 		request.type satisfies "retry";
 		taskState = { status: "running" };
 	} else {
-		const requestTaskState = request.taskState;
+		const requestTaskState = request.state;
 		taskState =
 			requestTaskState.status === "completed"
 				? {

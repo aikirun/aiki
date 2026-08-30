@@ -368,7 +368,7 @@ describe("workflow version execution", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							taskState: {
+							state: {
 								status: "failed",
 								error: expect.objectContaining({ message: "declined" }),
 							},
@@ -441,7 +441,7 @@ describe("workflow version execution", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							taskState: {
+							state: {
 								status: "failed",
 								error: expect.objectContaining({ message: "declined" }),
 							},

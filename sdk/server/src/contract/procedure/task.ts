@@ -55,21 +55,21 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 				id: "string > 0",
 				workflowRunId: "string > 0",
 				attempts: "number.integer > 0",
-				taskState: taskStateCompletedSchema.omit("output").and({ "output?": "unknown" }),
+				state: taskStateCompletedSchema.omit("output").and({ "output?": "unknown" }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				workflowRunId: "string > 0",
 				attempts: "number.integer > 0",
-				taskState: taskStateFailedSchema,
+				state: taskStateFailedSchema,
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				workflowRunId: "string > 0",
 				attempts: "number.integer > 0",
-				taskState: taskStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }),
+				state: taskStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 	)

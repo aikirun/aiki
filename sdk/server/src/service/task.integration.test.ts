@@ -215,7 +215,7 @@ describe("TaskService setTaskState", () => {
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
 				attempts: 1,
-				taskState: {
+				state: {
 					status: "awaiting_retry",
 					error: { name: "Error", message: "boom" },
 					nextAttemptInMs: 60_000,

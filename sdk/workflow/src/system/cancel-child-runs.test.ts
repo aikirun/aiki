@@ -113,7 +113,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						id: runningListNonTerminalChildrenTask.id,
 						attempts: 1,
-						taskState: completedListNonTerminalChildrenTask.state,
+						state: completedListNonTerminalChildrenTask.state,
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -135,7 +135,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						id: runningCancelRunsTask.id,
 						attempts: 1,
-						taskState: completedCancelRunsTask.state,
+						state: completedCancelRunsTask.state,
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -213,7 +213,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						id: runningListNonTerminalChildrenTask.id,
 						attempts: 1,
-						taskState: completedListNonTerminalChildrenTask.state,
+						state: completedListNonTerminalChildrenTask.state,
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},

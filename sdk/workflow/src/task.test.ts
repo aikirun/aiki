@@ -102,7 +102,7 @@ describe("task", () => {
 							{
 								id: runningTaskInfo.id,
 								attempts: 1,
-								taskState: completedTaskInfo.state,
+								state: completedTaskInfo.state,
 								workflowRunId: runRecord.id,
 								expectedWorkflowRunRevision: runRecord.revision,
 							},
@@ -161,7 +161,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 2,
-							taskState: completedTaskInfo.state,
+							state: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
@@ -207,7 +207,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							taskState: {
+							state: {
 								status: "awaiting_retry",
 								error: expect.objectContaining({ message: "down" }),
 								nextAttemptInMs: 1_000,
@@ -254,7 +254,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							taskState: {
+							state: {
 								status: "failed",
 								error: expect.objectContaining({ message: "declined" }),
 							},
@@ -473,7 +473,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							taskState: completedTaskInfo.state,
+							state: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},

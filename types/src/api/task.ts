@@ -47,7 +47,7 @@ export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | 
 export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
 	id: string;
 	attempts: number;
-	taskState: TaskStateCompletedRequest;
+	state: TaskStateCompletedRequest;
 }
 
 export type TaskStateCompletedRequest = OptionalProp<TaskStateCompleted<unknown>, "output">;
@@ -55,13 +55,13 @@ export type TaskStateCompletedRequest = OptionalProp<TaskStateCompleted<unknown>
 export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
 	id: string;
 	attempts: number;
-	taskState: TaskStateFailed;
+	state: TaskStateFailed;
 }
 
 export interface TransitionTaskStateToAwaitingRetry extends TransitionTaskStateBase {
 	id: string;
 	attempts: number;
-	taskState: TaskStateAwaitingRetryRequest;
+	state: TaskStateAwaitingRetryRequest;
 }
 
 export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAttemptAt"> & {

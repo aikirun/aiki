@@ -38,7 +38,7 @@ describe("TaskStateMachine transitionState", () => {
 					expectedWorkflowRunRevision: attackerRunSeed.revisionWhenClaimed,
 					id: victimTaskSeed.taskInfo.id,
 					attempts: 2,
-					taskState: { status: "completed", output: "hijacked" },
+					state: { status: "completed", output: "hijacked" },
 				})
 			).rejects.toBeInstanceOf(NotFoundError);
 
