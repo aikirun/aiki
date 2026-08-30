@@ -70,6 +70,10 @@ const workflowRunStateTransitionValidator: Record<
 		queued: { reason: "retry" },
 		cancelled: true,
 	},
+	awaiting_task_retry: {
+		queued: { reason: "task_retry" },
+		cancelled: true,
+	},
 	awaiting_child_workflow: {
 		scheduled: { reason: "child_workflow" },
 		queued: { reason: "child_workflow_wait_timeout" },

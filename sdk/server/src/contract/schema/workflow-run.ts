@@ -9,7 +9,7 @@ import { triggerStrategySchema } from "./trigger";
 import { workflowSourceSchema } from "./workflow";
 
 export const workflowRunStatusSchema = type(
-	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_child_workflow' | 'stalled' | 'cancelled' | 'failed' | 'completed'"
+	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_task_retry' | 'awaiting_child_workflow' | 'stalled' | 'cancelled' | 'failed' | 'completed'"
 );
 
 export const terminalWorkflowRunStatusSchema = type("'cancelled' | 'failed' | 'completed'");
@@ -89,6 +89,11 @@ export const workflowRunStateAwaitingRetrySchema = type({
 		nextAttemptAt: "number > 0",
 	});
 
+export const workflowRunStateAwaitingTaskRetrySchema = type({
+	status: "'awaiting_task_retry'",
+	nextAttemptAt: "number > 0",
+});
+
 export const workflowRunStateAwaitingChildWorkflowSchema = type({
 	status: "'awaiting_child_workflow'",
 	childWorkflowRunId: "string > 0",
@@ -132,6 +137,7 @@ export const workflowRunStateSchema = workflowRunStateScheduledSchema
 	.or(workflowRunStateSleepingSchema)
 	.or(workflowRunStateAwaitingEventSchema)
 	.or(workflowRunStateAwaitingRetrySchema)
+	.or(workflowRunStateAwaitingTaskRetrySchema)
 	.or(workflowRunStateAwaitingChildWorkflowSchema)
 	.or(workflowRunStateStalledSchema)
 	.or(workflowRunStateCancelledSchema)

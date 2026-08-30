@@ -33,6 +33,7 @@ const getStatsV1: ContractProcedure<WorkflowGetStatsRequestV1, WorkflowGetStatsR
 					sleeping: "number.integer >= 0",
 					awaiting_event: "number.integer >= 0",
 					awaiting_retry: "number.integer >= 0",
+					awaiting_task_retry: "number.integer >= 0",
 					awaiting_child_workflow: "number.integer >= 0",
 					stalled: "number.integer >= 0",
 					cancelled: "number.integer >= 0",

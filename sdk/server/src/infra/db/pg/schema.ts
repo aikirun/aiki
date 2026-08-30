@@ -193,6 +193,9 @@ export const workflowRun = pgTable(
 		index("idx_workflow_run_due_awaiting_retry")
 			.on(table.nextAttemptAt, table.id)
 			.where(sql`${table.status} = 'awaiting_retry'`),
+		index("idx_workflow_run_due_awaiting_task_retry")
+			.on(table.nextAttemptAt, table.id)
+			.where(sql`${table.status} = 'awaiting_task_retry'`),
 	]
 );
 

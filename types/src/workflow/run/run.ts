@@ -18,6 +18,7 @@ export const WORKFLOW_RUN_STATUSES = [
 	"sleeping",
 	"awaiting_event",
 	"awaiting_retry",
+	"awaiting_task_retry",
 	"awaiting_child_workflow",
 	"stalled",
 	"cancelled",
@@ -204,6 +205,11 @@ export type WorkflowRunStateAwaitingRetry =
 	| WorkflowRunStateAwaitingRetryCausedByChildWorkflow
 	| WorkflowRunStateAwaitingRetryCausedBySelf;
 
+export interface WorkflowRunStateAwaitingTaskRetry extends WorkflowRunStateBase {
+	status: "awaiting_task_retry";
+	nextAttemptAt: number;
+}
+
 export interface WorkflowRunStateAwaitingChildWorkflow extends WorkflowRunStateBase {
 	status: "awaiting_child_workflow";
 	childWorkflowRunId: string;
@@ -257,6 +263,7 @@ export type WorkflowRunStateInComplete =
 	| WorkflowRunStateSleeping
 	| WorkflowRunStateAwaitingEvent
 	| WorkflowRunStateAwaitingRetry
+	| WorkflowRunStateAwaitingTaskRetry
 	| WorkflowRunStateAwaitingChildWorkflow
 	| WorkflowRunStateStalled
 	| WorkflowRunStateCancelled
