@@ -138,8 +138,8 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 				if (remainingCapacity > 0) {
 					const workflowRunIds = (await redis.eval(
 						ROUND_ROBIN_ZPOPMIN_SCRIPT,
-						queueNames.length,
-						...queueNames,
+						shuffledQueueNames.length,
+						...shuffledQueueNames,
 						remainingCapacity
 					)) as WorkflowRunId[];
 

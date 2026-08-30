@@ -103,7 +103,12 @@ describe("inMemoryQueue publish/subscribe", () => {
 		]);
 
 		const subscriber = queue.subscriber(subscriberContext([defaultWorkflow, otherWorkflow]));
-		expect<string[]>((await subscriber.getReadyRuns(4)).map(({ data }) => data.id)).toEqual(["a1", "b1", "a2", "b2"]);
+		// There are 2 workflow queues and the can start at either,
+		// so either rotation of the interleave is valid.
+		expect([
+			["a1", "b1", "a2", "b2"],
+			["b1", "a1", "b2", "a2"],
+		]).toContainEqual((await subscriber.getReadyRuns(4)).map(({ data }) => data.id));
 	});
 
 	test("returns at most `limit` runs and leaves the rest", async () => {

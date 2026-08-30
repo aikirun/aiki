@@ -44,7 +44,8 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 					return [];
 				}
 
-				const initialBatch = store.roundRobinPop({ queueNames, startQueueIndex: 0, limit });
+				const startQueueIndex = Math.floor(Math.random() * queueNames.length);
+				const initialBatch = store.roundRobinPop({ queueNames, startQueueIndex, limit });
 				if (initialBatch.length > 0) {
 					return initialBatch;
 				}
