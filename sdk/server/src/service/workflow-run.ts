@@ -26,7 +26,13 @@ import type {
 	WorkflowRunStateCancelled,
 	WorkflowRunStateScheduledByNew,
 } from "@aikirun/types/workflow/run";
-import type { TaskInfo, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
+import type {
+	TaskInfo,
+	TaskStartOptions,
+	TaskState,
+	TaskStateDiscarded,
+	TaskStatus,
+} from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
 import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
@@ -532,6 +538,8 @@ function buildTasksByAddress(
 		id: string;
 		name: string;
 		inputHash: string;
+		options: TaskStartOptions | null;
+		attempts: number;
 		state: TaskState;
 	}>
 ): Record<string, TaskInfo[]> {
@@ -543,6 +551,8 @@ function buildTasksByAddress(
 			name: task.name,
 			state: task.state as Exclude<TaskState, TaskStateDiscarded>,
 			inputHash: task.inputHash,
+			options: task.options ?? undefined,
+			attempts: task.attempts,
 		};
 		const tasksForAddress = tasksByAddress[address];
 		if (tasksForAddress) {

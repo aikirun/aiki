@@ -1,4 +1,4 @@
-import { createConsoleLogger, noopLogger } from "@aikirun/lib/logger";
+import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 
 import { processImminentRetryableTasks } from "./imminent-retryable-tasks";
@@ -14,7 +14,7 @@ import { seedAwaitingRetryTask } from "../testing/seed/task";
 
 const withHarness = createDaemonHarness();
 
-const namespaceRequestContext = namespaceRequestContextFactory.build({ logger: createConsoleLogger() });
+const namespaceRequestContext = namespaceRequestContextFactory.build({});
 
 const { republishBackoff } = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
 

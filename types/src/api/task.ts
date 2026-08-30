@@ -1,4 +1,4 @@
-import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
+import type { OptionalProp } from "@aikirun/lib/object";
 
 import type {
 	TaskInfo,
@@ -7,7 +7,6 @@ import type {
 	TaskStateAwaitingRetry,
 	TaskStateCompleted,
 	TaskStateFailed,
-	TaskStateRunning,
 } from "../workflow/task";
 
 export interface TaskApi {
@@ -40,14 +39,14 @@ export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateB
 export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
 	type: "retry";
 	id: string;
-	options?: TaskStartOptions;
-	taskState: TaskStateRunning;
+	attempts: number;
 }
 
 export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | TransitionTaskStateToRunningRetry;
 
 export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
 	id: string;
+	attempts: number;
 	taskState: TaskStateCompletedRequest;
 }
 
@@ -55,11 +54,13 @@ export type TaskStateCompletedRequest = OptionalProp<TaskStateCompleted<unknown>
 
 export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
 	id: string;
+	attempts: number;
 	taskState: TaskStateFailed;
 }
 
 export interface TransitionTaskStateToAwaitingRetry extends TransitionTaskStateBase {
 	id: string;
+	attempts: number;
 	taskState: TaskStateAwaitingRetryRequest;
 }
 
@@ -80,5 +81,5 @@ export interface TaskTransitionStateResponseV1 {
 export interface TaskSetStateRequestV1 {
 	id: string;
 	workflowRunId: string;
-	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
+	state: TaskStateCompleted<unknown> | TaskStateFailed;
 }

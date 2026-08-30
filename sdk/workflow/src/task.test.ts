@@ -101,6 +101,7 @@ describe("task", () => {
 						.once(
 							{
 								id: runningTaskInfo.id,
+								attempts: 1,
 								taskState: completedTaskInfo.state,
 								workflowRunId: runRecord.id,
 								expectedWorkflowRunRevision: runRecord.revision,
@@ -139,7 +140,8 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: chargeCard.name,
-					state: { attempts: 2, output },
+					attempts: 2,
+					state: { output },
 				});
 
 				client.api.task.transitionStateV1
@@ -158,6 +160,7 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
+							attempts: 2,
 							taskState: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
@@ -203,9 +206,9 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
+							attempts: 1,
 							taskState: {
 								status: "awaiting_retry",
-								attempts: 1,
 								error: expect.objectContaining({ message: "down" }),
 								nextAttemptInMs: 1_000,
 							},
@@ -250,9 +253,9 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
+							attempts: 1,
 							taskState: {
 								status: "failed",
-								attempts: 1,
 								error: expect.objectContaining({ message: "declined" }),
 							},
 							workflowRunId: runRecord.id,
@@ -469,6 +472,7 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
+							attempts: 1,
 							taskState: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,

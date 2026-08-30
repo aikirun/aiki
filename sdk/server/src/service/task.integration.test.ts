@@ -29,7 +29,8 @@ describe("TaskService getTaskById", () => {
 				input: taskInput,
 				inputHash: taskInfo.inputHash,
 				options: undefined,
-				state: { status: "running", attempts: 1 },
+				attempts: 1,
+				state: { status: "running" },
 			});
 		}));
 
@@ -47,12 +48,12 @@ describe("TaskService getTaskById", () => {
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
 				id: taskInfo.id,
-				taskState: { status: "running", attempts: 2 },
+				attempts: 2,
 			});
 
 			const taskService = createTaskService({ repos });
 			expect(await taskService.getTaskById(context, taskInfo.id)).toEqual(
-				expect.objectContaining({ id: taskInfo.id, state: { status: "running", attempts: 2 } })
+				expect.objectContaining({ id: taskInfo.id, attempts: 2, state: { status: "running" } })
 			);
 		}));
 
@@ -90,7 +91,8 @@ describe("TaskService setTaskState", () => {
 			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
 				expect.objectContaining({
 					id: taskInfo.id,
-					state: { status: "completed", attempts: 2, output },
+					attempts: 2,
+					state: { status: "completed", output },
 				}),
 			]);
 		}));
@@ -114,7 +116,8 @@ describe("TaskService setTaskState", () => {
 			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
 				expect.objectContaining({
 					id: taskInfo.id,
-					state: { status: "failed", attempts: 2, error },
+					attempts: 2,
+					state: { status: "failed", error },
 				}),
 			]);
 		}));
@@ -211,9 +214,9 @@ describe("TaskService setTaskState", () => {
 				id: taskInfo.id,
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
+				attempts: 1,
 				taskState: {
 					status: "awaiting_retry",
-					attempts: 1,
 					error: { name: "Error", message: "boom" },
 					nextAttemptInMs: 60_000,
 				},

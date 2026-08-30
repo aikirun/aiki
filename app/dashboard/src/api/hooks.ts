@@ -64,11 +64,12 @@ export function useWorkflowRun(
 }
 
 // The task's status and attempts from the polled run record are part of the key:
-// every task transition changes at least one of them, so a poll that observes a
-// change refetches the detail, and an unchanged task never refetches.
+// every task transition that changes anything visible changes at least one of them,
+// so a poll that observes a change refetches the detail, and an unchanged task
+// never refetches.
 export function useTask(task: TaskInfo) {
 	return useQuery({
-		queryKey: ["task", task.id, task.state.status, task.state.attempts],
+		queryKey: ["task", task.id, task.state.status, task.attempts],
 		queryFn: () => namespaceAuthedClient.task.getByIdV1({ id: task.id }),
 		placeholderData: keepPreviousData,
 	});

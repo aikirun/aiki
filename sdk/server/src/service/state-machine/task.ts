@@ -7,6 +7,7 @@ import type {
 	TaskInfo,
 	TaskName,
 	TaskState,
+	TaskStateDiscarded,
 	TaskStateFailed,
 	TaskStateRunning,
 	TaskStatus,
@@ -90,10 +91,10 @@ async function transitionStateInTx(
 		const taskName = request.taskName as TaskName;
 		const taskId = ulid() as TaskId;
 		const stateTransitionId = ulid();
+		const attempts = 1;
 
 		const taskState: TaskStateRunning = {
 			status: "running",
-			attempts: 1,
 		};
 
 		assertIsValidTaskStateTransition(runId, taskName, taskId, undefined, taskState.status);
@@ -103,7 +104,7 @@ async function transitionStateInTx(
 			name: taskName,
 			workflowRunId: runId,
 			status: taskState.status,
-			attempts: taskState.attempts,
+			attempts,
 			input: request.input,
 			inputHash,
 			options: request.options,
@@ -115,7 +116,7 @@ async function transitionStateInTx(
 			type: "task",
 			taskId,
 			status: taskState.status,
-			attempt: taskState.attempts,
+			attempt: attempts,
 			state: taskState,
 		});
 
@@ -125,7 +126,7 @@ async function transitionStateInTx(
 			"aiki.taskState": taskState,
 		});
 
-		return { id: taskId, name: taskName, state: taskState, inputHash };
+		return { id: taskId, name: taskName, state: taskState, inputHash, options: request.options, attempts };
 	}
 
 	const taskId = request.id as TaskId;
@@ -137,30 +138,30 @@ async function transitionStateInTx(
 	const inputHash = existingTask.inputHash;
 	const taskName = existingTask.name as TaskName;
 
-	const requestTaskState = request.taskState;
-
-	const taskState: TaskState =
-		requestTaskState.status === "running"
-			? {
-					status: requestTaskState.status,
-					attempts: requestTaskState.attempts,
-				}
-			: requestTaskState.status === "completed"
+	let taskState: Exclude<TaskState, TaskStateDiscarded>;
+	if ("type" in request) {
+		request.type satisfies "retry";
+		taskState = { status: "running" };
+	} else {
+		const requestTaskState = request.taskState;
+		taskState =
+			requestTaskState.status === "completed"
 				? {
 						status: requestTaskState.status,
-						attempts: requestTaskState.attempts,
 						output: requestTaskState.output,
 					}
 				: requestTaskState.status === "awaiting_retry"
 					? {
 							status: requestTaskState.status,
-							attempts: requestTaskState.attempts,
 							error: requestTaskState.error,
 							nextAttemptAt: Date.now() + requestTaskState.nextAttemptInMs,
 						}
 					: (requestTaskState satisfies TaskStateFailed);
+	}
 
 	assertIsValidTaskStateTransition(runId, taskName, taskId, existingTask.status, taskState.status);
+
+	const attempts = request.attempts;
 
 	const stateTransitionId = ulid();
 	await txRepos.stateTransition.append({
@@ -169,7 +170,7 @@ async function transitionStateInTx(
 		type: "task",
 		taskId,
 		status: taskState.status,
-		attempt: taskState.attempts,
+		attempt: attempts,
 		state: taskState,
 	});
 
@@ -177,7 +178,7 @@ async function transitionStateInTx(
 		{ id: taskId, workflowRunId: runId, status: existingTask.status, attempts: existingTask.attempts },
 		{
 			status: taskState.status,
-			attempts: taskState.attempts,
+			attempts,
 			latestStateTransitionId: stateTransitionId,
 			nextAttemptAt: taskState.status === "awaiting_retry" ? (taskState.nextAttemptAt as TimestampMs) : null,
 		}
@@ -206,5 +207,12 @@ async function transitionStateInTx(
 		"aiki.taskState": taskState,
 	});
 
-	return { id: taskId, name: taskName, state: taskState, inputHash };
+	return {
+		id: taskId,
+		name: taskName,
+		state: taskState,
+		inputHash,
+		options: existingTask.options ?? undefined,
+		attempts,
+	};
 }

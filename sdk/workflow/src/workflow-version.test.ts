@@ -367,9 +367,9 @@ describe("workflow version execution", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
+							attempts: 1,
 							taskState: {
 								status: "failed",
-								attempts: 1,
 								error: expect.objectContaining({ message: "declined" }),
 							},
 							workflowRunId: runRecord.id,
@@ -440,9 +440,9 @@ describe("workflow version execution", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
+							attempts: 1,
 							taskState: {
 								status: "failed",
-								attempts: 1,
 								error: expect.objectContaining({ message: "declined" }),
 							},
 							workflowRunId: runRecord.id,

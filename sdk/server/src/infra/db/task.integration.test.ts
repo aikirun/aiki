@@ -20,7 +20,7 @@ describe("task repository state reads", () => {
 			const row = await repos.task.getByIdWithState(context.namespaceId, taskInfo.id);
 
 			expect(row?.state).toContainKey("output");
-			expect(row?.state).toEqual({ status: "completed", attempts: 1, output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined });
 		}));
 });
 
@@ -59,7 +59,7 @@ describe("task repository compare-and-swap guards", () => {
 				id: taskInfo.id,
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
-				taskState: { status: "running", attempts: 2 },
+				attempts: 2,
 			});
 			const rowBefore = await repos.task.getById({ id: taskInfo.id, workflowRunId: runId });
 
@@ -72,7 +72,7 @@ describe("task repository compare-and-swap guards", () => {
 			expect(await repos.task.getById({ id: taskInfo.id, workflowRunId: runId })).toEqual(rowBefore);
 		}));
 
-	test("bulkDiscard skips a task whose attempts moved past the expected value", () =>
+	test("bulkTransitionToDiscarded skips a task whose attempts moved past the expected value", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
 				namespaceRequestContext: context,
@@ -86,11 +86,11 @@ describe("task repository compare-and-swap guards", () => {
 				id: taskInfo.id,
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
-				taskState: { status: "running", attempts: 2 },
+				attempts: 2,
 			});
 			const rowBefore = await repos.task.getById({ id: taskInfo.id, workflowRunId: runId });
 
-			const discardedTaskIds = await repos.task.bulkDiscard([
+			const discardedTaskIds = await repos.task.bulkTransitionToDiscarded([
 				{
 					filter: { id: taskInfo.id, workflowRunId: runId, status: "running", attempts: 1 },
 					update: { latestStateTransitionId: "never-applied" },
@@ -101,7 +101,7 @@ describe("task repository compare-and-swap guards", () => {
 			expect(await repos.task.getById({ id: taskInfo.id, workflowRunId: runId })).toEqual(rowBefore);
 		}));
 
-	test("bulkDiscard discards only the tasks whose expected status still matches", () =>
+	test("bulkTransitionToDiscarded discards only the tasks whose expected status still matches", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const staleTaskSeed = await seedRunningTask({ namespaceRequestContext: context, repos, publisher });
 			const completedTaskSeed = await seedCompletedTask({ namespaceRequestContext: context, repos, publisher });
@@ -113,7 +113,7 @@ describe("task repository compare-and-swap guards", () => {
 			// Both discards expect "running" — the read-time status. The completed row keeps
 			// attempts 1, so only its status differs and its discard must match nothing.
 			const staleTransitionId = "stale-transition-1";
-			const discardedTaskIds = await repos.task.bulkDiscard([
+			const discardedTaskIds = await repos.task.bulkTransitionToDiscarded([
 				{
 					filter: { id: staleTaskSeed.taskInfo.id, workflowRunId: staleTaskSeed.runId, status: "running", attempts: 1 },
 					update: { latestStateTransitionId: staleTransitionId },

@@ -27,6 +27,7 @@ export const createTaskService = ({ repos }: TaskServiceDeps) => ({
 			input: task.input,
 			inputHash: task.inputHash,
 			options: task.options !== null ? task.options : undefined,
+			attempts: task.attempts,
 			state: task.state,
 		};
 	},
@@ -70,12 +71,12 @@ async function setTaskStateInTx(
 		request.state.status
 	);
 
-	const attempts = existingTaskRow.attempts;
+	const attempts = existingTaskRow.attempts + 1;
 
 	const state: TaskState =
 		request.state.status === "completed"
-			? { status: "completed", attempts: attempts + 1, output: request.state.output }
-			: { status: request.state.status satisfies "failed", attempts: attempts + 1, error: request.state.error };
+			? { status: "completed", output: request.state.output }
+			: { status: request.state.status satisfies "failed", error: request.state.error };
 
 	const transitionId = ulid();
 	await txRepos.stateTransition.append({
@@ -84,7 +85,7 @@ async function setTaskStateInTx(
 		type: "task",
 		taskId: existingTaskRow.id,
 		status: state.status,
-		attempt: state.attempts,
+		attempt: attempts,
 		state: state,
 	});
 	const updatedTask = await txRepos.task.update(
@@ -96,7 +97,7 @@ async function setTaskStateInTx(
 		},
 		{
 			status: state.status,
-			attempts: state.attempts,
+			attempts,
 			latestStateTransitionId: transitionId,
 		}
 	);

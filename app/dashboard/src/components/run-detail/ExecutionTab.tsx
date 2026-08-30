@@ -156,7 +156,7 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 
 	const color = TASK_STATUS_COLORS[task.state.status];
 	const glyph = TASK_STATUS_GLYPHS[task.state.status];
-	const attempts = task.state.attempts;
+	const attempts = task.attempts;
 
 	useEffect(() => {
 		if (scrollTo && ref.current) {
