@@ -59,7 +59,16 @@ There are three ways to run this stack:
 
 ### With the aiki binary
 
-Download the `aiki` binary for your platform from the [latest release](https://github.com/aikirun/aiki/releases/latest) and put it on your `PATH`. It carries the migrate and server commands plus its own runtime.
+Download the binary for your platform from the [latest release](https://github.com/aikirun/aiki/releases/latest). It carries the migrate and server commands plus its own runtime. Assets are published for macOS on Apple Silicon (`aiki-darwin-arm64`) and Linux (`aiki-linux-arm64`, `aiki-linux-x64`); on any other platform use [Docker](#with-docker) or [From source](#from-source) instead.
+
+The asset is named for its platform and downloads without the executable bit, so rename it and make it executable before putting it on your `PATH`:
+
+```bash
+mv aiki-darwin-arm64 aiki
+chmod +x aiki
+```
+
+If you downloaded the asset with a browser rather than `curl`, macOS also flags it as quarantined; clear that with `xattr -c aiki`.
 
 ```bash
 export DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
@@ -91,14 +100,16 @@ Create a `.env` next to it with your database URL:
 DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
 ```
 
+If Postgres runs on the same machine as the stack rather than on a remote host, use `host.docker.internal` as the host instead of `localhost` — inside a container, `localhost` is the container itself, not the machine running it.
+
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 - Server: http://localhost:9850
 - Dashboard: http://localhost:9851
 
-The migration step applies the packages listed in `AIKI_MIGRATE_PACKAGES` — by default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set. Override the list to depart from that, for example to create the iam tables before turning auth on: `AIKI_MIGRATE_PACKAGES=server,iam docker-compose up -d`.
+The migration step applies the packages listed in `AIKI_MIGRATE_PACKAGES` — by default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set. Override the list to depart from that, for example to create the iam tables before turning auth on: `AIKI_MIGRATE_PACKAGES=server,iam docker compose up -d`.
 
 #### Without Docker Compose
 
