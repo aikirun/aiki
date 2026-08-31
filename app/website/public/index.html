@@ -364,11 +364,10 @@
       </div>
       <p style="margin: 0; font-size: 15.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">External systems signal running workflows with typed, schema-validated events. Events sent early are held and delivered the moment the workflow asks for them. <span style="color: #17171a; font-weight: 600;">No race between the event arriving and your code being ready for it.</span></p>
       <div style="grid-column: 1 / -1; background: #16161b; border-radius: 10px; padding: 16px 18px; overflow-x: auto;">
-<pre style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.85; color: #d7d6de;"><span style="color:#8b8794">// look up the running workflow — from anywhere
-</span><span style="color:#b78ce0">const</span> <span style="color:#8ab4e8">handle</span> = <span style="color:#b78ce0">await</span> <span style="color:#8ab4e8">trialV1</span>.getHandleById(client, <span style="color:#d9b48a">"run_8f2d"</span>);
-
-<span style="color:#8b8794">// send it an event
-</span><span style="color:#b78ce0">await</span> <span style="color:#8ab4e8">handle</span>.events.<span style="color:#8ab4e8">paymentReceived</span>.send({ invoiceId: <span style="color:#d9b48a">"in_8a2f"</span> });</pre>
+<pre style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.85; color: #d7d6de;">
+<span style="color:#8b8794">// send an event to the running workflow</span>
+<span style="color:#b78ce0">await</span> <span style="color:#8ab4e8">trialV1</span>.events.<span style="color:#8ab4e8">paymentReceived</span>.send(client, <span style="color:#d9b48a">"runId_8f2d"</span>);
+</pre>
       </div>
     </div>
   </section>
