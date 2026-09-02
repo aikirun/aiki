@@ -12,9 +12,9 @@ import { queueChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-o
 import { queueEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { type DueSchedule, queueRecurringRuns } from "./imminent-recurring-runs";
 import { queueRetryableRuns } from "./imminent-retryable-runs";
-import { queueRetryableTasks } from "./imminent-retryable-tasks";
 import { queueScheduledRuns } from "./imminent-scheduled-runs";
 import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
+import { queueTaskRetryableRuns } from "./imminent-task-retryable-runs";
 import type { RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
@@ -203,7 +203,7 @@ export async function processDueTimers(
 				}
 				case "task_retry": {
 					promises.push(
-						queueRetryableTasks(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
+						queueTaskRetryableRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
 					);
 					break;
 				}
@@ -238,7 +238,7 @@ export async function processDueTimers(
 const timerTypeToWorkflowRunStatus: Record<Exclude<TimerType, "recurring">, WorkflowRunStatus> = {
 	sleep: "sleeping",
 	retry: "awaiting_retry",
-	task_retry: "running",
+	task_retry: "awaiting_task_retry",
 	event_wait_timeout: "awaiting_event",
 	child_wait_timeout: "awaiting_child_workflow",
 	scheduled: "scheduled",

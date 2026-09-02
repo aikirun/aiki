@@ -1,16 +1,14 @@
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 
-import { processImminentRetryableTasks } from "./imminent-retryable-tasks";
+import { processImminentTaskRetryableRuns } from "./imminent-task-retryable-runs";
 import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
-import { createWorkflowRunStateMachine } from "../service/state-machine/workflow-run";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createDaemonHarness } from "../testing/harness";
-import { seedAwaitingRetryTask } from "../testing/seed/task";
+import { seedAwaitingRetryTask, seedAwaitingTaskRetryRun } from "../testing/seed/task";
 
 const withHarness = createDaemonHarness();
 
@@ -18,16 +16,20 @@ const namespaceRequestContext = namespaceRequestContextFactory.build({});
 
 const { republishBackoff } = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
 
-describe("processImminentRetryableTasks", () => {
-	test("a due retryable task promotes its run to queued with the rank carrying the run's priority", () =>
+describe("processImminentTaskRetryableRuns", () => {
+	test("a due awaiting_task_retry run is requeued with the rank carrying the run's priority", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId } = await seedAwaitingRetryTask(
+			const { runId } = await seedAwaitingTaskRetryRun(
 				{ namespaceRequestContext, repos, publisher },
 				{ nextAttemptAt: 1 },
 				{ options: { priority: 2 } }
 			);
 
-			await processImminentRetryableTasks(context, { repos }, { limit: 100, lookaheadWindowMs: 0, republishBackoff });
+			await processImminentTaskRetryableRuns(
+				context,
+				{ repos },
+				{ limit: 100, lookaheadWindowMs: 0, republishBackoff }
+			);
 
 			const run = await repos.workflowRun.getByIdWithState({
 				namespaceId: namespaceRequestContext.namespaceId,
@@ -44,25 +46,26 @@ describe("processImminentRetryableTasks", () => {
 				namespaceId: namespaceRequestContext.namespaceId,
 				workflowRunId: runId,
 			});
-			// computeRank(nextAttemptAt = 1, priority 2) = 1 * 10 + 2.
+			// computeRank(nextAttemptAt = 1, priority 2) = 1 * 10 + 2 — the rank proves the scan
+			// read the deadline the park stored on the run row.
 			expect(row).toEqual(
 				expect.objectContaining({ workflowRunId: runId, status: "pending", rank: 12, nextPublishAttemptRank: 12 })
 			);
 		}));
 
-	test("a task due within the lookahead window mints a timer carrying the run's priority", () =>
+	test("a run due within the lookahead window mints a timer carrying the run's priority", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId } = await seedAwaitingRetryTask(
+			const { runId } = await seedAwaitingTaskRetryRun(
 				{ namespaceRequestContext, repos, publisher },
 				{ nextAttemptAt: 1_030_000 },
 				{ options: { priority: 2 } }
 			);
 
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
-			// At now = 1_000_000 the task is not yet due, but its due time sits inside the
+			// At now = 1_000_000 the run is not yet due, but its deadline sits inside the
 			// 60_000ms lookahead window.
 			await withFakeClock(1_000_000, () =>
-				processImminentRetryableTasks(
+				processImminentTaskRetryableRuns(
 					context,
 					{ repos, timerPriorityQueue },
 					{ limit: 100, lookaheadWindowMs: 60_000, republishBackoff }
@@ -80,23 +83,20 @@ describe("processImminentRetryableTasks", () => {
 			).toBeNull();
 		}));
 
-	test("a task whose run is no longer running promotes nothing", () =>
+	test("a running run with a due awaiting_retry task is not requeued", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			// The same seed a promotion test uses; only the pause below stops it.
+			// The task is due, but the run is still running, not awaiting_task_retry — only
+			// parked runs are scanned.
 			const { runId } = await seedAwaitingRetryTask(
 				{ namespaceRequestContext, repos, publisher },
-				{ nextAttemptAt: 1 },
-				{ options: { priority: 2 } }
+				{ nextAttemptAt: 1 }
 			);
 
-			const stateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() });
-			await stateMachine.transitionState(namespaceRequestContext, {
-				type: "pessimistic",
-				id: runId,
-				state: { status: "paused" },
-			});
-
-			await processImminentRetryableTasks(context, { repos }, { limit: 100, lookaheadWindowMs: 0, republishBackoff });
+			await processImminentTaskRetryableRuns(
+				context,
+				{ repos },
+				{ limit: 100, lookaheadWindowMs: 0, republishBackoff }
+			);
 
 			const run = await repos.workflowRun.getByIdWithState({
 				namespaceId: namespaceRequestContext.namespaceId,
@@ -104,7 +104,7 @@ describe("processImminentRetryableTasks", () => {
 			});
 			expect(run).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: runId, status: "paused" }),
+					run: expect.objectContaining({ id: runId, status: "running" }),
 				})
 			);
 			expect(

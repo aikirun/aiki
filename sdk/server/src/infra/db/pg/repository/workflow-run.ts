@@ -633,6 +633,35 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.limit(limit);
 	},
 
+	async listTaskRetryableRuns(
+		_context: DaemonContext,
+		before: TimestampMs,
+		limit: number,
+		cursor?: KeysetStreamCursor
+	): Promise<DueWorkflowRun[]> {
+		return db
+			.select({
+				id: workflowRun.id,
+				namespaceId: workflowRun.namespaceId,
+				workflowId: workflowRun.workflowId,
+				revision: workflowRun.revision,
+				attempts: workflowRun.attempts,
+				options: workflowRun.options,
+				latestStateTransitionId: workflowRun.latestStateTransitionId,
+				dueAt: sql<TimestampMs>`${workflowRun.nextAttemptAt}`.mapWith(workflowRun.nextAttemptAt),
+			})
+			.from(workflowRun)
+			.where(
+				and(
+					eq(workflowRun.status, "awaiting_task_retry"),
+					lte(workflowRun.nextAttemptAt, before),
+					keysetStreamCursorFilter(workflowRun.nextAttemptAt, workflowRun.id, cursor)
+				)
+			)
+			.orderBy(workflowRun.nextAttemptAt, workflowRun.id)
+			.limit(limit);
+	},
+
 	async listEventWaitTimedOutRuns(
 		_context: DaemonContext,
 		before: TimestampMs,
@@ -733,7 +762,13 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 
 	async bulkTransitionToQueued(
 		_context: DaemonContext,
-		fromStatus: "scheduled" | "sleeping" | "awaiting_retry" | "awaiting_event" | "awaiting_child_workflow" | "running",
+		fromStatus:
+			| "scheduled"
+			| "sleeping"
+			| "awaiting_retry"
+			| "awaiting_task_retry"
+			| "awaiting_event"
+			| "awaiting_child_workflow",
 		runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
 		options?: { incrementAttempts?: boolean }
 	): Promise<string[]> {

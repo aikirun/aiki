@@ -2,12 +2,9 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { DiscardableTaskStatus, TaskStatus } from "@aikirun/types/workflow/task";
-import { and, count, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
+import { and, count, eq, inArray, min, ne, sql } from "drizzle-orm";
 
-import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import { toTaskState } from "./state-transition";
-import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
-import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { stateTransition, task, workflowRun } from "../schema";
 
@@ -93,22 +90,6 @@ export const createTaskRepository = (db: PgDb) => ({
 			.limit(10_000);
 
 		return rows.map((row) => ({ ...row, state: toTaskState(row.state) }));
-	},
-
-	async listRetryableTasks(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: KeysetStreamCursor) {
-		const dueAtExpr = min(task.nextAttemptAt);
-
-		return db
-			.select({
-				workflowRunId: task.workflowRunId,
-				dueAt: sql<TimestampMs>`${dueAtExpr}`.mapWith(task.nextAttemptAt),
-			})
-			.from(task)
-			.where(and(eq(task.status, "awaiting_retry"), lte(task.nextAttemptAt, before)))
-			.groupBy(task.workflowRunId)
-			.having(keysetStreamCursorFilter(dueAtExpr, task.workflowRunId, cursor))
-			.orderBy(dueAtExpr, task.workflowRunId)
-			.limit(limit);
 	},
 
 	async getEarliestNextAttemptAt(workflowRunId: string): Promise<TimestampMs | null> {
