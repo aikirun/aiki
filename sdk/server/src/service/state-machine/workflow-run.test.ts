@@ -40,6 +40,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 			sleeping: {},
 			awaiting_event: {},
 			awaiting_retry: {},
+			awaiting_task_retry: {},
 			awaiting_child_workflow: {},
 			cancelled: {},
 			completed: {},

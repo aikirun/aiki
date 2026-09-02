@@ -18,6 +18,7 @@ import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness, withRepos } from "../../testing/harness";
 import { claimRun, seedClaimedRun, seedCompletedRun, seedScheduledRun, seedStalledRun } from "../../testing/seed/run";
+import { seedRunningTask, seedSiblingAwaitingRetryTasks } from "../../testing/seed/task";
 import { createChildRunCanceller } from "../cancel-child-runs";
 import { createEventService } from "../event";
 
@@ -343,6 +344,65 @@ describe("WorkflowRunStateMachine attempt counting", () => {
 						attempts: result.attempts,
 					}),
 					state: { status: "queued", reason: "new" },
+				})
+			);
+		}));
+});
+
+describe("WorkflowRunStateMachine task-retry park", () => {
+	test("parking a run for its retrying tasks stores the earliest task deadline", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedSiblingAwaitingRetryTasks(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ firstNextAttemptAt: 1, siblingNextAttemptAt: 4_000_000_000_000 }
+			);
+
+			const stateMachine = createStateMachine(repos);
+			const parked = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "awaiting_task_retry" },
+				expectedRevision: revisionWhenClaimed,
+			});
+
+			expect(parked).toEqual({
+				revision: revisionWhenClaimed + 1,
+				attempts: attemptsWhenClaimed,
+				state: { status: "awaiting_task_retry", nextAttemptAt: 1 },
+			});
+
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({ id: runId, status: "awaiting_task_retry" }),
+					state: { status: "awaiting_task_retry", nextAttemptAt: 1 },
+				})
+			);
+		}));
+
+	test("a park with no task awaiting a retry is rejected", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			// The seeded task is running, not awaiting a retry — there is no deadline to park on.
+			const { runId, revisionWhenClaimed } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			expect(
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: runId,
+					state: { status: "awaiting_task_retry" },
+					expectedRevision: revisionWhenClaimed,
+				})
+			).rejects.toBeInstanceOf(InvalidWorkflowRunStateTransitionError);
+
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({ id: runId, status: "running", revision: revisionWhenClaimed }),
 				})
 			);
 		}));

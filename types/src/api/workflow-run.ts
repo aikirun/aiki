@@ -9,6 +9,7 @@ import type {
 	WorkflowRunStateAwaitingChildWorkflow,
 	WorkflowRunStateAwaitingEvent,
 	WorkflowRunStateAwaitingRetry,
+	WorkflowRunStateAwaitingTaskRetry,
 	WorkflowRunStateCancelled,
 	WorkflowRunStateCompleted,
 	WorkflowRunStatePaused,
@@ -124,11 +125,11 @@ export type WorkflowRunStateScheduledRequest = DistributiveOmit<WorkflowRunState
 	scheduledInMs: number;
 };
 
-export type WorkflowRunStateSleepingRequest = DistributiveOmit<WorkflowRunStateSleeping, "wakeupAt"> & {
+export type WorkflowRunStateSleepingRequest = Omit<WorkflowRunStateSleeping, "wakeupAt"> & {
 	durationMs: number;
 };
 
-export type WorkflowRunStateAwaitingEventRequest = DistributiveOmit<WorkflowRunStateAwaitingEvent, "timeoutAt"> & {
+export type WorkflowRunStateAwaitingEventRequest = Omit<WorkflowRunStateAwaitingEvent, "timeoutAt"> & {
 	timeoutInMs?: number;
 };
 
@@ -136,10 +137,9 @@ export type WorkflowRunStateAwaitingRetryRequest = DistributiveOmit<WorkflowRunS
 	nextAttemptInMs: number;
 };
 
-export type WorkflowRunStateAwaitingChildWorkflowRequest = DistributiveOmit<
-	WorkflowRunStateAwaitingChildWorkflow,
-	"timeoutAt"
-> & {
+export type WorkflowRunStateAwaitingTaskRetryRequest = Omit<WorkflowRunStateAwaitingTaskRetry, "nextAttemptAt">;
+
+export type WorkflowRunStateAwaitingChildWorkflowRequest = Omit<WorkflowRunStateAwaitingChildWorkflow, "timeoutAt"> & {
 	timeoutInMs?: number;
 };
 
@@ -163,6 +163,7 @@ export type WorkflowRunStateRequest =
 	| WorkflowRunStateSleepingRequest
 	| WorkflowRunStateAwaitingEventRequest
 	| WorkflowRunStateAwaitingRetryRequest
+	| WorkflowRunStateAwaitingTaskRetryRequest
 	| WorkflowRunStateAwaitingChildWorkflowRequest
 	| WorkflowRunStateCompletedRequest;
 

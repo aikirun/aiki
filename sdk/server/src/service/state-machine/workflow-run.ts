@@ -6,13 +6,17 @@ import type {
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/api/workflow-run";
-import type { WorkflowRunId, WorkflowRunState, WorkflowRunStatus } from "@aikirun/types/workflow/run";
+import type {
+	WaitingForSignalWorkflowRunStatus,
+	WorkflowRunId,
+	WorkflowRunState,
+	WorkflowRunStatus,
+} from "@aikirun/types/workflow/run";
 import { isTerminalWorkflowRunStatus, WORKFLOW_RUN_SCHEDULED_REASONS } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
 import type { Repositories, TxRepositories } from "../../infra/db/types";
-import type { UpdateWorkflowRunParams } from "../../infra/db/types/workflow-run";
 import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import type { ChildRunCanceller } from "../cancel-child-runs";
@@ -47,6 +51,7 @@ const workflowRunStateTransitionValidator: Record<
 		sleeping: true,
 		awaiting_event: true,
 		awaiting_retry: true,
+		awaiting_task_retry: true,
 		awaiting_child_workflow: true,
 		cancelled: true,
 		completed: true,
@@ -176,7 +181,21 @@ async function transitionStateInTx(
 	}
 
 	const now = Date.now() as TimestampMs;
-	let toState = convertDurationToTimestamp(request.state, now);
+	let toState: WorkflowRunState;
+	if (request.state.status === "awaiting_task_retry") {
+		const nextAttemptAt = await txRepos.task.getEarliestNextAttemptAt(runId);
+		if (nextAttemptAt === null) {
+			throw new InvalidWorkflowRunStateTransitionError(
+				runId,
+				fromState.status,
+				request.state.status,
+				"no task awaiting retry"
+			);
+		}
+		toState = { status: "awaiting_task_retry", nextAttemptAt };
+	} else {
+		toState = convertDurationToTimestamp(request.state, now);
+	}
 
 	if (fromState.status === "sleeping" && (toState.status === "scheduled" || toState.status === "cancelled")) {
 		await cancelSleep(runId, fromState.sleepName, now, txRepos);
@@ -354,31 +373,12 @@ async function updateWorkflowRun(
 		return { revision: result.revision, state: toState };
 	}
 
-	let updates: Extract<UpdateWorkflowRunParams, { waitForSignal: false }>["updates"];
-	if (toState.status === "scheduled") {
-		updates = {
-			status: toState.status,
-			attempts,
-			latestStateTransitionId: stateTransitionId,
-			scheduledAt: toState.scheduledAt as TimestampMs,
-		};
-	} else if (toState.status === "sleeping") {
-		updates = {
-			status: toState.status,
-			attempts,
-			latestStateTransitionId: stateTransitionId,
-			wakeupAt: toState.wakeupAt as TimestampMs,
-		};
-	} else if (toState.status === "awaiting_retry") {
-		updates = {
-			status: toState.status,
-			attempts,
-			latestStateTransitionId: stateTransitionId,
-			nextAttemptAt: toState.nextAttemptAt as TimestampMs,
-		};
-	} else {
-		updates = { status: toState.status, attempts, latestStateTransitionId: stateTransitionId };
-	}
+	const updates = {
+		status: toState.status,
+		attempts,
+		latestStateTransitionId: stateTransitionId,
+		...extractDueTimestamp(toState),
+	};
 
 	if (request.type === "optimistic") {
 		const result = await txRepos.workflowRun.update({
@@ -403,7 +403,31 @@ async function updateWorkflowRun(
 	}
 }
 
-export function convertDurationToTimestamp(request: WorkflowRunStateRequest, now: TimestampMs): WorkflowRunState {
+function extractDueTimestamp(state: Exclude<WorkflowRunState, { status: WaitingForSignalWorkflowRunStatus }>) {
+	switch (state.status) {
+		case "scheduled":
+			return { scheduledAt: state.scheduledAt as TimestampMs };
+		case "sleeping":
+			return { wakeupAt: state.wakeupAt as TimestampMs };
+		case "awaiting_retry":
+		case "awaiting_task_retry":
+			return { nextAttemptAt: state.nextAttemptAt as TimestampMs };
+		default:
+			state satisfies {
+				status: WorkflowRunStatus;
+				scheduledAt?: never;
+				wakeupAt?: never;
+				nextAttemptAt?: never;
+				timeoutAt?: never;
+			};
+			return {};
+	}
+}
+
+export function convertDurationToTimestamp(
+	request: Exclude<WorkflowRunStateRequest, { status: "awaiting_task_retry" }>,
+	now: TimestampMs
+): WorkflowRunState {
 	if (request.status === "scheduled") {
 		return {
 			status: "scheduled",
