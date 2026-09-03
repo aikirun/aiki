@@ -107,11 +107,12 @@ describe("processImminentTaskRetryableRuns", () => {
 					run: expect.objectContaining({ id: runId, status: "running" }),
 				})
 			);
+			// The delivery's claimed outbox row stays with the run until it parks.
 			expect(
 				await repos.workflowRunOutbox.getByWorkflowRunId({
 					namespaceId: namespaceRequestContext.namespaceId,
 					workflowRunId: runId,
 				})
-			).toBeNull();
+			).toEqual(expect.objectContaining({ workflowRunId: runId, status: "claimed" }));
 		}));
 });

@@ -354,8 +354,11 @@ describe("WorkflowRunStateMachine task-retry park", () => {
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedSiblingAwaitingRetryTasks(
 				{ namespaceRequestContext: context, repos, publisher },
-				{ firstNextAttemptAt: 1, siblingNextAttemptAt: 4_000_000_000_000 }
+				{ firstNextAttemptAt: 1, siblingNextAttemptAt: 2 }
 			);
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toEqual(expect.objectContaining({ workflowRunId: runId, status: "claimed" }));
 
 			const stateMachine = createStateMachine(repos);
 			const parked = await stateMachine.transitionState(context, {
@@ -364,6 +367,10 @@ describe("WorkflowRunStateMachine task-retry park", () => {
 				state: { status: "awaiting_task_retry" },
 				expectedRevision: revisionWhenClaimed,
 			});
+
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toBeNull();
 
 			expect(parked).toEqual({
 				revision: revisionWhenClaimed + 1,

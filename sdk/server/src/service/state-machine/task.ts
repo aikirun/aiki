@@ -190,13 +190,6 @@ async function transitionStateInTx(
 		});
 	}
 
-	if (taskState.status === "awaiting_retry") {
-		// The workflow run stays in `running` while the task waits for its retry, so the outbox row
-		// is not cleared by the workflow state machine. Delete it here so `recoverOverdueOutboxEntries`
-		// cannot re-dispatch the run before it parks for the retry.
-		await txRepos.workflowRunOutbox.deleteByWorkflowRunId({ namespaceId, workflowRunId: runId });
-	}
-
 	logger.info("Transitioning task state", {
 		"aiki.runId": runId,
 		"aiki.taskId": taskId,
