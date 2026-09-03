@@ -1,7 +1,10 @@
 import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
+import { hashInput } from "@aikirun/lib/crypto";
+import { getCompositeId } from "@aikirun/lib/id";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
+import { awaitingRetryTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
@@ -17,6 +20,7 @@ import type { EventsDefinition } from "./event";
 import { executeWorkflowRun } from "./execute";
 import type { WorkflowRun } from "./index";
 import { describe, expect, spyOn, test } from "bun:test";
+import { task } from "../task";
 import type { AnyWorkflowVersion } from "../workflow-version";
 
 const configProvider = asConfigProvider(() => ({
@@ -97,6 +101,60 @@ describe("executeWorkflowRun", () => {
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const workflowVersion = fakeWorkflowVersion(async () => {});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(true);
+			}));
+	});
+
+	describe("awaiting_task_retry", () => {
+		test("a replayed task whose retry is not due transitions the run to awaiting_task_retry", () =>
+			withFakeClient(async (client) => {
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => "charged",
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
+				// The clock cannot be pinned in unit tests (files run concurrently), so "not due"
+				// is a deadline a day out — far beyond the lifetime of a test run.
+				const nextAttemptAt = Date.now() + 24 * 60 * 60 * 1000;
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({
+					name: chargeCard.name,
+					options: { retry },
+					state: { nextAttemptAt },
+				});
+				const workflowRun = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [awaitingRetryTaskInfo] },
+				});
+				const workflowVersion = fakeWorkflowVersion(async (run) => {
+					await chargeCard.start(run, input);
+				});
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: { status: "awaiting_task_retry" },
+						expectedRevision: workflowRun.revision,
+					},
+					{
+						revision: workflowRun.revision + 1,
+						state: { status: "awaiting_task_retry", nextAttemptAt },
+						attempts: workflowRun.attempts,
+					}
+				);
 
 				const result = await executeWorkflowRun({
 					client,

@@ -28,6 +28,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { WorkflowRun } from "./run";
 import { workflowRunHandle } from "./run/handle";
 import { createReplayManifest } from "./run/replay-manifest";
+import { taskExecutionTracker } from "./run/task-execution-tracker";
 import { task } from "./task";
 import { workflow } from "./workflow";
 import { describe, expect, test } from "bun:test";
@@ -51,6 +52,7 @@ function createTestWorkflowRun(
 		[INTERNAL]: {
 			handle,
 			replayManifest: createReplayManifest(record),
+			createTaskExecutionTracker: taskExecutionTracker(handle, client.logger).create,
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
 			hasher: hashInput,
 		},
