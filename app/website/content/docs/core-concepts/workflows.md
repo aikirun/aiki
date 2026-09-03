@@ -146,12 +146,12 @@ const configured = orderWorkflowV1
 	.with("retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 });
 ```
 
-The paths are strings, but they are type checked. `with()` takes only paths that exist on the options, and the value has to match the type at that path — your editor completes the paths, and anything else fails to compile:
+The paths are type checked string literals (with auto-complete in your editor). `with()` takes only paths that exist on the options, and will only compile if the provided value matches the type at that path:
 
 ```typescript
 orderWorkflowV1.with("reference.id", "order-123");   // ✅︎
-orderWorkflowV1.with("reference.di", "order-123");   // ❌ no such option
-orderWorkflowV1.with("reference.id", 123);           // ❌ reference.id is a string
+orderWorkflowV1.with("reference.di", "order-123");   // ❌ compile error, no such option
+orderWorkflowV1.with("reference.id", 123);           // ❌ compile error, reference.id must be a string
 ```
 
 Look at what each option answers and they fall into two groups.
