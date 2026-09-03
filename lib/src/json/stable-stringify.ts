@@ -19,9 +19,38 @@ export function stableStringify(value: Record<string, unknown>): string {
 	return stringifyValue(value);
 }
 
+// Most keys and values are short, and scanning a short string here is cheaper than a native
+// call. A string that is long, or that holds anything JSON escapes, goes to JSON.stringify.
+const STRING_SCAN_LIMIT = 32;
+
+function quote(text: string): string {
+	if (text.length > STRING_SCAN_LIMIT) {
+		return JSON.stringify(text);
+	}
+	for (let index = 0; index < text.length; index++) {
+		const code = text.charCodeAt(index);
+		if (code < 32 || code === 34 || code === 92 || (code >= 0xd800 && code <= 0xdfff)) {
+			return JSON.stringify(text);
+		}
+	}
+	return `"${text}"`;
+}
+
 function stringifyValue(value: unknown): string {
 	if (value === null || value === undefined) {
 		return "null";
+	}
+
+	if (typeof value === "string") {
+		return quote(value);
+	}
+
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? String(value) : "null";
+	}
+
+	if (typeof value === "boolean") {
+		return value ? "true" : "false";
 	}
 
 	if (typeof value === "function") {
@@ -37,7 +66,14 @@ function stringifyValue(value: unknown): string {
 	}
 
 	if (Array.isArray(value)) {
-		return `[${value.map(stringifyValue).join(",")}]`;
+		let out = "[";
+		for (let index = 0; index < value.length; index++) {
+			if (index > 0) {
+				out += ",";
+			}
+			out += stringifyValue(value[index]);
+		}
+		return `${out}]`;
 	}
 
 	const prototype = Object.getPrototypeOf(value);
@@ -45,15 +81,24 @@ function stringifyValue(value: unknown): string {
 		throw new Error(`stableStringify does not support ${typeName(value)} values`);
 	}
 
-	const keys = Object.keys(value).sort();
-	const pairs: string[] = [];
+	const keys = Object.keys(value);
+	if (keys.length > 1) {
+		keys.sort();
+	}
+	let out = "{";
+	let first = true;
 	for (const key of keys) {
 		const keyValue = (value as Record<string, unknown>)[key];
-		if (keyValue !== undefined) {
-			pairs.push(`${JSON.stringify(key)}:${stringifyValue(keyValue)}`);
+		if (keyValue === undefined) {
+			continue;
 		}
+		if (!first) {
+			out += ",";
+		}
+		first = false;
+		out += `${quote(key)}:${stringifyValue(keyValue)}`;
 	}
-	return `{${pairs.join(",")}}`;
+	return `${out}}`;
 }
 
 function typeName(value: object): string {

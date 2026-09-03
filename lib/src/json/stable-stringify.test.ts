@@ -124,3 +124,20 @@ describe("stableStringify on objects JSON would change", () => {
 		expect(stableStringify({ value: Object.assign(Object.create(null), { a: 1 }) })).toBe('{"value":{"a":1}}');
 	});
 });
+
+describe("stableStringify output pinned for hash stability", () => {
+	test("formats numbers exactly as JSON.stringify does", () => {
+		expect(stableStringify({ zero: -0, big: 1e21, small: 1e-7, float: 0.1 + 0.2 })).toBe(
+			'{"big":1e+21,"float":0.30000000000000004,"small":1e-7,"zero":0}'
+		);
+	});
+
+	test("orders integer-like keys lexicographically, not in enumeration order", () => {
+		expect(stableStringify({ "10": 1, "2": 2, a: 3, "": 4 })).toBe('{"":4,"10":1,"2":2,"a":3}');
+	});
+
+	test("escapes strings exactly as JSON.stringify does", () => {
+		const text = `q"b\\${String.fromCharCode(10, 1, 0xd800)}é😀`;
+		expect(stableStringify({ text })).toBe(`{"text":${JSON.stringify(text)}}`);
+	});
+});
