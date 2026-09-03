@@ -6,7 +6,7 @@ export type {
 	NeverRetryStrategy,
 	RetryStrategy,
 } from "@aikirun/lib/retry";
-export type { Serializable, SerializableError } from "@aikirun/lib/serializable";
+export type { SerializableError } from "@aikirun/lib/serializable";
 export type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
 export { SchemaValidationError } from "@aikirun/types/validator";
 export type {

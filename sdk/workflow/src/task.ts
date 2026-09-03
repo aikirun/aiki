@@ -82,8 +82,8 @@ type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown>;
  * const result = await chargeCard.start(run, { cardId: "123", amount: 9999 });
  * ```
  */
-export function task<Input extends Serializable = void, Output extends Serializable = void>(
-	params: TaskParams<Input, Output>
+export function task<Input = void, Output = void>(
+	params: TaskParams<Input, Output> & Serializable<Input, "input"> & Serializable<Output, "output">
 ): Task<Input, Output> {
 	return new TaskImpl(params);
 }

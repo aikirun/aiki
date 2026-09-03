@@ -32,8 +32,8 @@ import type { WorkflowRun } from "./run";
 import { workflowRunHandle } from "./run/handle";
 import { createReplayManifest } from "./run/replay-manifest";
 import { taskExecutionTracker } from "./run/task-execution-tracker";
-import { task } from "./task";
-import { describe, expect, test } from "bun:test";
+import { type Task, task } from "./task";
+import { describe, expect, expectTypeOf, test } from "bun:test";
 
 function createTestWorkflowRun(
 	client: Client,
@@ -780,5 +780,37 @@ describe("task", () => {
 
 				expect(await sendEmail.with("retry", retry).start(run, input)).toBe(output);
 			}));
+	});
+});
+
+describe("task input/output serializability", () => {
+	test("accepts an interface as output", () => {
+		interface Receipt {
+			id: string;
+			total: number;
+		}
+		const charge = task({
+			name: "charge",
+			async handler() {
+				const output: Receipt = { id: "r1", total: 5 };
+				return output;
+			},
+		});
+		expectTypeOf(charge).toEqualTypeOf<Task<void, Receipt>>();
+	});
+
+	test("rejects an output that cannot be stored", () => {
+		// @ts-expect-error output.chargedAt is Date
+		task({ name: "charge", handler: async () => ({ chargedAt: new Date() }) });
+	});
+
+	test("rejects an input that cannot be stored", () => {
+		// @ts-expect-error input.since is Date
+		task({ name: "charge", handler: async (input: { since: Date }) => input.since.toISOString() });
+	});
+
+	test("rejects an output typed any", () => {
+		// @ts-expect-error output is any
+		task({ name: "charge", handler: async () => JSON.parse("{}") });
 	});
 });
