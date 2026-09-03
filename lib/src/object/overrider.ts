@@ -45,12 +45,22 @@ export interface ObjectBuilder<T extends object> {
  * Creates a type-safe object overrider that allows setting deeply nested fields
  * with full autocomplete support.
  *
+ * Paths descend through plain nested objects and stop at union-typed fields —
+ * a union is overridden whole.
+ *
  * @example
  * ```typescript
- * const overrider = objectOverrider<TaskOptions>({ retry: { type: "never" } });
+ * interface TestConfig {
+ *   name: string;
+ *   limits: { maxWorkers: number; queueDepth: number };
+ * }
+ *
+ * const overrider = objectOverrider<TestConfig>({
+ *   name: "default",
+ *   limits: { maxWorkers: 4, queueDepth: 100 }
+ * });
  * const result = overrider()
- *   .with("retry.type", "fixed")
- *   .with("retry.maxAttempts", 3)
+ *   .with("limits.maxWorkers", 8)
  *   .build();
  * ```
  */
