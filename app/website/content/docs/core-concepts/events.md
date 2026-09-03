@@ -23,6 +23,8 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 });
 ```
 
+Event data must be plain JSON data, like workflow inputs. See [Inputs and Outputs](./workflows.md#inputs-and-outputs).
+
 ## Event Schemas
 
 For runtime validation, provide a schema:

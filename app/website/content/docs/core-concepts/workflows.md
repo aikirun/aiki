@@ -34,6 +34,24 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 });
 ```
 
+## Inputs and Outputs
+
+Aiki stores workflow inputs and outputs, task inputs and outputs, and event data as JSON. So they must be plain JSON data: strings, numbers, booleans, `null`, arrays, and plain objects.
+
+Anything else is a compile error, and the error names the field:
+
+```typescript
+const fetchOrder = task({
+	name: "fetch-order",
+	async handler(orderId: string) {
+		return { orderId, placedAt: new Date() };
+	},
+});
+// error: ... '{ "Aiki: not serializable": "output.placedAt is Date" }'
+```
+
+The same applies to `Map`, `Set`, `bigint`, class instances, and functions.
+
 ## Workflow Versioning
 
 Versioning allows safe updates to workflows without breaking existing runs.

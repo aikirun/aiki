@@ -111,9 +111,9 @@ Schemas work with any validation library that implements [Standard Schema](https
 
 **Why use output schemas?** When task results are cached, the schema validates cached data on replay. If the cached shape doesn't match (e.g., after refactoring), the workflow fails immediately rather than silently returning mismatched data. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
 
-## Task Input
+## Task Input and Output
 
-The task receives input directly:
+A task receives its input directly and returns its output. Both must be plain JSON data; see [Inputs and Outputs](./workflows.md#inputs-and-outputs).
 
 ```typescript
 const exampleTask = task({
