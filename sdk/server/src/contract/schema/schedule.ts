@@ -15,7 +15,7 @@ export const cronScheduleSpecSchema = type({
 
 export const intervalScheduleSpecSchema = type({
 	type: "'interval'",
-	everyMs: "number > 0",
+	everyMs: "number.integer > 0",
 	"overlapPolicy?": overlapPolicySchema.or("undefined"),
 });
 

@@ -172,7 +172,7 @@ export const workflowRunRecordSchema = type({
 	versionId: "string > 0",
 	source: workflowSourceSchema,
 	createdAt: "number > 0",
-	revision: "number >= 0",
+	revision: "number.integer >= 0",
 	signalSequence: "number.integer >= 0",
 	stateTransitionId: "string > 0",
 	"input?": opaquePayloadSchema,

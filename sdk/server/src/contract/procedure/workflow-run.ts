@@ -186,7 +186,11 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 						state: workflowRunStateScheduledRequestOptimisticSchema
 							.or(workflowRunStateQueuedSchema)
 							.or(workflowRunStateRunningSchema)
-							.or(workflowRunStateSleepingSchema.omit("wakeupAt").and({ durationMs: "number > 0" }))
+							.or(
+								workflowRunStateSleepingSchema
+									.omit("wakeupAt")
+									.and({ durationMs: "0 < number.integer <= 315360000000" }) // max of 10 years
+							)
 							.or(
 								workflowRunStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" })
 							)
