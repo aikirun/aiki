@@ -49,6 +49,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 		sleeping: { scheduled: { reasons: ["wakeup_early"] }, queued: { reasons: ["wakeup"] }, cancelled: {} },
 		awaiting_event: { scheduled: { reasons: ["event"] }, queued: { reasons: ["event_wait_timeout"] }, cancelled: {} },
 		awaiting_retry: { queued: { reasons: ["retry"] }, cancelled: {} },
+		awaiting_task_retry: { queued: { reasons: ["task_retry"] }, cancelled: {} },
 		awaiting_child_workflow: {
 			scheduled: { reasons: ["child_workflow"] },
 			queued: { reasons: ["child_workflow_wait_timeout"] },
@@ -221,7 +222,13 @@ describe("convertDurationToTimestamp", () => {
 	} satisfies {
 		[Status in Exclude<
 			WorkflowRunStatus,
-			"scheduled" | "sleeping" | "awaiting_event" | "awaiting_retry" | "awaiting_child_workflow" | "completed"
+			| "scheduled"
+			| "sleeping"
+			| "awaiting_event"
+			| "awaiting_retry"
+			| "awaiting_task_retry"
+			| "awaiting_child_workflow"
+			| "completed"
 		>]: Extract<WorkflowRunStateRequest, { status: Status }>;
 	}).forEach(([status, request]) => {
 		test(`${status}: carries no duration and passes through unchanged`, () => {

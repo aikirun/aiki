@@ -25,6 +25,7 @@ export const WORKFLOW_RUN_STATUS_COLORS: Record<WorkflowRunStatus, string> = {
 	sleeping: "var(--accent-indigo)",
 	awaiting_event: "var(--accent-pink)",
 	awaiting_retry: "var(--accent-orange)",
+	awaiting_task_retry: "var(--accent-orange)",
 	awaiting_child_workflow: "var(--accent-purple)",
 	stalled: "var(--accent-gray)",
 	cancelled: "var(--accent-gray)",

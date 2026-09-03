@@ -154,6 +154,7 @@ export type WorkflowRunStateRequest =
 					| "sleeping"
 					| "awaiting_event"
 					| "awaiting_retry"
+					| "awaiting_task_retry"
 					| "awaiting_child_workflow"
 					| "completed";
 			}

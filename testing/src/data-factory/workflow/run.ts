@@ -23,6 +23,7 @@ export const workflowRunStateByStatus: {
 		nextAttemptAt: 0,
 		error: { name: "Error", message: "boom" },
 	},
+	awaiting_task_retry: { status: "awaiting_task_retry", nextAttemptAt: 0 },
 	awaiting_child_workflow: {
 		status: "awaiting_child_workflow",
 		childWorkflowRunId: "child-1",

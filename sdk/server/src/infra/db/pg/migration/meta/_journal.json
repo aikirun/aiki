@@ -204,6 +204,20 @@
 			"when": 1788055475279,
 			"tag": "0029_nosy_leopardon",
 			"breakpoints": true
+		},
+		{
+			"idx": 30,
+			"version": "7",
+			"when": 1788107051348,
+			"tag": "0030_aspiring_jetstream",
+			"breakpoints": true
+		},
+		{
+			"idx": 31,
+			"version": "7",
+			"when": 1788107063950,
+			"tag": "0031_windy_karen_page",
+			"breakpoints": true
 		}
 	]
 }

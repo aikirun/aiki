@@ -1,0 +1,1 @@
+CREATE INDEX "idx_workflow_run_due_awaiting_task_retry" ON "workflow_run" USING btree ("next_attempt_at","id") WHERE "workflow_run"."status" = 'awaiting_task_retry';

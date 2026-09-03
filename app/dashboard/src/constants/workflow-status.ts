@@ -13,6 +13,11 @@ export const WORKFLOW_STATUS_CONFIG: Record<
 	sleeping: { label: "Sleeping", color: WORKFLOW_RUN_STATUS_COLORS.sleeping, glyph: "☽" },
 	awaiting_event: { label: "Awaiting Event", color: WORKFLOW_RUN_STATUS_COLORS.awaiting_event, glyph: "⚡" },
 	awaiting_retry: { label: "Awaiting Retry", color: WORKFLOW_RUN_STATUS_COLORS.awaiting_retry, glyph: "↺" },
+	awaiting_task_retry: {
+		label: "Awaiting Task Retry",
+		color: WORKFLOW_RUN_STATUS_COLORS.awaiting_task_retry,
+		glyph: "↻",
+	},
 	awaiting_child_workflow: {
 		label: "Awaiting Child",
 		color: WORKFLOW_RUN_STATUS_COLORS.awaiting_child_workflow,
