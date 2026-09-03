@@ -2,7 +2,7 @@ import type { Serializable } from "@aikirun/lib/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
-import type { EventsDefinition } from "./run/event";
+import type { EventsData, EventsDefinition } from "./run/event";
 import {
 	type AnyWorkflowVersion,
 	type WorkflowVersion,
@@ -89,13 +89,12 @@ export interface WorkflowParams {
 export interface Workflow<Context> {
 	name: WorkflowName;
 
-	v: <
-		Input extends Serializable = void,
-		Output extends Serializable = void,
-		TEvents extends EventsDefinition = Record<string, never>,
-	>(
+	v: <Input = void, Output = void, TEvents extends EventsDefinition = Record<string, never>>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, Context, TEvents>
+		params: WorkflowVersionParams<Input, Output, Context, TEvents> &
+			Serializable<Input, "input"> &
+			Serializable<Output, "output"> &
+			Serializable<EventsData<TEvents>, "events">
 	) => WorkflowVersion<Input, Output, Context, TEvents>;
 
 	[INTERNAL]: {

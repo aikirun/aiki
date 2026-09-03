@@ -1,8 +1,10 @@
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
+import { event } from "./run/event";
 import { workflow } from "./workflow";
-import { describe, expect, test } from "bun:test";
+import type { WorkflowVersion } from "./workflow-version";
+import { describe, expect, expectTypeOf, test } from "bun:test";
 
 describe("workflow", () => {
 	test("has the given name", () => {
@@ -57,5 +59,44 @@ describe("workflow", () => {
 		const orders = workflow({ name: "orders" });
 
 		expect(orders[INTERNAL].getVersion("1.0.0" as WorkflowVersionId)).toBeUndefined();
+	});
+});
+
+describe("workflow.v input/output serializability", () => {
+	test("accepts an interface as input and output", () => {
+		interface Customer {
+			id: string;
+			email: string;
+		}
+		interface Welcome {
+			sentTo: string;
+		}
+		const orders = workflow({ name: "orders" });
+		const ordersV1 = orders.v("1.0.0", {
+			handler: async (run, input: Customer): Promise<Welcome> => {
+				run.logger.info(input.email);
+				return { sentTo: input.email };
+			},
+		});
+		expectTypeOf(ordersV1).toEqualTypeOf<WorkflowVersion<Customer, Welcome, null, Record<string, never>>>();
+	});
+
+	test("rejects an input that cannot be stored", () => {
+		const orders = workflow({ name: "orders" });
+		// @ts-expect-error input.placedAt is Date
+		orders.v("1.0.0", { handler: async (_run, input: { placedAt: Date }) => input.placedAt.getTime() });
+	});
+
+	test("rejects an output that cannot be stored", () => {
+		const orders = workflow({ name: "orders" });
+		// @ts-expect-error output.shippedAt is Date
+		orders.v("1.0.0", { handler: async () => ({ shippedAt: new Date() }) });
+	});
+
+	test("rejects an event whose data cannot be stored", () => {
+		const orders = workflow({ name: "orders" });
+		const shipped = event<{ shippedAt: Date }>();
+		// @ts-expect-error events.shipped.shippedAt is Date
+		orders.v("1.0.0", { events: { shipped }, handler: async () => {} });
 	});
 });

@@ -2,7 +2,6 @@ import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
-import type { Serializable } from "@aikirun/lib/serializable";
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
@@ -43,7 +42,7 @@ import type { WorkflowRunHandle } from "./handle";
  * ```
  */
 export function event(): EventDefinition<void>;
-export function event<Data extends Serializable>(params?: EventParams<Data>): EventDefinition<Data>;
+export function event<Data>(params?: EventParams<Data>): EventDefinition<Data>;
 export function event<Data>(params?: EventParams<Data>): EventDefinition<Data> {
 	return {
 		// biome-ignore lint/style/useNamingConvention: phantom type marker
@@ -65,8 +64,12 @@ export type EventsDefinition = Record<string, EventDefinition<unknown>>;
 
 export type EventData<TEvent> = TEvent extends EventDefinition<infer Data> ? Data : never;
 
+export type EventsData<TEvents extends EventsDefinition> = {
+	[Name in keyof TEvents]: EventData<TEvents[Name]>;
+};
+
 export type EventWaiters<TEvents extends EventsDefinition> = {
-	[K in keyof TEvents]: EventWaiter<EventData<TEvents[K]>>;
+	[Name in keyof TEvents]: EventWaiter<EventData<TEvents[Name]>>;
 };
 
 export interface EventWaiter<Data> {
@@ -75,7 +78,7 @@ export interface EventWaiter<Data> {
 }
 
 export type EventSenders<TEvents extends EventsDefinition> = {
-	[K in keyof TEvents]: EventSender<EventData<TEvents[K]>>;
+	[Name in keyof TEvents]: EventSender<EventData<TEvents[Name]>>;
 };
 
 export interface EventSender<Data> {
@@ -88,7 +91,7 @@ export interface EventSender<Data> {
 }
 
 export type EventMulticasters<TEvents extends EventsDefinition> = {
-	[K in keyof TEvents]: EventMulticaster<EventData<TEvents[K]>>;
+	[Name in keyof TEvents]: EventMulticaster<EventData<TEvents[Name]>>;
 };
 
 export interface EventMulticaster<Data> {
