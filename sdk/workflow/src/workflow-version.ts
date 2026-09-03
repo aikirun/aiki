@@ -1,4 +1,5 @@
 import { getCompositeId } from "@aikirun/lib/id";
+import type { Logger } from "@aikirun/lib/logger";
 import {
 	type ObjectBuilder,
 	objectOverrider,
@@ -176,8 +177,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		let input = args[0];
-		const hasher = client[INTERNAL].hasher;
-		const clientCodec = client[INTERNAL].codec;
+		const { codec: clientCodec, hasher } = client[INTERNAL];
 		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
 		const schema = this.params.schema?.input;
 		if (schema) {
@@ -221,21 +221,22 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		startOptions: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Output, Context, TEvents>> {
-		const parentRunHandle = parentRun[INTERNAL].handle;
-		parentRunHandle[INTERNAL].assertExecutionAllowed();
-
-		const { client } = parentRunHandle[INTERNAL];
+		const {
+			logger: parentRunLogger,
+			[INTERNAL]: { handle: parentRunHandle, hasher: parentRunHasher, replayManifest: parentRunReplayManifest },
+		} = parentRun;
+		const { assertExecutionAllowed, client, codec: parentRunCodec } = parentRunHandle[INTERNAL];
+		assertExecutionAllowed();
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
 		const inputSchemaValidationResult = inputSchema
-			? validateWithSchema(parentRunHandle, inputSchema, inputRaw, parentRun.logger, "Invalid workflow data")
+			? validateWithSchema(parentRunHandle, inputSchema, inputRaw, parentRunLogger, "Invalid workflow data")
 			: inputRaw;
 		const input =
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		// we should use a parent hasher instead of the client to enforce consistency
-		const hasher = parentRun[INTERNAL].hasher;
-		const inputHash = { value: await hasher(input) };
+		const inputHash = { value: await parentRunHasher(input) };
 
 		const referenceId = startOptions.reference?.id;
 		const address = getCompositeId<WorkflowRunAddress>({
@@ -243,14 +244,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			versionId: this.versionId,
 			referenceId: referenceId ?? inputHash.value,
 		});
-		const parentRunReplayManifest = parentRun[INTERNAL].replayManifest;
 
 		if (parentRunReplayManifest.hasUnconsumedEntries()) {
 			const existingRunInfo = parentRunReplayManifest.consumeNextChildWorkflowRun(address);
 			if (existingRunInfo) {
 				const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
 
-				const logger = parentRun.logger.child({
+				const logger = parentRunLogger.child({
 					"aiki.childWorkflowName": existingRun.name,
 					"aiki.childWorkflowVersionId": existingRun.versionId,
 					"aiki.childWorkflowRunId": existingRun.id,
@@ -259,18 +259,18 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				return childWorkflowRunHandle(
 					client,
 					existingRun as WorkflowRunRecord,
-					parentRun[INTERNAL].handle,
+					parentRunHandle,
 					logger,
 					this[INTERNAL].eventsDefinition
 				);
 			}
 
 			await this.throwNonDeterminismError(
-				parentRun,
 				parentRunHandle,
 				inputHash.value,
 				referenceId,
-				parentRunReplayManifest
+				parentRunReplayManifest,
+				parentRunLogger
 			);
 		}
 
@@ -279,7 +279,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			const response = await client.api.workflowRun.createV1({
 				name: this.name,
 				versionId: this.versionId,
-				input: await parentRunHandle[INTERNAL].codec.encode(input),
+				input: await parentRunCodec.encode(input),
 				inputHash,
 				clientCodecApplied: parentRunHandle.run.clientCodecApplied,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
@@ -298,7 +298,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		}
 		const { run: newRun } = await client.api.workflowRun.getByIdV1({ id: newRunId });
 
-		const logger = parentRun.logger.child({
+		const logger = parentRunLogger.child({
 			"aiki.childWorkflowName": newRun.name,
 			"aiki.childWorkflowVersionId": newRun.versionId,
 			"aiki.childWorkflowRunId": newRun.id,
@@ -309,18 +309,18 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		return childWorkflowRunHandle(
 			client,
 			newRun as WorkflowRunRecord,
-			parentRun[INTERNAL].handle,
+			parentRunHandle,
 			logger,
 			this[INTERNAL].eventsDefinition
 		);
 	}
 
 	private async throwNonDeterminismError(
-		parentRun: WorkflowRun<Context, EventsDefinition>,
 		parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 		inputHash: string,
 		referenceId: string | undefined,
-		parentRunReplayManifest: ReplayManifest
+		parentRunReplayManifest: ReplayManifest,
+		parentRunLogger: Logger
 	): Promise<never> {
 		const unconsumedManifestEntries = parentRunReplayManifest.getUnconsumedEntries();
 
@@ -332,9 +332,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		if (referenceId !== undefined) {
 			logMeta["aiki.referenceId"] = referenceId;
 		}
-		parentRun.logger.error("Replay divergence", logMeta);
+		parentRunLogger.error("Replay divergence", logMeta);
 
-		const err = new NonDeterminismError(parentRun.id, parentRunHandle.run.attempts, unconsumedManifestEntries);
+		const err = new NonDeterminismError(
+			parentRunHandle.run.id as WorkflowRunId,
+			parentRunHandle.run.attempts,
+			unconsumedManifestEntries
+		);
 		await parentRunHandle[INTERNAL].transitionState({
 			status: "failed",
 			cause: "self",
@@ -384,14 +388,17 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		run: WorkflowRun<Context, TEvents>,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
-		const { handle } = run[INTERNAL];
+		const {
+			logger,
+			[INTERNAL]: { handle },
+		} = run;
 
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(run, input);
 				const outputSchema = this.params.schema?.output;
 				const outputSchemaValidationResult = outputSchema
-					? validateWithSchema(handle, outputSchema, outputRaw, run.logger, "Invalid workflow data")
+					? validateWithSchema(handle, outputSchema, outputRaw, logger, "Invalid workflow data")
 					: (outputRaw as Output);
 				const output =
 					outputSchemaValidationResult instanceof Promise
@@ -419,7 +426,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					for (const [key, value] of Object.entries(failedState)) {
 						logMeta[`aiki.${key}`] = value;
 					}
-					run.logger.error("Workflow failed", {
+					logger.error("Workflow failed", {
 						"aiki.attempts": attempts,
 						...logMeta,
 					});
@@ -433,7 +440,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				for (const [key, value] of Object.entries(awaitingRetryState)) {
 					logMeta[`aiki.${key}`] = value;
 				}
-				run.logger.info("Workflow awaiting retry", {
+				logger.info("Workflow awaiting retry", {
 					"aiki.attempts": attempts,
 					...logMeta,
 				});
