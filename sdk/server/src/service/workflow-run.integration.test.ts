@@ -591,10 +591,15 @@ describe("WorkflowRunService cancelByIds", () => {
 			expect(scheduledRuns).toEqual({
 				rows: [
 					expect.objectContaining({ id: childRunId, status: "scheduled", name: parent.workflowName }),
-					expect.objectContaining({ status: "scheduled", name: "cancel-child-runs", clientCodecApplied: false }),
+					expect.objectContaining({ status: "scheduled", name: "cancel-child-runs" }),
 				],
 				total: 2,
 			});
+
+			const cascadeRuns = scheduledRuns.rows.filter((row) => row.name === "cancel-child-runs");
+			expect(await Promise.all(cascadeRuns.map((row) => service.getWorkflowRunById(context, row.id)))).toEqual([
+				expect.objectContaining({ name: "cancel-child-runs", clientCodecApplied: false }),
+			]);
 		}));
 });
 
