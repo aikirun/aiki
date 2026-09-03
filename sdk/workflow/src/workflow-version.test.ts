@@ -53,8 +53,6 @@ function createTestWorkflowRun(client: Client, record: WorkflowRunRecord): Workf
 			createTaskExecutionTracker: taskExecutionTracker(handle, client.logger).create,
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
 			hasher: hashInput,
-			codec: client[INTERNAL].codec,
-			clientCodecApplied: record.clientCodecApplied,
 		},
 	};
 }

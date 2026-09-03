@@ -6,7 +6,6 @@ import type { DistributiveOmit } from "@aikirun/lib/object";
 import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
 import type { WorkflowRunStateRequest, WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { ApiClient, Client } from "@aikirun/types/client";
-import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
 	TerminalWorkflowRunState,
@@ -17,12 +16,8 @@ import type {
 import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
+import { type BoundCodec, bindRunCodec } from "./codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
-
-const noopCodec: Codec = {
-	encode: async (payload) => payload,
-	decode: async (payload) => payload,
-};
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
@@ -138,7 +133,7 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 
 	[INTERNAL]: {
 		client: Client<Context>;
-		codec: Codec;
+		codec: BoundCodec;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (
 			request: DistributiveOmit<TaskTransitionStateRequestV1, "workflowRunId" | "expectedWorkflowRunRevision">
@@ -176,7 +171,7 @@ export type WorkflowRunWaitResult<Output, Timed extends boolean, Abortable exten
 			  };
 
 export async function decodeWaitResultState<Output>(
-	codec: Codec,
+	codec: BoundCodec,
 	state: TerminalWorkflowRunState
 ): Promise<WorkflowRunWaitResultSuccess<Output>> {
 	if (state.status !== "completed") {
@@ -205,11 +200,9 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		this.api = client.api;
 		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger);
 
-		const codec = this._run.clientCodecApplied ? client[INTERNAL].codec : noopCodec;
-
 		this[INTERNAL] = {
 			client,
-			codec,
+			codec: bindRunCodec(client, this._run),
 			transitionState: this.transitionState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),

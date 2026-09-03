@@ -11,7 +11,6 @@ import { getRetryParams } from "@aikirun/lib/retry";
 import { createSerializableError } from "@aikirun/lib/serializable";
 import type { WorkflowRunStateAwaitingRetryRequest } from "@aikirun/types/api/workflow-run";
 import type { Client } from "@aikirun/types/client";
-import type { OpaquePayload } from "@aikirun/types/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -34,6 +33,7 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
+import { noopCodec, toBoundCodec } from "./run/codec";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { isWorkflowRunRevisionConflictError, type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
@@ -177,6 +177,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		let input = args[0];
 		const hasher = client[INTERNAL].hasher;
+		const clientCodec = client[INTERNAL].codec;
+		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
 		const schema = this.params.schema?.input;
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(input);
@@ -192,9 +194,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		const { id } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
-			input: (await client[INTERNAL].codec.encode(input)) as OpaquePayload,
+			input: await codec.encode(input),
 			inputHash,
-			clientCodecApplied: client[INTERNAL].clientCodecApplied,
+			clientCodecApplied: clientCodec !== undefined,
 			options: startOptions,
 		});
 
@@ -277,9 +279,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			const response = await client.api.workflowRun.createV1({
 				name: this.name,
 				versionId: this.versionId,
-				input: (await parentRun[INTERNAL].codec.encode(input)) as OpaquePayload,
+				input: await parentRunHandle[INTERNAL].codec.encode(input),
 				inputHash,
-				clientCodecApplied: parentRun[INTERNAL].clientCodecApplied,
+				clientCodecApplied: parentRunHandle.run.clientCodecApplied,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
 				options: {
 					...startOptions,
@@ -362,7 +364,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 	private async handler(run: WorkflowRun<Context, TEvents>, input: Input): Promise<void> {
 		const { logger } = run;
-		const { assertExecutionAllowed, transitionState } = run[INTERNAL].handle[INTERNAL];
+		const { assertExecutionAllowed, codec, transitionState } = run[INTERNAL].handle[INTERNAL];
 
 		assertExecutionAllowed();
 
@@ -373,7 +375,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		const output = await this.tryExecuteWorkflow(input, run, retryStrategy);
 
-		await transitionState({ status: "completed", output: (await run[INTERNAL].codec.encode(output)) as OpaquePayload });
+		await transitionState({ status: "completed", output: await codec.encode(output) });
 		logger.info("Workflow complete");
 	}
 

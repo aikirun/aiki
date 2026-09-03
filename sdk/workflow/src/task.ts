@@ -13,8 +13,6 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Serializable } from "@aikirun/lib/serializable";
 import { createSerializableError } from "@aikirun/lib/serializable";
-import type { Codec } from "@aikirun/types/infra/codec";
-import type { OpaquePayload } from "@aikirun/types/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { UnconsumedManifestEntries, WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
@@ -146,7 +144,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	): Promise<Output> {
 		const {
 			logger,
-			[INTERNAL]: { handle, hasher, codec, replayManifest, configProvider },
+			[INTERNAL]: { handle, hasher, replayManifest, configProvider },
 		} = run;
 
 		handle[INTERNAL].assertExecutionAllowed();
@@ -164,15 +162,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		if (replayManifest.hasUnconsumedEntries()) {
 			const existingTaskInfo = replayManifest.consumeNextTask(address);
 			if (existingTaskInfo) {
-				return this.getExistingTaskResult(
-					handle,
-					executionTracker,
-					input,
-					existingTaskInfo,
-					codec,
-					configProvider,
-					logger
-				);
+				return this.getExistingTaskResult(handle, executionTracker, input, existingTaskInfo, configProvider, logger);
 			}
 
 			await this.throwNonDeterminismError(handle, inputHash, replayManifest.getUnconsumedEntries(), logger);
@@ -185,7 +175,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			type: "create",
 			taskName: this.name,
 			options: startOptions,
-			input: (await codec.encode(input)) as OpaquePayload,
+			input: await handle[INTERNAL].codec.encode(input),
 			inputHash,
 		});
 
@@ -210,7 +200,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output: (await codec.encode(output)) as OpaquePayload },
+			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
 		});
 		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
 
@@ -222,14 +212,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		executionTracker: TaskExecutionTracker,
 		input: Input,
 		existingTaskInfo: TaskInfo,
-		codec: Codec,
 		configProvider: ConfigProvider<WorkflowExecutionConfig>,
 		logger: Logger
 	) {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return (await codec.decode(existingTaskState.output)) as Output;
+			return (await handle[INTERNAL].codec.decode(existingTaskState.output)) as Output;
 		}
 
 		if (existingTaskState.status === "failed") {
@@ -270,7 +259,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			existingTaskInfo.id,
 			retryStrategy,
 			attempts,
-			codec,
 			configProvider,
 			logger
 		);
@@ -283,7 +271,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		taskId: string,
 		retryStrategy: RetryStrategy,
 		previousAttempts: number,
-		codec: Codec,
 		configProvider: ConfigProvider<WorkflowExecutionConfig>,
 		logger: Logger
 	): Promise<Output> {
@@ -315,7 +302,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output: (await codec.encode(output)) as OpaquePayload },
+			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
 		});
 		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
 

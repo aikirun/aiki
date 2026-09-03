@@ -5,6 +5,7 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
+	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -125,8 +126,6 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 					createTaskExecutionTracker,
 					configProvider,
 					hasher,
-					codec,
-					clientCodecApplied: workflowRun.clientCodecApplied,
 				},
 			},
 			await codec.decode(workflowRun.input)
@@ -134,6 +133,11 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 		return true;
 	} catch (err) {
+		if (err instanceof ClientCodecMissingError) {
+			logger.error("The workflow run  expects a client codec, but none present", { err });
+			return false;
+		}
+
 		if (
 			err instanceof WorkflowRunNotExecutableError ||
 			err instanceof WorkflowRunSuspendedError ||

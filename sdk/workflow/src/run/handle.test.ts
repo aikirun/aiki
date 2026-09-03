@@ -7,9 +7,11 @@ import {
 import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { TransitionTaskStateToRunningCreate } from "@aikirun/types/api/task";
+import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecMissingError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
@@ -27,6 +29,44 @@ describe("workflowRunHandle", () => {
 				const handle = workflowRunHandle(client, record);
 
 				expect(handle.run).toEqual(record);
+			}));
+
+		test("binds the client's codec for a run that expects it", () =>
+			withFakeClient(async (client) => {
+				const codec: Codec = {
+					encode: async (payload) => ({ marked: payload }),
+					decode: async (payload) => ({ unmarked: payload }),
+				};
+				client[INTERNAL].codec = codec;
+				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+
+				const handle = workflowRunHandle(client, record);
+
+				const payload = { value: 1 };
+				expect(await handle[INTERNAL].codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
+				expect(await handle[INTERNAL].codec.decode(asOpaquePayload(payload))).toEqual({ unmarked: payload });
+			}));
+
+		test("binds a passthrough codec for a run that doesn't expect a client codec", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async (payload) => ({ marked: payload }),
+					decode: async (payload) => payload,
+				};
+				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
+
+				const handle = workflowRunHandle(client, record);
+
+				const payload = { value: 1 };
+				expect(await handle[INTERNAL].codec.encode(payload)).toBe(asOpaquePayload(payload));
+				expect(await handle[INTERNAL].codec.decode(asOpaquePayload(payload))).toBe(payload);
+			}));
+
+		test("throws ClientCodecMissingError for a run that expects a client codec but non is present", () =>
+			withFakeClient((client) => {
+				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+
+				expect(() => workflowRunHandle(client, record)).toThrow(ClientCodecMissingError);
 			}));
 
 		test("the id overload fetches the run via getByIdV1", () =>

@@ -1,7 +1,6 @@
 import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Duration } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
-import type { Codec } from "@aikirun/types/infra/codec";
 import type { BoundHasher } from "@aikirun/types/infra/hasher";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -27,7 +26,5 @@ export interface WorkflowRun<Context, TEvents extends EventsDefinition = EventsD
 		createTaskExecutionTracker: CreateTaskExecutionTracker;
 		configProvider: ConfigProvider<WorkflowExecutionConfig>;
 		hasher: BoundHasher;
-		codec: Codec;
-		clientCodecApplied: boolean;
 	};
 }

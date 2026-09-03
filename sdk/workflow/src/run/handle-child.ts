@@ -25,11 +25,7 @@ export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDe
 	logger: Logger,
 	eventsDefinition?: TEvents
 ): ChildWorkflowRunHandle<Output, Context, TEvents> {
-	const handle = workflowRunHandle(client, run, eventsDefinition, logger) as WorkflowRunHandle<
-		Output,
-		Context,
-		TEvents
-	>;
+	const handle = workflowRunHandle<Output, Context, TEvents>(client, run, eventsDefinition, logger);
 
 	return {
 		run: handle.run,

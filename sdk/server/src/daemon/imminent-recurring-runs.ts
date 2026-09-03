@@ -5,7 +5,6 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { OpaquePayload } from "@aikirun/types/payload";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
 import {
 	NON_TERMINAL_WORKFLOW_RUN_STATUSES,
@@ -39,7 +38,6 @@ export interface ProcessImminentRecurringRunsDeps {
 export type DueSchedule = Schedule & {
 	workflowId: string;
 	namespaceId: NamespaceId;
-	workflowRunInput: OpaquePayload | null;
 	workflowRunInputHash: string;
 	clientCodecApplied: boolean;
 };
@@ -68,7 +66,6 @@ export async function processImminentRecurringRuns(
 			...scheduleRowToDomain(schedule, workflow),
 			workflowId: schedule.workflowId,
 			namespaceId: schedule.namespaceId as NamespaceId,
-			workflowRunInput: schedule.workflowRunInput,
 			workflowRunInputHash: schedule.workflowRunInputHash,
 			clientCodecApplied: schedule.clientCodecApplied,
 		}));

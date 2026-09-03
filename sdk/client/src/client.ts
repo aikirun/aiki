@@ -1,17 +1,11 @@
 import { plainHasher } from "@aikirun/lib/crypto";
 import { createConsoleLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client, ClientParams, EmbeddedClientParams, RemoteClientParams } from "@aikirun/types/client";
-import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
 const EMBEDDED_BASE_URL = "aiki://embedded/api";
-
-const noopCodec: Codec = {
-	encode: async (payload) => payload,
-	decode: async (payload) => payload,
-};
 
 /**
  * Creates an Aiki client.
@@ -43,7 +37,7 @@ export function client<Context = null>(params: EmbeddedClientParams<Context>): C
 export function client<Context = null>(params: ClientParams<Context>): Client<Context> {
 	const logger = params.logger ?? createConsoleLogger();
 	const hasher = params.hasher?.({ logger }) ?? plainHasher;
-	const codec = params.codec?.({ logger }) ?? noopCodec;
+	const codec = params.codec?.({ logger });
 
 	const rpcLink = isEmbeddedParams(params)
 		? new RPCLink({
@@ -75,7 +69,6 @@ export function client<Context = null>(params: ClientParams<Context>): Client<Co
 			context: params.context,
 			hasher,
 			codec,
-			clientCodecApplied: params.codec !== undefined,
 		},
 	};
 }

@@ -6,7 +6,6 @@ import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import { awaitingRetryTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
-import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
@@ -257,15 +256,15 @@ describe("executeWorkflowRun", () => {
 			expect(capturedInput).toEqual(decodedInput);
 		}));
 
-	test("passes the client's codec on the run", () =>
+	test("returns false when the run was recorded with the client codec applied but the client has none", () =>
 		withFakeClient(async (client) => {
 			const workflowRun = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
-			let capturedCodec: unknown;
-			const workflowVersion = fakeWorkflowVersion(async (run) => {
-				capturedCodec = run[INTERNAL].codec;
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
 			});
 
-			await executeWorkflowRun({
+			const result = await executeWorkflowRun({
 				client,
 				workflowRun,
 				workflowVersion,
@@ -273,32 +272,8 @@ describe("executeWorkflowRun", () => {
 				configProvider,
 			});
 
-			expect(capturedCodec).toBe(client[INTERNAL].codec);
-		}));
-
-	test("binds the noop codec when the run was recorded without the client codec", () =>
-		withFakeClient(async (client) => {
-			client[INTERNAL].codec = {
-				encode: async (payload) => ({ marked: payload }),
-				decode: async (payload) => payload,
-			};
-			const workflowRun = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
-			let capturedCodec: Codec | undefined;
-			const workflowVersion = fakeWorkflowVersion(async (run) => {
-				capturedCodec = run[INTERNAL].codec;
-			});
-
-			await executeWorkflowRun({
-				client,
-				workflowRun,
-				workflowVersion,
-				logger: client.logger,
-				configProvider,
-			});
-
-			const payload = { value: 1 };
-			expect(await capturedCodec?.encode(payload)).toBe(payload);
-			expect(await capturedCodec?.decode(payload)).toBe(payload);
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
 		}));
 
 	test("returns false when no hasher is bound for the run's input hash", () =>

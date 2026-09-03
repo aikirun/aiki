@@ -61,8 +61,6 @@ function createTestWorkflowRun(
 				maxInlineWaitMs: options.maxInlineWaitMs ?? 10,
 			})),
 			hasher: hashInput,
-			codec: client[INTERNAL].codec,
-			clientCodecApplied: record.clientCodecApplied,
 		},
 	};
 }
@@ -138,7 +136,7 @@ describe("task", () => {
 					decode: async (payload) => payload,
 				};
 
-				const runRecord = runningWorkflowRunRecordFactory.build();
+				const runRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 				const run = createTestWorkflowRun(client, runRecord);
 
 				const sendEmail = task({
@@ -584,6 +582,7 @@ describe("task", () => {
 					state: { output: encodedOutput },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
+					clientCodecApplied: true,
 					tasks: { [address]: [recordedTask] },
 				});
 				const run = createTestWorkflowRun(client, runRecord);

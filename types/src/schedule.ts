@@ -1,3 +1,4 @@
+import type { OpaquePayload } from "./payload";
 import type { WorkflowSource } from "./workflow";
 import type { WorkflowRunOptions } from "./workflow/run";
 
@@ -49,7 +50,7 @@ export interface Schedule {
 	workflowVersionId: string;
 	status: ScheduleStatus;
 	spec: ScheduleSpec;
-	workflowRunInput?: unknown;
+	workflowRunInput?: OpaquePayload;
 	referenceId?: string;
 	workflowRunOptions?: WorkflowRunOptions;
 	createdAt: number;

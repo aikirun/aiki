@@ -12,7 +12,6 @@ import type {
 	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateAwaitingTaskRetry,
 	WorkflowRunStateCancelled,
-	WorkflowRunStateCompleted,
 	WorkflowRunStatePaused,
 	WorkflowRunStateScheduled,
 	WorkflowRunStateSleeping,
@@ -145,8 +144,6 @@ export type WorkflowRunStateAwaitingChildWorkflowRequest = Omit<WorkflowRunState
 	timeoutInMs?: number;
 };
 
-export type WorkflowRunStateCompletedRequest = WorkflowRunStateCompleted;
-
 export type WorkflowRunStateRequest =
 	| Exclude<
 			WorkflowRunState,
@@ -157,8 +154,7 @@ export type WorkflowRunStateRequest =
 					| "awaiting_event"
 					| "awaiting_retry"
 					| "awaiting_task_retry"
-					| "awaiting_child_workflow"
-					| "completed";
+					| "awaiting_child_workflow";
 			}
 	  >
 	| WorkflowRunStateScheduledRequest
@@ -166,8 +162,7 @@ export type WorkflowRunStateRequest =
 	| WorkflowRunStateAwaitingEventRequest
 	| WorkflowRunStateAwaitingRetryRequest
 	| WorkflowRunStateAwaitingTaskRetryRequest
-	| WorkflowRunStateAwaitingChildWorkflowRequest
-	| WorkflowRunStateCompletedRequest;
+	| WorkflowRunStateAwaitingChildWorkflowRequest;
 
 type WorkflowRunStateRequestOptimistic = Exclude<WorkflowRunStateRequest, WorkflowRunStateRequestPessimistic>;
 

@@ -437,7 +437,7 @@ export function scheduleRowToDomain(
 		workflowVersionId: workflow.workflowVersionId,
 		status: schedule.status,
 		spec,
-		workflowRunInput: schedule.workflowRunInput,
+		workflowRunInput: schedule.workflowRunInput ?? undefined,
 		referenceId: schedule.referenceId ?? undefined,
 		workflowRunOptions: schedule.workflowRunOptions ?? undefined,
 		createdAt: schedule.createdAt,

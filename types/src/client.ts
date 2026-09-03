@@ -32,8 +32,7 @@ export interface Client<Context = null> {
 	[INTERNAL]: {
 		context?: (run: WorkflowRunRecord) => Context | Promise<Context>;
 		hasher: Hasher;
-		codec: Codec;
-		clientCodecApplied: boolean;
+		codec?: Codec;
 	};
 }
 

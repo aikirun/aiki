@@ -88,7 +88,6 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 				namespaceId: parentRun.namespaceId,
 				workflowId: workflow.id,
 				status: "scheduled",
-				// The server authors this run's input itself, so it stores it as-is.
 				clientCodecApplied: false,
 				input: parentRun.id as unknown as OpaquePayload,
 				inputHash,

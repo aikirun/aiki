@@ -46,10 +46,8 @@ export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | 
 export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
 	id: string;
 	attempts: number;
-	state: TaskStateCompletedRequest;
+	state: TaskStateCompleted;
 }
-
-export type TaskStateCompletedRequest = TaskStateCompleted;
 
 export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
 	id: string;
