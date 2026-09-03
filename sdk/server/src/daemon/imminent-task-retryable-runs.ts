@@ -1,4 +1,3 @@
-import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { asNonEmptyArray, chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
@@ -14,74 +13,47 @@ import type { WorkflowRow } from "../infra/db/types/workflow";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
 import { runConcurrently } from "../lib/concurrency";
-import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
-import { computeRank, type Ranked } from "../lib/rank";
+import type { Ranked } from "../lib/rank";
+import { streamTimers } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 
-export interface ProcessImminentRetryableTasksDeps {
+export interface ProcessImminentTaskRetryableRunsDeps {
 	repos: Repositories;
 	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
 }
 
-interface RetryableTask {
-	workflowRunId: string;
-	dueAt: TimestampMs;
-}
-
-const advanceTaskCursor = createKeysetStreamCursorAdvancer<RetryableTask>({
-	getOrder: (entry) => entry.dueAt,
-	getId: (entry) => entry.workflowRunId,
-});
-
-export async function processImminentRetryableTasks(
+export async function processImminentTaskRetryableRuns(
 	context: DaemonContext,
-	{ repos, publisher, timerPriorityQueue }: ProcessImminentRetryableTasksDeps,
+	{ repos, publisher, timerPriorityQueue }: ProcessImminentTaskRetryableRunsDeps,
 	config: { limit: number; lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
 	const { limit, lookaheadWindowMs, republishBackoff } = config;
 	const dueBefore = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
-	let now = Date.now();
-	for await (const tasks of streamChunks((cursor) => repos.task.listRetryableTasks(context, dueBefore, limit, cursor), {
-		advanceCursor: advanceTaskCursor,
-		until: (chunk) => chunk.length < limit,
-	})) {
-		const runIds = asNonEmptyArray(tasks.map((task) => task.workflowRunId));
-		const runs = await repos.workflowRun.listByIdsAndStatus(context, runIds, "running");
-		const runsById = new Map(runs.map((run) => [run.id, run]));
-
-		const rankedRuns: Ranked<WorkflowRunMeta>[] = [];
-		const timers: TimerEntry[] = [];
-		for (const { workflowRunId, dueAt } of tasks) {
-			const run = runsById.get(workflowRunId);
-			if (!run) {
-				continue;
-			}
-			const rank = computeRank({ dueAt, priority: run.options?.priority });
-			if (dueAt <= now) {
-				rankedRuns.push({ ...run, rank });
-			} else {
-				timers.push({ type: "task_retry", id: workflowRunId, rank });
-			}
+	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
+		(cursor) => repos.workflowRun.listTaskRetryableRuns(context, dueBefore, limit, cursor),
+		{ until: (chunk) => chunk.length < limit }
+	)) {
+		if (isNonEmptyArray(runsDueNow)) {
+			await queueTaskRetryableRuns(context, repos, publisher, republishBackoff, runsDueNow);
 		}
 
-		if (isNonEmptyArray(rankedRuns)) {
-			await queueRetryableTasks(context, repos, publisher, republishBackoff, rankedRuns);
-		}
-
-		if (timerPriorityQueue && isNonEmptyArray(timers)) {
-			const result = await timerPriorityQueue.add(timers);
+		if (timerPriorityQueue && isNonEmptyArray(runsDueSoon)) {
+			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
+				type: "task_retry",
+				id: run.id,
+				rank: run.rank,
+			}));
+			const result = await timerPriorityQueue.add(asNonEmptyArray(timers));
 			if (result.status === "failed") {
 				context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
 			}
 		}
-
-		now = Date.now();
 	}
 }
 
-export async function queueRetryableTasks(
+export async function queueTaskRetryableRuns(
 	context: DaemonContext,
 	repos: Repositories,
 	publisher: Publisher | undefined,
@@ -183,7 +155,11 @@ async function transitionToQueuedInTx(
 	txRepos: TxRepositories
 ): Promise<WorkflowRunOutboxRowInsertPending[]> {
 	const { workflowRunUpdates, stateTransitionEntries, outboxEntries } = entries;
-	const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(context, "running", workflowRunUpdates);
+	const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
+		context,
+		"awaiting_task_retry",
+		workflowRunUpdates
+	);
 	if (!isNonEmptyArray(transitionedRunIds)) {
 		return [];
 	}

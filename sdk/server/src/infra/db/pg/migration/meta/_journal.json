@@ -218,6 +218,20 @@
 			"when": 1788107063950,
 			"tag": "0031_windy_karen_page",
 			"breakpoints": true
+		},
+		{
+			"idx": 32,
+			"version": "7",
+			"when": 1788366628670,
+			"tag": "0032_noisy_husk",
+			"breakpoints": true
+		},
+		{
+			"idx": 33,
+			"version": "7",
+			"when": 1788367183719,
+			"tag": "0033_right_texas_twister",
+			"breakpoints": true
 		}
 	]
 }

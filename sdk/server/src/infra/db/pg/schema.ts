@@ -227,9 +227,6 @@ export const task = pgTable(
 		}),
 		index("idx_task_workflow_run_id").on(table.workflowRunId, table.id),
 		index("idx_task_workflow_run_status").on(table.workflowRunId, table.status),
-		index("idx_task_due_awaiting_retry")
-			.on(table.nextAttemptAt, table.workflowRunId)
-			.where(sql`${table.status} = 'awaiting_retry'`),
 	]
 );
 

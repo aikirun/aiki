@@ -2,7 +2,9 @@ import { hashInput } from "@aikirun/lib/crypto";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 
 import { type SeedRunDeps, type SeedRunOverrides, seedClaimedRun } from "./run";
+import { createChildRunCanceller } from "../../service/cancel-child-runs";
 import { createTaskStateMachine } from "../../service/state-machine/task";
+import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
 import { withFakeClock } from "../clock";
 import { namespaceRequestContextFactory } from "../data-factory/middleware/context";
 
@@ -30,6 +32,7 @@ export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePubli
 	return { ...seeded, taskInfo, taskInput: seededTask.input };
 }
 
+/** An `awaiting_retry` task on a run that has not parked yet — the state between a task park and the run park. */
 export async function seedAwaitingRetryTask(
 	deps: SeedRunDeps & { publisher: FakePublisher },
 	params: { nextAttemptAt: number },
@@ -99,6 +102,34 @@ export async function seedSiblingAwaitingRetryTasks(
 	);
 
 	return { ...seeded, siblingTaskInfo, siblingNextAttemptAt: params.siblingNextAttemptAt };
+}
+
+/** A run parked as `awaiting_task_retry`, with one `awaiting_retry` task carrying the deadline. */
+export async function seedAwaitingTaskRetryRun(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params: { nextAttemptAt: number },
+	overrides?: SeedRunOverrides
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedAwaitingRetryTask(
+		{ ...deps, namespaceRequestContext },
+		{ nextAttemptAt: params.nextAttemptAt },
+		overrides
+	);
+
+	const workflowRunStateMachine = createWorkflowRunStateMachine({
+		repos,
+		childRunCanceller: createChildRunCanceller(),
+	});
+	const parked = await workflowRunStateMachine.transitionState(namespaceRequestContext, {
+		type: "optimistic",
+		id: seeded.runId,
+		state: { status: "awaiting_task_retry" },
+		expectedRevision: seeded.revisionWhenClaimed,
+	});
+
+	return { ...seeded, revisionWhenParked: parked.revision };
 }
 
 export async function seedCompletedTask(
