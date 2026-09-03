@@ -39,6 +39,7 @@ export type DueSchedule = Schedule & {
 	workflowId: string;
 	namespaceId: NamespaceId;
 	workflowRunInputHash: string;
+	clientCodecApplied: boolean;
 };
 
 const advanceScheduleCursor = createKeysetStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: TimestampMs } }>({
@@ -66,6 +67,7 @@ export async function processImminentRecurringRuns(
 			workflowId: schedule.workflowId,
 			namespaceId: schedule.namespaceId as NamespaceId,
 			workflowRunInputHash: schedule.workflowRunInputHash,
+			clientCodecApplied: schedule.clientCodecApplied,
 		}));
 
 		const now = Date.now();
@@ -166,7 +168,7 @@ async function processOverlapAllowSchedules(
 				workflowId: schedule.workflowId,
 				scheduleId: schedule.id,
 				status: "queued",
-				clientCodec: "none",
+				clientCodecApplied: schedule.clientCodecApplied,
 				input: schedule.workflowRunInput,
 				inputHash: schedule.workflowRunInputHash,
 				options: schedule.workflowRunOptions,
@@ -274,14 +276,13 @@ async function processOverlapSkipSchedules(
 		const stateTransitionId = ulid();
 		const referenceId = getReferenceId(schedule.id, occurrence);
 
-		// TODO: check if decoded/hashing needed here?
 		workflowRunEntries.push({
 			id: runId,
 			namespaceId: schedule.namespaceId,
 			workflowId: schedule.workflowId,
 			scheduleId: schedule.id,
 			status: "queued",
-			clientCodec: "none",
+			clientCodecApplied: schedule.clientCodecApplied,
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,
@@ -405,7 +406,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowId: schedule.workflowId,
 			scheduleId: schedule.id,
 			status: "queued",
-			clientCodec: "none",
+			clientCodecApplied: schedule.clientCodecApplied,
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,

@@ -18,19 +18,14 @@ import {
 	workflowRunHandle,
 } from "./handle";
 
-export function childWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
+export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
 	run: WorkflowRunRecord,
-	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
+	parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 	logger: Logger,
 	eventsDefinition?: TEvents
-): ChildWorkflowRunHandle<Input, Output, Context, TEvents> {
-	const handle = workflowRunHandle(client, run, eventsDefinition, logger) as WorkflowRunHandle<
-		Input,
-		Output,
-		Context,
-		TEvents
-	>;
+): ChildWorkflowRunHandle<Output, Context, TEvents> {
+	const handle = workflowRunHandle<Output, Context, TEvents>(client, run, eventsDefinition, logger);
 
 	return {
 		run: handle.run,
@@ -45,8 +40,8 @@ export function childWorkflowRunHandle<Input, Output, Context, TEvents extends E
 	};
 }
 
-export type ChildWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> = Omit<
-	WorkflowRunHandle<Input, Output, Context, TEvents>,
+export type ChildWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition> = Omit<
+	WorkflowRunHandle<Output, Context, TEvents>,
 	"wait"
 > & {
 	/**
@@ -102,9 +97,9 @@ export type ChildWorkflowRunWaitResult<Output, Timed extends boolean> = Timed ex
 			state: WorkflowRunWaitResultSuccess<Output>;
 		};
 
-function createWaiter<Input, Output, Context, TEvents extends EventsDefinition>(
-	handle: WorkflowRunHandle<Input, Output, Context, TEvents>,
-	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
+function createWaiter<Output, Context, TEvents extends EventsDefinition>(
+	handle: WorkflowRunHandle<Output, Context, TEvents>,
+	parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 	logger: Logger
 ) {
 	let nextTimeoutIndex = 0;

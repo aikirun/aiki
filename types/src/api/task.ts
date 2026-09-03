@@ -1,6 +1,4 @@
-import type { OptionalProp } from "@aikirun/lib/object";
-
-import type { ClientCodec } from "../workflow";
+import type { OpaquePayload } from "../payload";
 import type {
 	TaskInfo,
 	TaskRecord,
@@ -33,9 +31,8 @@ export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateB
 	type: "create";
 	taskName: string;
 	options?: TaskStartOptions;
-	input?: unknown;
+	input?: OpaquePayload;
 	inputHash: string;
-	clientCodec: ClientCodec;
 }
 
 export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
@@ -49,10 +46,8 @@ export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | 
 export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
 	id: string;
 	attempts: number;
-	state: TaskStateCompletedRequest;
+	state: TaskStateCompleted;
 }
-
-export type TaskStateCompletedRequest = OptionalProp<TaskStateCompleted<unknown>, "output">;
 
 export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
 	id: string;
@@ -83,5 +78,5 @@ export interface TaskTransitionStateResponseV1 {
 export interface TaskSetStateRequestV1 {
 	id: string;
 	workflowRunId: string;
-	state: TaskStateCompleted<unknown> | TaskStateFailed;
+	state: TaskStateCompleted | TaskStateFailed;
 }

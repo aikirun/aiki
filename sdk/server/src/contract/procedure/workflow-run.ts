@@ -34,12 +34,12 @@ import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 import { inputHashSchema } from "../schema/hash";
+import { opaquePayloadSchema } from "../schema/payload";
 import { stateTransitionSchema } from "../schema/state-transition";
 import { workflowSourceSchema } from "../schema/workflow";
 import {
 	cancelByIdsRequestSchema,
 	cancelByIdsResponseSchema,
-	encodedPayloadSchema,
 	listChildRunsRequestSchema,
 	listChildRunsResponseSchema,
 	multicastEventResponseSchema,
@@ -160,9 +160,9 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 		type({
 			name: "string > 0",
 			versionId: "string > 0",
-			input: encodedPayloadSchema,
+			"input?": opaquePayloadSchema,
 			inputHash: inputHashSchema,
-			clientCodec: "'applied' | 'none'",
+			clientCodecApplied: "boolean",
 			"parent?": type({ workflowRunId: "string > 0", expectedRevision: "number.integer >= 0" }).or("undefined"),
 			"options?": workflowStartOptionsSchema,
 		})
@@ -191,7 +191,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 								workflowRunStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" })
 							)
 							.or(workflowRunStateAwaitingTaskRetrySchema.omit("nextAttemptAt"))
-							.or(workflowRunStateCompletedSchema)
+							.or(workflowRunStateCompletedSchema.omit("output").and({ "output?": opaquePayloadSchema }))
 							.or(workflowRunStateFailedSchema),
 					}).or({
 						expectedSignalSequence: "number.integer >= 0",

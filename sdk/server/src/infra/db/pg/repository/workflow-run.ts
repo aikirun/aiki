@@ -71,7 +71,7 @@ export type WorkflowRunWithWorkflowAndState = {
 		| "latestStateTransitionId"
 		| "input"
 		| "inputHash"
-		| "clientCodec"
+		| "clientCodecApplied"
 		| "referenceId"
 		| "options"
 		| "parentWorkflowRunId"
@@ -279,7 +279,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
 					input: workflowRun.input,
 					inputHash: workflowRun.inputHash,
-					clientCodec: workflowRun.clientCodec,
+					clientCodecApplied: workflowRun.clientCodecApplied,
 					referenceId: workflowRun.referenceId,
 					options: workflowRun.options,
 					parentWorkflowRunId: workflowRun.parentWorkflowRunId,
@@ -319,7 +319,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 					latestStateTransitionId: workflowRun.latestStateTransitionId,
 					input: workflowRun.input,
 					inputHash: workflowRun.inputHash,
-					clientCodec: workflowRun.clientCodec,
+					clientCodecApplied: workflowRun.clientCodecApplied,
 					referenceId: workflowRun.referenceId,
 					options: workflowRun.options,
 					parentWorkflowRunId: workflowRun.parentWorkflowRunId,

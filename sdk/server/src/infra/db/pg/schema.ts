@@ -1,7 +1,7 @@
+import type { OpaquePayload } from "@aikirun/types/payload";
 import { SCHEDULE_OVERLAP_POLICIES, SCHEDULE_STATUSES, SCHEDULE_TYPES } from "@aikirun/types/schedule";
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
-	CLIENT_CODECS,
 	EVENT_WAIT_STATUSES,
 	SLEEP_STATUSES,
 	TERMINAL_WORKFLOW_RUN_STATUSES,
@@ -12,6 +12,7 @@ import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition
 import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
 import { relations, sql } from "drizzle-orm";
 import {
+	boolean,
 	check,
 	doublePrecision,
 	foreignKey,
@@ -36,7 +37,6 @@ export const scheduleOverlapPolicyEnum = pgEnum("schedule_overlap_policy", SCHED
 
 export const workflowRunStatusEnum = pgEnum("workflow_run_status", WORKFLOW_RUN_STATUSES);
 export const terminalWorkflowRunStatusEnum = pgEnum("terminal_workflow_run_status", TERMINAL_WORKFLOW_RUN_STATUSES);
-export const clientCodecEnum = pgEnum("client_codec", CLIENT_CODECS);
 
 export const taskStatusEnum = pgEnum("task_status", TASK_STATUSES);
 
@@ -79,7 +79,7 @@ export const schedule = pgTable(
 		workflowId: text("workflow_id").notNull(),
 
 		status: scheduleStatusEnum("status").notNull(),
-		clientCodec: clientCodecEnum("client_codec").notNull(),
+		clientCodecApplied: boolean("client_codec_applied").notNull(),
 
 		type: scheduleTypeEnum("type").notNull(),
 		cronExpression: text("cron_expression"),
@@ -87,7 +87,7 @@ export const schedule = pgTable(
 		intervalMs: integer("interval_ms"),
 		overlapPolicy: scheduleOverlapPolicyEnum("overlap_policy"),
 
-		workflowRunInput: jsonb("workflow_run_input"),
+		workflowRunInput: jsonb("workflow_run_input").$type<OpaquePayload>(),
 		workflowRunInputHash: text("workflow_run_input_hash").notNull(),
 
 		definitionHash: text("definition_hash").notNull(),
@@ -130,12 +130,12 @@ export const workflowRun = pgTable(
 		parentWorkflowRunId: text("parent_workflow_run_id"),
 
 		status: workflowRunStatusEnum("status").notNull(),
-		clientCodec: clientCodecEnum("client_codec").notNull(),
+		clientCodecApplied: boolean("client_codec_applied").notNull(),
 		revision: integer("revision").notNull().default(0),
 		signalSequence: integer("signal_sequence").notNull().default(0),
 		attempts: integer("attempts").notNull().default(1),
 
-		input: jsonb("input"),
+		input: jsonb("input").$type<OpaquePayload>(),
 		inputHash: text("input_hash").notNull(),
 		options: jsonb("options").$type<WorkflowRunOptions>(),
 
@@ -211,10 +211,9 @@ export const task = pgTable(
 		workflowRunId: text("workflow_run_id").notNull(),
 
 		status: taskStatusEnum("status").notNull(),
-		clientCodec: clientCodecEnum("client_codec").notNull(),
 		attempts: integer("attempts").notNull(),
 
-		input: jsonb("input"),
+		input: jsonb("input").$type<OpaquePayload>(),
 		inputHash: text("input_hash").notNull(),
 		options: jsonb("options").$type<TaskStartOptions>(),
 

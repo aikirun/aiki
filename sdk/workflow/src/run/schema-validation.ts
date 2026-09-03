@@ -6,7 +6,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRunHandle } from "./handle";
 
-type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
+type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown>;
 
 /**
  * Validates data against a schema inside a running workflow. Schema issues

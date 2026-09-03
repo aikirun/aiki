@@ -37,12 +37,10 @@ export const failedTaskInfoFactory = Factory.define<TaskInfo & { state: TaskStat
 	state: { status: "failed", error: { name: "Error", message: "task failed" } },
 }));
 
-export const completedTaskInfoFactory = Factory.define<TaskInfo & { state: TaskStateCompleted<unknown> }>(
-	({ sequence }) => ({
-		id: `task-${sequence}`,
-		name: "task",
-		inputHash: "hash",
-		attempts: 1,
-		state: { status: "completed", output: undefined },
-	})
-);
+export const completedTaskInfoFactory = Factory.define<TaskInfo & { state: TaskStateCompleted }>(({ sequence }) => ({
+	id: `task-${sequence}`,
+	name: "task",
+	inputHash: "hash",
+	attempts: 1,
+	state: { status: "completed", output: undefined },
+}));

@@ -3,6 +3,7 @@ import { hashInput } from "@aikirun/lib/crypto";
 import type { Logger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OpaquePayload } from "@aikirun/types/payload";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	NON_TERMINAL_WORKFLOW_RUN_STATUSES,
@@ -87,8 +88,8 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 				namespaceId: parentRun.namespaceId,
 				workflowId: workflow.id,
 				status: "scheduled",
-				clientCodec: "none",
-				input: parentRun.id,
+				clientCodecApplied: false,
+				input: parentRun.id as unknown as OpaquePayload,
 				inputHash,
 				options: {
 					pool: parentRun.pool,

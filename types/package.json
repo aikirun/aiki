@@ -60,6 +60,10 @@
 			"types": "./dist/organization.d.ts",
 			"import": "./dist/organization.js"
 		},
+		"./payload": {
+			"types": "./dist/payload.d.ts",
+			"import": "./dist/payload.js"
+		},
 		"./schedule": {
 			"types": "./dist/schedule.d.ts",
 			"import": "./dist/schedule.js"

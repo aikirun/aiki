@@ -1,6 +1,8 @@
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { SerializableError } from "@aikirun/lib/serializable";
 
+import type { OpaquePayload } from "../../payload";
+
 export type TaskId = string & { _brand: "task_id" };
 
 export type TaskName = string & { _brand: "task_name" };
@@ -26,9 +28,9 @@ export interface TaskStateAwaitingRetry {
 	nextAttemptAt: number;
 }
 
-export interface TaskStateCompleted<Output> {
+export interface TaskStateCompleted {
 	status: "completed";
-	output: Output;
+	output?: OpaquePayload;
 }
 
 export interface TaskStateFailed {
@@ -40,10 +42,10 @@ export interface TaskStateDiscarded {
 	status: "discarded";
 }
 
-export type TaskState<Output = unknown> =
+export type TaskState =
 	| TaskStateRunning
 	| TaskStateAwaitingRetry
-	| TaskStateCompleted<Output>
+	| TaskStateCompleted
 	| TaskStateFailed
 	| TaskStateDiscarded;
 
@@ -56,13 +58,13 @@ export interface TaskInfo {
 	state: Exclude<TaskState, TaskStateDiscarded>;
 }
 
-export interface TaskRecord<Input = unknown, Output = unknown> {
+export interface TaskRecord {
 	id: string;
 	name: string;
 	workflowRunId: string;
-	input?: Input;
+	input?: OpaquePayload;
 	inputHash: string;
 	options?: TaskStartOptions;
 	attempts: number;
-	state: TaskState<Output>;
+	state: TaskState;
 }

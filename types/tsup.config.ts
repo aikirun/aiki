@@ -16,6 +16,7 @@ export default defineConfig({
 		"infra/timer": "src/infra/timer.ts",
 		namespace: "src/namespace.ts",
 		organization: "src/organization.ts",
+		payload: "src/payload.ts",
 		schedule: "src/schedule.ts",
 		symbols: "src/symbols.ts",
 		validator: "src/validator.ts",

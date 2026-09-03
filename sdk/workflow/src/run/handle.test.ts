@@ -5,10 +5,12 @@ import {
 	workflowRunStateByStatus,
 } from "@aikirun/testing/data-factory/workflow/run";
 import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { TransitionTaskStateToRunningCreate } from "@aikirun/types/api/task";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecMissingError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
@@ -26,6 +28,13 @@ describe("workflowRunHandle", () => {
 				const handle = workflowRunHandle(client, record);
 
 				expect(handle.run).toEqual(record);
+			}));
+
+		test("throws ClientCodecMissingError for a run that expects a client codec when the client has none", () =>
+			withFakeClient((client) => {
+				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+
+				expect(() => workflowRunHandle(client, record)).toThrow(ClientCodecMissingError);
 			}));
 
 		test("the id overload fetches the run via getByIdV1", () =>
@@ -47,7 +56,7 @@ describe("workflowRunHandle", () => {
 
 				const refreshed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: initial.id }),
-					state: { status: "completed", output: { encodedValue: "done" } },
+					state: { status: "completed", output: asOpaquePayload("done") },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: initial.id }, { run: refreshed });
 
@@ -117,7 +126,6 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
-					clientCodec: "none",
 				};
 				client.api.task.transitionStateV1.once(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
@@ -139,7 +147,6 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
-					clientCodec: "none",
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
@@ -159,7 +166,6 @@ describe("workflowRunHandle", () => {
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
-					clientCodec: "none",
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
@@ -283,7 +289,35 @@ describe("workflowRunHandle", () => {
 				);
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
-					state: { status: "completed", output: { encodedValue: "done" } },
+					state: { status: "completed", output: asOpaquePayload("done") },
+				};
+				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
+
+				const result = await handle.wait();
+
+				expect(result).toEqual({ success: true, state: { status: "completed", output: "done" } });
+			}));
+
+		test("decodes the completed output through the run's codec", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ stored: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual(storedOutput);
+						return "done";
+					},
+				};
+				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0", clientCodecApplied: true });
+				const handle = workflowRunHandle(client, record);
+
+				client.api.workflowRun.hasTerminatedV1.once(
+					{ id: record.id, afterStateTransitionId: "t0" },
+					{ terminated: true, latestStateTransitionId: "t1" }
+				);
+				const completed: WorkflowRunRecord = {
+					...baseWorkflowRunRecordFactory.build({ id: record.id, clientCodecApplied: true }),
+					state: { status: "completed", output: storedOutput },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
@@ -325,7 +359,7 @@ describe("workflowRunHandle", () => {
 					.once({ id: record.id, afterStateTransitionId: "t1" }, { terminated: true, latestStateTransitionId: "t2" });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
-					state: { status: "completed", output: { encodedValue: 42 } },
+					state: { status: "completed", output: asOpaquePayload(42) },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 

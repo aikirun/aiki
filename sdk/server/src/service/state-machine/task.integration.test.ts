@@ -1,4 +1,5 @@
 import { NotFoundError } from "@aikirun/lib/error";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
 import { createTaskStateMachine } from "./task";
@@ -38,7 +39,7 @@ describe("TaskStateMachine transitionState", () => {
 					expectedWorkflowRunRevision: attackerRunSeed.revisionWhenClaimed,
 					id: victimTaskSeed.taskInfo.id,
 					attempts: 2,
-					state: { status: "completed", output: "hijacked" },
+					state: { status: "completed", output: asOpaquePayload("hijacked") },
 				})
 			).rejects.toBeInstanceOf(NotFoundError);
 

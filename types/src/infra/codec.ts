@@ -4,13 +4,9 @@ export interface CodecContext {
 	logger: Logger;
 }
 
-export interface EncodedPayload {
-	encodedValue: unknown;
-}
-
 export type Codec = {
-	encode(payload: unknown): Promise<EncodedPayload>;
-	decode(payload: EncodedPayload): Promise<unknown>;
+	encode(payload: unknown): Promise<unknown>;
+	decode(payload: unknown): Promise<unknown>;
 };
 
 export type CreateCodec = (context: CodecContext) => Codec;

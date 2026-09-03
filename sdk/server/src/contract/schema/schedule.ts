@@ -1,5 +1,6 @@
 import { type } from "arktype";
 
+import { opaquePayloadSchema } from "./payload";
 import { workflowSourceSchema } from "./workflow";
 import { workflowRunOptionsSchema } from "./workflow-run";
 
@@ -44,7 +45,7 @@ export const scheduleSchema = type({
 	workflowSource: workflowSourceSchema,
 	workflowName: "string > 0",
 	workflowVersionId: "string > 0",
-	"workflowRunInput?": "unknown",
+	"workflowRunInput?": opaquePayloadSchema,
 	spec: scheduleSpecSchema,
 	status: scheduleStatusSchema,
 	"referenceId?": "string > 0 | undefined",

@@ -23,7 +23,7 @@ export interface TaskExecutionTracker {
  * `running`; otherwise it does nothing. `flush` never throws.
  */
 export function taskExecutionTracker(
-	handle: WorkflowRunHandle<unknown, unknown, unknown>,
+	handle: WorkflowRunHandle<unknown, unknown>,
 	logger: Logger
 ): {
 	create: CreateTaskExecutionTracker;

@@ -1,5 +1,5 @@
 {
-	"id": "0131203e-9c5f-483c-8492-b2eefb88ca1b",
+	"id": "9d6eb9fa-8378-4985-9884-a030bf6945b9",
 	"prevId": "87295e3c-a782-42e5-878f-a1d5acd38ed6",
 	"version": "7",
 	"dialect": "postgresql",
@@ -307,10 +307,9 @@
 					"primaryKey": false,
 					"notNull": true
 				},
-				"client_codec": {
-					"name": "client_codec",
-					"type": "client_codec",
-					"typeSchema": "public",
+				"client_codec_applied": {
+					"name": "client_codec_applied",
+					"type": "boolean",
 					"primaryKey": false,
 					"notNull": true
 				},
@@ -774,13 +773,6 @@
 					"primaryKey": false,
 					"notNull": true
 				},
-				"client_codec": {
-					"name": "client_codec",
-					"type": "client_codec",
-					"typeSchema": "public",
-					"primaryKey": false,
-					"notNull": true
-				},
 				"attempts": {
 					"name": "attempts",
 					"type": "integer",
@@ -1019,10 +1011,9 @@
 					"primaryKey": false,
 					"notNull": true
 				},
-				"client_codec": {
-					"name": "client_codec",
-					"type": "client_codec",
-					"typeSchema": "public",
+				"client_codec_applied": {
+					"name": "client_codec_applied",
+					"type": "boolean",
 					"primaryKey": false,
 					"notNull": true
 				},
@@ -1726,11 +1717,6 @@
 			"name": "child_workflow_run_wait_status",
 			"schema": "public",
 			"values": ["completed", "timeout"]
-		},
-		"public.client_codec": {
-			"name": "client_codec",
-			"schema": "public",
-			"values": ["applied", "none"]
 		},
 		"public.event_wait_status": {
 			"name": "event_wait_status",

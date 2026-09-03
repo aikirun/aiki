@@ -104,7 +104,6 @@ async function transitionStateInTx(
 			name: taskName,
 			workflowRunId: runId,
 			status: taskState.status,
-			clientCodec: request.clientCodec,
 			attempts,
 			input: request.input,
 			inputHash,

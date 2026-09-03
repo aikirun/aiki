@@ -24,7 +24,7 @@ export const createTaskService = ({ repos }: TaskServiceDeps) => ({
 			id: task.id,
 			name: task.name,
 			workflowRunId: task.workflowRunId,
-			input: task.input,
+			input: task.input ?? undefined,
 			inputHash: task.inputHash,
 			options: task.options !== null ? task.options : undefined,
 			attempts: task.attempts,

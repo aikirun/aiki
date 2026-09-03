@@ -1,6 +1,7 @@
 import { hashInput } from "@aikirun/lib/crypto";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowStartOptions } from "@aikirun/types/workflow/run";
 
 import { defaultServerRuntimeConfig } from "../../config/runtime";
@@ -57,9 +58,9 @@ export async function seedScheduledRun(
 	const runId = await services.workflowRun.createWorkflowRun(namespaceRequestContext, {
 		name: seededWorkflow.name,
 		versionId: seededWorkflow.versionId,
-		input: { encodedValue: input },
+		input: asOpaquePayload(input),
 		inputHash: { value: await hashInput(input) },
-		clientCodec: "none",
+		clientCodecApplied: false,
 		options: overrides?.options,
 		parent: overrides?.parent,
 	});
@@ -135,7 +136,7 @@ export async function completeRun(deps: {
 	const completion = await services.workflowRunStateMachine.transitionState(context, {
 		type: "optimistic",
 		id: runId,
-		state: { status: "completed", output: { encodedValue: seededRunOutput } },
+		state: { status: "completed", output: asOpaquePayload(seededRunOutput) },
 		expectedRevision,
 	});
 
@@ -162,18 +163,17 @@ export async function seedCompletedRun(
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
 
-	const output =
-		overrides && "output" in overrides ? { encodedValue: overrides.output } : { encodedValue: seededRunOutput };
+	const output = overrides && "output" in overrides ? overrides.output : seededRunOutput;
 
 	const services = createServices(repos);
 	await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
 		id: seeded.runId,
-		state: { status: "completed", output },
+		state: { status: "completed", output: asOpaquePayload(output) },
 		expectedRevision: seeded.revisionWhenClaimed,
 	});
 
-	return { ...seeded, runOutput: output.encodedValue };
+	return { ...seeded, runOutput: output };
 }
 
 export async function seedPublishedRun(deps: SeedRunDeps & { publisher: FakePublisher }) {
