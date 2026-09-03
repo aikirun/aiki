@@ -124,7 +124,6 @@ async function processChunk(
 			id: ulid(),
 			parentWorkflowRunId: run.id,
 			childWorkflowRunId: fromState.childWorkflowRunId,
-			childWorkflowRunStatus: fromState.childWorkflowRunStatus,
 			status: "timeout",
 			timedOutAt,
 		});

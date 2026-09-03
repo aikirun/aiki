@@ -7,10 +7,9 @@ import type {
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/api/workflow-run";
 import type {
-	TerminalWorkflowRunStatus,
+	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunId,
 	WorkflowRunState,
-	WorkflowRunStateAwaitingChildWorkflow,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
 import { isTerminalWorkflowRunStatus, WORKFLOW_RUN_SCHEDULED_REASONS } from "@aikirun/types/workflow/run";
@@ -21,6 +20,7 @@ import type { Repositories, TxRepositories } from "../../infra/db/types";
 import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import type { ChildRunCanceller } from "../cancel-child-runs";
+import { deliverTerminatedSignalToParentRun } from "../deliver-terminated-signals";
 import { discardStaleTasks } from "../discard-stale-tasks";
 
 type StateTransitionValidation<Status extends WorkflowRunStatus> =
@@ -51,6 +51,7 @@ const workflowRunStateTransitionValidator: Record<
 		sleeping: true,
 		awaiting_event: true,
 		awaiting_retry: true,
+		awaiting_task_retry: true,
 		awaiting_child_workflow: true,
 		cancelled: true,
 		completed: true,
@@ -74,6 +75,10 @@ const workflowRunStateTransitionValidator: Record<
 		queued: { reason: "retry" },
 		cancelled: true,
 	},
+	awaiting_task_retry: {
+		queued: { reason: "task_retry" },
+		cancelled: true,
+	},
 	awaiting_child_workflow: {
 		scheduled: { reason: "child_workflow" },
 		queued: { reason: "child_workflow_wait_timeout" },
@@ -85,9 +90,7 @@ const workflowRunStateTransitionValidator: Record<
 	},
 	cancelled: {},
 	completed: {},
-	failed: {
-		awaiting_retry: true,
-	},
+	failed: {},
 };
 
 export function assertIsValidWorkflowRunStateTransition(
@@ -177,8 +180,22 @@ async function transitionStateInTx(
 		throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
 	}
 
-	const now = Date.now();
-	let toState = convertDurationToTimestamp(request.state, now);
+	const now = Date.now() as TimestampMs;
+	let toState: WorkflowRunState;
+	if (request.state.status === "awaiting_task_retry") {
+		const nextAttemptAt = await txRepos.task.getEarliestNextAttemptAt(runId);
+		if (nextAttemptAt === null) {
+			throw new InvalidWorkflowRunStateTransitionError(
+				runId,
+				fromState.status,
+				request.state.status,
+				"no task awaiting retry"
+			);
+		}
+		toState = { status: "awaiting_task_retry", nextAttemptAt };
+	} else {
+		toState = convertDurationToTimestamp(request.state, now);
+	}
 
 	if (fromState.status === "sleeping" && (toState.status === "scheduled" || toState.status === "cancelled")) {
 		await cancelSleep(runId, fromState.sleepName, now, txRepos);
@@ -222,13 +239,20 @@ async function transitionStateInTx(
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunId({ namespaceId, workflowRunId: runId });
 	}
 
-	if (toState.status === "awaiting_child_workflow") {
-		if (await childWorkflowRunWaitNotNeeded(context, runId, toState, now, txRepos)) {
-			toState = { status: "scheduled", scheduledAt: now, reason: "child_workflow" };
-		}
-	}
-
 	const stateTransitionId = ulid();
+
+	const updatedRun = await updateWorkflowRun(
+		context,
+		runId,
+		request,
+		toState,
+		stateTransitionId,
+		attempts,
+		now,
+		txRepos
+	);
+	toState = updatedRun.state;
+
 	await txRepos.stateTransition.append({
 		id: stateTransitionId,
 		workflowRunId: runId,
@@ -238,36 +262,43 @@ async function transitionStateInTx(
 		state: toState,
 	});
 
-	const newRevision = await updateWorkflowRun(context, runId, request, toState, stateTransitionId, attempts, txRepos);
-
 	if (imminentRunTimerQueue && toState.status === "scheduled") {
-		txRepos.onCommit(() => imminentRunTimerQueue.add([{ id: runId, scheduledAt: toState.scheduledAt }]));
+		txRepos.onCommit(() =>
+			imminentRunTimerQueue.add([{ id: runId, scheduledAt: toState.scheduledAt, priority: run.options?.priority }])
+		);
 	}
 
 	if (toState.status === "cancelled") {
 		await discardStaleTasks(runId, ["running", "awaiting_retry"], txRepos);
-		await childRunCanceller.cancel([{ namespaceId, id: runId, pool: run.options?.pool }], txRepos, context.logger);
-	}
-
-	if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {
-		await notifyParentOfStateChangeIfNecessary(
-			context,
-			{
-				id: run.id,
-				latestStateTransitionId: stateTransitionId,
-				parentWorkflowRunId: run.parentWorkflowRunId,
-				status: toState.status,
-			},
-			now,
-			childRunCanceller,
-			txRepos
+		await childRunCanceller.cancel(
+			[{ namespaceId, id: runId, pool: run.options?.pool, priority: run.options?.priority }],
+			txRepos,
+			context.logger
 		);
 	}
 
-	return { revision: newRevision, state: toState, attempts };
+	if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {
+		await deliverTerminatedSignalToParentRun(
+			[
+				{
+					namespaceId,
+					id: run.id,
+					latestStateTransitionId: stateTransitionId,
+					parentWorkflowRunId: run.parentWorkflowRunId,
+					status: toState.status,
+				},
+			],
+			now,
+			txRepos,
+			context.logger,
+			imminentRunTimerQueue
+		);
+	}
+
+	return { revision: updatedRun.revision, state: toState, attempts };
 }
 
-async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: number, txRepos: TxRepositories) {
+async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: TimestampMs, txRepos: TxRepositories) {
 	const activeSleep = await txRepos.sleep.getActiveByWorkflowRunIdAndName(runId, sleepName);
 	if (!activeSleep) {
 		return;
@@ -275,45 +306,8 @@ async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: number,
 
 	await txRepos.sleep.update(activeSleep.id, {
 		status: "cancelled",
-		cancelledAt: now as TimestampMs,
+		cancelledAt: now,
 	});
-}
-
-async function childWorkflowRunWaitNotNeeded(
-	{ namespaceId, logger }: NamespaceRequestContext,
-	runId: WorkflowRunId,
-	toState: WorkflowRunStateAwaitingChildWorkflow,
-	now: number,
-	txRepos: TxRepositories
-) {
-	const childRunId = toState.childWorkflowRunId as WorkflowRunId;
-	const childRunResult = await txRepos.workflowRun.getByIdWithState({ namespaceId, id: childRunId });
-	if (!childRunResult) {
-		throw new NotFoundError(`Workflow run not found: ${childRunId}`);
-	}
-	const childRun = childRunResult.run;
-
-	if (childRun.status === toState.childWorkflowRunStatus || isTerminalWorkflowRunStatus(childRun.status)) {
-		await txRepos.childWorkflowRunWait.insert({
-			id: ulid(),
-			parentWorkflowRunId: runId,
-			childWorkflowRunId: childRunId,
-			childWorkflowRunStatus: toState.childWorkflowRunStatus,
-			status: "completed",
-			completedAt: now as TimestampMs,
-			childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
-		});
-
-		logger.info("Child already at status, scheduling immediately", {
-			"aiki.runId": runId,
-			"aiki.childRunId": childRunId,
-			"aiki.childRunStatus": childRun.status,
-		});
-
-		return true;
-	}
-
-	return false;
 }
 
 async function updateWorkflowRun(
@@ -323,110 +317,117 @@ async function updateWorkflowRun(
 	toState: WorkflowRunState,
 	stateTransitionId: string,
 	attempts: number,
+	now: TimestampMs,
 	txRepos: TxRepositories
-): Promise<number> {
-	const updates: Record<string, unknown> = {
-		status: toState.status,
-		attempts,
-		latestStateTransitionId: stateTransitionId,
-		scheduledAt: null,
-		wakeupAt: null,
-		timeoutAt: null,
-		nextAttemptAt: null,
-	};
-	if (toState.status === "scheduled") {
-		updates.scheduledAt = toState.scheduledAt as TimestampMs;
-	} else if (toState.status === "sleeping") {
-		updates.wakeupAt = toState.wakeupAt as TimestampMs;
-	} else if (
-		(toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") &&
-		toState.timeoutAt !== undefined
-	) {
-		updates.timeoutAt = toState.timeoutAt as TimestampMs;
-	} else if (toState.status === "awaiting_retry") {
-		updates.nextAttemptAt = toState.nextAttemptAt as TimestampMs;
-	}
+): Promise<{ revision: number; state: WorkflowRunState }> {
+	const { namespaceId } = context;
 
-	if (request.type === "optimistic") {
-		const result = await txRepos.workflowRun.update(
-			{
-				namespaceId: context.namespaceId,
+	if (toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") {
+		if (request.type !== "optimistic" || !("expectedSignalSequence" in request)) {
+			// The request contract makes this impossible.
+			throw new Error(`Wait transition without expectedSignalSequence for run: ${runId}`);
+		}
+
+		const result = await txRepos.workflowRun.update({
+			waitForSignal: true,
+			filter: {
+				namespaceId,
 				id: runId,
 				revision: request.expectedRevision,
+				signalSequence: request.expectedSignalSequence,
 			},
-			updates
-		);
+			updates: {
+				attempts,
+				latestStateTransitionId: stateTransitionId,
+				onSignalSequenceMatch: {
+					status: toState.status,
+					timeoutAt: toState.timeoutAt !== undefined ? (toState.timeoutAt as TimestampMs) : null,
+				},
+				onSignalSequenceMismatch: { status: "scheduled", scheduledAt: now },
+			},
+		});
 		if (!result) {
 			throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
 		}
-		return result.revision;
+
+		if (result.signalSequence !== request.expectedSignalSequence) {
+			// TODO: gather metrics on false re-schedules.
+			// This can happen when sequence was moved by an unrelated signal like an
+			// event different from the one we attempted to wait on.
+			// My bet is that these are rare occurrences, but if they bite, we'll need
+			// find a solution, possibly querying the db to see if a re-schedule can be skipped.
+			if (toState.status === "awaiting_event") {
+				return {
+					revision: result.revision,
+					state: { status: "scheduled", reason: "event", scheduledAt: now },
+				};
+			} else {
+				toState.status satisfies "awaiting_child_workflow";
+				return {
+					revision: result.revision,
+					state: { status: "scheduled", reason: "child_workflow", scheduledAt: now },
+				};
+			}
+		}
+
+		return { revision: result.revision, state: toState };
+	}
+
+	const updates = {
+		status: toState.status,
+		attempts,
+		latestStateTransitionId: stateTransitionId,
+		...extractDueTimestamp(toState),
+	};
+
+	if (request.type === "optimistic") {
+		const result = await txRepos.workflowRun.update({
+			waitForSignal: false,
+			filter: { namespaceId, id: runId, revision: request.expectedRevision },
+			updates,
+		});
+		if (!result) {
+			throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
+		}
+		return { revision: result.revision, state: toState };
 	} else {
-		const result = await txRepos.workflowRun.update({ namespaceId: context.namespaceId, id: runId }, updates);
+		const result = await txRepos.workflowRun.update({
+			waitForSignal: false,
+			filter: { namespaceId, id: runId },
+			updates,
+		});
 		if (!result) {
 			throw new NotFoundError(`Workflow run not found: ${runId}`);
 		}
-		return result.revision;
+		return { revision: result.revision, state: toState };
 	}
 }
 
-async function notifyParentOfStateChangeIfNecessary(
-	context: NamespaceRequestContext,
-	childRun: {
-		id: string;
-		latestStateTransitionId: string;
-		parentWorkflowRunId: string;
-		status: TerminalWorkflowRunStatus;
-	},
-	now: number,
-	childRunCanceller: ChildRunCanceller,
-	txRepos: TxRepositories
-): Promise<void> {
-	const parentRunResult = await txRepos.workflowRun.getByIdWithState({
-		namespaceId: context.namespaceId,
-		id: childRun.parentWorkflowRunId,
-	});
-	if (!parentRunResult) {
-		throw new NotFoundError(`Workflow run not found: ${childRun.parentWorkflowRunId}`);
-	}
-
-	const { run: parentRun, state: parentRunState } = parentRunResult;
-
-	if (
-		parentRunState.status === "awaiting_child_workflow" &&
-		parentRunState.childWorkflowRunId === childRun.id &&
-		parentRunState.childWorkflowRunStatus === childRun.status
-	) {
-		context.logger.info("Notifying parent of child state change", {
-			"aiki.parentRunId": parentRun.id,
-			"aiki.childRunId": childRun.id,
-			"aiki.status": childRun.status,
-		});
-
-		await txRepos.childWorkflowRunWait.insert({
-			id: ulid(),
-			parentWorkflowRunId: parentRun.id,
-			childWorkflowRunId: childRun.id,
-			childWorkflowRunStatus: parentRunState.childWorkflowRunStatus,
-			status: "completed",
-			completedAt: now as TimestampMs,
-			childWorkflowRunStateTransitionId: childRun.latestStateTransitionId,
-		});
-
-		await transitionStateInTx(
-			context,
-			{
-				type: "optimistic",
-				id: parentRun.id,
-				state: { status: "scheduled", scheduledInMs: 0, reason: "child_workflow" },
-				expectedRevision: parentRun.revision,
-			},
-			childRunCanceller,
-			txRepos
-		);
+function extractDueTimestamp(state: Exclude<WorkflowRunState, { status: WaitingForSignalWorkflowRunStatus }>) {
+	switch (state.status) {
+		case "scheduled":
+			return { scheduledAt: state.scheduledAt as TimestampMs };
+		case "sleeping":
+			return { wakeupAt: state.wakeupAt as TimestampMs };
+		case "awaiting_retry":
+		case "awaiting_task_retry":
+			return { nextAttemptAt: state.nextAttemptAt as TimestampMs };
+		default:
+			state satisfies {
+				status: WorkflowRunStatus;
+				scheduledAt?: never;
+				wakeupAt?: never;
+				nextAttemptAt?: never;
+				timeoutAt?: never;
+			};
+			return {};
 	}
 }
 
-export function convertDurationToTimestamp(request: WorkflowRunStateRequest, now: number): WorkflowRunState {
+export function convertDurationToTimestamp(
+	request: Exclude<WorkflowRunStateRequest, { status: "awaiting_task_retry" }>,
+	now: TimestampMs
+): WorkflowRunState {
 	if (request.status === "scheduled") {
 		return {
 			status: "scheduled",
@@ -482,7 +483,6 @@ export function convertDurationToTimestamp(request: WorkflowRunStateRequest, now
 		return {
 			status: request.status,
 			childWorkflowRunId: request.childWorkflowRunId,
-			childWorkflowRunStatus: request.childWorkflowRunStatus,
 			timeoutAt: now + request.timeoutInMs,
 		};
 	}

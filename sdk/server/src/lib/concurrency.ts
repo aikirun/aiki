@@ -31,15 +31,16 @@ export async function runConcurrently<Item, TContext extends Context>(
 				return;
 			}
 
+			const item = next.value;
 			const spanCtx = forkContext(context);
 			try {
-				await fn(next.value, spanCtx);
+				await fn(item, spanCtx);
 			} catch (err) {
 				if (!hasError) {
 					hasError = true;
 					firstError = err;
 				} else {
-					spanCtx.logger.error("Concurrent task failed", { err });
+					spanCtx.logger.error("Concurrent call failed", { item, err });
 				}
 				if (failFast) {
 					stopped = true;

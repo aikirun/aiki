@@ -1,4 +1,4 @@
-import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
+import type { OptionalProp } from "@aikirun/lib/object";
 
 import type { ClientCodec } from "../workflow";
 import type {
@@ -8,7 +8,6 @@ import type {
 	TaskStateAwaitingRetry,
 	TaskStateCompleted,
 	TaskStateFailed,
-	TaskStateRunning,
 } from "../workflow/task";
 
 export interface TaskApi {
@@ -42,27 +41,29 @@ export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateB
 export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
 	type: "retry";
 	id: string;
-	options?: TaskStartOptions;
-	taskState: TaskStateRunning;
+	attempts: number;
 }
 
 export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | TransitionTaskStateToRunningRetry;
 
 export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
 	id: string;
-	taskState: TaskStateCompletedRequest;
+	attempts: number;
+	state: TaskStateCompletedRequest;
 }
 
 export type TaskStateCompletedRequest = OptionalProp<TaskStateCompleted<unknown>, "output">;
 
 export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
 	id: string;
-	taskState: TaskStateFailed;
+	attempts: number;
+	state: TaskStateFailed;
 }
 
 export interface TransitionTaskStateToAwaitingRetry extends TransitionTaskStateBase {
 	id: string;
-	taskState: TaskStateAwaitingRetryRequest;
+	attempts: number;
+	state: TaskStateAwaitingRetryRequest;
 }
 
 export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAttemptAt"> & {
@@ -79,20 +80,8 @@ export interface TaskTransitionStateResponseV1 {
 	taskInfo: TaskInfo;
 }
 
-export interface TaskSetStateRequestNew {
-	type: "new";
-	workflowRunId: string;
-	taskName: string;
-	input?: unknown;
-	inputHash: string;
-	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
-}
-
-export interface TaskSetStateRequestExisting {
-	type: "existing";
+export interface TaskSetStateRequestV1 {
 	id: string;
 	workflowRunId: string;
-	state: DistributiveOmit<TaskStateCompleted<unknown> | TaskStateFailed, "attempts">;
+	state: TaskStateCompleted<unknown> | TaskStateFailed;
 }
-
-export type TaskSetStateRequestV1 = TaskSetStateRequestNew | TaskSetStateRequestExisting;

@@ -14,6 +14,7 @@ import { describe, expect, test } from "bun:test";
 import type { WorkflowRun } from "../run";
 import { workflowRunHandle } from "../run/handle";
 import { createReplayManifest } from "../run/replay-manifest";
+import { taskExecutionTracker } from "../run/task-execution-tracker";
 
 const LIST_NON_TERMINAL_CHILDREN_TASK_NAME = "list-non-terminal-child-runs";
 const CANCEL_RUNS_TASK_NAME = "cancel-runs";
@@ -38,6 +39,7 @@ function createTestWorkflowRun(
 		[INTERNAL]: {
 			handle,
 			replayManifest: createReplayManifest(record),
+			createTaskExecutionTracker: taskExecutionTracker(handle, client.logger).create,
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
 			hasher: hashInput,
 			codec: client[INTERNAL].codec,
@@ -116,11 +118,8 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						id: runningListNonTerminalChildrenTask.id,
-						taskState: {
-							status: "completed",
-							attempts: 1,
-							output: { encodedValue: nonTerminalChildRunIds },
-						},
+						attempts: 1,
+						state: { status: "completed", output: { encodedValue: nonTerminalChildRunIds } },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -142,11 +141,8 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						id: runningCancelRunsTask.id,
-						taskState: {
-							status: "completed",
-							attempts: 1,
-							output: { encodedValue: nonTerminalChildRunIds },
-						},
+						attempts: 1,
+						state: { status: "completed", output: { encodedValue: nonTerminalChildRunIds } },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -224,11 +220,8 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						id: runningListNonTerminalChildrenTask.id,
-						taskState: {
-							status: "completed",
-							attempts: 1,
-							output: { encodedValue: [] },
-						},
+						attempts: 1,
+						state: { status: "completed", output: { encodedValue: [] } },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},

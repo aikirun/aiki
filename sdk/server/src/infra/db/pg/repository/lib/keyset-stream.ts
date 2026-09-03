@@ -1,4 +1,4 @@
-import { and, gt, or, type SQL, sql } from "drizzle-orm";
+import { and, Column, gt, or, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
 import type { KeysetStreamCursor } from "../../../../../lib/keyset-stream";
@@ -22,9 +22,12 @@ export function keysetStreamCursorFilter(
 	if (!cursor) {
 		return undefined;
 	}
+	// A raw `sql` param skips the column's driver mapping, so apply it here when the order
+	// column has one — a timestamp column binds an ISO string, not the ms number.
+	const order = orderCol instanceof Column ? orderCol.mapToDriverValue(cursor.order) : cursor.order;
 	return or(
-		sql`${orderCol} > ${cursor.order}`,
-		and(sql`${orderCol} = ${cursor.order}`, gt(idCol, cursor.id)),
-		and(sql`${orderCol} < ${cursor.order}`, gt(idCol, cursor.maxSeenId))
+		sql`${orderCol} > ${order}`,
+		and(sql`${orderCol} = ${order}`, gt(idCol, cursor.id)),
+		and(sql`${orderCol} < ${order}`, gt(idCol, cursor.maxSeenId))
 	);
 }

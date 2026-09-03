@@ -4,11 +4,13 @@ import type { EncodedPayload } from "../infra/codec";
 import type { Hash } from "../infra/hasher";
 import type { ClientCodec, WorkflowSource } from "../workflow";
 import type {
+	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStateAwaitingChildWorkflow,
 	WorkflowRunStateAwaitingEvent,
 	WorkflowRunStateAwaitingRetry,
+	WorkflowRunStateAwaitingTaskRetry,
 	WorkflowRunStateCancelled,
 	WorkflowRunStateCompleted,
 	WorkflowRunStatePaused,
@@ -18,7 +20,7 @@ import type {
 	WorkflowRunStatus,
 	WorkflowStartOptions,
 } from "../workflow/run";
-import type { EventSendOptions } from "../workflow/run/event";
+import type { EventMulticastResult, EventSendOptions } from "../workflow/run/event";
 import type { StateTransition } from "../workflow/state-transition";
 import type { TaskStatus } from "../workflow/task";
 
@@ -31,8 +33,10 @@ export interface WorkflowRunApi {
 	transitionStateV1: (_: WorkflowRunTransitionStateRequestV1) => Promise<WorkflowRunTransitionStateResponseV1>;
 	listTransitionsV1: (_: WorkflowRunListTransitionsRequestV1) => Promise<WorkflowRunListTransitionsResponseV1>;
 	sendEventV1: (_: WorkflowRunSendEventRequestV1) => Promise<void>;
-	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<void>;
-	multicastEventByReferenceV1: (_: WorkflowRunMulticastEventByReferenceRequestV1) => Promise<void>;
+	multicastEventV1: (_: WorkflowRunMulticastEventRequestV1) => Promise<WorkflowRunMulticastEventResponseV1>;
+	multicastEventByReferenceV1: (
+		_: WorkflowRunMulticastEventByReferenceRequestV1
+	) => Promise<WorkflowRunMulticastEventResponseV1>;
 	listChildRunsV1: (_: WorkflowRunListChildRunsRequestV1) => Promise<WorkflowRunListChildRunsResponseV1>;
 	cancelByIdsV1: (_: WorkflowRunCancelByIdsRequestV1) => Promise<WorkflowRunCancelByIdsResponseV1>;
 	claimReadyV1: (_: WorkflowRunClaimReadyRequestV1) => Promise<WorkflowRunClaimReadyResponseV1>;
@@ -123,11 +127,11 @@ export type WorkflowRunStateScheduledRequest = DistributiveOmit<WorkflowRunState
 	scheduledInMs: number;
 };
 
-export type WorkflowRunStateSleepingRequest = DistributiveOmit<WorkflowRunStateSleeping, "wakeupAt"> & {
+export type WorkflowRunStateSleepingRequest = Omit<WorkflowRunStateSleeping, "wakeupAt"> & {
 	durationMs: number;
 };
 
-export type WorkflowRunStateAwaitingEventRequest = DistributiveOmit<WorkflowRunStateAwaitingEvent, "timeoutAt"> & {
+export type WorkflowRunStateAwaitingEventRequest = Omit<WorkflowRunStateAwaitingEvent, "timeoutAt"> & {
 	timeoutInMs?: number;
 };
 
@@ -135,10 +139,9 @@ export type WorkflowRunStateAwaitingRetryRequest = DistributiveOmit<WorkflowRunS
 	nextAttemptInMs: number;
 };
 
-export type WorkflowRunStateAwaitingChildWorkflowRequest = DistributiveOmit<
-	WorkflowRunStateAwaitingChildWorkflow,
-	"timeoutAt"
-> & {
+export type WorkflowRunStateAwaitingTaskRetryRequest = Omit<WorkflowRunStateAwaitingTaskRetry, "nextAttemptAt">;
+
+export type WorkflowRunStateAwaitingChildWorkflowRequest = Omit<WorkflowRunStateAwaitingChildWorkflow, "timeoutAt"> & {
 	timeoutInMs?: number;
 };
 
@@ -153,6 +156,7 @@ export type WorkflowRunStateRequest =
 					| "sleeping"
 					| "awaiting_event"
 					| "awaiting_retry"
+					| "awaiting_task_retry"
 					| "awaiting_child_workflow"
 					| "completed";
 			}
@@ -161,14 +165,9 @@ export type WorkflowRunStateRequest =
 	| WorkflowRunStateSleepingRequest
 	| WorkflowRunStateAwaitingEventRequest
 	| WorkflowRunStateAwaitingRetryRequest
+	| WorkflowRunStateAwaitingTaskRetryRequest
 	| WorkflowRunStateAwaitingChildWorkflowRequest
 	| WorkflowRunStateCompletedRequest;
-
-interface WorkflowRunTransitionStateRequestBase {
-	type: "optimistic" | "pessimistic";
-	id: string;
-	state: WorkflowRunStateRequest;
-}
 
 type WorkflowRunStateRequestOptimistic = Exclude<WorkflowRunStateRequest, WorkflowRunStateRequestPessimistic>;
 
@@ -178,14 +177,23 @@ type WorkflowRunStateRequestPessimistic =
 	| WorkflowRunStateStalled
 	| WorkflowRunStateCancelled;
 
-export interface WorkflowRunTransitionStateRequestOptimistic extends WorkflowRunTransitionStateRequestBase {
+export type WorkflowRunTransitionStateRequestOptimistic = {
 	type: "optimistic";
+	id: string;
 	expectedRevision: number;
-	state: WorkflowRunStateRequestOptimistic;
-}
+} & (
+	| {
+			state: Extract<WorkflowRunStateRequestOptimistic, { status: WaitingForSignalWorkflowRunStatus }>;
+			expectedSignalSequence: number;
+	  }
+	| {
+			state: Exclude<WorkflowRunStateRequestOptimistic, { status: WaitingForSignalWorkflowRunStatus }>;
+	  }
+);
 
-export interface WorkflowRunTransitionStateRequestPessimistic extends WorkflowRunTransitionStateRequestBase {
+export interface WorkflowRunTransitionStateRequestPessimistic {
 	type: "pessimistic";
+	id: string;
 	state: WorkflowRunStateRequestPessimistic;
 }
 
@@ -233,6 +241,8 @@ export interface WorkflowRunMulticastEventByReferenceRequestV1 {
 	data?: unknown;
 	options?: EventSendOptions;
 }
+
+export type WorkflowRunMulticastEventResponseV1 = EventMulticastResult;
 
 export interface WorkflowRunListChildRunsRequestV1 {
 	id: string;

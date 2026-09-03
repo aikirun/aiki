@@ -1,20 +1,23 @@
 name: Deploy dashboard
 
-# Builds the hosted dashboard for a given release version and deploys it to
-# Cloudflare Pages. The dashboard is built from the version's tag.
+# Builds the hosted dashboard and deploys it to Cloudflare Pages. The release
+# runs this at the version's tag; dispatched with a blank ref it deploys the
+# branch you run it from, so a dashboard-only fix can ship from main without
+# cutting a release. The dashboard is a client of the hosted server — deploy
+# from main only when the change needs no server API the hosted server lacks.
 
 on:
-  workflow_call:
-    inputs:
-      version:
-        description: Release version to deploy, without the v prefix (e.g. 0.34.1)
-        required: true
-        type: string
   workflow_dispatch:
     inputs:
-      version:
-        description: Release version to deploy, without the v prefix (e.g. 0.34.1)
-        required: true
+      ref:
+        description: Git ref to deploy (blank = the branch you run this from)
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to deploy (blank = the caller's ref)
+        required: false
         type: string
 
 permissions:
@@ -28,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: v${{ inputs.version }}
+          ref: ${{ inputs.ref }}
 
       - uses: ./.github/actions/setup-workspace
 

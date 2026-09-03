@@ -16,13 +16,15 @@ in code, the **verify** step will block the release.
 
 ## Redeploying or rolling back the hosted deployment
 
-`deploy-server` and `deploy-dashboard` are reusable workflows the release calls. 
-Each is also dispatchable on its own — Actions tab → **Deploy server** or
-**Deploy dashboard** → **Run workflow** → enter a `version` (without the `v`
-prefix). Use this to redeploy or roll back the hosted server or dashboard to an
-already-released version without cutting a new release.
+`deploy-server`, `deploy-dashboard` and `deploy-website` are reusable workflows
+the release calls. Each is also dispatchable on its own from the Actions tab
+via **Run workflow**, to redeploy or roll back without cutting a new release.
 
-`deploy-website` publishes the website the same way — Actions tab →
-**Deploy website** → **Run workflow**. It takes an optional git `ref` instead of
-a version: leave it blank to redeploy the current `main`, or pass a tag like
-`v0.34.1` to republish that release's docs.
+**Deploy server** takes a `version` (without the `v` prefix) and always deploys
+that released version's image.
+
+**Deploy dashboard** and **Deploy website** take an optional git `ref`: leave
+it blank to deploy the current `main`, or pass a tag like `v0.34.1` to redeploy
+that release. Deploying the dashboard from `main` is for dashboard-only fixes —
+the hosted server stays on the last release, so the change must not depend on
+server APIs that haven't shipped.

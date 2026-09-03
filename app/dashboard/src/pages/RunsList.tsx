@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useWorkflowRuns } from "../api/hooks";
+import { btnSecondary, card, cardGrid, LIST_ROWS, secondaryHover } from "../components/common/ui";
 import { RunRow } from "../components/runs/RunRow";
 import { RunsFilterBar } from "../components/runs/RunsFilterBar";
 import { useDebounce } from "../hooks/useDebounce";
@@ -109,7 +110,7 @@ export function RunsList() {
 
 	return (
 		<div>
-			<div style={{ marginBottom: 14 }}>
+			<div style={{ marginBottom: 16 }}>
 				<RunsFilterBar
 					idFilter={idFilter}
 					onIdFilterChange={(v) => {
@@ -135,43 +136,43 @@ export function RunsList() {
 				/>
 			</div>
 
-			{/* Run list */}
-			<div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-				{isLoading && runs.length === 0 ? (
-					<RunListSkeleton />
-				) : runs.length === 0 ? (
-					<div className="text-center py-12 text-t-2">
-						<p className="text-sm">No runs found</p>
-						<p className="text-xs text-t-3 mt-1">Adjust your filters or start a workflow</p>
-					</div>
-				) : (
-					runs.map((run) => <RunRow key={run.id} run={run} />)
-				)}
-			</div>
+			{/* Run list — one enclosed grid, rows separated by hairlines */}
+			{isLoading && runs.length === 0 ? (
+				<RunListSkeleton />
+			) : runs.length === 0 ? (
+				<div style={{ ...card, padding: "64px 24px", textAlign: "center" }}>
+					<p
+						style={{
+							margin: 0,
+							fontSize: 17,
+							fontWeight: 700,
+							letterSpacing: "-0.024em",
+							color: "var(--t0)",
+						}}
+					>
+						No runs match these filters
+					</p>
+					<p style={{ margin: "8px 0 0", fontSize: 14, lineHeight: 1.6, color: "var(--t3)" }}>
+						Clear a filter, or start a workflow to see it here.
+					</p>
+				</div>
+			) : (
+				<div className={LIST_ROWS} style={cardGrid}>
+					{runs.map((run) => (
+						<RunRow key={run.id} run={run} />
+					))}
+				</div>
+			)}
 
 			{/* Pagination */}
 			{totalPages > 1 && (
-				<div className="flex items-center justify-between mt-4 px-1">
-					<span className="text-xs text-t-2">
+				<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+					<span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--t3)" }}>
 						{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
 					</span>
-					<div className="flex gap-1">
-						<button
-							type="button"
-							disabled={page === 0}
-							onClick={() => setPage(page - 1)}
-							className="px-2.5 py-1 text-xs rounded bg-surface-s2 text-t-1 hover:bg-surface-s3 disabled:opacity-30 disabled:cursor-not-allowed"
-						>
-							Prev
-						</button>
-						<button
-							type="button"
-							disabled={page >= totalPages - 1}
-							onClick={() => setPage(page + 1)}
-							className="px-2.5 py-1 text-xs rounded bg-surface-s2 text-t-1 hover:bg-surface-s3 disabled:opacity-30 disabled:cursor-not-allowed"
-						>
-							Next
-						</button>
+					<div style={{ display: "flex", gap: 6 }}>
+						<PageButton label="Prev" disabled={page === 0} onClick={() => setPage(page - 1)} />
+						<PageButton label="Next" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} />
 					</div>
 				</div>
 			)}
@@ -179,19 +180,33 @@ export function RunsList() {
 	);
 }
 
+function PageButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+	return (
+		<button
+			type="button"
+			disabled={disabled}
+			onClick={onClick}
+			style={{
+				...btnSecondary(),
+				fontSize: 12,
+				padding: "5px 12px",
+				opacity: disabled ? 0.35 : 1,
+				cursor: disabled ? "not-allowed" : "pointer",
+			}}
+			{...(disabled ? {} : secondaryHover)}
+		>
+			{label}
+		</button>
+	);
+}
+
 function RunListSkeleton() {
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+		<div className={LIST_ROWS} style={cardGrid}>
 			{["a", "b", "c", "d", "e", "f", "g", "h"].map((key) => (
-				<div
-					key={key}
-					style={{
-						height: 56,
-						borderRadius: 8,
-						backgroundColor: "var(--s1)",
-					}}
-					className="animate-pulse"
-				/>
+				<div key={key} style={{ height: 62, backgroundColor: "var(--s1)" }}>
+					<div style={{ height: "100%", background: "var(--s2)", opacity: 0.5 }} className="animate-pulse" />
+				</div>
 			))}
 		</div>
 	);

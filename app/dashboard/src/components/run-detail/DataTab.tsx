@@ -10,7 +10,7 @@ export function DataTab({ run }: DataTabProps) {
 	const isCompleted = run.state.status === "completed";
 	const isFailed = run.state.status === "failed";
 
-	const stateColor = isCompleted ? "#34D399" : isFailed ? "#F87171" : "var(--t1)";
+	const stateTone = isCompleted ? "var(--on-code-green)" : isFailed ? "var(--on-code-red)" : undefined;
 
 	const inputJson = run.input.encodedValue !== undefined ? JSON.stringify(run.input, null, 2) : "void";
 	const stateJson = JSON.stringify(run.state, null, 2);
@@ -22,7 +22,7 @@ export function DataTab({ run }: DataTabProps) {
 			<DataBlock label="Input" text={inputJson} />
 
 			{/* Output (completed) or State (all other statuses) */}
-			<DataBlock label={isCompleted ? "Output" : "State"} text={stateJson} color={stateColor} />
+			<DataBlock label={isCompleted ? "Output" : "State"} text={stateJson} tone={stateTone} />
 
 			{/* Options — only if present */}
 			{optionsJson && <DataBlock label="Options" text={optionsJson} />}

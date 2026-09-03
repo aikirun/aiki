@@ -10,9 +10,9 @@ import { processImminentChildRunWaitTimedOutRuns } from "./imminent-child-run-wa
 import { processImminentEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
 import { processImminentRecurringRuns } from "./imminent-recurring-runs";
 import { processImminentRetryableRuns } from "./imminent-retryable-runs";
-import { processImminentRetryableTasks } from "./imminent-retryable-tasks";
 import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
+import { processImminentTaskRetryableRuns } from "./imminent-task-retryable-runs";
 import { publishPendingOutboxEntries } from "./publish-pending-outbox-entries";
 import { recoverOverdueOutboxEntries } from "./recover-overdue-outbox-entries";
 import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
@@ -123,11 +123,11 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			})
 		),
 		startPollingDaemon(
-			processImminentRetryableTasks,
-			"process-imminent-retryable-tasks",
+			processImminentTaskRetryableRuns,
+			"process-imminent-task-retryable-runs",
 			{ repos, publisher, timerPriorityQueue },
 			(config) => ({
-				...config.imminentRetryableTasks,
+				...config.imminentTaskRetryableRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
 			})
 		),

@@ -6,102 +6,87 @@ import { useElementWidth } from "../../hooks/useElementWidth";
 import { CopyButton } from "../common/CopyButton";
 import { RelativeTime } from "../common/RelativeTime";
 import { StatusBadge } from "../common/StatusBadge";
+import { chipNeutral } from "../common/ui";
 
 interface RunRowProps {
 	run: WorkflowRunListItem;
 }
 
+const metaText = {
+	fontFamily: "var(--mono)",
+	fontSize: 10,
+	color: "var(--t3)",
+	whiteSpace: "nowrap" as const,
+};
+
+/**
+ * The run name is the row's only real control; `row-target` stretches its hit area
+ * across the row. The copy buttons sit beside it rather than inside it, which keeps
+ * one interactive element per action instead of nesting buttons in a link.
+ */
 export function RunRow({ run }: RunRowProps) {
-	const [rowRef, rowWidth] = useElementWidth<HTMLAnchorElement>();
+	const [rowRef, rowWidth] = useElementWidth<HTMLDivElement>();
 	const showRef = rowWidth >= 400;
 	const showVersion = rowWidth >= 340;
 	const showDate = rowWidth >= 300;
 
 	return (
-		<Link
+		<div
 			ref={rowRef}
-			to={`/runs/${run.id}`}
+			className="list-row"
 			style={{
+				position: "relative",
 				display: "grid",
 				gridTemplateColumns: "1fr auto",
-				padding: "11px 16px",
-				backgroundColor: "var(--s1)",
-				border: "1px solid transparent",
-				borderRadius: 8,
-				cursor: "pointer",
-				textDecoration: "none",
-				transition: "background-color 0.15s, border-color 0.15s",
-			}}
-			onMouseEnter={(e) => {
-				(e.currentTarget as HTMLElement).style.backgroundColor = "var(--s2)";
-				(e.currentTarget as HTMLElement).style.borderColor = "var(--b0)";
-			}}
-			onMouseLeave={(e) => {
-				(e.currentTarget as HTMLElement).style.backgroundColor = "var(--s1)";
-				(e.currentTarget as HTMLElement).style.borderColor = "transparent";
+				padding: "12px 18px",
 			}}
 		>
-			<div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
-				<div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-					<span
+			<div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+				<div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+					<Link
+						to={`/runs/${run.id}`}
+						className="row-target"
 						style={{
-							fontSize: 13,
+							fontSize: 13.5,
 							fontWeight: 700,
+							letterSpacing: "-0.018em",
 							color: "var(--t0)",
+							textDecoration: "none",
 							whiteSpace: "nowrap",
 							overflow: "hidden",
 							textOverflow: "ellipsis",
 						}}
 					>
 						{run.name}
-					</span>
-					{showVersion && (
-						<span
-							style={{
-								fontFamily: "monospace",
-								fontSize: 10,
-								color: "var(--t3)",
-								backgroundColor: "var(--s3)",
-								padding: "1px 5px",
-								borderRadius: 4,
-								flexShrink: 0,
-							}}
-						>
-							v{run.versionId.slice(0, 8)}
-						</span>
-					)}
+					</Link>
+					{showVersion && <span style={{ ...chipNeutral(), flexShrink: 0 }}>v{run.versionId.slice(0, 8)}</span>}
 					<StatusBadge status={run.status} />
 				</div>
 
 				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 					<div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-						<span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap" }}>
-							ID: {run.id.slice(-6)}
+						<span style={metaText}>
+							<span style={{ opacity: 0.62 }}>ID</span> {run.id.slice(-6)}
 						</span>
-						<CopyButton text={run.id} />
+						<CopyButton text={run.id} title="Copy run ID" />
 					</div>
 
 					{showRef && run.referenceId ? (
 						<>
-							<span style={{ color: "var(--t1)", fontSize: 10, fontWeight: 700, marginLeft: -2, marginRight: 2 }}>
-								•
-							</span>
+							<span style={{ color: "var(--b0)", fontSize: 10, marginLeft: -2, marginRight: 2 }}>•</span>
 							<div style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
 								<span
 									style={{
-										fontFamily: "monospace",
-										fontSize: 10,
-										color: "var(--t3)",
+										...metaText,
 										overflow: "hidden",
 										textOverflow: "ellipsis",
-										whiteSpace: "nowrap",
 										maxWidth: 120,
 									}}
 									title={run.referenceId}
 								>
-									REF: {run.referenceId}
+									<span style={{ opacity: 0.62 }}>REF</span> {run.referenceId}
 								</span>
-								<CopyButton text={run.referenceId} />
+								<CopyButton text={run.referenceId} title="Copy reference ID" />
 							</div>
 						</>
 					) : null}
@@ -117,7 +102,8 @@ export function RunRow({ run }: RunRowProps) {
 						display: "flex",
 						alignItems: "center",
 						paddingLeft: 16,
-						fontSize: 10.5,
+						fontFamily: "var(--mono)",
+						fontSize: 10,
 						color: "var(--t3)",
 						whiteSpace: "nowrap",
 					}}
@@ -125,6 +111,6 @@ export function RunRow({ run }: RunRowProps) {
 					<RelativeTime timestamp={run.createdAt} />
 				</div>
 			)}
-		</Link>
+		</div>
 	);
 }

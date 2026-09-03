@@ -1,9 +1,9 @@
 import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
-import type { CSSProperties } from "react";
 
 import { StatusChips } from "./StatusChips";
 import { WorkflowSearchInput } from "./WorkflowSearchInput";
 import { useWorkflowVersions } from "../../api/hooks";
+import { card, inputFocusProps, inputStyle } from "../common/ui";
 
 interface RunsFilterBarProps {
 	idFilter: string;
@@ -20,18 +20,6 @@ interface RunsFilterBarProps {
 	onSelectedStatusesChange: (v: WorkflowRunStatus[]) => void;
 }
 
-const inputStyle: CSSProperties = {
-	backgroundColor: "var(--s1)",
-	border: "1px solid var(--b0)",
-	borderRadius: 6,
-	padding: "5px 9px",
-	fontFamily: "monospace",
-	fontSize: 11.5,
-	color: "var(--t0)",
-	outline: "none",
-	width: "100%",
-};
-
 interface FilterInputProps {
 	value: string;
 	onChange: (v: string) => void;
@@ -40,13 +28,16 @@ interface FilterInputProps {
 
 function FilterInput({ value, onChange, placeholder }: FilterInputProps) {
 	return (
-		<div style={{ flex: 1, minWidth: 120 }}>
+		// A 160px basis, not `flex: 1`: these fields either all share a row or all take
+		// one each, rather than two sharing while the third stretches to the full width.
+		<div style={{ flex: "1 1 160px", minWidth: 0 }}>
 			<input
 				type="text"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder={placeholder}
 				style={inputStyle}
+				{...inputFocusProps}
 			/>
 		</div>
 	);
@@ -70,7 +61,7 @@ export function RunsFilterBar({
 	const hasVersions = workflowFilter && versionsData?.versions && versionsData.versions.length > 0;
 
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+		<div style={{ ...card, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
 			{/* Row 1: ID, Ref, Schedule filters */}
 			<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
 				<FilterInput value={idFilter} onChange={onIdFilterChange} placeholder="Run ID" />
@@ -79,19 +70,17 @@ export function RunsFilterBar({
 			</div>
 
 			{/* Row 2: Workflow name + optional version select */}
-			<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-				<div style={{ flex: 1, maxWidth: 220 }}>
+			<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+				{/* A real basis so the version select drops to its own line rather than
+				    squeezing the name field to a few characters. */}
+				<div style={{ flex: "1 1 200px", minWidth: 0 }}>
 					<WorkflowSearchInput value={workflowFilter} onChange={onWorkflowFilterChange} />
 				</div>
 				{hasVersions && (
 					<select
 						value={versionFilter}
 						onChange={(e) => onVersionFilterChange(e.target.value)}
-						style={{
-							...inputStyle,
-							width: "auto",
-							cursor: "pointer",
-						}}
+						style={{ ...inputStyle, flex: "0 1 auto", width: "auto", minWidth: 0, cursor: "pointer" }}
 					>
 						<option value="">All versions</option>
 						{versionsData.versions.map((v) => (

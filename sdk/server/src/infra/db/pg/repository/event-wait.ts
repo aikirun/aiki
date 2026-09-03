@@ -28,7 +28,7 @@ export const createEventWaitRepository = (db: PgDb) => ({
 			.select()
 			.from(eventWait)
 			.where(eq(eventWait.workflowRunId, workflowRunId))
-			.orderBy(eventWait.id)
+			.orderBy(eventWait.signalSequence, eventWait.id)
 			.limit(10_000);
 	},
 });

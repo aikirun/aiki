@@ -142,21 +142,21 @@ Schemas work with any validation library that implements [Standard Schema](https
 
 ```typescript
 const configured = orderWorkflowV1
-	.with("pool", "gpu")
+	.with("pool", "tenant-acme")
 	.with("retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 });
 ```
 
-The paths are strings, but they are type checked. `with()` takes only paths that exist on the options, and the value has to match the type at that path — your editor completes the paths, and anything else fails to compile:
+The paths are type checked string literals (with auto-complete in your editor). `with()` takes only paths that exist on the options, and will only compile if the provided value matches the type at that path:
 
 ```typescript
 orderWorkflowV1.with("reference.id", "order-123");   // ✅︎
-orderWorkflowV1.with("reference.di", "order-123");   // ❌ no such option
-orderWorkflowV1.with("reference.id", 123);           // ❌ reference.id is a string
+orderWorkflowV1.with("reference.di", "order-123");   // ❌ compile error, no such option
+orderWorkflowV1.with("reference.id", 123);           // ❌ compile error, reference.id must be a string
 ```
 
 Look at what each option answers and they fall into two groups.
 
-`retry` answers "if this fails, try three more times". `pool` answers "run on this kind of workers". Answers like those fit any run — the one you start now, or one that goes next Tuesday. Set one and you get back something you can go on starting as often as you like.
+`retry` answers "if this fails, try three more times". `pool` answers "run on this kind of workers". `priority` answers "when several runs are due at the same instant, this one goes first". Answers like those fit any run — the one you start now, or one that goes next Tuesday. Set one and you get back something you can go on starting as often as you like.
 
 `reference` answers "this particular run is order-123" - a second run cannot be referenced as order-123. `trigger` answers "execute this particular run five minutes from now" - scheduled runs are triggered on a pre-configured cadence. Both are about one particular run — which one it is, when it goes. Set one and you get back a single start — you can `start()` it, and that is all.
 
@@ -176,11 +176,25 @@ Route workflows to a named worker pool when only part of your fleet should execu
 
 ```typescript
 const handle = await orderWorkflowV1
-	.with("pool", "gpu")
+	.with("pool", "tenant-acme")
 	.start(client, { orderId: "123" });
 ```
 
-Workers must be configured to serve the same pool. A workflow routed to `"gpu"` will only be picked up by workers with `pools: ["gpu"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
+Workers must be configured to serve the same pool. A workflow routed to `"tenant-acme"` will only be picked up by workers with `pools: ["tenant-acme"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
+
+## Priority
+
+When many runs become due at the same instant — a burst of starts, schedules firing on the same tick — priority decides who dispatches first:
+
+```typescript
+const handle = await orderWorkflowV1
+	.with("priority", 2)
+	.start(client, { orderId: "123" });
+```
+
+Priority is an integer from 0 (highest) to 9 (lowest), defaulting to 5. It follows the run through its whole life: a wakeup after a sleep, a retry, or an event resumption dispatches with the same priority as the original start. Child workflows inherit their parent's priority unless they set their own.
+
+Priority never moves a run ahead of its due time. A run due earlier always dispatches first, whatever the priorities — `trigger` decides *when* a run becomes due, priority only breaks the tie among runs due at the same millisecond.
 
 ## Starting Workflows
 
@@ -196,12 +210,12 @@ const handle = await workflowVersion.start(client, {
 console.log("Started:", handle.run.id);
 console.log("Status:", handle.run.state.status);
 
-// Wait for completion
-const result = await handle.waitForStatus("completed");
-if (result.success) {
+// Wait for the run to finish
+const result = await handle.wait();
+if (result.state.status === "completed") {
 	console.log("Output:", result.state.output);
 } else {
-	console.log("Failed:", result.cause);
+	console.log("Ended with:", result.state.status);
 }
 ```
 
@@ -245,25 +259,26 @@ The handle returned from `.start()` provides:
 | `run` | The workflow run data (id, state, input, output, etc.) |
 | `events` | Send events to the workflow |
 | `refresh()` | Refresh run data from the server |
-| `waitForStatus(status)` | Wait for a terminal status (`completed`, `failed`, `cancelled`) |
+| `wait()` | Wait for a terminal status (`completed`, `failed`, `cancelled`) |
 | `cancel(explanation?)` | Cancel the workflow run |
 | `pause()` | Pause the workflow |
 | `resume()` | Resume a paused workflow |
 | `wakeup()` | Wake a sleeping workflow |
 
-#### Waiting for Status
+#### Waiting for the Run to Finish
 
-The `waitForStatus()` method returns a result object:
+The `wait()` method resolves when the run reaches any terminal status; the state says
+which one. With a timeout, the result can also report that the timeout elapsed:
 
 ```typescript
-const result = await handle.waitForStatus("completed");
+const result = await handle.wait({ timeout: { minutes: 5 } });
 
-if (result.success) {
-	// Workflow reached the requested status
+if (!result.success) {
+	console.log("Timed out waiting for the run");
+} else if (result.state.status === "completed") {
 	console.log("Output:", result.state.output);
 } else {
-	// Workflow reached a different terminal status
-	console.log("Ended with:", result.cause);
+	console.log("Ended with:", result.state.status);
 }
 ```
 
@@ -300,20 +315,22 @@ const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
 
 ### Waiting for Child Completion
 
-To wait for a child workflow to complete, call `waitForStatus()` on the child handle:
+To wait for a child workflow to finish, call `wait()` on the child handle. The wait
+resolves when the child reaches any terminal status (`completed`, `failed`, or
+`cancelled`), and the result carries the state the child ended in:
 
 ```typescript
 const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
 	async handler(run, input) {
 		const childHandle = await childWorkflowV1.startAsChild(run, { userId: input.userId });
 
-		// Parent suspends until child completes
-		const result = await childHandle.waitForStatus("completed");
+		// Parent suspends until the child finishes
+		const { state } = await childHandle.wait();
 
-		if (result.success) {
-			return { childOutput: result.state.output };
+		if (state.status === "completed") {
+			return { childOutput: state.output };
 		} else {
-			throw new Error(`Child failed: ${result.cause}`);
+			throw new Error(`Child ended ${state.status}`);
 		}
 	},
 });
@@ -322,12 +339,12 @@ const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
 You can also wait with a timeout:
 
 ```typescript
-const result = await childHandle.waitForStatus("completed", {
+const result = await childHandle.wait({
 	timeout: { hours: 1 },
 });
 
-if (result.timeout) {
-	// Child didn't complete within 1 hour
+if (!result.success) {
+	// Child didn't finish within 1 hour
 }
 ```
 
@@ -347,11 +364,11 @@ const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
 			sendNotificationV1.startAsChild(run, { userId: input.userId }),
 		]);
 
-		// Wait for all to complete
+		// Wait for all to finish
 		const [userResult, orderResult, notifyResult] = await Promise.all([
-			userHandle.waitForStatus("completed"),
-			orderHandle.waitForStatus("completed"),
-			notifyHandle.waitForStatus("completed"),
+			userHandle.wait(),
+			orderHandle.wait(),
+			notifyHandle.wait(),
 		]);
 
 		return {

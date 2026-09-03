@@ -10,5 +10,5 @@ function _startConfiguredWorkflowIsNotRegistrable() {
 	// @ts-expect-error a worker executes runs it did not start, so a workflow bound to one start is not one it can run
 	worker({ workflows: [ordersV1.with("trigger", { type: "delayed", delay: { seconds: 5 } })] });
 
-	worker({ workflows: [ordersV1.with("pool", "gpu")] });
+	worker({ workflows: [ordersV1.with("pool", "tenant-acme")] });
 }

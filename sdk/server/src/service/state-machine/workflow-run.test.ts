@@ -1,4 +1,5 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
 import type { WorkflowRunStateRequest } from "@aikirun/types/api/workflow-run";
 import {
@@ -39,6 +40,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 			sleeping: {},
 			awaiting_event: {},
 			awaiting_retry: {},
+			awaiting_task_retry: {},
 			awaiting_child_workflow: {},
 			cancelled: {},
 			completed: {},
@@ -48,6 +50,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 		sleeping: { scheduled: { reasons: ["wakeup_early"] }, queued: { reasons: ["wakeup"] }, cancelled: {} },
 		awaiting_event: { scheduled: { reasons: ["event"] }, queued: { reasons: ["event_wait_timeout"] }, cancelled: {} },
 		awaiting_retry: { queued: { reasons: ["retry"] }, cancelled: {} },
+		awaiting_task_retry: { queued: { reasons: ["task_retry"] }, cancelled: {} },
 		awaiting_child_workflow: {
 			scheduled: { reasons: ["child_workflow"] },
 			queued: { reasons: ["child_workflow_wait_timeout"] },
@@ -56,7 +59,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 		stalled: { scheduled: { reasons: ["redelivery"] }, cancelled: {} },
 		cancelled: {},
 		completed: {},
-		failed: { awaiting_retry: {} },
+		failed: {},
 	};
 
 	const possibleReasons = Array.from(new Set([...WORKFLOW_RUN_SCHEDULED_REASONS, ...WORKFLOW_RUN_QUEUED_REASON]));
@@ -109,7 +112,7 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 });
 
 describe("convertDurationToTimestamp", () => {
-	const now = 1_000;
+	const now = 1_000 as TimestampMs;
 
 	test("scheduled: scheduledInMs becomes an absolute scheduledAt", () => {
 		expect(convertDurationToTimestamp({ status: "scheduled", reason: "event", scheduledInMs: 500 }, now)).toEqual({
@@ -176,7 +179,6 @@ describe("convertDurationToTimestamp", () => {
 				{
 					status: "awaiting_child_workflow",
 					childWorkflowRunId: "child-1",
-					childWorkflowRunStatus: "completed",
 					timeoutInMs: 500,
 				},
 				now
@@ -184,21 +186,16 @@ describe("convertDurationToTimestamp", () => {
 		).toEqual({
 			status: "awaiting_child_workflow",
 			childWorkflowRunId: "child-1",
-			childWorkflowRunStatus: "completed",
 			timeoutAt: 1_500,
 		});
 	});
 
 	test("awaiting_child_workflow without a timeout: passes through with no timeoutAt", () => {
 		expect(
-			convertDurationToTimestamp(
-				{ status: "awaiting_child_workflow", childWorkflowRunId: "child-1", childWorkflowRunStatus: "completed" },
-				now
-			)
+			convertDurationToTimestamp({ status: "awaiting_child_workflow", childWorkflowRunId: "child-1" }, now)
 		).toEqual({
 			status: "awaiting_child_workflow",
 			childWorkflowRunId: "child-1",
-			childWorkflowRunStatus: "completed",
 		});
 	});
 
@@ -221,7 +218,13 @@ describe("convertDurationToTimestamp", () => {
 	} satisfies {
 		[Status in Exclude<
 			WorkflowRunStatus,
-			"scheduled" | "sleeping" | "awaiting_event" | "awaiting_retry" | "awaiting_child_workflow" | "completed"
+			| "scheduled"
+			| "sleeping"
+			| "awaiting_event"
+			| "awaiting_retry"
+			| "awaiting_task_retry"
+			| "awaiting_child_workflow"
+			| "completed"
 		>]: Extract<WorkflowRunStateRequest, { status: Status }>;
 	}).forEach(([status, request]) => {
 		test(`${status}: carries no duration and passes through unchanged`, () => {

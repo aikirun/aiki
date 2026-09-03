@@ -8,6 +8,7 @@ import {
 	workflowRunStateByStatus,
 } from "@aikirun/testing/data-factory/workflow/run";
 import {
+	awaitingRetryTaskInfoFactory,
 	completedTaskInfoFactory,
 	failedTaskInfoFactory,
 	runningTaskInfoFactory,
@@ -29,6 +30,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { WorkflowRun } from "./run";
 import { workflowRunHandle } from "./run/handle";
 import { createReplayManifest } from "./run/replay-manifest";
+import { taskExecutionTracker } from "./run/task-execution-tracker";
 import { task } from "./task";
 import { describe, expect, test } from "bun:test";
 
@@ -57,6 +59,7 @@ function createTestWorkflowRun(
 		[INTERNAL]: {
 			handle,
 			replayManifest: createReplayManifest(record),
+			createTaskExecutionTracker: taskExecutionTracker(handle, client.logger).create,
 			configProvider: asConfigProvider(() => ({
 				claimRefreshIntervalMs: 30_000,
 				maxInlineWaitMs: options.maxInlineWaitMs ?? 10,
@@ -109,7 +112,8 @@ describe("task", () => {
 						.once(
 							{
 								id: runningTaskInfo.id,
-								taskState: completedTaskInfo.state,
+								attempts: 1,
+								state: completedTaskInfo.state,
 								workflowRunId: runRecord.id,
 								expectedWorkflowRunRevision: runRecord.revision,
 							},
@@ -172,7 +176,8 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
-							taskState: completedTaskInfo.state,
+							attempts: 1,
+							state: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
@@ -209,7 +214,8 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: chargeCard.name,
-					state: { attempts: 2, output: encoded(output) },
+					attempts: 2,
+					state: { output: encoded(output) },
 				});
 
 				client.api.task.transitionStateV1
@@ -229,7 +235,8 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
-							taskState: completedTaskInfo.state,
+							attempts: 2,
+							state: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
@@ -275,9 +282,9 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
-							taskState: {
+							attempts: 1,
+							state: {
 								status: "awaiting_retry",
-								attempts: 1,
 								error: expect.objectContaining({ message: "down" }),
 								nextAttemptInMs: 1_000,
 							},
@@ -288,6 +295,197 @@ describe("task", () => {
 					);
 
 				expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			}));
+
+		test("retries a due replayed task with the strategy from its stored options", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				let handlerCalls = 0;
+				// The definition carries no retry; the stored options are what allow this retry.
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						handlerCalls++;
+						return "charged";
+					},
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({
+					name: chargeCard.name,
+					options: { retry },
+					state: { nextAttemptAt: 1 },
+				});
+				const recordWithTask = { ...runRecord, tasks: { [address]: [awaitingRetryTaskInfo] } };
+				const run = createTestWorkflowRun(client, recordWithTask);
+
+				const retriedTaskInfo = runningTaskInfoFactory.build({
+					id: awaitingRetryTaskInfo.id,
+					name: chargeCard.name,
+					attempts: 2,
+				});
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "retry",
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: retriedTaskInfo }
+					)
+					.once(
+						{
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							state: { status: "completed", output: encoded("charged") },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{
+							taskInfo: completedTaskInfoFactory.build({
+								id: awaitingRetryTaskInfo.id,
+								name: chargeCard.name,
+								attempts: 2,
+								state: { output: encoded("charged") },
+							}),
+						}
+					);
+
+				expect(await chargeCard.start(run, input)).toBe("charged");
+				expect(handlerCalls).toBe(1);
+			}));
+
+		test("suspends without a request when a replayed task's retry is not due", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				let handlerCalls = 0;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						handlerCalls++;
+						return "charged";
+					},
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
+				// The clock cannot be pinned in unit tests (files run concurrently), so "not due"
+				// is a deadline a day out — far beyond the lifetime of a test run.
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({
+					name: chargeCard.name,
+					options: { retry },
+					state: { nextAttemptAt: Date.now() + 24 * 60 * 60 * 1000 },
+				});
+				const recordWithTask = { ...runRecord, tasks: { [address]: [awaitingRetryTaskInfo] } };
+				const run = createTestWorkflowRun(client, recordWithTask, { maxInlineWaitMs: 0 });
+
+				expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				expect(handlerCalls).toBe(0);
+			}));
+
+		test("retries in process when the remaining wait is within the max inline wait", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				let handlerCalls = 0;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						handlerCalls++;
+						return "charged";
+					},
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
+				// The max inline wait admits every remaining wait, so the branch is decided by
+				// configuration; the deadline sits a few milliseconds out only to keep the
+				// in-process wait short.
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({
+					name: chargeCard.name,
+					options: { retry },
+					state: { nextAttemptAt: Date.now() + 5 },
+				});
+				const recordWithTask = { ...runRecord, tasks: { [address]: [awaitingRetryTaskInfo] } };
+				const run = createTestWorkflowRun(client, recordWithTask, { maxInlineWaitMs: Number.MAX_SAFE_INTEGER });
+
+				const retriedTaskInfo = runningTaskInfoFactory.build({
+					id: awaitingRetryTaskInfo.id,
+					name: chargeCard.name,
+					attempts: 2,
+				});
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "retry",
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: retriedTaskInfo }
+					)
+					.once(
+						{
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							state: { status: "completed", output: encoded("charged") },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{
+							taskInfo: completedTaskInfoFactory.build({
+								id: awaitingRetryTaskInfo.id,
+								name: chargeCard.name,
+								attempts: 2,
+								state: { output: encoded("charged") },
+							}),
+						}
+					);
+
+				expect(await chargeCard.start(run, input)).toBe("charged");
+				expect(handlerCalls).toBe(1);
+			}));
+
+		test("does not retry a replayed task whose stored options have no retry", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+
+				// The definition carries a retry, but the stored options do not — the stored
+				// options are the ones that count.
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				let handlerCalls = 0;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						handlerCalls++;
+						return "charged";
+					},
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({ name: chargeCard.name });
+				const recordWithTask = { ...runRecord, tasks: { [address]: [awaitingRetryTaskInfo] } };
+				const run = createTestWorkflowRun(client, recordWithTask);
+
+				expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
+				expect(handlerCalls).toBe(0);
 			}));
 
 		test("fails the task and throws TaskFailedError when there is no retry budget", () =>
@@ -323,9 +521,9 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
-							taskState: {
+							attempts: 1,
+							state: {
 								status: "failed",
-								attempts: 1,
 								error: expect.objectContaining({ message: "declined" }),
 							},
 							workflowRunId: runRecord.id,
@@ -583,7 +781,8 @@ describe("task", () => {
 					.once(
 						{
 							id: runningTaskInfo.id,
-							taskState: completedTaskInfo.state,
+							attempts: 1,
+							state: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},

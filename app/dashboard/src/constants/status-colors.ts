@@ -2,27 +2,43 @@ import type { ScheduleStatus } from "@aikirun/types/schedule";
 import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type { TaskStatus } from "@aikirun/types/workflow/task";
 
-export const WORKFLOW_RUN_STATUS_COLORS: Record<WorkflowRunStatus, { tint: string; text: string }> = {
-	scheduled: { tint: "#A78BFA", text: "var(--accent-purple)" },
-	queued: { tint: "#C084FC", text: "var(--accent-purple)" },
-	running: { tint: "#38BDF8", text: "var(--accent-sky)" },
-	paused: { tint: "#FBBF24", text: "var(--accent-amber)" },
-	sleeping: { tint: "#818CF8", text: "var(--accent-indigo)" },
-	awaiting_event: { tint: "#F472B6", text: "var(--accent-pink)" },
-	awaiting_retry: { tint: "#FB923C", text: "var(--accent-orange)" },
-	awaiting_child_workflow: { tint: "#C084FC", text: "var(--accent-purple)" },
-	stalled: { tint: "#94A3B8", text: "var(--accent-gray)" },
-	cancelled: { tint: "#6B7280", text: "var(--accent-gray)" },
-	completed: { tint: "#34D399", text: "var(--accent-green)" },
-	failed: { tint: "#F87171", text: "var(--accent-red)" },
+/**
+ * Status colours are CSS custom properties, so a status keeps its meaning across
+ * themes while the actual hue is tuned per theme in index.css.
+ *
+ * `tint` fills a chip, `edge` draws its border. Both are mixed from the same
+ * colour, by an amount the theme decides (`--tint-mix` / `--edge-mix`).
+ */
+export function tint(color: string): string {
+	return `color-mix(in srgb, ${color} var(--tint-mix), transparent)`;
+}
+
+export function edge(color: string): string {
+	return `color-mix(in srgb, ${color} var(--edge-mix), transparent)`;
+}
+
+export const WORKFLOW_RUN_STATUS_COLORS: Record<WorkflowRunStatus, string> = {
+	scheduled: "var(--accent-indigo)",
+	queued: "var(--accent-purple)",
+	running: "var(--accent-sky)",
+	paused: "var(--accent-amber)",
+	sleeping: "var(--accent-indigo)",
+	awaiting_event: "var(--accent-pink)",
+	awaiting_retry: "var(--accent-orange)",
+	awaiting_task_retry: "var(--accent-orange)",
+	awaiting_child_workflow: "var(--accent-purple)",
+	stalled: "var(--accent-gray)",
+	cancelled: "var(--accent-gray)",
+	completed: "var(--accent-green)",
+	failed: "var(--accent-red)",
 };
 
-export const TASK_STATUS_COLORS: Record<TaskStatus, { tint: string; text: string }> = {
-	running: { tint: "#38BDF8", text: "var(--accent-sky)" },
-	awaiting_retry: { tint: "#FB923C", text: "var(--accent-orange)" },
-	completed: { tint: "#34D399", text: "var(--accent-green)" },
-	failed: { tint: "#F87171", text: "var(--accent-red)" },
-	discarded: { tint: "#6B7280", text: "var(--accent-gray)" },
+export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
+	running: "var(--accent-sky)",
+	awaiting_retry: "var(--accent-orange)",
+	completed: "var(--accent-green)",
+	failed: "var(--accent-red)",
+	discarded: "var(--accent-gray)",
 };
 
 export const TASK_STATUS_GLYPHS: Record<TaskStatus, string> = {
@@ -34,13 +50,13 @@ export const TASK_STATUS_GLYPHS: Record<TaskStatus, string> = {
 };
 
 export const SCHEDULE_STATUS_COLORS: Record<ScheduleStatus, string> = {
-	active: "#10B981",
-	paused: "#F59E0B",
-	inactive: "#6B7280",
+	active: "var(--accent-green)",
+	paused: "var(--accent-amber)",
+	inactive: "var(--accent-gray)",
 };
 
 export const API_KEY_STATUS_COLORS: Record<string, string> = {
-	active: "#34D399",
-	revoked: "#F87171",
-	expired: "#6B7280",
+	active: "var(--accent-green)",
+	revoked: "var(--accent-red)",
+	expired: "var(--accent-gray)",
 };

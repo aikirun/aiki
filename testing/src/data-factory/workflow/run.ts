@@ -23,10 +23,10 @@ export const workflowRunStateByStatus: {
 		nextAttemptAt: 0,
 		error: { name: "Error", message: "boom" },
 	},
+	awaiting_task_retry: { status: "awaiting_task_retry", nextAttemptAt: 0 },
 	awaiting_child_workflow: {
 		status: "awaiting_child_workflow",
 		childWorkflowRunId: "child-1",
-		childWorkflowRunStatus: "completed",
 	},
 	stalled: { status: "stalled" },
 	cancelled: { status: "cancelled" },
@@ -39,11 +39,6 @@ export const childWorkflowRunInfoFactory = Factory.define<ChildWorkflowRunInfo>(
 	name: "child-run",
 	versionId: "1.0.0",
 	inputHash: "hash",
-	waits: {
-		cancelled: [],
-		completed: [],
-		failed: [],
-	},
 }));
 
 const baseWorkflowRunRecord = (sequence: number): Omit<WorkflowRunRecord, "state"> => ({
@@ -53,6 +48,7 @@ const baseWorkflowRunRecord = (sequence: number): Omit<WorkflowRunRecord, "state
 	source: "user",
 	createdAt: 0,
 	revision: 0,
+	signalSequence: 0,
 	stateTransitionId: "transition",
 	input: { encodedValue: undefined },
 	inputHash: "hash",
@@ -62,6 +58,7 @@ const baseWorkflowRunRecord = (sequence: number): Omit<WorkflowRunRecord, "state
 	sleeps: {},
 	eventWaits: {},
 	childWorkflowRuns: {},
+	childWorkflowRunWaits: {},
 });
 
 export const baseWorkflowRunRecordFactory = Factory.define<Omit<WorkflowRunRecord, "state">>(({ sequence }) =>

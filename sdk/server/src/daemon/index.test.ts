@@ -191,7 +191,7 @@ describe("startDaemons", () => {
 		"process-imminent-scheduled-runs",
 		"process-imminent-sleep-elapsed-runs",
 		"process-imminent-retryable-runs",
-		"process-imminent-retryable-tasks",
+		"process-imminent-task-retryable-runs",
 		"process-imminent-event-wait-timed-out-runs",
 		"process-imminent-child-run-wait-timed-out-runs",
 		"process-imminent-recurring-runs",

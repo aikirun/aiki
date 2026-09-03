@@ -1,9 +1,10 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import { chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
+import { asNonEmptyArray, chunkLazy, isNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
-import type { WorkflowRunState, WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { WorkflowRunId, WorkflowRunState, WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
@@ -99,7 +100,7 @@ async function processChunk(
 ): Promise<void> {
 	const timedOutAt = Date.now() as TimestampMs;
 
-	const eventWaitEntries: EventWaitRowInsert[] = [];
+	const eventWaitEntries: Omit<EventWaitRowInsert, "signalSequence">[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
@@ -186,7 +187,7 @@ async function transitionToQueuedInTx(
 			filter: { id: string; revision: number };
 			update: { stateTransitionId: string };
 		}>;
-		eventWaitEntries: EventWaitRowInsert[];
+		eventWaitEntries: Omit<EventWaitRowInsert, "signalSequence">[];
 		stateTransitionEntries: StateTransitionRowInsert[];
 		outboxEntries: WorkflowRunOutboxRowInsertPending[];
 	},
@@ -222,7 +223,24 @@ async function transitionToQueuedInTx(
 		return [];
 	}
 
-	await txRepos.eventWait.insert(eventWaitEntriesToInsert);
+	const incrementedRuns = await txRepos.workflowRun.bulkIncrementSignalSequence(
+		asNonEmptyArray(
+			outboxEntriesToInsert.map((entry) => ({
+				namespaceId: entry.namespaceId as NamespaceId,
+				id: entry.workflowRunId as WorkflowRunId,
+			}))
+		)
+	);
+	const incrementedRunsById = new Map(incrementedRuns.map((run) => [run.id, run]));
+	const sequenceStampedEventWaitEntries = eventWaitEntriesToInsert.map((entry) => {
+		const incrementedRun = incrementedRunsById.get(entry.workflowRunId);
+		if (!incrementedRun) {
+			throw new Error(`Run not found: ${entry.workflowRunId}`);
+		}
+		return { ...entry, signalSequence: incrementedRun.signalSequence };
+	});
+
+	await txRepos.eventWait.insert(sequenceStampedEventWaitEntries);
 	await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
 	await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
 	return outboxEntriesToInsert;

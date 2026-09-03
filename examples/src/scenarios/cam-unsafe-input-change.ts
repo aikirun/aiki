@@ -9,10 +9,10 @@ await runWithWorker([cam.camInputChangeV1], async (client) => {
 	await delay(5_000);
 	cam.flags.inputChange = true;
 	await handle.events.proceed.send();
-	const result = await handle.waitForStatus("failed");
-	const passed = !result.success;
+	const result = await handle.wait();
+	const passed = result.state.status === "failed";
 	client.logger.info(`[CAM] Unsafe Input Change: ${passed ? "PASS" : "FAIL"}`, {
 		expected: "failed",
-		got: result.success ? "completed" : "failed",
+		got: result.state.status,
 	});
 });

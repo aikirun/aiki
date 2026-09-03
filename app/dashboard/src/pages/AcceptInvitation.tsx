@@ -35,7 +35,12 @@ function LoadingSpinner() {
 				padding: "24px 0",
 			}}
 		>
-			<svg style={{ width: 32, height: 32, color: "#667eea" }} fill="none" viewBox="0 0 24 24" className="animate-spin">
+			<svg
+				style={{ width: 32, height: 32, color: "var(--accent-ink)" }}
+				fill="none"
+				viewBox="0 0 24 24"
+				className="animate-spin"
+			>
 				<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
 				<path
 					className="opacity-75"
@@ -213,10 +218,10 @@ export function AcceptInvitation() {
 					<div
 						style={{
 							padding: 12,
-							borderRadius: 8,
-							background: "rgba(248,113,113,0.08)",
-							border: "1px solid rgba(248,113,113,0.2)",
-							color: "#F87171",
+							borderRadius: "var(--r-control)",
+							background: "color-mix(in srgb, var(--accent-red) var(--tint-mix), transparent)",
+							border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
+							color: "var(--accent-red)",
 							fontSize: 13,
 							textAlign: "center",
 						}}
@@ -229,7 +234,7 @@ export function AcceptInvitation() {
 							display: "block",
 							textAlign: "center",
 							fontSize: 13,
-							color: "#667eea",
+							color: "var(--accent-ink)",
 							fontWeight: 600,
 							textDecoration: "none",
 						}}
@@ -254,8 +259,8 @@ export function AcceptInvitation() {
 					<div
 						style={{
 							background: "var(--s2)",
-							border: "1px solid rgba(255,255,255,0.06)",
-							borderRadius: 8,
+							border: "1px solid var(--b0)",
+							borderRadius: "var(--r-panel)",
 							padding: "14px 16px",
 							display: "flex",
 							flexDirection: "column",
@@ -278,10 +283,10 @@ export function AcceptInvitation() {
 									fontSize: 10,
 									fontWeight: 600,
 									padding: "2px 8px",
-									borderRadius: 4,
+									borderRadius: "var(--r-chip)",
 									background: "rgba(167,139,250,0.12)",
-									color: "#A78BFA",
-									fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+									color: "var(--accent-ink)",
+									fontFamily: "var(--mono)",
 								}}
 							>
 								{invitation.role}
@@ -294,10 +299,10 @@ export function AcceptInvitation() {
 					<div
 						style={{
 							padding: 10,
-							borderRadius: 8,
-							background: "rgba(248,113,113,0.08)",
-							border: "1px solid rgba(248,113,113,0.2)",
-							color: "#F87171",
+							borderRadius: "var(--r-control)",
+							background: "color-mix(in srgb, var(--accent-red) var(--tint-mix), transparent)",
+							border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
+							color: "var(--accent-red)",
 							fontSize: 13,
 						}}
 					>
@@ -312,11 +317,11 @@ export function AcceptInvitation() {
 					style={{
 						width: "100%",
 						padding: "10px 16px",
-						background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+						background: "var(--accent)",
 						color: "#fff",
 						fontSize: 14,
 						fontWeight: 700,
-						borderRadius: 8,
+						borderRadius: "var(--r-control)",
 						border: "none",
 						cursor: isActing ? "not-allowed" : "pointer",
 						opacity: isActing ? 0.5 : 1,
@@ -334,11 +339,11 @@ export function AcceptInvitation() {
 						width: "100%",
 						padding: "10px 16px",
 						background: "none",
-						border: "1px solid rgba(248,113,113,0.25)",
-						color: "#F87171",
+						border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
+						color: "var(--accent-red)",
 						fontSize: 14,
 						fontWeight: 600,
-						borderRadius: 8,
+						borderRadius: "var(--r-control)",
 						cursor: isActing ? "not-allowed" : "pointer",
 						opacity: isActing ? 0.5 : 1,
 						fontFamily: "inherit",

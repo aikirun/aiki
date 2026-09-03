@@ -13,7 +13,7 @@ import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type { Serializable } from "@aikirun/lib/serializable";
 import { createSerializableError } from "@aikirun/lib/serializable";
-import type { EncodedPayload } from "@aikirun/types/infra/codec";
+import type { Codec, EncodedPayload } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { UnconsumedManifestEntries, WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
@@ -22,7 +22,14 @@ import {
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
-import type { TaskAddress, TaskId, TaskInfo, TaskName, TaskStartOptions } from "@aikirun/types/workflow/task";
+import type {
+	TaskAddress,
+	TaskId,
+	TaskInfo,
+	TaskName,
+	TaskStartOptions,
+	TaskStateAwaitingRetry,
+} from "@aikirun/types/workflow/task";
 import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
@@ -30,6 +37,7 @@ import type { WorkflowRun } from "./run";
 import type { WorkflowExecutionConfig } from "./run/execute";
 import type { WorkflowRunHandle } from "./run/handle";
 import { validateWithSchema } from "./run/schema-validation";
+import type { TaskExecutionTracker } from "./run/task-execution-tracker";
 
 type UnknownWorkflowRun = WorkflowRun<unknown, unknown>;
 type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
@@ -121,38 +129,52 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	}
 
 	public async start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
-		return this.startWithOptions(run, this.startOptionsBuilder.build(), ...args);
+		const executionTracker = run[INTERNAL].createTaskExecutionTracker();
+		try {
+			return await this.startWithOptions(run, this.startOptionsBuilder.build(), executionTracker, ...args);
+		} finally {
+			executionTracker.end();
+		}
 	}
 
 	private async startWithOptions(
 		run: UnknownWorkflowRun,
 		startOptions: TaskStartOptions,
+		executionTracker: TaskExecutionTracker,
 		...args: Input extends void ? [] : [Input]
 	): Promise<Output> {
-		const handle = run[INTERNAL].handle;
-		const hasher = run[INTERNAL].hasher;
-		const codec = run[INTERNAL].codec;
+		const {
+			logger,
+			[INTERNAL]: { handle, hasher, codec, replayManifest, configProvider },
+		} = run;
+
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
 		const inputSchemaValidationResult = inputSchema
-			? validateWithSchema(handle, inputSchema, inputRaw, run.logger, "Invalid task data")
+			? validateWithSchema(handle, inputSchema, inputRaw, logger, "Invalid task data")
 			: (inputRaw as Input);
 		const input =
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		const inputHash = await hasher(input);
 		const address = getCompositeId<TaskAddress>({ name: this.name, referenceId: inputHash });
 
-		const replayManifest = run[INTERNAL].replayManifest;
-
 		if (replayManifest.hasUnconsumedEntries()) {
 			const existingTaskInfo = replayManifest.consumeNextTask(address);
 			if (existingTaskInfo) {
-				return this.getExistingTaskResult(run, handle, startOptions, input, existingTaskInfo);
+				return this.getExistingTaskResult(
+					handle,
+					executionTracker,
+					input,
+					existingTaskInfo,
+					codec,
+					configProvider,
+					logger
+				);
 			}
 
-			await this.throwNonDeterminismError(run, handle, inputHash, replayManifest.getUnconsumedEntries());
+			await this.throwNonDeterminismError(handle, inputHash, replayManifest.getUnconsumedEntries(), logger);
 		}
 
 		const attempts = 1;
@@ -167,134 +189,142 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			clientCodec: run[INTERNAL].clientCodec,
 		});
 
-		const logger = run.logger.child({
+		const taskLogger = logger.child({
 			"aiki.taskName": this.name,
 			"aiki.taskId": taskInfo.id,
 		});
 
-		logger.info("Task started", { "aiki.attempts": attempts });
+		taskLogger.info("Task started", { "aiki.attempts": attempts });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(
 			handle,
+			executionTracker,
 			input,
 			taskInfo.id as TaskId,
 			retryStrategy,
 			attempts,
-			run[INTERNAL].configProvider,
-			logger
+			configProvider,
+			taskLogger
 		);
 
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
-			taskState: { status: "completed", attempts: lastAttempt, output: await codec.encode(output) },
+			attempts: lastAttempt,
+			state: { status: "completed", output: await codec.encode(output) },
 		});
-		logger.info("Task complete", { "aiki.attempts": lastAttempt });
+		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
 	}
 
 	private async getExistingTaskResult(
-		run: UnknownWorkflowRun,
 		handle: UnknownWorkflowRunHandle,
-		startOptions: TaskStartOptions,
+		executionTracker: TaskExecutionTracker,
 		input: Input,
-		existingTaskInfo: TaskInfo
+		existingTaskInfo: TaskInfo,
+		codec: Codec,
+		configProvider: ConfigProvider<WorkflowExecutionConfig>,
+		logger: Logger
 	) {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return (await run[INTERNAL].codec.decode(existingTaskState.output as EncodedPayload)) as Output;
+			return (await codec.decode(existingTaskState.output as EncodedPayload)) as Output;
 		}
 
 		if (existingTaskState.status === "failed") {
 			throw new TaskFailedError(
 				existingTaskInfo.id as TaskId,
-				existingTaskState.attempts,
+				existingTaskInfo.attempts,
 				existingTaskState.error.message
 			);
 		}
 
 		existingTaskState.status satisfies "running" | "awaiting_retry";
 
-		const attempts = existingTaskState.attempts;
-		const retryStrategy = startOptions.retry ?? { type: "never" };
-		this.assertRetryAllowed(existingTaskInfo.id as TaskId, attempts, retryStrategy, run.logger);
+		const attempts = existingTaskInfo.attempts;
+		const retryStrategy = existingTaskInfo.options?.retry ?? { type: "never" };
+		this.assertRetryAttemptsLeft(existingTaskInfo.id as TaskId, attempts, retryStrategy, logger);
+		if (existingTaskState.status === "awaiting_retry") {
+			await this.assertRetryIsDue(
+				handle,
+				executionTracker,
+				existingTaskInfo.id as TaskId,
+				existingTaskState,
+				configProvider,
+				logger
+			);
+		}
 
-		run.logger.debug("Retrying task", {
+		logger.debug("Retrying task", {
 			"aiki.taskName": this.name,
 			"aiki.taskId": existingTaskInfo.id,
 			"aiki.attempts": attempts,
 			"aiki.taskStatus": existingTaskState.status,
 		});
 
-		return this.retryAndExecute(run, handle, input, existingTaskInfo.id, startOptions, retryStrategy, attempts);
+		return this.retryExecute(
+			handle,
+			executionTracker,
+			input,
+			existingTaskInfo.id,
+			retryStrategy,
+			attempts,
+			codec,
+			configProvider,
+			logger
+		);
 	}
 
-	private async throwNonDeterminismError(
-		run: UnknownWorkflowRun,
+	private async retryExecute(
 		handle: UnknownWorkflowRunHandle,
-		inputHash: string,
-		unconsumedManifestEntries: UnconsumedManifestEntries
-	): Promise<never> {
-		run.logger.error("Replay divergence", {
-			"aiki.taskName": this.name,
-			"aiki.inputHash": inputHash,
-			"aiki.unconsumedManifestEntries": unconsumedManifestEntries,
-		});
-		const err = new NonDeterminismError(run.id, handle.run.attempts, unconsumedManifestEntries);
-		await handle[INTERNAL].transitionState({
-			status: "failed",
-			cause: "self",
-			error: createSerializableError(err),
-		});
-		throw err;
-	}
-
-	private async retryAndExecute(
-		run: UnknownWorkflowRun,
-		handle: UnknownWorkflowRunHandle,
+		executionTracker: TaskExecutionTracker,
 		input: Input,
 		taskId: string,
-		startOptions: TaskStartOptions,
 		retryStrategy: RetryStrategy,
-		previousAttempts: number
+		previousAttempts: number,
+		codec: Codec,
+		configProvider: ConfigProvider<WorkflowExecutionConfig>,
+		logger: Logger
 	): Promise<Output> {
 		const attempts = previousAttempts + 1;
 
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "retry",
 			id: taskId,
-			options: startOptions,
-			taskState: { status: "running", attempts },
+			attempts,
 		});
 
-		const logger = run.logger.child({
+		const taskLogger = logger.child({
 			"aiki.taskName": this.name,
 			"aiki.taskId": taskInfo.id,
 		});
-		logger.info("Task started", { "aiki.attempts": attempts });
+		taskLogger.info("Task started", { "aiki.attempts": attempts });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(
 			handle,
+			executionTracker,
 			input,
 			taskInfo.id as TaskId,
 			retryStrategy,
 			attempts,
-			run[INTERNAL].configProvider,
-			logger
+			configProvider,
+			taskLogger
 		);
 
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
-			taskState: { status: "completed", attempts: lastAttempt, output: await run[INTERNAL].codec.encode(output) },
+			attempts: lastAttempt,
+			state: { status: "completed", output: await codec.encode(output) },
 		});
-		logger.info("Task complete", { "aiki.attempts": lastAttempt });
+		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
 	}
 
 	private async tryExecuteTask(
 		handle: UnknownWorkflowRunHandle,
+		executionTracker: TaskExecutionTracker,
 		input: Input,
 		taskId: TaskId,
 		retryStrategy: RetryStrategy,
@@ -341,7 +371,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					});
 					await handle[INTERNAL].transitionTaskState({
 						id: taskId,
-						taskState: { status: "failed", attempts, error: serializableError },
+						attempts,
+						state: { status: "failed", error: serializableError },
 					});
 					throw new TaskFailedError(taskId, attempts, serializableError.message);
 				}
@@ -360,19 +391,45 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 				await handle[INTERNAL].transitionTaskState({
 					id: taskId,
-					taskState: {
+					attempts,
+					state: {
 						status: "awaiting_retry",
-						attempts,
 						error: serializableError,
 						nextAttemptInMs: retryParams.delayMs,
 					},
 				});
+				executionTracker.awaitingRetry();
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
 		}
 	}
 
-	private assertRetryAllowed(taskId: TaskId, attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
+	private async throwNonDeterminismError(
+		handle: UnknownWorkflowRunHandle,
+		inputHash: string,
+		unconsumedManifestEntries: UnconsumedManifestEntries,
+		logger: Logger
+	): Promise<never> {
+		logger.error("Replay divergence", {
+			"aiki.taskName": this.name,
+			"aiki.inputHash": inputHash,
+			"aiki.unconsumedManifestEntries": unconsumedManifestEntries,
+		});
+		const err = new NonDeterminismError(handle.run.id as WorkflowRunId, handle.run.attempts, unconsumedManifestEntries);
+		await handle[INTERNAL].transitionState({
+			status: "failed",
+			cause: "self",
+			error: createSerializableError(err),
+		});
+		throw err;
+	}
+
+	private assertRetryAttemptsLeft(
+		taskId: TaskId,
+		attempts: number,
+		retryStrategy: RetryStrategy,
+		logger: Logger
+	): void {
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
 			logger.error("Task retry not allowed", {
@@ -381,6 +438,29 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				"aiki.attempts": attempts,
 			});
 			throw new TaskFailedError(taskId, attempts, "Task retry not allowed");
+		}
+	}
+
+	private async assertRetryIsDue(
+		handle: UnknownWorkflowRunHandle,
+		executionTracker: TaskExecutionTracker,
+		taskId: TaskId,
+		taskState: TaskStateAwaitingRetry,
+		configProvider: ConfigProvider<WorkflowExecutionConfig>,
+		logger: Logger
+	): Promise<void> {
+		const remainingDelayMs = taskState.nextAttemptAt - Date.now();
+		if (remainingDelayMs > configProvider.config.maxInlineWaitMs) {
+			executionTracker.awaitingRetry();
+			logger.debug("Task retry not due, suspending", {
+				"aiki.taskName": this.name,
+				"aiki.taskId": taskId,
+				"aiki.remainingDelayMs": remainingDelayMs,
+			});
+			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
+		}
+		if (remainingDelayMs > 0) {
+			await delay(remainingDelayMs);
 		}
 	}
 }

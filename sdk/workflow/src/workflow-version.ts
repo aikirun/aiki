@@ -146,8 +146,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	}
 
 	private runOptions(): WorkflowRunOptions {
-		const { retry, pool } = this.startOptionsBuilder.build();
-		return { retry, pool };
+		const { retry, pool, priority } = this.startOptionsBuilder.build();
+		return { retry, pool, priority };
 	}
 
 	public with<Path extends PathFromObject<WorkflowStartOptions>>(
@@ -240,10 +240,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			versionId: this.versionId,
 			referenceId: referenceId ?? inputHash.value,
 		});
-		const replayManifest = parentRun[INTERNAL].replayManifest;
+		const parentRunReplayManifest = parentRun[INTERNAL].replayManifest;
 
-		if (replayManifest.hasUnconsumedEntries()) {
-			const existingRunInfo = replayManifest.consumeNextChildWorkflowRun(address);
+		if (parentRunReplayManifest.hasUnconsumedEntries()) {
+			const existingRunInfo = parentRunReplayManifest.consumeNextChildWorkflowRun(address);
 			if (existingRunInfo) {
 				const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
 
@@ -257,16 +257,20 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					client,
 					existingRun as WorkflowRunRecord,
 					parentRun[INTERNAL].handle,
-					existingRunInfo.waits,
 					logger,
 					this[INTERNAL].eventsDefinition
 				);
 			}
 
-			await this.throwNonDeterminismError(parentRun, parentRunHandle, inputHash.value, referenceId, replayManifest);
+			await this.throwNonDeterminismError(
+				parentRun,
+				parentRunHandle,
+				inputHash.value,
+				referenceId,
+				parentRunReplayManifest
+			);
 		}
 
-		const pool = parentRun.options.pool;
 		let newRunId: string | undefined;
 		try {
 			const response = await client.api.workflowRun.createV1({
@@ -276,7 +280,11 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				inputHash,
 				clientCodec: parentRun[INTERNAL].clientCodec,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
-				options: pool === undefined ? startOptions : { ...startOptions, pool },
+				options: {
+					...startOptions,
+					pool: startOptions.pool ?? parentRun.options.pool,
+					priority: startOptions.priority ?? parentRun.options.priority,
+				},
 			});
 			newRunId = response.id;
 		} catch (err) {
@@ -299,11 +307,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			client,
 			newRun as WorkflowRunRecord,
 			parentRun[INTERNAL].handle,
-			{
-				cancelled: [],
-				completed: [],
-				failed: [],
-			},
 			logger,
 			this[INTERNAL].eventsDefinition
 		);
@@ -314,9 +317,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
 		inputHash: string,
 		referenceId: string | undefined,
-		manifest: ReplayManifest
+		parentRunReplayManifest: ReplayManifest
 	): Promise<never> {
-		const unconsumedManifestEntries = manifest.getUnconsumedEntries();
+		const unconsumedManifestEntries = parentRunReplayManifest.getUnconsumedEntries();
 
 		const logMeta: Record<string, unknown> = {
 			"aiki.workflowName": this.name,

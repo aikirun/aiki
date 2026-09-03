@@ -1,33 +1,34 @@
 import { SCHEDULE_STATUSES, type Schedule, type ScheduleStatus } from "@aikirun/types/schedule";
 import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 import { useQueryClient } from "@tanstack/react-query";
-import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { namespaceAuthedClient } from "../api/client";
 import { useSchedules, useWorkflowVersions } from "../api/hooks";
 import { CopyButton } from "../components/common/CopyButton";
+import { DataBlock } from "../components/common/DataBlock";
+import {
+	btnSecondary,
+	btnTinted,
+	card,
+	cardGrid,
+	chipNeutral,
+	chipStatus,
+	fieldLabel,
+	inputFocusProps,
+	inputStyle,
+	LIST_ROWS,
+} from "../components/common/ui";
 import { WorkflowSearchInput } from "../components/runs/WorkflowSearchInput";
 import { SCHEDULE_STATUS_CONFIG } from "../constants/schedule-status";
+import { edge, tint } from "../constants/status-colors";
 import { useDebounce } from "../hooks/useDebounce";
 import { useElementWidth } from "../hooks/useElementWidth";
 
 const PAGE_SIZE = 25;
 
 // --- Shared styles ---
-
-const inputStyle: CSSProperties = {
-	backgroundColor: "var(--s1)",
-	border: "1px solid var(--b0)",
-	borderRadius: 6,
-	padding: "5px 9px",
-	fontFamily: "var(--mono, 'IBM Plex Mono', monospace)",
-	fontSize: 11.5,
-	color: "var(--t0)",
-	outline: "none",
-	width: "100%",
-};
 
 function FilterInput({
 	value,
@@ -39,13 +40,16 @@ function FilterInput({
 	placeholder: string;
 }) {
 	return (
-		<div style={{ flex: 1, minWidth: 0 }}>
+		// A 160px basis, not `flex: 1`: these fields either all share a row or all take
+		// one each, rather than two sharing while the third stretches to the full width.
+		<div style={{ flex: "1 1 160px", minWidth: 0 }}>
 			<input
 				type="text"
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder={placeholder}
 				style={inputStyle}
+				{...inputFocusProps}
 			/>
 		</div>
 	);
@@ -54,53 +58,16 @@ function FilterInput({
 function SchedulePill({ status }: { status: ScheduleStatus }) {
 	const config = SCHEDULE_STATUS_CONFIG[status];
 	return (
-		<span
-			style={{
-				display: "inline-flex",
-				alignItems: "center",
-				gap: 4,
-				padding: "2px 8px",
-				borderRadius: 999,
-				background: `${config.color}30`,
-				border: `1px solid ${config.color}50`,
-				fontSize: 10.5,
-				fontWeight: 600,
-				color: config.textColor,
-			}}
-		>
+		<span style={chipStatus(config.color)}>
 			<span style={{ fontSize: 8 }}>{config.glyph}</span>
 			{config.label}
 		</span>
 	);
 }
 
-function ActionBtn({
-	label,
-	color,
-	textColor,
-	onClick,
-}: {
-	label: string;
-	color: string;
-	textColor?: string;
-	onClick: () => void;
-}) {
+function ActionBtn({ label, color, onClick }: { label: string; color: string; onClick: () => void }) {
 	return (
-		<button
-			type="button"
-			onClick={onClick}
-			style={{
-				background: `${color}30`,
-				border: `1px solid ${color}50`,
-				color: textColor ?? color,
-				fontSize: 11.5,
-				fontWeight: 600,
-				padding: "5px 13px",
-				borderRadius: 7,
-				cursor: "pointer",
-				fontFamily: "inherit",
-			}}
-		>
+		<button type="button" onClick={onClick} style={{ ...btnTinted(color), fontSize: 11.5, padding: "5px 12px" }}>
 			{label}
 		</button>
 	);
@@ -108,21 +75,23 @@ function ActionBtn({
 
 function Meta({ label, value, copyable }: { label: string; value: string | number; copyable?: boolean }) {
 	return (
-		<div>
-			<div
-				style={{
-					fontSize: 9,
-					fontWeight: 600,
-					textTransform: "uppercase",
-					letterSpacing: "0.07em",
-					color: "var(--t3)",
-					marginBottom: 2,
-				}}
-			>
-				{label}
-			</div>
-			<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-				<span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 500, color: "var(--t0)" }}>{value}</span>
+		// A full id is one unbroken token wider than a phone's card. Bounded by the
+		// row and allowed to break, it takes two lines instead of running off the edge.
+		<div style={{ minWidth: 0, maxWidth: "100%" }}>
+			<div style={{ ...fieldLabel(), marginBottom: 3 }}>{label}</div>
+			<div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+				<span
+					style={{
+						fontFamily: "var(--mono)",
+						fontSize: 12,
+						fontWeight: 500,
+						color: "var(--t0)",
+						minWidth: 0,
+						overflowWrap: "break-word",
+					}}
+				>
+					{value}
+				</span>
 				{copyable && <CopyButton text={String(value)} />}
 			</div>
 		</div>
@@ -274,8 +243,10 @@ export function SchedulesList() {
 	return (
 		<div className="anim-in">
 			{/* Filters */}
-			<div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-				<div style={{ display: "flex", gap: 8 }}>
+			<div
+				style={{ ...card, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}
+			>
+				<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
 					<FilterInput
 						value={idFilter}
 						onChange={(v) => {
@@ -293,8 +264,10 @@ export function SchedulesList() {
 						placeholder="Reference ID"
 					/>
 				</div>
-				<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-					<div style={{ flex: 1 }}>
+				<div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+					{/* A real basis so the version select drops to its own line rather than
+					    squeezing the name field to a few characters. */}
+					<div style={{ flex: "1 1 200px", minWidth: 0 }}>
 						<WorkflowSearchInput
 							value={workflowFilter}
 							onChange={(v) => {
@@ -311,7 +284,7 @@ export function SchedulesList() {
 								setVersionFilter(e.target.value);
 								updateParams({ version: e.target.value });
 							}}
-							style={{ ...inputStyle, width: "auto", cursor: "pointer" }}
+							style={{ ...inputStyle, flex: "0 1 auto", width: "auto", minWidth: 0, cursor: "pointer" }}
 						>
 							<option value="">All versions</option>
 							{versionsData.versions.map((v) => (
@@ -334,23 +307,24 @@ export function SchedulesList() {
 								type="button"
 								onClick={() => toggleStatus(status)}
 								style={{
-									padding: "3px 8px",
-									borderRadius: 999,
-									fontSize: 10,
+									padding: "4px 9px",
+									borderRadius: "var(--r-chip)",
+									fontFamily: "var(--sans)",
+									fontSize: 11,
 									fontWeight: 600,
+									lineHeight: 1.45,
 									cursor: "pointer",
-									transition: "all 0.12s",
-									fontFamily: "inherit",
+									transition: "color .16s ease, background-color .16s ease, border-color .16s ease",
 									...(isActive
 										? {
 												color: config.color,
-												background: `${config.color}20`,
-												border: `1px solid ${config.color}35`,
+												background: tint(config.color),
+												border: `1px solid ${edge(config.color)}`,
 											}
 										: {
-												color: "var(--t3)",
-												background: "transparent",
-												border: "1px solid var(--b0)",
+												color: "var(--t2)",
+												background: "var(--s2)",
+												border: "1px solid transparent",
 											}),
 								}}
 							>
@@ -381,27 +355,34 @@ export function SchedulesList() {
 				</div>
 			</div>
 
-			{/* Schedule list */}
-			<div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-				{isLoading && schedules.length === 0 ? (
-					["a", "b", "c", "d"].map((key) => (
-						<div key={key} style={{ height: 64, borderRadius: 8, background: "var(--s1)" }} className="animate-pulse" />
-					))
-				) : schedules.length === 0 ? (
-					<div style={{ padding: 40, textAlign: "center", color: "var(--t3)", fontSize: 13 }}>No schedules match</div>
-				) : (
-					schedules.map((item, i) => (
-						<ScheduleRow
-							key={item.schedule.id}
-							schedule={item.schedule}
-							runCount={item.runCount}
-							idx={i}
-							onViewRuns={handleViewRuns}
-							onAction={handleAction}
-						/>
-					))
-				)}
-			</div>
+			{/* Schedule list — one enclosed grid, rows separated by hairlines */}
+			{schedules.length === 0 && !isLoading ? (
+				<div style={{ ...card, padding: "64px 24px", textAlign: "center" }}>
+					<p style={{ margin: 0, fontSize: 17, fontWeight: 700, letterSpacing: "-0.024em", color: "var(--t0)" }}>
+						No schedules match these filters
+					</p>
+					<p style={{ margin: "8px 0 0", fontSize: 14, lineHeight: 1.6, color: "var(--t3)" }}>
+						Clear a filter, or create a schedule to see it here.
+					</p>
+				</div>
+			) : (
+				<div className={LIST_ROWS} style={cardGrid}>
+					{isLoading && schedules.length === 0
+						? ["a", "b", "c", "d"].map((key) => (
+								<div key={key} style={{ height: 70, background: "var(--s1)" }} className="animate-pulse" />
+							))
+						: schedules.map((item, i) => (
+								<ScheduleRow
+									key={item.schedule.id}
+									schedule={item.schedule}
+									runCount={item.runCount}
+									idx={i}
+									onViewRuns={handleViewRuns}
+									onAction={handleAction}
+								/>
+							))}
+				</div>
+			)}
 
 			{/* Pagination */}
 			{totalPages > 1 && (
@@ -414,7 +395,7 @@ export function SchedulesList() {
 						padding: "0 4px",
 					}}
 				>
-					<span style={{ fontSize: 10, color: "var(--t3)" }}>
+					<span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--t3)" }}>
 						{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
 					</span>
 					<div style={{ display: "flex", gap: 4 }}>
@@ -423,15 +404,11 @@ export function SchedulesList() {
 							disabled={page === 0}
 							onClick={() => setPage(page - 1)}
 							style={{
-								padding: "4px 10px",
-								fontSize: 11,
-								borderRadius: 6,
-								background: "var(--s2)",
-								border: "1px solid var(--b0)",
-								color: "var(--t1)",
+								...btnSecondary(),
+								fontSize: 12,
+								padding: "5px 12px",
 								cursor: page === 0 ? "not-allowed" : "pointer",
-								opacity: page === 0 ? 0.3 : 1,
-								fontFamily: "inherit",
+								opacity: page === 0 ? 0.35 : 1,
 							}}
 						>
 							Prev
@@ -441,15 +418,11 @@ export function SchedulesList() {
 							disabled={page >= totalPages - 1}
 							onClick={() => setPage(page + 1)}
 							style={{
-								padding: "4px 10px",
-								fontSize: 11,
-								borderRadius: 6,
-								background: "var(--s2)",
-								border: "1px solid var(--b0)",
-								color: "var(--t1)",
+								...btnSecondary(),
+								fontSize: 12,
+								padding: "5px 12px",
 								cursor: page >= totalPages - 1 ? "not-allowed" : "pointer",
-								opacity: page >= totalPages - 1 ? 0.3 : 1,
-								fontFamily: "inherit",
+								opacity: page >= totalPages - 1 ? 0.35 : 1,
 							}}
 						>
 							Next
@@ -491,80 +464,60 @@ function ScheduleRow({
 
 	return (
 		<div ref={rowRef} className="anim-in" style={{ animationDelay: `${idx * 30}ms` }}>
-			{/* Collapsed row */}
-			<button
-				type="button"
-				onClick={() => setOpen(!open)}
+			{/* Collapsed row — the workflow name is the toggle; everything else sits beside it */}
+			<div
+				className="list-row"
 				style={{
-					display: "block",
+					position: "relative",
 					width: "100%",
 					textAlign: "left",
-					padding: "12px 16px",
-					background: "var(--s1)",
-					border: `1px solid ${open ? "var(--b0)" : "transparent"}`,
-					borderRadius: open ? "8px 8px 0 0" : 8,
-					cursor: "pointer",
-					transition: "all 0.12s",
-					font: "inherit",
-					color: "inherit",
-				}}
-				onMouseEnter={(e) => {
-					e.currentTarget.style.background = "var(--s2)";
-				}}
-				onMouseLeave={(e) => {
-					e.currentTarget.style.background = "var(--s1)";
+					padding: "13px 18px",
 				}}
 			>
 				<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
 					<div style={{ flex: 1, minWidth: 0 }}>
 						{/* Line 1: name, version, status pill, spec badge */}
 						<div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5, flexWrap: "wrap" }}>
-							<span style={{ fontSize: 13, fontWeight: 700, color: "var(--t0)" }}>{schedule.workflowName}</span>
-							<span
+							<button
+								type="button"
+								className="row-target"
+								aria-expanded={open}
+								onClick={() => setOpen(!open)}
 								style={{
-									fontFamily: "monospace",
-									fontSize: 10,
-									color: "var(--t3)",
-									background: "var(--s3)",
-									padding: "1px 5px",
-									borderRadius: 4,
+									background: "none",
+									border: "none",
+									padding: 0,
+									cursor: "pointer",
+									fontFamily: "var(--sans)",
+									fontSize: 13.5,
+									fontWeight: 700,
+									letterSpacing: "-0.018em",
+									color: "var(--t0)",
+									textAlign: "left",
 								}}
 							>
-								v{schedule.workflowVersionId}
-							</span>
+								{schedule.workflowName}
+							</button>
+							<span style={chipNeutral()}>v{schedule.workflowVersionId}</span>
 							<SchedulePill status={schedule.status} />
-							<span
-								style={{
-									fontFamily: "monospace",
-									fontSize: 10,
-									padding: "1px 6px",
-									borderRadius: 4,
-									background: isCron ? "rgba(129,140,248,0.18)" : "rgba(56,189,248,0.18)",
-									color: isCron ? "var(--accent-indigo)" : "var(--accent-sky)",
-									border: `1px solid ${isCron ? "rgba(129,140,248,0.35)" : "rgba(56,189,248,0.35)"}`,
-								}}
-							>
-								{specLabel}
-							</span>
+							<span style={chipStatus(isCron ? "var(--accent-indigo)" : "var(--accent-sky)")}>{specLabel}</span>
 						</div>
 
 						{/* Line 2: short ID, ref, overlap */}
 						<div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10.5, color: "var(--t3)" }}>
 							<span style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-								<span style={{ fontFamily: "monospace", fontSize: 10, whiteSpace: "nowrap" }}>
-									ID: {shortId(schedule.id)}
+								<span style={{ fontFamily: "var(--mono)", fontSize: 10, whiteSpace: "nowrap" }}>
+									<span style={{ opacity: 0.62 }}>ID</span> {shortId(schedule.id)}
 								</span>
 								<CopyButton text={schedule.id} />
 							</span>
 							{showRef && schedule.referenceId && (
 								<>
-									<span style={{ fontSize: 10, color: "var(--t1)", fontWeight: 700, marginLeft: -2, marginRight: 2 }}>
-										•
-									</span>
+									<span style={{ fontSize: 10, color: "var(--b0)", marginLeft: -2, marginRight: 2 }}>•</span>
 									<span style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
 										<span
 											style={{
-												fontFamily: "monospace",
+												fontFamily: "var(--mono)",
 												fontSize: 10,
 												color: "var(--t3)",
 												overflow: "hidden",
@@ -574,25 +527,14 @@ function ScheduleRow({
 											}}
 											title={schedule.referenceId}
 										>
-											REF: {schedule.referenceId}
+											<span style={{ opacity: 0.62 }}>REF</span> {schedule.referenceId}
 										</span>
 										<CopyButton text={schedule.referenceId} />
 									</span>
 								</>
 							)}
 							{showOverlap && schedule.spec.overlapPolicy && (
-								<span
-									style={{
-										fontFamily: "monospace",
-										fontSize: 9.5,
-										color: "var(--t3)",
-										background: "var(--s3)",
-										padding: "1px 5px",
-										borderRadius: 3,
-									}}
-								>
-									OVERLAP: {schedule.spec.overlapPolicy}
-								</span>
+								<span style={{ ...chipNeutral(), fontSize: 9.5 }}>overlap {schedule.spec.overlapPolicy}</span>
 							)}
 						</div>
 					</div>
@@ -611,7 +553,7 @@ function ScheduleRow({
 					>
 						<div style={{ textAlign: "right" }}>
 							{schedule.status === "active" && schedule.nextRunAt > 0 && (
-								<div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--accent-sky)", fontWeight: 500 }}>
+								<div style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--accent-sky)", fontWeight: 500 }}>
 									next {timeUntil(schedule.nextRunAt)}
 								</div>
 							)}
@@ -625,9 +567,11 @@ function ScheduleRow({
 							type="button"
 							onClick={viewRuns}
 							style={{
+								position: "relative",
+								zIndex: 1,
 								color: "var(--accent-sky)",
 								cursor: "pointer",
-								borderBottom: "1px dashed #38BDF8",
+								borderBottom: "1px dashed currentColor",
 								paddingBottom: 1,
 								background: "none",
 								border: "none",
@@ -641,7 +585,7 @@ function ScheduleRow({
 						</button>
 					</div>
 				</div>
-			</button>
+			</div>
 
 			{/* Expanded detail */}
 			{open && (
@@ -649,10 +593,8 @@ function ScheduleRow({
 					className="anim-in"
 					style={{
 						background: "var(--s2)",
-						border: "1px solid var(--b0)",
-						borderTop: "none",
-						borderRadius: "0 0 8px 8px",
-						padding: "14px 16px",
+						borderTop: "1px solid var(--b0)",
+						padding: "16px 18px",
 					}}
 				>
 					{/* Metadata row */}
@@ -677,78 +619,46 @@ function ScheduleRow({
 					{/* Input JSON */}
 					{schedule.workflowRunInput != null &&
 						Object.keys(schedule.workflowRunInput as Record<string, unknown>).length > 0 && (
-							<div style={{ marginBottom: 12 }}>
-								<div
-									style={{
-										fontSize: 9,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.07em",
-										color: "var(--t3)",
-										marginBottom: 4,
-									}}
-								>
-									Input
-								</div>
-								<pre
-									style={{
-										fontFamily: "monospace",
-										fontSize: 11,
-										color: "var(--t1)",
-										lineHeight: 1.5,
-										whiteSpace: "pre-wrap",
-										margin: 0,
-									}}
-								>
-									{JSON.stringify(schedule.workflowRunInput, null, 2)}
-								</pre>
+							<div style={{ marginBottom: 14 }}>
+								<DataBlock label="Input" text={JSON.stringify(schedule.workflowRunInput, null, 2)} />
 							</div>
 						)}
 
 					{/* Action buttons */}
-					<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-						{schedule.status === "active" && (
-							<ActionBtn
-								label="Pause"
-								color="#FBBF24"
-								textColor="var(--accent-amber)"
-								onClick={() => onAction("pause", schedule.id)}
-							/>
-						)}
-						{schedule.status === "paused" && (
-							<ActionBtn
-								label="Resume"
-								color="#34D399"
-								textColor="var(--accent-green)"
-								onClick={() => onAction("resume", schedule.id)}
-							/>
-						)}
-						{schedule.status !== "inactive" && (
-							<ActionBtn
-								label="Deactivate"
-								color="#F87171"
-								textColor="var(--accent-red)"
-								onClick={() => onAction("deactivate", schedule.id)}
-							/>
-						)}
-						<div style={{ flex: 1 }} />
+					{/*
+					 * The state actions travel together and "View runs" sits opposite them.
+					 * `space-between` rather than a margin on the last button: once the row
+					 * wraps, a margin would push "View runs" to the right of its own line,
+					 * out of line with the buttons above it.
+					 */}
+					<div
+						style={{
+							display: "flex",
+							gap: 6,
+							alignItems: "center",
+							flexWrap: "wrap",
+							justifyContent: "space-between",
+						}}
+					>
+						<div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+							{schedule.status === "active" && (
+								<ActionBtn label="Pause" color="var(--accent-amber)" onClick={() => onAction("pause", schedule.id)} />
+							)}
+							{schedule.status === "paused" && (
+								<ActionBtn label="Resume" color="var(--accent-green)" onClick={() => onAction("resume", schedule.id)} />
+							)}
+							{schedule.status !== "inactive" && (
+								<ActionBtn
+									label="Deactivate"
+									color="var(--accent-red)"
+									onClick={() => onAction("deactivate", schedule.id)}
+								/>
+							)}
+						</div>
 						<button
 							type="button"
 							onClick={() => onViewRuns(schedule.id)}
-							style={{
-								background: "rgba(56,189,248,0.12)",
-								border: "1px solid rgba(56,189,248,0.35)",
-								color: "var(--accent-sky)",
-								fontSize: 11,
-								fontWeight: 600,
-								fontFamily: "inherit",
-								padding: "5px 13px",
-								borderRadius: 7,
-								cursor: "pointer",
-								display: "flex",
-								alignItems: "center",
-								gap: 5,
-							}}
+							style={{ ...btnTinted("var(--accent-sky)"), fontSize: 11.5, padding: "5px 12px" }}
 						>
 							View runs <span style={{ fontSize: 13 }}>→</span>
 						</button>

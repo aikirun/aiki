@@ -271,8 +271,8 @@ describe("workflowRunHandle", () => {
 			}));
 	});
 
-	describe("waitForStatus", () => {
-		test("returns success with the state when the run reaches the target status", () =>
+	describe("wait", () => {
+		test("resolves with the state when the run terminates", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0" });
 				const handle = workflowRunHandle(client, record);
@@ -287,12 +287,12 @@ describe("workflowRunHandle", () => {
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
-				const result = await handle.waitForStatus("completed");
+				const result = await handle.wait();
 
 				expect(result).toEqual({ success: true, state: { status: "completed", output: "done" } });
 			}));
 
-		test("returns run_terminated when the run reaches a different terminal status", () =>
+		test("resolves with whatever terminal state the run reached", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0" });
 				const handle = workflowRunHandle(client, record);
@@ -307,9 +307,12 @@ describe("workflowRunHandle", () => {
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: failed });
 
-				const result = await handle.waitForStatus("completed");
+				const result = await handle.wait();
 
-				expect(result).toEqual({ success: false, cause: "run_terminated" });
+				expect(result).toEqual({
+					success: true,
+					state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+				});
 			}));
 
 		test("polls until the run terminates, advancing the state-transition cursor", () =>
@@ -326,7 +329,7 @@ describe("workflowRunHandle", () => {
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
-				const result = await handle.waitForStatus("completed", { interval: { milliseconds: 1 } });
+				const result = await handle.wait({ interval: { milliseconds: 1 } });
 
 				expect(result).toEqual({ success: true, state: { status: "completed", output: 42 } });
 			}));
@@ -342,7 +345,7 @@ describe("workflowRunHandle", () => {
 
 				// timeout < interval: the sleep after the first poll is capped to the remaining
 				// budget, and exactly one more poll happens at the deadline before giving up
-				const result = await handle.waitForStatus("completed", {
+				const result = await handle.wait({
 					interval: { seconds: 2 },
 					timeout: { milliseconds: 20 },
 				});
@@ -358,7 +361,7 @@ describe("workflowRunHandle", () => {
 				const controller = new AbortController();
 				controller.abort();
 
-				const result = await handle.waitForStatus("completed", { signal: controller.signal });
+				const result = await handle.wait({ signal: controller.signal });
 
 				expect(result).toEqual({ success: false, cause: "aborted" });
 			}));

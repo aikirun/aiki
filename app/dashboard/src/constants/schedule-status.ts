@@ -2,28 +2,10 @@ import type { ScheduleStatus } from "@aikirun/types/schedule";
 
 import { SCHEDULE_STATUS_COLORS } from "./status-colors";
 
-export const SCHEDULE_STATUS_CONFIG: Record<
-	ScheduleStatus,
-	{ label: string; color: string; textColor: string; glyph: string }
-> = {
-	active: {
-		label: "Active",
-		color: SCHEDULE_STATUS_COLORS.active,
-		textColor: "var(--accent-green)",
-		glyph: "●",
-	},
-	paused: {
-		label: "Paused",
-		color: SCHEDULE_STATUS_COLORS.paused,
-		textColor: "var(--accent-amber)",
-		glyph: "❙❙",
-	},
-	inactive: {
-		label: "Inactive",
-		color: SCHEDULE_STATUS_COLORS.inactive,
-		textColor: "var(--accent-gray)",
-		glyph: "⊘",
-	},
+export const SCHEDULE_STATUS_CONFIG: Record<ScheduleStatus, { label: string; color: string; glyph: string }> = {
+	active: { label: "Active", color: SCHEDULE_STATUS_COLORS.active, glyph: "●" },
+	paused: { label: "Paused", color: SCHEDULE_STATUS_COLORS.paused, glyph: "❙❙" },
+	inactive: { label: "Inactive", color: SCHEDULE_STATUS_COLORS.inactive, glyph: "⊘" },
 };
 
 export type ScheduleStatusOption = { value: ScheduleStatus; label: string };

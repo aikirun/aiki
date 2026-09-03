@@ -16,6 +16,7 @@ import type {
 import type { EventsDefinition, EventWaiters } from "./event";
 import type { WorkflowExecutionConfig } from "./execute";
 import type { WorkflowRunHandle } from "./handle";
+import type { CreateTaskExecutionTracker } from "./task-execution-tracker";
 
 export interface WorkflowRun<Input, Context, TEvents extends EventsDefinition = EventsDefinition> {
 	id: WorkflowRunId;
@@ -30,6 +31,7 @@ export interface WorkflowRun<Input, Context, TEvents extends EventsDefinition = 
 	[INTERNAL]: {
 		handle: WorkflowRunHandle<Input, unknown, Context, TEvents>;
 		replayManifest: ReplayManifest;
+		createTaskExecutionTracker: CreateTaskExecutionTracker;
 		configProvider: ConfigProvider<WorkflowExecutionConfig>;
 		hasher: BoundHasher;
 		codec: Codec;

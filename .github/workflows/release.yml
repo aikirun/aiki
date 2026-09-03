@@ -221,7 +221,7 @@ jobs:
     needs: [verify, deploy-server]
     uses: ./.github/workflows/deploy-dashboard.yml
     with:
-      version: ${{ needs.verify.outputs.version }}
+      ref: v${{ needs.verify.outputs.version }}
     secrets: inherit
 
   # The public artifacts: npm packages and the GitHub release page.

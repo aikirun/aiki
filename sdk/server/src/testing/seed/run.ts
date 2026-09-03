@@ -34,8 +34,9 @@ export interface SeedRunDeps {
 	namespaceRequestContext?: NamespaceRequestContext;
 }
 
-interface SeedRunOverrides {
+export interface SeedRunOverrides {
 	options?: WorkflowStartOptions;
+	parent?: { workflowRunId: string; expectedRevision: number };
 }
 
 export async function seedPooledScheduledRun(deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">) {
@@ -60,6 +61,7 @@ export async function seedScheduledRun(
 		inputHash: { value: await hashInput(input) },
 		clientCodec: "none",
 		options: overrides?.options,
+		parent: overrides?.parent,
 	});
 
 	return { runId, revisionWhenScheduled: 0, attemptsWhenScheduled: 1 };
@@ -184,9 +186,56 @@ export async function seedPublishedRun(deps: SeedRunDeps & { publisher: FakePubl
 	return seeded;
 }
 
-export async function seedStalledRun(deps: SeedRunDeps) {
+export async function seedAwaitingEventRun(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params: { eventName: string; timeoutInMs?: number }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
+
+	const services = createServices(repos);
+	const parked = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+		type: "optimistic",
+		id: seeded.runId,
+		state: { status: "awaiting_event", eventName: params.eventName, timeoutInMs: params.timeoutInMs },
+		expectedRevision: seeded.revisionWhenClaimed,
+		expectedSignalSequence: 0,
+	});
+
+	return { ...seeded, eventName: params.eventName, revisionWhenParked: parked.revision };
+}
+
+export async function seedSleepingRun(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params: { sleepName: string; durationMs: number }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
+
+	const services = createServices(repos);
+	const sleepStartedAt = Date.now() as TimestampMs;
+	const asleep = await withFakeClock(sleepStartedAt, () =>
+		services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+			type: "optimistic",
+			id: seeded.runId,
+			state: { status: "sleeping", sleepName: params.sleepName, durationMs: params.durationMs },
+			expectedRevision: seeded.revisionWhenClaimed,
+		})
+	);
+
+	return {
+		...seeded,
+		sleepName: params.sleepName,
+		wakeupAt: (sleepStartedAt + params.durationMs) as TimestampMs,
+		revisionWhenAsleep: asleep.revision,
+	};
+}
+
+export async function seedStalledRun(deps: SeedRunDeps, overrides?: SeedRunOverrides) {
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
-	const seeded = await withFakeClock(1 as TimestampMs, () => seedQueuedRun(deps));
+	const seeded = await withFakeClock(1 as TimestampMs, () => seedQueuedRun(deps, overrides));
 
 	await stallUndeliverableRuns(daemonContext, { repos: deps.repos }, { maxAgeMs: 60_000, limit: 100 });
 

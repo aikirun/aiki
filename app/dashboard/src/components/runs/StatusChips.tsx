@@ -1,12 +1,29 @@
 import { WORKFLOW_RUN_STATUSES, type WorkflowRunStatus } from "@aikirun/types/workflow/run";
 
-import { WORKFLOW_RUN_STATUS_COLORS } from "../../constants/status-colors";
+import { chipStatus } from "../../components/common/ui";
 import { WORKFLOW_STATUS_CONFIG } from "../../constants/workflow-status";
 
 interface StatusChipsProps {
 	selected: WorkflowRunStatus[];
 	onChange: (statuses: WorkflowRunStatus[]) => void;
 }
+
+const restingChip = {
+	display: "inline-flex" as const,
+	alignItems: "center" as const,
+	padding: "4px 9px",
+	borderRadius: "var(--r-chip)",
+	fontFamily: "var(--sans)",
+	fontSize: 11,
+	fontWeight: 600,
+	lineHeight: 1.45,
+	cursor: "pointer",
+	color: "var(--t2)",
+	background: "var(--s2)",
+	border: "1px solid transparent",
+	transition: "color .16s ease, border-color .16s ease, background-color .16s ease",
+	whiteSpace: "nowrap" as const,
+};
 
 export function StatusChips({ selected, onChange }: StatusChipsProps) {
 	const toggle = (status: WorkflowRunStatus) => {
@@ -20,10 +37,9 @@ export function StatusChips({ selected, onChange }: StatusChipsProps) {
 	const hasActive = selected.length > 0;
 
 	return (
-		<div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+		<div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
 			{WORKFLOW_RUN_STATUSES.map((status) => {
 				const config = WORKFLOW_STATUS_CONFIG[status];
-				const color = WORKFLOW_RUN_STATUS_COLORS[status].tint;
 				const isActive = selected.includes(status);
 
 				return (
@@ -31,25 +47,22 @@ export function StatusChips({ selected, onChange }: StatusChipsProps) {
 						key={status}
 						type="button"
 						onClick={() => toggle(status)}
-						style={{
-							padding: "3px 8px",
-							borderRadius: 999,
-							fontSize: 10,
-							fontWeight: 600,
-							cursor: "pointer",
-							transition: "all 0.15s",
-							lineHeight: "1.4",
-							...(isActive
-								? {
-										color: config.textColor,
-										backgroundColor: `${color}30`,
-										border: `1px solid ${color}50`,
-									}
-								: {
-										color: "var(--t3)",
-										backgroundColor: "transparent",
-										border: "1px solid var(--b0)",
-									}),
+						style={
+							isActive
+								? { ...chipStatus(config.color), padding: "4px 9px", cursor: "pointer", lineHeight: 1.45 }
+								: restingChip
+						}
+						onMouseEnter={(e) => {
+							if (!isActive) {
+								e.currentTarget.style.color = "var(--t0)";
+								e.currentTarget.style.background = "var(--s3)";
+							}
+						}}
+						onMouseLeave={(e) => {
+							if (!isActive) {
+								e.currentTarget.style.color = "var(--t2)";
+								e.currentTarget.style.background = "var(--s2)";
+							}
 						}}
 					>
 						{config.label}
@@ -61,18 +74,7 @@ export function StatusChips({ selected, onChange }: StatusChipsProps) {
 				<button
 					type="button"
 					onClick={() => onChange([])}
-					style={{
-						padding: "3px 8px",
-						borderRadius: 999,
-						fontSize: 10,
-						fontWeight: 600,
-						cursor: "pointer",
-						color: "var(--t3)",
-						backgroundColor: "transparent",
-						border: "1px solid var(--b0)",
-						transition: "all 0.15s",
-						lineHeight: "1.4",
-					}}
+					style={{ ...restingChip, color: "var(--accent-ink)", background: "var(--accent-tint)" }}
 				>
 					Clear
 				</button>

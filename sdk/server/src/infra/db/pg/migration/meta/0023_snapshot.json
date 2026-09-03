@@ -1,5 +1,5 @@
 {
-	"id": "b3c40f00-e44f-4cfc-bfa2-a2d3089b9187",
+	"id": "747c7395-3e7a-4639-93a8-26a006021410",
 	"prevId": "7ca4cf5d-da7e-4719-87d0-ec7cfb06c49e",
 	"version": "7",
 	"dialect": "postgresql",
@@ -1019,15 +1019,15 @@
 					"primaryKey": false,
 					"notNull": true
 				},
-				"client_codec": {
-					"name": "client_codec",
-					"type": "client_codec",
-					"typeSchema": "public",
-					"primaryKey": false,
-					"notNull": true
-				},
 				"revision": {
 					"name": "revision",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 0
+				},
+				"signal_sequence": {
+					"name": "signal_sequence",
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
@@ -1692,11 +1692,6 @@
 			"name": "child_workflow_run_wait_status",
 			"schema": "public",
 			"values": ["completed", "timeout"]
-		},
-		"public.client_codec": {
-			"name": "client_codec",
-			"schema": "public",
-			"values": ["applied", "none"]
 		},
 		"public.event_wait_status": {
 			"name": "event_wait_status",

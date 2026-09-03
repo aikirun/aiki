@@ -7,7 +7,7 @@ import { InvalidTaskStateTransitionError, WorkflowRunTerminatedError } from "../
 import { createTaskService } from "../service/task";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
-import { completeRun, seedClaimedRun, seedCompletedRun } from "../testing/seed/run";
+import { completeRun, seedClaimedRun } from "../testing/seed/run";
 import { seedCompletedTask, seedRunningTask } from "../testing/seed/task";
 
 const withHarness = createServiceHarness();
@@ -29,7 +29,8 @@ describe("TaskService getTaskById", () => {
 				input: taskInput,
 				inputHash: taskInfo.inputHash,
 				options: undefined,
-				state: { status: "running", attempts: 1 },
+				attempts: 1,
+				state: { status: "running" },
 			});
 		}));
 
@@ -47,12 +48,12 @@ describe("TaskService getTaskById", () => {
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
 				id: taskInfo.id,
-				taskState: { status: "running", attempts: 2 },
+				attempts: 2,
 			});
 
 			const taskService = createTaskService({ repos });
 			expect(await taskService.getTaskById(context, taskInfo.id)).toEqual(
-				expect.objectContaining({ id: taskInfo.id, state: { status: "running", attempts: 2 } })
+				expect.objectContaining({ id: taskInfo.id, attempts: 2, state: { status: "running" } })
 			);
 		}));
 
@@ -71,33 +72,52 @@ describe("TaskService getTaskById", () => {
 });
 
 describe("TaskService setTaskState", () => {
-	test("creates a new task with the request's input hash and terminal state", () =>
+	test("completes a running task with the request's output", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId } = await seedClaimedRun({
+			const { runId, taskInfo } = await seedRunningTask({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
 			});
 
-			const input = { sku: "SKU-42", quantity: 3 };
-			const inputHash = "request-input-hash";
 			const output = { reservationId: "rsv-1" };
-
 			const taskService = createTaskService({ repos });
 			await taskService.setTaskState(context, {
-				type: "new",
+				id: taskInfo.id,
 				workflowRunId: runId,
-				taskName: "reserve-inventory",
-				input,
-				inputHash,
 				state: { status: "completed", output },
 			});
 
 			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
 				expect.objectContaining({
-					name: "reserve-inventory",
-					inputHash,
-					state: { status: "completed", attempts: 1, output },
+					id: taskInfo.id,
+					attempts: 2,
+					state: { status: "completed", output },
+				}),
+			]);
+		}));
+
+	test("fails a running task with the request's error", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const error = { name: "Error", message: "inventory system unreachable" };
+			const taskService = createTaskService({ repos });
+			await taskService.setTaskState(context, {
+				id: taskInfo.id,
+				workflowRunId: runId,
+				state: { status: "failed", error },
+			});
+
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					id: taskInfo.id,
+					attempts: 2,
+					state: { status: "failed", error },
 				}),
 			]);
 		}));
@@ -125,7 +145,6 @@ describe("TaskService setTaskState", () => {
 			const taskService = createTaskService({ repos });
 			expect(
 				taskService.setTaskState(context, {
-					type: "existing",
 					id: victimTaskSeed.taskInfo.id,
 					workflowRunId: attackerRunSeed.runId,
 					state: { status: "completed", output: "hijacked" },
@@ -135,29 +154,6 @@ describe("TaskService setTaskState", () => {
 			expect(await repos.task.getById({ id: victimTaskSeed.taskInfo.id, workflowRunId: victimTaskSeed.runId })).toEqual(
 				victimRowBefore
 			);
-		}));
-
-	test("does not create a task on a run that has already finished", () =>
-		withHarness(async ({ context, repos, publisher }) => {
-			const { runId } = await seedCompletedRun({
-				namespaceRequestContext: context,
-				repos,
-				publisher,
-			});
-
-			const taskService = createTaskService({ repos });
-			expect(
-				taskService.setTaskState(context, {
-					type: "new",
-					workflowRunId: runId,
-					taskName: "reserve-inventory",
-					input: { sku: "SKU-42", quantity: 3 },
-					inputHash: "request-input-hash",
-					state: { status: "completed", output: { reservationId: "rsv-1" } },
-				})
-			).rejects.toBeInstanceOf(WorkflowRunTerminatedError);
-
-			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([]);
 		}));
 
 	test("does not set an existing task's state on a run that has already finished", () =>
@@ -174,7 +170,6 @@ describe("TaskService setTaskState", () => {
 			const taskService = createTaskService({ repos });
 			expect(
 				taskService.setTaskState(context, {
-					type: "existing",
 					id: taskInfo.id,
 					workflowRunId: runId,
 					state: { status: "completed", output: { reservationId: "rsv-1" } },
@@ -197,7 +192,6 @@ describe("TaskService setTaskState", () => {
 			const taskService = createTaskService({ repos });
 			expect(
 				taskService.setTaskState(context, {
-					type: "existing",
 					id: taskInfo.id,
 					workflowRunId: runId,
 					state: { status: "failed", error: { name: "Error", message: "boom" } },
@@ -220,9 +214,9 @@ describe("TaskService setTaskState", () => {
 				id: taskInfo.id,
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
-				taskState: {
+				attempts: 1,
+				state: {
 					status: "awaiting_retry",
-					attempts: 1,
 					error: { name: "Error", message: "boom" },
 					nextAttemptInMs: 60_000,
 				},
@@ -233,7 +227,6 @@ describe("TaskService setTaskState", () => {
 			const taskService = createTaskService({ repos });
 			expect(
 				taskService.setTaskState(context, {
-					type: "existing",
 					id: taskInfo.id,
 					workflowRunId: runId,
 					state: { status: "failed", error: { name: "Error", message: "boom" } },

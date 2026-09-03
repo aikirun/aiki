@@ -96,8 +96,8 @@ const syncSchedule = schedule({
 
 | Policy | Behavior |
 |--------|----------|
-| `"allow"` (default) | Start a new run regardless of active runs |
-| `"skip"` | Skip this occurrence if a run is still active |
+| `"allow"` | Start a new run regardless of active runs |
+| `"skip"` (default) | Skip this occurrence if a run is still active |
 | `"cancel_previous"` | Cancel the active run and start a new one |
 
 Overlap policies are evaluated per schedule instance, not globally. If you activate the same schedule for multiple tenants with different inputs, each tenant has independent overlap handling.
@@ -120,7 +120,7 @@ await hourlySync.activate(
 );
 ```
 
-Only `retry` and `pool` travel this way. `reference` or `trigger` answers something about one particular run — which run it is, when execution begins — and a schedule fires a fresh run every tick, so passing a workflow that carries either will not compile. See [Workflow Options](./workflows.md#workflow-options).
+Only `retry`, `pool`, and `priority` travel this way. `reference` or `trigger` answers something about one particular run — which run it is, when execution begins — and a schedule fires a fresh run every tick, so passing a workflow that carries either will not compile. See [Workflow Options](./workflows.md#workflow-options).
 
 Run options are part of a schedule's identity, so changing them is a different schedule — or, with a [reference ID](#reference-ids), a conflict.
 

@@ -11,30 +11,10 @@ export function TaskSummaryBar({ taskCounts }: TaskSummaryBarProps) {
 	if (total === 0) return null;
 
 	const segments = [
-		{
-			count: taskCounts.completed,
-			tint: TASK_STATUS_COLORS.completed.tint,
-			text: TASK_STATUS_COLORS.completed.text,
-			symbol: "\u2713",
-		},
-		{
-			count: taskCounts.running,
-			tint: TASK_STATUS_COLORS.running.tint,
-			text: TASK_STATUS_COLORS.running.text,
-			symbol: "\u25CF",
-		},
-		{
-			count: taskCounts.failed,
-			tint: TASK_STATUS_COLORS.failed.tint,
-			text: TASK_STATUS_COLORS.failed.text,
-			symbol: "\u2715",
-		},
-		{
-			count: taskCounts.awaiting_retry,
-			tint: TASK_STATUS_COLORS.awaiting_retry.tint,
-			text: TASK_STATUS_COLORS.awaiting_retry.text,
-			symbol: "\u21BB",
-		},
+		{ count: taskCounts.completed, color: TASK_STATUS_COLORS.completed, symbol: "\u2713" },
+		{ count: taskCounts.running, color: TASK_STATUS_COLORS.running, symbol: "\u25CF" },
+		{ count: taskCounts.failed, color: TASK_STATUS_COLORS.failed, symbol: "\u2715" },
+		{ count: taskCounts.awaiting_retry, color: TASK_STATUS_COLORS.awaiting_retry, symbol: "\u21BB" },
 	].filter((s) => s.count > 0);
 
 	return (
@@ -43,11 +23,11 @@ export function TaskSummaryBar({ taskCounts }: TaskSummaryBarProps) {
 				style={{
 					width: 44,
 					height: 4,
-					borderRadius: 2,
+					borderRadius: 999,
 					display: "flex",
 					gap: 0.5,
 					overflow: "hidden",
-					backgroundColor: "var(--s3)",
+					backgroundColor: "var(--s2)",
 					flexShrink: 0,
 				}}
 			>
@@ -57,17 +37,17 @@ export function TaskSummaryBar({ taskCounts }: TaskSummaryBarProps) {
 						style={{
 							flex: seg.count,
 							minWidth: 2,
-							backgroundColor: seg.tint,
+							backgroundColor: seg.color,
 						}}
 					/>
 				))}
 			</div>
 
-			<span style={{ fontSize: 10, fontFamily: "monospace", color: "var(--t2)", whiteSpace: "nowrap" }}>
+			<span style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--t2)", whiteSpace: "nowrap" }}>
 				{segments.map((seg, i) => (
 					<span key={seg.symbol}>
 						{i > 0 && " "}
-						<span style={{ color: seg.text }}>
+						<span style={{ color: seg.color }}>
 							{seg.count}
 							{seg.symbol}
 						</span>

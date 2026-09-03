@@ -9,18 +9,72 @@ import { type ThemePreference, useTheme } from "../../hooks/useTheme";
 const SIDEBAR_COLLAPSED_KEY = "aiki-sidebar-collapsed";
 
 const NAV_ITEMS = [
-	{ key: "/", label: "Runs", icon: "▶", end: true },
-	{ key: "/schedules", label: "Schedules", icon: "◷", end: false },
+	{ key: "/", label: "Runs", icon: "runs", end: true },
+	{ key: "/schedules", label: "Schedules", icon: "schedules", end: false },
 ] as const;
+
+type IconName = "runs" | "schedules" | "settings";
+
+/** One stroked set at a single weight, so the rail reads as a family. */
+function NavIcon({ name }: { name: IconName }) {
+	const common = {
+		width: 15,
+		height: 15,
+		viewBox: "0 0 16 16",
+		fill: "none",
+		stroke: "currentColor",
+		strokeWidth: 1.4,
+		strokeLinecap: "round" as const,
+		strokeLinejoin: "round" as const,
+		style: { display: "block", flexShrink: 0 },
+	};
+	if (name === "runs") {
+		return (
+			<svg {...common} aria-hidden="true">
+				<path d="M6 4.2v7.6l6-3.8-6-3.8Z" />
+			</svg>
+		);
+	}
+	if (name === "schedules") {
+		return (
+			<svg {...common} aria-hidden="true">
+				<circle cx="8" cy="8" r="6" />
+				<path d="M8 4.8V8l2.2 1.6" />
+			</svg>
+		);
+	}
+	// Sliders rather than a gear: at 15px a toothed gear turns to mush, and a
+	// radial gear is indistinguishable from the sun on the theme toggle below it.
+	return (
+		<svg {...common} aria-hidden="true">
+			<path d="M2.5 4.5h11M2.5 11.5h11" />
+			<circle cx="6" cy="4.5" r="1.6" />
+			<circle cx="10.5" cy="11.5" r="1.6" />
+		</svg>
+	);
+}
 
 const SMALL_SCREEN_QUERY = "(max-width: 768px)";
 
 export function Sidebar() {
+	const [small, setSmall] = useState(() => window.matchMedia(SMALL_SCREEN_QUERY).matches);
 	const [collapsed, setCollapsed] = useState(() => {
 		if (window.matchMedia(SMALL_SCREEN_QUERY).matches) return true;
 		return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
 	});
 	const manuallyCollapsed = useRef(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true");
+
+	/*
+	 * On a phone the expanded rail is half the viewport. Taking that width out of the
+	 * content leaves it around 130px, where every row overlaps its neighbour — so the
+	 * rail floats over the page instead and a fixed 52px spacer holds its place.
+	 *
+	 * It floats the whole time it is on a phone, not only while it is open: taken out
+	 * of the flow only when open, the content would be back in the flow for the 200ms
+	 * the rail spends animating shut, reflowing the whole page down to 200px and back.
+	 */
+	const floating = small;
+	const scrimShown = small && !collapsed;
 
 	const location = useLocation();
 	const navigate = useNavigate();
@@ -30,6 +84,7 @@ export function Sidebar() {
 	useEffect(() => {
 		const mql = window.matchMedia(SMALL_SCREEN_QUERY);
 		const handler = (e: MediaQueryListEvent) => {
+			setSmall(e.matches);
 			if (e.matches) {
 				setCollapsed(true);
 			} else {
@@ -47,97 +102,128 @@ export function Sidebar() {
 		localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
 	};
 
+	/* A floating rail covers what you are navigating to, so it closes behind you. */
+	const go = (to: string) => {
+		navigate(to);
+		if (small) setCollapsed(true);
+	};
+
 	const activePage =
 		location.pathname === "/"
 			? "/"
 			: (NAV_ITEMS.find((n) => !n.end && location.pathname.startsWith(n.key))?.key ?? null);
 
 	return (
-		<aside
-			style={{
-				width: collapsed ? 52 : 192,
-				display: "flex",
-				flexDirection: "column",
-				height: "100vh",
-				background: "var(--s1)",
-				borderRight: "1px solid var(--b0)",
-				transition: "width 200ms ease",
-				flexShrink: 0,
-			}}
-		>
-			{/* Logo row */}
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					padding: collapsed ? "24px 0 14px" : "24px 12px 14px",
-					minHeight: 52,
-					justifyContent: collapsed ? "center" : "flex-start",
-					gap: 8,
-				}}
-			>
-				<Link to="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", flexShrink: 0 }}>
-					<LogoMark />
-					{!collapsed && (
-						<span style={{ color: "var(--t0)", fontWeight: 700, fontSize: 15, letterSpacing: "-0.02em" }}>aiki</span>
-					)}
-				</Link>
-			</div>
-
-			{/* Org & Namespace Switchers */}
-			{iam.dashboard && (
-				<div style={{ padding: collapsed ? "0 6px 10px" : "0 8px 10px" }}>
-					<OrgSwitcher collapsed={collapsed} />
-					<NamespaceSwitcher collapsed={collapsed} />
-				</div>
-			)}
-
-			{/* Navigation */}
-			<nav
-				style={{ flex: 1, padding: collapsed ? "0 6px" : "0 8px", display: "flex", flexDirection: "column", gap: 2 }}
-			>
-				{NAV_ITEMS.map(({ key, label, icon }) => (
-					<NavButton
-						key={key}
-						icon={icon}
-						label={label}
-						active={activePage === key}
-						collapsed={collapsed}
-						onClick={() => navigate(key)}
-					/>
-				))}
-			</nav>
-
-			{/* Bottom section */}
-			<div
-				style={{ padding: collapsed ? "0 6px 12px" : "0 8px 12px", display: "flex", flexDirection: "column", gap: 2 }}
-			>
-				{iam.dashboard && (
-					<NavButton
-						icon="⚙"
-						label="Settings"
-						active={location.pathname.startsWith("/settings")}
-						collapsed={collapsed}
-						onClick={() => navigate("/settings")}
-					/>
-				)}
-
-				<ThemeToggle collapsed={collapsed} />
-
-				{/* Collapse toggle — uses same layout as NavButton for alignment */}
-				<CollapseButton collapsed={collapsed} onClick={toggleCollapsed} />
-
-				{/* User menu */}
-				<UserMenu
-					collapsed={collapsed}
-					user={user}
-					onSignOut={async () => {
-						await signOut();
-						navigate("/sign-in");
+		<>
+			{scrimShown && (
+				<button
+					type="button"
+					className="scrim-in"
+					aria-label="Close sidebar"
+					onClick={toggleCollapsed}
+					style={{
+						position: "fixed",
+						inset: 0,
+						zIndex: 40,
+						border: "none",
+						padding: 0,
+						cursor: "pointer",
+						background: "rgba(23,23,26,0.34)",
 					}}
 				/>
-			</div>
-		</aside>
+			)}
+			{/* Holds the rail's place in the flow while the rail floats above it. */}
+			{floating && <div aria-hidden="true" style={{ width: 52, flexShrink: 0 }} />}
+			<aside
+				style={{
+					width: collapsed ? 52 : 192,
+					display: "flex",
+					flexDirection: "column",
+					height: "100vh",
+					background: "var(--s1)",
+					borderRight: "1px solid var(--b0)",
+					zIndex: floating ? 41 : 1,
+					transition: "width 200ms ease",
+					flexShrink: 0,
+					...(floating ? { position: "fixed" as const, top: 0, left: 0 } : null),
+					...(scrimShown ? { boxShadow: "0 0 40px -8px var(--shadow)" } : null),
+				}}
+			>
+				{/* Logo row */}
+				<div
+					style={{
+						display: "flex",
+						alignItems: "center",
+						padding: collapsed ? "24px 0 14px" : "24px 12px 14px",
+						minHeight: 52,
+						justifyContent: collapsed ? "center" : "flex-start",
+						gap: 8,
+					}}
+				>
+					<Link to="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", flexShrink: 0 }}>
+						<LogoMark />
+						{!collapsed && (
+							<span style={{ color: "var(--t0)", fontWeight: 800, fontSize: 19, letterSpacing: "-0.04em" }}>aiki</span>
+						)}
+					</Link>
+				</div>
+
+				{/* Org & Namespace Switchers */}
+				{iam.dashboard && (
+					<div style={{ padding: collapsed ? "0 6px 10px" : "0 8px 10px" }}>
+						<OrgSwitcher collapsed={collapsed} />
+						<NamespaceSwitcher collapsed={collapsed} />
+					</div>
+				)}
+
+				{/* Navigation */}
+				<nav
+					style={{ flex: 1, padding: collapsed ? "0 6px" : "0 8px", display: "flex", flexDirection: "column", gap: 2 }}
+				>
+					{NAV_ITEMS.map(({ key, label, icon }) => (
+						<NavButton
+							key={key}
+							icon={icon}
+							label={label}
+							primary
+							active={activePage === key}
+							collapsed={collapsed}
+							onClick={() => go(key)}
+						/>
+					))}
+				</nav>
+
+				{/* Bottom section */}
+				<div
+					style={{ padding: collapsed ? "0 6px 12px" : "0 8px 12px", display: "flex", flexDirection: "column", gap: 2 }}
+				>
+					{iam.dashboard && (
+						<NavButton
+							icon="settings"
+							label="Settings"
+							active={location.pathname.startsWith("/settings")}
+							collapsed={collapsed}
+							onClick={() => go("/settings")}
+						/>
+					)}
+
+					<ThemeToggle collapsed={collapsed} />
+
+					{/* Collapse toggle — uses same layout as NavButton for alignment */}
+					<CollapseButton collapsed={collapsed} onClick={toggleCollapsed} />
+
+					{/* User menu */}
+					<UserMenu
+						collapsed={collapsed}
+						user={user}
+						onSignOut={async () => {
+							await signOut();
+							navigate("/sign-in");
+						}}
+					/>
+				</div>
+			</aside>
+		</>
 	);
 }
 
@@ -171,18 +257,21 @@ function NavButton({
 	label,
 	active,
 	collapsed,
+	primary = false,
 	onClick,
 }: {
-	icon: string;
+	icon: IconName;
 	label: string;
 	active: boolean;
 	collapsed: boolean;
+	/** The rail's main destinations carry more weight than the utility rows below them. */
+	primary?: boolean;
 	onClick: () => void;
 }) {
 	const [hovered, setHovered] = useState(false);
 
-	const bg = active ? "var(--s3)" : hovered ? "var(--s2)" : "transparent";
-	const color = active ? "var(--t0)" : "var(--t2)";
+	const bg = active ? "var(--accent-tint)" : hovered ? "var(--s2)" : "transparent";
+	const color = active ? "var(--accent-ink)" : hovered ? "var(--t0)" : "var(--t3)";
 
 	return (
 		<button
@@ -198,21 +287,22 @@ function NavButton({
 				justifyContent: collapsed ? "center" : "flex-start",
 				gap: 8,
 				padding: collapsed ? "8px 0" : "8px 10px",
-				borderRadius: 6,
+				borderRadius: "var(--r-control)",
 				background: bg,
-				border: "none",
+				border: "1px solid",
+				borderColor: active ? "var(--accent-tint-border)" : "transparent",
 				cursor: "pointer",
 				color,
+				fontFamily: "var(--sans)",
 				fontSize: 13,
-				fontWeight: 600,
-				transition: "background 120ms, color 120ms",
-				fontFamily: "inherit",
+				fontWeight: primary ? 700 : 600,
+				letterSpacing: "-0.012em",
+				transition: "background .14s ease, color .14s ease, border-color .14s ease",
 			}}
 		>
 			<span
 				style={{
-					fontSize: 16,
-					opacity: active ? 1 : 0.55,
+					opacity: active ? 1 : 0.75,
 					lineHeight: 1,
 					flexShrink: 0,
 					width: 16,
@@ -221,7 +311,7 @@ function NavButton({
 					justifyContent: "center",
 				}}
 			>
-				{icon}
+				<NavIcon name={icon} />
 			</span>
 			{!collapsed && <span>{label}</span>}
 		</button>
@@ -260,21 +350,21 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
 				justifyContent: collapsed ? "center" : "flex-start",
 				gap: 8,
 				padding: collapsed ? "8px 0" : "8px 10px",
-				borderRadius: 6,
+				borderRadius: "var(--r-control)",
 				background: hovered ? "var(--s2)" : "transparent",
-				border: "none",
+				border: "1px solid transparent",
 				cursor: "pointer",
-				color: "var(--t2)",
+				color: hovered ? "var(--t0)" : "var(--t3)",
+				fontFamily: "var(--sans)",
 				fontSize: 13,
 				fontWeight: 600,
-				transition: "background 120ms, color 120ms",
-				fontFamily: "inherit",
+				letterSpacing: "-0.008em",
+				transition: "background .14s ease, color .14s ease",
 			}}
 		>
 			<span
 				style={{
-					fontSize: 16,
-					opacity: 0.55,
+					opacity: 0.75,
 					lineHeight: 1,
 					flexShrink: 0,
 					width: 16,
@@ -358,21 +448,21 @@ function CollapseButton({ collapsed, onClick }: { collapsed: boolean; onClick: (
 				justifyContent: collapsed ? "center" : "flex-start",
 				gap: 8,
 				padding: collapsed ? "8px 0" : "8px 10px",
-				borderRadius: 6,
+				borderRadius: "var(--r-control)",
 				background: hovered ? "var(--s2)" : "transparent",
-				border: "none",
+				border: "1px solid transparent",
 				cursor: "pointer",
-				color: "var(--t2)",
+				color: hovered ? "var(--t0)" : "var(--t3)",
+				fontFamily: "var(--sans)",
 				fontSize: 13,
 				fontWeight: 600,
-				transition: "background 120ms, color 120ms",
-				fontFamily: "inherit",
+				letterSpacing: "-0.008em",
+				transition: "background .14s ease, color .14s ease",
 			}}
 		>
 			<span
 				style={{
-					fontSize: 16,
-					opacity: 0.55,
+					opacity: 0.75,
 					lineHeight: 1,
 					flexShrink: 0,
 					width: 16,
@@ -443,15 +533,16 @@ function UserMenu({
 					justifyContent: collapsed ? "center" : "flex-start",
 					gap: 8,
 					padding: collapsed ? "8px 0" : "8px 10px",
-					borderRadius: 6,
-					background: isOpen ? "var(--s3)" : hovered ? "var(--s2)" : "transparent",
-					border: "none",
+					borderRadius: "var(--r-control)",
+					background: isOpen ? "var(--s2)" : hovered ? "var(--s2)" : "transparent",
+					border: "1px solid transparent",
 					cursor: "pointer",
-					color: isOpen ? "var(--t0)" : "var(--t2)",
+					color: isOpen || hovered ? "var(--t0)" : "var(--t3)",
+					fontFamily: "var(--sans)",
 					fontSize: 13,
 					fontWeight: 600,
-					transition: "background 120ms, color 120ms",
-					fontFamily: "inherit",
+					letterSpacing: "-0.008em",
+					transition: "background .14s ease, color .14s ease",
 				}}
 			>
 				<span
@@ -470,7 +561,7 @@ function UserMenu({
 							width: 14,
 							height: 14,
 							borderRadius: "50%",
-							background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+							background: "var(--accent)",
 							display: "flex",
 							alignItems: "center",
 							justifyContent: "center",
@@ -500,7 +591,7 @@ function UserMenu({
 						width: 200,
 						background: "var(--s2)",
 						border: "1px solid var(--b0)",
-						borderRadius: 8,
+						borderRadius: "var(--r-control)",
 						boxShadow: "0 8px 24px var(--shadow)",
 						zIndex: 50,
 						paddingBlock: 4,
@@ -542,7 +633,7 @@ function UserMenu({
 							onSignOut();
 						}}
 					>
-						<span style={{ color: "#F87171" }}>Sign out</span>
+						<span style={{ color: "var(--accent-red)" }}>Sign out</span>
 					</DropdownItem>
 				</div>
 			)}
@@ -576,21 +667,28 @@ function OrgSwitcher({ collapsed }: { collapsed: boolean }) {
 					alignItems: "center",
 					justifyContent: collapsed ? "center" : "flex-start",
 					gap: 8,
-					padding: "6px 8px",
-					borderRadius: 6,
+					padding: "7px 9px",
+					borderRadius: "var(--r-control)",
 					background: "var(--s2)",
-					border: "1px solid var(--b0)",
+					border: "1px solid transparent",
 					cursor: "pointer",
 					fontFamily: "inherit",
+					transition: "background-color .14s ease",
+				}}
+				onMouseEnter={(e) => {
+					e.currentTarget.style.background = "var(--s3)";
+				}}
+				onMouseLeave={(e) => {
+					e.currentTarget.style.background = "var(--s2)";
 				}}
 			>
 				<span
 					style={{
 						width: 20,
 						height: 20,
-						borderRadius: 4,
-						background: "rgba(167,139,250,0.18)",
-						color: "var(--amber)",
+						borderRadius: "var(--r-chip)",
+						background: "var(--accent-tint)",
+						color: "var(--accent-ink)",
 						fontSize: 10,
 						fontWeight: 700,
 						display: "flex",
@@ -678,12 +776,19 @@ function NamespaceSwitcher({ collapsed }: { collapsed: boolean }) {
 					alignItems: "center",
 					justifyContent: collapsed ? "center" : "flex-start",
 					gap: 8,
-					padding: "6px 8px",
-					borderRadius: 6,
-					background: "transparent",
-					border: "1px solid var(--b0)",
+					padding: "7px 9px",
+					borderRadius: "var(--r-control)",
+					background: "var(--s2)",
+					border: "1px solid transparent",
 					cursor: "pointer",
 					fontFamily: "inherit",
+					transition: "background-color .14s ease",
+				}}
+				onMouseEnter={(e) => {
+					e.currentTarget.style.background = "var(--s3)";
+				}}
+				onMouseLeave={(e) => {
+					e.currentTarget.style.background = "var(--s2)";
 				}}
 			>
 				<span
@@ -702,7 +807,7 @@ function NamespaceSwitcher({ collapsed }: { collapsed: boolean }) {
 							style={{
 								flex: 1,
 								fontSize: 12,
-								fontFamily: "'IBM Plex Mono', monospace",
+								fontFamily: "var(--mono)",
 								color: "var(--t1)",
 								overflow: "hidden",
 								textOverflow: "ellipsis",
@@ -739,7 +844,7 @@ function NamespaceSwitcher({ collapsed }: { collapsed: boolean }) {
 										flexShrink: 0,
 									}}
 								/>
-								<span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{ns.name}</span>
+								<span style={{ fontFamily: "var(--mono)" }}>{ns.name}</span>
 							</span>
 						</DropdownItem>
 					))}
@@ -800,7 +905,7 @@ function Dropdown({ children }: { children: React.ReactNode }) {
 				width: 200,
 				background: "var(--s2)",
 				border: "1px solid var(--b0)",
-				borderRadius: 8,
+				borderRadius: "var(--r-control)",
 				boxShadow: "0 8px 24px var(--shadow)",
 				zIndex: 50,
 				paddingBlock: 4,
@@ -837,12 +942,12 @@ function DropdownItem({
 				padding: "5px 8px",
 				textAlign: "left",
 				fontSize: 13,
-				borderRadius: 5,
+				borderRadius: "var(--r-chip)",
 				border: "none",
 				cursor: "pointer",
 				fontFamily: "inherit",
-				background: selected ? "var(--s3)" : hovered ? "var(--s3)" : "transparent",
-				color: selected ? "var(--amber)" : "var(--t1)",
+				background: selected ? "var(--accent-tint)" : hovered ? "var(--s2)" : "transparent",
+				color: selected ? "var(--accent-ink)" : "var(--t1)",
 				transition: "background 100ms, color 100ms",
 			}}
 		>

@@ -1,7 +1,6 @@
 import { SCHEDULE_OVERLAP_POLICIES, SCHEDULE_STATUSES, SCHEDULE_TYPES } from "@aikirun/types/schedule";
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
-	CHILD_WORKFLOW_RUN_WAIT_STATUSES,
 	CLIENT_CODECS,
 	EVENT_WAIT_STATUSES,
 	SLEEP_STATUSES,
@@ -26,6 +25,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { timestampMs } from "./timestamp";
+import { CHILD_WORKFLOW_RUN_WAIT_STATUSES } from "../constants/child-workflow-run-wait";
 import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../constants/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
@@ -112,7 +112,7 @@ export const schedule = pgTable(
 		uniqueIndex("uqidx_schedule_namespace_reference").on(table.namespaceId, table.referenceId),
 		index("idx_schedule_namespace_workflow").on(table.namespaceId, table.workflowId),
 		// TODO: how to prevent certain namespaces from starving others
-		index("idx_schedule_status_next_run_at_id").on(table.status, table.nextRunAt, table.id),
+		index("idx_schedule_due_active").on(table.nextRunAt, table.id).where(sql`${table.status} = 'active'`),
 		check(
 			"chk_schedule_spec_matches_type",
 			sql`(${table.type} = 'cron' AND ${table.cronExpression} IS NOT NULL AND ${table.intervalMs} IS NULL) OR (${table.type} = 'interval' AND ${table.intervalMs} > 0 AND ${table.cronExpression} IS NULL AND ${table.cronTimezone} IS NULL)`
@@ -132,6 +132,7 @@ export const workflowRun = pgTable(
 		status: workflowRunStatusEnum("status").notNull(),
 		clientCodec: clientCodecEnum("client_codec").notNull(),
 		revision: integer("revision").notNull().default(0),
+		signalSequence: integer("signal_sequence").notNull().default(0),
 		attempts: integer("attempts").notNull().default(1),
 
 		input: jsonb("input"),
@@ -166,7 +167,9 @@ export const workflowRun = pgTable(
 			columns: [table.parentWorkflowRunId],
 			foreignColumns: [table.id],
 		}),
-		uniqueIndex("uqidx_workflow_run_workflow_reference").on(table.workflowId, table.referenceId),
+		uniqueIndex("uqidx_workflow_run_workflow_reference")
+			.on(table.workflowId, table.referenceId)
+			.where(sql`${table.referenceId} IS NOT NULL`),
 
 		index("idx_workflow_run_namespace_id").on(table.namespaceId, table.id),
 		index("idx_workflow_run_namespace_status_id").on(table.namespaceId, table.status, table.id),
@@ -174,15 +177,29 @@ export const workflowRun = pgTable(
 		index("idx_workflow_run_workflow_id").on(table.workflowId, table.id),
 		index("idx_workflow_run_workflow_status_id").on(table.workflowId, table.status, table.id),
 
-		index("idx_workflow_run_schedule_namespace").on(table.scheduleId, table.namespaceId),
-		index("idx_workflow_run_parent_workflow_run_status").on(table.parentWorkflowRunId, table.status),
+		index("idx_workflow_run_schedule_namespace")
+			.on(table.scheduleId, table.namespaceId)
+			.where(sql`${table.scheduleId} IS NOT NULL`),
+		index("idx_workflow_run_parent_workflow_run_status")
+			.on(table.parentWorkflowRunId, table.status)
+			.where(sql`${table.parentWorkflowRunId} IS NOT NULL`),
 
 		// TODO: will adding an index on input hash make conflict resolution faster?
 
-		index("idx_workflow_run_status_scheduled_at_id").on(table.status, table.scheduledAt, table.id),
-		index("idx_workflow_run_status_wakeup_at_id").on(table.status, table.wakeupAt, table.id),
-		index("idx_workflow_run_status_timeout_at_id").on(table.status, table.timeoutAt, table.id),
-		index("idx_workflow_run_status_next_attempt_at_id").on(table.status, table.nextAttemptAt, table.id),
+		index("idx_workflow_run_due_scheduled").on(table.scheduledAt, table.id).where(sql`${table.status} = 'scheduled'`),
+		index("idx_workflow_run_due_sleeping").on(table.wakeupAt, table.id).where(sql`${table.status} = 'sleeping'`),
+		index("idx_workflow_run_due_awaiting_event")
+			.on(table.timeoutAt, table.id)
+			.where(sql`${table.status} = 'awaiting_event'`),
+		index("idx_workflow_run_due_awaiting_child_workflow")
+			.on(table.timeoutAt, table.id)
+			.where(sql`${table.status} = 'awaiting_child_workflow'`),
+		index("idx_workflow_run_due_awaiting_retry")
+			.on(table.nextAttemptAt, table.id)
+			.where(sql`${table.status} = 'awaiting_retry'`),
+		index("idx_workflow_run_due_awaiting_task_retry")
+			.on(table.nextAttemptAt, table.id)
+			.where(sql`${table.status} = 'awaiting_task_retry'`),
 	]
 );
 
@@ -215,7 +232,6 @@ export const task = pgTable(
 		}),
 		index("idx_task_workflow_run_id").on(table.workflowRunId, table.id),
 		index("idx_task_workflow_run_status").on(table.workflowRunId, table.status),
-		index("idx_task_status_next_attempt_at_workflow_run").on(table.status, table.nextAttemptAt, table.workflowRunId),
 	]
 );
 
@@ -298,6 +314,15 @@ export const eventWait = pgTable(
 		status: eventWaitStatusEnum("status").notNull(),
 		referenceId: text("reference_id"),
 
+		// The run's signal_sequence at the moment this row was written. Rows are handed to
+		// the workflow's waits in this order: the value is assigned under the run's row
+		// lock, so it is exactly the order the server accepted the sends — ids order only
+		// down to the millisecond and can invert two sends that land close together on
+		// different server replicas. Timeout rows sit in the same ordered queue as received
+		// rows, so they carry it too. It also lets a worker fetch just the rows written
+		// after the copy it loaded, the same catch-up the child wait column below serves.
+		signalSequence: integer("signal_sequence").notNull(),
+
 		data: jsonb("data"),
 
 		timedOutAt: timestampMs("timed_out_at"),
@@ -311,7 +336,7 @@ export const eventWait = pgTable(
 			foreignColumns: [workflowRun.id],
 		}),
 		uniqueIndex("uqidx_event_wait_workflow_run_name_reference").on(table.workflowRunId, table.name, table.referenceId),
-		index("idx_event_wait_workflow_run_id").on(table.workflowRunId, table.id),
+		index("idx_event_wait_workflow_run_signal_sequence_id").on(table.workflowRunId, table.signalSequence, table.id),
 		check(
 			"chk_event_wait_timeout_requires_timed_out_at",
 			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
@@ -325,13 +350,21 @@ export const childWorkflowRunWait = pgTable(
 		id: text("id").primaryKey(),
 		parentWorkflowRunId: text("parent_workflow_run_id").notNull(),
 		childWorkflowRunId: text("child_workflow_run_id").notNull(),
-		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status").notNull(),
+		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status"),
 
 		status: childWorkflowRunWaitStatusEnum("status").notNull(),
 		completedAt: timestampMs("completed_at"),
 		timedOutAt: timestampMs("timed_out_at"),
 
 		childWorkflowRunStateTransitionId: text("child_workflow_run_state_transition_id"),
+
+		// The parent run's signal_sequence at the moment this row was written. A child can
+		// finish while its parent is executing, so a row can land that the parent's loaded
+		// copy of this table lacks; the value lets the parent fetch just the rows written
+		// after its copy, instead of re-reading everything. A timeout row cannot land that
+		// way — it is written only while the parent is parked, and the parent re-reads
+		// everything when it wakes — so there is nothing to catch up on, and it stays null.
+		signalSequence: integer("signal_sequence"),
 
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
@@ -354,11 +387,11 @@ export const childWorkflowRunWait = pgTable(
 		index("idx_child_workflow_run_wait_parent_id").on(table.parentWorkflowRunId, table.id),
 		check(
 			"chk_child_workflow_run_wait_completed_invariants",
-			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL)`
+			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NOT NULL AND ${table.signalSequence} IS NOT NULL)`
 		),
 		check(
-			"chk_child_workflow_run_wait_timeout_requires_timed_out_at",
-			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
+			"chk_child_workflow_run_wait_timeout_invariants",
+			sql`${table.status} != 'timeout' OR (${table.timedOutAt} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NULL AND ${table.childWorkflowRunStateTransitionId} IS NULL AND ${table.signalSequence} IS NULL)`
 		),
 	]
 );

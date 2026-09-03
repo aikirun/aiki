@@ -18,6 +18,7 @@ import { createEventWaiters } from "./event";
 import { workflowRunHandle } from "./handle";
 import { createReplayManifest } from "./replay-manifest";
 import { createSleeper } from "./sleeper";
+import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../workflow-version";
 
 export interface ExecuteWorkflowParams<Context> {
@@ -63,6 +64,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 	const workflowRunId = workflowRun.id as WorkflowRunId;
 
 	const intervals: Array<{ stop: () => void }> = [];
+	let flushTaskExecutions: (() => Promise<void>) | undefined;
 	try {
 		intervals.push(
 			runOnInterval(() => client.api.workflowRun.claimRefreshV1({ id: workflowRunId }), {
@@ -91,6 +93,8 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
 		const handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
+		const { create: createTaskExecutionTracker, flush: taskExecutionsFlusher } = taskExecutionTracker(handle, logger);
+		flushTaskExecutions = taskExecutionsFlusher;
 
 		const createContext = client[INTERNAL].context;
 		const context = createContext ? createContext(workflowRun) : null;
@@ -119,6 +123,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				[INTERNAL]: {
 					handle,
 					replayManifest: createReplayManifest(workflowRun),
+					createTaskExecutionTracker,
 					configProvider,
 					hasher,
 					codec,
@@ -144,6 +149,11 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 		return false;
 	} finally {
+		// Flushed before the claim refresh stops, so the claim stays live while the
+		// tracker waits out task executions that are still running.
+		if (flushTaskExecutions) {
+			await flushTaskExecutions();
+		}
 		for (const interval of intervals) {
 			interval.stop();
 		}

@@ -33,7 +33,11 @@ Before writing any test, study the exemplars for its tier and match their idioms
     clock so aged state is minted through the real code paths. Clock placement follows
     necessity: wrap at the call site when aging is the test's own policy; a seed that
     constitutively requires aged state (a stalled run) owns its clock internally.
-    Integration-only (test files run sequentially in one process).
+    Integration-only (test files run sequentially in one process). Freeze at 1 or later,
+    never 0: bun's `setSystemTime(new Date(0))` resets to the real clock instead of freezing.
+- Ulids embed their mint time, so rows minted under a clock frozen in the past sort before
+  rows minted earlier in real time. A read ordered by id (`listByRunId`) returns them in that
+  order — author expectations in id order, not in the order the test took its steps.
 - Use these tools only where the test's semantics need them. The fake clock earns its place
   where state must look aged, where an expectation pins an exact written timestamp, or where
   a premise needs pinning — not where a status check suffices. Derive each piece of harness
