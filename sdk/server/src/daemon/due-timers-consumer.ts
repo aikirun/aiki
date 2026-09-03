@@ -162,7 +162,9 @@ export async function processDueTimers(
 				...scheduleRowToDomain(schedule, workflow),
 				workflowId: schedule.workflowId,
 				namespaceId: schedule.namespaceId as NamespaceId,
+				workflowRunInput: schedule.workflowRunInput,
 				workflowRunInputHash: schedule.workflowRunInputHash,
+				clientCodecApplied: schedule.clientCodecApplied,
 			}));
 			if (!isNonEmptyArray(schedules)) {
 				continue;

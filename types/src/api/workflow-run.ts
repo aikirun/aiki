@@ -1,8 +1,8 @@
 import type { DistributiveOmit } from "@aikirun/lib/object";
 
-import type { EncodedPayload } from "../infra/codec";
 import type { Hash } from "../infra/hasher";
-import type { ClientCodec, WorkflowSource } from "../workflow";
+import type { OpaquePayload } from "../payload";
+import type { WorkflowSource } from "../workflow";
 import type {
 	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunRecord,
@@ -109,9 +109,9 @@ export interface WorkflowRunGetStateResponseV1 {
 export interface WorkflowRunCreateRequestV1 {
 	name: string;
 	versionId: string;
-	input: EncodedPayload;
+	input?: OpaquePayload;
 	inputHash: Hash;
-	clientCodec: ClientCodec;
+	clientCodecApplied: boolean;
 	parent?: {
 		workflowRunId: string;
 		expectedRevision: number;

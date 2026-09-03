@@ -6,7 +6,7 @@ import type { DistributiveOmit } from "@aikirun/lib/object";
 import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
 import type { WorkflowRunStateRequest, WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { ApiClient, Client } from "@aikirun/types/client";
-import type { Codec, EncodedPayload } from "@aikirun/types/infra/codec";
+import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
 	TerminalWorkflowRunState,
@@ -19,32 +19,31 @@ import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
-/** Identity codec used when the client codec must not apply (system runs / codec none). */
 const noopCodec: Codec = {
-	encode: async (payload: unknown): Promise<EncodedPayload> => ({ encodedValue: payload }),
-	decode: async (payload: EncodedPayload): Promise<unknown> => payload.encodedValue,
+	encode: async (payload) => payload,
+	decode: async (payload) => payload,
 };
 
-export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
+export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
 	id: WorkflowRunId,
 	eventsDefinition?: TEvents,
 	logger?: Logger
-): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
+): Promise<WorkflowRunHandle<Output, Context, TEvents>>;
 
-export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
+export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
 	run: WorkflowRunRecord,
 	eventsDefinition?: TEvents,
 	logger?: Logger
-): WorkflowRunHandle<Input, Output, Context, TEvents>;
+): WorkflowRunHandle<Output, Context, TEvents>;
 
-export function workflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
+export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
 	runOrId: WorkflowRunId | WorkflowRunRecord,
 	eventsDefinition?: TEvents,
 	logger?: Logger
-): WorkflowRunHandle<Input, Output, Context, TEvents> | Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
+): WorkflowRunHandle<Output, Context, TEvents> | Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 	if (typeof runOrId === "string") {
 		const runId = runOrId;
 		return (async () => {
@@ -77,7 +76,7 @@ export function workflowRunHandle<Input, Output, Context, TEvents extends Events
 	);
 }
 
-export interface WorkflowRunHandle<_Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> {
+export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition> {
 	run: Readonly<WorkflowRunRecord>;
 
 	events: EventSenders<TEvents>;
@@ -190,12 +189,12 @@ export async function decodeWaitResultState<Output>(
 	};
 }
 
-class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefinition>
-	implements WorkflowRunHandle<Input, Output, Context, TEvents>
+class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
+	implements WorkflowRunHandle<Output, Context, TEvents>
 {
 	private readonly api: ApiClient;
 	public readonly events: EventSenders<TEvents>;
-	public readonly [INTERNAL]: WorkflowRunHandle<Input, Output, Context, TEvents>[typeof INTERNAL];
+	public readonly [INTERNAL]: WorkflowRunHandle<Output, Context, TEvents>[typeof INTERNAL];
 
 	constructor(
 		client: Client<Context>,
@@ -206,9 +205,7 @@ class WorkflowRunHandleImpl<Input, Output, Context, TEvents extends EventsDefini
 		this.api = client.api;
 		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger);
 
-		// System workflows should not use the client codec — always fall back to noop.
-		const codec =
-			this._run.source !== "system" && this._run.clientCodec === "applied" ? client[INTERNAL].codec : noopCodec;
+		const codec = this._run.clientCodecApplied ? client[INTERNAL].codec : noopCodec;
 
 		this[INTERNAL] = {
 			client,

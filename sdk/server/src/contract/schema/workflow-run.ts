@@ -1,14 +1,13 @@
 import { type } from "arktype";
 
 import { eventWaitSchema } from "./event";
+import { opaquePayloadSchema } from "./payload";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
 import { sleepSchema } from "./sleep";
 import { taskInfoSchema } from "./task";
 import { triggerStrategySchema } from "./trigger";
 import { workflowSourceSchema } from "./workflow";
-
-export const encodedPayloadSchema = type({ encodedValue: "unknown" });
 
 export const workflowRunStatusSchema = type(
 	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_task_retry' | 'awaiting_child_workflow' | 'stalled' | 'cancelled' | 'failed' | 'completed'"
@@ -113,7 +112,7 @@ export const workflowRunStateCancelledSchema = type({
 
 export const workflowRunStateCompletedSchema = type({
 	status: "'completed'",
-	output: encodedPayloadSchema,
+	output: opaquePayloadSchema,
 });
 
 export const workflowRunStateFailedSchema = type({
@@ -176,9 +175,9 @@ export const workflowRunRecordSchema = type({
 	revision: "number >= 0",
 	signalSequence: "number.integer >= 0",
 	stateTransitionId: "string > 0",
-	input: encodedPayloadSchema,
+	"input?": opaquePayloadSchema,
 	inputHash: "string > 0",
-	clientCodec: "'applied' | 'none'",
+	clientCodecApplied: "boolean",
 	"referenceId?": "string > 0 | undefined",
 	"options?": workflowRunOptionsSchema.or("undefined"),
 	attempts: "number.integer >= 0",

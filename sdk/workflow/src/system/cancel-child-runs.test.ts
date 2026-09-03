@@ -3,6 +3,7 @@ import { hashInput } from "@aikirun/lib/crypto";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import { completedTaskInfoFactory, runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -19,16 +20,12 @@ import { taskExecutionTracker } from "../run/task-execution-tracker";
 const LIST_NON_TERMINAL_CHILDREN_TASK_NAME = "list-non-terminal-child-runs";
 const CANCEL_RUNS_TASK_NAME = "cancel-runs";
 
-function createTestWorkflowRun(
-	client: Client,
-	record: WorkflowRunRecord
-): WorkflowRun<unknown, null, Record<string, never>> {
+function createTestWorkflowRun(client: Client, record: WorkflowRunRecord): WorkflowRun<null, Record<string, never>> {
 	const handle = workflowRunHandle(client, record);
 	return {
 		id: record.id as WorkflowRunId,
 		name: record.name as WorkflowName,
 		versionId: record.versionId as WorkflowVersionId,
-		source: record.source,
 		options: record.options ?? {},
 		logger: client.logger,
 		sleep: () => {
@@ -43,7 +40,7 @@ function createTestWorkflowRun(
 			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
 			hasher: hashInput,
 			codec: client[INTERNAL].codec,
-			clientCodec: record.clientCodec,
+			clientCodecApplied: record.clientCodecApplied,
 		},
 	};
 }
@@ -52,7 +49,7 @@ describe("createCancelChildRunsV1", () => {
 	test("lists the parent's non-terminal child runs and cancels exactly those", () =>
 		withFakeClient(async (client) => {
 			const runRecord = runningWorkflowRunRecordFactory.build();
-			const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<string, null, Record<string, never>>;
+			const run = createTestWorkflowRun(client, runRecord);
 			const canceChildRunsV1 = createCancelChildRunsV1(client.api);
 
 			const parentRunId = "parent-run-1";
@@ -66,7 +63,7 @@ describe("createCancelChildRunsV1", () => {
 			const completedListNonTerminalChildrenTask = completedTaskInfoFactory.build({
 				id: runningListNonTerminalChildrenTask.id,
 				name: runningListNonTerminalChildrenTask.name,
-				state: { output: nonTerminalChildRunIds },
+				state: { output: asOpaquePayload(nonTerminalChildRunIds) },
 			});
 			const runningCancelRunsTask = runningTaskInfoFactory.build({
 				name: CANCEL_RUNS_TASK_NAME,
@@ -74,7 +71,7 @@ describe("createCancelChildRunsV1", () => {
 			const completedCancelRunsTask = completedTaskInfoFactory.build({
 				id: runningCancelRunsTask.id,
 				name: runningCancelRunsTask.name,
-				state: { output: nonTerminalChildRunIds },
+				state: { output: asOpaquePayload(nonTerminalChildRunIds) },
 			});
 
 			client.api.workflowRun.transitionStateV1
@@ -91,12 +88,12 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "optimistic",
 						id: runRecord.id,
-						state: { status: "completed", output: { encodedValue: undefined } },
+						state: { status: "completed", output: undefined },
 						expectedRevision: runRecord.revision,
 					},
 					{
 						revision: runRecord.revision,
-						state: { status: "completed", output: { encodedValue: undefined } },
+						state: { status: "completed", output: undefined },
 						attempts: runRecord.attempts,
 					}
 				);
@@ -105,8 +102,7 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
-						clientCodec: "none",
-						input: { encodedValue: parentRunId },
+						input: asOpaquePayload(parentRunId),
 						inputHash: parentRunIdInputHash,
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
@@ -119,7 +115,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						id: runningListNonTerminalChildrenTask.id,
 						attempts: 1,
-						state: { status: "completed", output: { encodedValue: nonTerminalChildRunIds } },
+						state: { status: "completed", output: asOpaquePayload(nonTerminalChildRunIds) },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -128,8 +124,7 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
-						clientCodec: "none",
-						input: { encodedValue: nonTerminalChildRunIds },
+						input: asOpaquePayload(nonTerminalChildRunIds),
 						inputHash: nonTerminalChildRunIdsInputHash,
 						taskName: runningCancelRunsTask.name,
 						options: {},
@@ -142,7 +137,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						id: runningCancelRunsTask.id,
 						attempts: 1,
-						state: { status: "completed", output: { encodedValue: nonTerminalChildRunIds } },
+						state: { status: "completed", output: asOpaquePayload(nonTerminalChildRunIds) },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},
@@ -164,7 +159,7 @@ describe("createCancelChildRunsV1", () => {
 	test("does not cancel anything when the parent has no non-terminal children", () =>
 		withFakeClient(async (client) => {
 			const runRecord = runningWorkflowRunRecordFactory.build();
-			const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<string, null, Record<string, never>>;
+			const run = createTestWorkflowRun(client, runRecord);
 			const canceChildRunsV1 = createCancelChildRunsV1(client.api);
 
 			const parentRunId = "parent-run-1";
@@ -176,7 +171,7 @@ describe("createCancelChildRunsV1", () => {
 			const completedListNonTerminalChildrenTask = completedTaskInfoFactory.build({
 				id: runningListNonTerminalChildrenTask.id,
 				name: runningListNonTerminalChildrenTask.name,
-				state: { output: [] },
+				state: { output: asOpaquePayload([]) },
 			});
 
 			client.api.workflowRun.transitionStateV1
@@ -193,12 +188,12 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "optimistic",
 						id: runRecord.id,
-						state: { status: "completed", output: { encodedValue: undefined } },
+						state: { status: "completed", output: undefined },
 						expectedRevision: runRecord.revision,
 					},
 					{
 						revision: runRecord.revision,
-						state: { status: "completed", output: { encodedValue: undefined } },
+						state: { status: "completed", output: undefined },
 						attempts: runRecord.attempts,
 					}
 				);
@@ -207,8 +202,7 @@ describe("createCancelChildRunsV1", () => {
 				.once(
 					{
 						type: "create",
-						clientCodec: "none",
-						input: { encodedValue: parentRunId },
+						input: asOpaquePayload(parentRunId),
 						inputHash: parentRunIdInputHash,
 						taskName: runningListNonTerminalChildrenTask.name,
 						options: {},
@@ -221,7 +215,7 @@ describe("createCancelChildRunsV1", () => {
 					{
 						id: runningListNonTerminalChildrenTask.id,
 						attempts: 1,
-						state: { status: "completed", output: { encodedValue: [] } },
+						state: { status: "completed", output: asOpaquePayload([]) },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 					},

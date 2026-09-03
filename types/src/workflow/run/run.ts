@@ -4,7 +4,7 @@ import type { SerializableError } from "@aikirun/lib/serializable";
 import type { EventWait } from "./event";
 import type { Sleep } from "./sleep";
 import type { TriggerStrategy } from "./trigger";
-import type { EncodedPayload } from "../../infra/codec";
+import type { OpaquePayload } from "../../payload";
 import type { TaskInfo } from "../task";
 import type { WorkflowSource } from "../workflow";
 
@@ -54,9 +54,6 @@ export type WaitingForSignalWorkflowRunStatus = "awaiting_event" | "awaiting_chi
 
 export const WORKFLOW_RUN_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type WorkflowRunConflictPolicy = (typeof WORKFLOW_RUN_CONFLICT_POLICIES)[number];
-
-export const CLIENT_CODECS = ["applied", "none"] as const;
-export type ClientCodec = (typeof CLIENT_CODECS)[number];
 
 export interface WorkflowReference {
 	id: string;
@@ -231,7 +228,7 @@ export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
 
 export interface WorkflowRunStateCompleted extends WorkflowRunStateBase {
 	status: "completed";
-	output: EncodedPayload;
+	output?: OpaquePayload;
 }
 
 interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
@@ -286,9 +283,9 @@ export interface WorkflowRunRecord {
 	revision: number;
 	signalSequence: number;
 	stateTransitionId: string;
-	input: EncodedPayload;
+	input?: OpaquePayload;
 	inputHash: string;
-	clientCodec: ClientCodec;
+	clientCodecApplied: boolean;
 	referenceId?: string;
 	options?: WorkflowRunOptions;
 	attempts: number;

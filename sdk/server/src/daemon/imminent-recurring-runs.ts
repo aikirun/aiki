@@ -5,6 +5,7 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OpaquePayload } from "@aikirun/types/payload";
 import type { Schedule, ScheduleOverlapPolicy } from "@aikirun/types/schedule";
 import {
 	NON_TERMINAL_WORKFLOW_RUN_STATUSES,
@@ -38,7 +39,9 @@ export interface ProcessImminentRecurringRunsDeps {
 export type DueSchedule = Schedule & {
 	workflowId: string;
 	namespaceId: NamespaceId;
+	workflowRunInput: OpaquePayload | null;
 	workflowRunInputHash: string;
+	clientCodecApplied: boolean;
 };
 
 const advanceScheduleCursor = createKeysetStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: TimestampMs } }>({
@@ -65,7 +68,9 @@ export async function processImminentRecurringRuns(
 			...scheduleRowToDomain(schedule, workflow),
 			workflowId: schedule.workflowId,
 			namespaceId: schedule.namespaceId as NamespaceId,
+			workflowRunInput: schedule.workflowRunInput,
 			workflowRunInputHash: schedule.workflowRunInputHash,
+			clientCodecApplied: schedule.clientCodecApplied,
 		}));
 
 		const now = Date.now();
@@ -166,7 +171,7 @@ async function processOverlapAllowSchedules(
 				workflowId: schedule.workflowId,
 				scheduleId: schedule.id,
 				status: "queued",
-				clientCodec: "none",
+				clientCodecApplied: schedule.clientCodecApplied,
 				input: schedule.workflowRunInput,
 				inputHash: schedule.workflowRunInputHash,
 				options: schedule.workflowRunOptions,
@@ -274,14 +279,13 @@ async function processOverlapSkipSchedules(
 		const stateTransitionId = ulid();
 		const referenceId = getReferenceId(schedule.id, occurrence);
 
-		// TODO: check if decoded/hashing needed here?
 		workflowRunEntries.push({
 			id: runId,
 			namespaceId: schedule.namespaceId,
 			workflowId: schedule.workflowId,
 			scheduleId: schedule.id,
 			status: "queued",
-			clientCodec: "none",
+			clientCodecApplied: schedule.clientCodecApplied,
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,
@@ -405,7 +409,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowId: schedule.workflowId,
 			scheduleId: schedule.id,
 			status: "queued",
-			clientCodec: "none",
+			clientCodecApplied: schedule.clientCodecApplied,
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,

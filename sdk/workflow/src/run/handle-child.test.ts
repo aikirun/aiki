@@ -1,5 +1,6 @@
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
 import { workflowRunHandle } from "./handle";
@@ -15,7 +16,7 @@ describe("childWorkflowRunHandle", () => {
 					childWorkflowRunWaits: {
 						[childRecord.id]: {
 							timeouts: [],
-							terminal: { state: { status: "completed", output: { encodedValue: "done" } }, completedAt: 1_000 },
+							terminal: { state: { status: "completed", output: asOpaquePayload("done") }, completedAt: 1_000 },
 						},
 					},
 				});
@@ -58,7 +59,7 @@ describe("childWorkflowRunHandle", () => {
 					childWorkflowRunWaits: {
 						[childRecord.id]: {
 							timeouts: [],
-							terminal: { state: { status: "completed", output: { encodedValue: "done" } }, completedAt: 1_000 },
+							terminal: { state: { status: "completed", output: asOpaquePayload("done") }, completedAt: 1_000 },
 						},
 					},
 				});
@@ -97,7 +98,7 @@ describe("childWorkflowRunHandle", () => {
 					childWorkflowRunWaits: {
 						[childRecord.id]: {
 							timeouts: [{ timedOutAt: 1_000 }],
-							terminal: { state: { status: "completed", output: { encodedValue: "done" } }, completedAt: 2_000 },
+							terminal: { state: { status: "completed", output: asOpaquePayload("done") }, completedAt: 2_000 },
 						},
 					},
 				});

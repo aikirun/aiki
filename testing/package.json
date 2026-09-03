@@ -8,6 +8,7 @@
 		"./client": "./src/client.ts",
 		"./infra/queue": "./src/infra/queue/index.ts",
 		"./infra/timer": "./src/infra/timer.ts",
+		"./payload": "./src/payload.ts",
 		"./data-factory/api/schedule": "./src/data-factory/api/schedule.ts",
 		"./data-factory/schedule": "./src/data-factory/schedule.ts",
 		"./data-factory/infra/queue": "./src/data-factory/infra/queue.ts",

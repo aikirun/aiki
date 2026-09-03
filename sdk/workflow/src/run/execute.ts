@@ -114,7 +114,6 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				id: workflowRunId,
 				name: workflowRun.name as WorkflowName,
 				versionId: workflowRun.versionId as WorkflowVersionId,
-				source: workflowRun.source,
 				options: workflowRun.options ?? {},
 				logger,
 				sleep: createSleeper(handle, logger),
@@ -127,10 +126,10 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 					configProvider,
 					hasher,
 					codec,
-					clientCodec: workflowRun.clientCodec,
+					clientCodecApplied: workflowRun.clientCodecApplied,
 				},
 			},
-			workflowRun.input.encodedValue === undefined ? undefined : await codec.decode(workflowRun.input)
+			await codec.decode(workflowRun.input)
 		);
 
 		return true;

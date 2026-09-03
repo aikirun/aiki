@@ -1,15 +1,15 @@
 import { plainHasher } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client } from "@aikirun/types/client";
-import type { Codec, EncodedPayload } from "@aikirun/types/infra/codec";
+import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
 
 import { expect, type Mock, mock } from "bun:test";
 
 const noopCodec: Codec = {
-	encode: async (payload: unknown): Promise<EncodedPayload> => ({ encodedValue: payload }),
-	decode: async (payload: EncodedPayload): Promise<unknown> => payload.encodedValue,
+	encode: async (payload) => payload,
+	decode: async (payload) => payload,
 };
 
 type MockEndpoint<Args extends unknown[], Return> = Mock<(...args: Args) => Return> & {
@@ -212,7 +212,7 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 		[INTERNAL]: {
 			hasher: plainHasher,
 			codec: noopCodec,
-			clientCodec: "none",
+			clientCodecApplied: false,
 			...(options.context ? { context: options.context } : {}),
 		},
 

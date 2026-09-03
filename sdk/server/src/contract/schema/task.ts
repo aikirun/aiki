@@ -1,5 +1,6 @@
 import { type } from "arktype";
 
+import { opaquePayloadSchema } from "./payload";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
 
@@ -19,7 +20,7 @@ export const taskStateAwaitingRetrySchema = type({
 
 export const taskStateCompletedSchema = type({
 	status: "'completed'",
-	output: "unknown",
+	output: opaquePayloadSchema,
 });
 
 export const taskStateFailedSchema = type({
@@ -51,7 +52,7 @@ export const taskRecordSchema = type({
 	id: "string > 0",
 	name: "string > 0",
 	workflowRunId: "string > 0",
-	"input?": "unknown",
+	"input?": opaquePayloadSchema,
 	inputHash: "string > 0",
 	"options?": taskOptionsSchema.or("undefined"),
 	attempts: "number.integer > 0",

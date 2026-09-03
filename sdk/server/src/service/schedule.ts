@@ -4,6 +4,7 @@ import { NotFoundError } from "@aikirun/lib/error";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { ScheduleActivateRequestV1, ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OpaquePayload } from "@aikirun/types/payload";
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
@@ -408,13 +409,13 @@ async function createSchedule(
 		namespaceId: params.namespaceId,
 		workflowId: params.workflowId,
 		status: "active",
-		clientCodec: "none",
+		clientCodecApplied: false,
 		type: spec.type,
 		cronExpression: spec.type === "cron" ? spec.expression : null,
 		cronTimezone: spec.type === "cron" ? (spec.timezone ?? null) : null,
 		intervalMs: spec.type === "interval" ? spec.everyMs : null,
 		overlapPolicy: spec.overlapPolicy ?? null,
-		workflowRunInput: params.workflowRunInput,
+		workflowRunInput: params.workflowRunInput as OpaquePayload,
 		workflowRunInputHash: params.workflowRunInputHash,
 		definitionHash: params.definitionHash,
 		referenceId: params.referenceId,

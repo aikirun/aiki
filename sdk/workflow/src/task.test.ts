@@ -13,6 +13,7 @@ import {
 	failedTaskInfoFactory,
 	runningTaskInfoFactory,
 } from "@aikirun/testing/data-factory/workflow/task";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -34,21 +35,16 @@ import { taskExecutionTracker } from "./run/task-execution-tracker";
 import { task } from "./task";
 import { describe, expect, test } from "bun:test";
 
-function encoded<T>(value: T): { encodedValue: T } {
-	return { encodedValue: value };
-}
-
 function createTestWorkflowRun(
 	client: Client,
 	record: WorkflowRunRecord,
 	options: { maxInlineWaitMs?: number } = {}
-): WorkflowRun<unknown, null, Record<string, never>> {
+): WorkflowRun<null, Record<string, never>> {
 	const handle = workflowRunHandle(client, record);
 	return {
 		id: record.id as WorkflowRunId,
 		name: record.name as WorkflowName,
 		versionId: record.versionId as WorkflowVersionId,
-		source: record.source,
 		options: record.options ?? {},
 		logger: client.logger,
 		sleep: () => {
@@ -66,7 +62,7 @@ function createTestWorkflowRun(
 			})),
 			hasher: hashInput,
 			codec: client[INTERNAL].codec,
-			clientCodec: record.clientCodec,
+			clientCodecApplied: record.clientCodecApplied,
 		},
 	};
 }
@@ -92,15 +88,14 @@ describe("task", () => {
 					const completedTaskInfo = completedTaskInfoFactory.build({
 						id: runningTaskInfo.id,
 						name: sendEmail.name,
-						state: { output: encoded(output) },
+						state: { output: asOpaquePayload(output) },
 					});
 
 					client.api.task.transitionStateV1
 						.once(
 							{
 								type: "create",
-								clientCodec: "none",
-								input: encoded(input),
+								input: asOpaquePayload(input),
 								inputHash,
 								taskName: sendEmail.name,
 								options: {},
@@ -128,8 +123,8 @@ describe("task", () => {
 			withFakeClient(async (client) => {
 				const input = "info@aiki.run";
 				const output = "Sent to info@aiki.run";
-				const encodedInput = { encodedValue: { encodedInput: true } };
-				const encodedOutput = { encodedValue: { encodedOutput: true } };
+				const encodedInput = asOpaquePayload({ encodedInput: true });
+				const encodedOutput = asOpaquePayload({ encodedOutput: true });
 				client[INTERNAL].codec = {
 					encode: async (payload) => {
 						if (payload === input) {
@@ -138,9 +133,9 @@ describe("task", () => {
 						if (payload === output) {
 							return encodedOutput;
 						}
-						return { encodedValue: payload };
+						return payload;
 					},
-					decode: async (payload) => payload.encodedValue,
+					decode: async (payload) => payload,
 				};
 
 				const runRecord = runningWorkflowRunRecordFactory.build();
@@ -163,7 +158,6 @@ describe("task", () => {
 					.once(
 						{
 							type: "create",
-							clientCodec: "none",
 							input: encodedInput,
 							inputHash,
 							taskName: sendEmail.name,
@@ -215,15 +209,14 @@ describe("task", () => {
 					id: runningTaskInfo.id,
 					name: chargeCard.name,
 					attempts: 2,
-					state: { output: encoded(output) },
+					state: { output: asOpaquePayload(output) },
 				});
 
 				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
-							clientCodec: "none",
-							input: encoded(input),
+							input: asOpaquePayload(input),
 							inputHash,
 							taskName: chargeCard.name,
 							options: { retry },
@@ -269,8 +262,7 @@ describe("task", () => {
 					.once(
 						{
 							type: "create",
-							clientCodec: "none",
-							input: encoded(input),
+							input: asOpaquePayload(input),
 							inputHash,
 							taskName: chargeCard.name,
 							options: { retry },
@@ -343,7 +335,7 @@ describe("task", () => {
 						{
 							id: awaitingRetryTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: encoded("charged") },
+							state: { status: "completed", output: asOpaquePayload("charged") },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
@@ -352,7 +344,7 @@ describe("task", () => {
 								id: awaitingRetryTaskInfo.id,
 								name: chargeCard.name,
 								attempts: 2,
-								state: { output: encoded("charged") },
+								state: { output: asOpaquePayload("charged") },
 							}),
 						}
 					);
@@ -442,7 +434,7 @@ describe("task", () => {
 						{
 							id: awaitingRetryTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: encoded("charged") },
+							state: { status: "completed", output: asOpaquePayload("charged") },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 						},
@@ -451,7 +443,7 @@ describe("task", () => {
 								id: awaitingRetryTaskInfo.id,
 								name: chargeCard.name,
 								attempts: 2,
-								state: { output: encoded("charged") },
+								state: { output: asOpaquePayload("charged") },
 							}),
 						}
 					);
@@ -508,8 +500,7 @@ describe("task", () => {
 					.once(
 						{
 							type: "create",
-							clientCodec: "none",
-							input: encoded(input),
+							input: asOpaquePayload(input),
 							inputHash,
 							taskName: chargeCard.name,
 							options: {},
@@ -553,7 +544,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: sendEmail.name, referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: sendEmail.name,
-					state: { output: encoded(output) },
+					state: { output: asOpaquePayload(output) },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					tasks: { [address]: [recordedTask] },
@@ -566,10 +557,10 @@ describe("task", () => {
 
 		test("decodes recorded output when replaying a completed task", () =>
 			withFakeClient(async (client) => {
-				const encodedOutput = { encodedValue: { encoded: true } };
+				const encodedOutput = asOpaquePayload({ encoded: true });
 				const decodedOutput = "previously-sent";
 				client[INTERNAL].codec = {
-					encode: async (payload) => ({ encodedValue: payload }),
+					encode: async (payload) => payload,
 					decode: async (payload) => {
 						expect(payload).toEqual(encodedOutput);
 						return decodedOutput;
@@ -627,7 +618,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: sendEmail.name, referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: sendEmail.name,
-					state: { output: encoded(recordedOutput) },
+					state: { output: asOpaquePayload(recordedOutput) },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					tasks: { [address]: [recordedTask] },
@@ -761,15 +752,14 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: sendEmail.name,
-					state: { output: encoded(output) },
+					state: { output: asOpaquePayload(output) },
 				});
 
 				client.api.task.transitionStateV1
 					.once(
 						{
 							type: "create",
-							clientCodec: "none",
-							input: encoded(input),
+							input: asOpaquePayload(input),
 							inputHash,
 							taskName: sendEmail.name,
 							options: { retry },

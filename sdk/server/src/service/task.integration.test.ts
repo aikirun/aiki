@@ -1,4 +1,5 @@
 import { NotFoundError } from "@aikirun/lib/error";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
 import { createTaskStateMachine } from "./state-machine/task";
@@ -26,7 +27,7 @@ describe("TaskService getTaskById", () => {
 				id: taskInfo.id,
 				name: taskInfo.name,
 				workflowRunId: runId,
-				input: taskInput,
+				input: asOpaquePayload(taskInput),
 				inputHash: taskInfo.inputHash,
 				options: undefined,
 				attempts: 1,
@@ -85,14 +86,14 @@ describe("TaskService setTaskState", () => {
 			await taskService.setTaskState(context, {
 				id: taskInfo.id,
 				workflowRunId: runId,
-				state: { status: "completed", output },
+				state: { status: "completed", output: asOpaquePayload(output) },
 			});
 
 			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
 				expect.objectContaining({
 					id: taskInfo.id,
 					attempts: 2,
-					state: { status: "completed", output },
+					state: { status: "completed", output: asOpaquePayload(output) },
 				}),
 			]);
 		}));
@@ -147,7 +148,7 @@ describe("TaskService setTaskState", () => {
 				taskService.setTaskState(context, {
 					id: victimTaskSeed.taskInfo.id,
 					workflowRunId: attackerRunSeed.runId,
-					state: { status: "completed", output: "hijacked" },
+					state: { status: "completed", output: asOpaquePayload("hijacked") },
 				})
 			).rejects.toBeInstanceOf(NotFoundError);
 
@@ -172,7 +173,7 @@ describe("TaskService setTaskState", () => {
 				taskService.setTaskState(context, {
 					id: taskInfo.id,
 					workflowRunId: runId,
-					state: { status: "completed", output: { reservationId: "rsv-1" } },
+					state: { status: "completed", output: asOpaquePayload({ reservationId: "rsv-1" }) },
 				})
 			).rejects.toBeInstanceOf(WorkflowRunTerminatedError);
 
