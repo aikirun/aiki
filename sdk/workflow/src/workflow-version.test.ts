@@ -10,6 +10,7 @@ import {
 	workflowRunStateByStatus,
 } from "@aikirun/testing/data-factory/workflow/run";
 import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
@@ -33,10 +34,7 @@ import { task } from "./task";
 import { workflow } from "./workflow";
 import { describe, expect, test } from "bun:test";
 
-function createTestWorkflowRun(
-	client: Client,
-	record: WorkflowRunRecord
-): WorkflowRun<unknown, null, Record<string, never>> {
+function createTestWorkflowRun(client: Client, record: WorkflowRunRecord): WorkflowRun<null, Record<string, never>> {
 	const handle = workflowRunHandle(client, record);
 	return {
 		id: record.id as WorkflowRunId,
@@ -70,7 +68,7 @@ describe("workflow version execution", () => {
 					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({ options: { retry: { type: "never" } } });
-				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+				const run = createTestWorkflowRun(client, runRecord);
 
 				client.api.workflowRun.transitionStateV1
 					.once(
@@ -112,7 +110,7 @@ describe("workflow version execution", () => {
 					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+				const run = createTestWorkflowRun(client, runRecord);
 
 				client.api.workflowRun.transitionStateV1
 					.once(
@@ -159,7 +157,7 @@ describe("workflow version execution", () => {
 					},
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+				const run = createTestWorkflowRun(client, runRecord);
 
 				client.api.workflowRun.transitionStateV1
 					.once(
@@ -203,7 +201,7 @@ describe("workflow version execution", () => {
 						},
 					});
 					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
-					const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+					const run = createTestWorkflowRun(client, runRecord);
 
 					client.api.workflowRun.transitionStateV1
 						.once(
@@ -219,12 +217,12 @@ describe("workflow version execution", () => {
 							{
 								type: "optimistic",
 								id: runRecord.id,
-								state: { status: "completed", output: "done" },
+								state: { status: "completed", output: asOpaquePayload("done") },
 								expectedRevision: runRecord.revision,
 							},
 							{
 								revision: runRecord.revision,
-								state: { status: "completed", output: "done" },
+								state: { status: "completed", output: asOpaquePayload("done") },
 								attempts: runRecord.attempts,
 							}
 						);
@@ -232,6 +230,54 @@ describe("workflow version execution", () => {
 					expect(await workflowVersion[INTERNAL].handler(run)).toBeUndefined();
 				}));
 		}
+
+		test("encodes the handler output with the run's codec before persisting it", () =>
+			withFakeClient(async (client) => {
+				const encodedOutput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("done");
+						return encodedOutput;
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "completing-workflow" }).v("1.0.0", {
+					async handler() {
+						return "done";
+					},
+				});
+				const runRecord = {
+					...baseWorkflowRunRecordFactory.build({ clientCodecApplied: true }),
+					state: workflowRunStateByStatus.running,
+				};
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: { status: "running" }, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "completed", output: encodedOutput },
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "completed", output: encodedOutput },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(await workflowVersion[INTERNAL].handler(run)).toBeUndefined();
+			}));
 
 		test("persists the schema-parsed value when an output schema is provided", () =>
 			withFakeClient(async (client) => {
@@ -249,7 +295,7 @@ describe("workflow version execution", () => {
 					schema: { output: toUpperCase },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+				const run = createTestWorkflowRun(client, runRecord);
 
 				client.api.workflowRun.transitionStateV1
 					.once(
@@ -265,12 +311,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "completed", output: "DONE" },
+							state: { status: "completed", output: asOpaquePayload("DONE") },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "completed", output: "DONE" },
+							state: { status: "completed", output: asOpaquePayload("DONE") },
 							attempts: runRecord.attempts,
 						}
 					);
@@ -295,7 +341,7 @@ describe("workflow version execution", () => {
 					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+				const run = createTestWorkflowRun(client, runRecord);
 
 				client.api.workflowRun.transitionStateV1
 					.once(
@@ -349,7 +395,7 @@ describe("workflow version execution", () => {
 					retry: { type: "never" },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+				const run = createTestWorkflowRun(client, runRecord);
 
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 				const inputHash = await hashInput(undefined);
@@ -358,6 +404,7 @@ describe("workflow version execution", () => {
 					.once(
 						{
 							type: "create",
+							input: undefined,
 							inputHash,
 							taskName: chargeCard.name,
 							options: {},
@@ -422,7 +469,7 @@ describe("workflow version execution", () => {
 					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+				const run = createTestWorkflowRun(client, runRecord);
 
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
 				const inputHash = await hashInput(undefined);
@@ -431,6 +478,7 @@ describe("workflow version execution", () => {
 					.once(
 						{
 							type: "create",
+							input: undefined,
 							inputHash,
 							taskName: chargeCard.name,
 							options: {},
@@ -503,7 +551,7 @@ describe("workflow version execution", () => {
 						},
 						retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
 					});
-					const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+					const run = createTestWorkflowRun(client, runRecord);
 
 					client.api.workflowRun.transitionStateV1.once(
 						{
@@ -534,7 +582,7 @@ describe("workflow version execution", () => {
 						},
 					});
 					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
-					const run = createTestWorkflowRun(client, runRecord) as WorkflowRun<void, null, Record<string, never>>;
+					const run = createTestWorkflowRun(client, runRecord);
 
 					expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunNotExecutableError);
 				}));
@@ -555,7 +603,50 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("world");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "world", inputHash: { value: inputHash }, options: {} },
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("encodes the input with the client's codec and declares it applied", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("world");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return `Hello ${name}`;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						options: {},
+					},
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -584,7 +675,14 @@ describe("creating a workflow run", () => {
 				const inputHash = await hashInput("WORLD");
 
 				client.api.workflowRun.createV1.once(
-					{ name: "greet", versionId: "1.0.0", input: "WORLD", inputHash: { value: inputHash }, options: {} },
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("WORLD"),
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: {},
+					},
 					{ id: newRunRecord.id }
 				);
 				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
@@ -628,7 +726,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "greet",
 						versionId: "1.0.0",
-						input: "world",
+						input: asOpaquePayload("world"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
 					},
@@ -658,7 +757,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "greet",
 						versionId: "1.0.0",
-						input: "world",
+						input: asOpaquePayload("world"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "never" } },
 					},
@@ -686,7 +786,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "greet",
 						versionId: "1.0.0",
-						input: "world",
+						input: asOpaquePayload("world"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, pool: "eu-west" },
 					},
@@ -713,7 +814,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "greet",
 						versionId: "1.0.0",
-						input: "world",
+						input: asOpaquePayload("world"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { priority: 2 },
 					},
@@ -744,7 +846,47 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: asOpaquePayload("payload"),
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("encodes the child input with the parent's bound codec and inherits the parent's declaration", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("payload");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientCodecApplied: true,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -777,7 +919,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: asOpaquePayload("payload"),
+						clientCodecApplied: false,
 						inputHash: { value: "run-bound-hash" },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -806,7 +949,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: asOpaquePayload("payload"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -833,7 +977,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: asOpaquePayload("payload"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { pool: "eu-west" },
@@ -863,7 +1008,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: asOpaquePayload("payload"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { pool: "us-east" },
@@ -893,7 +1039,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: asOpaquePayload("payload"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { priority: 2 },
@@ -923,7 +1070,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "payload",
+						input: asOpaquePayload("payload"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { priority: 1 },
@@ -1047,7 +1195,8 @@ describe("creating a workflow run", () => {
 					{
 						name: "child-workflow",
 						versionId: "1.0.0",
-						input: "PAYLOAD",
+						input: asOpaquePayload("PAYLOAD"),
+						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},

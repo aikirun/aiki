@@ -37,6 +37,7 @@ export function client<Context = null>(params: EmbeddedClientParams<Context>): C
 export function client<Context = null>(params: ClientParams<Context>): Client<Context> {
 	const logger = params.logger ?? createConsoleLogger();
 	const hasher = params.hasher?.({ logger }) ?? plainHasher;
+	const codec = params.codec?.({ logger });
 
 	const rpcLink = isEmbeddedParams(params)
 		? new RPCLink({
@@ -67,6 +68,7 @@ export function client<Context = null>(params: ClientParams<Context>): Client<Co
 		[INTERNAL]: {
 			context: params.context,
 			hasher,
+			codec,
 		},
 	};
 }

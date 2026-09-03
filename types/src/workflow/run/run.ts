@@ -4,6 +4,7 @@ import type { SerializableError } from "@aikirun/lib/serializable";
 import type { EventWait } from "./event";
 import type { Sleep } from "./sleep";
 import type { TriggerStrategy } from "./trigger";
+import type { OpaquePayload } from "../../payload";
 import type { TaskInfo } from "../task";
 import type { WorkflowSource } from "../workflow";
 
@@ -225,9 +226,9 @@ export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
 	explanation?: string;
 }
 
-export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {
+export interface WorkflowRunStateCompleted extends WorkflowRunStateBase {
 	status: "completed";
-	output: Output;
+	output?: OpaquePayload;
 }
 
 interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
@@ -269,14 +270,11 @@ export type WorkflowRunStateInComplete =
 	| WorkflowRunStateCancelled
 	| WorkflowRunStateFailed;
 
-export type WorkflowRunState<Output = unknown> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
+export type WorkflowRunState = WorkflowRunStateInComplete | WorkflowRunStateCompleted;
 
-export type TerminalWorkflowRunState<Output = unknown> = Extract<
-	WorkflowRunState<Output>,
-	{ status: "cancelled" | "completed" | "failed" }
->;
+export type TerminalWorkflowRunState = Extract<WorkflowRunState, { status: "cancelled" | "completed" | "failed" }>;
 
-export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
+export interface WorkflowRunRecord {
 	id: string;
 	name: string;
 	versionId: string;
@@ -285,12 +283,13 @@ export interface WorkflowRunRecord<Input = unknown, Output = unknown> {
 	revision: number;
 	signalSequence: number;
 	stateTransitionId: string;
-	input?: Input;
+	input?: OpaquePayload;
 	inputHash: string;
+	clientCodecApplied: boolean;
 	referenceId?: string;
 	options?: WorkflowRunOptions;
 	attempts: number;
-	state: WorkflowRunState<Output>;
+	state: WorkflowRunState;
 	// TODO:
 	// for workflows with a large number of tasks/sleeps/eventWaits/childWorkflowRuns,
 	// prefetching all results might be problematic.

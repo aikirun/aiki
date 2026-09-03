@@ -1,3 +1,4 @@
+import type { OpaquePayload } from "@aikirun/types/payload";
 import { SCHEDULE_OVERLAP_POLICIES, SCHEDULE_STATUSES, SCHEDULE_TYPES } from "@aikirun/types/schedule";
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
@@ -11,6 +12,7 @@ import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition
 import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
 import { relations, sql } from "drizzle-orm";
 import {
+	boolean,
 	check,
 	doublePrecision,
 	foreignKey,
@@ -77,6 +79,7 @@ export const schedule = pgTable(
 		workflowId: text("workflow_id").notNull(),
 
 		status: scheduleStatusEnum("status").notNull(),
+		clientCodecApplied: boolean("client_codec_applied").notNull(),
 
 		type: scheduleTypeEnum("type").notNull(),
 		cronExpression: text("cron_expression"),
@@ -84,7 +87,7 @@ export const schedule = pgTable(
 		intervalMs: integer("interval_ms"),
 		overlapPolicy: scheduleOverlapPolicyEnum("overlap_policy"),
 
-		workflowRunInput: jsonb("workflow_run_input"),
+		workflowRunInput: jsonb("workflow_run_input").$type<OpaquePayload>(),
 		workflowRunInputHash: text("workflow_run_input_hash").notNull(),
 
 		definitionHash: text("definition_hash").notNull(),
@@ -127,11 +130,12 @@ export const workflowRun = pgTable(
 		parentWorkflowRunId: text("parent_workflow_run_id"),
 
 		status: workflowRunStatusEnum("status").notNull(),
+		clientCodecApplied: boolean("client_codec_applied").notNull(),
 		revision: integer("revision").notNull().default(0),
 		signalSequence: integer("signal_sequence").notNull().default(0),
 		attempts: integer("attempts").notNull().default(1),
 
-		input: jsonb("input"),
+		input: jsonb("input").$type<OpaquePayload>(),
 		inputHash: text("input_hash").notNull(),
 		options: jsonb("options").$type<WorkflowRunOptions>(),
 
@@ -209,7 +213,7 @@ export const task = pgTable(
 		status: taskStatusEnum("status").notNull(),
 		attempts: integer("attempts").notNull(),
 
-		input: jsonb("input"),
+		input: jsonb("input").$type<OpaquePayload>(),
 		inputHash: text("input_hash").notNull(),
 		options: jsonb("options").$type<TaskStartOptions>(),
 

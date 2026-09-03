@@ -4,7 +4,6 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
-	type TerminalWorkflowRunState,
 	type WorkflowRunId,
 	type WorkflowRunRecord,
 	WorkflowRunRevisionConflictError,
@@ -12,16 +11,21 @@ import {
 } from "@aikirun/types/workflow/run";
 
 import type { EventsDefinition } from "./event";
-import { type WorkflowRunHandle, workflowRunHandle } from "./handle";
+import {
+	decodeWaitResultState,
+	type WorkflowRunHandle,
+	type WorkflowRunWaitResultSuccess,
+	workflowRunHandle,
+} from "./handle";
 
-export function childWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition>(
+export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
-	run: WorkflowRunRecord<Input, Output>,
-	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
+	run: WorkflowRunRecord,
+	parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 	logger: Logger,
 	eventsDefinition?: TEvents
-): ChildWorkflowRunHandle<Input, Output, Context, TEvents> {
-	const handle = workflowRunHandle(client, run, eventsDefinition, logger);
+): ChildWorkflowRunHandle<Output, Context, TEvents> {
+	const handle = workflowRunHandle<Output, Context, TEvents>(client, run, eventsDefinition, logger);
 
 	return {
 		run: handle.run,
@@ -36,8 +40,8 @@ export function childWorkflowRunHandle<Input, Output, Context, TEvents extends E
 	};
 }
 
-export type ChildWorkflowRunHandle<Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> = Omit<
-	WorkflowRunHandle<Input, Output, Context, TEvents>,
+export type ChildWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition> = Omit<
+	WorkflowRunHandle<Output, Context, TEvents>,
 	"wait"
 > & {
 	/**
@@ -82,7 +86,7 @@ export type ChildWorkflowRunWaitResult<Output, Timed extends boolean> = Timed ex
 	?
 			| {
 					success: true;
-					state: TerminalWorkflowRunState<Output>;
+					state: WorkflowRunWaitResultSuccess<Output>;
 			  }
 			| {
 					success: false;
@@ -90,12 +94,12 @@ export type ChildWorkflowRunWaitResult<Output, Timed extends boolean> = Timed ex
 			  }
 	: {
 			success: true;
-			state: TerminalWorkflowRunState<Output>;
+			state: WorkflowRunWaitResultSuccess<Output>;
 		};
 
-function createWaiter<Input, Output, Context, TEvents extends EventsDefinition>(
-	handle: WorkflowRunHandle<Input, Output, Context, TEvents>,
-	parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
+function createWaiter<Output, Context, TEvents extends EventsDefinition>(
+	handle: WorkflowRunHandle<Output, Context, TEvents>,
+	parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 	logger: Logger
 ) {
 	let nextTimeoutIndex = 0;
@@ -124,7 +128,7 @@ function createWaiter<Input, Output, Context, TEvents extends EventsDefinition>(
 		if (terminal) {
 			return {
 				success: true,
-				state: terminal.state as TerminalWorkflowRunState<Output>,
+				state: await decodeWaitResultState<Output>(handle[INTERNAL].codec, terminal.state),
 			};
 		}
 

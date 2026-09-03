@@ -1,6 +1,7 @@
 import { type } from "arktype";
 
 import { eventWaitSchema } from "./event";
+import { opaquePayloadSchema } from "./payload";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
 import { sleepSchema } from "./sleep";
@@ -111,7 +112,7 @@ export const workflowRunStateCancelledSchema = type({
 
 export const workflowRunStateCompletedSchema = type({
 	status: "'completed'",
-	output: "unknown",
+	output: opaquePayloadSchema,
 });
 
 export const workflowRunStateFailedSchema = type({
@@ -174,8 +175,9 @@ export const workflowRunRecordSchema = type({
 	revision: "number >= 0",
 	signalSequence: "number.integer >= 0",
 	stateTransitionId: "string > 0",
-	"input?": "unknown",
+	"input?": opaquePayloadSchema,
 	inputHash: "string > 0",
+	clientCodecApplied: "boolean",
 	"referenceId?": "string > 0 | undefined",
 	"options?": workflowRunOptionsSchema.or("undefined"),
 	attempts: "number.integer >= 0",

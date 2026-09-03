@@ -207,6 +207,7 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 			hasher: plainHasher,
 			...(options.context ? { context: options.context } : {}),
 		},
+
 		verify,
 	};
 }

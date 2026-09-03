@@ -11,7 +11,7 @@ import type { WorkflowExecutionConfig } from "./execute";
 import type { WorkflowRunHandle } from "./handle";
 import type { CreateTaskExecutionTracker } from "./task-execution-tracker";
 
-export interface WorkflowRun<Input, Context, TEvents extends EventsDefinition = EventsDefinition> {
+export interface WorkflowRun<Context, TEvents extends EventsDefinition = EventsDefinition> {
 	id: WorkflowRunId;
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
@@ -21,7 +21,7 @@ export interface WorkflowRun<Input, Context, TEvents extends EventsDefinition = 
 	events: EventWaiters<TEvents>;
 	context: Context;
 	[INTERNAL]: {
-		handle: WorkflowRunHandle<Input, unknown, Context, TEvents>;
+		handle: WorkflowRunHandle<unknown, Context, TEvents>;
 		replayManifest: ReplayManifest;
 		createTaskExecutionTracker: CreateTaskExecutionTracker;
 		configProvider: ConfigProvider<WorkflowExecutionConfig>;

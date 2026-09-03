@@ -1,5 +1,6 @@
 import { hashInput } from "@aikirun/lib/crypto";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 
 import { type SeedRunDeps, type SeedRunOverrides, seedClaimedRun } from "./run";
 import { createChildRunCanceller } from "../../service/cancel-child-runs";
@@ -25,7 +26,7 @@ export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePubli
 		workflowRunId: seeded.runId,
 		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
 		taskName: seededTask.name,
-		input: seededTask.input,
+		input: asOpaquePayload(seededTask.input),
 		inputHash: await hashInput(seededTask.input),
 	});
 
@@ -84,7 +85,7 @@ export async function seedSiblingAwaitingRetryTasks(
 		workflowRunId: seeded.runId,
 		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
 		taskName: "charge-payment",
-		input: siblingInput,
+		input: asOpaquePayload(siblingInput),
 		inputHash: await hashInput(siblingInput),
 	});
 	const siblingTaskInfo = await withFakeClock(1, () =>
@@ -148,7 +149,7 @@ export async function seedCompletedTask(
 		workflowRunId: seeded.runId,
 		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
 		attempts: 1,
-		state: { status: "completed", output },
+		state: { status: "completed", output: asOpaquePayload(output) },
 	});
 
 	return { ...seeded, taskInfo, taskOutput: output };

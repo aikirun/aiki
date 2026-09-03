@@ -33,13 +33,14 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
+import { noopCodec, toBoundCodec } from "./run/bound-codec";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { isWorkflowRunRevisionConflictError, type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
 import { validateWithSchema } from "./run/schema-validation";
 
 export interface WorkflowVersionParams<Input, Output, Context, TEvents extends EventsDefinition> {
-	handler: (run: Readonly<WorkflowRun<Input, Context, TEvents>>, input: Input) => Promise<Output>;
+	handler: (run: Readonly<WorkflowRun<Context, TEvents>>, input: Input) => Promise<Output>;
 	events?: TEvents;
 	retry?: RetryStrategy;
 	schema?: RequireAtLeastOneProp<{
@@ -74,23 +75,23 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 	start(
 		client: Client<Context>,
 		...args: Input extends void ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
+	): Promise<WorkflowRunHandle<Output, Context, TEvents>>;
 
-	startAsChild<ParentInput, ParentEvents extends EventsDefinition>(
-		parentRun: WorkflowRun<ParentInput, Context, ParentEvents>,
+	startAsChild<ParentEvents extends EventsDefinition>(
+		parentRun: WorkflowRun<Context, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
-	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>>;
+	): Promise<ChildWorkflowRunHandle<Output, Context, TEvents>>;
 
-	getHandleById(client: Client<Context>, runId: string): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
+	getHandleById(client: Client<Context>, runId: string): Promise<WorkflowRunHandle<Output, Context, TEvents>>;
 
 	getHandleByReferenceId(
 		client: Client<Context>,
 		referenceId: string
-	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>>;
+	): Promise<WorkflowRunHandle<Output, Context, TEvents>>;
 
 	[INTERNAL]: {
 		eventsDefinition: TEvents;
-		handler: (run: WorkflowRun<Input, Context, TEvents>, input: Input) => Promise<void>;
+		handler: (run: WorkflowRun<Context, TEvents>, input: Input) => Promise<void>;
 		runOptions: () => WorkflowRunOptions;
 	};
 }
@@ -165,7 +166,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	public async start(
 		client: Client<Context>,
 		...args: Input extends void ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
+	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		return this.startWithOptions(client, this.startOptionsBuilder.build(), ...args);
 	}
 
@@ -173,9 +174,11 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		client: Client<Context>,
 		startOptions: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
-	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
+	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		let input = args[0];
 		const hasher = client[INTERNAL].hasher;
+		const clientCodec = client[INTERNAL].codec;
+		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
 		const schema = this.params.schema?.input;
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(input);
@@ -191,8 +194,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		const { id } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
-			input,
+			input: await codec.encode(input),
 			inputHash,
+			clientCodecApplied: clientCodec !== undefined,
 			options: startOptions,
 		});
 
@@ -206,17 +210,17 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	}
 
 	public async startAsChild(
-		parentRun: WorkflowRun<unknown, Context, EventsDefinition>,
+		parentRun: WorkflowRun<Context, EventsDefinition>,
 		...args: Input extends void ? [] : [Input]
-	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>> {
+	): Promise<ChildWorkflowRunHandle<Output, Context, TEvents>> {
 		return this.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);
 	}
 
 	private async startAsChildWithOptions(
-		parentRun: WorkflowRun<unknown, Context, EventsDefinition>,
+		parentRun: WorkflowRun<Context, EventsDefinition>,
 		startOptions: WorkflowStartOptions,
 		...args: Input extends void ? [] : [Input]
-	): Promise<ChildWorkflowRunHandle<Input, Output, Context, TEvents>> {
+	): Promise<ChildWorkflowRunHandle<Output, Context, TEvents>> {
 		const parentRunHandle = parentRun[INTERNAL].handle;
 		parentRunHandle[INTERNAL].assertExecutionAllowed();
 
@@ -254,7 +258,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 				return childWorkflowRunHandle(
 					client,
-					existingRun as WorkflowRunRecord<Input, Output>,
+					existingRun as WorkflowRunRecord,
 					parentRun[INTERNAL].handle,
 					logger,
 					this[INTERNAL].eventsDefinition
@@ -275,8 +279,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			const response = await client.api.workflowRun.createV1({
 				name: this.name,
 				versionId: this.versionId,
-				input,
+				input: await parentRunHandle[INTERNAL].codec.encode(input),
 				inputHash,
+				clientCodecApplied: parentRunHandle.run.clientCodecApplied,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
 				options: {
 					...startOptions,
@@ -303,7 +308,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		return childWorkflowRunHandle(
 			client,
-			newRun as WorkflowRunRecord<Input, Output>,
+			newRun as WorkflowRunRecord,
 			parentRun[INTERNAL].handle,
 			logger,
 			this[INTERNAL].eventsDefinition
@@ -311,8 +316,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	}
 
 	private async throwNonDeterminismError(
-		parentRun: WorkflowRun<unknown, Context, EventsDefinition>,
-		parentRunHandle: WorkflowRunHandle<unknown, unknown, Context, EventsDefinition>,
+		parentRun: WorkflowRun<Context, EventsDefinition>,
+		parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 		inputHash: string,
 		referenceId: string | undefined,
 		parentRunReplayManifest: ReplayManifest
@@ -341,25 +346,25 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	public async getHandleById(
 		client: Client<Context>,
 		runId: string
-	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
+	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		return workflowRunHandle(client, runId as WorkflowRunId, this[INTERNAL].eventsDefinition);
 	}
 
 	public async getHandleByReferenceId(
 		client: Client<Context>,
 		referenceId: string
-	): Promise<WorkflowRunHandle<Input, Output, Context, TEvents>> {
+	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		const { run } = await client.api.workflowRun.getByReferenceIdV1({
 			name: this.name,
 			versionId: this.versionId,
 			referenceId,
 		});
-		return workflowRunHandle(client, run as WorkflowRunRecord<Input, Output>, this[INTERNAL].eventsDefinition);
+		return workflowRunHandle(client, run as WorkflowRunRecord, this[INTERNAL].eventsDefinition);
 	}
 
-	private async handler(run: WorkflowRun<Input, Context, TEvents>, input: Input): Promise<void> {
+	private async handler(run: WorkflowRun<Context, TEvents>, input: Input): Promise<void> {
 		const { logger } = run;
-		const { assertExecutionAllowed, transitionState } = run[INTERNAL].handle[INTERNAL];
+		const { assertExecutionAllowed, codec, transitionState } = run[INTERNAL].handle[INTERNAL];
 
 		assertExecutionAllowed();
 
@@ -370,13 +375,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		const output = await this.tryExecuteWorkflow(input, run, retryStrategy);
 
-		await transitionState({ status: "completed", output });
+		await transitionState({ status: "completed", output: await codec.encode(output) });
 		logger.info("Workflow complete");
 	}
 
 	private async tryExecuteWorkflow(
 		input: Input,
-		run: WorkflowRun<Input, Context, TEvents>,
+		run: WorkflowRun<Context, TEvents>,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
 		const { handle } = run[INTERNAL];

@@ -1,6 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunStateRequest } from "@aikirun/types/api/workflow-run";
 import {
 	WORKFLOW_RUN_QUEUED_REASON,
@@ -200,9 +201,11 @@ describe("convertDurationToTimestamp", () => {
 	});
 
 	test("completed with an output: keeps the output", () => {
-		expect(convertDurationToTimestamp({ status: "completed", output: { orderId: "order-7" } }, now)).toEqual({
+		expect(
+			convertDurationToTimestamp({ status: "completed", output: asOpaquePayload({ orderId: "order-7" }) }, now)
+		).toEqual({
 			status: "completed",
-			output: { orderId: "order-7" },
+			output: asOpaquePayload({ orderId: "order-7" }),
 		});
 	});
 

@@ -3,6 +3,7 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { ScheduleApi } from "./api/schedule";
 import type { TaskApi } from "./api/task";
 import type { WorkflowRunApi } from "./api/workflow-run";
+import type { Codec, CreateCodec } from "./infra/codec";
 import type { CreateHasher, Hasher } from "./infra/hasher";
 import { INTERNAL } from "./symbols";
 import type { WorkflowRunRecord } from "./workflow/run";
@@ -11,6 +12,7 @@ interface BaseClientParams<Context = null> {
 	logger?: Logger;
 	context?: (run: Readonly<WorkflowRunRecord>) => Context | Promise<Context>;
 	hasher?: CreateHasher;
+	codec?: CreateCodec;
 }
 
 export interface RemoteClientParams<Context = null> extends BaseClientParams<Context> {
@@ -30,6 +32,7 @@ export interface Client<Context = null> {
 	[INTERNAL]: {
 		context?: (run: WorkflowRunRecord) => Context | Promise<Context>;
 		hasher: Hasher;
+		codec?: Codec;
 	};
 }
 

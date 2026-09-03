@@ -39,6 +39,7 @@ export type DueSchedule = Schedule & {
 	workflowId: string;
 	namespaceId: NamespaceId;
 	workflowRunInputHash: string;
+	clientCodecApplied: boolean;
 };
 
 const advanceScheduleCursor = createKeysetStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: TimestampMs } }>({
@@ -66,6 +67,7 @@ export async function processImminentRecurringRuns(
 			workflowId: schedule.workflowId,
 			namespaceId: schedule.namespaceId as NamespaceId,
 			workflowRunInputHash: schedule.workflowRunInputHash,
+			clientCodecApplied: schedule.clientCodecApplied,
 		}));
 
 		const now = Date.now();
@@ -166,6 +168,7 @@ async function processOverlapAllowSchedules(
 				workflowId: schedule.workflowId,
 				scheduleId: schedule.id,
 				status: "queued",
+				clientCodecApplied: schedule.clientCodecApplied,
 				input: schedule.workflowRunInput,
 				inputHash: schedule.workflowRunInputHash,
 				options: schedule.workflowRunOptions,
@@ -279,6 +282,7 @@ async function processOverlapSkipSchedules(
 			workflowId: schedule.workflowId,
 			scheduleId: schedule.id,
 			status: "queued",
+			clientCodecApplied: schedule.clientCodecApplied,
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,
@@ -402,6 +406,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowId: schedule.workflowId,
 			scheduleId: schedule.id,
 			status: "queued",
+			clientCodecApplied: schedule.clientCodecApplied,
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,

@@ -2,6 +2,7 @@ import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
@@ -67,8 +68,9 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 			const runId = await service.createWorkflowRun(context, {
 				name: "checkout",
 				versionId: "v1",
-				input,
+				input: asOpaquePayload(input),
 				inputHash: { value: inputHash },
+				clientCodecApplied: false,
 				options: { pool: "eu-west" },
 			});
 
@@ -83,8 +85,9 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					createdAt: expect.any(Number),
 					revision: 0,
 					stateTransitionId: expect.any(String),
-					input: { orderId: "order-1" },
+					input: asOpaquePayload({ orderId: "order-1" }),
 					inputHash,
+					clientCodecApplied: false,
 					options: { pool: "eu-west" },
 					attempts: 1,
 					tasks: {},
@@ -97,6 +100,24 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 						scheduledAt: expect.any(Number),
 					}),
 				})
+			);
+		}));
+
+	test("records that the client codec was applied", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const input = { orderId: "order-1" };
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: await hashInput(input) },
+				clientCodecApplied: true,
+			});
+
+			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+				expect.objectContaining({ id: runId, clientCodecApplied: true })
 			);
 		}));
 
@@ -400,7 +421,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			stateMachine.transitionState(context, {
 				type: "optimistic",
 				id: seed.runId,
-				state: { status: "completed", output: "receipt-9" },
+				state: { status: "completed", output: asOpaquePayload("receipt-9") },
 				expectedRevision: seed.revisionWhenClaimed,
 			}),
 		failed: (context, stateMachine, seed) =>
@@ -496,7 +517,7 @@ describe("WorkflowRunService cancelByIds", () => {
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
 				taskName: "charge-card",
-				input: taskInput,
+				input: asOpaquePayload(taskInput),
 				inputHash: await hashInput(taskInput),
 			});
 
@@ -530,8 +551,9 @@ describe("WorkflowRunService cancelByIds", () => {
 				service.createWorkflowRun(context, {
 					name: parent.workflowName,
 					versionId: parent.workflowVersionId,
-					input: childInput,
+					input: asOpaquePayload(childInput),
 					inputHash: { value: await hashInput(childInput) },
+					clientCodecApplied: false,
 					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 				})
 			).rejects.toThrow(WorkflowRunRevisionConflictError);
@@ -548,8 +570,9 @@ describe("WorkflowRunService cancelByIds", () => {
 			const childRunId = await service.createWorkflowRun(context, {
 				name: parent.workflowName,
 				versionId: parent.workflowVersionId,
-				input: childInput,
+				input: asOpaquePayload(childInput),
 				inputHash: { value: await hashInput(childInput) },
+				clientCodecApplied: false,
 				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 			});
 
@@ -572,6 +595,11 @@ describe("WorkflowRunService cancelByIds", () => {
 				],
 				total: 2,
 			});
+
+			const cascadeRuns = scheduledRuns.rows.filter((row) => row.name === "cancel-child-runs");
+			expect(await Promise.all(cascadeRuns.map((row) => service.getWorkflowRunById(context, row.id)))).toEqual([
+				expect.objectContaining({ name: "cancel-child-runs", clientCodecApplied: false }),
+			]);
 		}));
 });
 
@@ -629,7 +657,8 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 			const request = {
 				name: "checkout",
 				versionId: "v1",
-				input,
+				input: asOpaquePayload(input),
+				clientCodecApplied: false,
 				inputHash: { value: inputHash },
 				options: { reference: { id: "order-ref-1" } },
 			};
@@ -650,7 +679,8 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 			const runId = await service.createWorkflowRun(context, {
 				name: "checkout",
 				versionId: "v1",
-				input,
+				input: asOpaquePayload(input),
+				clientCodecApplied: false,
 				inputHash: { value: previousHash },
 				options,
 			});
@@ -658,7 +688,8 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 			const matchedRunId = await service.createWorkflowRun(context, {
 				name: "checkout",
 				versionId: "v1",
-				input,
+				input: asOpaquePayload(input),
+				clientCodecApplied: false,
 				inputHash: { value: currentHash, deprecatedValues: [previousHash] },
 				options,
 			});
@@ -675,7 +706,8 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 			await service.createWorkflowRun(context, {
 				name: "checkout",
 				versionId: "v1",
-				input,
+				input: asOpaquePayload(input),
+				clientCodecApplied: false,
 				inputHash: { value: "previous-hash" },
 				options,
 			});
@@ -684,7 +716,8 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				service.createWorkflowRun(context, {
 					name: "checkout",
 					versionId: "v1",
-					input,
+					input: asOpaquePayload(input),
+					clientCodecApplied: false,
 					inputHash: { value: await hashInput(input) },
 					options,
 				})
@@ -708,8 +741,9 @@ describe("WorkflowRunService imminent run timers", () => {
 				service.createWorkflowRun(context, {
 					name: "checkout",
 					versionId: "v1",
-					input,
+					input: asOpaquePayload(input),
 					inputHash: { value: inputHash },
+					clientCodecApplied: false,
 				})
 			);
 
@@ -733,8 +767,9 @@ describe("WorkflowRunService imminent run timers", () => {
 				service.createWorkflowRun(context, {
 					name: "checkout",
 					versionId: "v1",
-					input,
+					input: asOpaquePayload(input),
 					inputHash: { value: inputHash },
+					clientCodecApplied: false,
 					options: { priority: 2 },
 				})
 			);
@@ -756,8 +791,9 @@ describe("WorkflowRunService imminent run timers", () => {
 			await service.createWorkflowRun(context, {
 				name: "checkout",
 				versionId: "v1",
-				input,
+				input: asOpaquePayload(input),
 				inputHash: { value: await hashInput(input) },
+				clientCodecApplied: false,
 				options: { trigger: { type: "delayed", delayMs: 60_000 } },
 			});
 
@@ -777,7 +813,8 @@ describe("WorkflowRunService imminent run timers", () => {
 			const request = {
 				name: "checkout",
 				versionId: "v1",
-				input,
+				input: asOpaquePayload(input),
+				clientCodecApplied: false,
 				inputHash: { value: inputHash },
 				options: { reference: { id: "order-ref-1" } },
 			};
@@ -810,8 +847,9 @@ describe("WorkflowRunService imminent run timers", () => {
 				service.createWorkflowRun(context, {
 					name: parent.workflowName,
 					versionId: parent.workflowVersionId,
-					input: childInput,
+					input: asOpaquePayload(childInput),
 					inputHash: { value: childInputHash },
+					clientCodecApplied: false,
 					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 				})
 			);
@@ -856,8 +894,9 @@ describe("WorkflowRunService imminent run timers", () => {
 			const childRunId = await service.createWorkflowRun(context, {
 				name: parent.workflowName,
 				versionId: parent.workflowVersionId,
-				input: childInput,
+				input: asOpaquePayload(childInput),
 				inputHash: { value: await hashInput(childInput) },
+				clientCodecApplied: false,
 				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 			});
 			await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 });

@@ -38,8 +38,8 @@ import type { WorkflowRunHandle } from "./run/handle";
 import { validateWithSchema } from "./run/schema-validation";
 import type { TaskExecutionTracker } from "./run/task-execution-tracker";
 
-type UnknownWorkflowRun = WorkflowRun<unknown, unknown>;
-type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
+type UnknownWorkflowRun = WorkflowRun<unknown>;
+type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown>;
 
 /**
  * Defines a durable task with deterministic execution and automatic retries.
@@ -175,7 +175,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			type: "create",
 			taskName: this.name,
 			options: startOptions,
-			input,
+			input: await handle[INTERNAL].codec.encode(input),
 			inputHash,
 		});
 
@@ -200,7 +200,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output },
+			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
 		});
 		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
 
@@ -218,7 +218,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return existingTaskState.output as Output;
+			return (await handle[INTERNAL].codec.decode(existingTaskState.output)) as Output;
 		}
 
 		if (existingTaskState.status === "failed") {
@@ -302,7 +302,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output },
+			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
 		});
 		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
 

@@ -11,6 +11,7 @@ import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
+import { opaquePayloadSchema } from "../schema/payload";
 import {
 	taskInfoSchema,
 	taskOptionsSchema,
@@ -40,7 +41,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 			workflowRunId: "string > 0",
 			taskName: "string > 0",
 			"options?": taskOptionsSchema,
-			"input?": "unknown",
+			"input?": opaquePayloadSchema,
 			inputHash: "string > 0",
 			expectedWorkflowRunRevision: "number.integer >= 0",
 		})
@@ -55,7 +56,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 				id: "string > 0",
 				workflowRunId: "string > 0",
 				attempts: "number.integer > 0",
-				state: taskStateCompletedSchema.omit("output").and({ "output?": "unknown" }),
+				state: taskStateCompletedSchema.omit("output").and({ "output?": opaquePayloadSchema }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({

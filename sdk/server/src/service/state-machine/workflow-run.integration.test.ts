@@ -3,6 +3,7 @@ import { asConfigProvider } from "@aikirun/lib/config";
 import { NotFoundError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunTransitionStateRequestV1 } from "@aikirun/types/api/workflow-run";
 import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
 
@@ -56,7 +57,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
-					state: { status: "completed", output: { receipt: "r-1" } },
+					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
 					// The pre-claim revision: exactly what a fenced-out worker would still hold.
 					expectedRevision: revisionWhenClaimed - 1,
 				})
@@ -87,13 +88,13 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			const result = await stateMachine.transitionState(context, {
 				type: "optimistic",
 				id: runId,
-				state: { status: "completed", output: { receipt: "r-1" } },
+				state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
 				expectedRevision: revisionWhenClaimed,
 			});
 
 			expect(result).toEqual({
 				revision: revisionWhenClaimed + 1,
-				state: { status: "completed", output: { receipt: "r-1" } },
+				state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
 				attempts: attemptsWhenClaimed,
 			});
 
@@ -106,7 +107,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 						revision: result.revision,
 						attempts: result.attempts,
 					}),
-					state: { status: "completed", output: { receipt: "r-1" } },
+					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
 				})
 			);
 		}));
@@ -960,10 +961,10 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 				({
 					type: "optimistic",
 					id,
-					state: { status: "completed", output: { receiptId: "child-receipt-9" } },
+					state: { status: "completed", output: asOpaquePayload({ receiptId: "child-receipt-9" }) },
 					expectedRevision,
 				}) as const,
-			expectedChildState: { status: "completed", output: { receiptId: "child-receipt-9" } },
+			expectedChildState: { status: "completed", output: asOpaquePayload({ receiptId: "child-receipt-9" }) },
 		},
 		failed: {
 			request: (id: string, expectedRevision: number) =>
@@ -1178,7 +1179,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: child.runId,
-					state: { status: "completed", output: { receiptId: "rcp-7" } },
+					state: { status: "completed", output: asOpaquePayload({ receiptId: "rcp-7" }) },
 					expectedRevision: child.revisionWhenClaimed,
 				})
 			);

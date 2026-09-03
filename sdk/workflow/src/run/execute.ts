@@ -5,6 +5,7 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
+	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -99,6 +100,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		const createContext = client[INTERNAL].context;
 		const context = createContext ? createContext(workflowRun) : null;
 		const hasher = await client[INTERNAL].hasher.for(workflowRun.inputHash);
+		const codec = handle[INTERNAL].codec;
 
 		if (!hasher) {
 			logger.error("Failed to determine the bound hasher for the workflow run. Check hasher configuration.", {
@@ -126,11 +128,16 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 					hasher,
 				},
 			},
-			workflowRun.input
+			await codec.decode(workflowRun.input)
 		);
 
 		return true;
 	} catch (err) {
+		if (err instanceof ClientCodecMissingError) {
+			logger.error("The workflow run  expects a client codec, but none present", { err });
+			return false;
+		}
+
 		if (
 			err instanceof WorkflowRunNotExecutableError ||
 			err instanceof WorkflowRunSuspendedError ||

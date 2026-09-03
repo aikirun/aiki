@@ -1,6 +1,7 @@
-import type { DistributiveOmit, OptionalProp } from "@aikirun/lib/object";
+import type { DistributiveOmit } from "@aikirun/lib/object";
 
 import type { Hash } from "../infra/hasher";
+import type { OpaquePayload } from "../payload";
 import type { WorkflowSource } from "../workflow";
 import type {
 	WaitingForSignalWorkflowRunStatus,
@@ -11,7 +12,6 @@ import type {
 	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateAwaitingTaskRetry,
 	WorkflowRunStateCancelled,
-	WorkflowRunStateCompleted,
 	WorkflowRunStatePaused,
 	WorkflowRunStateScheduled,
 	WorkflowRunStateSleeping,
@@ -108,8 +108,9 @@ export interface WorkflowRunGetStateResponseV1 {
 export interface WorkflowRunCreateRequestV1 {
 	name: string;
 	versionId: string;
-	input?: unknown;
+	input?: OpaquePayload;
 	inputHash: Hash;
+	clientCodecApplied: boolean;
 	parent?: {
 		workflowRunId: string;
 		expectedRevision: number;
@@ -143,8 +144,6 @@ export type WorkflowRunStateAwaitingChildWorkflowRequest = Omit<WorkflowRunState
 	timeoutInMs?: number;
 };
 
-export type WorkflowRunStateCompletedRequest = OptionalProp<WorkflowRunStateCompleted<unknown>, "output">;
-
 export type WorkflowRunStateRequest =
 	| Exclude<
 			WorkflowRunState,
@@ -155,8 +154,7 @@ export type WorkflowRunStateRequest =
 					| "awaiting_event"
 					| "awaiting_retry"
 					| "awaiting_task_retry"
-					| "awaiting_child_workflow"
-					| "completed";
+					| "awaiting_child_workflow";
 			}
 	  >
 	| WorkflowRunStateScheduledRequest
@@ -164,8 +162,7 @@ export type WorkflowRunStateRequest =
 	| WorkflowRunStateAwaitingEventRequest
 	| WorkflowRunStateAwaitingRetryRequest
 	| WorkflowRunStateAwaitingTaskRetryRequest
-	| WorkflowRunStateAwaitingChildWorkflowRequest
-	| WorkflowRunStateCompletedRequest;
+	| WorkflowRunStateAwaitingChildWorkflowRequest;
 
 type WorkflowRunStateRequestOptimistic = Exclude<WorkflowRunStateRequest, WorkflowRunStateRequestPessimistic>;
 
