@@ -338,7 +338,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					outputSchemaValidationResult instanceof Promise
 						? await outputSchemaValidationResult
 						: outputSchemaValidationResult;
-				return { output, lastAttempt: attempts };
+				return {
+					output: output !== undefined ? JSON.parse(JSON.stringify(output)) : output,
+					lastAttempt: attempts,
+				};
 			} catch (err) {
 				if (
 					err instanceof WorkflowRunSuspendedError ||
