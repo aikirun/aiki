@@ -19,7 +19,6 @@ import {
 	taskStateAwaitingRetrySchema,
 	taskStateCompletedSchema,
 	taskStateFailedSchema,
-	taskStateRunningSchema,
 } from "../schema/task";
 
 const getByIdV1: ContractProcedure<TaskGetByIdRequestV1, TaskGetByIdResponseV1> = oc
@@ -49,26 +48,28 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 				type: "'retry'",
 				id: "string > 0",
 				workflowRunId: "string > 0",
-				"options?": taskOptionsSchema,
-				taskState: taskStateRunningSchema,
+				attempts: "number.integer > 0",
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				workflowRunId: "string > 0",
-				taskState: taskStateCompletedSchema.omit("output").and({ "output?": "unknown" }),
+				attempts: "number.integer > 0",
+				state: taskStateCompletedSchema.omit("output").and({ "output?": "unknown" }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				workflowRunId: "string > 0",
-				taskState: taskStateFailedSchema,
+				attempts: "number.integer > 0",
+				state: taskStateFailedSchema,
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 			.or({
 				id: "string > 0",
 				workflowRunId: "string > 0",
-				taskState: taskStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }),
+				attempts: "number.integer > 0",
+				state: taskStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
 			})
 	)

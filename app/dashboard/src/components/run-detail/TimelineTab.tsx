@@ -256,7 +256,7 @@ function TimelineItem({
 			transition.taskState.status === "awaiting_retry" ||
 			transition.taskState.status === "completed" ||
 			transition.taskState.status === "failed"
-				? transition.taskState.attempts
+				? transition.attempt
 				: undefined;
 
 		return (

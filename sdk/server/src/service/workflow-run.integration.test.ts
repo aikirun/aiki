@@ -115,8 +115,10 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					{
 						id: taskInfo.id,
 						name: taskInfo.name,
-						state: { status: "running", attempts: 1 },
+						state: { status: "running" },
 						inputHash: taskInfo.inputHash,
+						options: undefined,
+						attempts: 1,
 					},
 				],
 			]);
@@ -588,7 +590,7 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
 				id: taskInfo.id,
-				taskState: { status: "running", attempts: 2 },
+				attempts: 2,
 			});
 
 			const { service } = createService(repos);
@@ -604,7 +606,7 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 					type: "task",
 					attempt: 1,
 					taskId: taskInfo.id,
-					taskState: { status: "running", attempts: 1 },
+					taskState: { status: "running" },
 				},
 				{
 					id: expect.any(String),
@@ -612,7 +614,7 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 					type: "task",
 					attempt: 2,
 					taskId: taskInfo.id,
-					taskState: { status: "running", attempts: 2 },
+					taskState: { status: "running" },
 				},
 			]);
 		}));

@@ -48,9 +48,9 @@ export async function seedAwaitingRetryTask(
 			id: seeded.taskInfo.id,
 			workflowRunId: seeded.runId,
 			expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-			taskState: {
+			attempts: 1,
+			state: {
 				status: "awaiting_retry",
-				attempts: 1,
 				error: { name: "Error", message: "inventory service unavailable" },
 				nextAttemptInMs: params.nextAttemptAt - 1,
 			},
@@ -75,7 +75,8 @@ export async function seedCompletedTask(
 		id: seeded.taskInfo.id,
 		workflowRunId: seeded.runId,
 		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-		taskState: { status: "completed", attempts: 1, output },
+		attempts: 1,
+		state: { status: "completed", output },
 	});
 
 	return { ...seeded, taskInfo, taskOutput: output };

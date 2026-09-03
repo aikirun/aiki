@@ -1,7 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { TaskStatus } from "@aikirun/types/workflow/task";
+import type { DiscardableTaskStatus, TaskStatus } from "@aikirun/types/workflow/task";
 import { and, count, eq, inArray, lte, min, ne, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
@@ -43,6 +43,7 @@ export const createTaskRepository = (db: PgDb) => ({
 				input: task.input,
 				inputHash: task.inputHash,
 				options: task.options,
+				attempts: task.attempts,
 				state: stateTransition.state,
 			})
 			.from(task)
@@ -81,6 +82,8 @@ export const createTaskRepository = (db: PgDb) => ({
 				id: task.id,
 				name: task.name,
 				inputHash: task.inputHash,
+				options: task.options,
+				attempts: task.attempts,
 				state: stateTransition.state,
 			})
 			.from(task)
@@ -142,9 +145,9 @@ export const createTaskRepository = (db: PgDb) => ({
 		return result;
 	},
 
-	async bulkDiscard(
+	async bulkTransitionToDiscarded(
 		tasks: NonEmptyArray<{
-			filter: { id: string; workflowRunId: string; status: TaskStatus; attempts: number };
+			filter: { id: string; workflowRunId: string; status: DiscardableTaskStatus; attempts: number };
 			update: { latestStateTransitionId: string };
 		}>
 	): Promise<string[]> {
