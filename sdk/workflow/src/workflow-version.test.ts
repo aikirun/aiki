@@ -231,6 +231,54 @@ describe("workflow version execution", () => {
 				}));
 		}
 
+		test("encodes the handler output with the run's codec before persisting it", () =>
+			withFakeClient(async (client) => {
+				const encodedOutput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("done");
+						return encodedOutput;
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "completing-workflow" }).v("1.0.0", {
+					async handler() {
+						return "done";
+					},
+				});
+				const runRecord = {
+					...baseWorkflowRunRecordFactory.build({ clientCodecApplied: true }),
+					state: workflowRunStateByStatus.running,
+				};
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: { status: "running" }, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "completed", output: encodedOutput },
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "completed", output: encodedOutput },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(await workflowVersion[INTERNAL].handler(run)).toBeUndefined();
+			}));
+
 		test("persists the schema-parsed value when an output schema is provided", () =>
 			withFakeClient(async (client) => {
 				const toUpperCase: StandardSchemaV1<string> = {
@@ -572,6 +620,42 @@ describe("creating a workflow run", () => {
 				expect(handle.run.id).toBe(newRunRecord.id);
 			}));
 
+		test("encodes the input with the client's codec and declares it applied", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("world");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return `Hello ${name}`;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
 		test("forwards the schema-parsed value to createV1 when an input schema is provided", () =>
 			withFakeClient(async (client) => {
 				const toUpperCase: StandardSchemaV1<string> = {
@@ -764,6 +848,45 @@ describe("creating a workflow run", () => {
 						versionId: "1.0.0",
 						input: asOpaquePayload("payload"),
 						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("encodes the child input with the parent's bound codec and inherits the parent's declaration", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("payload");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientCodecApplied: true,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},

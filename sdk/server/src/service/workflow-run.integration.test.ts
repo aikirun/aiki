@@ -103,6 +103,24 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 			);
 		}));
 
+	test("records that the client codec was applied", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const input = { orderId: "order-1" };
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: await hashInput(input) },
+				clientCodecApplied: true,
+			});
+
+			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+				expect.objectContaining({ id: runId, clientCodecApplied: true })
+			);
+		}));
+
 	test("returns the run's tasks", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, taskInfo } = await seedRunningTask({
@@ -573,7 +591,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			expect(scheduledRuns).toEqual({
 				rows: [
 					expect.objectContaining({ id: childRunId, status: "scheduled", name: parent.workflowName }),
-					expect.objectContaining({ status: "scheduled", name: "cancel-child-runs" }),
+					expect.objectContaining({ status: "scheduled", name: "cancel-child-runs", clientCodecApplied: false }),
 				],
 				total: 2,
 			});

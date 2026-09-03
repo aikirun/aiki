@@ -209,6 +209,13 @@ describe("convertDurationToTimestamp", () => {
 		});
 	});
 
+	test("completed without an output: normalizes output to undefined", () => {
+		expect(convertDurationToTimestamp({ status: "completed" }, now)).toEqual({
+			status: "completed",
+			output: undefined,
+		});
+	});
+
 	Object.entries({
 		queued: { status: "queued", reason: "new" },
 		running: { status: "running" },
