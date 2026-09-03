@@ -60,6 +60,47 @@ export async function seedAwaitingRetryTask(
 	return { ...seeded, taskInfo, nextAttemptAt: params.nextAttemptAt };
 }
 
+/**
+ * Two `awaiting_retry` tasks on one running run.
+ */
+export async function seedSiblingAwaitingRetryTasks(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params: { firstNextAttemptAt: number; siblingNextAttemptAt: number }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedAwaitingRetryTask(
+		{ ...deps, namespaceRequestContext },
+		{ nextAttemptAt: params.firstNextAttemptAt }
+	);
+
+	const siblingInput = { invoiceId: "inv-9" };
+	const taskStateMachine = createTaskStateMachine({ repos });
+	const createdSibling = await taskStateMachine.transitionState(namespaceRequestContext, {
+		type: "create",
+		workflowRunId: seeded.runId,
+		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+		taskName: "charge-payment",
+		input: siblingInput,
+		inputHash: await hashInput(siblingInput),
+	});
+	const siblingTaskInfo = await withFakeClock(1, () =>
+		taskStateMachine.transitionState(namespaceRequestContext, {
+			id: createdSibling.id,
+			workflowRunId: seeded.runId,
+			expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+			attempts: 1,
+			state: {
+				status: "awaiting_retry",
+				error: { name: "Error", message: "payment gateway unavailable" },
+				nextAttemptInMs: params.siblingNextAttemptAt - 1,
+			},
+		})
+	);
+
+	return { ...seeded, siblingTaskInfo, siblingNextAttemptAt: params.siblingNextAttemptAt };
+}
+
 export async function seedCompletedTask(
 	deps: SeedRunDeps & { publisher: FakePublisher },
 	overrides?: { output: unknown }

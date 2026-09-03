@@ -46,6 +46,7 @@ import {
 	workflowRunStateAwaitingChildWorkflowSchema,
 	workflowRunStateAwaitingEventSchema,
 	workflowRunStateAwaitingRetrySchema,
+	workflowRunStateAwaitingTaskRetrySchema,
 	workflowRunStateCancelledSchema,
 	workflowRunStateCompletedSchema,
 	workflowRunStateFailedSchema,
@@ -187,6 +188,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 							.or(
 								workflowRunStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" })
 							)
+							.or(workflowRunStateAwaitingTaskRetrySchema.omit("nextAttemptAt"))
 							.or(workflowRunStateCompletedSchema.omit("output").and({ "output?": "unknown" }))
 							.or(workflowRunStateFailedSchema),
 					}).or({

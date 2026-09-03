@@ -111,6 +111,14 @@ export const createTaskRepository = (db: PgDb) => ({
 			.limit(limit);
 	},
 
+	async getEarliestNextAttemptAt(workflowRunId: string): Promise<TimestampMs | null> {
+		const result = await db
+			.select({ nextAttemptAt: sql`${min(task.nextAttemptAt)}`.mapWith(task.nextAttemptAt) })
+			.from(task)
+			.where(and(eq(task.workflowRunId, workflowRunId), eq(task.status, "awaiting_retry")));
+		return result[0]?.nextAttemptAt ?? null;
+	},
+
 	async listByWorkflowRunIdsAndStatuses(workflowRunIds: string | NonEmptyArray<string>, statuses: TaskStatus[]) {
 		const runIdsFilter =
 			typeof workflowRunIds === "string"
