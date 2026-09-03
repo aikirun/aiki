@@ -1,6 +1,7 @@
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import { INTERNAL } from "@aikirun/types/symbols";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
 import { workflowRunHandle } from "./handle";
@@ -17,6 +18,35 @@ describe("childWorkflowRunHandle", () => {
 						[childRecord.id]: {
 							timeouts: [],
 							terminal: { state: { status: "completed", output: asOpaquePayload("done") }, completedAt: 1_000 },
+						},
+					},
+				});
+				const parentHandle = workflowRunHandle(client, parentRecord);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
+
+				expect(await childHandle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
+			}));
+
+		test("decodes the child's completed output through the child's codec, not the parent's", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ stored: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual(storedOutput);
+						return "done";
+					},
+				};
+				const childRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRecord = runningWorkflowRunRecordFactory.build({
+					clientCodecApplied: false,
+					childWorkflowRunWaits: {
+						[childRecord.id]: {
+							timeouts: [],
+							terminal: { state: { status: "completed", output: storedOutput }, completedAt: 1_000 },
 						},
 					},
 				});

@@ -7,7 +7,6 @@ import {
 import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { TransitionTaskStateToRunningCreate } from "@aikirun/types/api/task";
-import type { Codec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
@@ -31,38 +30,7 @@ describe("workflowRunHandle", () => {
 				expect(handle.run).toEqual(record);
 			}));
 
-		test("binds the client's codec for a run that expects it", () =>
-			withFakeClient(async (client) => {
-				const codec: Codec = {
-					encode: async (payload) => ({ marked: payload }),
-					decode: async (payload) => ({ unmarked: payload }),
-				};
-				client[INTERNAL].codec = codec;
-				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
-
-				const handle = workflowRunHandle(client, record);
-
-				const payload = { value: 1 };
-				expect(await handle[INTERNAL].codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
-				expect(await handle[INTERNAL].codec.decode(asOpaquePayload(payload))).toEqual({ unmarked: payload });
-			}));
-
-		test("binds a passthrough codec for a run that doesn't expect a client codec", () =>
-			withFakeClient(async (client) => {
-				client[INTERNAL].codec = {
-					encode: async (payload) => ({ marked: payload }),
-					decode: async (payload) => payload,
-				};
-				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
-
-				const handle = workflowRunHandle(client, record);
-
-				const payload = { value: 1 };
-				expect(await handle[INTERNAL].codec.encode(payload)).toBe(asOpaquePayload(payload));
-				expect(await handle[INTERNAL].codec.decode(asOpaquePayload(payload))).toBe(payload);
-			}));
-
-		test("throws ClientCodecMissingError for a run that expects a client codec but non is present", () =>
+		test("throws ClientCodecMissingError for a run that expects a client codec when the client has none", () =>
 			withFakeClient((client) => {
 				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 
@@ -322,6 +290,34 @@ describe("workflowRunHandle", () => {
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
 					state: { status: "completed", output: asOpaquePayload("done") },
+				};
+				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
+
+				const result = await handle.wait();
+
+				expect(result).toEqual({ success: true, state: { status: "completed", output: "done" } });
+			}));
+
+		test("decodes the completed output through the run's codec", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ stored: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual(storedOutput);
+						return "done";
+					},
+				};
+				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0", clientCodecApplied: true });
+				const handle = workflowRunHandle(client, record);
+
+				client.api.workflowRun.hasTerminatedV1.once(
+					{ id: record.id, afterStateTransitionId: "t0" },
+					{ terminated: true, latestStateTransitionId: "t1" }
+				);
+				const completed: WorkflowRunRecord = {
+					...baseWorkflowRunRecordFactory.build({ id: record.id, clientCodecApplied: true }),
+					state: { status: "completed", output: storedOutput },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
