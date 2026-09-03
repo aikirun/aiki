@@ -2,6 +2,9 @@
  * Stable JSON serialization that sorts object keys for deterministic hashing.
  * Ensures {a: 1, b: 2} and {b: 2, a: 1} produce the same hash.
  *
+ * Throws for values JSON would change silently (Date, Map, Set, class instances),
+ * so two different values never appear equal.
+ *
  * @param value - The record to serialize
  * @returns A stable JSON string representation
  *
@@ -37,8 +40,9 @@ function stringifyValue(value: unknown): string {
 		return `[${value.map(stringifyValue).join(",")}]`;
 	}
 
-	if (value instanceof Promise) {
-		throw new Error("stableStringify does not support Promise values");
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) {
+		throw new Error(`stableStringify does not support ${typeName(value)} values`);
 	}
 
 	const keys = Object.keys(value).sort();
@@ -50,4 +54,9 @@ function stringifyValue(value: unknown): string {
 		}
 	}
 	return `{${pairs.join(",")}}`;
+}
+
+function typeName(value: object): string {
+	const constructorName = typeof value.constructor === "function" ? value.constructor.name : "";
+	return constructorName === "" ? "object" : constructorName;
 }

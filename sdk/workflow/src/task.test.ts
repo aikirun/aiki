@@ -814,3 +814,86 @@ describe("task input/output serializability", () => {
 		task({ name: "charge", handler: async () => JSON.parse("{}") });
 	});
 });
+
+describe("task output on the first run", () => {
+	test("returns the output as JSON stores it, so the first run sees what a replay will see", () =>
+		withFakeClient(async (client) => {
+			const runRecord = runningWorkflowRunRecordFactory.build();
+			const run = createTestWorkflowRun(client, runRecord);
+			const syncInventory = task<string, { syncedAt: string }>({
+				name: "sync-inventory",
+				handler: async () => {
+					// The type says string but it really is a date
+					return { syncedAt: new Date(0) as unknown as string };
+				},
+			});
+			const input = "wh-1";
+			const storedOutput = { syncedAt: "1970-01-01T00:00:00.000Z" };
+			const runningTaskInfo = runningTaskInfoFactory.build({ name: syncInventory.name });
+			const completedTaskInfo = completedTaskInfoFactory.build({
+				id: runningTaskInfo.id,
+				name: syncInventory.name,
+				state: { output: asOpaquePayload(storedOutput) },
+			});
+
+			client.api.task.transitionStateV1
+				.once(
+					{
+						type: "create",
+						input: asOpaquePayload(input),
+						inputHash: await hashInput(input),
+						taskName: syncInventory.name,
+						options: {},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+					},
+					{ taskInfo: runningTaskInfo }
+				)
+				.once(
+					{
+						id: runningTaskInfo.id,
+						attempts: 1,
+						state: completedTaskInfo.state,
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+					},
+					{ taskInfo: completedTaskInfo }
+				);
+
+			expect(await syncInventory.start(run, input)).toEqual(storedOutput);
+		}));
+
+	test("returns undefined when the handler returns nothing", () =>
+		withFakeClient(async (client) => {
+			const runRecord = runningWorkflowRunRecordFactory.build();
+			const run = createTestWorkflowRun(client, runRecord);
+			const ping = task({ name: "ping", handler: async () => {} });
+			const runningTaskInfo = runningTaskInfoFactory.build({ name: ping.name });
+
+			client.api.task.transitionStateV1
+				.once(
+					{
+						type: "create",
+						input: undefined,
+						inputHash: await hashInput(undefined),
+						taskName: ping.name,
+						options: {},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+					},
+					{ taskInfo: runningTaskInfo }
+				)
+				.once(
+					{
+						id: runningTaskInfo.id,
+						attempts: 1,
+						state: { status: "completed", output: undefined },
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+					},
+					{ taskInfo: { ...runningTaskInfo, state: { status: "completed" } } }
+				);
+
+			expect(await ping.start(run)).toBeUndefined();
+		}));
+});
