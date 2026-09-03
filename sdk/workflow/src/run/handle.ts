@@ -16,7 +16,7 @@ import type {
 import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
-import { type BoundCodec, bindRunCodec } from "./codec";
+import { type BoundCodec, bindRunCodec } from "./bound-codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(

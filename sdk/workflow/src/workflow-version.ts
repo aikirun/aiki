@@ -33,7 +33,7 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
-import { noopCodec, toBoundCodec } from "./run/codec";
+import { noopCodec, toBoundCodec } from "./run/bound-codec";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { isWorkflowRunRevisionConflictError, type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
