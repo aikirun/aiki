@@ -28,7 +28,7 @@ describe("processImminentTaskRetryableRuns", () => {
 			await processImminentTaskRetryableRuns(
 				context,
 				{ repos },
-				{ limit: 100, lookaheadWindowMs: 0, republishBackoff }
+				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
 			);
 
 			const run = await repos.workflowRun.getByIdWithState({
@@ -68,7 +68,7 @@ describe("processImminentTaskRetryableRuns", () => {
 				processImminentTaskRetryableRuns(
 					context,
 					{ repos, timerPriorityQueue },
-					{ limit: 100, lookaheadWindowMs: 60_000, republishBackoff }
+					{ pageSize: 100, lookaheadWindowMs: 60_000, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
 				)
 			);
 
@@ -95,7 +95,7 @@ describe("processImminentTaskRetryableRuns", () => {
 			await processImminentTaskRetryableRuns(
 				context,
 				{ repos },
-				{ limit: 100, lookaheadWindowMs: 0, republishBackoff }
+				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
 			);
 
 			const run = await repos.workflowRun.getByIdWithState({

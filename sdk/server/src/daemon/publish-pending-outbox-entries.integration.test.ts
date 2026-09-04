@@ -66,7 +66,7 @@ describe("publishPendingOutboxEntries", () => {
 						published: { runs: request.map((run) => ({ run })) },
 					}));
 
-				await publishPendingOutboxEntries(context, { repos, publisher }, configBuilder.with("limit", 2).build());
+				await publishPendingOutboxEntries(context, { repos, publisher }, configBuilder.with("pageSize", 2).build());
 
 				const pendingRows = await repos.workflowRunOutbox.listPending(context, 100);
 				expect(pendingRows).toEqual([]);

@@ -36,7 +36,7 @@ describe("processImminentRecurringRuns", () => {
 				processImminentRecurringRuns(
 					context,
 					{ repos, childRunCanceller: createChildRunCanceller() },
-					{ limit: 100, lookaheadWindowMs: 0, republishBackoff }
+					{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
 				)
 			);
 

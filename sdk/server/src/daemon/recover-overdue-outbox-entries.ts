@@ -1,12 +1,14 @@
 import { streamChunks } from "@aikirun/lib/async";
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
+import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import { runConcurrently } from "../lib/concurrency";
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import type { DaemonContext } from "../middleware/context";
 
@@ -30,44 +32,60 @@ const advancePublishedCursor = createKeysetStreamCursorAdvancer<{
 export async function recoverOverdueOutboxEntries(
 	context: DaemonContext,
 	{ repos }: RecoverOverdueOutboxEntriesDeps,
-	{ claimIdleTimeoutMs, limit }: { claimIdleTimeoutMs: number; limit: number }
+	config: PageProcessingConfig & { claimIdleTimeoutMs: number }
 ): Promise<void> {
+	const { claimIdleTimeoutMs, pageSize, chunk } = config;
+
 	for await (const staleEntries of streamChunks(
-		(cursor) => repos.workflowRunOutbox.listStaleClaimed(context, { claimIdleTimeoutMs, limit, cursor }),
+		(cursor) => repos.workflowRunOutbox.listStaleClaimed(context, { claimIdleTimeoutMs, limit: pageSize, cursor }),
 		{
 			advanceCursor: advanceClaimedCursor,
-			until: (chunk) => chunk.length < limit,
+			until: (page) => page.length < pageSize,
 		}
 	)) {
-		const entryIds: string[] = [];
-		const runIds: string[] = [];
-		for (const { id, workflowRunId } of staleEntries) {
-			entryIds.push(id);
-			runIds.push(workflowRunId);
-		}
+		await runConcurrently(
+			context,
+			chunkLazy(staleEntries, chunk.size),
+			async (entriesChunk, spanCtx) => {
+				const entryIds: string[] = [];
+				const runIds: string[] = [];
+				for (const { id, workflowRunId } of entriesChunk) {
+					entryIds.push(id);
+					runIds.push(workflowRunId);
+				}
 
-		if (!isNonEmptyArray(entryIds) || !isNonEmptyArray(runIds)) {
-			continue;
-		}
+				if (!isNonEmptyArray(entryIds) || !isNonEmptyArray(runIds)) {
+					return;
+				}
 
-		await repos.transaction(async (txRepos) => releaseStaleClaimsInTx(context, { entryIds, runIds }, txRepos));
-		context.logger.debug("Recovered stale claimed outbox entries", { "aiki.count": staleEntries.length });
+				await repos.transaction(async (txRepos) => releaseStaleClaimsInTx(spanCtx, { entryIds, runIds }, txRepos));
+				spanCtx.logger.debug("Recovered stale claimed outbox entries", { "aiki.count": entriesChunk.length });
+			},
+			{ concurrency: chunk.maxConcurrency }
+		);
 	}
 
 	for await (const publishableEntries of streamChunks(
-		(cursor) => repos.workflowRunOutbox.listPublishable(context, limit, cursor),
+		(cursor) => repos.workflowRunOutbox.listPublishable(context, pageSize, cursor),
 		{
 			advanceCursor: advancePublishedCursor,
-			until: (chunk) => chunk.length < limit,
+			until: (page) => page.length < pageSize,
 		}
 	)) {
-		const entryIds = publishableEntries.map((entry) => entry.id);
-		if (!isNonEmptyArray(entryIds)) {
-			continue;
-		}
+		await runConcurrently(
+			context,
+			chunkLazy(publishableEntries, chunk.size),
+			async (entriesChunk, spanCtx) => {
+				const entryIds = entriesChunk.map((entry) => entry.id);
+				if (!isNonEmptyArray(entryIds)) {
+					return;
+				}
 
-		await repos.workflowRunOutbox.returnToPending(entryIds, "published");
-		context.logger.debug("Recovered publishable outbox entries", { "aiki.count": publishableEntries.length });
+				await repos.workflowRunOutbox.returnToPending(entryIds, "published");
+				spanCtx.logger.debug("Recovered publishable outbox entries", { "aiki.count": entriesChunk.length });
+			},
+			{ concurrency: chunk.maxConcurrency }
+		);
 	}
 }
 

@@ -1,11 +1,13 @@
 import { streamChunks } from "@aikirun/lib/async";
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunStateStalled } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
+import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import { runConcurrently } from "../lib/concurrency";
 import { ulidUpperBound } from "../lib/ulid";
 import type { DaemonContext } from "../middleware/context";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
@@ -19,22 +21,30 @@ const advanceStreamCursor = (_cursor: string | undefined, item: { id: string }) 
 export async function stallUndeliverableRuns(
 	context: DaemonContext,
 	{ repos }: StallUndeliverableRunsDeps,
-	{ limit, maxAgeMs }: { limit: number; maxAgeMs: number }
+	config: PageProcessingConfig & { maxAgeMs: number }
 ): Promise<void> {
+	const { pageSize, chunk, maxAgeMs } = config;
 	const maxId = ulidUpperBound(Date.now() - maxAgeMs);
 
 	for await (const undeliverableEntries of streamChunks(
-		(cursorId) => repos.workflowRunOutbox.listUndeliverable(context, { maxId, limit, cursorId }),
+		(cursorId) => repos.workflowRunOutbox.listUndeliverable(context, { maxId, limit: pageSize, cursorId }),
 		{
 			advanceCursor: advanceStreamCursor,
-			until: (chunk) => chunk.length < limit,
+			until: (page) => page.length < pageSize,
 		}
 	)) {
-		const undeliverableRunIds = undeliverableEntries.map((entry) => entry.workflowRunId) as NonEmptyArray<string>;
-		const stalledRunIds = await repos.transaction(async (txRepos) =>
-			stallByRunIdsInTx(context, undeliverableRunIds, txRepos)
+		await runConcurrently(
+			context,
+			chunkLazy(undeliverableEntries, chunk.size),
+			async (entriesChunk, spanCtx) => {
+				const undeliverableRunIds = entriesChunk.map((entry) => entry.workflowRunId) as NonEmptyArray<string>;
+				const stalledRunIds = await repos.transaction(async (txRepos) =>
+					stallByRunIdsInTx(spanCtx, undeliverableRunIds, txRepos)
+				);
+				spanCtx.logger.info("Stalled undeliverable runs", { "aiki.count": stalledRunIds.length });
+			},
+			{ concurrency: chunk.maxConcurrency }
 		);
-		context.logger.info("Stalled undeliverable runs", { "aiki.count": stalledRunIds.length });
 	}
 }
 

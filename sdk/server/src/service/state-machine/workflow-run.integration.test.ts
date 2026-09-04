@@ -518,9 +518,10 @@ describe("WorkflowRunStateMachine sleep lifecycle", () => {
 					daemonContext,
 					{ repos },
 					{
-						limit: 100,
+						pageSize: 100,
 						lookaheadWindowMs: 0,
 						republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
+						chunk: { size: 100, maxConcurrency: 10 },
 					}
 				)
 			);
@@ -633,9 +634,10 @@ describe("WorkflowRunStateMachine redelivery", () => {
 				daemonContext,
 				{ repos },
 				{
-					limit: 100,
+					pageSize: 100,
 					lookaheadWindowMs: 0,
 					republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
+					chunk: { size: 100, maxConcurrency: 10 },
 				}
 			);
 
