@@ -25,7 +25,7 @@ import type { ChildRunCanceller } from "../service/cancel-child-runs";
 import { scheduleRowToDomain } from "../service/schedule";
 
 interface DueTimerConsumerConfig {
-	limit: number;
+	pageSize: number;
 	overshootMs: number;
 	republishBackoff: RepublishBackoff;
 }
@@ -113,11 +113,11 @@ async function dueTimersConsumerLoop(
 					timerPriorityQueue.popDue({
 						// The cutoff must cover every priority digit, so it takes the lowest priority, not the default.
 						maxRank: computeRank({ dueAt: Date.now(), priority: PRIORITY_LEVELS - 1 }),
-						limit: configProvider.config.limit,
+						limit: configProvider.config.pageSize,
 					});
 
 				for await (const dueTimers of streamChunks(next, {
-					until: (chunk) => chunk.length < configProvider.config.limit,
+					until: (page) => page.length < configProvider.config.pageSize,
 				})) {
 					try {
 						await processDueTimers(context, deps, dueTimers);

@@ -19,7 +19,11 @@ describe("processImminentScheduledRuns", () => {
 			await withFakeClock(now, async () => {
 				const { runId } = await seedScheduledRun({ repos, namespaceRequestContext }, { options: { priority: 2 } });
 
-				await processImminentScheduledRuns(context, { repos }, { limit: 100, lookaheadWindowMs: 0, republishBackoff });
+				await processImminentScheduledRuns(
+					context,
+					{ repos },
+					{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				);
 
 				const row = await repos.workflowRunOutbox.getByWorkflowRunId({
 					namespaceId: namespaceRequestContext.namespaceId,

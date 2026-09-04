@@ -32,7 +32,7 @@ describe("processDueTimers", () => {
 						signal: new AbortController().signal,
 						timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
 						childRunCanceller: createChildRunCanceller(),
-						configProvider: asConfigProvider(() => ({ limit: 100, overshootMs: 0, republishBackoff })),
+						configProvider: asConfigProvider(() => ({ pageSize: 100, overshootMs: 0, republishBackoff })),
 					},
 					[{ type: "scheduled", id: runId, rank: computeRank({ dueAt: now, priority: 2 }) }]
 				);

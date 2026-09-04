@@ -1,13 +1,15 @@
 import { streamChunks } from "@aikirun/lib/async";
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Equal, ExpectTrue } from "@aikirun/lib/testing/expect";
 import type { Publisher, PublishRunsResult, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 
+import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories } from "../infra/db/types";
 import type {
 	WorkflowRunOutboxRowInsertPending,
 	WorkflowRunOutboxRowPending,
 } from "../infra/db/types/workflow-run-outbox";
+import { runConcurrently } from "../lib/concurrency";
 import { computeRank, extractRankPriority } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 
@@ -22,11 +24,10 @@ export interface RepublishBackoff {
 	declinedBackoffMs: number;
 }
 
-export interface PublishPendingOutboxEntriesConfig {
-	limit: number;
+export type PublishPendingOutboxEntriesConfig = PageProcessingConfig & {
 	leaseDurationMs: number;
 	republishBackoff: RepublishBackoff;
-}
+};
 
 const PUBLISH_OUTCOMES = ["published", "deferred", "failed", "declined"] as const;
 declare const _publishOutcomeTypeTest: [ExpectTrue<Equal<(typeof PUBLISH_OUTCOMES)[number], keyof PublishRunsResult>>];
@@ -34,13 +35,20 @@ declare const _publishOutcomeTypeTest: [ExpectTrue<Equal<(typeof PUBLISH_OUTCOME
 export async function publishPendingOutboxEntries(
 	context: DaemonContext,
 	{ repos, publisher }: PublishPendingOutboxEntriesDeps,
-	{ limit, leaseDurationMs, republishBackoff }: PublishPendingOutboxEntriesConfig
+	{ pageSize, chunk, leaseDurationMs, republishBackoff }: PublishPendingOutboxEntriesConfig
 ) {
 	for await (const pendingEntries of streamChunks(
-		() => repos.workflowRunOutbox.leaseDuePending(context, { leaseDurationMs, limit }),
-		{ until: (chunk) => chunk.length < limit }
+		() => repos.workflowRunOutbox.leaseDuePending(context, { leaseDurationMs, limit: pageSize }),
+		{ until: (page) => page.length < pageSize }
 	)) {
-		await publishOutboxEntries(context, repos, publisher, pendingEntries, republishBackoff);
+		await runConcurrently(
+			context,
+			chunkLazy(pendingEntries, chunk.size),
+			async (entriesChunk, spanCtx) => {
+				await publishOutboxEntries(spanCtx, repos, publisher, entriesChunk, republishBackoff);
+			},
+			{ concurrency: chunk.maxConcurrency }
+		);
 	}
 }
 

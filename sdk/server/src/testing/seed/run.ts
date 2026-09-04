@@ -85,7 +85,12 @@ export async function seedQueuedRun(deps: SeedRunDeps, overrides?: SeedRunOverri
 	await processImminentScheduledRuns(
 		daemonContext,
 		{ repos },
-		{ limit: 100, lookaheadWindowMs: 0, republishBackoff: publishPendingOutboxEntriesDaemonConfig.republishBackoff }
+		{
+			pageSize: 100,
+			lookaheadWindowMs: 0,
+			republishBackoff: publishPendingOutboxEntriesDaemonConfig.republishBackoff,
+			chunk: { size: 100, maxConcurrency: 10 },
+		}
 	);
 
 	const outboxRow = await repos.workflowRunOutbox.getByWorkflowRunId({
@@ -237,7 +242,11 @@ export async function seedStalledRun(deps: SeedRunDeps, overrides?: SeedRunOverr
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const seeded = await withFakeClock(1 as TimestampMs, () => seedQueuedRun(deps, overrides));
 
-	await stallUndeliverableRuns(daemonContext, { repos: deps.repos }, { maxAgeMs: 60_000, limit: 100 });
+	await stallUndeliverableRuns(
+		daemonContext,
+		{ repos: deps.repos },
+		{ maxAgeMs: 60_000, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
+	);
 
 	return {
 		runId: seeded.runId,

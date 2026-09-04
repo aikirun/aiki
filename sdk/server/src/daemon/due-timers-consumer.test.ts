@@ -37,7 +37,7 @@ describe("startDueTimersConsumer", () => {
 			timerPriorityQueue,
 			childRunCanceller: createChildRunCanceller(),
 			configProvider: asConfigProvider(() => ({
-				limit: 1,
+				pageSize: 1,
 				overshootMs: 10,
 				republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
 			})),
@@ -82,7 +82,7 @@ describe("startDueTimersConsumer", () => {
 			timerPriorityQueue,
 			childRunCanceller: createChildRunCanceller(),
 			configProvider: asConfigProvider(() => ({
-				limit: 1_000,
+				pageSize: 1_000,
 				overshootMs: 10,
 				republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
 			})),

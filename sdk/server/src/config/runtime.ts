@@ -1,9 +1,16 @@
 import type { DeepPartial } from "@aikirun/lib/object";
 import { DEFAULT_CLAIM_IDLE_TIMEOUT_MS } from "@aikirun/types/workflow/run";
 
-interface PollingDaemonConfig {
+export interface PageProcessingConfig {
+	pageSize: number;
+	chunk: {
+		size: number;
+		maxConcurrency: number;
+	};
+}
+
+interface PollingDaemonConfig extends PageProcessingConfig {
 	intervalMs: number;
-	limit: number;
 }
 
 interface ImminentPollingDaemonConfig extends PollingDaemonConfig {
@@ -34,7 +41,7 @@ export interface ServerRuntimeConfig {
 			maxAgeMs: number;
 		};
 		dueTimersConsumer: {
-			limit: number;
+			pageSize: number;
 			overshootMs: number;
 		};
 	};
@@ -47,42 +54,74 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 	daemons: {
 		imminentScheduledRuns: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
 			lookaheadWindowMs: 30_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 		},
 		imminentSleepElapsedRuns: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
 			lookaheadWindowMs: 30_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 		},
 		imminentRetryableRuns: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
 			lookaheadWindowMs: 30_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 		},
 		imminentTaskRetryableRuns: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
 			lookaheadWindowMs: 30_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 		},
 		imminentEventWaitTimedOutRuns: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
 			lookaheadWindowMs: 30_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 		},
 		imminentChildRunWaitTimedOutRuns: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
 			lookaheadWindowMs: 30_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 		},
 		imminentRecurringRuns: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
 			lookaheadWindowMs: 30_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 		},
 		publishPendingOutboxEntries: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 			leaseDurationMs: 5_000,
 			republishBackoff: {
 				baseDelayMs: 5_000,
@@ -92,16 +131,24 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 		},
 		recoverOverdueOutboxEntries: {
 			intervalMs: 10_000,
-			limit: 1_000,
+			pageSize: 1_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 			claimIdleTimeoutMs: DEFAULT_CLAIM_IDLE_TIMEOUT_MS,
 		},
 		stallUndeliverableRuns: {
 			intervalMs: 60_000,
-			limit: 1_000,
+			pageSize: 1_000,
+			chunk: {
+				size: 100,
+				maxConcurrency: 10,
+			},
 			maxAgeMs: 24 * 60 * 60 * 1_000, // 24 hours
 		},
 		dueTimersConsumer: {
-			limit: 1_000,
+			pageSize: 1_000,
 			overshootMs: 30,
 		},
 	},

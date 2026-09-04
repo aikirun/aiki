@@ -15,6 +15,7 @@ import {
 import { ulid } from "ulidx";
 
 import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
+import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleOccurrenceUpdate } from "../infra/db/types/schedule";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
@@ -50,16 +51,16 @@ const advanceScheduleCursor = createKeysetStreamCursorAdvancer<{ schedule: { id:
 export async function processImminentRecurringRuns(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringRunsDeps,
-	config: { limit: number; lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
+	config: PageProcessingConfig & { lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
-	const { limit, lookaheadWindowMs, republishBackoff } = config;
+	const { pageSize, lookaheadWindowMs, republishBackoff } = config;
 	const dueBefore = (Date.now() + (deps.timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	for await (const rows of streamChunks(
-		(cursor) => deps.repos.schedule.listDueSchedules(context, dueBefore, limit, cursor),
+		(cursor) => deps.repos.schedule.listDueSchedules(context, dueBefore, pageSize, cursor),
 		{
 			advanceCursor: advanceScheduleCursor,
-			until: (chunk) => chunk.length < limit,
+			until: (page) => page.length < pageSize,
 		}
 	)) {
 		const schedules: DueSchedule[] = rows.map(({ schedule, workflow }) => ({

@@ -203,7 +203,7 @@ describe("claimReady visibility after recovery", () => {
 			await recoverOverdueOutboxEntries(
 				daemonContext,
 				{ repos },
-				{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+				{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
 			);
 
 			// Both runs are now visible to claimReady.

@@ -45,7 +45,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
 				);
 
 				const pendingRows = await repos.workflowRunOutbox.listPending(context, 100);
@@ -80,7 +80,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
 				);
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
@@ -101,7 +101,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
 				);
 
 				const run = await repos.workflowRun.getByIdWithState({
@@ -132,7 +132,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
 				);
 
 				const run = await repos.workflowRun.getByIdWithState({
@@ -156,7 +156,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
 				);
 
 				const run = await repos.workflowRun.getByIdWithState({
@@ -178,7 +178,11 @@ describe("recoverOverdueOutboxEntries", () => {
 					repos: deps.repos,
 				});
 
-				await recoverOverdueOutboxEntries(context, { repos }, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 });
+				await recoverOverdueOutboxEntries(
+					context,
+					{ repos },
+					{ claimIdleTimeoutMs: ONE_HOUR_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
+				);
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
 				expect(
@@ -209,7 +213,11 @@ describe("recoverOverdueOutboxEntries", () => {
 				const outboxService = createWorkflowRunOutboxService({ repos });
 				await outboxService.refreshClaim(namespaceRequestContext, runId);
 
-				await recoverOverdueOutboxEntries(context, { repos }, { claimIdleTimeoutMs: ONE_HOUR_MS, limit: 100 });
+				await recoverOverdueOutboxEntries(
+					context,
+					{ repos },
+					{ claimIdleTimeoutMs: ONE_HOUR_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
+				);
 
 				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
 				expect(
@@ -244,7 +252,7 @@ describe("recoverOverdueOutboxEntries", () => {
 				await recoverOverdueOutboxEntries(
 					context,
 					{ repos },
-					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, limit: 100 }
+					{ claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
 				);
 
 				const pendingRows = await repos.workflowRunOutbox.listPending(context, 100);
@@ -267,7 +275,11 @@ describe("recoverOverdueOutboxEntries", () => {
 					seedQueuedRun({ daemonContext: deps.context, namespaceRequestContext, repos: deps.repos })
 				);
 
-				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
+				await stallUndeliverableRuns(
+					context,
+					{ repos },
+					{ maxAgeMs: 60_000, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
+				);
 
 				const run = await repos.workflowRun.getByIdWithState({
 					namespaceId: namespaceRequestContext.namespaceId,
@@ -296,7 +308,11 @@ describe("recoverOverdueOutboxEntries", () => {
 					})
 				);
 
-				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
+				await stallUndeliverableRuns(
+					context,
+					{ repos },
+					{ maxAgeMs: 60_000, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
+				);
 
 				const run = await repos.workflowRun.getByIdWithState({
 					namespaceId: namespaceRequestContext.namespaceId,
@@ -326,7 +342,11 @@ describe("recoverOverdueOutboxEntries", () => {
 				);
 				await claimRun({ context: namespaceRequestContext, repos, runId });
 
-				await stallUndeliverableRuns(context, { repos }, { maxAgeMs: 60_000, limit: 100 });
+				await stallUndeliverableRuns(
+					context,
+					{ repos },
+					{ maxAgeMs: 60_000, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
+				);
 
 				const run = await repos.workflowRun.getByIdWithState({
 					namespaceId: namespaceRequestContext.namespaceId,
