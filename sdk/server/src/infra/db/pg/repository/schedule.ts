@@ -74,7 +74,9 @@ export const createScheduleRepository = (db: PgDb) => ({
 	},
 
 	async bulkUpdateOccurrence(entries: NonEmptyArray<ScheduleOccurrenceUpdate>): Promise<void> {
-		const valueRows = entries.map(({ filter, update }, index) => {
+		// Locked in id order so concurrent bulk promoters acquire the same rows the same way.
+		const sortedEntries = [...entries].sort((a, b) => (a.filter.id < b.filter.id ? -1 : 1));
+		const valueRows = sortedEntries.map(({ filter, update }, index) => {
 			const expectedNextRunAtIso = new Date(filter.nextRunAt).toISOString();
 			const lastOccurrenceIso = update.lastOccurrence ? new Date(update.lastOccurrence).toISOString() : null;
 			const nextRunAtIso = new Date(update.nextRunAt).toISOString();

@@ -92,7 +92,9 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 	async markPublished(entries: NonEmptyArray<{ id: string; nextPublishAttemptRank: number }>): Promise<void> {
 		const now = Date.now() as TimestampMs;
 
-		const valueRows = entries.map((entry, index) => {
+		// Locked in id order so concurrent bulk publishers acquire the same rows the same way.
+		const sortedEntries = [...entries].sort((a, b) => (a.id < b.id ? -1 : 1));
+		const valueRows = sortedEntries.map((entry, index) => {
 			if (index === 0) {
 				return sql`(${entry.id}::text, ${entry.nextPublishAttemptRank}::float8)`;
 			}
@@ -114,7 +116,9 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 	async setNextPublishAttemptRank(
 		entries: NonEmptyArray<{ id: string; nextPublishAttemptRank: number }>
 	): Promise<void> {
-		const valueRows = entries.map((entry, index) => {
+		// Locked in id order so concurrent bulk publishers acquire the same rows the same way.
+		const sortedEntries = [...entries].sort((a, b) => (a.id < b.id ? -1 : 1));
+		const valueRows = sortedEntries.map((entry, index) => {
 			if (index === 0) {
 				return sql`(${entry.id}::text, ${entry.nextPublishAttemptRank}::float8)`;
 			}
