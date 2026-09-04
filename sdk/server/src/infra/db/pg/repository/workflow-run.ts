@@ -775,7 +775,9 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
 		options?: { incrementAttempts?: boolean }
 	): Promise<string[]> {
-		const valueRows = runs.map(({ filter, update }, index) => {
+		// Locked in id order so concurrent bulk promoters acquire the same rows the same way.
+		const sortedRuns = [...runs].sort((a, b) => (a.filter.id < b.filter.id ? -1 : 1));
+		const valueRows = sortedRuns.map(({ filter, update }, index) => {
 			if (index === 0) {
 				return sql`(${filter.id}::text, ${filter.revision}::integer, ${update.stateTransitionId}::text)`;
 			}
