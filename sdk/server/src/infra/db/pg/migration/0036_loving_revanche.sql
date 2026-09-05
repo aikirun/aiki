@@ -1,0 +1,1 @@
+ALTER TABLE "event_wait" ADD CONSTRAINT "chk_event_wait_timeout_not_codec_applied" CHECK ("event_wait"."status" != 'timeout' OR "event_wait"."client_codec_applied" = false);
