@@ -341,6 +341,10 @@ export const eventWait = pgTable(
 			"chk_event_wait_timeout_requires_timed_out_at",
 			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
 		),
+		check(
+			"chk_event_wait_timeout_not_codec_applied",
+			sql`${table.status} != 'timeout' OR ${table.clientCodecApplied} = false`
+		),
 	]
 );
 

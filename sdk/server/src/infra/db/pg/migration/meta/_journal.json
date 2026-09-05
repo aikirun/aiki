@@ -246,6 +246,13 @@
 			"when": 1788632483102,
 			"tag": "0035_robust_gambit",
 			"breakpoints": true
+		},
+		{
+			"idx": 36,
+			"version": "7",
+			"when": 1788643132365,
+			"tag": "0036_loving_revanche",
+			"breakpoints": true
 		}
 	]
 }

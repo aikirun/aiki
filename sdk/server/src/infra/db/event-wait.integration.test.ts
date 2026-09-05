@@ -1,3 +1,4 @@
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 
 import { describe, expect, test } from "bun:test";
@@ -38,5 +39,22 @@ describe("event wait repository", () => {
 				expect.objectContaining({ signalSequence: 1, data: { trackingId: "TRK-1" } }),
 				expect.objectContaining({ signalSequence: 2, data: { trackingId: "TRK-2" } }),
 			]);
+		}));
+
+	test("rejects a timeout row that declares the client codec applied", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			expect(
+				repos.eventWait.insert({
+					id: "01-timeout",
+					workflowRunId: runId,
+					name: "orderShipped",
+					status: "timeout",
+					timedOutAt: 1 as TimestampMs,
+					clientCodecApplied: true,
+					signalSequence: 1,
+				})
+			).rejects.toThrow("chk_event_wait_timeout_not_codec_applied");
 		}));
 });
