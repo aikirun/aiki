@@ -6,7 +6,7 @@ import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { TerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
+import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { createTaskStateMachine } from "./state-machine/task";
 import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./state-machine/workflow-run";
@@ -17,6 +17,7 @@ import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infr
 import { computeRank } from "../lib/rank";
 import type { NamespaceRequestContext } from "../middleware/context";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
+import { createEventService } from "../service/event";
 import { createWorkflowRunService } from "../service/workflow-run";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
@@ -143,6 +144,27 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					},
 				],
 			]);
+		}));
+
+	test("returns the run's received event waits with each sender's declaration", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			// The seeded run declares no client codec; the sender declares one.
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const { service, stateMachine } = createService(repos);
+			const encodedData = asOpaquePayload({ encoded: "TRK-1" });
+
+			await createEventService({ repos, workflowRunStateMachine: stateMachine }).sendEventToWorkflowRun(context, {
+				runId: runId as WorkflowRunId,
+				eventName: "orderShipped",
+				data: encodedData,
+				clientCodecApplied: true,
+				reference: undefined,
+			});
+
+			const run = await service.getWorkflowRunById(context, runId);
+			expect(run.eventWaits).toEqual({
+				orderShipped: [expect.objectContaining({ status: "received", data: encodedData, clientCodecApplied: true })],
+			});
 		}));
 });
 

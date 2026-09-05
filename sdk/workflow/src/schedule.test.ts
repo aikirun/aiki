@@ -5,8 +5,10 @@ import {
 	intervalScheduleActivateRequestFactory,
 } from "@aikirun/testing/data-factory/api/schedule";
 import { cronScheduleFactory, intervalScheduleFactory } from "@aikirun/testing/data-factory/schedule";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { Client } from "@aikirun/types/client";
 import type { ScheduleId } from "@aikirun/types/schedule";
+import { INTERNAL } from "@aikirun/types/symbols";
 
 import { schedule } from "./schedule";
 import { workflow } from "./workflow";
@@ -22,13 +24,13 @@ const workflowRunInputHash = await hashInput(workflowRunInput);
 const intervalScheduleActivateRequest = intervalScheduleActivateRequestFactory.params({
 	workflowName: syncInventoryWorkflow.name,
 	workflowVersionId: syncInventoryWorkflow.versionId,
-	workflowRunInput,
+	workflowRunInput: asOpaquePayload(workflowRunInput),
 	workflowRunInputHash: { value: workflowRunInputHash },
 });
 const cronScheduleActivateRequest = cronScheduleActivateRequestFactory.params({
 	workflowName: syncInventoryWorkflow.name,
 	workflowVersionId: syncInventoryWorkflow.versionId,
-	workflowRunInput,
+	workflowRunInput: asOpaquePayload(workflowRunInput),
 	workflowRunInputHash: { value: workflowRunInputHash },
 });
 
@@ -63,6 +65,34 @@ describe("schedule", () => {
 					client,
 					syncInventoryWorkflow,
 					{ warehouseId: "wh-1" }
+				);
+			}));
+
+		test("hashes the plaintext input, then encodes it with the client's codec and declares it applied", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toEqual(workflowRunInput);
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequestFactory.build({
+						workflowName: syncInventoryWorkflow.name,
+						workflowVersionId: syncInventoryWorkflow.versionId,
+						workflowRunInput: encodedInput,
+						workflowRunInputHash: { value: workflowRunInputHash },
+						clientCodecApplied: true,
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
+
+				await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					syncInventoryWorkflow,
+					workflowRunInput
 				);
 			}));
 

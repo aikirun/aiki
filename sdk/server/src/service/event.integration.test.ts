@@ -3,6 +3,7 @@ import { NotFoundError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { createWorkflowRunStateMachine } from "./state-machine/workflow-run";
@@ -32,7 +33,8 @@ describe("EventService sendEventToWorkflowRun", () => {
 			await createService(repos).sendEventToWorkflowRun(context, {
 				runId: runId as WorkflowRunId,
 				eventName: "orderShipped",
-				data: { trackingId: "TRK-1" },
+				data: asOpaquePayload({ trackingId: "TRK-1" }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 
@@ -42,8 +44,34 @@ describe("EventService sendEventToWorkflowRun", () => {
 					name: "orderShipped",
 					status: "received",
 					data: { trackingId: "TRK-1" },
+					clientCodecApplied: false,
 					referenceId: null,
 					signalSequence: 1,
+				}),
+			]);
+		}));
+
+	test("records the sender's declaration on the wait, regardless of the run's own declaration", () =>
+		withHarness(async ({ repos, context, publisher }) => {
+			// The seeded run declares no client codec; the sender declares one.
+			const { runId } = await seedClaimedRun({ repos, namespaceRequestContext: context, publisher });
+			const encodedData = asOpaquePayload({ encoded: "TRK-1" });
+
+			await createService(repos).sendEventToWorkflowRun(context, {
+				runId: runId as WorkflowRunId,
+				eventName: "orderShipped",
+				data: encodedData,
+				clientCodecApplied: true,
+				reference: undefined,
+			});
+
+			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
+				expect.objectContaining({
+					workflowRunId: runId,
+					name: "orderShipped",
+					status: "received",
+					data: encodedData,
+					clientCodecApplied: true,
 				}),
 			]);
 		}));
@@ -57,7 +85,8 @@ describe("EventService sendEventToWorkflowRun", () => {
 				eventService.sendEventToWorkflowRun(context, {
 					runId: runId as WorkflowRunId,
 					eventName: "orderShipped",
-					data: { trackingId },
+					data: asOpaquePayload({ trackingId }),
+					clientCodecApplied: false,
 					reference: { id: "carrier-callback-1" },
 				});
 
@@ -91,7 +120,8 @@ describe("EventService sendEventToWorkflowRun", () => {
 				eventService.sendEventToWorkflowRun(context, {
 					runId: runId as WorkflowRunId,
 					eventName: "orderShipped",
-					data: { trackingId },
+					data: asOpaquePayload({ trackingId }),
+					clientCodecApplied: false,
 					reference: undefined,
 				});
 
@@ -120,7 +150,8 @@ describe("EventService sendEventToWorkflowRun", () => {
 				createService(repos).sendEventToWorkflowRun(context, {
 					runId: "01JZZZZZZZZZZZZZZZZZZZZZZZ" as WorkflowRunId,
 					eventName: "orderShipped",
-					data: { trackingId: "TRK-1" },
+					data: asOpaquePayload({ trackingId: "TRK-1" }),
+					clientCodecApplied: false,
 					reference: undefined,
 				})
 			).rejects.toThrow(NotFoundError);
@@ -140,7 +171,8 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 				createService(repos).sendEventToWorkflowRun(context, {
 					runId: runId as WorkflowRunId,
 					eventName: "orderShipped",
-					data: { trackingId: "TRK-1" },
+					data: asOpaquePayload({ trackingId: "TRK-1" }),
+					clientCodecApplied: false,
 					reference: undefined,
 				})
 			);
@@ -175,7 +207,8 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 				eventService.sendEventToWorkflowRun(context, {
 					runId: runId as WorkflowRunId,
 					eventName: "orderShipped",
-					data: { trackingId: "TRK-1" },
+					data: asOpaquePayload({ trackingId: "TRK-1" }),
+					clientCodecApplied: false,
 					reference: undefined,
 				})
 			);
@@ -195,7 +228,8 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 			await createService(repos).sendEventToWorkflowRun(context, {
 				runId: runId as WorkflowRunId,
 				eventName: "orderCancelled",
-				data: { reason: "customer changed their mind" },
+				data: asOpaquePayload({ reason: "customer changed their mind" }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 
@@ -221,7 +255,8 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 			await createService(repos).sendEventToWorkflowRun(context, {
 				runId: runId as WorkflowRunId,
 				eventName: "orderShipped",
-				data: { trackingId: "TRK-1" },
+				data: asOpaquePayload({ trackingId: "TRK-1" }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 
@@ -243,7 +278,8 @@ describe("EventService multicastEventToWorkflowRuns", () => {
 			const result = await createService(repos).multicastEventToWorkflowRuns(context, {
 				runIds: [first.runId, second.runId] as WorkflowRunId[],
 				eventName: "orderShipped",
-				data: { trackingId: "TRK-1" },
+				data: asOpaquePayload({ trackingId: "TRK-1" }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 
@@ -267,7 +303,8 @@ describe("EventService multicastEventToWorkflowRuns", () => {
 			const result = await createService(repos).multicastEventToWorkflowRuns(context, {
 				runIds: [reachable.runId, missingRunId] as WorkflowRunId[],
 				eventName: "orderShipped",
-				data: { trackingId: "TRK-1" },
+				data: asOpaquePayload({ trackingId: "TRK-1" }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 
@@ -291,7 +328,8 @@ describe("EventService multicastEventToWorkflowRuns", () => {
 			const result = await createService(repos).multicastEventToWorkflowRuns(context, {
 				runIds: [parked.runId, sleeping.runId] as WorkflowRunId[],
 				eventName: "orderShipped",
-				data: { trackingId: "TRK-1" },
+				data: asOpaquePayload({ trackingId: "TRK-1" }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 

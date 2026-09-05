@@ -132,6 +132,7 @@ async function processChunk(
 			workflowRunId: run.id,
 			name: fromState.eventName,
 			status: "timeout",
+			clientCodecApplied: false,
 			timedOutAt,
 		});
 

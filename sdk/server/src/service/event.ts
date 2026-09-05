@@ -1,5 +1,6 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
+import type { OpaquePayload } from "@aikirun/types/payload";
 import {
 	type EventMulticastResult,
 	type EventReference,
@@ -20,15 +21,17 @@ export interface EventServiceDeps {
 	workflowRunStateMachine: WorkflowRunStateMachine;
 }
 
+export interface EventSendParams {
+	eventName: string;
+	data: OpaquePayload | undefined;
+	clientCodecApplied: boolean;
+	reference: EventReference | undefined;
+}
+
 export const createEventService = ({ repos, workflowRunStateMachine }: EventServiceDeps) => ({
 	async sendEventToWorkflowRun(
 		context: NamespaceRequestContext,
-		params: {
-			runId: WorkflowRunId;
-			eventName: string;
-			data: unknown;
-			reference: EventReference | undefined;
-		}
+		params: EventSendParams & { runId: WorkflowRunId }
 	): Promise<void> {
 		return repos.transaction(async (txRepos) =>
 			sendEventToWorkflowRunInTx(context, params, txRepos, workflowRunStateMachine)
@@ -37,14 +40,9 @@ export const createEventService = ({ repos, workflowRunStateMachine }: EventServ
 
 	async multicastEventToWorkflowRuns(
 		context: NamespaceRequestContext,
-		params: {
-			runIds: WorkflowRunId[];
-			eventName: string;
-			data: unknown;
-			reference: EventReference | undefined;
-		}
+		params: EventSendParams & { runIds: WorkflowRunId[] }
 	): Promise<EventMulticastResult> {
-		const { runIds, eventName, data, reference } = params;
+		const { runIds, eventName, data, clientCodecApplied, reference } = params;
 
 		const sentIds: string[] = [];
 		const failedIds: string[] = [];
@@ -52,7 +50,12 @@ export const createEventService = ({ repos, workflowRunStateMachine }: EventServ
 		await runConcurrently(context, runIds, async (runId, spanCtx) => {
 			try {
 				await repos.transaction(async (txRepos) =>
-					sendEventToWorkflowRunInTx(spanCtx, { runId, eventName, data, reference }, txRepos, workflowRunStateMachine)
+					sendEventToWorkflowRunInTx(
+						spanCtx,
+						{ runId, eventName, data, clientCodecApplied, reference },
+						txRepos,
+						workflowRunStateMachine
+					)
 				);
 				sentIds.push(runId);
 			} catch (err) {
@@ -69,16 +72,11 @@ export type EventService = ReturnType<typeof createEventService>;
 
 async function sendEventToWorkflowRunInTx(
 	context: NamespaceRequestContext,
-	params: {
-		runId: WorkflowRunId;
-		eventName: string;
-		data: unknown;
-		reference: EventReference | undefined;
-	},
+	params: EventSendParams & { runId: WorkflowRunId },
 	txRepos: TxRepositories,
 	workflowRunStateMachine: WorkflowRunStateMachine
 ) {
-	const { runId, eventName, data, reference } = params;
+	const { runId, eventName, data, clientCodecApplied, reference } = params;
 	const { namespaceId } = context;
 
 	// acquire lock on run row so that the wakeup is never lost if its current status
@@ -100,6 +98,7 @@ async function sendEventToWorkflowRunInTx(
 		referenceId: reference?.id,
 		signalSequence: run.signalSequence,
 		data,
+		clientCodecApplied,
 	};
 	if (propsRequiredNonNull(eventWaitEntry, "referenceId")) {
 		await txRepos.eventWait.upsert(eventWaitEntry);

@@ -1,5 +1,7 @@
 import type { DurationObject } from "@aikirun/lib/duration";
 
+import type { OpaquePayload } from "../../payload";
+
 export type EventName = string & { _brand: "event_name" };
 
 export const EVENT_WAIT_STATUSES = ["received", "timeout"] as const;
@@ -9,9 +11,10 @@ interface EventWaitBase {
 	status: EventWaitStatus;
 }
 
-export interface EventWaitReceived<Data> extends EventWaitBase {
+export interface EventWaitReceived extends EventWaitBase {
 	status: "received";
-	data?: Data;
+	data?: OpaquePayload;
+	clientCodecApplied: boolean;
 	receivedAt: number;
 	reference?: EventReference;
 }
@@ -21,7 +24,7 @@ export interface EventWaitTimeout extends EventWaitBase {
 	timedOutAt: number;
 }
 
-export type EventWait<Data> = EventWaitReceived<Data> | EventWaitTimeout;
+export type EventWait = EventWaitReceived | EventWaitTimeout;
 
 export interface EventWaitOptions<Timed extends boolean> {
 	timeout?: Timed extends true ? DurationObject : never;

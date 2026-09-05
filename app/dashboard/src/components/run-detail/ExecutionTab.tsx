@@ -627,7 +627,7 @@ function EventRow({
 	timeoutAt,
 }: {
 	name: string;
-	waits: EventWait<unknown>[];
+	waits: EventWait[];
 	isWaiting: boolean;
 	timeoutAt?: number;
 }) {
@@ -757,7 +757,7 @@ function EventTimeoutCountdown({ timeoutAt }: { timeoutAt: number }) {
 	return <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--accent-pink)" }}>timeout {label}</span>;
 }
 
-function EventWaitRow({ wait }: { wait: EventWait<unknown> }) {
+function EventWaitRow({ wait }: { wait: EventWait }) {
 	const isReceived = wait.status === "received";
 	const color = isReceived ? "var(--accent-green)" : "var(--accent-orange)";
 

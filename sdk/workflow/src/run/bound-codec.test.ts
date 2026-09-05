@@ -1,10 +1,9 @@
 import { withFakeClient } from "@aikirun/testing/client";
-import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { ClientCodecMissingError } from "@aikirun/types/workflow/run";
+import { ClientCodecMissingError, type WorkflowRunId } from "@aikirun/types/workflow/run";
 
-import { bindRunCodec, noopCodec, toBoundCodec } from "./bound-codec";
+import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./bound-codec";
 import { describe, expect, test } from "bun:test";
 
 describe("toBoundCodec", () => {
@@ -29,41 +28,39 @@ describe("noopCodec", () => {
 	});
 });
 
-describe("bindRunCodec", () => {
-	test("binds the client's codec for a run that expects it", () =>
+describe("bindDeclaredCodec", () => {
+	const runId = "run-1" as WorkflowRunId;
+
+	test("binds the client's codec when the declaration says it was applied", () =>
 		withFakeClient(async (client) => {
 			client[INTERNAL].codec = {
 				encode: async (payload) => ({ marked: payload }),
 				decode: async (payload) => ({ unmarked: payload }),
 			};
-			const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 
-			const codec = bindRunCodec(client, record);
+			const codec = bindDeclaredCodec(client, { runId, clientCodecApplied: true });
 
 			const payload = { value: 1 };
 			expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
 			expect(await codec.decode(asOpaquePayload(payload))).toEqual({ unmarked: payload });
 		}));
 
-	test("binds a passthrough codec for a run that doesn't expect a client codec", () =>
+	test("binds a passthrough codec when the declaration says it was not applied", () =>
 		withFakeClient(async (client) => {
 			client[INTERNAL].codec = {
 				encode: async (payload) => ({ marked: payload }),
 				decode: async (payload) => ({ unmarked: payload }),
 			};
-			const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
 
-			const codec = bindRunCodec(client, record);
+			const codec = bindDeclaredCodec(client, { runId, clientCodecApplied: false });
 
 			const payload = { value: 1 };
 			expect(await codec.encode(payload)).toBe(asOpaquePayload(payload));
 			expect(await codec.decode(asOpaquePayload(payload))).toBe(payload);
 		}));
 
-	test("throws ClientCodecMissingError for a run that expects a client codec when the client has none", () =>
+	test("throws ClientCodecMissingError when the declaration expects a client codec the client lacks", () =>
 		withFakeClient((client) => {
-			const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
-
-			expect(() => bindRunCodec(client, record)).toThrow(ClientCodecMissingError);
+			expect(() => bindDeclaredCodec(client, { runId, clientCodecApplied: true })).toThrow(ClientCodecMissingError);
 		}));
 });

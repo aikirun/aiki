@@ -609,8 +609,8 @@ function buildSleepsByName(sleepRows: SleepRow[]): Record<string, Sleep[]> {
 	return sleepsByName;
 }
 
-function buildEventWaitsByName(eventWaitRows: EventWaitRow[]): Record<string, EventWait<unknown>[]> {
-	const eventWaitsByName: Record<string, EventWait<unknown>[]> = {};
+function buildEventWaitsByName(eventWaitRows: EventWaitRow[]): Record<string, EventWait[]> {
+	const eventWaitsByName: Record<string, EventWait[]> = {};
 
 	for (const row of eventWaitRows) {
 		let eventWaits = eventWaitsByName[row.name];
@@ -623,7 +623,8 @@ function buildEventWaitsByName(eventWaitRows: EventWaitRow[]): Record<string, Ev
 			case "received":
 				eventWaits.push({
 					status: row.status,
-					data: row.data,
+					data: row.data ?? undefined,
+					clientCodecApplied: row.clientCodecApplied,
 					receivedAt: row.createdAt,
 					reference: row.referenceId ? { id: row.referenceId } : undefined,
 				});

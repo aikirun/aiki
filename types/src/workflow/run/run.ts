@@ -297,7 +297,7 @@ export interface WorkflowRunRecord {
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
 	tasks: Record<string, TaskInfo[]>;
 	sleeps: Record<string, Sleep[]>;
-	eventWaits: Record<string, EventWait<unknown>[]>;
+	eventWaits: Record<string, EventWait[]>;
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo[]>;
 	childWorkflowRunWaits: Record<string, ChildWorkflowRunWaits>;
 	parentWorkflowRunId?: string;

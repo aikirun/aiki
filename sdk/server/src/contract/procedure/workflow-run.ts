@@ -252,7 +252,8 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, void> = oc
 		type({
 			id: "string > 0",
 			eventName: "string > 0",
-			"data?": "unknown",
+			"data?": opaquePayloadSchema,
+			clientCodecApplied: "boolean",
 			"options?": {
 				"reference?": { id: "string > 0" },
 			},
@@ -265,7 +266,8 @@ const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, Wo
 		type({
 			ids: type("string > 0").array().atLeastLength(1).atMostLength(10),
 			eventName: "string > 0",
-			"data?": "unknown",
+			"data?": opaquePayloadSchema,
+			clientCodecApplied: "boolean",
 			"options?": {
 				"reference?": { id: "string > 0" },
 			},
@@ -288,7 +290,8 @@ const multicastEventByReferenceV1: ContractProcedure<
 				.atLeastLength(1)
 				.atMostLength(10),
 			eventName: "string > 0",
-			"data?": "unknown",
+			"data?": opaquePayloadSchema,
+			clientCodecApplied: "boolean",
 			"options?": {
 				"reference?": { id: "string > 0" },
 			},

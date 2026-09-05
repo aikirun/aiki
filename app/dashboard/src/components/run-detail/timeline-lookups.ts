@@ -30,7 +30,7 @@ export function formatDuration(ms: number): string {
 
 export function buildTimelineLookups(
 	transitions: StateTransition[],
-	eventWaits: Record<string, EventWait<unknown>[]>,
+	eventWaits: Record<string, EventWait[]>,
 	sleeps: Record<string, Sleep[]>,
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>,
 	childWorkflowRunWaits: Record<string, ChildWorkflowRunWaits>,

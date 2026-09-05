@@ -1,4 +1,5 @@
 import { hashInput } from "@aikirun/lib/crypto";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 
 import { createScheduleService } from "./schedule";
 import { describe, expect, test } from "bun:test";
@@ -14,8 +15,9 @@ describe("ScheduleService activateSchedule", () => {
 			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientCodecApplied: false,
 				spec: { type: "cron", expression: "0 9 * * *", timezone: "Europe/Berlin" },
 			});
 
@@ -38,19 +40,21 @@ describe("ScheduleService activateSchedule", () => {
 			const { schedule: created } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientCodecApplied: false,
 				spec,
 			});
 
 			const { schedule: matched } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: {
 					value: await hashInput(workflowRunInput),
 					deprecatedValues: [previousHash],
 				},
+				clientCodecApplied: false,
 				spec,
 			});
 
@@ -68,8 +72,9 @@ describe("ScheduleService activateSchedule", () => {
 			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientCodecApplied: false,
 				spec,
 			});
 			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
@@ -78,8 +83,9 @@ describe("ScheduleService activateSchedule", () => {
 			await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				clientCodecApplied: false,
 				spec,
 			});
 
@@ -97,15 +103,17 @@ describe("ScheduleService activateSchedule", () => {
 			const { schedule: previous } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: "previous-hash" },
+				clientCodecApplied: false,
 				spec,
 			});
 			const { schedule: current } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientCodecApplied: false,
 				spec,
 			});
 
@@ -123,19 +131,21 @@ describe("ScheduleService activateSchedule", () => {
 			const { schedule: created } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientCodecApplied: false,
 				spec,
 				options,
 			});
 			const { schedule: matched } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: {
 					value: await hashInput(workflowRunInput),
 					deprecatedValues: [previousHash],
 				},
+				clientCodecApplied: false,
 				spec,
 				options,
 			});
@@ -155,8 +165,9 @@ describe("ScheduleService activateSchedule", () => {
 			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientCodecApplied: false,
 				spec,
 				options,
 			});
@@ -166,8 +177,9 @@ describe("ScheduleService activateSchedule", () => {
 			await scheduleService.activateSchedule(context.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				clientCodecApplied: false,
 				spec,
 				options,
 			});
@@ -175,5 +187,170 @@ describe("ScheduleService activateSchedule", () => {
 			const migrated = await repos.schedule.get(context.namespaceId, { id: schedule.id });
 			expect(migrated).toEqual(expect.objectContaining({ id: schedule.id, workflowRunInputHash: currentHash }));
 			expect(migrated?.definitionHash).not.toBe(stored?.definitionHash);
+		}));
+});
+
+describe("ScheduleService activateSchedule recording the client codec", () => {
+	const spec = { type: "interval" as const, everyMs: 60_000 };
+
+	test("stores the activating client's input and declaration", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const encodedInput = asOpaquePayload({ encoded: "eu-west" });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: encodedInput,
+				workflowRunInputHash: { value: await hashInput({ region: "eu-west" }) },
+				clientCodecApplied: true,
+				spec,
+			});
+
+			expect(await scheduleService.getScheduleById(context.namespaceId, schedule.id)).toEqual(
+				expect.objectContaining({
+					schedule: expect.objectContaining({
+						id: schedule.id,
+						workflowRunInput: encodedInput,
+						clientCodecApplied: true,
+					}),
+				})
+			);
+		}));
+
+	test("rewrites the stored input and declaration together with the hashes when matched via a deprecated value", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const previousHash = "previous-hash";
+			const currentHash = await hashInput(workflowRunInput);
+			const encodedInput = asOpaquePayload({ encoded: "eu-west" });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: previousHash },
+				clientCodecApplied: false,
+				spec,
+			});
+
+			await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: encodedInput,
+				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				clientCodecApplied: true,
+				spec,
+			});
+
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({
+					id: schedule.id,
+					workflowRunInput: encodedInput,
+					workflowRunInputHash: currentHash,
+					clientCodecApplied: true,
+				})
+			);
+		}));
+
+	test("rewrites the stored input when only the declaration changes", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const workflowRunInputHash = { value: await hashInput(workflowRunInput) };
+			const encodedInput = asOpaquePayload({ encoded: "eu-west" });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash,
+				clientCodecApplied: false,
+				spec,
+			});
+
+			// Same plaintext, so the same hashes: only the declaration and the stored bytes differ.
+			const { schedule: reactivated } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: encodedInput,
+				workflowRunInputHash,
+				clientCodecApplied: true,
+				spec,
+			});
+
+			expect(reactivated.id).toBe(schedule.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ id: schedule.id, workflowRunInput: encodedInput, clientCodecApplied: true })
+			);
+		}));
+
+	test("leaves the stored input untouched when the hashes and declaration are unchanged", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInputHash = { value: await hashInput({ region: "eu-west" }) };
+			// A codec may encode the same input differently each time; the stored bytes still decode.
+			const firstEncoding = asOpaquePayload({ encoded: "eu-west", nonce: 1 });
+			const secondEncoding = asOpaquePayload({ encoded: "eu-west", nonce: 2 });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: firstEncoding,
+				workflowRunInputHash,
+				clientCodecApplied: true,
+				spec,
+			});
+
+			await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: secondEncoding,
+				workflowRunInputHash,
+				clientCodecApplied: true,
+				spec,
+			});
+
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ id: schedule.id, workflowRunInput: firstEncoding, clientCodecApplied: true })
+			);
+		}));
+
+	test("adopting a free reference id onto an unreferenced schedule rewrites its input and declaration from the request", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const workflowRunInputHash = { value: await hashInput(workflowRunInput) };
+			const encodedInput = asOpaquePayload({ encoded: "eu-west" });
+
+			const { schedule: unreferenced } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash,
+				clientCodecApplied: false,
+				spec,
+			});
+
+			const { schedule: referenced } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: encodedInput,
+				workflowRunInputHash,
+				clientCodecApplied: true,
+				spec,
+				options: { reference: { id: "invoices-eu-west" } },
+			});
+
+			expect(referenced.id).toBe(unreferenced.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: unreferenced.id })).toEqual(
+				expect.objectContaining({
+					id: unreferenced.id,
+					referenceId: "invoices-eu-west",
+					workflowRunInput: encodedInput,
+					clientCodecApplied: true,
+				})
+			);
 		}));
 });

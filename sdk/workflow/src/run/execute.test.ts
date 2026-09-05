@@ -10,6 +10,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
@@ -77,6 +78,24 @@ describe("executeWorkflowRun", () => {
 					expect(result).toBe(true);
 				}));
 		}
+
+		test("returns false when the handler throws ClientCodecMissingError, so the run is redelivered", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new ClientCodecMissingError(workflowRun.id as WorkflowRunId);
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
 
 		test("returns false and logs when the handler throws an unexpected error", () =>
 			withFakeClient(async (client) => {
