@@ -147,6 +147,37 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			);
 		}));
 
+	test("a stale expectedRevision is a revision conflict even when the move is illegal from the current state", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedCompletedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			// A worker that fetched the run before another worker finished it still holds the
+			// pre-completion revision and asks for 'running'. It is told the run moved, not that
+			// the move is illegal, so it settles the delivery instead of reporting an error.
+			expect(
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: runId,
+					state: { status: "running" },
+					expectedRevision: revisionWhenClaimed,
+				})
+			).rejects.toThrow(WorkflowRunRevisionConflictError);
+
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			// Completion moved the revision one past the claim.
+			expect(run).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({ id: runId, revision: revisionWhenClaimed + 1 }),
+					state: expect.objectContaining({ status: "completed" }),
+				})
+			);
+		}));
+
 	test("an invalid transition is rejected without touching the run", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({

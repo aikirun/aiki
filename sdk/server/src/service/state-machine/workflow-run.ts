@@ -174,11 +174,11 @@ async function transitionStateInTx(
 	}
 	const { run, state: fromState } = result;
 
-	assertIsValidWorkflowRunStateTransition(runId, fromState, request.state);
-
 	if (request.type === "optimistic" && run.revision !== request.expectedRevision) {
 		throw new WorkflowRunRevisionConflictError(runId, request.expectedRevision);
 	}
+
+	assertIsValidWorkflowRunStateTransition(runId, fromState, request.state);
 
 	const now = Date.now() as TimestampMs;
 	let toState: WorkflowRunState;
