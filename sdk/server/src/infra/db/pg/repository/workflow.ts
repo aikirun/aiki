@@ -1,17 +1,16 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/api/workflow";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
-import { and, count, eq, inArray, like, max, or, sql } from "drizzle-orm";
-import { ulid } from "ulidx";
+import { and, count, desc, eq, inArray, like, sql } from "drizzle-orm";
 
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
-import { workflow, workflowRun } from "../schema";
+import { workflow } from "../schema";
 
 export type WorkflowRow = typeof workflow.$inferSelect;
-export type WorkflowRowInsert = Omit<typeof workflow.$inferInsert, "id">;
+export type WorkflowRowInsert = typeof workflow.$inferInsert;
+export type WorkflowIdentity = Pick<WorkflowRow, "namespaceId" | "source" | "name" | "versionId">;
 
 export const createWorkflowRepository = (db: PgDb) => ({
 	async getById(namespaceId: NamespaceId, id: string): Promise<WorkflowRow | null> {
@@ -46,31 +45,34 @@ export const createWorkflowRepository = (db: PgDb) => ({
 		return result[0] ?? null;
 	},
 
-	async getOrCreate({ namespaceId, name, versionId, source }: WorkflowRowInsert): Promise<WorkflowRow> {
-		const result = await db
-			.insert(workflow)
-			.values({ id: ulid(), namespaceId, name, versionId, source })
-			.onConflictDoUpdate({
-				target: [workflow.namespaceId, workflow.source, workflow.name, workflow.versionId],
-				set: { name: sql`excluded.name` },
-			})
-			.returning();
-		const row = result[0];
-		if (!row) {
-			throw new Error("Failed to get or create workflow - no row returned");
-		}
-		return row;
+	async listByIdentities(identities: NonEmptyArray<WorkflowIdentity>): Promise<WorkflowRow[]> {
+		const rows = identities.map(({ namespaceId, source, name, versionId }, index) => {
+			if (index === 0) {
+				return sql`(${namespaceId}::text, ${source}::workflow_source, ${name}::text, ${versionId}::text)`;
+			}
+			return sql`(${namespaceId}, ${source}, ${name}, ${versionId})`;
+		});
+
+		// A semi-join, so an identity listed twice still yields its row once.
+		return db
+			.select()
+			.from(workflow)
+			.where(
+				sql`exists (
+					select 1 from (VALUES ${sql.join(rows, sql`, `)}) AS v(namespace_id, source, name, version_id)
+					where ${workflow.namespaceId} = v.namespace_id
+						and ${workflow.source} = v.source
+						and ${workflow.name} = v.name
+						and ${workflow.versionId} = v.version_id
+				)`
+			);
 	},
 
-	async getOrCreateBulk(entries: NonEmptyArray<WorkflowRowInsert>): Promise<WorkflowRow[]> {
-		return db
+	async createIfMissing(entries: WorkflowRowInsert | NonEmptyArray<WorkflowRowInsert>): Promise<void> {
+		await db
 			.insert(workflow)
-			.values(entries.map((entry) => ({ id: ulid(), ...entry })))
-			.onConflictDoUpdate({
-				target: [workflow.namespaceId, workflow.source, workflow.name, workflow.versionId],
-				set: { name: sql`excluded.name` },
-			})
-			.returning();
+			.values(Array.isArray(entries) ? entries : [entries])
+			.onConflictDoNothing({ target: [workflow.namespaceId, workflow.source, workflow.name, workflow.versionId] });
 	},
 
 	async listByNameAndVersion(
@@ -95,70 +97,55 @@ export const createWorkflowRepository = (db: PgDb) => ({
 		namespaceId: NamespaceId,
 		pairs: NonEmptyArray<{ name: string; versionId?: string; source: WorkflowSource }>
 	): Promise<WorkflowRow[]> {
+		const rows = pairs.map(({ name, versionId, source }, index) => {
+			if (index === 0) {
+				return sql`(${source}::workflow_source, ${name}::text, ${versionId ?? null}::text)`;
+			}
+			return sql`(${source}, ${name}, ${versionId ?? null})`;
+		});
+
+		// A pair without a version matches every version of that name.
 		return db
 			.select()
 			.from(workflow)
 			.where(
 				and(
 					eq(workflow.namespaceId, namespaceId),
-					or(
-						...pairs.map(({ name, versionId, source }) =>
-							and(
-								eq(workflow.source, source),
-								eq(workflow.name, name),
-								versionId ? eq(workflow.versionId, versionId) : undefined
-							)
-						)
-					)
+					sql`exists (
+						select 1 from (VALUES ${sql.join(rows, sql`, `)}) AS v(source, name, version_id)
+						where ${workflow.source} = v.source
+							and ${workflow.name} = v.name
+							and (v.version_id is null or ${workflow.versionId} = v.version_id)
+					)`
 				)
 			);
 	},
 
-	async listWithStats(
+	async listNames(
 		namespaceId: NamespaceId,
 		request: WorkflowListRequestV1
-	): Promise<{
-		items: Array<{ name: string; runCount: number; lastRunId: string | null }>;
-		total: number;
-	}> {
-		const { source, limit = 50, offset = 0, namePrefix, sort } = request;
-
-		const sortField = sort?.field ?? "name";
-		const sortOrder = sort?.order ?? "asc";
-
-		const dir = sql.raw(sortOrder);
-
-		const orderByClause =
-			sortField === "name"
-				? sql`${workflow.name} ${dir}`
-				: sortField === "runCount"
-					? sql`count(${workflowRun.id}) ${dir}`
-					: (sortField satisfies "lastRunAt") &&
-						sql`max(${workflowRun.id}) ${dir} nulls ${sql.raw(sortOrder === "asc" ? "first" : "last")}`;
+	): Promise<{ items: Array<{ name: string }>; total: number }> {
+		const { source, limit = 50, offset = 0, namePrefix } = request;
 
 		const namePrefixCondition =
 			namePrefix !== undefined
 				? like(workflow.name, `${namePrefix.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_")}%`)
 				: undefined;
+		const whereClause = and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), namePrefixCondition);
 
 		const items = await db
-			.select({
-				name: workflow.name,
-				runCount: count(workflowRun.id),
-				lastRunId: max(workflowRun.id),
-			})
+			.select({ name: workflow.name })
 			.from(workflow)
-			.leftJoin(workflowRun, eq(workflow.id, workflowRun.workflowId))
-			.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), namePrefixCondition))
+			.where(whereClause)
 			.groupBy(workflow.name)
-			.orderBy(orderByClause)
+			.orderBy(workflow.name)
 			.limit(limit)
 			.offset(offset);
 
 		const totalResult = await db
 			.select({ count: sql`count(distinct ${workflow.name})`.mapWith(Number) })
 			.from(workflow)
-			.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), namePrefixCondition));
+			.where(whereClause);
 
 		return {
 			items,
@@ -166,44 +153,28 @@ export const createWorkflowRepository = (db: PgDb) => ({
 		};
 	},
 
-	async listVersionsWithStats(
+	async listVersions(
 		namespaceId: NamespaceId,
 		request: WorkflowListVersionsRequestV1
-	): Promise<{
-		items: Array<{ versionId: string; firstSeenAt: TimestampMs; lastRunId: string | null; runCount: number }>;
-		total: number;
-	}> {
-		const { name, source, limit = 50, offset = 0, sort } = request;
+	): Promise<{ items: Array<{ versionId: string }>; total: number }> {
+		const { name, source, limit = 50, offset = 0 } = request;
 
-		const sortField = sort?.field ?? "firstSeenAt";
-		const sortOrder = sort?.order ?? "desc";
+		const whereClause = and(
+			eq(workflow.namespaceId, namespaceId),
+			eq(workflow.source, source),
+			eq(workflow.name, name)
+		);
 
-		const dir = sql.raw(sortOrder);
-
-		const orderByClause =
-			sortField === "firstSeenAt"
-				? sql`${workflow.id} ${dir}`
-				: (sortField satisfies "runCount") && sql`count(${workflowRun.id}) ${dir}`;
-
+		// Newest version first: ids are ulids, so id order is creation order.
 		const items = await db
-			.select({
-				versionId: workflow.versionId,
-				firstSeenAt: workflow.createdAt,
-				lastRunId: max(workflowRun.id),
-				runCount: count(workflowRun.id),
-			})
+			.select({ versionId: workflow.versionId })
 			.from(workflow)
-			.leftJoin(workflowRun, eq(workflow.id, workflowRun.workflowId))
-			.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), eq(workflow.name, name)))
-			.groupBy(workflow.id)
-			.orderBy(orderByClause)
+			.where(whereClause)
+			.orderBy(desc(workflow.id))
 			.limit(limit)
 			.offset(offset);
 
-		const totalResult = await db
-			.select({ count: count() })
-			.from(workflow)
-			.where(and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), eq(workflow.name, name)));
+		const totalResult = await db.select({ count: count() }).from(workflow).where(whereClause);
 
 		return {
 			items,

@@ -16,6 +16,7 @@ import { queueScheduledRuns } from "./imminent-scheduled-runs";
 import { queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { queueTaskRetryableRuns } from "./imminent-task-retryable-runs";
 import type { RepublishBackoff } from "./publish-pending-outbox-entries";
+import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import { computeRank, extractRankDueAtMs, PRIORITY_LEVELS, type Ranked } from "../lib/rank";
@@ -28,6 +29,7 @@ interface DueTimerConsumerConfig {
 	pageSize: number;
 	overshootMs: number;
 	republishBackoff: RepublishBackoff;
+	chunkByTimerType: Record<TimerType, PageProcessingConfig["chunk"]>;
 }
 
 export interface DueTimersConsumerDeps {
@@ -155,6 +157,8 @@ export async function processDueTimers(
 	const promises: Promise<void>[] = [];
 
 	for (const [timerType, timers] of timersByType) {
+		const chunkConfig = configProvider.config.chunkByTimerType[timerType];
+
 		if (timerType === "recurring") {
 			const idSet = new Set(timers.map((timer) => timer.id));
 			const rows = await repos.schedule.listActiveByIds(context, Array.from(idSet) as NonEmptyArray<string>);
@@ -168,7 +172,9 @@ export async function processDueTimers(
 			if (!isNonEmptyArray(schedules)) {
 				continue;
 			}
-			promises.push(queueRecurringRuns(context, deps, schedules, configProvider.config.republishBackoff));
+			promises.push(
+				queueRecurringRuns(context, deps, schedules, configProvider.config.republishBackoff, { chunk: chunkConfig })
+			);
 		} else {
 			const rankById = new Map(timers.map((timer) => [timer.id, timer.rank]));
 			const runStatus = timerTypeToWorkflowRunStatus[timerType];
@@ -192,37 +198,54 @@ export async function processDueTimers(
 			switch (timerType) {
 				case "sleep": {
 					promises.push(
-						queueSleepElapsedRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
+						queueSleepElapsedRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns, {
+							chunk: chunkConfig,
+						})
 					);
 					break;
 				}
 				case "retry": {
 					promises.push(
-						queueRetryableRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
+						queueRetryableRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns, {
+							chunk: chunkConfig,
+						})
 					);
 					break;
 				}
 				case "task_retry": {
 					promises.push(
-						queueTaskRetryableRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
+						queueTaskRetryableRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns, {
+							chunk: chunkConfig,
+						})
 					);
 					break;
 				}
 				case "event_wait_timeout": {
 					promises.push(
-						queueEventWaitTimedOutRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
+						queueEventWaitTimedOutRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns, {
+							chunk: chunkConfig,
+						})
 					);
 					break;
 				}
 				case "child_wait_timeout": {
 					promises.push(
-						queueChildRunWaitTimedOutRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
+						queueChildRunWaitTimedOutRuns(
+							context,
+							repos,
+							publisher,
+							configProvider.config.republishBackoff,
+							rankedRuns,
+							{ chunk: chunkConfig }
+						)
 					);
 					break;
 				}
 				case "scheduled": {
 					promises.push(
-						queueScheduledRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns)
+						queueScheduledRuns(context, repos, publisher, configProvider.config.republishBackoff, rankedRuns, {
+							chunk: chunkConfig,
+						})
 					);
 					break;
 				}

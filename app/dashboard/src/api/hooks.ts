@@ -1,9 +1,5 @@
 import type { ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
-import type {
-	WorkflowGetStatsRequestV1,
-	WorkflowListRequestV1,
-	WorkflowListVersionsRequestV1,
-} from "@aikirun/types/api/workflow";
+import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/api/workflow";
 import type { WorkflowRunListRequestV1, WorkflowRunListTransitionsRequestV1 } from "@aikirun/types/api/workflow-run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -26,13 +22,6 @@ export function useWorkflowVersions(
 		queryKey: ["workflow-versions", name, params],
 		queryFn: () => namespaceAuthedClient.workflow.listVersionsV1({ name, ...params }),
 		enabled: !!name,
-	});
-}
-
-export function useWorkflowStats(params: WorkflowGetStatsRequestV1 = undefined) {
-	return useQuery({
-		queryKey: ["workflow-stats", params],
-		queryFn: () => namespaceAuthedClient.workflow.getStatsV1(params),
 	});
 }
 

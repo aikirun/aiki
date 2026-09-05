@@ -1,6 +1,6 @@
 import { streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import { asNonEmptyArray, isNonEmptyArray, partitionArray } from "@aikirun/lib/collection/array";
+import { asNonEmptyArray, chunkLazy, isNonEmptyArray, partitionArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
@@ -21,13 +21,14 @@ import type { ScheduleOccurrenceUpdate } from "../infra/db/types/schedule";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
+import { runConcurrently } from "../lib/concurrency";
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import { computeRank } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
 import { deliverTerminatedSignalToParentRun, type TerminatedChildRun } from "../service/deliver-terminated-signals";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
-import { getDueOccurrences, getNextOccurrence, getReferenceId, scheduleRowToDomain } from "../service/schedule";
+import { getDueOccurrences, getReferenceId, scheduleRowToDomain } from "../service/schedule";
 
 export interface ProcessImminentRecurringRunsDeps {
 	repos: Repositories;
@@ -53,7 +54,7 @@ export async function processImminentRecurringRuns(
 	deps: ProcessImminentRecurringRunsDeps,
 	config: PageProcessingConfig & { lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
-	const { pageSize, lookaheadWindowMs, republishBackoff } = config;
+	const { pageSize, lookaheadWindowMs, republishBackoff, chunk } = config;
 	const dueBefore = (Date.now() + (deps.timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	for await (const rows of streamChunks(
@@ -78,7 +79,7 @@ export async function processImminentRecurringRuns(
 		}));
 
 		if (isNonEmptyArray(schedulesDueNow)) {
-			await queueRecurringRuns(context, deps, schedulesDueNow, republishBackoff);
+			await queueRecurringRuns(context, deps, schedulesDueNow, republishBackoff, { chunk });
 		}
 
 		const { timerPriorityQueue } = deps;
@@ -100,10 +101,27 @@ export async function queueRecurringRuns(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringRunsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
-	republishBackoff: RepublishBackoff
+	republishBackoff: RepublishBackoff,
+	options?: { chunk?: { size?: number; maxConcurrency?: number } }
 ) {
+	const { size: chunkSize = schedules.length, maxConcurrency } = options?.chunk ?? {};
 	const now = Date.now();
 
+	await runConcurrently(
+		context,
+		chunkLazy(schedules, chunkSize),
+		(chunk, spanCtx) => processChunk(spanCtx, deps, chunk, now, republishBackoff),
+		maxConcurrency ? { concurrency: maxConcurrency } : undefined
+	);
+}
+
+async function processChunk(
+	context: DaemonContext,
+	deps: ProcessImminentRecurringRunsDeps,
+	schedules: NonEmptyArray<DueSchedule>,
+	now: number,
+	republishBackoff: RepublishBackoff
+) {
 	const allowSchedules: DueSchedule[] = [];
 	const skipSchedules: DueSchedule[] = [];
 	const cancelPreviousSchedules: DueSchedule[] = [];
@@ -153,12 +171,12 @@ async function processOverlapAllowSchedules(
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
-		const occurrences = getDueOccurrences(schedule, now);
-		if (!isNonEmptyArray(occurrences)) {
+		const due = getDueOccurrences(schedule, now);
+		if (!due) {
 			continue;
 		}
 
-		for (const occurrence of occurrences) {
+		for (const occurrence of due.occurrences) {
 			const runId = ulid() as WorkflowRunId;
 			const stateTransitionId = ulid();
 			const referenceId = getReferenceId(schedule.id, occurrence);
@@ -200,12 +218,12 @@ async function processOverlapAllowSchedules(
 		}
 
 		// biome-ignore lint/style/noNonNullAssertion: isNonEmptyArray guarantees at least one element
-		const lastOccurrence = occurrences.at(-1)!;
+		const lastOccurrence = due.occurrences.at(-1)!;
 		scheduleUpdates.push({
 			filter: { id: schedule.id, nextRunAt: schedule.nextRunAt as TimestampMs },
 			update: {
 				lastOccurrence: lastOccurrence as TimestampMs,
-				nextRunAt: getNextOccurrence(schedule.spec, lastOccurrence) as TimestampMs,
+				nextRunAt: due.nextRunAt as TimestampMs,
 			},
 		});
 	}
@@ -259,16 +277,16 @@ async function processOverlapSkipSchedules(
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
-		const occurrences = getDueOccurrences(schedule, now);
-		if (!isNonEmptyArray(occurrences)) {
+		const due = getDueOccurrences(schedule, now);
+		if (!due) {
 			continue;
 		}
-		const occurrence = occurrences[0];
+		const occurrence = due.occurrences[0];
 
 		if (activeRunsByScheduleId.has(schedule.id)) {
 			scheduleUpdates.push({
 				filter: { id: schedule.id, nextRunAt: schedule.nextRunAt as TimestampMs },
-				update: { nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs },
+				update: { nextRunAt: due.nextRunAt as TimestampMs },
 			});
 			continue;
 		}
@@ -315,7 +333,7 @@ async function processOverlapSkipSchedules(
 			filter: { id: schedule.id, nextRunAt: schedule.nextRunAt as TimestampMs },
 			update: {
 				lastOccurrence: occurrence as TimestampMs,
-				nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
+				nextRunAt: due.nextRunAt as TimestampMs,
 			},
 		});
 	}
@@ -382,11 +400,11 @@ async function processOverlapCancelPreviousSchedules(
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
-		const occurrences = getDueOccurrences(schedule, now);
-		if (!isNonEmptyArray(occurrences)) {
+		const due = getDueOccurrences(schedule, now);
+		if (!due) {
 			continue;
 		}
-		const occurrence = occurrences[0];
+		const occurrence = due.occurrences[0];
 
 		const activeRun = activeRunsByScheduleId.get(schedule.id);
 		if (activeRun) {
@@ -439,7 +457,7 @@ async function processOverlapCancelPreviousSchedules(
 			filter: { id: schedule.id, nextRunAt: schedule.nextRunAt as TimestampMs },
 			update: {
 				lastOccurrence: occurrence as TimestampMs,
-				nextRunAt: getNextOccurrence(schedule.spec, occurrence) as TimestampMs,
+				nextRunAt: due.nextRunAt as TimestampMs,
 			},
 		});
 	}

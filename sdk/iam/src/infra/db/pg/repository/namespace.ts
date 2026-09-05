@@ -2,15 +2,17 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { ConflictError } from "@aikirun/lib/error";
 import type { NamespaceRole } from "@aikirun/types/namespace";
 import { and, eq, sql } from "drizzle-orm";
-import { ulid } from "ulidx";
 
-import type { NamespaceMemberInfo, NamespaceMemberInput } from "../../../../contract/schema/namespace";
+import type { NamespaceMemberInfo } from "../../../../contract/schema/namespace";
 import type { PgDb } from "../provider";
 import { namespace, namespaceMember, user } from "../schema";
 
 export type NamespaceRow = typeof namespace.$inferSelect;
-export type NamespaceRowInsert = Pick<typeof namespace.$inferInsert, "name" | "organizationId">;
-export type NamespaceMemberRowInsert = Pick<typeof namespaceMember.$inferInsert, "userId" | "role">;
+export type NamespaceRowInsert = Pick<typeof namespace.$inferInsert, "id" | "name" | "organizationId">;
+export type NamespaceMemberRowInsert = Pick<
+	typeof namespaceMember.$inferInsert,
+	"id" | "namespaceId" | "userId" | "role"
+>;
 export type NamespaceMemberRow = typeof namespaceMember.$inferSelect;
 export type NamespaceRowWithRole = NamespaceRow & { role: NamespaceRole };
 
@@ -18,7 +20,7 @@ export const createNamespaceRepository = (db: PgDb) => ({
 	async create(namespaceParams: NamespaceRowInsert): Promise<NamespaceRow> {
 		const [createdNamespace] = await db
 			.insert(namespace)
-			.values({ ...namespaceParams, id: ulid() })
+			.values(namespaceParams)
 			.onConflictDoUpdate({
 				target: [namespace.organizationId, namespace.name],
 				set: { status: "active" },
@@ -32,13 +34,13 @@ export const createNamespaceRepository = (db: PgDb) => ({
 		return createdNamespace;
 	},
 
-	async createMember(memberParams: NamespaceMemberRowInsert & { id: string; namespaceId: string }): Promise<void> {
+	async createMember(member: NamespaceMemberRowInsert): Promise<void> {
 		await db
 			.insert(namespaceMember)
-			.values(memberParams)
+			.values(member)
 			.onConflictDoUpdate({
 				target: [namespaceMember.namespaceId, namespaceMember.userId],
-				set: { role: memberParams.role },
+				set: { role: member.role },
 			});
 	},
 
@@ -94,17 +96,10 @@ export const createNamespaceRepository = (db: PgDb) => ({
 		await db.update(namespace).set({ status: "deleted" }).where(eq(namespace.id, namespaceId));
 	},
 
-	async upsertMembers(namespaceId: string, members: NonEmptyArray<NamespaceMemberInput>): Promise<void> {
+	async upsertMembers(members: NonEmptyArray<NamespaceMemberRowInsert>): Promise<void> {
 		await db
 			.insert(namespaceMember)
-			.values(
-				members.map((m) => ({
-					id: ulid(),
-					namespaceId,
-					userId: m.userId,
-					role: m.role,
-				}))
-			)
+			.values(members)
 			.onConflictDoUpdate({
 				target: [namespaceMember.namespaceId, namespaceMember.userId],
 				set: { role: sql`excluded.role` },

@@ -1,1 +1,1 @@
-export type { WorkflowRepository, WorkflowRow, WorkflowRowInsert } from "../pg/repository/workflow";
+export type { WorkflowIdentity, WorkflowRepository, WorkflowRow, WorkflowRowInsert } from "../pg/repository/workflow";

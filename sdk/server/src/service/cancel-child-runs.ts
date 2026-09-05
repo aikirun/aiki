@@ -13,9 +13,10 @@ import {
 } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
+import { bulkGetOrCreateWorkflowsInTx } from "./workflow";
 import type { TxRepositories } from "../infra/db/types";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
-import type { WorkflowRowInsert } from "../infra/db/types/workflow";
+import type { WorkflowIdentity } from "../infra/db/types/workflow";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 
@@ -44,7 +45,7 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 
 		logger.info("Scheduling cancel-child-runs workflows", { "aiki.parentRunIds": runIdsHavingChildren });
 
-		const workflowEntries: WorkflowRowInsert[] = [];
+		const workflowEntries: WorkflowIdentity[] = [];
 		const inputHashPromises: Array<Promise<string>> = [];
 		const seenNamespaceIds = new Set<NamespaceId>();
 
@@ -64,7 +65,7 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 			return;
 		}
 
-		const workflows = await txRepos.workflow.getOrCreateBulk(workflowEntries);
+		const workflows = await bulkGetOrCreateWorkflowsInTx(workflowEntries, txRepos);
 		const workflowsByNamespaceId = new Map(workflows.map((workflow) => [workflow.namespaceId, workflow]));
 
 		const now = Date.now();

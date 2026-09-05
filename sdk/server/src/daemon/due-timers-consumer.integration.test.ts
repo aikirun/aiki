@@ -16,7 +16,19 @@ const withHarness = createDaemonHarness();
 
 const namespaceRequestContext = namespaceRequestContextFactory.build();
 
-const { republishBackoff } = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
+const daemonConfig = defaultServerRuntimeConfig.daemons;
+
+const { republishBackoff } = daemonConfig.publishPendingOutboxEntries;
+
+const chunkConfigByTimerType = {
+	scheduled: daemonConfig.imminentScheduledRuns.chunk,
+	sleep: daemonConfig.imminentSleepElapsedRuns.chunk,
+	retry: daemonConfig.imminentRetryableRuns.chunk,
+	task_retry: daemonConfig.imminentTaskRetryableRuns.chunk,
+	event_wait_timeout: daemonConfig.imminentEventWaitTimedOutRuns.chunk,
+	child_wait_timeout: daemonConfig.imminentChildRunWaitTimedOutRuns.chunk,
+	recurring: daemonConfig.imminentRecurringRuns.chunk,
+};
 
 describe("processDueTimers", () => {
 	test("the timer's rank flows to the outbox entry unchanged", () =>
@@ -32,7 +44,12 @@ describe("processDueTimers", () => {
 						signal: new AbortController().signal,
 						timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
 						childRunCanceller: createChildRunCanceller(),
-						configProvider: asConfigProvider(() => ({ pageSize: 100, overshootMs: 0, republishBackoff })),
+						configProvider: asConfigProvider(() => ({
+							pageSize: 100,
+							overshootMs: 0,
+							republishBackoff,
+							chunkByTimerType: chunkConfigByTimerType,
+						})),
 					},
 					[{ type: "scheduled", id: runId, rank: computeRank({ dueAt: now, priority: 2 }) }]
 				);

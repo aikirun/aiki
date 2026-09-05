@@ -531,24 +531,6 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 		return { rows, total: countResult[0]?.count ?? 0 };
 	},
 
-	async countByStatus(
-		filter: { namespaceId: NamespaceId } | { workflowIds: NonEmptyArray<string> }
-	): Promise<Array<{ status: WorkflowRunStatus; count: number }>> {
-		const whereClause =
-			"workflowIds" in filter
-				? inArray(workflowRun.workflowId, filter.workflowIds)
-				: eq(workflowRun.namespaceId, filter.namespaceId);
-
-		return db
-			.select({
-				status: workflowRun.status,
-				count: count(),
-			})
-			.from(workflowRun)
-			.where(whereClause)
-			.groupBy(workflowRun.status);
-	},
-
 	async listDueScheduleRuns(
 		_context: DaemonContext,
 		before: TimestampMs,
