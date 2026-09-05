@@ -60,6 +60,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 				runId,
 				eventName: request.eventName,
 				data: request.data,
+				clientCodecApplied: request.clientCodecApplied,
 				reference: request.options?.reference,
 			});
 		}),
@@ -69,6 +70,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 				runIds: request.ids as WorkflowRunId[],
 				eventName: request.eventName,
 				data: request.data,
+				clientCodecApplied: request.clientCodecApplied,
 				reference: request.options?.reference,
 			});
 		}),
@@ -80,6 +82,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 				runIds,
 				eventName: request.eventName,
 				data: request.data,
+				clientCodecApplied: request.clientCodecApplied,
 				reference: request.options?.reference,
 			});
 		}),

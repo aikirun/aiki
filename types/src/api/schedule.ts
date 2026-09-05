@@ -1,4 +1,5 @@
 import type { Hash } from "../infra/hasher";
+import type { OpaquePayload } from "../payload";
 import type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } from "../schedule";
 import type { WorkflowSource } from "../workflow";
 import type { WorkflowRunOptions } from "../workflow/run";
@@ -16,8 +17,9 @@ export interface ScheduleApi {
 export interface ScheduleActivateRequestV1 {
 	workflowName: string;
 	workflowVersionId: string;
-	workflowRunInput?: unknown;
+	workflowRunInput?: OpaquePayload;
 	workflowRunInputHash: Hash;
+	clientCodecApplied: boolean;
 	spec: ScheduleSpec;
 	options?: ScheduleActivateOptions;
 	workflowRunOptions?: WorkflowRunOptions;

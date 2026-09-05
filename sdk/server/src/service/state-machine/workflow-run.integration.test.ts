@@ -756,7 +756,8 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 					}).sendEventToWorkflowRun(context, {
 						runId: runId as WorkflowRunId,
 						eventName: "paymentReceived",
-						data: { amount: 25 },
+						data: asOpaquePayload({ amount: 25 }),
+						clientCodecApplied: false,
 						reference: undefined,
 					});
 					eventCommitted.signal();
@@ -835,7 +836,8 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 			await createEventService({ repos, workflowRunStateMachine: stateMachine }).sendEventToWorkflowRun(context, {
 				runId: runId as WorkflowRunId,
 				eventName: "paymentReceived",
-				data: { amount: 25 },
+				data: asOpaquePayload({ amount: 25 }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 
@@ -882,7 +884,8 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 			await createEventService({ repos, workflowRunStateMachine: stateMachine }).sendEventToWorkflowRun(context, {
 				runId: parent.runId as WorkflowRunId,
 				eventName: "paymentReceived",
-				data: { amount: 25 },
+				data: asOpaquePayload({ amount: 25 }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 
@@ -935,7 +938,8 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 			await createEventService({ repos, workflowRunStateMachine: stateMachine }).sendEventToWorkflowRun(context, {
 				runId: runId as WorkflowRunId,
 				eventName: "paymentReceived",
-				data: { amount: 25 },
+				data: asOpaquePayload({ amount: 25 }),
+				clientCodecApplied: false,
 				reference: undefined,
 			});
 

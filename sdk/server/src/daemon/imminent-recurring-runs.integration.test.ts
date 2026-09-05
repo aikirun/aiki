@@ -1,4 +1,5 @@
 import { hashInput } from "@aikirun/lib/crypto";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 
 import { processImminentRecurringRuns } from "./imminent-recurring-runs";
 import { describe, expect, test } from "bun:test";
@@ -24,8 +25,9 @@ describe("processImminentRecurringRuns", () => {
 			const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput,
+				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 				workflowRunOptions: { priority: 2 },
 			});

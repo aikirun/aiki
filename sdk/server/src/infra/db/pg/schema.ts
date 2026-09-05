@@ -322,7 +322,8 @@ export const eventWait = pgTable(
 		// after the copy it loaded, the same catch-up the child wait column below serves.
 		signalSequence: integer("signal_sequence").notNull(),
 
-		data: jsonb("data"),
+		data: jsonb("data").$type<OpaquePayload>(),
+		clientCodecApplied: boolean("client_codec_applied").notNull(),
 
 		timedOutAt: timestampMs("timed_out_at"),
 

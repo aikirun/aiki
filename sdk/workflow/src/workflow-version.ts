@@ -25,6 +25,7 @@ import type {
 	WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
@@ -410,7 +411,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					err instanceof WorkflowRunSuspendedError ||
 					err instanceof WorkflowRunFailedError ||
 					err instanceof WorkflowRunRevisionConflictError ||
-					err instanceof NonDeterminismError
+					err instanceof NonDeterminismError ||
+					err instanceof ClientCodecMissingError
 				) {
 					throw err;
 				}

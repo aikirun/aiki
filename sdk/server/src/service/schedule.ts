@@ -256,15 +256,29 @@ async function hashScheduleDefinitions(request: ScheduleActivateRequestV1): Prom
 	return { currentHash, candidateHashes: Array.from(new Set([currentHash].concat(deprecatedHashes))) };
 }
 
+interface SchedulePayload {
+	workflowRunInput: OpaquePayload | null;
+	workflowRunInputHash: string;
+	clientCodecApplied: boolean;
+	definitionHash: string;
+}
+
 async function activateScheduleInTx(
 	namespaceId: NamespaceId,
 	request: ScheduleActivateRequestV1,
 	definition: { currentHash: string; candidateHashes: string[] },
 	txRepos: TxRepositories
 ) {
-	const { workflowName, workflowVersionId, workflowRunInput, workflowRunOptions, spec, options } = request;
-	const definitionHash = definition.currentHash;
-	const workflowRunInputHash = request.workflowRunInputHash.value;
+	const { workflowName, workflowVersionId, workflowRunOptions, spec, options } = request;
+	// The activating client computed these together, with its own codec and keys, so they are
+	// always stored together: a row mixing one client's input with another's hash or declaration
+	// would mint runs whose input does not decode.
+	const payload: SchedulePayload = {
+		workflowRunInput: request.workflowRunInput ?? null,
+		workflowRunInputHash: request.workflowRunInputHash.value,
+		clientCodecApplied: request.clientCodecApplied,
+		definitionHash: definition.currentHash,
+	};
 
 	const referenceId = options?.reference?.id;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
@@ -292,17 +306,14 @@ async function activateScheduleInTx(
 			? await reuseSchedule(txRepos.schedule, {
 					namespaceId,
 					existing: existingScheduleByDefinition,
-					workflowRunInputHash: workflowRunInputHash,
-					definitionHash,
+					payload,
 					nextRunAt,
 				})
 			: await createSchedule(txRepos.schedule, {
 					namespaceId,
 					workflowId: workflowRow.id,
 					spec,
-					workflowRunInput,
-					workflowRunInputHash: workflowRunInputHash,
-					definitionHash,
+					payload,
 					referenceId: undefined,
 					workflowRunOptions,
 					nextRunAt,
@@ -315,7 +326,7 @@ async function activateScheduleInTx(
 	if (existingScheduleByReference) {
 		if (!definition.candidateHashes.includes(existingScheduleByReference.definitionHash)) {
 			if (conflictPolicy === "error") {
-				throw new ScheduleConflictError({ definitionHash, referenceId });
+				throw new ScheduleConflictError({ definitionHash: payload.definitionHash, referenceId });
 			}
 			conflictPolicy satisfies "return_existing";
 			return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
@@ -324,8 +335,7 @@ async function activateScheduleInTx(
 		const schedule = await reuseSchedule(txRepos.schedule, {
 			namespaceId,
 			existing: existingScheduleByReference,
-			workflowRunInputHash: workflowRunInputHash,
-			definitionHash,
+			payload,
 			nextRunAt,
 		});
 
@@ -346,8 +356,10 @@ async function activateScheduleInTx(
 				referenceId,
 				status: "active",
 				nextRunAt,
-				workflowRunInputHash: workflowRunInputHash,
-				definitionHash,
+				workflowRunInput: payload.workflowRunInput,
+				workflowRunInputHash: payload.workflowRunInputHash,
+				clientCodecApplied: payload.clientCodecApplied,
+				definitionHash: payload.definitionHash,
 			}
 		);
 
@@ -360,9 +372,7 @@ async function activateScheduleInTx(
 		namespaceId,
 		workflowId: workflowRow.id,
 		spec,
-		workflowRunInput,
-		workflowRunInputHash: workflowRunInputHash,
-		definitionHash,
+		payload,
 		referenceId,
 		workflowRunOptions,
 		nextRunAt,
@@ -376,41 +386,41 @@ async function reuseSchedule(
 	params: {
 		namespaceId: NamespaceId;
 		existing: ScheduleRow;
-		workflowRunInputHash: string;
-		definitionHash: string;
+		payload: SchedulePayload;
 		nextRunAt: TimestampMs;
 	}
 ): Promise<ScheduleRow> {
-	const needsActivation = params.existing.status !== "active";
-	const hashesChanged =
-		params.existing.workflowRunInputHash !== params.workflowRunInputHash ||
-		params.existing.definitionHash !== params.definitionHash;
+	const { existing, payload } = params;
+	const needsActivation = existing.status !== "active";
+	// The stored input itself is not compared: a codec may encode the same input differently
+	// each time, and an unchanged hash and declaration mean the stored value still decodes.
+	const payloadChanged =
+		existing.workflowRunInputHash !== payload.workflowRunInputHash ||
+		existing.definitionHash !== payload.definitionHash ||
+		existing.clientCodecApplied !== payload.clientCodecApplied;
 
-	if (!needsActivation && !hashesChanged) {
-		return params.existing;
+	if (!needsActivation && !payloadChanged) {
+		return existing;
 	}
 
-	const updates: {
-		status?: "active";
-		nextRunAt?: TimestampMs;
-		workflowRunInputHash?: string;
-		definitionHash?: string;
-	} = {};
+	const updates: Partial<SchedulePayload> & { status?: "active"; nextRunAt?: TimestampMs } = {};
 
 	if (needsActivation) {
 		updates.status = "active";
 		updates.nextRunAt = params.nextRunAt;
 	}
 
-	if (hashesChanged) {
-		updates.workflowRunInputHash = params.workflowRunInputHash;
-		updates.definitionHash = params.definitionHash;
+	if (payloadChanged) {
+		updates.workflowRunInput = payload.workflowRunInput;
+		updates.workflowRunInputHash = payload.workflowRunInputHash;
+		updates.clientCodecApplied = payload.clientCodecApplied;
+		updates.definitionHash = payload.definitionHash;
 	}
 
-	const updatedRow = await repo.update(params.namespaceId, { id: params.existing.id }, updates);
+	const updatedRow = await repo.update(params.namespaceId, { id: existing.id }, updates);
 
 	if (!updatedRow) {
-		throw new NotFoundError(`Schedule not found: ${params.existing.id}`);
+		throw new NotFoundError(`Schedule not found: ${existing.id}`);
 	}
 
 	return updatedRow;
@@ -422,29 +432,27 @@ async function createSchedule(
 		namespaceId: NamespaceId;
 		workflowId: string;
 		spec: ScheduleSpec;
-		workflowRunInput: unknown;
-		workflowRunInputHash: string;
-		definitionHash: string;
+		payload: SchedulePayload;
 		referenceId: string | undefined;
 		workflowRunOptions: WorkflowRunOptions | undefined;
 		nextRunAt: TimestampMs;
 	}
 ): Promise<ScheduleRow> {
-	const { spec } = params;
+	const { spec, payload } = params;
 	return repo.create({
 		id: ulid(),
 		namespaceId: params.namespaceId,
 		workflowId: params.workflowId,
 		status: "active",
-		clientCodecApplied: false,
 		type: spec.type,
 		cronExpression: spec.type === "cron" ? spec.expression : null,
 		cronTimezone: spec.type === "cron" ? (spec.timezone ?? null) : null,
 		intervalMs: spec.type === "interval" ? spec.everyMs : null,
 		overlapPolicy: spec.overlapPolicy ?? null,
-		workflowRunInput: params.workflowRunInput as OpaquePayload,
-		workflowRunInputHash: params.workflowRunInputHash,
-		definitionHash: params.definitionHash,
+		workflowRunInput: payload.workflowRunInput,
+		workflowRunInputHash: payload.workflowRunInputHash,
+		clientCodecApplied: payload.clientCodecApplied,
+		definitionHash: payload.definitionHash,
 		referenceId: params.referenceId,
 		workflowRunOptions: params.workflowRunOptions,
 		nextRunAt: params.nextRunAt,
@@ -465,6 +473,7 @@ export function scheduleRowToDomain(
 		status: schedule.status,
 		spec,
 		workflowRunInput: schedule.workflowRunInput ?? undefined,
+		clientCodecApplied: schedule.clientCodecApplied,
 		referenceId: schedule.referenceId ?? undefined,
 		workflowRunOptions: schedule.workflowRunOptions ?? undefined,
 		createdAt: schedule.createdAt,

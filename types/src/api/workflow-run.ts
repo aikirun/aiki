@@ -219,21 +219,24 @@ export interface WorkflowRunListTransitionsResponseV1 {
 export interface WorkflowRunSendEventRequestV1 {
 	id: string;
 	eventName: string;
-	data?: unknown;
+	data?: OpaquePayload;
+	clientCodecApplied: boolean;
 	options?: EventSendOptions;
 }
 
 export interface WorkflowRunMulticastEventRequestV1 {
 	ids: string[];
 	eventName: string;
-	data?: unknown;
+	data?: OpaquePayload;
+	clientCodecApplied: boolean;
 	options?: EventSendOptions;
 }
 
 export interface WorkflowRunMulticastEventByReferenceRequestV1 {
 	references: WorkflowRunReference[];
 	eventName: string;
-	data?: unknown;
+	data?: OpaquePayload;
+	clientCodecApplied: boolean;
 	options?: EventSendOptions;
 }
 

@@ -1,3 +1,5 @@
+import { asOpaquePayload } from "@aikirun/testing/payload";
+
 import { describe, expect, test } from "bun:test";
 import { createServiceHarness } from "../../testing/harness";
 import { seedClaimedRun } from "../../testing/seed/run";
@@ -17,7 +19,8 @@ describe("event wait repository", () => {
 					workflowRunId: runId,
 					name: "orderShipped",
 					status: "received",
-					data: { trackingId: "TRK-2" },
+					data: asOpaquePayload({ trackingId: "TRK-2" }),
+					clientCodecApplied: false,
 					signalSequence: 2,
 				},
 				{
@@ -25,7 +28,8 @@ describe("event wait repository", () => {
 					workflowRunId: runId,
 					name: "orderShipped",
 					status: "received",
-					data: { trackingId: "TRK-1" },
+					data: asOpaquePayload({ trackingId: "TRK-1" }),
+					clientCodecApplied: false,
 					signalSequence: 1,
 				},
 			]);

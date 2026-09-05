@@ -17,6 +17,7 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecMissingError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
@@ -538,6 +539,7 @@ describe("workflow version execution", () => {
 				name: "NonDeterminismError",
 				create: (id, attempts) => new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
 			},
+			{ name: "ClientCodecMissingError", create: (id) => new ClientCodecMissingError(id) },
 		];
 
 		for (const errorCase of controlFlowErrorCases) {

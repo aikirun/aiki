@@ -16,7 +16,7 @@ import type {
 import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
-import { type BoundCodec, bindRunCodec } from "./bound-codec";
+import { type BoundCodec, bindDeclaredCodec } from "./bound-codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
@@ -198,11 +198,14 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		private readonly logger: Logger
 	) {
 		this.api = client.api;
-		this.events = createEventSenders(client.api, this._run.id, eventsDefinition, this.logger);
+		this.events = createEventSenders(client, this._run.id, eventsDefinition, this.logger);
 
 		this[INTERNAL] = {
 			client,
-			codec: bindRunCodec(client, this._run),
+			codec: bindDeclaredCodec(client, {
+				runId: this._run.id as WorkflowRunId,
+				clientCodecApplied: this._run.clientCodecApplied,
+			}),
 			transitionState: this.transitionState.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),

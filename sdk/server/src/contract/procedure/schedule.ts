@@ -18,6 +18,7 @@ import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 import { inputHashSchema } from "../schema/hash";
+import { opaquePayloadSchema } from "../schema/payload";
 import {
 	scheduleActivateOptionsSchema,
 	scheduleSchema,
@@ -32,8 +33,9 @@ const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateR
 		type({
 			workflowName: "string > 0",
 			workflowVersionId: "string > 0",
-			"workflowRunInput?": "unknown",
+			"workflowRunInput?": opaquePayloadSchema,
 			workflowRunInputHash: inputHashSchema,
+			clientCodecApplied: "boolean",
 			spec: scheduleSpecSchema,
 			"options?": scheduleActivateOptionsSchema.or("undefined"),
 			"workflowRunOptions?": workflowRunOptionsSchema.or("undefined"),

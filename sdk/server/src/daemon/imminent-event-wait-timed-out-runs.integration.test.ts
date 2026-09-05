@@ -77,6 +77,7 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 					status: "timeout",
 					timedOutAt,
 					data: null,
+					clientCodecApplied: false,
 					referenceId: null,
 					signalSequence: 1,
 				}),

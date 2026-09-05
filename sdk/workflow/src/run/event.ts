@@ -2,7 +2,7 @@ import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
-import type { ApiClient, Client } from "@aikirun/types/client";
+import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -10,7 +10,6 @@ import type {
 	EventMulticastResult,
 	EventName,
 	EventSendOptions,
-	EventWait,
 	EventWaitOptions,
 	EventWaitResult,
 	WorkflowRunId,
@@ -18,6 +17,7 @@ import type {
 import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
+import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./bound-codec";
 import type { WorkflowRunHandle } from "./handle";
 
 /**
@@ -143,7 +143,7 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitResult<Data, boolean>> {
 		const eventWaits = handle.run.eventWaits[eventName] ?? [];
 
-		const existingEventWait = eventWaits[nextIndex] as EventWait<Data> | undefined;
+		const existingEventWait = eventWaits[nextIndex];
 		if (existingEventWait) {
 			nextIndex++;
 
@@ -152,8 +152,14 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 				return { timeout: true };
 			}
 
+			// The data decodes by its sender's declaration, not the run's: the sender's client
+			// wrote it, and that client may hold a codec this run's creator did not, or vice versa.
+			const codec = bindDeclaredCodec(handle[INTERNAL].client, {
+				runId: handle.run.id as WorkflowRunId,
+				clientCodecApplied: existingEventWait.clientCodecApplied,
+			});
 			logger.debug("Event received");
-			return { timeout: false, data: existingEventWait.data as Data };
+			return { timeout: false, data: (await codec.decode(existingEventWait.data)) as Data };
 		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
@@ -180,8 +186,8 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 	return { wait };
 }
 
-export function createEventSenders<TEvents extends EventsDefinition>(
-	api: ApiClient,
+export function createEventSenders<TEvents extends EventsDefinition, Context>(
+	client: Client<Context>,
 	workflowRunId: string,
 	eventsDefinition: TEvents,
 	logger: Logger
@@ -191,7 +197,7 @@ export function createEventSenders<TEvents extends EventsDefinition>(
 	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
 		const optionsBuilder = objectOverrider<EventSendOptions>({})();
 		const sender = createEventSender(
-			api,
+			client,
 			workflowRunId,
 			eventName as EventName,
 			eventDefinition.schema,
@@ -204,8 +210,8 @@ export function createEventSenders<TEvents extends EventsDefinition>(
 	return senders;
 }
 
-function createEventSender<Data>(
-	api: ApiClient,
+function createEventSender<Data, Context>(
+	client: Client<Context>,
 	workflowRunId: string,
 	eventName: EventName,
 	schema: StandardSchemaV1<Data> | undefined,
@@ -225,11 +231,14 @@ function createEventSender<Data>(
 		}
 
 		const options = optionsBuilder.build();
+		const { codec: clientCodec } = client[INTERNAL];
+		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
 
-		await api.workflowRun.sendEventV1({
+		await client.api.workflowRun.sendEventV1({
 			id: workflowRunId,
 			eventName,
-			data,
+			data: await codec.encode(data),
+			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});
 
@@ -240,7 +249,7 @@ function createEventSender<Data>(
 
 	return {
 		with: (path, value) =>
-			createEventSender(api, workflowRunId, eventName, schema, optionsBuilder.with(path, value), logger),
+			createEventSender(client, workflowRunId, eventName, schema, optionsBuilder.with(path, value), logger),
 		send,
 	};
 }
@@ -301,11 +310,14 @@ function createEventMulticaster<Data>(
 		}
 
 		const options = optionsBuilder.build();
+		const { codec: clientCodec } = client[INTERNAL];
+		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
 
 		const result = await client.api.workflowRun.multicastEventV1({
 			ids: runIds,
 			eventName,
-			data,
+			data: await codec.encode(data),
+			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});
 
@@ -348,6 +360,8 @@ function createEventMulticaster<Data>(
 		}
 
 		const options = optionsBuilder.build();
+		const { codec: clientCodec } = client[INTERNAL];
+		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
 
 		const result = await client.api.workflowRun.multicastEventByReferenceV1({
 			references: referenceIds.map((referenceId) => ({
@@ -356,7 +370,8 @@ function createEventMulticaster<Data>(
 				referenceId,
 			})),
 			eventName,
-			data,
+			data: await codec.encode(data),
+			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});
 
