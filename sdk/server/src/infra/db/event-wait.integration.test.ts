@@ -1,6 +1,7 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 
+import type { EventWaitRowInsert } from "./types/event-wait";
 import { describe, expect, test } from "bun:test";
 import { createServiceHarness } from "../../testing/harness";
 import { seedClaimedRun } from "../../testing/seed/run";
@@ -44,17 +45,20 @@ describe("event wait repository", () => {
 	test("rejects a timeout row that declares the client codec applied", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const timeoutRow: Omit<EventWaitRowInsert, "id" | "clientCodecApplied"> = {
+				workflowRunId: runId,
+				name: "orderShipped",
+				status: "timeout",
+				timedOutAt: 1 as TimestampMs,
+				signalSequence: 1,
+			};
+			await repos.eventWait.insert({ ...timeoutRow, id: "01-declares-false", clientCodecApplied: false });
 
 			expect(
-				repos.eventWait.insert({
-					id: "01-timeout",
-					workflowRunId: runId,
-					name: "orderShipped",
-					status: "timeout",
-					timedOutAt: 1 as TimestampMs,
-					clientCodecApplied: true,
-					signalSequence: 1,
-				})
-			).rejects.toThrow("chk_event_wait_timeout_not_codec_applied");
+				repos.eventWait.insert({ ...timeoutRow, id: "02-declares-true", clientCodecApplied: true })
+			).rejects.toThrow();
+			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
+				expect.objectContaining({ id: "01-declares-false", status: "timeout", clientCodecApplied: false }),
+			]);
 		}));
 });
