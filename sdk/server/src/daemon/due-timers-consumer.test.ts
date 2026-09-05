@@ -9,6 +9,17 @@ import { describe, expect, test } from "bun:test";
 import type { Repositories } from "../infra/db/types";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
 
+const chunkConfig = { size: 100, maxConcurrency: 10 };
+const chunkConfigByTimerType = {
+	scheduled: chunkConfig,
+	sleep: chunkConfig,
+	retry: chunkConfig,
+	task_retry: chunkConfig,
+	event_wait_timeout: chunkConfig,
+	child_wait_timeout: chunkConfig,
+	recurring: chunkConfig,
+};
+
 describe("startDueTimersConsumer", () => {
 	test("resolves when the runtime signal aborts while parked in an indefinite wait", async () => {
 		const abortController = new AbortController();
@@ -40,6 +51,7 @@ describe("startDueTimersConsumer", () => {
 				pageSize: 1,
 				overshootMs: 10,
 				republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
+				chunkByTimerType: chunkConfigByTimerType,
 			})),
 		}).then(() => {
 			resolved = true;
@@ -85,6 +97,7 @@ describe("startDueTimersConsumer", () => {
 				pageSize: 1_000,
 				overshootMs: 10,
 				republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
+				chunkByTimerType: chunkConfigByTimerType,
 			})),
 		});
 

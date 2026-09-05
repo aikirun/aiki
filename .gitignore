@@ -21,3 +21,5 @@ build/
 .playwright-mcp/
 
 *.data
+
+benchmark/

@@ -35,6 +35,7 @@ import type {
 } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
+import { getOrCreateWorkflowInTx } from "./workflow";
 import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ChildRunWaitWithState } from "../infra/db/types/child-workflow-run-wait";
@@ -334,7 +335,7 @@ async function createWorkflowRunInTx(
 		}
 	}
 
-	const workflow = await txRepos.workflow.getOrCreate({ namespaceId, name, versionId, source: "user" });
+	const workflow = await getOrCreateWorkflowInTx({ namespaceId, name, versionId, source: "user" }, txRepos);
 
 	if (referenceId) {
 		const existingRun = await txRepos.workflowRun.getByWorkflowAndReferenceId({

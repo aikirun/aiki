@@ -1,4 +1,4 @@
-import { isNonEmptyArray } from "@aikirun/lib/collection/array";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
@@ -11,6 +11,7 @@ import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 import CronExpressionParser from "cron-parser";
 import { ulid } from "ulidx";
 
+import { getOrCreateWorkflowInTx } from "./workflow";
 import { ScheduleConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleRow } from "../infra/db/types/schedule";
@@ -19,12 +20,21 @@ export function getReferenceId(scheduleId: string, occurrence: number) {
 	return `schedule:${scheduleId}:${occurrence}`;
 }
 
+export interface DueOccurrences {
+	/** Occurrences due at or before `now`, oldest first. */
+	occurrences: NonEmptyArray<number>;
+	/** The occurrence after the last due one. */
+	nextRunAt: number;
+}
+
 /**
- * Computes all occurrences that are due between `anchor` and `now` (inclusive).
- * Used for catchup policy.
+ * Returns every occurrence due between `anchor` and `now` (inclusive).
+ * Also returns the first non-due occurrence i.e. `nextRunAt`.
+ * Used for the allow policy.
  */
-function getAllOccurrencesBetween(spec: ScheduleSpec, anchor: number, now: number): number[] {
+function getAllDueOccurrencesBetween(spec: ScheduleSpec, anchor: number, now: number): DueOccurrences | null {
 	const occurrences: number[] = [];
+	let nextRunAt: number;
 
 	if (spec.type === "cron") {
 		const parsed = CronExpressionParser.parse(spec.expression, {
@@ -32,57 +42,71 @@ function getAllOccurrencesBetween(spec: ScheduleSpec, anchor: number, now: numbe
 			tz: spec.timezone,
 		});
 
-		while (true) {
-			const next = parsed.next().getTime();
-			if (next > now) {
-				break;
-			}
+		let next = parsed.next().getTime();
+		while (next <= now) {
 			occurrences.push(next);
+			next = parsed.next().getTime();
 		}
+		nextRunAt = next;
 	} else {
 		let cursor = anchor + spec.everyMs;
 		while (cursor <= now) {
 			occurrences.push(cursor);
 			cursor += spec.everyMs;
 		}
+		nextRunAt = cursor;
 	}
 
-	return occurrences;
+	if (!isNonEmptyArray(occurrences)) {
+		return null;
+	}
+	return { occurrences, nextRunAt };
 }
 
 /**
- * Computes the last occurrence that should have fired before or at `now` timestamp,
- * but after the `anchor` timestamp. Returns undefined if no occurrence exists in that range.
+ * Returns the last occurrence due between `anchor` and `now` (inclusive).
+ * Also returns the first non-due occurrence i.e. `nextRunAt`.
+ * Used for the skip and cancel_previous policies.
  */
-function getLastOccurrenceBetween(spec: ScheduleSpec, anchor: number, now: number): number | undefined {
+function getLastDueOccurrenceBetween(spec: ScheduleSpec, anchor: number, now: number): DueOccurrences | null {
 	if (spec.type === "cron") {
 		const parsed = CronExpressionParser.parse(spec.expression, {
 			currentDate: new Date(now),
 			tz: spec.timezone,
 		});
 		const previous = parsed.prev().getTime();
-		return previous > anchor ? previous : undefined;
+		if (previous <= anchor) {
+			return null;
+		}
+		// The parser's cursor now sits on `previous`, so next() is the occurrence after it.
+		return { occurrences: [previous], nextRunAt: parsed.next().getTime() };
 	}
 
 	const elapsed = now - anchor;
 	if (elapsed < spec.everyMs) {
-		return undefined;
+		return null;
 	}
 	const intervalsPassed = Math.floor(elapsed / spec.everyMs);
-	return anchor + intervalsPassed * spec.everyMs;
+	const last = anchor + intervalsPassed * spec.everyMs;
+	return { occurrences: [last], nextRunAt: last + spec.everyMs };
 }
 
-export function getDueOccurrences(schedule: Schedule, now: number): number[] {
+/**
+ * What a schedule owes as of `now`, and when it runs next.
+ * Returns null when nothing is due.
+ */
+export function getDueOccurrences(
+	schedule: Pick<Schedule, "spec" | "lastOccurrence" | "createdAt">,
+	now: number
+): DueOccurrences | null {
 	const { spec } = schedule;
 	const anchor = schedule.lastOccurrence ?? schedule.createdAt;
 	const overlapPolicy = spec.overlapPolicy ?? "skip";
 
 	if (overlapPolicy === "allow") {
-		return getAllOccurrencesBetween(spec, anchor, now);
+		return getAllDueOccurrencesBetween(spec, anchor, now);
 	}
-
-	const lastDue = getLastOccurrenceBetween(spec, anchor, now);
-	return lastDue !== undefined ? [lastDue] : [];
+	return getLastDueOccurrenceBetween(spec, anchor, now);
 }
 
 export function getNextOccurrence(spec: ScheduleSpec, anchor: number): number {
@@ -245,12 +269,15 @@ async function activateScheduleInTx(
 	const referenceId = options?.reference?.id;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 
-	const workflowRow = await txRepos.workflow.getOrCreate({
-		namespaceId,
-		name: workflowName as WorkflowName,
-		versionId: workflowVersionId as WorkflowVersionId,
-		source: "user",
-	});
+	const workflowRow = await getOrCreateWorkflowInTx(
+		{
+			namespaceId,
+			name: workflowName as WorkflowName,
+			versionId: workflowVersionId as WorkflowVersionId,
+			source: "user",
+		},
+		txRepos
+	);
 
 	const workflowInfo = { workflowSource: workflowRow.source, workflowName, workflowVersionId };
 	const now = Date.now();

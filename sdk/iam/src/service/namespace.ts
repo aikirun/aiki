@@ -1,5 +1,5 @@
 import { fireAndForget } from "@aikirun/lib/async";
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import { asNonEmptyArray, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { ForbiddenError, ValidationError } from "@aikirun/lib/error";
 import type { Cache } from "@aikirun/types/infra/cache";
 import type { NamespaceId, NamespaceRole } from "@aikirun/types/namespace";
@@ -124,6 +124,7 @@ async function createNamespaceWithMemberInTx(
 	txRepos: TxRepositories
 ) {
 	const createdNamespace = await txRepos.namespace.create({
+		id: ulid(),
 		name: params.name,
 		organizationId: context.organizationId,
 	});
@@ -142,7 +143,16 @@ async function setMembershipInTx(
 	members: NonEmptyArray<NamespaceMemberInput>,
 	txRepos: TxRepositories
 ) {
-	await txRepos.namespace.upsertMembers(namespaceId, members);
+	await txRepos.namespace.upsertMembers(
+		asNonEmptyArray(
+			members.map((member) => ({
+				id: ulid(),
+				namespaceId,
+				userId: member.userId,
+				role: member.role,
+			}))
+		)
+	);
 }
 
 async function softDeleteNamespaceByIdInTx(

@@ -196,6 +196,15 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 					return {
 						...config.dueTimersConsumer,
 						republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+						chunkByTimerType: {
+							scheduled: config.imminentScheduledRuns.chunk,
+							sleep: config.imminentSleepElapsedRuns.chunk,
+							retry: config.imminentRetryableRuns.chunk,
+							task_retry: config.imminentTaskRetryableRuns.chunk,
+							event_wait_timeout: config.imminentEventWaitTimedOutRuns.chunk,
+							child_wait_timeout: config.imminentChildRunWaitTimedOutRuns.chunk,
+							recurring: config.imminentRecurringRuns.chunk,
+						},
 					};
 				}),
 			})

@@ -17,6 +17,10 @@
 			"types": "./dist/collection/heap/index.d.ts",
 			"import": "./dist/collection/heap/index.js"
 		},
+		"./collection/map": {
+			"types": "./dist/collection/map/index.d.ts",
+			"import": "./dist/collection/map/index.js"
+		},
 		"./config": {
 			"types": "./dist/config/index.d.ts",
 			"import": "./dist/config/index.js"
