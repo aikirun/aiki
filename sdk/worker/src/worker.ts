@@ -225,7 +225,7 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			const gracefulShutdownTimeoutMs = this.configProvider.config.gracefulShutdownTimeoutMs;
 			if (gracefulShutdownTimeoutMs > 0) {
 				await settleWithin(
-					Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)),
+					Promise.allSettled(activeWorkflowRuns.map((run) => run.executionPromise)),
 					gracefulShutdownTimeoutMs
 				);
 			}
