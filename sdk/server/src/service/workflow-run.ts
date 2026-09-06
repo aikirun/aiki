@@ -44,6 +44,7 @@ import type { SleepRow } from "../infra/db/types/sleep";
 import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { ChildRunWithWorkflow, WorkflowRunWithWorkflowAndState } from "../infra/db/types/workflow-run";
 import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import { candidateHashes } from "../lib/hash";
 import type { NamespaceRequestContext } from "../middleware/context";
 import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
 import { deliverTerminatedSignalToParentRun, type TerminatedChildRun } from "../service/deliver-terminated-signals";
@@ -344,9 +345,7 @@ async function createWorkflowRunInTx(
 			referenceId,
 		});
 		if (existingRun) {
-			const hashCandidates = [inputHash.value, ...(inputHash.deprecatedValues ?? [])];
-
-			if (!hashCandidates.includes(existingRun.inputHash)) {
+			if (!candidateHashes(inputHash).includes(existingRun.inputHash)) {
 				const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 				if (conflictPolicy === "error") {
 					throw new WorkflowRunReferenceConflictError(name, versionId, referenceId);

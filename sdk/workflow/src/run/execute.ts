@@ -105,6 +105,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		if (!hasher) {
 			logger.error("Failed to determine the bound hasher for the workflow run. Check hasher configuration.", {
 				workflowRunId,
+				"aiki.inputHash": workflowRun.inputHash,
 			});
 
 			return false;
