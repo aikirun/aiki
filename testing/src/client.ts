@@ -1,4 +1,3 @@
-import { plainHasher } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -204,7 +203,6 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 		api,
 		logger: noopLogger,
 		[INTERNAL]: {
-			hasher: plainHasher,
 			...(options.context ? { context: options.context } : {}),
 		},
 

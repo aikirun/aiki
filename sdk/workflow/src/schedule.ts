@@ -1,3 +1,4 @@
+import { hashInput } from "@aikirun/lib/crypto";
 import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
@@ -74,9 +75,11 @@ async function activateWithOptions<Input, Output, Context, TEvents extends Event
 	...args: Input extends void ? [] : [Input]
 ): Promise<ScheduleHandle> {
 	const workflowRunInput = args[0];
-	const { codec: clientCodec, hasher } = client[INTERNAL];
+	const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
 	const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
-	const workflowRunInputHash = await hasher(workflowRunInput);
+	const workflowRunInputHash = clientHasher
+		? await clientHasher(workflowRunInput)
+		: { value: await hashInput(workflowRunInput) };
 
 	let scheduleSpec: ScheduleSpec;
 	if (params.type === "interval") {
@@ -95,6 +98,7 @@ async function activateWithOptions<Input, Output, Context, TEvents extends Event
 		spec: scheduleSpec,
 		workflowRunInput: await codec.encode(workflowRunInput),
 		workflowRunInputHash,
+		clientHasherApplied: clientHasher !== undefined,
 		clientCodecApplied: clientCodec !== undefined,
 		options,
 		workflowRunOptions: workflow[INTERNAL].runOptions(),

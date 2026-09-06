@@ -1,3 +1,4 @@
+import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
 import {
@@ -178,7 +179,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		...args: Input extends void ? [] : [Input]
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		let input = args[0];
-		const { codec: clientCodec, hasher } = client[INTERNAL];
+		const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
 		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
 		const schema = this.params.schema?.input;
 		if (schema) {
@@ -191,12 +192,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			input = schemaValidationResult.value;
 		}
 
-		const inputHash = await hasher(input);
+		const inputHash = clientHasher ? await clientHasher(input) : { value: await hashInput(input) };
 		const { id } = await client.api.workflowRun.createV1({
 			name: this.name,
 			versionId: this.versionId,
 			input: await codec.encode(input),
 			inputHash,
+			clientHasherApplied: clientHasher !== undefined,
 			clientCodecApplied: clientCodec !== undefined,
 			options: startOptions,
 		});
@@ -282,6 +284,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				versionId: this.versionId,
 				input: await parentRunCodec.encode(input),
 				inputHash,
+				clientHasherApplied: parentRunHandle.run.clientHasherApplied,
 				clientCodecApplied: parentRunHandle.run.clientCodecApplied,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
 				options: {

@@ -60,6 +60,7 @@ export async function seedScheduledRun(
 		versionId: seededWorkflow.versionId,
 		input: asOpaquePayload(input),
 		inputHash: { value: await hashInput(input) },
+		clientHasherApplied: false,
 		clientCodecApplied: false,
 		options: overrides?.options,
 		parent: overrides?.parent,

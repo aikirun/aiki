@@ -609,6 +609,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: {},
@@ -645,8 +646,44 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: encodedInput,
+						clientHasherApplied: false,
 						clientCodecApplied: true,
 						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("hashes the input with the client's hasher and declares it applied", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].hasher = Object.assign(
+					async (input: unknown) => {
+						expect(input).toBe("world");
+						return { value: "client-hash" };
+					},
+					{ for: async () => null }
+				);
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return `Hello ${name}`;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: true,
+						clientCodecApplied: false,
+						inputHash: { value: "client-hash" },
 						options: {},
 					},
 					{ id: newRunRecord.id }
@@ -681,6 +718,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: asOpaquePayload("WORLD"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: {},
@@ -729,6 +767,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
@@ -760,6 +799,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "never" } },
@@ -789,6 +829,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, pool: "eu-west" },
@@ -817,6 +858,7 @@ describe("creating a workflow run", () => {
 						name: "greet",
 						versionId: "1.0.0",
 						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { priority: 2 },
@@ -849,6 +891,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
@@ -888,6 +931,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: encodedInput,
+						clientHasherApplied: false,
 						clientCodecApplied: true,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
@@ -922,6 +966,39 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: "run-bound-hash" },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("the child declares the parent's hasher, since its hash was made under it", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				parentRun[INTERNAL].hasher = async () => "run-bound-hash";
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: true,
 						clientCodecApplied: false,
 						inputHash: { value: "run-bound-hash" },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
@@ -952,6 +1029,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
@@ -980,6 +1058,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
@@ -1011,6 +1090,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
@@ -1042,6 +1122,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
@@ -1073,6 +1154,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
@@ -1198,6 +1280,7 @@ describe("creating a workflow run", () => {
 						name: "child-workflow",
 						versionId: "1.0.0",
 						input: asOpaquePayload("PAYLOAD"),
+						clientHasherApplied: false,
 						clientCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },

@@ -96,6 +96,33 @@ describe("schedule", () => {
 				);
 			}));
 
+		test("hashes the input with the client's hasher and declares it applied", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].hasher = Object.assign(
+					async (input: unknown) => {
+						expect(input).toEqual(workflowRunInput);
+						return { value: "client-hash" };
+					},
+					{ for: async () => null }
+				);
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequestFactory.build({
+						workflowName: syncInventoryWorkflow.name,
+						workflowVersionId: syncInventoryWorkflow.versionId,
+						workflowRunInput: asOpaquePayload(workflowRunInput),
+						workflowRunInputHash: { value: "client-hash" },
+						clientHasherApplied: true,
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
+
+				await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					syncInventoryWorkflow,
+					workflowRunInput
+				);
+			}));
+
 		test("returns a handle carrying the activated schedule id", () =>
 			withFakeClient(async (client) => {
 				const activatedSchedule = intervalScheduleFactory.build();

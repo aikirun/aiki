@@ -17,6 +17,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec: { type: "cron", expression: "0 9 * * *", timezone: "Europe/Berlin" },
 			});
@@ -42,6 +43,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -54,6 +56,7 @@ describe("ScheduleService activateSchedule", () => {
 					value: await hashInput(workflowRunInput),
 					deprecatedValues: [previousHash],
 				},
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -74,6 +77,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -85,6 +89,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -105,6 +110,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: "previous-hash" },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -113,6 +119,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -133,6 +140,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 				options,
@@ -145,6 +153,7 @@ describe("ScheduleService activateSchedule", () => {
 					value: await hashInput(workflowRunInput),
 					deprecatedValues: [previousHash],
 				},
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 				options,
@@ -167,6 +176,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 				options,
@@ -179,6 +189,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 				options,
@@ -203,6 +214,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: encodedInput,
 				workflowRunInputHash: { value: await hashInput({ region: "eu-west" }) },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 			});
@@ -231,6 +243,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash: { value: previousHash },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -240,6 +253,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: encodedInput,
 				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 			});
@@ -266,6 +280,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash,
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -276,6 +291,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: encodedInput,
 				workflowRunInputHash,
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 			});
@@ -299,6 +315,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: firstEncoding,
 				workflowRunInputHash,
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 			});
@@ -308,6 +325,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: secondEncoding,
 				workflowRunInputHash,
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 			});
@@ -329,6 +347,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: asOpaquePayload(workflowRunInput),
 				workflowRunInputHash,
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec,
 			});
@@ -338,6 +357,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: encodedInput,
 				workflowRunInputHash,
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 				options: { reference: { id: "invoices-eu-west" } },
@@ -351,6 +371,66 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 					workflowRunInput: encodedInput,
 					clientCodecApplied: true,
 				})
+			);
+		}));
+});
+
+describe("ScheduleService activateSchedule recording the client hasher", () => {
+	const spec = { type: "interval" as const, everyMs: 60_000 };
+	const workflowRunInput = { region: "eu-west" };
+
+	test("stores the activating client's hasher declaration", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: "client-hash" },
+				clientHasherApplied: true,
+				clientCodecApplied: false,
+				spec,
+			});
+
+			expect(await scheduleService.getScheduleById(context.namespaceId, schedule.id)).toEqual(
+				expect.objectContaining({
+					schedule: expect.objectContaining({ id: schedule.id, clientHasherApplied: true }),
+				})
+			);
+		}));
+
+	test("rewrites the stored payload when only the hasher declaration changes", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInputHash = { value: await hashInput(workflowRunInput) };
+			const firstInput = asOpaquePayload({ region: "eu-west", sent: 1 });
+			const secondInput = asOpaquePayload({ region: "eu-west", sent: 2 });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: firstInput,
+				workflowRunInputHash,
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			});
+
+			// Same hashes and codec declaration; only the hasher declaration differs.
+			const { schedule: reactivated } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: secondInput,
+				workflowRunInputHash,
+				clientHasherApplied: true,
+				clientCodecApplied: false,
+				spec,
+			});
+
+			expect(reactivated.id).toBe(schedule.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ id: schedule.id, workflowRunInput: secondInput, clientHasherApplied: true })
 			);
 		}));
 });
@@ -372,6 +452,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: aheadInput,
 				workflowRunInputHash: { value: announcedHash },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 			});
@@ -382,6 +463,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: behindInput,
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 			});
@@ -400,6 +482,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: aheadInput,
 				workflowRunInputHash: { value: announcedHash },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 				options,
@@ -411,6 +494,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: behindInput,
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 				options,
@@ -429,6 +513,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: aheadInput,
 				workflowRunInputHash: { value: announcedHash },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 			});
@@ -438,6 +523,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowVersionId: "v1",
 				workflowRunInput: behindInput,
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
 				options: { reference: { id: "invoices-eu-west" } },

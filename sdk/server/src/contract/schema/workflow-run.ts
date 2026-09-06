@@ -177,6 +177,7 @@ export const workflowRunRecordSchema = type({
 	stateTransitionId: "string > 0",
 	"input?": opaquePayloadSchema,
 	inputHash: "string > 0",
+	clientHasherApplied: "boolean",
 	clientCodecApplied: "boolean",
 	"referenceId?": "string > 0 | undefined",
 	"options?": workflowRunOptionsSchema.or("undefined"),

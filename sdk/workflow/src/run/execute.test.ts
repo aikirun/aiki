@@ -295,9 +295,62 @@ describe("executeWorkflowRun", () => {
 			expect(handlerCalled).toBe(false);
 		}));
 
-	test("returns false when no hasher is bound for the run's input hash", () =>
+	test("hashes inside the run with the plain function when the run declares no client hasher, whatever the client holds", () =>
 		withFakeClient(async (client) => {
-			const workflowRun = runningWorkflowRunRecordFactory.build();
+			client[INTERNAL].hasher = Object.assign(async () => ({ value: "client-hash" }), {
+				for: async () => async () => "client-bound-hash",
+			});
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: false });
+			const workflowVersion = fakeWorkflowVersion(async (run) => {
+				expect(await run[INTERNAL].hasher({ orderId: "order-1" })).toBe(await hashInput({ orderId: "order-1" }));
+			});
+
+			expect(
+				await executeWorkflowRun({ client, workflowRun, workflowVersion, logger: client.logger, configProvider })
+			).toBe(true);
+		}));
+
+	test("hashes inside the run with the client's hasher under the rotation that produced the run's hash", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+			client[INTERNAL].hasher = Object.assign(async () => ({ value: "client-hash" }), {
+				for: async (hash: string) => {
+					expect(hash).toBe(workflowRun.inputHash);
+					return async () => "client-bound-hash";
+				},
+			});
+			const workflowVersion = fakeWorkflowVersion(async (run) => {
+				expect(await run[INTERNAL].hasher({ orderId: "order-1" })).toBe("client-bound-hash");
+			});
+
+			expect(
+				await executeWorkflowRun({ client, workflowRun, workflowVersion, logger: client.logger, configProvider })
+			).toBe(true);
+		}));
+
+	test("returns false when the run declares a client hasher but the client has none", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
+			});
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false when the client's hasher cannot hash under the rotation that produced the run's hash", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
 			let handlerCalled = false;
 			const workflowVersion = fakeWorkflowVersion(async () => {
 				handlerCalled = true;

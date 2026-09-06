@@ -28,9 +28,3 @@ export async function sha256Async(input: string): Promise<string> {
 export async function hashInput(input: unknown): Promise<string> {
 	return sha256Async(stableStringify({ input }));
 }
-
-export async function plainHasher(input: unknown): Promise<{ value: string }> {
-	return { value: await hashInput(input) };
-}
-
-plainHasher.for = async (_hash: string) => hashInput;

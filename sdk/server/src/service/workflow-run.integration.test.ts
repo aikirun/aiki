@@ -71,6 +71,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				versionId: "v1",
 				input: asOpaquePayload(input),
 				inputHash: { value: inputHash },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				options: { pool: "eu-west" },
 			});
@@ -88,6 +89,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					stateTransitionId: expect.any(String),
 					input: asOpaquePayload({ orderId: "order-1" }),
 					inputHash,
+					clientHasherApplied: false,
 					clientCodecApplied: false,
 					options: { pool: "eu-west" },
 					attempts: 1,
@@ -114,11 +116,30 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				versionId: "v1",
 				input: asOpaquePayload(input),
 				inputHash: { value: await hashInput(input) },
+				clientHasherApplied: false,
 				clientCodecApplied: true,
 			});
 
 			expect(await service.getWorkflowRunById(context, runId)).toEqual(
 				expect.objectContaining({ id: runId, clientCodecApplied: true })
+			);
+		}));
+
+	test("records that a client hasher was applied", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload({ orderId: "order-1" }),
+				inputHash: { value: "client-hash" },
+				clientHasherApplied: true,
+				clientCodecApplied: false,
+			});
+
+			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+				expect.objectContaining({ id: runId, clientHasherApplied: true })
 			);
 		}));
 
@@ -575,6 +596,7 @@ describe("WorkflowRunService cancelByIds", () => {
 					versionId: parent.workflowVersionId,
 					input: asOpaquePayload(childInput),
 					inputHash: { value: await hashInput(childInput) },
+					clientHasherApplied: false,
 					clientCodecApplied: false,
 					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 				})
@@ -594,6 +616,7 @@ describe("WorkflowRunService cancelByIds", () => {
 				versionId: parent.workflowVersionId,
 				input: asOpaquePayload(childInput),
 				inputHash: { value: await hashInput(childInput) },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 			});
@@ -680,6 +703,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				name: "checkout",
 				versionId: "v1",
 				input: asOpaquePayload(input),
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				inputHash: { value: inputHash },
 				options: { reference: { id: "order-ref-1" } },
@@ -702,6 +726,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				name: "checkout",
 				versionId: "v1",
 				input: asOpaquePayload(input),
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				inputHash: { value: previousHash },
 				options,
@@ -711,6 +736,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				name: "checkout",
 				versionId: "v1",
 				input: asOpaquePayload(input),
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				inputHash: { value: currentHash, deprecatedValues: [previousHash] },
 				options,
@@ -731,6 +757,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				name: "checkout",
 				versionId: "v1",
 				input: asOpaquePayload(input),
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				inputHash: { value: announcedHash },
 				options,
@@ -741,6 +768,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				name: "checkout",
 				versionId: "v1",
 				input: asOpaquePayload(input),
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				inputHash: { value: await hashInput(input), nextValue: announcedHash },
 				options,
@@ -759,6 +787,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				name: "checkout",
 				versionId: "v1",
 				input: asOpaquePayload(input),
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				inputHash: { value: "previous-hash" },
 				options,
@@ -769,6 +798,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 					name: "checkout",
 					versionId: "v1",
 					input: asOpaquePayload(input),
+					clientHasherApplied: false,
 					clientCodecApplied: false,
 					inputHash: { value: await hashInput(input) },
 					options,
@@ -795,6 +825,7 @@ describe("WorkflowRunService imminent run timers", () => {
 					versionId: "v1",
 					input: asOpaquePayload(input),
 					inputHash: { value: inputHash },
+					clientHasherApplied: false,
 					clientCodecApplied: false,
 				})
 			);
@@ -821,6 +852,7 @@ describe("WorkflowRunService imminent run timers", () => {
 					versionId: "v1",
 					input: asOpaquePayload(input),
 					inputHash: { value: inputHash },
+					clientHasherApplied: false,
 					clientCodecApplied: false,
 					options: { priority: 2 },
 				})
@@ -845,6 +877,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				versionId: "v1",
 				input: asOpaquePayload(input),
 				inputHash: { value: await hashInput(input) },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				options: { trigger: { type: "delayed", delayMs: 60_000 } },
 			});
@@ -866,6 +899,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				name: "checkout",
 				versionId: "v1",
 				input: asOpaquePayload(input),
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				inputHash: { value: inputHash },
 				options: { reference: { id: "order-ref-1" } },
@@ -901,6 +935,7 @@ describe("WorkflowRunService imminent run timers", () => {
 					versionId: parent.workflowVersionId,
 					input: asOpaquePayload(childInput),
 					inputHash: { value: childInputHash },
+					clientHasherApplied: false,
 					clientCodecApplied: false,
 					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 				})
@@ -948,6 +983,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				versionId: parent.workflowVersionId,
 				input: asOpaquePayload(childInput),
 				inputHash: { value: await hashInput(childInput) },
+				clientHasherApplied: false,
 				clientCodecApplied: false,
 				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 			});

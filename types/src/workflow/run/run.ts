@@ -285,6 +285,7 @@ export interface WorkflowRunRecord {
 	stateTransitionId: string;
 	input?: OpaquePayload;
 	inputHash: string;
+	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
 	referenceId?: string;
 	options?: WorkflowRunOptions;

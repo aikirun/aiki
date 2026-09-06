@@ -19,6 +19,7 @@ export interface ScheduleActivateRequestV1 {
 	workflowVersionId: string;
 	workflowRunInput?: OpaquePayload;
 	workflowRunInputHash: Hash;
+	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
 	spec: ScheduleSpec;
 	options?: ScheduleActivateOptions;

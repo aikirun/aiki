@@ -1,7 +1,9 @@
 import { runOnInterval } from "@aikirun/lib/async";
 import type { ConfigProvider } from "@aikirun/lib/config";
+import { hashInput } from "@aikirun/lib/crypto";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
+import type { BoundHasher } from "@aikirun/types/infra/hasher";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
@@ -99,16 +101,28 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 		const createContext = client[INTERNAL].context;
 		const context = createContext ? createContext(workflowRun) : null;
-		const hasher = await client[INTERNAL].hasher.for(workflowRun.inputHash);
 		const codec = handle[INTERNAL].codec;
 
-		if (!hasher) {
-			logger.error("Failed to determine the bound hasher for the workflow run. Check hasher configuration.", {
-				workflowRunId,
-				"aiki.inputHash": workflowRun.inputHash,
-			});
+		// Every hash inside the run must come from the hasher that made the run's own hash.
+		let hasher: BoundHasher;
+		if (!workflowRun.clientHasherApplied) {
+			hasher = hashInput;
+		} else {
+			const clientHasher = client[INTERNAL].hasher;
+			if (!clientHasher) {
+				logger.error("The workflow run expects a client hasher, but none present", { workflowRunId });
+				return false;
+			}
 
-			return false;
+			const boundHasher = await clientHasher.for(workflowRun.inputHash);
+			if (!boundHasher) {
+				logger.error("The client's hasher cannot hash under the rotation that produced the run's input hash", {
+					workflowRunId,
+					"aiki.inputHash": workflowRun.inputHash,
+				});
+				return false;
+			}
+			hasher = boundHasher;
 		}
 
 		await workflowVersion[INTERNAL].handler(
