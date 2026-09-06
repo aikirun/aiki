@@ -2,6 +2,126 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.40.0
+
+This release lets a client bring its own codec, so payloads can be encrypted or compressed end to end without the server knowing, and adds a `priority` run option. A run whose task is waiting out a retry delay now has its own status instead of sitting in `running`. Inputs, outputs, and event data that are not plain JSON are rejected at compile time, with the offending path in the error. Under load, run creation no longer serializes on the workflow row, bulk transitions lock rows in id order, and every daemon works through its pages in bounded concurrent chunks. The dashboard is usable at phone width. Nine database migrations (`0029` through `0037`) ship with this release.
+
+### Breaking Changes
+
+- **Non-serializable inputs, outputs, and event data fail to compile.** `task()` and `workflow.v()` check every input, output, and event data type. A `Date`, `Map`, `Set`, `bigint`, function, class instance, or `any` anywhere inside them is a compile error naming the path. The `Serializable` type is no longer exported from `@aikirun/workflow`.
+
+  ```typescript
+  const fetchOrder = task({
+  	name: "fetch-order",
+  	async handler(orderId: string) {
+  		return { orderId, placedAt: new Date() };
+  	},
+  });
+  // error: ... '{ "Aiki: not serializable": "output.placedAt is Date" }'
+  ```
+
+- **Run, task, and event records no longer carry type parameters.** `WorkflowRunRecord<Input, Output>`, `WorkflowRunState<Output>`, `TerminalWorkflowRunState<Output>`, `WorkflowRunStateCompleted<Output>`, `TaskRecord<Input, Output>`, `TaskState<Output>`, `TaskStateCompleted<Output>`, and `EventWait<Data>` are all non-generic. A stored `input`, `output`, or event `data` is typed `OpaquePayload` — the form the server holds, which a codec may have transformed — so it cannot be read as the domain type off a record. Decoded, typed values arrive where the SDK hands them to you: the handler's `input`, a task's return value, an event waiter's `data`, and the `state.output` of a `wait()` result.
+
+- **`WorkflowRunHandle` and `WorkflowRun` dropped their `Input` type parameter.** `WorkflowRunHandle<Input, Output, Context, TEvents>` is now `WorkflowRunHandle<Output, Context, TEvents>`, `ChildWorkflowRunHandle` likewise, and the `run` a handler receives is `WorkflowRun<Context, TEvents>`.
+
+  ```typescript
+  // Before
+  function report(run: WorkflowRun<OrderInput, MyContext>) { ... }
+  let handle: WorkflowRunHandle<OrderInput, OrderOutput, MyContext>;
+
+  // After
+  function report(run: WorkflowRun<MyContext>) { ... }
+  let handle: WorkflowRunHandle<OrderOutput, MyContext>;
+  ```
+
+- **`attempts` moved off task states onto the task.** `TaskInfo` and `TaskRecord` carry `attempts` and `options` at the top level; `TaskStateRunning`, `TaskStateCompleted`, `TaskStateFailed`, `TaskStateAwaitingRetry`, and `TaskStateDiscarded` no longer have `attempts`. On the wire, `task.transitionStateV1` names its state `state` instead of `taskState`, takes `attempts` beside it, and the `retry` variant carries only `id` and `attempts`.
+
+  ```typescript
+  // Before
+  taskInfo.state.attempts
+
+  // After
+  taskInfo.attempts
+  ```
+
+- **Workflow stats are gone from the API.** `workflow.getStatsV1` is removed with no replacement. `workflow.listV1` and `listVersionsV1` no longer take `sort`, and their items no longer carry `runCount`, `lastRunAt`, or `firstSeenAt`. The `Workflow`, `WorkflowVersionStats`, `WorkflowStats`, `WorkflowGetStatsRequestV1`, and `WorkflowGetStatsResponseV1` types are removed.
+
+- **The API contract declares what the client applied.** `workflowRun.createV1` and `schedule.activateV1` require `clientHasherApplied` and `clientCodecApplied`; `sendEventV1`, `multicastEventV1`, and `multicastEventByReferenceV1` require `clientCodecApplied`. Run, schedule, and event-wait records carry the same flags. Upgrade the server and SDKs together.
+
+- **Server runtime config: `limit` is now `pageSize`, and `daemons.imminentRetryableTasks` is now `daemons.imminentTaskRetryableRuns`.** This applies to every daemon block in `ServerRuntimeConfigOverrides` and to `dueTimersConsumer`; an override under an old key is ignored. The daemon's log and span name changes from `process-imminent-retryable-tasks` to `process-imminent-task-retryable-runs`.
+
+  ```typescript
+  // Before
+  staticRuntimeConfigProvider({ daemons: { imminentRetryableTasks: { limit: 500 } } });
+
+  // After
+  staticRuntimeConfigProvider({ daemons: { imminentTaskRetryableRuns: { pageSize: 500 } } });
+  ```
+
+- **A sleep must be a whole number of milliseconds, at most ten years.** The server now enforces on `transitionStateV1` what the SDK already enforced, so a fractional or longer `durationMs` is rejected.
+
+- **A fenced-out worker sees a revision conflict.** A state transition with a stale `expectedRevision` fails with `WorkflowRunRevisionConflictError` before the transition's legality is checked, where it could previously surface as `InvalidWorkflowRunStateTransitionError`.
+
+### New Features
+
+- **Bring your own codec.** `client({ codec })` takes a `CreateCodec`. The SDK runs `encode` over workflow input, task input and output, workflow output, event data, and schedule input before they leave the process, and `decode` on the way back, so the server only ever sees the encoded form. Every record declares whether the client's codec was applied, and a worker honours the declaration: a run written with a codec is executed only by a worker that has one, and a worker without it logs `ClientCodecMissingError` and leaves the run for another. Event data decodes by its sender's declaration, not the run's, so a client with a codec can send to a run created by one without. The `Codec` and `CreateCodec` types live in `@aikirun/types/infra/codec`, and `OpaquePayload` in `@aikirun/types/payload`.
+
+  ```typescript
+  const aiki = client({
+  	url: "http://localhost:9876",
+  	codec: ({ logger }) => ({
+  		encode: async (payload) => encrypt(payload),
+  		decode: async (payload) => decrypt(payload),
+  	}),
+  });
+  ```
+
+- **Run priority.** `.with("priority", n)` on a workflow version, integer 0 (highest) to 9 (lowest), default 5. It breaks dispatch ties among runs due in the same millisecond and never moves a run ahead of its due time. It follows the run through wakeups, retries, and event resumptions, travels through schedules like `retry` and `pool`, and a child run inherits it unless it sets its own.
+
+  ```typescript
+  const handle = await orderWorkflowV1.with("priority", 2).start(client, { orderId: "123" });
+  ```
+
+- **`awaiting_task_retry` run status.** A run whose task is waiting out a retry delay longer than the worker's inline wait budget is parked in `awaiting_task_retry` with `nextAttemptAt`, instead of staying `running`. The task-retry scanner queues it when the earliest task retry is due, and it can be cancelled while parked. Shorter delays are still waited out in place. Migration `0032` moves runs already in this situation and bumps their revision, so a worker still holding one is fenced out.
+
+- **Hasher rotation announcements.** A `Hash` can carry `nextValue`, the hash under a rotation the hasher has been told about but has not switched to. The server matches it like `value` when deduplicating runs by reference and reusing schedules, but never stores it, so instances on either side of a rotation keep finding each other's records.
+
+### Web UI
+
+- **The dashboard works at phone width.** Below tablet width the sidebar floats over the page and closes after navigation; page and card padding shrink; the run detail header, tabs, and loading skeleton stay inside their cards; filter rows, member rows, and schedule rows wrap instead of collapsing; long IDs and names truncate or break instead of overflowing. iOS no longer zooms into form fields, and overscroll no longer triggers pull-to-refresh.
+
+- **Awaiting Task Retry** appears as a status in the runs filter, badges, and timeline.
+
+### Improvements
+
+- **Run creation no longer serializes on the workflow row.** Concurrent starts of the same workflow used an upsert that locked the row and left dead tuples on every call; the workflow row is now looked up and inserted with `ON CONFLICT DO NOTHING`.
+
+- **Bulk transitions lock rows in id order.** Every bulk update sorts its rows before writing, so daemons updating overlapping sets cannot deadlock each other.
+
+- **Every daemon processes pages in bounded chunks.** Each polling daemon and the outbox publish, recover, and stall daemons split a page into `chunk.size` chunks and run `chunk.maxConcurrency` at a time (defaults 100 and 10), configurable per daemon.
+
+- **Status-keyed indexes are partial.** The due-run and due-schedule indexes are keyed on the time column with a status predicate (migration `0029`), keeping them small on tables dominated by terminal rows.
+
+- **Queue fills start at a random queue.** The in-memory and Redis subscribers begin each round-robin fill at a random position, so the first workflow and pool in a worker's list no longer wins every fill.
+
+- **A child run keeps its own pool.** A child workflow that sets `pool` now runs there; previously the parent's pool overrode it. Without one of its own it inherits the parent's, as before. `priority` follows the same rule.
+
+- **Schedules store their activation payload as one unit.** Input, input hash, and the codec and hasher declarations are written together, so a reused schedule never mixes one client's input with another's hash, and a schedule already recorded under the newer hash rotation is not rewritten. Due occurrences and the next run time are computed in a single walk of the spec.
+
+- **Input hashing is cheaper.** `stableStringify`, on the path of every input hash, is about twice as fast on large inputs.
+
+- **The dashboard deploys independently of a release.** The Deploy dashboard workflow takes an optional `ref` (blank for `main`, or a tag), so a dashboard-only fix ships without cutting a version. The hosted server stays on the last release, so a `main` deploy must not depend on unreleased server APIs.
+
+### Bug Fixes
+
+- **A task's first-run output matches its replay.** The value a task handler returns now goes through a JSON round trip before the workflow sees it, so a field that is `undefined` is absent on the first run as well as after a replay.
+
+- **Two inputs differing only in a `Date` no longer hash the same.** `stableStringify` serialized any non-plain object as `{}`, so inputs that differed only in a `Date`, `Map`, or `Set` deduplicated into one run. It now throws for those values, which the compile-time check catches first in TypeScript.
+
+### Documentation
+
+- New **Inputs and Outputs** and **Priority** sections in the workflows doc, with the tasks and events docs linking to them. The schedules doc now lists `"skip"` as the default overlap policy, which is what the server has always done. The home page event snippet sends straight from the workflow version.
+
 ## 0.39.0
 
 This release closes the race that could lose a wake-up signal on a waiting run, collapses the option builders into a single `with`, and lets a client bring its own input hasher. A run now carries a signal sequence, every write into a waiting state is guarded on it, and a terminal child run signals its parent the moment it finishes. `waitForStatus` becomes `wait`, resolving on whichever terminal status the run reaches. The dashboard and the website now share one design language. Six database migrations (`0022` through `0028`) ship with this release.
