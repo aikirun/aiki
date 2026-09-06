@@ -26,6 +26,7 @@ export async function seedActiveSchedule(
 		workflowName: overrides?.workflowName ?? seededSchedule.workflowName,
 		workflowRunInput: asOpaquePayload(seededSchedule.workflowRunInput),
 		workflowRunInputHash: { value: await hashInput(seededSchedule.workflowRunInput) },
+		clientHasherApplied: false,
 		clientCodecApplied: false,
 	});
 

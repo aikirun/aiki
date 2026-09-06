@@ -260,6 +260,7 @@ async function hashScheduleDefinitions(request: ScheduleActivateRequestV1): Prom
 interface SchedulePayload {
 	workflowRunInput: OpaquePayload | null;
 	workflowRunInputHash: string;
+	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
 	definitionHash: string;
 }
@@ -278,6 +279,7 @@ async function activateScheduleInTx(
 	const payload: SchedulePayload = {
 		workflowRunInput: request.workflowRunInput ?? null,
 		workflowRunInputHash: request.workflowRunInputHash.value,
+		clientHasherApplied: request.clientHasherApplied,
 		clientCodecApplied: request.clientCodecApplied,
 		definitionHash: currentDefinitionHash,
 	};
@@ -364,6 +366,7 @@ async function activateScheduleInTx(
 		if (existingNonReferencedSchedule.definitionHash !== definitionHashes.nextValue) {
 			updates.workflowRunInput = payload.workflowRunInput;
 			updates.workflowRunInputHash = payload.workflowRunInputHash;
+			updates.clientHasherApplied = payload.clientHasherApplied;
 			updates.clientCodecApplied = payload.clientCodecApplied;
 			updates.definitionHash = payload.definitionHash;
 		}
@@ -412,6 +415,7 @@ async function reuseSchedule(
 		existing.definitionHash !== params.nextDefinitionHash &&
 		(existing.workflowRunInputHash !== payload.workflowRunInputHash ||
 			existing.definitionHash !== payload.definitionHash ||
+			existing.clientHasherApplied !== payload.clientHasherApplied ||
 			existing.clientCodecApplied !== payload.clientCodecApplied);
 
 	if (!needsActivation && !payloadChanged) {
@@ -428,6 +432,7 @@ async function reuseSchedule(
 	if (payloadChanged) {
 		updates.workflowRunInput = payload.workflowRunInput;
 		updates.workflowRunInputHash = payload.workflowRunInputHash;
+		updates.clientHasherApplied = payload.clientHasherApplied;
 		updates.clientCodecApplied = payload.clientCodecApplied;
 		updates.definitionHash = payload.definitionHash;
 	}
@@ -466,6 +471,7 @@ async function createSchedule(
 		overlapPolicy: spec.overlapPolicy ?? null,
 		workflowRunInput: payload.workflowRunInput,
 		workflowRunInputHash: payload.workflowRunInputHash,
+		clientHasherApplied: payload.clientHasherApplied,
 		clientCodecApplied: payload.clientCodecApplied,
 		definitionHash: payload.definitionHash,
 		referenceId: params.referenceId,
@@ -488,6 +494,7 @@ export function scheduleRowToDomain(
 		status: schedule.status,
 		spec,
 		workflowRunInput: schedule.workflowRunInput ?? undefined,
+		clientHasherApplied: schedule.clientHasherApplied,
 		clientCodecApplied: schedule.clientCodecApplied,
 		referenceId: schedule.referenceId ?? undefined,
 		workflowRunOptions: schedule.workflowRunOptions ?? undefined,

@@ -110,6 +110,7 @@ export interface WorkflowRunCreateRequestV1 {
 	versionId: string;
 	input?: OpaquePayload;
 	inputHash: Hash;
+	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
 	parent?: {
 		workflowRunId: string;

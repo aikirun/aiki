@@ -162,6 +162,7 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 			versionId: "string > 0",
 			"input?": opaquePayloadSchema,
 			inputHash: inputHashSchema,
+			clientHasherApplied: "boolean",
 			clientCodecApplied: "boolean",
 			"parent?": type({ workflowRunId: "string > 0", expectedRevision: "number.integer >= 0" }).or("undefined"),
 			"options?": workflowStartOptionsSchema,

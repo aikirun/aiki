@@ -16,6 +16,7 @@ type ScheduleRowUpdate = Partial<
 	Pick<
 		ScheduleRowInsert,
 		| "status"
+		| "clientHasherApplied"
 		| "clientCodecApplied"
 		| "type"
 		| "cronExpression"

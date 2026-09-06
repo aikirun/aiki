@@ -31,7 +31,7 @@ export interface Client<Context = null> {
 	logger: Logger;
 	[INTERNAL]: {
 		context?: (run: WorkflowRunRecord) => Context | Promise<Context>;
-		hasher: Hasher;
+		hasher?: Hasher;
 		codec?: Codec;
 	};
 }

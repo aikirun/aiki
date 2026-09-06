@@ -79,6 +79,7 @@ export const schedule = pgTable(
 		workflowId: text("workflow_id").notNull(),
 
 		status: scheduleStatusEnum("status").notNull(),
+		clientHasherApplied: boolean("client_hasher_applied").notNull(),
 		clientCodecApplied: boolean("client_codec_applied").notNull(),
 
 		type: scheduleTypeEnum("type").notNull(),
@@ -130,6 +131,7 @@ export const workflowRun = pgTable(
 		parentWorkflowRunId: text("parent_workflow_run_id"),
 
 		status: workflowRunStatusEnum("status").notNull(),
+		clientHasherApplied: boolean("client_hasher_applied").notNull(),
 		clientCodecApplied: boolean("client_codec_applied").notNull(),
 		revision: integer("revision").notNull().default(0),
 		signalSequence: integer("signal_sequence").notNull().default(0),

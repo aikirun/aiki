@@ -51,6 +51,7 @@ export interface Schedule {
 	status: ScheduleStatus;
 	spec: ScheduleSpec;
 	workflowRunInput?: OpaquePayload;
+	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
 	referenceId?: string;
 	workflowRunOptions?: WorkflowRunOptions;

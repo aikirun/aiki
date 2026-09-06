@@ -253,6 +253,13 @@
 			"when": 1788643132365,
 			"tag": "0036_loving_revanche",
 			"breakpoints": true
+		},
+		{
+			"idx": 37,
+			"version": "7",
+			"when": 1788676737416,
+			"tag": "0037_freezing_stranger",
+			"breakpoints": true
 		}
 	]
 }
