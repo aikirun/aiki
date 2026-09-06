@@ -44,9 +44,19 @@ type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown>;
 /**
  * Defines a durable task with deterministic execution and automatic retries.
  *
- * Tasks must be deterministic - the same input should always produce the same output.
- * Tasks can be retried multiple times, so they should be idempotent when possible.
- * Tasks execute within a workflow context and can access logging.
+ * Tasks are the boundary for side effects and nondeterministic work in a workflow.
+ * A task handler may perform operations such as network requests, database writes,
+ * reading the current time, or generating random values.
+ *
+ * Once a task completes, its result is persisted and reused during workflow
+ * replay instead of executing the handler again.
+ *
+ * Side-effecting tasks should be idempotent because a task may be executed more
+ * than once if the worker fails after the side effect succeeds but before the result
+ * is durably recorded.
+ *
+ * Task identity is derived from the task name and its validated input, so
+ * changing either can affect replay compatibility for existing workflow runs.
  *
  * @template Input - Type of task input (must be JSON serializable)
  * @template Output - Type of task output (must be JSON serializable)
