@@ -354,3 +354,104 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 			);
 		}));
 });
+
+describe("ScheduleService activateSchedule under an announced key", () => {
+	const spec = { type: "interval" as const, everyMs: 60_000 };
+	const workflowRunInput = { region: "eu-west" };
+	// Written under the announced key by a client one rotation ahead.
+	const announcedHash = "announced-hash";
+	const aheadInput = asOpaquePayload({ encoded: "eu-west", key: "2025" });
+	const behindInput = asOpaquePayload({ encoded: "eu-west", key: "2024" });
+
+	test("matches a schedule stored under the announced hash and leaves its payload alone", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: aheadInput,
+				workflowRunInputHash: { value: announcedHash },
+				clientCodecApplied: true,
+				spec,
+			});
+			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+
+			const { schedule: matched } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: behindInput,
+				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
+				clientCodecApplied: true,
+				spec,
+			});
+
+			expect(matched.id).toBe(schedule.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(stored);
+		}));
+
+	test("recognises a referenced schedule stored under the announced hash and leaves its payload alone", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const options = { reference: { id: "invoices-eu-west" } };
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: aheadInput,
+				workflowRunInputHash: { value: announcedHash },
+				clientCodecApplied: true,
+				spec,
+				options,
+			});
+			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+
+			const { schedule: matched } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: behindInput,
+				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
+				clientCodecApplied: true,
+				spec,
+				options,
+			});
+
+			expect(matched.id).toBe(schedule.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(stored);
+		}));
+
+	test("adopting a reference id onto a schedule stored under the announced hash leaves its payload alone", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+
+			const { schedule: unreferenced } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: aheadInput,
+				workflowRunInputHash: { value: announcedHash },
+				clientCodecApplied: true,
+				spec,
+			});
+
+			const { schedule: referenced } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: behindInput,
+				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
+				clientCodecApplied: true,
+				spec,
+				options: { reference: { id: "invoices-eu-west" } },
+			});
+
+			expect(referenced.id).toBe(unreferenced.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: unreferenced.id })).toEqual(
+				expect.objectContaining({
+					id: unreferenced.id,
+					referenceId: "invoices-eu-west",
+					workflowRunInput: aheadInput,
+					workflowRunInputHash: announcedHash,
+					clientCodecApplied: true,
+				})
+			);
+		}));
+});

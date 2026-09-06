@@ -3,6 +3,7 @@ import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { ScheduleActivateRequestV1, ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
+import type { Hash } from "@aikirun/types/infra/hasher";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OpaquePayload } from "@aikirun/types/payload";
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
@@ -15,6 +16,7 @@ import { getOrCreateWorkflowInTx } from "./workflow";
 import { ScheduleConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleRow } from "../infra/db/types/schedule";
+import { candidateHashes } from "../lib/hash";
 
 export function getReferenceId(scheduleId: string, occurrence: number) {
 	return `schedule:${scheduleId}:${occurrence}`;
@@ -145,8 +147,8 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 		namespaceId: NamespaceId,
 		request: ScheduleActivateRequestV1
 	): Promise<{ schedule: Schedule }> {
-		const definition = await hashScheduleDefinitions(request);
-		return repos.transaction(async (txRepos) => activateScheduleInTx(namespaceId, request, definition, txRepos));
+		const definitionHashes = await hashScheduleDefinitions(request);
+		return repos.transaction(async (txRepos) => activateScheduleInTx(namespaceId, request, definitionHashes, txRepos));
 	},
 
 	async getScheduleById(namespaceId: NamespaceId, id: string) {
@@ -233,10 +235,8 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 
 export type ScheduleService = ReturnType<typeof createScheduleService>;
 
-async function hashScheduleDefinitions(request: ScheduleActivateRequestV1): Promise<{
-	currentHash: string;
-	candidateHashes: string[];
-}> {
+/** The definition hash under each rotation the request's input hash carries. */
+async function hashScheduleDefinitions(request: ScheduleActivateRequestV1): Promise<Hash> {
 	const { workflowName, workflowVersionId, workflowRunInputHash, workflowRunOptions, spec } = request;
 	const hashDefinition = (inputHash: string) =>
 		// insecure hashing is safe here as workflowRunInputHash already has keyed hashing
@@ -248,12 +248,13 @@ async function hashScheduleDefinitions(request: ScheduleActivateRequestV1): Prom
 			workflowRunOptions,
 		});
 
-	const [currentHash, ...deprecatedHashes] = await Promise.all([
+	const [currentHash, deprecatedHashes, nextHash] = await Promise.all([
 		hashDefinition(workflowRunInputHash.value),
-		...(workflowRunInputHash.deprecatedValues ?? []).map(hashDefinition),
+		Promise.all((workflowRunInputHash.deprecatedValues ?? []).map(hashDefinition)),
+		workflowRunInputHash.nextValue === undefined ? undefined : hashDefinition(workflowRunInputHash.nextValue),
 	]);
 
-	return { currentHash, candidateHashes: Array.from(new Set([currentHash].concat(deprecatedHashes))) };
+	return { value: currentHash, deprecatedValues: deprecatedHashes, nextValue: nextHash };
 }
 
 interface SchedulePayload {
@@ -266,10 +267,11 @@ interface SchedulePayload {
 async function activateScheduleInTx(
 	namespaceId: NamespaceId,
 	request: ScheduleActivateRequestV1,
-	definition: { currentHash: string; candidateHashes: string[] },
+	definitionHashes: Hash,
 	txRepos: TxRepositories
 ) {
 	const { workflowName, workflowVersionId, workflowRunOptions, spec, options } = request;
+	const currentDefinitionHash = definitionHashes.value;
 	// The activating client computed these together, with its own codec and keys, so they are
 	// always stored together: a row mixing one client's input with another's hash or declaration
 	// would mint runs whose input does not decode.
@@ -277,7 +279,7 @@ async function activateScheduleInTx(
 		workflowRunInput: request.workflowRunInput ?? null,
 		workflowRunInputHash: request.workflowRunInputHash.value,
 		clientCodecApplied: request.clientCodecApplied,
-		definitionHash: definition.currentHash,
+		definitionHash: currentDefinitionHash,
 	};
 
 	const referenceId = options?.reference?.id;
@@ -299,7 +301,7 @@ async function activateScheduleInTx(
 
 	if (!referenceId) {
 		const existingScheduleByDefinition = await txRepos.schedule.get(namespaceId, {
-			definitionHashes: definition.candidateHashes,
+			definitionHashes: candidateHashes(definitionHashes),
 		});
 
 		const schedule = existingScheduleByDefinition
@@ -307,6 +309,7 @@ async function activateScheduleInTx(
 					namespaceId,
 					existing: existingScheduleByDefinition,
 					payload,
+					nextDefinitionHash: definitionHashes.nextValue,
 					nextRunAt,
 				})
 			: await createSchedule(txRepos.schedule, {
@@ -324,9 +327,9 @@ async function activateScheduleInTx(
 
 	const existingScheduleByReference = await txRepos.schedule.get(namespaceId, { referenceId });
 	if (existingScheduleByReference) {
-		if (!definition.candidateHashes.includes(existingScheduleByReference.definitionHash)) {
+		if (!candidateHashes(definitionHashes).includes(existingScheduleByReference.definitionHash)) {
 			if (conflictPolicy === "error") {
-				throw new ScheduleConflictError({ definitionHash: payload.definitionHash, referenceId });
+				throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
 			}
 			conflictPolicy satisfies "return_existing";
 			return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
@@ -336,6 +339,7 @@ async function activateScheduleInTx(
 			namespaceId,
 			existing: existingScheduleByReference,
 			payload,
+			nextDefinitionHash: definitionHashes.nextValue,
 			nextRunAt,
 		});
 
@@ -344,23 +348,29 @@ async function activateScheduleInTx(
 
 	// Reference id is free, but the definition may already exist.
 	const existingNonReferencedSchedule = await txRepos.schedule.get(namespaceId, {
-		definitionHashes: definition.candidateHashes,
+		definitionHashes: candidateHashes(definitionHashes),
 		referenceId: null,
 	});
 
 	if (existingNonReferencedSchedule) {
+		const updates: Partial<SchedulePayload> & { referenceId: string; status: "active"; nextRunAt: TimestampMs } = {
+			referenceId,
+			status: "active",
+			nextRunAt,
+		};
+		// Matching the request's next hash means the stored schedule was written by a client that
+		// has already switched to the rotation this request has only been told about. The stored
+		// payload is the newer one, so it stays.
+		if (existingNonReferencedSchedule.definitionHash !== definitionHashes.nextValue) {
+			updates.workflowRunInput = payload.workflowRunInput;
+			updates.workflowRunInputHash = payload.workflowRunInputHash;
+			updates.clientCodecApplied = payload.clientCodecApplied;
+			updates.definitionHash = payload.definitionHash;
+		}
 		const schedule = await txRepos.schedule.update(
 			namespaceId,
 			{ id: existingNonReferencedSchedule.id, referenceId: null },
-			{
-				referenceId,
-				status: "active",
-				nextRunAt,
-				workflowRunInput: payload.workflowRunInput,
-				workflowRunInputHash: payload.workflowRunInputHash,
-				clientCodecApplied: payload.clientCodecApplied,
-				definitionHash: payload.definitionHash,
-			}
+			updates
 		);
 
 		if (schedule) {
@@ -387,17 +397,22 @@ async function reuseSchedule(
 		namespaceId: NamespaceId;
 		existing: ScheduleRow;
 		payload: SchedulePayload;
+		nextDefinitionHash: string | undefined;
 		nextRunAt: TimestampMs;
 	}
 ): Promise<ScheduleRow> {
 	const { existing, payload } = params;
 	const needsActivation = existing.status !== "active";
-	// The stored input itself is not compared: a codec may encode the same input differently
-	// each time, and an unchanged hash and declaration mean the stored value still decodes.
+	// Matching the request's next hash means the stored schedule was written by a client that has
+	// already switched to the rotation this request has only been told about. The stored payload
+	// is the newer one, so it stays. The stored input itself is never compared: a codec may encode
+	// the same input differently each time, and an unchanged hash and declaration mean the stored
+	// value still decodes.
 	const payloadChanged =
-		existing.workflowRunInputHash !== payload.workflowRunInputHash ||
-		existing.definitionHash !== payload.definitionHash ||
-		existing.clientCodecApplied !== payload.clientCodecApplied;
+		existing.definitionHash !== params.nextDefinitionHash &&
+		(existing.workflowRunInputHash !== payload.workflowRunInputHash ||
+			existing.definitionHash !== payload.definitionHash ||
+			existing.clientCodecApplied !== payload.clientCodecApplied);
 
 	if (!needsActivation && !payloadChanged) {
 		return existing;
