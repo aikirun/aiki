@@ -363,12 +363,9 @@ async function createWorkflowRunInTx(
 
 	const now = Date.now();
 	const runId = ulid() as WorkflowRunId;
-	const trigger = options?.trigger;
+	const delay = options?.delay;
 
-	let scheduledAt = now;
-	if (trigger && trigger.type === "delayed") {
-		scheduledAt = "delayMs" in trigger ? now + trigger.delayMs : now + toMilliseconds(trigger.delay);
-	}
+	const scheduledAt = delay ? now + toMilliseconds(delay) : now;
 
 	const transitionId = ulid();
 

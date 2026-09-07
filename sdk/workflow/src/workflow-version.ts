@@ -65,7 +65,7 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 	 * run, so setting one — see {@link WorkflowRunOptions} — returns a {@link WorkflowVersion}, which
 	 * you can go on starting as often as you like.
 	 *
-	 * `reference` answers "this particular run is order-123"; `trigger` answers "execute this particular run five minutes from now".
+	 * `reference` answers "this particular run is order-123"; `delay` answers "execute this particular run five minutes from now".
 	 * Both are about one particular run, so setting one returns a {@link WorkflowVersionStart}:
 	 * that single start, and nothing else. Anything that mints or executes many runs from one version
 	 * e.g. a schedule or a worker, will not accept {@link WorkflowVersionStart}.
@@ -108,7 +108,7 @@ export type WorkflowVersionWith<Path, Input, Output, Context, TEvents extends Ev
 /**
  * A {@link WorkflowVersion} pinned to one start.
  *
- * You get one by setting an option about one particular run — `reference` names the run, `trigger`
+ * You get one by setting an option about one particular run — `reference` names the run, `delay`
  * says when it goes. Everything a version can do is still here save one thing: a schedule
  * or a worker will not take it. A schedule creates its own starts, one per tick, and has no use for
  * yours; a worker never starts anything at all — it executes runs that already exist, carrying the

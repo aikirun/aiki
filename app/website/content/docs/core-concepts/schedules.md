@@ -122,7 +122,7 @@ await hourlySync.activate(
 );
 ```
 
-Only `retry`, `pool`, and `priority` travel this way. `reference` or `trigger` answers something about one particular run — which run it is, when execution begins — and a schedule fires a fresh run every tick, so passing a workflow that carries either will not compile. See [Workflow Options](./workflows.md#workflow-options).
+Only `retry`, `pool`, and `priority` travel this way. `reference` or `delay` answers something about one particular run — which run it is, when execution begins — and a schedule fires a fresh run every tick, so passing a workflow that carries either will not compile. See [Workflow Options](./workflows.md#workflow-options).
 
 Run options are part of a schedule's identity, so changing them is a different schedule — or, with a [reference ID](#reference-ids), a conflict.
 

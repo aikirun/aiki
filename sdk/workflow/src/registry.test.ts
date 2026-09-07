@@ -152,7 +152,7 @@ describe("workflowRegistry", () => {
 // being reported, so they hold the run/start option split in place.
 function _startConfiguredWorkflowIsNotRegistrable() {
 	// @ts-expect-error a worker executes many runs, so a workflow bound to one start cannot be registered
-	workflowRegistry().add("user", ordersV1.with("trigger", { type: "delayed", delay: { seconds: 5 } }));
+	workflowRegistry().add("user", ordersV1.with("delay", { seconds: 5 }));
 
 	workflowRegistry().add("user", ordersV1.with("pool", "tenant-acme"));
 }

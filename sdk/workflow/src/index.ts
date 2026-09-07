@@ -17,7 +17,6 @@ export type {
 	EventWaitOptions,
 	EventWaitResult,
 	ReplayManifest,
-	TriggerStrategy,
 	UnconsumedManifestEntries,
 	WorkflowRunId,
 	WorkflowRunRecord,

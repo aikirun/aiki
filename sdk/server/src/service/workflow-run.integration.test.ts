@@ -879,7 +879,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				inputHash: { value: await hashInput(input) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				options: { trigger: { type: "delayed", delayMs: 60_000 } },
+				options: { delay: { minutes: 1 } },
 			});
 
 			expect(await timerPriorityQueue.peekNext()).toBeNull();

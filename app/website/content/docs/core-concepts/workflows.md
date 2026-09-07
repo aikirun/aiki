@@ -176,7 +176,7 @@ Look at what each option answers and they fall into two groups.
 
 `retry` answers "if this fails, try three more times". `pool` answers "run on this kind of workers". `priority` answers "when several runs are due at the same instant, this one goes first". Answers like those fit any run — the one you start now, or one that goes next Tuesday. Set one and you get back something you can go on starting as often as you like.
 
-`reference` answers "this particular run is order-123" - a second run cannot be referenced as order-123. `trigger` answers "execute this particular run five minutes from now" - scheduled runs are triggered on a pre-configured cadence. Both are about one particular run — which one it is, when it goes. Set one and you get back a single start — you can `start()` it, and that is all.
+`reference` answers "this particular run is order-123" - a second run cannot be referenced as order-123. `delay` answers "execute this particular run five minutes from now" - scheduled runs are triggered on a pre-configured cadence. Both are about one particular run — which one it is, when it goes. Set one and you get back a single start — you can `start()` it, and that is all.
 
 The difference is important because some things make or execute many runs out of one workflow: a schedule fires a run every tick, a worker executes whatever runs turn up. Hand either of them a single start and it will not compile:
 
@@ -212,7 +212,7 @@ const handle = await orderWorkflowV1
 
 Priority is an integer from 0 (highest) to 9 (lowest), defaulting to 5. It follows the run through its whole life: a wakeup after a sleep, a retry, or an event resumption dispatches with the same priority as the original start. Child workflows inherit their parent's priority unless they set their own.
 
-Priority never moves a run ahead of its due time. A run due earlier always dispatches first, whatever the priorities — `trigger` decides *when* a run becomes due, priority only breaks the tie among runs due at the same millisecond.
+Priority never moves a run ahead of its due time. A run due earlier always dispatches first, whatever the priorities — `delay` decides *when* a run becomes due, priority only breaks the tie among runs due at the same millisecond.
 
 ## Starting Workflows
 
