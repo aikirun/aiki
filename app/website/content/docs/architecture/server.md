@@ -26,7 +26,7 @@ When a workflow run becomes ready, the server records it in an **outbox** — th
 
 - **Default** — workers claim pending runs through the server's claim API. No infrastructure beyond the database.
 - **With a publisher configured** (e.g. `@aikirun/redis`) — the runtime also pushes ready runs to per-workflow queues the moment they're due, for sub-second delivery. The outbox remains the recovery path: anything lost in transit is re-published.
-- **Endpoints (push)** — the server sends a signed HTTP request to your endpoint handler; no subscriber involved.
+- **Endpoints (push, coming soon)** — the server sends a signed HTTP request to your endpoint handler; no subscriber involved.
 
 See [Subscribers](./subscribers.md) for the worker side of this.
 

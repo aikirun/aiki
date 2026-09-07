@@ -18,7 +18,7 @@ Durable execution is a fault-tolerant paradigm for building applications, especi
 
 With Aiki, workflows are plain TypeScript. The platform makes them durable: each workflow is a virtual thread of execution that can be suspended intentionally or due to crashes/intermittent failures, and automatically resumed from where it left off.
 
-Aiki's architecture is a server that orchestrates, and workers or endpoints that execute — all shipped as libraries. Run everything in a single process, or pull the components apart as you grow. Where each component runs is configuration, not architecture; workflow code never changes.
+Aiki's architecture is a server that orchestrates, and workers that execute — all shipped as libraries. Run everything in a single process, or pull the components apart as you grow. Where each component runs is configuration, not architecture; workflow code never changes.
 
 ## Example: Subscription Trial
 
@@ -138,8 +138,8 @@ That is the container path. You can also run the stack from the standalone `aiki
 |---------|-------------|
 | **Durable Execution** | Workflows survive crashes and resume from the last checkpoint |
 | **Workflow Versioning** | Ship new workflow versions without breaking in-flight runs |
+| **Pull or Push** | Long-lived workers pull work today — push to serverless endpoints is coming soon |
 | **Flexible Topology** | One process or many — split the server, workers, and endpoints apart with a config change, not a rewrite |
-| **Workers or Serverless** | Long-lived workers, or push-based endpoints for serverless platforms |
 | **Child Workflows** | Modular, reusable sub-workflows that run in parallel on other workers |
 | **Typed Events** | Wait for external signals with full TypeScript support; waiting releases the worker until the event arrives |
 | **Event Timeouts** | Set deadlines for human responses |
@@ -164,7 +164,7 @@ That is the container path. You can also run the stack from the standalone `aiki
 │         Embedded in your process, or hosted as a standalone service         │
 └─────────────────────┬─────────────────────────────────┬─────────────────────┘
                       │                                 │
-                      │ Pull (Subscribers)              │ Push (HTTP)
+                      │ Pull (Subscribers)              │ Push (HTTP) — coming soon
                       ▼                                 ▼
         ┌──────────────────────────┐       ┌──────────────────────────┐
         │  Workers                 │       │  Endpoints               │
@@ -173,7 +173,7 @@ That is the container path. You can also run the stack from the standalone `aiki
         └──────────────────────────┘       └──────────────────────────┘
 ```
 
-You choose where each component runs: everything in one process, a central server with distributed workers, or push-based execution on serverless functions. Workflow code stays the same.
+You choose where each component runs: everything in one process, or a central server with distributed workers. Workflow code stays the same.
 
 ## Documentation
 
@@ -203,7 +203,7 @@ See the [Installation Guide](https://aiki.run/docs/getting-started/installation)
 
 **Optional** — add when you need it:
 
-- [`@aikirun/endpoint`](https://www.npmjs.com/package/@aikirun/endpoint) — Run workflows on serverless platforms via push instead of pull
+- [`@aikirun/endpoint`](https://www.npmjs.com/package/@aikirun/endpoint) — Push-based execution on serverless platforms (coming soon)
 - [`@aikirun/iam`](https://www.npmjs.com/package/@aikirun/iam) — Multi-tenancy, API keys, and dashboard auth
 - [`@aikirun/redis`](https://www.npmjs.com/package/@aikirun/redis) — Sub-second timer dispatch and cross-host work distribution
 
