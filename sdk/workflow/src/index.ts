@@ -1,4 +1,4 @@
-export type { Duration, DurationObject } from "@aikirun/lib/duration";
+export type { DurationObject } from "@aikirun/lib/duration";
 export type {
 	ExponentialRetryStrategy,
 	FixedRetryStrategy,

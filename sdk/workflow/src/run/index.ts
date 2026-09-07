@@ -1,5 +1,5 @@
 import type { ConfigProvider } from "@aikirun/lib/config";
-import type { Duration } from "@aikirun/lib/duration";
+import type { DurationObject } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import type { BoundHasher } from "@aikirun/types/infra/hasher";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -17,7 +17,7 @@ export interface WorkflowRun<Context, TEvents extends EventsDefinition = EventsD
 	versionId: WorkflowVersionId;
 	options: WorkflowRunOptions;
 	logger: Logger;
-	sleep: (name: string, duration: Duration) => Promise<SleepResult>;
+	sleep: (name: string, duration: DurationObject) => Promise<SleepResult>;
 	events: EventWaiters<TEvents>;
 	context: Context;
 	[INTERNAL]: {
