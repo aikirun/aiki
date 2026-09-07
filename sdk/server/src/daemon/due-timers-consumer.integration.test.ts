@@ -48,6 +48,7 @@ describe("processDueTimers", () => {
 							pageSize: 100,
 							overshootMs: 0,
 							republishBackoff,
+							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
 							chunkByTimerType: chunkConfigByTimerType,
 						})),
 					},

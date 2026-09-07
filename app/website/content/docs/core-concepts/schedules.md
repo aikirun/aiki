@@ -100,6 +100,8 @@ const syncSchedule = schedule({
 | `"skip"` (default) | Skip this occurrence if a run is still active |
 | `"cancel_previous"` | Cancel the active run and start a new one |
 
+The policy also decides what happens to the occurrences a schedule missed, whether because the server was down or because the schedule was paused. `"allow"` runs every missed occurrence, oldest first, working through a large backlog in batches rather than all at once. `"skip"` and `"cancel_previous"` run only the most recent one.
+
 Overlap policies are evaluated per schedule instance, not globally. If you activate the same schedule for multiple tenants with different inputs, each tenant has independent overlap handling.
 
 ## Run Options

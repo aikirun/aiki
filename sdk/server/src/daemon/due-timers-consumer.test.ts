@@ -51,6 +51,7 @@ describe("startDueTimersConsumer", () => {
 				pageSize: 1,
 				overshootMs: 10,
 				republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
+				maxOccurrencesPerSchedule: 3,
 				chunkByTimerType: chunkConfigByTimerType,
 			})),
 		}).then(() => {
@@ -97,6 +98,7 @@ describe("startDueTimersConsumer", () => {
 				pageSize: 1_000,
 				overshootMs: 10,
 				republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
+				maxOccurrencesPerSchedule: 3,
 				chunkByTimerType: chunkConfigByTimerType,
 			})),
 		});

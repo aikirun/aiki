@@ -16,6 +16,16 @@ const namespaceRequestContext = namespaceRequestContextFactory.build();
 
 const { republishBackoff } = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
 
+const NO_CAP = Number.MAX_SAFE_INTEGER;
+
+const config = {
+	pageSize: 100,
+	lookaheadWindowMs: 0,
+	maxOccurrencesPerSchedule: NO_CAP,
+	republishBackoff,
+	chunk: { size: 100, maxConcurrency: 10 },
+};
+
 describe("processImminentRecurringRuns", () => {
 	test("the occurrence's outbox rank carries the schedule's run priority", () =>
 		withHarness(async ({ context, repos }) => {
@@ -35,11 +45,7 @@ describe("processImminentRecurringRuns", () => {
 			const occurrence = schedule.nextRunAt + 60_000;
 
 			await withFakeClock(occurrence, () =>
-				processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller() },
-					{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
-				)
+				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
 			);
 
 			// computeRank(occurrence, priority 2) = occurrence * 10 + 2.
@@ -69,11 +75,7 @@ describe("processImminentRecurringRuns", () => {
 			const occurrence = schedule.nextRunAt;
 
 			await withFakeClock(occurrence, () =>
-				processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller() },
-					{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
-				)
+				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
 			);
 
 			expect(
@@ -103,11 +105,7 @@ describe("processImminentRecurringRuns", () => {
 			});
 
 			await withFakeClock(schedule.nextRunAt + 120_000, () =>
-				processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller() },
-					{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
-				)
+				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
 			);
 
 			// computeRank(occurrence, default priority) = occurrence * 10 + 5.
@@ -116,5 +114,84 @@ describe("processImminentRecurringRuns", () => {
 				expect.objectContaining({ rank: (schedule.nextRunAt + 60_000) * 10 + 5 }),
 				expect.objectContaining({ rank: (schedule.nextRunAt + 120_000) * 10 + 5 }),
 			]);
+		}));
+
+	test("an allow schedule fires at most the cap's worth of occurrences and stays due at the first one left over", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+
+			const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "allow" },
+			});
+
+			// Three occurrences are due under a cap of two.
+			await withFakeClock(schedule.nextRunAt + 120_000, () =>
+				processImminentRecurringRuns(
+					context,
+					{ repos, childRunCanceller: createChildRunCanceller() },
+					{ ...config, maxOccurrencesPerSchedule: 2 }
+				)
+			);
+
+			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
+				expect.objectContaining({ rank: schedule.nextRunAt * 10 + 5 }),
+				expect.objectContaining({ rank: (schedule.nextRunAt + 60_000) * 10 + 5 }),
+			]);
+			expect(await repos.schedule.get(namespaceRequestContext.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({
+					lastOccurrence: schedule.nextRunAt + 60_000,
+					nextRunAt: schedule.nextRunAt + 120_000,
+				})
+			);
+		}));
+
+	test("a capped allow schedule fires the rest on the next pass", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+
+			const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "allow" },
+			});
+
+			// Three occurrences are due under a cap of two, so the second pass owes one.
+			await withFakeClock(schedule.nextRunAt + 120_000, async () => {
+				const cappedConfig = { ...config, maxOccurrencesPerSchedule: 2 };
+				await processImminentRecurringRuns(
+					context,
+					{ repos, childRunCanceller: createChildRunCanceller() },
+					cappedConfig
+				);
+				await processImminentRecurringRuns(
+					context,
+					{ repos, childRunCanceller: createChildRunCanceller() },
+					cappedConfig
+				);
+			});
+
+			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
+				expect.objectContaining({ rank: schedule.nextRunAt * 10 + 5 }),
+				expect.objectContaining({ rank: (schedule.nextRunAt + 60_000) * 10 + 5 }),
+				expect.objectContaining({ rank: (schedule.nextRunAt + 120_000) * 10 + 5 }),
+			]);
+			expect(await repos.schedule.get(namespaceRequestContext.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({
+					lastOccurrence: schedule.nextRunAt + 120_000,
+					nextRunAt: schedule.nextRunAt + 180_000,
+				})
+			);
 		}));
 });
