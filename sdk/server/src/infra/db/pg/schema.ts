@@ -8,7 +8,6 @@ import {
 	WORKFLOW_RUN_STATUSES,
 	type WorkflowRunOptions,
 } from "@aikirun/types/workflow/run";
-import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition";
 import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
 import { relations, sql } from "drizzle-orm";
 import {
@@ -27,6 +26,7 @@ import {
 
 import { timestampMs } from "./timestamp";
 import { CHILD_WORKFLOW_RUN_WAIT_STATUSES } from "../constants/child-workflow-run-wait";
+import { STATE_TRANSITION_TYPES } from "../constants/state-transition";
 import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../constants/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);

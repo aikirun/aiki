@@ -1,5 +1,5 @@
 import type { ChildWorkflowRunInfo, ChildWorkflowRunWaits, EventWait, Sleep } from "@aikirun/types/workflow/run";
-import type { StateTransition } from "@aikirun/types/workflow/state-transition";
+import type { TaskStateTransition, WorkflowRunStateTransition } from "@aikirun/types/workflow/state-transition";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 export interface TimelineLookups {
@@ -29,7 +29,7 @@ export function formatDuration(ms: number): string {
 }
 
 export function buildTimelineLookups(
-	transitions: StateTransition[],
+	transitions: Array<WorkflowRunStateTransition | TaskStateTransition>,
 	eventWaits: Record<string, EventWait[]>,
 	sleeps: Record<string, Sleep[]>,
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>,

@@ -20,7 +20,7 @@ import type {
 	WorkflowStartOptions,
 } from "../workflow/run";
 import type { EventMulticastResult, EventSendOptions } from "../workflow/run/event";
-import type { StateTransition } from "../workflow/state-transition";
+import type { TaskStateTransition, WorkflowRunStateTransition } from "../workflow/state-transition";
 import type { TaskStatus } from "../workflow/task";
 
 export interface WorkflowRunApi {
@@ -213,7 +213,7 @@ export interface WorkflowRunListTransitionsRequestV1 {
 }
 
 export interface WorkflowRunListTransitionsResponseV1 {
-	transitions: StateTransition[];
+	transitions: (WorkflowRunStateTransition | TaskStateTransition)[];
 	total: number;
 }
 

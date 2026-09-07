@@ -1,4 +1,4 @@
-import type { StateTransition } from "@aikirun/types/workflow/state-transition";
+import type { TaskStateTransition, WorkflowRunStateTransition } from "@aikirun/types/workflow/state-transition";
 import { Link } from "react-router-dom";
 
 import type { ScheduledContext, TimelineLookups } from "./timeline-lookups";
@@ -7,7 +7,7 @@ import { WORKFLOW_STATUS_CONFIG } from "../../constants/workflow-status";
 import { card, eyebrow } from "../common/ui";
 
 interface TimelineTabProps {
-	transitions: StateTransition[];
+	transitions: Array<WorkflowRunStateTransition | TaskStateTransition>;
 	isLoading: boolean;
 	lookups?: TimelineLookups;
 }
@@ -22,11 +22,11 @@ function fmtTime(ts: number): string {
 
 interface Attempt {
 	number: number;
-	transitions: StateTransition[];
+	transitions: Array<WorkflowRunStateTransition | TaskStateTransition>;
 	indexOffset: number;
 }
 
-function groupIntoAttempts(transitions: StateTransition[]): Attempt[] {
+function groupIntoAttempts(transitions: Array<WorkflowRunStateTransition | TaskStateTransition>): Attempt[] {
 	const attempts: Attempt[] = [];
 
 	for (let i = 0; i < transitions.length; i++) {
@@ -184,7 +184,7 @@ function TimelineItem({
 	globalIndex,
 	lookups,
 }: {
-	transition: StateTransition;
+	transition: WorkflowRunStateTransition | TaskStateTransition;
 	globalIndex: number;
 	lookups?: TimelineLookups;
 }) {
