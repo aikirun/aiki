@@ -16,20 +16,12 @@ type ScheduleRowUpdate = Partial<
 	Pick<
 		ScheduleRowInsert,
 		| "status"
-		| "clientHasherApplied"
-		| "clientCodecApplied"
-		| "type"
-		| "cronExpression"
-		| "intervalMs"
-		| "overlapPolicy"
+		| "referenceId"
 		| "workflowRunInput"
 		| "workflowRunInputHash"
+		| "clientHasherApplied"
+		| "clientCodecApplied"
 		| "definitionHash"
-		| "referenceId"
-		| "workflowRunOptions"
-		| "lastOccurrence"
-		| "nextRunAt"
-		| "workflowId"
 	>
 >;
 export interface ScheduleOccurrenceUpdate {

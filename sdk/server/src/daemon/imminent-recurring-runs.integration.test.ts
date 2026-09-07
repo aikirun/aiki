@@ -32,10 +32,9 @@ describe("processImminentRecurringRuns", () => {
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 				workflowRunOptions: { priority: 2 },
 			});
-			const { createdAt } = schedule;
-			expect(createdAt).toBeGreaterThan(0);
+			const occurrence = schedule.nextRunAt + 60_000;
 
-			await withFakeClock(createdAt + 120_000, () =>
+			await withFakeClock(occurrence, () =>
 				processImminentRecurringRuns(
 					context,
 					{ repos, childRunCanceller: createChildRunCanceller() },
@@ -48,8 +47,8 @@ describe("processImminentRecurringRuns", () => {
 				expect.objectContaining({
 					workflowName: "send-invoices",
 					status: "pending",
-					rank: (createdAt + 120_000) * 10 + 2,
-					nextPublishAttemptRank: (createdAt + 120_000) * 10 + 2,
+					rank: occurrence * 10 + 2,
+					nextPublishAttemptRank: occurrence * 10 + 2,
 				}),
 			]);
 		}));
@@ -67,9 +66,7 @@ describe("processImminentRecurringRuns", () => {
 				clientCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 			});
-			const { createdAt } = schedule;
-			expect(createdAt).toBeGreaterThan(0);
-			const occurrence = createdAt + 120_000;
+			const occurrence = schedule.nextRunAt;
 
 			await withFakeClock(occurrence, () =>
 				processImminentRecurringRuns(
@@ -88,5 +85,36 @@ describe("processImminentRecurringRuns", () => {
 					referenceId: getReferenceId(schedule.id, occurrence),
 				})
 			).toEqual(expect.objectContaining({ run: expect.objectContaining({ clientHasherApplied: true }) }));
+		}));
+
+	test("an allow schedule owes every occurrence from its next run, oldest first", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+
+			const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "allow" },
+			});
+
+			await withFakeClock(schedule.nextRunAt + 120_000, () =>
+				processImminentRecurringRuns(
+					context,
+					{ repos, childRunCanceller: createChildRunCanceller() },
+					{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				)
+			);
+
+			// computeRank(occurrence, default priority) = occurrence * 10 + 5.
+			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
+				expect.objectContaining({ rank: schedule.nextRunAt * 10 + 5 }),
+				expect.objectContaining({ rank: (schedule.nextRunAt + 60_000) * 10 + 5 }),
+				expect.objectContaining({ rank: (schedule.nextRunAt + 120_000) * 10 + 5 }),
+			]);
 		}));
 });

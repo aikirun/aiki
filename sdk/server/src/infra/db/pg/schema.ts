@@ -98,7 +98,7 @@ export const schedule = pgTable(
 		workflowRunOptions: jsonb("workflow_run_options").$type<WorkflowRunOptions>(),
 
 		lastOccurrence: timestampMs("last_occurrence"),
-		nextRunAt: timestampMs("next_run_at"),
+		nextRunAt: timestampMs("next_run_at").notNull(),
 
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),

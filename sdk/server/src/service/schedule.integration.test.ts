@@ -3,6 +3,7 @@ import { asOpaquePayload } from "@aikirun/testing/payload";
 
 import { createScheduleService } from "./schedule";
 import { describe, expect, test } from "bun:test";
+import { withFakeClock } from "../testing/clock";
 import { createServiceHarness } from "../testing/harness";
 
 const withHarness = createServiceHarness();
@@ -537,6 +538,72 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 					workflowRunInput: aheadInput,
 					workflowRunInputHash: announcedHash,
 					clientCodecApplied: true,
+				})
+			);
+		}));
+});
+
+describe("ScheduleService activateSchedule and the next run", () => {
+	const spec = { type: "interval" as const, everyMs: 60_000 };
+
+	test("reactivating a paused schedule leaves its next run untouched", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			};
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
+
+			// Two periods on
+			const { schedule: reactivated } = await withFakeClock(schedule.nextRunAt + 120_000, () =>
+				scheduleService.activateSchedule(context.namespaceId, request)
+			);
+
+			expect(reactivated.id).toBe(schedule.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ id: schedule.id, status: "active", nextRunAt: schedule.nextRunAt })
+			);
+		}));
+
+	test("adopting a reference id onto an unreferenced schedule leaves its next run untouched", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			};
+
+			const { schedule: unreferenced } = await scheduleService.activateSchedule(context.namespaceId, request);
+
+			// Two periods on
+			const { schedule: referenced } = await withFakeClock(unreferenced.nextRunAt + 120_000, () =>
+				scheduleService.activateSchedule(context.namespaceId, {
+					...request,
+					options: { reference: { id: "invoices-eu-west" } },
+				})
+			);
+
+			expect(referenced.id).toBe(unreferenced.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: unreferenced.id })).toEqual(
+				expect.objectContaining({
+					id: unreferenced.id,
+					referenceId: "invoices-eu-west",
+					nextRunAt: unreferenced.nextRunAt,
 				})
 			);
 		}));
