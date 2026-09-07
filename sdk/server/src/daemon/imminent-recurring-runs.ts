@@ -53,9 +53,13 @@ const advanceScheduleCursor = createKeysetStreamCursorAdvancer<{ schedule: { id:
 export async function processImminentRecurringRuns(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringRunsDeps,
-	config: PageProcessingConfig & { lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
+	config: PageProcessingConfig & {
+		lookaheadWindowMs: number;
+		maxOccurrencesPerSchedule: number;
+		republishBackoff: RepublishBackoff;
+	}
 ) {
-	const { pageSize, lookaheadWindowMs, republishBackoff, chunk } = config;
+	const { pageSize, lookaheadWindowMs, maxOccurrencesPerSchedule, republishBackoff, chunk } = config;
 	const dueBefore = (Date.now() + (deps.timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	for await (const rows of streamChunks(
@@ -79,7 +83,7 @@ export async function processImminentRecurringRuns(
 		}));
 
 		if (isNonEmptyArray(schedulesDueNow)) {
-			await queueRecurringRuns(context, deps, schedulesDueNow, republishBackoff, { chunk });
+			await queueRecurringRuns(context, deps, schedulesDueNow, republishBackoff, { maxOccurrencesPerSchedule, chunk });
 		}
 
 		const { timerPriorityQueue } = deps;
@@ -102,15 +106,17 @@ export async function queueRecurringRuns(
 	deps: ProcessImminentRecurringRunsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
 	republishBackoff: RepublishBackoff,
-	options?: { chunk?: { size?: number; maxConcurrency?: number } }
+	options: { maxOccurrencesPerSchedule: number; chunk?: { size?: number; maxConcurrency?: number } }
 ) {
-	const { size: chunkSize = schedules.length, maxConcurrency } = options?.chunk ?? {};
+	const { size: chunkSize = schedules.length, maxConcurrency } = options.chunk ?? {};
+	const { maxOccurrencesPerSchedule } = options;
 	const now = Date.now();
 
 	await runConcurrently(
 		context,
 		chunkLazy(schedules, chunkSize),
-		(chunk, spanCtx) => processChunk(spanCtx, deps, chunk, now, republishBackoff),
+		(chunk, spanCtx) =>
+			processChunk(spanCtx, deps, { schedules: chunk, now, maxOccurrencesPerSchedule, republishBackoff }),
 		maxConcurrency ? { concurrency: maxConcurrency } : undefined
 	);
 }
@@ -118,10 +124,15 @@ export async function queueRecurringRuns(
 async function processChunk(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringRunsDeps,
-	schedules: NonEmptyArray<DueSchedule>,
-	now: number,
-	republishBackoff: RepublishBackoff
+	params: {
+		schedules: NonEmptyArray<DueSchedule>;
+		now: number;
+		maxOccurrencesPerSchedule: number;
+		republishBackoff: RepublishBackoff;
+	}
 ) {
+	const { schedules, now, maxOccurrencesPerSchedule, republishBackoff } = params;
+
 	const allowSchedules: DueSchedule[] = [];
 	const skipSchedules: DueSchedule[] = [];
 	const cancelPreviousSchedules: DueSchedule[] = [];
@@ -140,13 +151,28 @@ async function processChunk(
 
 	const results = await Promise.allSettled([
 		isNonEmptyArray(allowSchedules)
-			? processOverlapAllowSchedules(context, deps.repos, allowSchedules, now, deps.publisher, republishBackoff)
+			? processOverlapAllowSchedules(context, deps, {
+					schedules: allowSchedules,
+					now,
+					maxOccurrencesPerSchedule,
+					republishBackoff,
+				})
 			: undefined,
 		isNonEmptyArray(skipSchedules)
-			? processOverlapSkipSchedules(context, deps.repos, skipSchedules, now, deps.publisher, republishBackoff)
+			? processOverlapSkipSchedules(context, deps, {
+					schedules: skipSchedules,
+					now,
+					maxOccurrencesPerSchedule,
+					republishBackoff,
+				})
 			: undefined,
 		isNonEmptyArray(cancelPreviousSchedules)
-			? processOverlapCancelPreviousSchedules(context, deps, cancelPreviousSchedules, now, republishBackoff)
+			? processOverlapCancelPreviousSchedules(context, deps, {
+					schedules: cancelPreviousSchedules,
+					now,
+					maxOccurrencesPerSchedule,
+					republishBackoff,
+				})
 			: undefined,
 	]);
 
@@ -159,21 +185,31 @@ async function processChunk(
 
 async function processOverlapAllowSchedules(
 	context: DaemonContext,
-	repos: Repositories,
-	schedules: NonEmptyArray<DueSchedule>,
-	now: number,
-	publisher: Publisher | undefined,
-	republishBackoff: RepublishBackoff
+	{ repos, publisher }: ProcessImminentRecurringRunsDeps,
+	params: {
+		schedules: NonEmptyArray<DueSchedule>;
+		now: number;
+		maxOccurrencesPerSchedule: number;
+		republishBackoff: RepublishBackoff;
+	}
 ) {
+	const { schedules, now, maxOccurrencesPerSchedule, republishBackoff } = params;
+
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
-		const due = getDueOccurrences(schedule, now);
+		const due = getDueOccurrences({ schedule, now, maxOccurrences: maxOccurrencesPerSchedule });
 		if (!due) {
 			continue;
+		}
+		if (due.nextRunAt <= now) {
+			context.logger.debug("Schedule reached the occurrence cap, the rest stays due", {
+				"aiki.scheduleId": schedule.id,
+				"aiki.count": due.occurrences.length,
+			});
 		}
 
 		for (const occurrence of due.occurrences) {
@@ -264,12 +300,15 @@ async function insertRecurringRunsInTx(
 
 async function processOverlapSkipSchedules(
 	context: DaemonContext,
-	repos: Repositories,
-	schedules: NonEmptyArray<DueSchedule>,
-	now: number,
-	publisher: Publisher | undefined,
-	republishBackoff: RepublishBackoff
+	{ repos, publisher }: ProcessImminentRecurringRunsDeps,
+	params: {
+		schedules: NonEmptyArray<DueSchedule>;
+		now: number;
+		maxOccurrencesPerSchedule: number;
+		republishBackoff: RepublishBackoff;
+	}
 ) {
+	const { schedules, now, maxOccurrencesPerSchedule, republishBackoff } = params;
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(repos, schedules);
 
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
@@ -278,7 +317,7 @@ async function processOverlapSkipSchedules(
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
-		const due = getDueOccurrences(schedule, now);
+		const due = getDueOccurrences({ schedule, now, maxOccurrences: maxOccurrencesPerSchedule });
 		if (!due) {
 			continue;
 		}
@@ -381,10 +420,15 @@ async function insertRunsAndAdvanceSchedulesInTx(
 async function processOverlapCancelPreviousSchedules(
 	context: DaemonContext,
 	deps: ProcessImminentRecurringRunsDeps,
-	schedules: NonEmptyArray<DueSchedule>,
-	now: number,
-	republishBackoff: RepublishBackoff
+	params: {
+		schedules: NonEmptyArray<DueSchedule>;
+		now: number;
+		maxOccurrencesPerSchedule: number;
+		republishBackoff: RepublishBackoff;
+	}
 ) {
+	const { schedules, now, maxOccurrencesPerSchedule, republishBackoff } = params;
+
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(deps.repos, schedules);
 
 	const runIdsToCancel: string[] = [];
@@ -402,7 +446,7 @@ async function processOverlapCancelPreviousSchedules(
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
 	for (const schedule of schedules) {
-		const due = getDueOccurrences(schedule, now);
+		const due = getDueOccurrences({ schedule, now, maxOccurrences: maxOccurrencesPerSchedule });
 		if (!due) {
 			continue;
 		}

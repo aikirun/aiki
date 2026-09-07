@@ -25,23 +25,30 @@ export function getReferenceId(scheduleId: string, occurrence: number) {
 export interface DueOccurrences {
 	/** Occurrences due at or before `now`, oldest first. */
 	occurrences: NonEmptyArray<number>;
-	/** The occurrence after the last due one. */
+	/** The occurrence after the last one returned. Still due when the cap cut the count short. */
 	nextRunAt: number;
 }
 
 interface OccurrenceRange {
 	/** Occurrences in the range, oldest first. */
 	occurrences: NonEmptyArray<number>;
-	/** The first occurrence after the range. */
+	/** The first occurrence after the last one returned. */
 	next: number;
 }
 
 /**
- * Every occurrence of `spec` between `from` and `to`, both inclusive. Interval occurrences fall
- * every `everyMs` starting at `from`; cron occurrences are the times the expression matches.
+ * Every occurrence of `spec` between `from` and `to`, both inclusive, up to `limit` of them. Interval
+ * occurrences fall every `everyMs` starting at `from`; cron occurrences are the times the expression matches.
  * Returns null when the range holds no occurrence.
  */
-function getOccurrencesBetween(spec: ScheduleSpec, from: number, to: number): OccurrenceRange | null {
+function getOccurrencesBetween(params: {
+	spec: ScheduleSpec;
+	from: number;
+	to: number;
+	limit: number;
+}): OccurrenceRange | null {
+	const { spec, from, to, limit } = params;
+
 	const occurrences: number[] = [];
 	let next: number;
 
@@ -52,13 +59,13 @@ function getOccurrencesBetween(spec: ScheduleSpec, from: number, to: number): Oc
 			tz: spec.timezone,
 		});
 		next = parsed.next().getTime();
-		while (next <= to) {
+		while (next <= to && occurrences.length < limit) {
 			occurrences.push(next);
 			next = parsed.next().getTime();
 		}
 	} else {
 		next = from;
-		while (next <= to) {
+		while (next <= to && occurrences.length < limit) {
 			occurrences.push(next);
 			next += spec.everyMs;
 		}
@@ -75,7 +82,9 @@ function getOccurrencesBetween(spec: ScheduleSpec, from: number, to: number): Oc
  * every `everyMs` starting at `from`; cron occurrences are the times the expression matches.
  * Returns null when the range holds no occurrence.
  */
-function getLastOccurrenceBetween(spec: ScheduleSpec, from: number, to: number): OccurrenceRange | null {
+function getLastOccurrenceBetween(params: { spec: ScheduleSpec; from: number; to: number }): OccurrenceRange | null {
+	const { spec, from, to } = params;
+
 	if (spec.type === "cron") {
 		// prev() is strict, so the cursor starts one millisecond past `to` to count an occurrence at `to` itself.
 		const parsed = CronExpressionParser.parse(spec.expression, {
@@ -99,16 +108,22 @@ function getLastOccurrenceBetween(spec: ScheduleSpec, from: number, to: number):
 }
 
 /**
- * What a schedule owes as of `now`, counted from its next run, and when it runs after that.
- * Returns null while the next run is still ahead.
+ * What a schedule owes as of `now`, counted from its next run and at most `maxOccurrences` of it,
+ * and when it runs after that. Returns null while the next run is still ahead.
  */
-export function getDueOccurrences(schedule: Pick<Schedule, "spec" | "nextRunAt">, now: number): DueOccurrences | null {
+export function getDueOccurrences(params: {
+	schedule: Pick<Schedule, "spec" | "nextRunAt">;
+	now: number;
+	maxOccurrences: number;
+}): DueOccurrences | null {
+	const { schedule, now, maxOccurrences } = params;
+
 	const { spec, nextRunAt } = schedule;
 	const overlapPolicy = spec.overlapPolicy ?? "skip";
 	const range =
 		overlapPolicy === "allow"
-			? getOccurrencesBetween(spec, nextRunAt, now)
-			: getLastOccurrenceBetween(spec, nextRunAt, now);
+			? getOccurrencesBetween({ spec, from: nextRunAt, to: now, limit: maxOccurrences })
+			: getLastOccurrenceBetween({ spec, from: nextRunAt, to: now });
 	if (!range) {
 		return null;
 	}

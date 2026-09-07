@@ -29,6 +29,7 @@ interface DueTimerConsumerConfig {
 	pageSize: number;
 	overshootMs: number;
 	republishBackoff: RepublishBackoff;
+	maxOccurrencesPerSchedule: number;
 	chunkByTimerType: Record<TimerType, PageProcessingConfig["chunk"]>;
 }
 
@@ -174,7 +175,10 @@ export async function processDueTimers(
 				continue;
 			}
 			promises.push(
-				queueRecurringRuns(context, deps, schedules, configProvider.config.republishBackoff, { chunk: chunkConfig })
+				queueRecurringRuns(context, deps, schedules, configProvider.config.republishBackoff, {
+					maxOccurrencesPerSchedule: configProvider.config.maxOccurrencesPerSchedule,
+					chunk: chunkConfig,
+				})
 			);
 		} else {
 			const rankById = new Map(timers.map((timer) => [timer.id, timer.rank]));
