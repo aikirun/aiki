@@ -260,6 +260,13 @@
 			"when": 1788676737416,
 			"tag": "0037_freezing_stranger",
 			"breakpoints": true
+		},
+		{
+			"idx": 38,
+			"version": "7",
+			"when": 1788783986246,
+			"tag": "0038_wet_gorgon",
+			"breakpoints": true
 		}
 	]
 }

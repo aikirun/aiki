@@ -6,7 +6,7 @@ import type { ScheduleActivateRequestV1, ScheduleListRequestV1 } from "@aikirun/
 import type { Hash } from "@aikirun/types/infra/hasher";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OpaquePayload } from "@aikirun/types/payload";
-import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
+import type { Schedule, ScheduleSpec } from "@aikirun/types/schedule";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 import CronExpressionParser from "cron-parser";
@@ -29,86 +29,90 @@ export interface DueOccurrences {
 	nextRunAt: number;
 }
 
+interface OccurrenceRange {
+	/** Occurrences in the range, oldest first. */
+	occurrences: NonEmptyArray<number>;
+	/** The first occurrence after the range. */
+	next: number;
+}
+
 /**
- * Returns every occurrence due between `anchor` and `now` (inclusive).
- * Also returns the first non-due occurrence i.e. `nextRunAt`.
- * Used for the allow policy.
+ * Every occurrence of `spec` between `from` and `to`, both inclusive. Interval occurrences fall
+ * every `everyMs` starting at `from`; cron occurrences are the times the expression matches.
+ * Returns null when the range holds no occurrence.
  */
-function getAllDueOccurrencesBetween(spec: ScheduleSpec, anchor: number, now: number): DueOccurrences | null {
+function getOccurrencesBetween(spec: ScheduleSpec, from: number, to: number): OccurrenceRange | null {
 	const occurrences: number[] = [];
-	let nextRunAt: number;
+	let next: number;
 
 	if (spec.type === "cron") {
+		// next() is strict, so the cursor starts one millisecond before `from` to count an occurrence at `from` itself.
 		const parsed = CronExpressionParser.parse(spec.expression, {
-			currentDate: new Date(anchor),
+			currentDate: new Date(from - 1),
 			tz: spec.timezone,
 		});
-
-		let next = parsed.next().getTime();
-		while (next <= now) {
+		next = parsed.next().getTime();
+		while (next <= to) {
 			occurrences.push(next);
 			next = parsed.next().getTime();
 		}
-		nextRunAt = next;
 	} else {
-		let cursor = anchor + spec.everyMs;
-		while (cursor <= now) {
-			occurrences.push(cursor);
-			cursor += spec.everyMs;
+		next = from;
+		while (next <= to) {
+			occurrences.push(next);
+			next += spec.everyMs;
 		}
-		nextRunAt = cursor;
 	}
 
 	if (!isNonEmptyArray(occurrences)) {
 		return null;
 	}
-	return { occurrences, nextRunAt };
+	return { occurrences, next };
 }
 
 /**
- * Returns the last occurrence due between `anchor` and `now` (inclusive).
- * Also returns the first non-due occurrence i.e. `nextRunAt`.
- * Used for the skip and cancel_previous policies.
+ * The last occurrence of `spec` between `from` and `to`, both inclusive. Interval occurrences fall
+ * every `everyMs` starting at `from`; cron occurrences are the times the expression matches.
+ * Returns null when the range holds no occurrence.
  */
-function getLastDueOccurrenceBetween(spec: ScheduleSpec, anchor: number, now: number): DueOccurrences | null {
+function getLastOccurrenceBetween(spec: ScheduleSpec, from: number, to: number): OccurrenceRange | null {
 	if (spec.type === "cron") {
+		// prev() is strict, so the cursor starts one millisecond past `to` to count an occurrence at `to` itself.
 		const parsed = CronExpressionParser.parse(spec.expression, {
-			currentDate: new Date(now),
+			currentDate: new Date(to + 1),
 			tz: spec.timezone,
 		});
-		const previous = parsed.prev().getTime();
-		if (previous <= anchor) {
+		const last = parsed.prev().getTime();
+		if (last < from) {
 			return null;
 		}
-		// The parser's cursor now sits on `previous`, so next() is the occurrence after it.
-		return { occurrences: [previous], nextRunAt: parsed.next().getTime() };
+		// The parser's cursor now sits on `last`, so next() is the occurrence after it.
+		return { occurrences: [last], next: parsed.next().getTime() };
 	}
 
-	const elapsed = now - anchor;
-	if (elapsed < spec.everyMs) {
+	if (from > to) {
 		return null;
 	}
-	const intervalsPassed = Math.floor(elapsed / spec.everyMs);
-	const last = anchor + intervalsPassed * spec.everyMs;
-	return { occurrences: [last], nextRunAt: last + spec.everyMs };
+	const intervalsPassed = Math.floor((to - from) / spec.everyMs);
+	const last = from + intervalsPassed * spec.everyMs;
+	return { occurrences: [last], next: last + spec.everyMs };
 }
 
 /**
- * What a schedule owes as of `now`, and when it runs next.
- * Returns null when nothing is due.
+ * What a schedule owes as of `now`, counted from its next run, and when it runs after that.
+ * Returns null while the next run is still ahead.
  */
-export function getDueOccurrences(
-	schedule: Pick<Schedule, "spec" | "lastOccurrence" | "createdAt">,
-	now: number
-): DueOccurrences | null {
-	const { spec } = schedule;
-	const anchor = schedule.lastOccurrence ?? schedule.createdAt;
+export function getDueOccurrences(schedule: Pick<Schedule, "spec" | "nextRunAt">, now: number): DueOccurrences | null {
+	const { spec, nextRunAt } = schedule;
 	const overlapPolicy = spec.overlapPolicy ?? "skip";
-
-	if (overlapPolicy === "allow") {
-		return getAllDueOccurrencesBetween(spec, anchor, now);
+	const range =
+		overlapPolicy === "allow"
+			? getOccurrencesBetween(spec, nextRunAt, now)
+			: getLastOccurrenceBetween(spec, nextRunAt, now);
+	if (!range) {
+		return null;
 	}
-	return getLastDueOccurrenceBetween(spec, anchor, now);
+	return { occurrences: range.occurrences, nextRunAt: range.next };
 }
 
 export function getNextOccurrence(spec: ScheduleSpec, anchor: number): number {
@@ -128,21 +132,6 @@ export interface ScheduleServiceDeps {
 }
 
 export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
-	async updateSchedule(
-		namespaceId: NamespaceId,
-		id: string,
-		updates: Partial<{
-			status: ScheduleStatus;
-			lastOccurrence: TimestampMs | null;
-			nextRunAt: TimestampMs | null;
-		}>
-	): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, { id }, updates);
-		if (!schedule) {
-			throw new NotFoundError(`Schedule not found: ${id}`);
-		}
-	},
-
 	async activateSchedule(
 		namespaceId: NamespaceId,
 		request: ScheduleActivateRequestV1
@@ -312,7 +301,6 @@ async function activateScheduleInTx(
 					existing: existingScheduleByDefinition,
 					payload,
 					nextDefinitionHash: definitionHashes.nextValue,
-					nextRunAt,
 				})
 			: await createSchedule(txRepos.schedule, {
 					namespaceId,
@@ -342,7 +330,6 @@ async function activateScheduleInTx(
 			existing: existingScheduleByReference,
 			payload,
 			nextDefinitionHash: definitionHashes.nextValue,
-			nextRunAt,
 		});
 
 		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
@@ -355,10 +342,9 @@ async function activateScheduleInTx(
 	});
 
 	if (existingNonReferencedSchedule) {
-		const updates: Partial<SchedulePayload> & { referenceId: string; status: "active"; nextRunAt: TimestampMs } = {
+		const updates: Partial<SchedulePayload> & { referenceId: string; status: "active" } = {
 			referenceId,
 			status: "active",
-			nextRunAt,
 		};
 		// Matching the request's next hash means the stored schedule was written by a client that
 		// has already switched to the rotation this request has only been told about. The stored
@@ -401,7 +387,6 @@ async function reuseSchedule(
 		existing: ScheduleRow;
 		payload: SchedulePayload;
 		nextDefinitionHash: string | undefined;
-		nextRunAt: TimestampMs;
 	}
 ): Promise<ScheduleRow> {
 	const { existing, payload } = params;
@@ -422,11 +407,10 @@ async function reuseSchedule(
 		return existing;
 	}
 
-	const updates: Partial<SchedulePayload> & { status?: "active"; nextRunAt?: TimestampMs } = {};
+	const updates: Partial<SchedulePayload> & { status?: "active" } = {};
 
 	if (needsActivation) {
 		updates.status = "active";
-		updates.nextRunAt = params.nextRunAt;
 	}
 
 	if (payloadChanged) {
@@ -501,7 +485,7 @@ export function scheduleRowToDomain(
 		createdAt: schedule.createdAt,
 		updatedAt: schedule.updatedAt,
 		lastOccurrence: schedule.lastOccurrence ?? undefined,
-		nextRunAt: schedule.nextRunAt ?? 0,
+		nextRunAt: schedule.nextRunAt,
 	};
 }
 
