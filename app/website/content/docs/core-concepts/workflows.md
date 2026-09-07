@@ -200,6 +200,22 @@ const handle = await orderWorkflowV1
 
 Workers must be configured to serve the same pool. A workflow routed to `"tenant-acme"` will only be picked up by workers with `pools: ["tenant-acme"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
 
+## Delayed Start
+
+Hold a run back before it becomes due:
+
+```typescript
+const handle = await orderWorkflowV1
+	.with("delay", { seconds: 30 })
+	.start(client, { orderId: "123" });
+```
+
+The delay is counted from the moment the run is created. Until it is due the run sits in `scheduled`; after that it dispatches like any other run.
+
+A duration names its units — `days`, `hours`, `minutes`, `seconds`, `milliseconds` — and you can combine them: `{ hours: 1, minutes: 30 }`. Set at least one field.
+
+A delay moves one run. To start a run on a repeating cadence, use a **[Schedule](./schedules.md)** instead.
+
 ## Priority
 
 When many runs become due at the same instant — a burst of starts, schedules firing on the same tick — priority decides who dispatches first:

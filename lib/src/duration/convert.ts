@@ -10,10 +10,6 @@ export interface DurationFields {
 
 export type DurationObject = RequireAtLeastOneProp<DurationFields>;
 
-type DurationMs = number;
-
-export type Duration = DurationMs | DurationObject;
-
 const MS_PER_SECOND = 1_000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
@@ -39,12 +35,7 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
  * toMilliseconds({ minutes: 1, seconds: 30 }) // => 90_000
  * toMilliseconds({ days: 1, hours: 2 }) // => 93_600_000
  */
-export function toMilliseconds(duration: Duration): number {
-	if (typeof duration === "number") {
-		assertIsPositiveNumber(duration);
-		return duration;
-	}
-
+export function toMilliseconds(duration: DurationObject): number {
 	let totalMs = 0;
 
 	if (duration.days !== undefined) {

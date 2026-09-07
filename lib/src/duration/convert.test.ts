@@ -2,33 +2,7 @@ import { toMilliseconds } from "./convert";
 import { describe, expect, test } from "bun:test";
 
 describe("toMilliseconds", () => {
-	describe("number input", () => {
-		test("passes through a valid number", () => {
-			expect(toMilliseconds(5_000)).toBe(5_000);
-		});
-
-		test("accepts zero", () => {
-			expect(toMilliseconds(0)).toBe(0);
-		});
-
-		test("throws on negative number", () => {
-			expect(() => toMilliseconds(-1)).toThrow("Duration must be non-negative. Received: -1");
-		});
-
-		test("throws on NaN", () => {
-			expect(() => toMilliseconds(NaN)).toThrow("Duration must be finite. Received: NaN");
-		});
-
-		test("throws on Infinity", () => {
-			expect(() => toMilliseconds(Infinity)).toThrow("Duration must be finite. Received: Infinity");
-		});
-
-		test("throws on negative Infinity", () => {
-			expect(() => toMilliseconds(-Infinity)).toThrow("Duration must be finite. Received: -Infinity");
-		});
-	});
-
-	describe("object input", () => {
+	describe("valid inputs", () => {
 		test("converts days to milliseconds", () => {
 			expect(toMilliseconds({ days: 1 })).toBe(86_400_000);
 		});
@@ -73,7 +47,7 @@ describe("toMilliseconds", () => {
 		});
 	});
 
-	describe("object input validation", () => {
+	describe("invalid inputs", () => {
 		test("throws on negative field with field name", () => {
 			expect(() => toMilliseconds({ hours: -1 })).toThrow("'hours' duration must be non-negative. Received: -1");
 		});
