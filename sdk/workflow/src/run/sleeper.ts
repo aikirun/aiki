@@ -1,4 +1,4 @@
-import type { Duration } from "@aikirun/lib/duration";
+import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -13,7 +13,7 @@ const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1_000;
 export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logger: Logger) {
 	const nextIndexBySleepName: Record<SleepName, number> = {};
 
-	return async (name: string, duration: Duration): Promise<SleepResult> => {
+	return async (name: string, duration: DurationObject): Promise<SleepResult> => {
 		const sleepName = name as SleepName;
 		const durationMs = toMilliseconds(duration);
 

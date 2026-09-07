@@ -23,19 +23,16 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 ### Duration Formats
 
-Durations can be specified as an object or milliseconds:
+A duration is an object naming its units:
 
 ```typescript
-// Object format (recommended for readability)
 await run.sleep("reminder", { days: 7 });
 await run.sleep("cooldown", { hours: 1, minutes: 30 });
 await run.sleep("delay", { seconds: 30 });
-
-// Milliseconds
-await run.sleep("short-delay", 5000);
+await run.sleep("short-delay", { milliseconds: 5000 });
 ```
 
-Available fields: `days`, `hours`, `minutes`, `seconds`, `milliseconds`.
+Available fields: `days`, `hours`, `minutes`, `seconds`, `milliseconds`. Set at least one.
 
 ## How Sleeps Work
 
