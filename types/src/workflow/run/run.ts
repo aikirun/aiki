@@ -1,9 +1,9 @@
+import type { DurationObject } from "@aikirun/lib/duration";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { SerializableError } from "@aikirun/lib/serializable";
 
 import type { EventWait } from "./event";
 import type { Sleep } from "./sleep";
-import type { TriggerStrategy } from "./trigger";
 import type { OpaquePayload } from "../../payload";
 import type { TaskInfo } from "../task";
 import type { WorkflowSource } from "../workflow";
@@ -71,7 +71,8 @@ export interface WorkflowRunOptions {
 }
 
 export interface WorkflowStartOptions extends WorkflowRunOptions {
-	trigger?: TriggerStrategy;
+	/** How long to wait before the run becomes due. Omit it and the run is due immediately. */
+	delay?: DurationObject;
 	reference?: WorkflowReference;
 }
 

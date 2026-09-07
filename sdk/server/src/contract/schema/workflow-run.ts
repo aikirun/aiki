@@ -1,12 +1,12 @@
 import { type } from "arktype";
 
+import { durationObjectSchema } from "./duration";
 import { eventWaitSchema } from "./event";
 import { opaquePayloadSchema } from "./payload";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
 import { sleepSchema } from "./sleep";
 import { taskInfoSchema } from "./task";
-import { triggerStrategySchema } from "./trigger";
 import { workflowSourceSchema } from "./workflow";
 
 export const workflowRunStatusSchema = type(
@@ -28,7 +28,7 @@ export const workflowRunOptionsSchema = type({
 
 export const workflowStartOptionsSchema = workflowRunOptionsSchema.and({
 	"reference?": workflowReferenceSchema,
-	"trigger?": triggerStrategySchema,
+	"delay?": durationObjectSchema,
 });
 
 export const workflowRunStateScheduledSchema = type({

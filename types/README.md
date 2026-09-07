@@ -11,8 +11,7 @@ npm install @aikirun/types
 ## Usage
 
 ```typescript
-import type { WorkflowOptions } from "@aikirun/types/workflow-run";
-import type { TriggerStrategy } from "@aikirun/types/trigger";
+import type { WorkflowStartOptions } from "@aikirun/types/workflow/run";
 ```
 
 ## Documentation
