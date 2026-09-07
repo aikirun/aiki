@@ -44,7 +44,10 @@
   @media (max-width: 820px) { .nav-l, .nav-sep { display: none; } }
   @media (max-width: 520px) { .nav-x { display: none; } }
   @media (max-width: 640px) { :root { --gut: 20px; } .code-note { display: none; } }
-  @media (min-width: 940px) { #grid-orch { grid-template-columns: repeat(3, minmax(0, 1fr)); } #grid-dura, #grid-infra { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (min-width: 940px) { #grid-orch, #grid-infra { grid-template-columns: repeat(3, minmax(0, 1fr)); } #grid-dura { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  /* Three cells over two columns would leave the container's border colour showing as an empty
+     half-row, so the last one spans the width. */
+  @media (min-width: 620px) and (max-width: 939px) { #grid-infra .cell:last-child { grid-column: 1 / -1; } }
   #topo-matrix, .topo-row { grid-template-columns: minmax(0, 1fr); }
   #topo-axis, #topo-head { display: none; }
   #topo-body { grid-template-rows: auto auto; }
@@ -55,6 +58,12 @@
     #topo-axis { display: grid; }
     #topo-head { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
+  /* The push column is veiled until the server-side push path ships; the endpoint package alone
+     does not deliver work. */
+  .topo-soon { position: relative; }
+  .topo-soon:hover { border-color: rgba(23,23,26,0.075); box-shadow: 0 1px 2px rgba(23,23,26,0.04); }
+  .topo-soon-veil { position: absolute; inset: 0; border-radius: 14px; background: rgba(23,23,26,0.055); pointer-events: none; }
+  .topo-soon-tag { position: relative; z-index: 1; align-self: flex-start; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #5d3a83; background: #ffffff; border: 1px solid rgba(118,75,162,0.3); border-radius: 999px; padding: 5px 11px; margin-bottom: 9px; }
 </style>
 </head>
 <body>
@@ -229,7 +238,7 @@
         <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.13em; color: #764ba2;">03 — TOPOLOGY</span>
         <h2 style="margin: 0; font-size: clamp(27px, 5.8vw, 38px); line-height: 1.06; letter-spacing: -0.036em; font-weight: 800;">Topology is your choice.</h2>
       </div>
-      <p style="margin: 0; font-size: 15px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">The Aiki server — the orchestrator — is a library. Run it entirely inside your app, or as a separate service with pull-based workers, serverless endpoints, or both — workflow code is identical either way. <span style="color: #17171a; font-weight: 600;">Where things run is configuration, not architecture.</span> In every shape, execution happens in your infrastructure.</p>
+      <p style="margin: 0; font-size: 15px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">The Aiki server — the orchestrator — is a library. Run it inside your app or as a separate service; workflow code is identical either way. <span style="color: #17171a; font-weight: 600;">Where things run is configuration, not architecture.</span> In every shape, execution happens in your infrastructure.</p>
     </div>
 
     <div id="topo-matrix" style="display: grid; gap: 14px;">
@@ -246,7 +255,7 @@
       <div id="topo-body" style="display: grid; gap: 14px; min-width: 0;">
         <div id="topo-head" style="gap: 14px;">
           <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #86868d;">Pull — workers</span>
-          <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #86868d;">Push — endpoints</span>
+          <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #86868d;">Push — endpoints <span style="color: #b0aeb6; letter-spacing: 0.06em;">· coming soon</span></span>
         </div>
 
         <div class="topo-row" style="display: grid; gap: 14px;">
@@ -274,7 +283,7 @@
               <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #5c5c64; text-wrap: pretty;">Everything in one process — your app, the server, and as many workers as you like. One deploy, nothing else to operate.</p>
             </div>
           </div>
-          <div class="card" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 18px; min-width: 0; transition: border-color .16s ease, box-shadow .16s ease;">
+          <div class="card topo-soon" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 18px; min-width: 0; transition: border-color .16s ease, box-shadow .16s ease;">
             <div style="position: relative; background: rgba(23,23,26,0.032); border-radius: 12px; padding: 27px 12px 13px; align-self: flex-start; max-width: 100%;">
               <span style="position: absolute; top: 10px; left: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #aeadb4;">your infrastructure</span>
               <div style="display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-family: ui-monospace, 'SF Mono', Menlo, monospace;">
@@ -298,10 +307,12 @@
                 </span>
               </div>
             </div>
-            <div>
+            <div style="display: flex; flex-direction: column;">
+              <span class="topo-soon-tag">Coming soon</span>
               <h3 style="margin: 0 0 7px; font-size: 16px; font-weight: 700; letter-spacing: -0.018em;">In your app + serverless endpoints</h3>
               <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #5c5c64; text-wrap: pretty;">Your app hosts the server; execution runs on serverless functions.</p>
             </div>
+            <div class="topo-soon-veil"></div>
           </div>
         </div>
 
@@ -327,7 +338,7 @@
               <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #5c5c64; text-wrap: pretty;">The server runs as its own service; long-lived workers pull work in your infrastructure.</p>
             </div>
           </div>
-          <div class="card" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 18px; min-width: 0; transition: border-color .16s ease, box-shadow .16s ease;">
+          <div class="card topo-soon" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 14px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 18px; min-width: 0; transition: border-color .16s ease, box-shadow .16s ease;">
             <div style="position: relative; background: rgba(23,23,26,0.032); border-radius: 12px; padding: 27px 12px 13px; align-self: flex-start; max-width: 100%;">
               <span style="position: absolute; top: 10px; left: 13px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #aeadb4;">your infrastructure</span>
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-family: ui-monospace, 'SF Mono', Menlo, monospace;">
@@ -346,58 +357,21 @@
                 </span>
               </div>
             </div>
-            <div>
+            <div style="display: flex; flex-direction: column;">
+              <span class="topo-soon-tag">Coming soon</span>
               <h3 style="margin: 0 0 7px; font-size: 16px; font-weight: 700; letter-spacing: -0.018em;">Separate service + serverless endpoints</h3>
               <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #5c5c64; text-wrap: pretty;">The server runs as its own service; execution runs entirely on serverless endpoints.</p>
             </div>
+            <div class="topo-soon-veil"></div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <section data-reveal style="max-width: 1180px; margin: 0 auto; padding: 0 var(--gut) 100px;">
-    <div id="events-grid" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 16px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: clamp(26px, 5vw, 44px) clamp(20px, 4vw, 40px) clamp(30px, 5vw, 48px); display: grid; gap: 40px; align-items: center;">
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.13em; color: #764ba2;">04 — EVENTS</span>
-        <h2 style="margin: 0; font-size: clamp(25px, 5.4vw, 34px); line-height: 1.08; letter-spacing: -0.036em; font-weight: 800;">Events from the outside world.</h2>
-      </div>
-      <p style="margin: 0; font-size: 15.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">External systems signal running workflows with typed, schema-validated events. Events sent early are held and delivered the moment the workflow asks for them. <span style="color: #17171a; font-weight: 600;">No race between the event arriving and your code being ready for it.</span></p>
-      <div style="grid-column: 1 / -1; background: #16161b; border-radius: 10px; padding: 16px 18px; overflow-x: auto;">
-<pre style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.85; color: #d7d6de;">
-<span style="color:#8b8794">// send an event to the running workflow</span>
-<span style="color:#b78ce0">await</span> <span style="color:#8ab4e8">trialV1</span>.events.<span style="color:#8ab4e8">paymentReceived</span>.send(client, <span style="color:#d9b48a">"runId_8f2d"</span>);
-</pre>
-      </div>
-    </div>
-  </section>
-
-  <section id="dashboard" data-reveal style="max-width: 1180px; margin: 0 auto; padding: 0 var(--gut) 100px; scroll-margin-top: 94px;">
-    <div style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 18px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: clamp(26px, 5vw, 44px) clamp(20px, 4vw, 40px) clamp(26px, 5vw, 40px); display: flex; flex-direction: column; gap: 32px;">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 28px; align-items: end;">
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-          <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.13em; color: #764ba2;">05 — DASHBOARD</span>
-          <h2 style="margin: 0; font-size: clamp(25px, 5.4vw, 34px); line-height: 1.08; letter-spacing: -0.034em; font-weight: 800; color: #17171a;">See every run.</h2>
-        </div>
-        <p style="margin: 0; font-size: 15.5px; line-height: 1.55; color: #5c5c64; max-width: 400px; text-wrap: pretty;">Status, task history, timings, and failures.</p>
-      </div>
-      <div style="position: relative; width: 100%; aspect-ratio: 1000 / 758; border-radius: 12px; overflow: hidden; background: #ffffff; border: 1px solid rgba(23,23,26,0.1); box-shadow: 0 18px 40px -24px rgba(23,23,26,0.26);">
-        <video autoplay loop muted playsinline preload="none"
-               poster="assets/aiki-dashboard-poster.jpg"
-               width="1000" height="758"
-               aria-label="Aiki dashboard — run detail view"
-               style="display: block; width: 100%; height: 100%; object-fit: cover;">
-          <source src="assets/aiki-dashboard-demo.webm" type="video/webm">
-          <source src="assets/aiki-dashboard-demo.mp4" type="video/mp4">
-          <img src="assets/aiki-dashboard-demo.gif" alt="Aiki dashboard — run detail view" loading="lazy" width="1000" height="758" style="display: block; width: 100%; height: 100%; object-fit: cover;">
-        </video>
-      </div>
-    </div>
-  </section>
-
   <section id="infra" data-reveal style="max-width: 1180px; margin: 0 auto; padding: 0 var(--gut) 100px; scroll-margin-top: 94px;">
     <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px;">
-      <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.13em; color: #764ba2;">06 — INFRASTRUCTURE</span>
+      <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.13em; color: #764ba2;">04 — INFRASTRUCTURE</span>
       <h2 style="margin: 0; font-size: clamp(27px, 5.8vw, 38px); line-height: 1.06; letter-spacing: -0.036em; font-weight: 800; max-width: 560px;">Infrastructure is optional.</h2>
       <p style="margin: 4px 0 0; font-size: 16px; line-height: 1.6; color: #5c5c64; max-width: 60ch; text-wrap: pretty;">What you run depends on what you need — nothing more.</p>
     </div>
@@ -414,12 +388,47 @@
         <h3 style="margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.018em;">Accelerated distribution</h3>
         <p style="margin: 0; font-size: 14.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">Plug in Redis — or any transport — to speed up work distribution across your workers.</p>
       </div>
-      <div class="cell" style="background: #ffffff; padding: 28px 26px 32px; display: flex; flex-direction: column; gap: 10px; transition: background .16s ease;">
-        <h3 style="margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.018em;">Fully distributed</h3>
-        <p style="margin: 0; font-size: 14.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">Standalone server, worker pools, serverless endpoints — in any combination.</p>
-      </div>
     </div>
     <p style="margin: 26px 0 0; font-size: 14px; line-height: 1.6; color: #86868d; max-width: 74ch; text-wrap: pretty;">These combine in any way you like — a standalone server on a SQLite file driving dozens of workers is a perfectly ordinary production setup.</p>
+  </section>
+
+  <section data-reveal style="max-width: 1180px; margin: 0 auto; padding: 0 var(--gut) 100px;">
+    <div id="events-grid" style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 16px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: clamp(26px, 5vw, 44px) clamp(20px, 4vw, 40px) clamp(30px, 5vw, 48px); display: grid; gap: 40px; align-items: center;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.13em; color: #764ba2;">05 — EVENTS</span>
+        <h2 style="margin: 0; font-size: clamp(25px, 5.4vw, 34px); line-height: 1.08; letter-spacing: -0.036em; font-weight: 800;">Events from the outside world.</h2>
+      </div>
+      <p style="margin: 0; font-size: 15.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">External systems signal running workflows with typed, schema-validated events. Events sent early are held and delivered the moment the workflow asks for them. <span style="color: #17171a; font-weight: 600;">No race between the event arriving and your code being ready for it.</span></p>
+      <div style="grid-column: 1 / -1; background: #16161b; border-radius: 10px; padding: 16px 18px; overflow-x: auto;">
+<pre style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.85; color: #d7d6de;">
+<span style="color:#8b8794">// send an event to the running workflow</span>
+<span style="color:#b78ce0">await</span> <span style="color:#8ab4e8">trialV1</span>.events.<span style="color:#8ab4e8">paymentReceived</span>.send(client, <span style="color:#d9b48a">"runId_8f2d"</span>);
+</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="dashboard" data-reveal style="max-width: 1180px; margin: 0 auto; padding: 0 var(--gut) 100px; scroll-margin-top: 94px;">
+    <div style="background: #ffffff; border: 1px solid rgba(23,23,26,0.075); border-radius: 18px; box-shadow: 0 1px 2px rgba(23,23,26,0.04); padding: clamp(26px, 5vw, 44px) clamp(20px, 4vw, 40px) clamp(26px, 5vw, 40px); display: flex; flex-direction: column; gap: 32px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 28px; align-items: end;">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: 0.13em; color: #764ba2;">06 — DASHBOARD</span>
+          <h2 style="margin: 0; font-size: clamp(25px, 5.4vw, 34px); line-height: 1.08; letter-spacing: -0.034em; font-weight: 800; color: #17171a;">See every run.</h2>
+        </div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.55; color: #5c5c64; max-width: 400px; text-wrap: pretty;">Status, task history, timings, and failures.</p>
+      </div>
+      <div style="position: relative; width: 100%; aspect-ratio: 1000 / 758; border-radius: 12px; overflow: hidden; background: #ffffff; border: 1px solid rgba(23,23,26,0.1); box-shadow: 0 18px 40px -24px rgba(23,23,26,0.26);">
+        <video autoplay loop muted playsinline preload="none"
+               poster="assets/aiki-dashboard-poster.jpg"
+               width="1000" height="758"
+               aria-label="Aiki dashboard — run detail view"
+               style="display: block; width: 100%; height: 100%; object-fit: cover;">
+          <source src="assets/aiki-dashboard-demo.webm" type="video/webm">
+          <source src="assets/aiki-dashboard-demo.mp4" type="video/mp4">
+          <img src="assets/aiki-dashboard-demo.gif" alt="Aiki dashboard — run detail view" loading="lazy" width="1000" height="758" style="display: block; width: 100%; height: 100%; object-fit: cover;">
+        </video>
+      </div>
+    </div>
   </section>
 
   <section id="cloud" style="max-width: 1180px; margin: 0 auto; padding: 0 var(--gut) 96px; scroll-margin-top: 94px;">
