@@ -6,7 +6,7 @@ const packageRoot = path.resolve(import.meta.dirname, "..");
 
 await migrateGenerate({
 	packageRoot,
-	resolveSchemaDir: (provider) => path.join(packageRoot, "src", "infra", "db", provider),
+	resolveSchemaFile: (provider) => path.join(packageRoot, "src", "infra", "db", provider, "schema.ts"),
 	resolveMigrationsDir: (provider) => path.join(packageRoot, "src", "infra", "db", provider, "migration"),
 	custom: process.argv.includes("--custom"),
 });

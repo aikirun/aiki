@@ -13,16 +13,16 @@ const providerDialects: Record<DatabaseProvider, string> = {
 interface MigrateGenerateParams {
 	// Spawn directory — drizzle-kit is resolved from here
 	packageRoot: string;
-	resolveSchemaDir: (provider: DatabaseProvider) => string;
+	resolveSchemaFile: (provider: DatabaseProvider) => string;
 	resolveMigrationsDir: (provider: DatabaseProvider) => string;
 	custom?: boolean;
 }
 
 export async function migrateGenerate(params: MigrateGenerateParams): Promise<void> {
 	for (const provider of DATABASE_PROVIDERS) {
-		const schemaDir = params.resolveSchemaDir(provider);
-		if (!fs.existsSync(schemaDir)) {
-			throw new Error(`no schema sources found for ${provider} database`);
+		const schemaFile = params.resolveSchemaFile(provider);
+		if (!fs.existsSync(schemaFile)) {
+			throw new Error(`no schema file for ${provider} database at ${schemaFile}`);
 		}
 
 		console.log(`generating ${provider} migrations`);
@@ -31,7 +31,7 @@ export async function migrateGenerate(params: MigrateGenerateParams): Promise<vo
 			"drizzle-kit",
 			"generate",
 			"--schema",
-			path.relative(params.packageRoot, schemaDir),
+			path.relative(params.packageRoot, schemaFile),
 			"--out",
 			path.relative(params.packageRoot, params.resolveMigrationsDir(provider)),
 			"--dialect",
