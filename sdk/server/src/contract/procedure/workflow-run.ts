@@ -35,7 +35,7 @@ import { type } from "arktype";
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
 import { inputHashSchema } from "../schema/hash";
 import { opaquePayloadSchema } from "../schema/payload";
-import { stateTransitionSchema } from "../schema/state-transition";
+import { taskStateTransitionSchema, workflowRunStateTransitionSchema } from "../schema/state-transition";
 import { workflowSourceSchema } from "../schema/workflow";
 import {
 	cancelByIdsRequestSchema,
@@ -243,7 +243,7 @@ const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, 
 		)
 		.output(
 			type({
-				transitions: stateTransitionSchema.array(),
+				transitions: workflowRunStateTransitionSchema.or(taskStateTransitionSchema).array(),
 				total: "number.integer >= 0",
 			})
 		);
