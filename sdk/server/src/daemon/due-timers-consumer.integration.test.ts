@@ -1,12 +1,15 @@
 import { asConfigProvider } from "@aikirun/lib/config";
+import { hashInput } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { asOpaquePayload } from "@aikirun/testing/payload";
 
 import { processDueTimers } from "./due-timers-consumer";
 import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
+import { createScheduleService } from "../service/schedule";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createDaemonHarness } from "../testing/harness";
@@ -49,6 +52,7 @@ describe("processDueTimers", () => {
 							overshootMs: 0,
 							republishBackoff,
 							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+							lookaheadWindowMs: daemonConfig.imminentRecurringRuns.lookaheadWindowMs,
 							chunkByTimerType: chunkConfigByTimerType,
 						})),
 					},
@@ -69,5 +73,52 @@ describe("processDueTimers", () => {
 					})
 				);
 			});
+		}));
+
+	test("a recurring timer arms the timer for the schedule's next run when due soon", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
+				workflowRunOptions: { priority: 2 },
+			});
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			// The next run lands one period on, exactly at the edge of the lookahead.
+			await withFakeClock(schedule.nextRunAt, () =>
+				processDueTimers(
+					context,
+					{
+						repos,
+						signal: new AbortController().signal,
+						timerPriorityQueue,
+						childRunCanceller: createChildRunCanceller(),
+						configProvider: asConfigProvider(() => ({
+							pageSize: 100,
+							overshootMs: 0,
+							republishBackoff,
+							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+							lookaheadWindowMs: 60_000,
+							chunkByTimerType: chunkConfigByTimerType,
+						})),
+					},
+					[{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: schedule.nextRunAt, priority: 2 }) }]
+				)
+			);
+
+			// The timer fired the occurrence it was set for.
+			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
+				expect.objectContaining({ rank: computeRank({ dueAt: schedule.nextRunAt, priority: 2 }) }),
+			]);
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: schedule.nextRunAt + 60_000, priority: 2 }) },
+			]);
 		}));
 });
