@@ -52,6 +52,7 @@ describe("startDueTimersConsumer", () => {
 				overshootMs: 10,
 				republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
 				maxOccurrencesPerSchedule: 3,
+				lookaheadWindowMs: 0,
 				chunkByTimerType: chunkConfigByTimerType,
 			})),
 		}).then(() => {
@@ -99,6 +100,7 @@ describe("startDueTimersConsumer", () => {
 				overshootMs: 10,
 				republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
 				maxOccurrencesPerSchedule: 3,
+				lookaheadWindowMs: 0,
 				chunkByTimerType: chunkConfigByTimerType,
 			})),
 		});

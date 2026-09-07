@@ -1,4 +1,4 @@
-import { streamChunks } from "@aikirun/lib/async";
+import { fireAndForget, streamChunks } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { asNonEmptyArray, chunkLazy, isNonEmptyArray, partitionArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
@@ -83,7 +83,11 @@ export async function processImminentRecurringRuns(
 		}));
 
 		if (isNonEmptyArray(schedulesDueNow)) {
-			await queueRecurringRuns(context, deps, schedulesDueNow, republishBackoff, { maxOccurrencesPerSchedule, chunk });
+			await queueRecurringRuns(context, deps, schedulesDueNow, republishBackoff, {
+				maxOccurrencesPerSchedule,
+				lookaheadWindowMs,
+				chunk,
+			});
 		}
 
 		const { timerPriorityQueue } = deps;
@@ -106,17 +110,27 @@ export async function queueRecurringRuns(
 	deps: ProcessImminentRecurringRunsDeps,
 	schedules: NonEmptyArray<DueSchedule>,
 	republishBackoff: RepublishBackoff,
-	options: { maxOccurrencesPerSchedule: number; chunk?: { size?: number; maxConcurrency?: number } }
+	options: {
+		maxOccurrencesPerSchedule: number;
+		lookaheadWindowMs: number;
+		chunk?: { size?: number; maxConcurrency?: number };
+	}
 ) {
 	const { size: chunkSize = schedules.length, maxConcurrency } = options.chunk ?? {};
-	const { maxOccurrencesPerSchedule } = options;
+	const { maxOccurrencesPerSchedule, lookaheadWindowMs } = options;
 	const now = Date.now();
 
 	await runConcurrently(
 		context,
 		chunkLazy(schedules, chunkSize),
 		(chunk, spanCtx) =>
-			processChunk(spanCtx, deps, { schedules: chunk, now, maxOccurrencesPerSchedule, republishBackoff }),
+			processChunk(spanCtx, deps, {
+				schedules: chunk,
+				now,
+				maxOccurrencesPerSchedule,
+				lookaheadWindowMs,
+				republishBackoff,
+			}),
 		maxConcurrency ? { concurrency: maxConcurrency } : undefined
 	);
 }
@@ -128,10 +142,11 @@ async function processChunk(
 		schedules: NonEmptyArray<DueSchedule>;
 		now: number;
 		maxOccurrencesPerSchedule: number;
+		lookaheadWindowMs: number;
 		republishBackoff: RepublishBackoff;
 	}
 ) {
-	const { schedules, now, maxOccurrencesPerSchedule, republishBackoff } = params;
+	const { schedules, now, maxOccurrencesPerSchedule, lookaheadWindowMs, republishBackoff } = params;
 
 	const allowSchedules: DueSchedule[] = [];
 	const skipSchedules: DueSchedule[] = [];
@@ -155,6 +170,7 @@ async function processChunk(
 					schedules: allowSchedules,
 					now,
 					maxOccurrencesPerSchedule,
+					lookaheadWindowMs,
 					republishBackoff,
 				})
 			: undefined,
@@ -163,6 +179,7 @@ async function processChunk(
 					schedules: skipSchedules,
 					now,
 					maxOccurrencesPerSchedule,
+					lookaheadWindowMs,
 					republishBackoff,
 				})
 			: undefined,
@@ -171,6 +188,7 @@ async function processChunk(
 					schedules: cancelPreviousSchedules,
 					now,
 					maxOccurrencesPerSchedule,
+					lookaheadWindowMs,
 					republishBackoff,
 				})
 			: undefined,
@@ -185,16 +203,18 @@ async function processChunk(
 
 async function processOverlapAllowSchedules(
 	context: DaemonContext,
-	{ repos, publisher }: ProcessImminentRecurringRunsDeps,
+	{ repos, publisher, timerPriorityQueue }: ProcessImminentRecurringRunsDeps,
 	params: {
 		schedules: NonEmptyArray<DueSchedule>;
 		now: number;
 		maxOccurrencesPerSchedule: number;
+		lookaheadWindowMs: number;
 		republishBackoff: RepublishBackoff;
 	}
 ) {
-	const { schedules, now, maxOccurrencesPerSchedule, republishBackoff } = params;
+	const { schedules, now, maxOccurrencesPerSchedule, lookaheadWindowMs, republishBackoff } = params;
 
+	const timersDueSoon: TimerEntry[] = [];
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
@@ -209,6 +229,13 @@ async function processOverlapAllowSchedules(
 			context.logger.debug("Schedule reached the occurrence cap, the rest stays due", {
 				"aiki.scheduleId": schedule.id,
 				"aiki.count": due.occurrences.length,
+			});
+		}
+		if (timerPriorityQueue && due.nextRunAt <= now + lookaheadWindowMs) {
+			timersDueSoon.push({
+				type: "recurring",
+				id: schedule.id,
+				rank: computeRank({ dueAt: due.nextRunAt, priority: schedule.workflowRunOptions?.priority }),
 			});
 		}
 
@@ -274,9 +301,15 @@ async function processOverlapAllowSchedules(
 		return;
 	}
 
-	await repos.transaction(async (txRepos) =>
-		insertRecurringRunsInTx({ workflowRunEntries, stateTransitionEntries, scheduleUpdates, outboxEntries }, txRepos)
-	);
+	await repos.transaction(async (txRepos) => {
+		await insertRecurringRunsInTx(
+			{ workflowRunEntries, stateTransitionEntries, scheduleUpdates, outboxEntries },
+			txRepos
+		);
+		if (timerPriorityQueue && isNonEmptyArray(timersDueSoon)) {
+			txRepos.onCommit(() => queueTimers(context, timerPriorityQueue, timersDueSoon));
+		}
+	});
 
 	if (publisher) {
 		await publishOutboxEntries(context, repos, publisher, outboxEntries, republishBackoff);
@@ -300,17 +333,19 @@ async function insertRecurringRunsInTx(
 
 async function processOverlapSkipSchedules(
 	context: DaemonContext,
-	{ repos, publisher }: ProcessImminentRecurringRunsDeps,
+	{ repos, publisher, timerPriorityQueue }: ProcessImminentRecurringRunsDeps,
 	params: {
 		schedules: NonEmptyArray<DueSchedule>;
 		now: number;
 		maxOccurrencesPerSchedule: number;
+		lookaheadWindowMs: number;
 		republishBackoff: RepublishBackoff;
 	}
 ) {
-	const { schedules, now, maxOccurrencesPerSchedule, republishBackoff } = params;
+	const { schedules, now, maxOccurrencesPerSchedule, lookaheadWindowMs, republishBackoff } = params;
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(repos, schedules);
 
+	const timersDueSoon: TimerEntry[] = [];
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
 	const stateTransitionEntries: StateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
@@ -322,6 +357,13 @@ async function processOverlapSkipSchedules(
 			continue;
 		}
 		const occurrence = due.occurrences[0];
+		if (timerPriorityQueue && due.nextRunAt <= now + lookaheadWindowMs) {
+			timersDueSoon.push({
+				type: "recurring",
+				id: schedule.id,
+				rank: computeRank({ dueAt: due.nextRunAt, priority: schedule.workflowRunOptions?.priority }),
+			});
+		}
 
 		if (activeRunsByScheduleId.has(schedule.id)) {
 			scheduleUpdates.push({
@@ -383,12 +425,16 @@ async function processOverlapSkipSchedules(
 		return;
 	}
 
-	const insertedOutboxEntries = await repos.transaction(async (txRepos) =>
-		insertRunsAndAdvanceSchedulesInTx(
+	const insertedOutboxEntries = await repos.transaction(async (txRepos) => {
+		const inserted = await insertRunsAndAdvanceSchedulesInTx(
 			{ workflowRunEntries, stateTransitionEntries, scheduleUpdates, outboxEntries },
 			txRepos
-		)
-	);
+		);
+		if (timerPriorityQueue && isNonEmptyArray(timersDueSoon)) {
+			txRepos.onCommit(() => queueTimers(context, timerPriorityQueue, timersDueSoon));
+		}
+		return inserted;
+	});
 
 	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
 		await publishOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
@@ -424,12 +470,14 @@ async function processOverlapCancelPreviousSchedules(
 		schedules: NonEmptyArray<DueSchedule>;
 		now: number;
 		maxOccurrencesPerSchedule: number;
+		lookaheadWindowMs: number;
 		republishBackoff: RepublishBackoff;
 	}
 ) {
-	const { schedules, now, maxOccurrencesPerSchedule, republishBackoff } = params;
+	const { repos, childRunCanceller, timerPriorityQueue, publisher } = deps;
+	const { schedules, now, maxOccurrencesPerSchedule, lookaheadWindowMs, republishBackoff } = params;
 
-	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(deps.repos, schedules);
+	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(repos, schedules);
 
 	const runIdsToCancel: string[] = [];
 	const runsToCancel: Array<{
@@ -440,6 +488,7 @@ async function processOverlapCancelPreviousSchedules(
 		priority?: number;
 	}> = [];
 
+	const timersDueSoon: TimerEntry[] = [];
 	const newWorkflowRunEntries: WorkflowRunRowInsert[] = [];
 	const newRunStateTransitionEntries: StateTransitionRowInsert[] = [];
 	const newOutboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
@@ -451,6 +500,13 @@ async function processOverlapCancelPreviousSchedules(
 			continue;
 		}
 		const occurrence = due.occurrences[0];
+		if (timerPriorityQueue && due.nextRunAt <= now + lookaheadWindowMs) {
+			timersDueSoon.push({
+				type: "recurring",
+				id: schedule.id,
+				rank: computeRank({ dueAt: due.nextRunAt, priority: schedule.workflowRunOptions?.priority }),
+			});
+		}
 
 		const activeRun = activeRunsByScheduleId.get(schedule.id);
 		if (activeRun) {
@@ -517,10 +573,10 @@ async function processOverlapCancelPreviousSchedules(
 		return;
 	}
 
-	const insertedOutboxEntries = await deps.repos.transaction(async (txRepos) =>
-		cancelPreviousAndInsertRunsInTx(
+	const insertedOutboxEntries = await repos.transaction(async (txRepos) => {
+		const inserted = await cancelPreviousAndInsertRunsInTx(
 			context,
-			deps.childRunCanceller,
+			childRunCanceller,
 			now as TimestampMs,
 			{
 				runIdsToCancel,
@@ -531,11 +587,15 @@ async function processOverlapCancelPreviousSchedules(
 				newOutboxEntries,
 			},
 			txRepos
-		)
-	);
+		);
+		if (timerPriorityQueue && isNonEmptyArray(timersDueSoon)) {
+			txRepos.onCommit(() => queueTimers(context, timerPriorityQueue, timersDueSoon));
+		}
+		return inserted;
+	});
 
-	if (deps.publisher && isNonEmptyArray(insertedOutboxEntries)) {
-		await publishOutboxEntries(context, deps.repos, deps.publisher, insertedOutboxEntries, republishBackoff);
+	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
+		await publishOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
 	}
 }
 
@@ -690,4 +750,19 @@ async function fetchActiveRunsBySchedule(repos: Repositories, schedules: NonEmpt
 	}
 
 	return { activeRunsByScheduleId };
+}
+
+function queueTimers(
+	context: DaemonContext,
+	timerPriorityQueue: TimerPriorityQueue,
+	timers: NonEmptyArray<TimerEntry>
+): void {
+	fireAndForget(
+		timerPriorityQueue.add(timers).then((result) => {
+			if (result.status === "failed") {
+				context.logger.debug("Failed to add recurring timers", { "aiki.count": timers.length });
+			}
+		}),
+		(err) => context.logger.debug("Failed to add recurring timers", { err, "aiki.count": timers.length })
+	);
 }

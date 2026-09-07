@@ -197,6 +197,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 						...config.dueTimersConsumer,
 						republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
 						maxOccurrencesPerSchedule: config.imminentRecurringRuns.maxOccurrencesPerSchedule,
+						lookaheadWindowMs: config.imminentRecurringRuns.lookaheadWindowMs,
 						chunkByTimerType: {
 							scheduled: config.imminentScheduledRuns.chunk,
 							sleep: config.imminentSleepElapsedRuns.chunk,
