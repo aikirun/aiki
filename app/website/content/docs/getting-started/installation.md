@@ -32,6 +32,23 @@ Re-run this command when upgrading Aiki to apply new migrations.
 
 Mount aiki server handler in any HTTP framework — in the same process as your app, or in a process dedicated to Aiki. The [Quick Start](./quick-start.mdx) walks through this end-to-end, including worker and client.
 
+An embedded server should also be given a timer priority queue. Without one it finds due work by scanning the database on an interval, so a short sleep or retry waits for the next scan:
+
+```package-install
+@aikirun/memory
+```
+
+```typescript
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+
+const aikiServer = server({
+  db: database({ provider: "pg", url: databaseUrl }),
+  timerPriorityQueue: inMemoryTimerPriorityQueue(),
+});
+```
+
+The in-process queue serves one server instance. Across several instances use `@aikirun/redis`, which hands each timer to exactly one of them — see [Server](../architecture/server.md).
+
 Workflow code is identical against an embedded or standalone server, so you can also skip embedding entirely and point your client at a server hosted per [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard).
 
 Want the web dashboard against your embedded server? Serve it separately — see [Run the dashboard on its own](#run-the-dashboard-on-its-own).
