@@ -2,6 +2,14 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.41.1
+
+A run that goes to sleep, parks on a retry, or parks on an event or a child with a timeout now arms its wake-up timer as the transition commits, so a short wait fires on time instead of waiting for the next poll.
+
+### Improvements
+
+- **A parked run arms its own wake-up timer.** Transitioning a run into `sleeping`, `awaiting_retry`, `awaiting_task_retry`, or a timed wait on an event or a child queues that timer on commit when the wake-up falls inside the lookahead window. Only a run entering `scheduled` did this before, so a five-second sleep waited for the next poll of the daemon that scans for it — 10 seconds apart by default. A wait with no timeout has no timer; the event, or the child finishing, wakes the run.
+
 ## 0.41.0
 
 This release reworks how a schedule catches up after a gap. A schedule counts what it owes from its stored next run and fires at most three occurrences per pass, arming its own timer for whatever is left, so a long backlog is worked through in batches rather than all at once. Schedule status changes are now validated transitions recorded as history: pausing a deactivated schedule is refused instead of silently applied, and activating a paused schedule leaves it paused. `trigger` is gone from the start options, replaced by a plain `delay`, and a duration is always an object — the raw-milliseconds form is no longer accepted. Three database migrations (`0038` through `0040`) ship with this release.
