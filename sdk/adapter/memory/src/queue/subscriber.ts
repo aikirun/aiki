@@ -7,10 +7,10 @@ import type {
 } from "@aikirun/types/infra/queue";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
+import type { Broker } from "./broker";
 import { getWorkflowQueueNames } from "./key";
-import type { Store } from "./store";
 
-export function createInMemorySubscriber(store: Store): CreateSubscriber {
+export function createInMemorySubscriber(broker: Broker): CreateSubscriber {
 	const getNextDelay = (delayParams: SubscriberDelayParams): number => {
 		switch (delayParams.type) {
 			case "no_work":
@@ -45,7 +45,7 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 				}
 
 				const startQueueIndex = Math.floor(Math.random() * queueNames.length);
-				const initialBatch = store.roundRobinPop({ queueNames, startQueueIndex, limit });
+				const initialBatch = broker.roundRobinPop({ queueNames, startQueueIndex, limit });
 				if (initialBatch.length > 0) {
 					return initialBatch;
 				}
@@ -80,7 +80,7 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 							while (true) {
 								queueIndex = (queueIndex + 1) % queueCount;
 								const queueName = queueNames[queueIndex];
-								const queue = queueName !== undefined ? store.getQueue(queueName) : undefined;
+								const queue = queueName !== undefined ? broker.getQueue(queueName) : undefined;
 
 								if (!visited[queueIndex]) {
 									queue?.waiterHandles.delete(handle);
@@ -109,7 +109,7 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 
 						close: () => {
 							for (const queueName of queueNames) {
-								store.getQueue(queueName)?.waiterHandles.delete(handle);
+								broker.getQueue(queueName)?.waiterHandles.delete(handle);
 							}
 							detach();
 							resolve([]);
@@ -123,7 +123,7 @@ export function createInMemorySubscriber(store: Store): CreateSubscriber {
 					signal.addEventListener("abort", handle.abortHandler, { once: true });
 
 					for (const queueName of queueNames) {
-						store.getOrCreateQueue(queueName).waiterHandles.add(handle);
+						broker.getOrCreateQueue(queueName).waiterHandles.add(handle);
 					}
 				});
 			},
