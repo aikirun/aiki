@@ -302,7 +302,11 @@ export const createWorkflowRunService = ({
 	},
 
 	async hasTerminated(context: NamespaceRequestContext, runId: string, afterStateTransitionId: string) {
-		const result = await repos.workflowRun.hasTerminated(context.namespaceId, runId, afterStateTransitionId);
+		const result = await repos.workflowRun.hasTerminated(
+			context.namespaceId,
+			runId as WorkflowRunId,
+			afterStateTransitionId
+		);
 		if (!result.runFound) {
 			throw new NotFoundError(`Workflow run not found: ${runId}`);
 		}
