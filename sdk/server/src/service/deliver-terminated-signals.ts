@@ -146,8 +146,9 @@ export async function deliverTerminatedSignalToParentRun(
 			imminentRunTimerQueue.add(
 				asNonEmptyArray(
 					scheduledParentRunIds.map((id) => ({
+						type: "scheduled",
 						id,
-						scheduledAt: now,
+						dueAt: now,
 						priority: incrementedParentRunsById.get(id)?.options?.priority,
 					}))
 				)

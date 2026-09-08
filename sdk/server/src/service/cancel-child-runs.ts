@@ -126,8 +126,9 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 
 			if (imminentRunTimerQueue) {
 				const imminentRuns = workflowRunEntries.map((entry) => ({
+					type: "scheduled" as const,
 					id: entry.id,
-					scheduledAt: now,
+					dueAt: now,
 					priority: entry.options?.priority,
 				}));
 				txRepos.onCommit(() => imminentRunTimerQueue.add(asNonEmptyArray(imminentRuns)));

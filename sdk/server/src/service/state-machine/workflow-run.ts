@@ -6,6 +6,7 @@ import type {
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/api/workflow-run";
+import type { TimerType } from "@aikirun/types/infra/timer";
 import type {
 	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunId,
@@ -261,10 +262,11 @@ async function transitionStateInTx(
 		state: toState,
 	});
 
-	if (imminentRunTimerQueue && toState.status === "scheduled") {
-		txRepos.onCommit(() =>
-			imminentRunTimerQueue.add([{ id: runId, scheduledAt: toState.scheduledAt, priority: run.options?.priority }])
-		);
+	if (imminentRunTimerQueue) {
+		const timer = extractTimer(toState);
+		if (timer) {
+			txRepos.onCommit(() => imminentRunTimerQueue.add([{ ...timer, id: runId, priority: run.options?.priority }]));
+		}
 	}
 
 	if (toState.status === "cancelled") {
@@ -420,6 +422,41 @@ function extractDueTimestamp(state: Exclude<WorkflowRunState, { status: WaitingF
 				timeoutAt?: never;
 			};
 			return {};
+	}
+}
+
+function extractTimer(state: WorkflowRunState): { type: TimerType; dueAt: number } | undefined {
+	switch (state.status) {
+		case "scheduled":
+			return { type: "scheduled", dueAt: state.scheduledAt };
+		case "sleeping":
+			return { type: "sleep", dueAt: state.wakeupAt };
+		case "awaiting_retry":
+			return { type: "retry", dueAt: state.nextAttemptAt };
+		case "awaiting_task_retry":
+			return { type: "task_retry", dueAt: state.nextAttemptAt };
+		case "awaiting_event": {
+			if (state.timeoutAt === undefined) {
+				return undefined;
+			}
+			return { type: "event_wait_timeout", dueAt: state.timeoutAt };
+		}
+		case "awaiting_child_workflow": {
+			if (state.timeoutAt === undefined) {
+				return undefined;
+			}
+			return { type: "child_wait_timeout", dueAt: state.timeoutAt };
+		}
+		case "queued":
+		case "running":
+		case "paused":
+		case "stalled":
+		case "cancelled":
+		case "completed":
+		case "failed":
+			return undefined;
+		default:
+			return state satisfies never;
 	}
 }
 
