@@ -41,7 +41,7 @@ import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ChildRunWaitWithState } from "../infra/db/types/child-workflow-run-wait";
 import type { EventWaitRow } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { ChildRunWithWorkflow, WorkflowRunWithWorkflowAndState } from "../infra/db/types/workflow-run";
 import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 import { candidateHashes } from "../lib/hash";
@@ -395,7 +395,6 @@ async function createWorkflowRunInTx(
 		id: transitionId,
 		workflowRunId: runId,
 		type: "workflow_run",
-		status: "scheduled",
 		attempt: 1,
 		state,
 	});
@@ -434,7 +433,7 @@ async function cancelByIdsInTx(
 	await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now);
 	await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
-	const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
+	const cancelStateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 	const cancelledRunStateTransitionUpdates: {
 		filter: { namespaceId: NamespaceId; id: string };
 		update: { stateTransitionId: string };
@@ -448,7 +447,6 @@ async function cancelByIdsInTx(
 			id: stateTransitionId,
 			workflowRunId: run.id,
 			type: "workflow_run",
-			status: "cancelled",
 			attempt: run.attempts,
 			state: { status: "cancelled" } satisfies WorkflowRunStateCancelled,
 		});

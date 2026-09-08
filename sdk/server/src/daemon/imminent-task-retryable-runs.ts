@@ -9,7 +9,7 @@ import { ulid } from "ulidx";
 import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories, TxRepositories } from "../infra/db/types";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRow } from "../infra/db/types/workflow";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
@@ -90,7 +90,7 @@ async function processChunk(
 	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
 	workflowsById: Map<string, WorkflowRow>
 ): Promise<void> {
-	const stateTransitionEntries: StateTransitionRowInsert[] = [];
+	const stateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
 		[];
 	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
@@ -107,7 +107,6 @@ async function processChunk(
 			id: stateTransitionId,
 			workflowRunId: run.id,
 			type: "workflow_run",
-			status: "queued",
 			attempt: run.attempts,
 			state,
 		});
@@ -155,7 +154,7 @@ async function transitionToQueuedInTx(
 			filter: { id: string; revision: number };
 			update: { stateTransitionId: string };
 		}>;
-		stateTransitionEntries: StateTransitionRowInsert[];
+		stateTransitionEntries: WorkflowRunStateTransitionRowInsert[];
 		outboxEntries: WorkflowRunOutboxRowInsertPending[];
 	},
 	txRepos: TxRepositories

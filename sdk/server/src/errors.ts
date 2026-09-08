@@ -1,4 +1,5 @@
 import { AikiError } from "@aikirun/lib/error";
+import type { ScheduleStatus } from "@aikirun/types/schedule";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { TerminalWorkflowRunStatus, WorkflowRunId, WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type { TaskId, TaskName, TaskStatus } from "@aikirun/types/workflow/task";
@@ -36,6 +37,23 @@ export class InvalidWorkflowRunStateTransitionError extends AikiError {
 		this.from = from;
 		this.to = to;
 		this.reason = reason;
+	}
+}
+
+export class InvalidScheduleStateTransitionError extends AikiError {
+	readonly code = "BAD_REQUEST";
+	readonly status = 400;
+
+	public readonly scheduleId: string;
+	public readonly from: ScheduleStatus;
+	public readonly to: ScheduleStatus;
+
+	constructor(scheduleId: string, from: ScheduleStatus, to: ScheduleStatus) {
+		super(`Cannot transition schedule ${scheduleId} from ${from} to ${to}`);
+		this.name = "InvalidScheduleStateTransitionError";
+		this.scheduleId = scheduleId;
+		this.from = from;
+		this.to = to;
 	}
 }
 

@@ -115,7 +115,6 @@ async function transitionStateInTx(
 			workflowRunId: runId,
 			type: "task",
 			taskId,
-			status: taskState.status,
 			attempt: attempts,
 			state: taskState,
 		});
@@ -169,7 +168,6 @@ async function transitionStateInTx(
 		workflowRunId: runId,
 		type: "task",
 		taskId,
-		status: taskState.status,
 		attempt: attempts,
 		state: taskState,
 	});

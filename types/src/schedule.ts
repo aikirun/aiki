@@ -43,6 +43,24 @@ export interface ScheduleActivateOptions {
 	reference?: ScheduleReference;
 }
 
+export const SCHEDULE_ACTIVE_REASONS = ["activated", "resumed", "reactivated"] as const;
+export type ScheduleActiveReason = (typeof SCHEDULE_ACTIVE_REASONS)[number];
+
+export interface ScheduleStateActive {
+	status: "active";
+	reason: ScheduleActiveReason;
+}
+
+export interface ScheduleStatePaused {
+	status: "paused";
+}
+
+export interface ScheduleStateInactive {
+	status: "inactive";
+}
+
+export type ScheduleState = ScheduleStateActive | ScheduleStatePaused | ScheduleStateInactive;
+
 export interface Schedule {
 	id: string;
 	workflowSource: WorkflowSource;

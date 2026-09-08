@@ -18,7 +18,7 @@ import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-o
 import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleOccurrenceUpdate } from "../infra/db/types/schedule";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
 import { runConcurrently } from "../lib/concurrency";
@@ -216,7 +216,7 @@ async function processOverlapAllowSchedules(
 
 	const timersDueSoon: TimerEntry[] = [];
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
-	const stateTransitionEntries: StateTransitionRowInsert[] = [];
+	const stateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
@@ -262,7 +262,6 @@ async function processOverlapAllowSchedules(
 				id: stateTransitionId,
 				workflowRunId: runId,
 				type: "workflow_run",
-				status: "queued",
 				attempt: 1,
 				state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 			});
@@ -319,7 +318,7 @@ async function processOverlapAllowSchedules(
 async function insertRecurringRunsInTx(
 	entries: {
 		workflowRunEntries: NonEmptyArray<WorkflowRunRowInsert>;
-		stateTransitionEntries: NonEmptyArray<StateTransitionRowInsert>;
+		stateTransitionEntries: NonEmptyArray<WorkflowRunStateTransitionRowInsert>;
 		scheduleUpdates: NonEmptyArray<ScheduleOccurrenceUpdate>;
 		outboxEntries: NonEmptyArray<WorkflowRunOutboxRowInsertPending>;
 	},
@@ -347,7 +346,7 @@ async function processOverlapSkipSchedules(
 
 	const timersDueSoon: TimerEntry[] = [];
 	const workflowRunEntries: WorkflowRunRowInsert[] = [];
-	const stateTransitionEntries: StateTransitionRowInsert[] = [];
+	const stateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
@@ -395,7 +394,6 @@ async function processOverlapSkipSchedules(
 			id: stateTransitionId,
 			workflowRunId: runId,
 			type: "workflow_run",
-			status: "queued",
 			attempt: 1,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
@@ -444,7 +442,7 @@ async function processOverlapSkipSchedules(
 async function insertRunsAndAdvanceSchedulesInTx(
 	entries: {
 		workflowRunEntries: WorkflowRunRowInsert[];
-		stateTransitionEntries: StateTransitionRowInsert[];
+		stateTransitionEntries: WorkflowRunStateTransitionRowInsert[];
 		scheduleUpdates: NonEmptyArray<ScheduleOccurrenceUpdate>;
 		outboxEntries: WorkflowRunOutboxRowInsertPending[];
 	},
@@ -490,7 +488,7 @@ async function processOverlapCancelPreviousSchedules(
 
 	const timersDueSoon: TimerEntry[] = [];
 	const newWorkflowRunEntries: WorkflowRunRowInsert[] = [];
-	const newRunStateTransitionEntries: StateTransitionRowInsert[] = [];
+	const newRunStateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 	const newOutboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
 	const scheduleUpdates: ScheduleOccurrenceUpdate[] = [];
 
@@ -539,7 +537,6 @@ async function processOverlapCancelPreviousSchedules(
 			id: stateTransitionId,
 			workflowRunId: runId,
 			type: "workflow_run",
-			status: "queued",
 			attempt: 1,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
@@ -607,7 +604,7 @@ async function cancelPreviousAndInsertRunsInTx(
 		runIdsToCancel: string[];
 		runsToCancel: Array<{ id: string; attempts: number; namespaceId: NamespaceId; pool?: string; priority?: number }>;
 		newWorkflowRunEntries: NonEmptyArray<WorkflowRunRowInsert>;
-		newRunStateTransitionEntries: NonEmptyArray<StateTransitionRowInsert>;
+		newRunStateTransitionEntries: NonEmptyArray<WorkflowRunStateTransitionRowInsert>;
 		scheduleUpdates: NonEmptyArray<ScheduleOccurrenceUpdate>;
 		newOutboxEntries: WorkflowRunOutboxRowInsertPending[];
 	},
@@ -638,7 +635,7 @@ async function cancelPreviousAndInsertRunsInTx(
 		await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now);
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
-		const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
+		const cancelStateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 		const cancelledRunStateTransitionIdUpdates: {
 			filter: { namespaceId: NamespaceId; id: string };
 			update: { stateTransitionId: string };
@@ -657,7 +654,6 @@ async function cancelPreviousAndInsertRunsInTx(
 				id: stateTransitionId,
 				workflowRunId: run.id,
 				type: "workflow_run",
-				status: "cancelled",
 				attempt: run.attempts,
 				state: { status: "cancelled", explanation: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
 			});

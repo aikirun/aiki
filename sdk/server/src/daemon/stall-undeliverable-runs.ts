@@ -6,7 +6,7 @@ import { ulid } from "ulidx";
 
 import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories, TxRepositories } from "../infra/db/types";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import { runConcurrently } from "../lib/concurrency";
 import { ulidUpperBound } from "../lib/ulid";
 import type { DaemonContext } from "../middleware/context";
@@ -59,7 +59,7 @@ async function stallByRunIdsInTx(context: DaemonContext, runIds: NonEmptyArray<s
 
 	await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(stalledRunIds);
 
-	const stallStateTransitionEntries: StateTransitionRowInsert[] = [];
+	const stallStateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 	const stalledRunStateTransitionUpdates: {
 		filter: { namespaceId: NamespaceId; id: string };
 		update: { stateTransitionId: string };
@@ -71,7 +71,6 @@ async function stallByRunIdsInTx(context: DaemonContext, runIds: NonEmptyArray<s
 			id: stateTransitionId,
 			workflowRunId: run.id,
 			type: "workflow_run",
-			status: "stalled",
 			attempt: run.attempts,
 			state: { status: "stalled" } satisfies WorkflowRunStateStalled,
 		});

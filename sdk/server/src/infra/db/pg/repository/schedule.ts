@@ -12,10 +12,11 @@ import { schedule, workflow } from "../schema";
 
 export type ScheduleRow = typeof schedule.$inferSelect;
 type ScheduleRowInsert = typeof schedule.$inferInsert;
-type ScheduleRowUpdate = Partial<
+export type ScheduleRowUpdate = Partial<
 	Pick<
 		ScheduleRowInsert,
 		| "status"
+		| "latestStateTransitionId"
 		| "referenceId"
 		| "workflowRunInput"
 		| "workflowRunInputHash"
@@ -95,7 +96,8 @@ export const createScheduleRepository = (db: PgDb) => ({
 
 	async get(
 		namespaceId: NamespaceId,
-		filter: { id?: string; definitionHashes?: string[]; referenceId?: string | null }
+		filter: { id?: string; definitionHashes?: string[]; referenceId?: string | null },
+		options?: { lock?: "update" }
 	): Promise<ScheduleRow | null> {
 		const conditions = [eq(schedule.namespaceId, namespaceId)];
 
@@ -113,12 +115,13 @@ export const createScheduleRepository = (db: PgDb) => ({
 			}
 		}
 
-		const result = await db
+		const query = db
 			.select()
 			.from(schedule)
 			.where(and(...conditions))
 			.limit(1);
 
+		const result = options?.lock ? await query.for(options.lock) : await query;
 		return result[0] ?? null;
 	},
 

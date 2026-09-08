@@ -4,7 +4,7 @@ import type { DiscardableTaskStatus, TaskStateDiscarded } from "@aikirun/types/w
 import { ulid } from "ulidx";
 
 import type { TxRepositories } from "../infra/db/types";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { TaskStateTransitionRowInsert } from "../infra/db/types/state-transition";
 
 export async function discardStaleTasks(
 	workflowRunIds: string | NonEmptyArray<string>,
@@ -36,7 +36,7 @@ export async function discardStaleTasks(
 		return;
 	}
 
-	const stateTransitionEntries: StateTransitionRowInsert[] = [];
+	const stateTransitionEntries: TaskStateTransitionRowInsert[] = [];
 
 	for (const discardedTaskId of discardedTaskIds) {
 		const taskUpdate = taskUpdatesById.get(discardedTaskId);
@@ -48,7 +48,6 @@ export async function discardStaleTasks(
 			workflowRunId: taskUpdate.filter.workflowRunId,
 			type: "task",
 			taskId: discardedTaskId,
-			status: "discarded",
 			attempt: taskUpdate.filter.attempts,
 			state: { status: "discarded" } satisfies TaskStateDiscarded,
 		});

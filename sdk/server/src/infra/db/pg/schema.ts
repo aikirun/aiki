@@ -9,7 +9,7 @@ import {
 	type WorkflowRunOptions,
 } from "@aikirun/types/workflow/run";
 import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
-import { relations, sql } from "drizzle-orm";
+import { relations, type SQL, sql } from "drizzle-orm";
 import {
 	boolean,
 	check,
@@ -99,6 +99,7 @@ export const schedule = pgTable(
 
 		lastOccurrence: timestampMs("last_occurrence"),
 		nextRunAt: timestampMs("next_run_at").notNull(),
+		latestStateTransitionId: text("latest_state_transition_id").notNull(),
 
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
@@ -240,11 +241,14 @@ export const stateTransition = pgTable(
 	"state_transition",
 	{
 		id: text("id").primaryKey(),
-		workflowRunId: text("workflow_run_id").notNull(),
+		workflowRunId: text("workflow_run_id"),
 		type: stateTransitionTypeEnum("type").notNull(),
 		taskId: text("task_id"),
-		status: text("status").notNull(),
-		attempt: integer("attempt").notNull(),
+		scheduleId: text("schedule_id"),
+		status: text("status")
+			.notNull()
+			.generatedAlwaysAs((): SQL => sql`${stateTransition.state}->>'status'`),
+		attempt: integer("attempt"),
 		state: jsonb("state").notNull(),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
@@ -259,14 +263,24 @@ export const stateTransition = pgTable(
 			columns: [table.taskId],
 			foreignColumns: [task.id],
 		}),
-		index("idx_state_transition_workflow_run_id").on(table.workflowRunId, table.id),
+		foreignKey({
+			name: "fk_state_transition_schedule",
+			columns: [table.scheduleId],
+			foreignColumns: [schedule.id],
+		}),
+		index("idx_state_transition_workflow_run_id")
+			.on(table.workflowRunId, table.id)
+			.where(sql`${table.workflowRunId} IS NOT NULL`),
+		index("idx_state_transition_schedule_id")
+			.on(table.scheduleId, table.id)
+			.where(sql`${table.scheduleId} IS NOT NULL`),
 		check(
-			"chk_task_state_transition_requires_task_id",
-			sql`(${table.type} = 'task' AND ${table.taskId} IS NOT NULL) OR (${table.type} = 'workflow_run' AND ${table.taskId} IS NULL)`
+			"chk_state_transition_columns_match_type",
+			sql`(${table.type} = 'workflow_run' AND ${table.workflowRunId} IS NOT NULL AND ${table.attempt} IS NOT NULL AND ${table.taskId} IS NULL AND ${table.scheduleId} IS NULL) OR (${table.type} = 'task' AND ${table.workflowRunId} IS NOT NULL AND ${table.attempt} IS NOT NULL AND ${table.taskId} IS NOT NULL AND ${table.scheduleId} IS NULL) OR (${table.type} = 'schedule' AND ${table.scheduleId} IS NOT NULL AND ${table.workflowRunId} IS NULL AND ${table.attempt} IS NULL AND ${table.taskId} IS NULL)`
 		),
 		check(
 			"chk_state_transition_status_matches_type",
-			sql`(${table.type} = 'workflow_run' AND ${table.status} = ANY(enum_range(NULL::workflow_run_status)::text[])) OR (${table.type} = 'task' AND ${table.status} = ANY(enum_range(NULL::task_status)::text[]))`
+			sql`(${table.type} = 'workflow_run' AND ${table.status} = ANY(enum_range(NULL::workflow_run_status)::text[])) OR (${table.type} = 'task' AND ${table.status} = ANY(enum_range(NULL::task_status)::text[])) OR (${table.type} = 'schedule' AND ${table.status} = ANY(enum_range(NULL::schedule_status)::text[]))`
 		),
 	]
 );

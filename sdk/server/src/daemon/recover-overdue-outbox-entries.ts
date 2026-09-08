@@ -7,7 +7,7 @@ import { ulid } from "ulidx";
 
 import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories, TxRepositories } from "../infra/db/types";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import { runConcurrently } from "../lib/concurrency";
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import type { DaemonContext } from "../middleware/context";
@@ -100,7 +100,7 @@ async function releaseStaleClaimsInTx(
 	const releasedRuns = await txRepos.workflowRun.bulkReleaseToQueued(context, params.runIds);
 
 	if (isNonEmptyArray(releasedRuns)) {
-		const stateTransitionEntries: StateTransitionRowInsert[] = [];
+		const stateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 		const stateTransitionUpdates: {
 			filter: { namespaceId: NamespaceId; id: string };
 			update: { stateTransitionId: string };
@@ -112,7 +112,6 @@ async function releaseStaleClaimsInTx(
 				id: stateTransitionId,
 				workflowRunId: run.id,
 				type: "workflow_run",
-				status: "queued",
 				attempt: run.attempts,
 				state: { status: "queued", reason: "recovery" } satisfies WorkflowRunStateQueued,
 			});
