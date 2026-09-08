@@ -17,7 +17,7 @@ export interface Queue {
 	clear(): void;
 }
 
-export interface Store {
+export interface Broker {
 	getOrCreateQueue(queueName: string): Queue;
 	getQueue(queueName: string): Queue | undefined;
 	/**
@@ -74,7 +74,7 @@ function createQueue(): Queue {
 	};
 }
 
-export function createStore(): Store {
+export function createBroker(): Broker {
 	const queuesByName = new Map<string, Queue>();
 
 	return {

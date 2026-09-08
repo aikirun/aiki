@@ -1,7 +1,7 @@
 import type { CreatePublisher, CreateSubscriber } from "@aikirun/types/infra/queue";
 
+import { createBroker } from "./broker";
 import { createInMemoryPublisher } from "./publisher";
-import { createStore } from "./store";
 import { createInMemorySubscriber } from "./subscriber";
 
 export interface InMemoryQueue {
@@ -11,14 +11,14 @@ export interface InMemoryQueue {
 }
 
 /**
- * In-process publisher + subscriber sharing a single store. The store
+ * In-process publisher + subscriber sharing a single broker. The broker
  * holds workflow-run queues and a registry of subscribers parked on the queues.
  */
 export function inMemoryQueue(): InMemoryQueue {
-	const store = createStore();
+	const broker = createBroker();
 	return {
-		publisher: createInMemoryPublisher(store),
-		subscriber: createInMemorySubscriber(store),
-		clear: () => store.clear(),
+		publisher: createInMemoryPublisher(broker),
+		subscriber: createInMemorySubscriber(broker),
+		clear: () => broker.clear(),
 	};
 }

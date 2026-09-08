@@ -7,16 +7,16 @@ import type {
 	ReadyWorkflowRun,
 } from "@aikirun/types/infra/queue";
 
+import type { Broker, Queue } from "./broker";
 import { getWorkflowQueueName } from "./key";
-import type { Queue, Store } from "./store";
 
-export function createInMemoryPublisher(store: Store): CreatePublisher {
+export function createInMemoryPublisher(broker: Broker): CreatePublisher {
 	return (_context: PublisherContext): Publisher => ({
 		async publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
 			const touchedQueues = new Map<string, Queue>();
 			for (const { id, source, name, versionId, rank, pool } of runs) {
 				const queueName = getWorkflowQueueName({ source, name, versionId, pool });
-				const queue = store.getOrCreateQueue(queueName);
+				const queue = broker.getOrCreateQueue(queueName);
 				queue.push({ rank, id });
 				touchedQueues.set(queueName, queue);
 			}

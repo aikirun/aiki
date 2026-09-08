@@ -43,6 +43,10 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 		signal,
 	});
 
+	if (!timerPriorityQueue) {
+		logger.warn("No timer priority queue configured, runs may wake seconds later than expected.");
+	}
+
 	const childRunCanceller = createChildRunCanceller(
 		timerPriorityQueue &&
 			createImminentRunTimerQueue({

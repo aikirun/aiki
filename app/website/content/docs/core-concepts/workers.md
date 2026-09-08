@@ -104,6 +104,28 @@ const aikiWorker = worker({
 });
 ```
 
+When the worker runs in the same process as the server, `inMemoryQueue()` pairs a publisher and a subscriber over one in-process broker, with no external service:
+
+```package-install
+@aikirun/memory
+```
+
+```typescript
+import { inMemoryQueue } from "@aikirun/memory";
+
+const queue = inMemoryQueue();
+
+const aikiServer = server({
+  db: database({ provider: "pg", url: databaseUrl }),
+  runtime: { publisher: queue.publisher },
+});
+
+const aikiWorker = worker({
+  workflows: [orderWorkflowV1],
+  subscriber: queue.subscriber,
+});
+```
+
 You can also implement your own subscriber by providing a function that matches the `CreateSubscriber` type from `@aikirun/types/infra/queue`. See [Subscribers](../architecture/subscribers.md) for how the implementations work and what custom subscribers must provide.
 
 ## Next Steps
