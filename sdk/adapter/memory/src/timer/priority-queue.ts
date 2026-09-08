@@ -34,6 +34,14 @@ function compareTimerItems(a: TimerHeapItem, b: TimerHeapItem): number {
 	return 0;
 }
 
+export interface InMemoryTimerPriorityQueue extends CreateTimerPriorityQueue {
+	/**
+	 * Drops every queued timer and any wake they left pending. Waiters already
+	 * parked on the queue stay attached and wake on what is added next.
+	 */
+	clear(): void;
+}
+
 /**
  * In-process TimerPriorityQueue backed by a min-heap and an internal signal queue.
  *
@@ -42,9 +50,10 @@ function compareTimerItems(a: TimerHeapItem, b: TimerHeapItem): number {
  * State is allocated once per call to `inMemoryTimerPriorityQueue()` and persists
  * for the lifetime of the returned factory. Every factory invocation returns a
  * queue over that same state, so a server can be stopped and restarted (which
- * re-invokes the factory) without losing queued timers.
+ * re-invokes the factory) without losing queued timers. `clear()` empties that
+ * state directly.
  */
-export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
+export function inMemoryTimerPriorityQueue(): InMemoryTimerPriorityQueue {
 	const heap = createMinHeap<TimerHeapItem>(compareTimerItems);
 	const signals: number[] = [];
 
@@ -61,7 +70,7 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 		return min === undefined ? null : { rank: min };
 	}
 
-	return (_context: TimerPriorityQueueContext): TimerPriorityQueue => ({
+	const createTimerPriorityQueue = (_context: TimerPriorityQueueContext): TimerPriorityQueue => ({
 		async add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult> {
 			const minRank = heap.peek()?.rank;
 
@@ -168,6 +177,13 @@ export function inMemoryTimerPriorityQueue(): CreateTimerPriorityQueue {
 					waiterHandle?.close();
 				},
 			};
+		},
+	});
+
+	return Object.assign(createTimerPriorityQueue, {
+		clear(): void {
+			while (heap.popMin() !== undefined) {}
+			signals.length = 0;
 		},
 	});
 }
