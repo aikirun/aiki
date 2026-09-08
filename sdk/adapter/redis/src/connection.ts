@@ -74,22 +74,41 @@ export const connectionTracker = (() => {
 
 /**
  * Resolves when the connection's connect → ready handshake completes, rejecting
- * if the connection closes first.
+ * if the connection closes first, or if it is still not ready after the
+ * connection's own connect timeout.
+ *
+ * A client that never starts connecting emits no events at all, so without the
+ * timeout this would wait forever. The rejection includes the connection's
+ * status, so the log shows what it was stuck on.
  */
 export function untilReadyHandshake(redis: Redis): Promise<void> {
 	if (redis.status === "ready") {
 		return Promise.resolve();
 	}
 
+	const handshakeTimeoutMs = redis.options.connectTimeout ?? 10_000;
+
 	return new Promise((resolve, reject) => {
 		const onReady = () => {
+			clearTimeout(handshakeTimeout);
 			redis.off("close", onClose);
 			resolve();
 		};
 		const onClose = () => {
+			clearTimeout(handshakeTimeout);
 			redis.off("ready", onReady);
 			reject(new Error("Redis connection closed before completing the ready handshake"));
 		};
+		const handshakeTimeout = setTimeout(() => {
+			redis.off("ready", onReady);
+			redis.off("close", onClose);
+			reject(
+				new Error(
+					`Redis connection did not complete the ready handshake within ${handshakeTimeoutMs}ms (status: ${redis.status})`
+				)
+			);
+		}, handshakeTimeoutMs);
+
 		redis.once("ready", onReady);
 		redis.once("close", onClose);
 	});

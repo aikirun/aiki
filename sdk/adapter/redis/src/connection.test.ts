@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { createBinaryLatch, delay } from "@aikirun/lib/async";
+import { createBinaryLatch, delay, settleWithin } from "@aikirun/lib/async";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Redis } from "ioredis";
 
@@ -122,6 +122,23 @@ describe("untilReadyHandshake", () => {
 
 		redis.emit("ready");
 		await handshakeReadyPromise;
+
+		expect(redis.listenerCount("ready")).toBe(0);
+		expect(redis.listenerCount("close")).toBe(0);
+	});
+
+	test("rejects when the connection does not become ready within the connect timeout", async () => {
+		const handshakeReadyPromise = untilReadyHandshake(fakeRedis("wait", 5));
+
+		expect(handshakeReadyPromise).rejects.toThrow("did not complete the ready handshake within 5ms");
+		expect(await settleWithin(handshakeReadyPromise, 1_000)).toBe(true);
+	});
+
+	test("removes both listeners after timing out", async () => {
+		const redis = fakeRedis("wait", 5);
+
+		const handshakeReadyPromise = untilReadyHandshake(redis);
+		expect(await settleWithin(handshakeReadyPromise, 1_000)).toBe(true);
 
 		expect(redis.listenerCount("ready")).toBe(0);
 		expect(redis.listenerCount("close")).toBe(0);

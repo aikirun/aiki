@@ -133,9 +133,13 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 			},
 
 			createWaiter(): TimerPriorityQueueWaiter {
+				// A lazy client waits for its first command before connecting, and this
+				// connection waits to be ready before it sends one. Left lazy, both
+				// sides wait forever, so it connects up front.
 				const redisDuplicate = redis.duplicate({
 					maxRetriesPerRequest: 0,
 					enableOfflineQueue: false,
+					lazyConnect: false,
 				});
 
 				let completedReadyHandshake = false;
