@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/types",
-	"version": "0.40.0",
+	"version": "0.41.0",
 	"description": "Core type definitions for Aiki",
 	"type": "module",
 	"exports": {

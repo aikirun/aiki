@@ -2,6 +2,79 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.41.0
+
+This release reworks how a schedule catches up after a gap. A schedule counts what it owes from its stored next run and fires at most three occurrences per pass, arming its own timer for whatever is left, so a long backlog is worked through in batches rather than all at once. Schedule status changes are now validated transitions recorded as history: pausing a deactivated schedule is refused instead of silently applied, and activating a paused schedule leaves it paused. `trigger` is gone from the start options, replaced by a plain `delay`, and a duration is always an object — the raw-milliseconds form is no longer accepted. Three database migrations (`0038` through `0040`) ship with this release.
+
+### Breaking Changes
+
+- **`trigger` is replaced by `delay`.** A delayed start takes a duration directly, counted from the moment the run is created. The `TriggerStrategy` type and the `@aikirun/types/workflow/run/trigger` module are gone, and `{ type: "immediate" }` has no replacement — omit `delay` and the run is due immediately.
+
+  ```typescript
+  // Before
+  await notify.with("trigger", { type: "delayed", delay: { seconds: 5 } }).start(client, input);
+  await notify.with("trigger", { type: "delayed", delayMs: 5_000 }).start(client, input);
+
+  // After
+  await notify.with("delay", { seconds: 5 }).start(client, input);
+  ```
+
+- **A duration is always an object.** The `Duration` type — `number | DurationObject` — is removed from `@aikirun/lib/duration` and `@aikirun/workflow`. `run.sleep` and `toMilliseconds` take a `DurationObject` carrying at least one of `days`, `hours`, `minutes`, `seconds`, `milliseconds`.
+
+  ```typescript
+  // Before
+  await run.sleep("short-delay", 5_000);
+
+  // After
+  await run.sleep("short-delay", { milliseconds: 5_000 });
+  ```
+
+- **`StateTransition` no longer exists as a union.** `@aikirun/types/workflow/state-transition` exports `WorkflowRunStateTransition` and `TaskStateTransition` on their own; `StateTransitionBase`, `STATE_TRANSITION_TYPES`, and `StateTransitionType` are gone. `WorkflowRunListTransitionsResponseV1.transitions` is typed as the union of the two.
+
+  ```typescript
+  // Before
+  import type { StateTransition } from "@aikirun/types/workflow/state-transition";
+  function render(transitions: StateTransition[]) {}
+
+  // After
+  import type { TaskStateTransition, WorkflowRunStateTransition } from "@aikirun/types/workflow/state-transition";
+  function render(transitions: Array<WorkflowRunStateTransition | TaskStateTransition>) {}
+  ```
+
+- **Activating a paused schedule leaves it paused.** Only `resume()` ends a pause. Activation is otherwise idempotent as before, and a deactivated schedule still comes back on activation, recorded as `reactivated`.
+
+- **Activation no longer resets a schedule's next run.** A schedule picks up from the next run it was holding, so a reactivated schedule under `"allow"` works through the occurrences it missed while it was inactive. Attaching a reference id to an existing schedule leaves its next run untouched too.
+
+- **`pause()` and `resume()` are refused on a deactivated schedule.** Both fail with a 400 instead of silently succeeding; `activate()` is what brings a deactivated schedule back. Pausing an already-paused schedule, or deactivating an already-deactivated one, stays a no-op and writes no history.
+
+- **Three migrations ship with this release.** `0038` makes `schedule.next_run_at` `NOT NULL`. `0039` adds `schedule` to the `state_transition_type` enum. `0040` adds `schedule.latest_state_transition_id` (`NOT NULL`, backfilled with a minted transition row per existing schedule) and `state_transition.schedule_id`, makes `state_transition.workflow_run_id` and `attempt` nullable, and turns `state_transition.status` into a column generated from `state`.
+
+### New Features
+
+- **Schedules catch up in batches.** A schedule counts what it owes from its stored next run and fires at most `maxOccurrencesPerSchedule` occurrences per pass — default 3, under `daemons.imminentRecurringRuns`. Whatever is left stays due, and where a timer queue is configured the schedule arms a timer that is due at once, so the rest go on the next pass. With `overlapPolicy: "allow"` every missed occurrence runs, oldest first, whether the gap came from downtime or from the schedule being deactivated; `"skip"` and `"cancel_previous"` run only the most recent one, as before.
+
+- **A schedule arms its own next timer.** When the next occurrence falls inside the lookahead window, firing a schedule queues that timer on commit instead of leaving it to the next poll.
+
+- **Schedule status history.** Every status change is recorded as a `state_transition` row the schedule points at, and an active schedule carries the reason it became active: `activated` on creation, `resumed` from paused, `reactivated` from inactive. `ScheduleState`, `ScheduleStateActive`, `ScheduleStatePaused`, `ScheduleStateInactive`, `ScheduleActiveReason`, and `SCHEDULE_ACTIVE_REASONS` are exported from `@aikirun/types/schedule`. The history is stored but not yet served over the API or shown in the dashboard.
+
+### Improvements
+
+- **Schedule writes lock the row they matched.** Activation, pause, resume, and deactivation take `FOR UPDATE` on the matching schedule inside a transaction, so concurrent activations, a payload upgrade racing a reactivation, and a reference adoption racing a status change all settle on one schedule.
+
+- **`state_transition.status` is generated from `state`.** The database computes the column from the state it describes, so the two cannot disagree.
+
+- **Every table with `updated_at` is checked for its trigger.** A new integration test in `@aikirun/server` and `@aikirun/iam` fails if a table declares the column without the trigger that maintains it.
+
+### Bug Fixes
+
+- **Adopting a reference id no longer duplicates a schedule.** When the reference id was free and the definition already existed unreferenced, an activation that lost the race to attach it fell through and created a second schedule for the same definition. The locked lookup settles the race, and both activations return the same schedule.
+
+- **Adopting a reference id no longer activates a paused schedule.** Attaching a reference used to set the schedule active and reset its next run; it now records the activating client's payload and leaves the status alone.
+
+### Documentation
+
+- New **Delayed Start** section in the workflows doc. The schedules doc says what each overlap policy does with missed occurrences, and spells out that re-activating does not resume a paused schedule. The sleeps doc drops the milliseconds form. Endpoint publishing is marked coming soon across the README, the architecture docs, and the landing page, which also gains an "Infrastructure is optional" section.
+
 ## 0.40.0
 
 This release lets a client bring its own codec, so payloads can be encrypted or compressed end to end without the server knowing, and adds a `priority` run option. A run whose task is waiting out a retry delay now has its own status instead of sitting in `running`. Inputs, outputs, and event data that are not plain JSON are rejected at compile time, with the offending path in the error. Under load, run creation no longer serializes on the workflow row, bulk transitions lock rows in id order, and every daemon works through its pages in bounded concurrent chunks. The dashboard is usable at phone width. Nine database migrations (`0029` through `0037`) ship with this release.
