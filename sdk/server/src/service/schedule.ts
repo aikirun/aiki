@@ -12,6 +12,7 @@ import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 import CronExpressionParser from "cron-parser";
 import { ulid } from "ulidx";
 
+import { transitionScheduleInTx, writeScheduleStateInTx } from "./state-machine/schedule";
 import { getOrCreateWorkflowInTx } from "./workflow";
 import { ScheduleConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
@@ -216,24 +217,25 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 	},
 
 	async pauseSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, { id }, { status: "paused" });
-		if (!schedule) {
-			throw new NotFoundError(`Schedule not found: ${id}`);
-		}
+		await repos.transaction((txRepos) =>
+			transitionScheduleInTx(txRepos, { namespaceId, id, state: { status: "paused" } })
+		);
 	},
 
 	async resumeSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, { id }, { status: "active" });
-		if (!schedule) {
-			throw new NotFoundError(`Schedule not found: ${id}`);
-		}
+		await repos.transaction((txRepos) =>
+			transitionScheduleInTx(txRepos, {
+				namespaceId,
+				id,
+				state: { status: "active", reason: "resumed" },
+			})
+		);
 	},
 
 	async deactivateSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
-		const schedule = await repos.schedule.update(namespaceId, { id }, { status: "inactive" });
-		if (!schedule) {
-			throw new NotFoundError(`Schedule not found: ${id}`);
-		}
+		await repos.transaction((txRepos) =>
+			transitionScheduleInTx(txRepos, { namespaceId, id, state: { status: "inactive" } })
+		);
 	},
 });
 
@@ -306,18 +308,20 @@ async function activateScheduleInTx(
 	const nextRunAt = getNextOccurrence(spec, now) as TimestampMs;
 
 	if (!referenceId) {
-		const existingScheduleByDefinition = await txRepos.schedule.get(namespaceId, {
-			definitionHashes: candidateHashes(definitionHashes),
-		});
+		const existingScheduleByDefinition = await txRepos.schedule.get(
+			namespaceId,
+			{ definitionHashes: candidateHashes(definitionHashes) },
+			{ lock: "update" }
+		);
 
 		const schedule = existingScheduleByDefinition
-			? await reuseSchedule(txRepos.schedule, {
+			? await activateExistingSchedule(txRepos, {
 					namespaceId,
 					existing: existingScheduleByDefinition,
 					payload,
 					nextDefinitionHash: definitionHashes.nextValue,
 				})
-			: await createSchedule(txRepos.schedule, {
+			: await createSchedule(txRepos, {
 					namespaceId,
 					workflowId: workflowRow.id,
 					spec,
@@ -330,7 +334,7 @@ async function activateScheduleInTx(
 		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 	}
 
-	const existingScheduleByReference = await txRepos.schedule.get(namespaceId, { referenceId });
+	const existingScheduleByReference = await txRepos.schedule.get(namespaceId, { referenceId }, { lock: "update" });
 	if (existingScheduleByReference) {
 		if (!candidateHashes(definitionHashes).includes(existingScheduleByReference.definitionHash)) {
 			if (conflictPolicy === "error") {
@@ -340,7 +344,7 @@ async function activateScheduleInTx(
 			return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
 		}
 
-		const schedule = await reuseSchedule(txRepos.schedule, {
+		const schedule = await activateExistingSchedule(txRepos, {
 			namespaceId,
 			existing: existingScheduleByReference,
 			payload,
@@ -351,38 +355,24 @@ async function activateScheduleInTx(
 	}
 
 	// Reference id is free, but the definition may already exist.
-	const existingNonReferencedSchedule = await txRepos.schedule.get(namespaceId, {
-		definitionHashes: candidateHashes(definitionHashes),
-		referenceId: null,
-	});
+	const existingNonReferencedSchedule = await txRepos.schedule.get(
+		namespaceId,
+		{ definitionHashes: candidateHashes(definitionHashes), referenceId: null },
+		{ lock: "update" }
+	);
 
 	if (existingNonReferencedSchedule) {
-		const updates: Partial<SchedulePayload> & { referenceId: string; status: "active" } = {
-			referenceId,
-			status: "active",
-		};
-		// Matching the request's next hash means the stored schedule was written by a client that
-		// has already switched to the rotation this request has only been told about. The stored
-		// payload is the newer one, so it stays.
-		if (existingNonReferencedSchedule.definitionHash !== definitionHashes.nextValue) {
-			updates.workflowRunInput = payload.workflowRunInput;
-			updates.workflowRunInputHash = payload.workflowRunInputHash;
-			updates.clientHasherApplied = payload.clientHasherApplied;
-			updates.clientCodecApplied = payload.clientCodecApplied;
-			updates.definitionHash = payload.definitionHash;
-		}
-		const schedule = await txRepos.schedule.update(
+		const schedule = await activateExistingSchedule(txRepos, {
 			namespaceId,
-			{ id: existingNonReferencedSchedule.id, referenceId: null },
-			updates
-		);
-
-		if (schedule) {
-			return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
-		}
+			existing: existingNonReferencedSchedule,
+			payload,
+			nextDefinitionHash: definitionHashes.nextValue,
+			referenceIdToAttach: referenceId,
+		});
+		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 	}
 
-	const schedule = await createSchedule(txRepos.schedule, {
+	const schedule = await createSchedule(txRepos, {
 		namespaceId,
 		workflowId: workflowRow.id,
 		spec,
@@ -395,40 +385,45 @@ async function activateScheduleInTx(
 	return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 }
 
-async function reuseSchedule(
-	repo: Repositories["schedule"],
+async function activateExistingSchedule(
+	txRepos: TxRepositories,
 	params: {
 		namespaceId: NamespaceId;
 		existing: ScheduleRow;
 		payload: SchedulePayload;
 		nextDefinitionHash: string | undefined;
+		referenceIdToAttach?: string;
 	}
 ): Promise<ScheduleRow> {
+	// Callers lock the matching schedule before entering this function. A reference is supplied
+	// only after the locked lookup confirmed the schedule has none, so attaching it cannot
+	// overwrite a reference assigned by another activation.
 	const { existing, payload } = params;
-	const needsActivation = existing.status !== "active";
-	// Matching the request's next hash means the stored schedule was written by a client that has
-	// already switched to the rotation this request has only been told about. The stored payload
-	// is the newer one, so it stays. The stored input itself is never compared: a codec may encode
-	// the same input differently each time, and an unchanged hash and declaration mean the stored
-	// value still decodes.
-	const payloadChanged =
+	// A paused schedule stays paused: only `resume` ends a pause.
+	const needsReactivation = existing.status === "inactive";
+
+	// The announced next hash identifies a newer stored payload that this client must preserve.
+	// Otherwise, attaching a reference records the activating client's payload. Repeated
+	// activation without attachment keeps equivalent input: a randomized codec can produce
+	// different bytes for the same input, so hashes and declarations decide whether to write.
+	const shouldWritePayload =
 		existing.definitionHash !== params.nextDefinitionHash &&
-		(existing.workflowRunInputHash !== payload.workflowRunInputHash ||
+		(params.referenceIdToAttach !== undefined ||
+			existing.workflowRunInputHash !== payload.workflowRunInputHash ||
 			existing.definitionHash !== payload.definitionHash ||
 			existing.clientHasherApplied !== payload.clientHasherApplied ||
 			existing.clientCodecApplied !== payload.clientCodecApplied);
 
-	if (!needsActivation && !payloadChanged) {
+	if (!needsReactivation && !shouldWritePayload && params.referenceIdToAttach === undefined) {
 		return existing;
 	}
 
-	const updates: Partial<SchedulePayload> & { status?: "active" } = {};
-
-	if (needsActivation) {
-		updates.status = "active";
+	const updates: Partial<SchedulePayload> & { referenceId?: string } = {};
+	if (params.referenceIdToAttach !== undefined) {
+		updates.referenceId = params.referenceIdToAttach;
 	}
 
-	if (payloadChanged) {
+	if (shouldWritePayload) {
 		updates.workflowRunInput = payload.workflowRunInput;
 		updates.workflowRunInputHash = payload.workflowRunInputHash;
 		updates.clientHasherApplied = payload.clientHasherApplied;
@@ -436,17 +431,24 @@ async function reuseSchedule(
 		updates.definitionHash = payload.definitionHash;
 	}
 
-	const updatedRow = await repo.update(params.namespaceId, { id: existing.id }, updates);
-
-	if (!updatedRow) {
-		throw new NotFoundError(`Schedule not found: ${existing.id}`);
+	if (!needsReactivation) {
+		const updatedRow = await txRepos.schedule.update(params.namespaceId, { id: existing.id }, updates);
+		if (!updatedRow) {
+			throw new NotFoundError(`Schedule not found: ${existing.id}`);
+		}
+		return updatedRow;
 	}
 
-	return updatedRow;
+	return writeScheduleStateInTx(txRepos, {
+		namespaceId: params.namespaceId,
+		id: existing.id,
+		state: { status: "active", reason: "reactivated" },
+		updates,
+	});
 }
 
 async function createSchedule(
-	repo: Repositories["schedule"],
+	txRepos: TxRepositories,
 	params: {
 		namespaceId: NamespaceId;
 		workflowId: string;
@@ -458,7 +460,8 @@ async function createSchedule(
 	}
 ): Promise<ScheduleRow> {
 	const { spec, payload } = params;
-	return repo.create({
+	const transitionId = ulid();
+	const created = await txRepos.schedule.create({
 		id: ulid(),
 		namespaceId: params.namespaceId,
 		workflowId: params.workflowId,
@@ -476,7 +479,15 @@ async function createSchedule(
 		referenceId: params.referenceId,
 		workflowRunOptions: params.workflowRunOptions,
 		nextRunAt: params.nextRunAt,
+		latestStateTransitionId: transitionId,
 	});
+	await txRepos.stateTransition.append({
+		id: transitionId,
+		type: "schedule",
+		scheduleId: created.id,
+		state: { status: "active", reason: "activated" },
+	});
+	return created;
 }
 
 export function scheduleRowToDomain(

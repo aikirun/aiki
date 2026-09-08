@@ -1,10 +1,13 @@
+import { createBinaryLatch } from "@aikirun/lib/async";
 import { hashInput } from "@aikirun/lib/crypto";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 
-import { createScheduleService } from "./schedule";
+import { createScheduleService, type ScheduleService } from "./schedule";
 import { describe, expect, test } from "bun:test";
+import { InvalidScheduleStateTransitionError } from "../errors";
+import type { Repositories } from "../infra/db/types";
 import { withFakeClock } from "../testing/clock";
-import { createServiceHarness } from "../testing/harness";
+import { createServiceHarness, withRepos } from "../testing/harness";
 
 const withHarness = createServiceHarness();
 
@@ -546,7 +549,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 describe("ScheduleService activateSchedule and the next run", () => {
 	const spec = { type: "interval" as const, everyMs: 60_000 };
 
-	test("reactivating a paused schedule leaves its next run untouched", () =>
+	test("activating a paused schedule again leaves it paused with its next run untouched", () =>
 		withHarness(async ({ context, repos }) => {
 			const scheduleService = createScheduleService({ repos });
 			const workflowRunInput = { region: "eu-west" };
@@ -570,7 +573,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 
 			expect(reactivated.id).toBe(schedule.id);
 			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
-				expect.objectContaining({ id: schedule.id, status: "active", nextRunAt: schedule.nextRunAt })
+				expect.objectContaining({ id: schedule.id, status: "paused", nextRunAt: schedule.nextRunAt })
 			);
 		}));
 
@@ -608,3 +611,432 @@ describe("ScheduleService activateSchedule and the next run", () => {
 			);
 		}));
 });
+
+describe("ScheduleService status transitions", () => {
+	const spec = { type: "interval" as const, everyMs: 60_000 };
+
+	async function activationRequest() {
+		const workflowRunInput = { region: "eu-west" };
+		return {
+			workflowName: "send-invoices",
+			workflowVersionId: "v1",
+			workflowRunInput: asOpaquePayload(workflowRunInput),
+			workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+			clientHasherApplied: false,
+			clientCodecApplied: false,
+			spec,
+		};
+	}
+
+	test("activating a new schedule writes an activated transition the schedule points at", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, await activationRequest());
+
+			const { rows } = await repos.stateTransition.listByScheduleId(schedule.id);
+			expect(rows).toEqual([
+				expect.objectContaining({
+					type: "schedule",
+					scheduleId: schedule.id,
+					status: "active",
+					state: { status: "active", reason: "activated" },
+				}),
+			]);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ status: "active", latestStateTransitionId: rows[0]?.id })
+			);
+		}));
+
+	test("resuming a paused schedule writes a resumed transition", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, await activationRequest());
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
+
+			await scheduleService.resumeSchedule(context.namespaceId, schedule.id);
+
+			const { rows } = await repos.stateTransition.listByScheduleId(schedule.id);
+			expect(rows).toEqual([
+				expect.objectContaining({ status: "active", state: { status: "active", reason: "resumed" } }),
+				expect.objectContaining({ status: "paused", state: { status: "paused" } }),
+				expect.objectContaining({ status: "active", state: { status: "active", reason: "activated" } }),
+			]);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ status: "active", latestStateTransitionId: rows[0]?.id })
+			);
+		}));
+
+	test("deactivating writes an inactive transition", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, await activationRequest());
+
+			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
+
+			const { rows } = await repos.stateTransition.listByScheduleId(schedule.id);
+			expect(rows).toEqual([
+				expect.objectContaining({ status: "inactive", state: { status: "inactive" } }),
+				expect.objectContaining({ status: "active", state: { status: "active", reason: "activated" } }),
+			]);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ status: "inactive", latestStateTransitionId: rows[0]?.id })
+			);
+		}));
+
+	test("activating a paused schedule again writes nothing", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const request = await activationRequest();
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
+
+			const { schedule: returned } = await scheduleService.activateSchedule(context.namespaceId, request);
+
+			expect(returned.id).toBe(schedule.id);
+			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({
+				rows: [
+					expect.objectContaining({ status: "paused", state: { status: "paused" } }),
+					expect.objectContaining({ status: "active", state: { status: "active", reason: "activated" } }),
+				],
+				total: 2,
+			});
+		}));
+
+	test("activating a deactivated schedule again writes a reactivated transition", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const request = await activationRequest();
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
+
+			const { schedule: reactivated } = await scheduleService.activateSchedule(context.namespaceId, request);
+
+			expect(reactivated.id).toBe(schedule.id);
+			const { rows } = await repos.stateTransition.listByScheduleId(schedule.id);
+			expect(rows).toEqual([
+				expect.objectContaining({ status: "active", state: { status: "active", reason: "reactivated" } }),
+				expect.objectContaining({ status: "inactive", state: { status: "inactive" } }),
+				expect.objectContaining({ status: "active", state: { status: "active", reason: "activated" } }),
+			]);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ status: "active", latestStateTransitionId: rows[0]?.id })
+			);
+		}));
+
+	test("resuming a deactivated schedule is refused", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, await activationRequest());
+			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
+
+			expect(scheduleService.resumeSchedule(context.namespaceId, schedule.id)).rejects.toThrow(
+				InvalidScheduleStateTransitionError
+			);
+			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({
+				rows: [expect.objectContaining({ status: "inactive" }), expect.objectContaining({ status: "active" })],
+				total: 2,
+			});
+		}));
+
+	test("pausing a deactivated schedule is refused", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, await activationRequest());
+			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
+
+			expect(scheduleService.pauseSchedule(context.namespaceId, schedule.id)).rejects.toThrow(
+				InvalidScheduleStateTransitionError
+			);
+			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({
+				rows: [expect.objectContaining({ status: "inactive" }), expect.objectContaining({ status: "active" })],
+				total: 2,
+			});
+		}));
+
+	test("adopting a reference id onto an active schedule writes no transition", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const request = await activationRequest();
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+
+			await scheduleService.activateSchedule(context.namespaceId, {
+				...request,
+				options: { reference: { id: "invoices-eu-west" } },
+			});
+
+			const { rows } = await repos.stateTransition.listByScheduleId(schedule.id);
+			expect(rows).toEqual([expect.objectContaining({ state: { status: "active", reason: "activated" } })]);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ referenceId: "invoices-eu-west", latestStateTransitionId: rows[0]?.id })
+			);
+		}));
+
+	test("adopting a reference id onto a paused schedule renames it and writes nothing", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const request = await activationRequest();
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
+
+			await scheduleService.activateSchedule(context.namespaceId, {
+				...request,
+				options: { reference: { id: "invoices-eu-west" } },
+			});
+
+			const { rows } = await repos.stateTransition.listByScheduleId(schedule.id);
+			expect(rows).toEqual([
+				expect.objectContaining({ status: "paused", state: { status: "paused" } }),
+				expect.objectContaining({ status: "active", state: { status: "active", reason: "activated" } }),
+			]);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({
+					status: "paused",
+					referenceId: "invoices-eu-west",
+					latestStateTransitionId: rows[0]?.id,
+				})
+			);
+		}));
+
+	test("adopting a reference id onto a deactivated schedule writes a reactivated transition", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const request = await activationRequest();
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
+
+			await scheduleService.activateSchedule(context.namespaceId, {
+				...request,
+				options: { reference: { id: "invoices-eu-west" } },
+			});
+
+			const { rows } = await repos.stateTransition.listByScheduleId(schedule.id);
+			expect(rows).toEqual([
+				expect.objectContaining({ status: "active", state: { status: "active", reason: "reactivated" } }),
+				expect.objectContaining({ status: "inactive" }),
+				expect.objectContaining({ status: "active", state: { status: "active", reason: "activated" } }),
+			]);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({
+					status: "active",
+					referenceId: "invoices-eu-west",
+					latestStateTransitionId: rows[0]?.id,
+				})
+			);
+		}));
+
+	test("two concurrent pauses write one transition", () =>
+		withHarness(async ({ context, repos }) =>
+			withRepos(async (secondaryRepos) => {
+				const service = createScheduleService({ repos });
+				const { schedule } = await service.activateSchedule(context.namespaceId, await activationRequest());
+
+				await runConcurrentScheduleOperations(
+					repos,
+					secondaryRepos,
+					(primary) => primary.pauseSchedule(context.namespaceId, schedule.id),
+					(secondary) => secondary.pauseSchedule(context.namespaceId, schedule.id)
+				);
+
+				expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({
+					rows: [
+						expect.objectContaining({ state: { status: "paused" } }),
+						expect.objectContaining({ state: { status: "active", reason: "activated" } }),
+					],
+					total: 2,
+				});
+			})
+		));
+
+	test("a concurrent resume after a repeated pause leaves the schedule active", () =>
+		withHarness(async ({ context, repos }) =>
+			withRepos(async (secondaryRepos) => {
+				const service = createScheduleService({ repos });
+				const { schedule } = await service.activateSchedule(context.namespaceId, await activationRequest());
+				await service.pauseSchedule(context.namespaceId, schedule.id);
+
+				await runConcurrentScheduleOperations(
+					repos,
+					secondaryRepos,
+					(primary) => primary.pauseSchedule(context.namespaceId, schedule.id),
+					(secondary) => secondary.resumeSchedule(context.namespaceId, schedule.id)
+				);
+
+				expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+					expect.objectContaining({ status: "active" })
+				);
+				expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({
+					rows: [
+						expect.objectContaining({ state: { status: "active", reason: "resumed" } }),
+						expect.objectContaining({ state: { status: "paused" } }),
+						expect.objectContaining({ state: { status: "active", reason: "activated" } }),
+					],
+					total: 3,
+				});
+			})
+		));
+
+	test("reference adoption racing with reactivation returns the same schedule", () =>
+		withHarness(async ({ context, repos }) =>
+			withRepos(async (secondaryRepos) => {
+				const service = createScheduleService({ repos });
+				const request = await activationRequest();
+				const { schedule } = await service.activateSchedule(context.namespaceId, request);
+				await service.deactivateSchedule(context.namespaceId, schedule.id);
+
+				const { schedule: adopted } = await runConcurrentScheduleOperations(
+					repos,
+					secondaryRepos,
+					(primary) => primary.activateSchedule(context.namespaceId, request),
+					(secondary) =>
+						secondary.activateSchedule(context.namespaceId, {
+							...request,
+							options: { reference: { id: "invoices-eu-west" } },
+						})
+				);
+
+				expect(adopted).toEqual(
+					expect.objectContaining({
+						id: schedule.id,
+						status: "active",
+						referenceId: "invoices-eu-west",
+						nextRunAt: schedule.nextRunAt,
+					})
+				);
+				expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({
+					rows: [
+						expect.objectContaining({ state: { status: "active", reason: "reactivated" } }),
+						expect.objectContaining({ state: { status: "inactive" } }),
+						expect.objectContaining({ state: { status: "active", reason: "activated" } }),
+					],
+					total: 3,
+				});
+			})
+		));
+
+	test("a payload upgrade survives a concurrent reactivation", () =>
+		withHarness(async ({ context, repos }) =>
+			withRepos(async (secondaryRepos) => {
+				const service = createScheduleService({ repos });
+				const request = await activationRequest();
+				const { schedule } = await service.activateSchedule(context.namespaceId, request);
+				await service.deactivateSchedule(context.namespaceId, schedule.id);
+				const nextInput = asOpaquePayload({ encrypted: "rotated-invoices" });
+
+				await runConcurrentScheduleOperations(
+					repos,
+					secondaryRepos,
+					(primary) => primary.activateSchedule(context.namespaceId, request),
+					(secondary) =>
+						secondary.activateSchedule(context.namespaceId, {
+							...request,
+							workflowRunInput: nextInput,
+							workflowRunInputHash: { value: "rotated-hash", deprecatedValues: [request.workflowRunInputHash.value] },
+							clientHasherApplied: true,
+							clientCodecApplied: true,
+						})
+				);
+
+				expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+					expect.objectContaining({
+						status: "active",
+						workflowRunInput: nextInput,
+						workflowRunInputHash: "rotated-hash",
+						clientHasherApplied: true,
+						clientCodecApplied: true,
+					})
+				);
+			})
+		));
+
+	test("an older activation preserves a concurrently upgraded payload", () =>
+		withHarness(async ({ context, repos }) =>
+			withRepos(async (secondaryRepos) => {
+				const service = createScheduleService({ repos });
+				const request = await activationRequest();
+				const { schedule } = await service.activateSchedule(context.namespaceId, request);
+				const nextInput = asOpaquePayload({ encrypted: "rotated-invoices" });
+
+				await runConcurrentScheduleOperations(
+					repos,
+					secondaryRepos,
+					(primary) =>
+						primary.activateSchedule(context.namespaceId, {
+							...request,
+							workflowRunInput: nextInput,
+							workflowRunInputHash: { value: "rotated-hash", deprecatedValues: [request.workflowRunInputHash.value] },
+							clientHasherApplied: true,
+							clientCodecApplied: true,
+						}),
+					(secondary) =>
+						secondary.activateSchedule(context.namespaceId, {
+							...request,
+							workflowRunInput: asOpaquePayload({ encrypted: "older-invoices" }),
+							workflowRunInputHash: { ...request.workflowRunInputHash, nextValue: "rotated-hash" },
+							clientCodecApplied: true,
+						})
+				);
+
+				expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+					expect.objectContaining({
+						workflowRunInput: nextInput,
+						workflowRunInputHash: "rotated-hash",
+						clientHasherApplied: true,
+						clientCodecApplied: true,
+					})
+				);
+			})
+		));
+});
+
+async function runConcurrentScheduleOperations<T>(
+	primaryRepos: Repositories,
+	secondaryRepos: Repositories,
+	primaryOperation: (service: ScheduleService) => Promise<unknown>,
+	secondaryOperation: (service: ScheduleService) => Promise<T>
+): Promise<T> {
+	const primaryWritten = createBinaryLatch();
+	const commitPrimary = createBinaryLatch();
+	const secondaryReadStarted = createBinaryLatch();
+	const primaryService = createScheduleService({
+		repos: {
+			...primaryRepos,
+			transaction: (fn) =>
+				primaryRepos.transaction(async (txRepos) => {
+					const result = await fn(txRepos);
+					primaryWritten.signal();
+					await commitPrimary.wait();
+					return result;
+				}),
+		},
+	});
+	const secondaryService = createScheduleService({
+		repos: {
+			...secondaryRepos,
+			transaction: (fn) =>
+				secondaryRepos.transaction((txRepos) =>
+					fn({
+						...txRepos,
+						schedule: {
+							...txRepos.schedule,
+							get: (namespaceId, filter, options) => {
+								const result = txRepos.schedule.get(namespaceId, filter, options);
+								if (filter.id || filter.definitionHashes) {
+									secondaryReadStarted.signal();
+								}
+								return result;
+							},
+						},
+					})
+				),
+		},
+	});
+
+	const primaryPromise = primaryOperation(primaryService);
+	await primaryWritten.wait();
+	const secondaryPromise = secondaryOperation(secondaryService);
+	await secondaryReadStarted.wait();
+	commitPrimary.signal();
+	await primaryPromise;
+	return secondaryPromise;
+}

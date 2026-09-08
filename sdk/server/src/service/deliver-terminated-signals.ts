@@ -11,7 +11,7 @@ import type {
 import { ulid } from "ulidx";
 
 import type { TxRepositories } from "../infra/db/types";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 
 export interface TerminatedChildRun {
@@ -83,7 +83,7 @@ export async function deliverTerminatedSignalToParentRun(
 	);
 
 	const childRunIds = new Set<string>(runs.map((childRun) => childRun.id));
-	const parentRunStateTransitionEntries: StateTransitionRowInsert[] = [];
+	const parentRunStateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 	const parentRunUpdates: {
 		filter: { namespaceId: NamespaceId; id: string; revision: number };
 		update: { stateTransitionId: string };
@@ -104,7 +104,6 @@ export async function deliverTerminatedSignalToParentRun(
 			id: stateTransitionId,
 			workflowRunId: parentRun.id,
 			type: "workflow_run",
-			status: "scheduled",
 			attempt: parentRun.attempts,
 			state: {
 				status: "scheduled",

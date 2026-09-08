@@ -257,7 +257,6 @@ async function transitionStateInTx(
 		id: stateTransitionId,
 		workflowRunId: runId,
 		type: "workflow_run",
-		status: toState.status,
 		attempt: attempts,
 		state: toState,
 	});

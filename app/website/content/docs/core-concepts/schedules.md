@@ -162,7 +162,7 @@ const handle = await dailyReport
 | `"error"` (default) | Throw a `ScheduleConflictError` if the reference ID already identifies a schedule with a different definition |
 | `"return_existing"` | Return the existing schedule unchanged |
 
-The definition is immutable, so a reference ID that already points at a different definition is a conflict, not an update. With `"error"` the activation throws a `ScheduleConflictError`; with `"return_existing"` it returns the existing schedule as-is. Re-activating with the *same* definition is idempotent, and reactivates the schedule if it was paused.
+The definition is immutable, so a reference ID that already points at a different definition is a conflict, not an update. With `"error"` the activation throws a `ScheduleConflictError`; with `"return_existing"` it returns the existing schedule as-is. Re-activating with the *same* definition is idempotent: it returns the existing schedule. If that schedule is paused, re-activating does not resume it; only `resume()` does. If the schedule was deactivated, re-activating brings it back.
 
 For more on reference IDs in workflows and events, see the [Reference IDs guide](../guides/reference-ids.md).
 
@@ -173,16 +173,16 @@ The handle returned from `activate()` lets you manage the schedule:
 ```typescript
 const handle = await mySchedule.activate(aikiClient, workflowV1);
 
-await handle.pause();      // Stop triggering
-await handle.resume();     // Resume triggering
+await handle.pause();      // Stop triggering until resumed
+await handle.resume();     // Resume a paused schedule
 await handle.deactivate(); // Deactivate schedule
 ```
 
 | Property/Method | Description |
 |-----------------|-------------|
 | `id` | Unique identifier for this schedule |
-| `pause()` | Stop triggering |
-| `resume()` | Resume triggering |
+| `pause()` | Stop triggering until resumed. Rejected on a deactivated schedule |
+| `resume()` | Resume a paused schedule. Rejected on a deactivated schedule; `activate()` brings it back |
 | `deactivate()` | Deactivate schedule |
 
 ## Multi-Tenant Schedules

@@ -15,7 +15,7 @@ import { ulid } from "ulidx";
 
 import { bulkGetOrCreateWorkflowsInTx } from "./workflow";
 import type { TxRepositories } from "../infra/db/types";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowIdentity } from "../infra/db/types/workflow";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
@@ -72,7 +72,7 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 		const inputHashes = await Promise.all(inputHashPromises);
 
 		const workflowRunEntries: WorkflowRunRowInsert[] = [];
-		const stateTransitionEntries: StateTransitionRowInsert[] = [];
+		const stateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
 
 		for (const [i, parentRun] of runsHavingChildren.entries()) {
 			const workflow = workflowsByNamespaceId.get(parentRun.namespaceId);
@@ -111,7 +111,6 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 				id: cancellationRunStateTransitionId,
 				workflowRunId: childrenCancellationRunId,
 				type: "workflow_run",
-				status: "scheduled",
 				attempt: 1,
 				state: {
 					status: "scheduled",

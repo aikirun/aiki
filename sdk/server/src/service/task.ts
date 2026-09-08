@@ -84,7 +84,6 @@ async function setTaskStateInTx(
 		workflowRunId: runId,
 		type: "task",
 		taskId: existingTaskRow.id,
-		status: state.status,
 		attempt: attempts,
 		state: state,
 	});
