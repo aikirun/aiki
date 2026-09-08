@@ -8,14 +8,14 @@ import type { Equal, ExpectTrue } from "../testing/expect";
 const pgDatabaseConfigSchema = type({
 	provider: "'pg'",
 	url: "string > 0",
-	maxConnections: "string.integer.parse | number.integer > 0 = 10",
+	"maxConnections?": "string.integer.parse | number.integer > 0",
 	"caCert?": "string > 0",
 });
 
 // const mysqlDatabaseConfigSchema = type({
 // 	provider: "'mysql'",
 // 	url: "string > 0",
-// 	maxConnections: "string.integer.parse | number.integer > 0 = 10",
+// 	"maxConnections?": "string.integer.parse | number.integer > 0",
 // 	"caCert?": "string > 0",
 // });
 
@@ -54,7 +54,7 @@ export function loadDatabaseConfig(): DatabaseConfig {
 				return {
 					provider,
 					url: process.env.DATABASE_URL,
-					maxConnections: process.env.DATABASE_MAX_CONNECTIONS,
+					maxConnections: process.env.DATABASE_MAX_CONNECTIONS || undefined,
 					caCert: process.env.DATABASE_CA_CERT || undefined,
 				};
 			default:

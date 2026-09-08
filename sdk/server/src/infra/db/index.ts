@@ -12,9 +12,11 @@ export function database(config: DatabaseConfig): CreateDatabase {
 			switch (config.provider) {
 				case "pg": {
 					const postgres = await importPostgres();
+					// Keys must be absent, not undefined: the driver merges options by key presence,
+					// so an explicit undefined beats its own default.
 					const client = postgres(config.url, {
-						max: config.maxConnections,
-						ssl: config.caCert ? { ca: config.caCert, rejectUnauthorized: true } : undefined,
+						...(config.maxConnections !== undefined && { max: config.maxConnections }),
+						...(config.caCert !== undefined && { ssl: { ca: config.caCert, rejectUnauthorized: true } }),
 					});
 					return { provider: "pg", [INTERNAL]: { client } };
 				}
