@@ -31,8 +31,8 @@ export interface EventWaitOptions<Timed extends boolean> {
 }
 
 export type EventWaitResult<Data, Timed extends boolean> = Timed extends false
-	? { data: Data }
-	: { timeout: false; data: Data } | { timeout: true };
+	? { data: Data; receivedAt: number }
+	: { timeout: false; data: Data; receivedAt: number } | { timeout: true; timedOutAt: number };
 
 export interface EventSendOptions {
 	reference?: EventReference;

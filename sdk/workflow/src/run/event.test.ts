@@ -60,17 +60,46 @@ describe("createEventWaiters", () => {
 			expect((await waiters.orderShipped.wait()).data).toEqual({ trackingId: "T1" });
 		}));
 
-	test("returns a timeout when the recorded wait timed out", () =>
+	test("returns the time the event was received alongside its data", () =>
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({
-				eventWaits: { orderShipped: [{ status: "timeout", timedOutAt: 0 }] },
+				eventWaits: {
+					orderShipped: [
+						{
+							status: "received",
+							data: asOpaquePayload({ trackingId: "T1" }),
+							clientCodecApplied: false,
+							receivedAt: 1_700_000_000_000,
+						},
+					],
+				},
+			});
+			const definition = { orderShipped: event<{ trackingId: string }>() };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect(await waiters.orderShipped.wait({ timeout: { seconds: 1 } })).toEqual({
+				timeout: false,
+				data: { trackingId: "T1" },
+				receivedAt: 1_700_000_000_000,
+			});
+		}));
+
+	test("returns a timeout with the time the wait expired", () =>
+		withFakeClient(async (client) => {
+			const record = runningWorkflowRunRecordFactory.build({
+				eventWaits: { orderShipped: [{ status: "timeout", timedOutAt: 1_700_000_060_000 }] },
 			});
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
-			expect(await waiters.orderShipped.wait({ timeout: { seconds: 1 } })).toEqual({ timeout: true });
+			expect(await waiters.orderShipped.wait({ timeout: { seconds: 1 } })).toEqual({
+				timeout: true,
+				timedOutAt: 1_700_000_060_000,
+			});
 		}));
 
 	test("returns recorded data as-is, without applying the event schema", () =>

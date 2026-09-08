@@ -149,7 +149,7 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 
 			if (existingEventWait.status === "timeout") {
 				logger.debug("Timed out waiting for event");
-				return { timeout: true };
+				return { timeout: true, timedOutAt: existingEventWait.timedOutAt };
 			}
 
 			// The data decodes by its sender's declaration, not the run's: the sender's client
@@ -159,7 +159,11 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 				clientCodecApplied: existingEventWait.clientCodecApplied,
 			});
 			logger.debug("Event received");
-			return { timeout: false, data: (await codec.decode(existingEventWait.data)) as Data };
+			return {
+				timeout: false,
+				data: (await codec.decode(existingEventWait.data)) as Data,
+				receivedAt: existingEventWait.receivedAt,
+			};
 		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
