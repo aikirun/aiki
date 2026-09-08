@@ -404,7 +404,9 @@ async function createWorkflowRunInTx(
 	});
 
 	if (imminentRunTimerQueue) {
-		txRepos.onCommit(() => imminentRunTimerQueue.add([{ id: runId, scheduledAt, priority: options?.priority }]));
+		txRepos.onCommit(() =>
+			imminentRunTimerQueue.add([{ type: "scheduled", id: runId, dueAt: scheduledAt, priority: options?.priority }])
+		);
 	}
 
 	logger.info("Created workflow run", {

@@ -19,7 +19,7 @@ import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness, withRepos } from "../../testing/harness";
 import { claimRun, seedClaimedRun, seedCompletedRun, seedScheduledRun, seedStalledRun } from "../../testing/seed/run";
-import { seedRunningTask, seedSiblingAwaitingRetryTasks } from "../../testing/seed/task";
+import { seedAwaitingRetryTask, seedRunningTask, seedSiblingAwaitingRetryTasks } from "../../testing/seed/task";
 import { createChildRunCanceller } from "../cancel-child-runs";
 import { createEventService } from "../event";
 
@@ -1223,6 +1223,203 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 
 			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
 				{ type: "scheduled", id: parent.runId, rank: computeRank({ dueAt: childTerminatedAt, priority: 2 }) },
+			]);
+		}));
+
+	test("a transition into sleeping adds the run's wakeup timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			const sleepStartedAt = Date.now();
+			await withFakeClock(sleepStartedAt, () =>
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: runId,
+					state: { status: "sleeping", sleepName: "restock-window", durationMs: 5_000 },
+					expectedRevision: revisionWhenClaimed,
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "sleep", id: runId, rank: computeRank({ dueAt: sleepStartedAt + 5_000 }) },
+			]);
+		}));
+
+	test("a park on an event with a timeout adds the run's timeout timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			const parkedAt = Date.now();
+			await withFakeClock(parkedAt, () =>
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: runId,
+					state: { status: "awaiting_event", eventName: "paymentReceived", timeoutInMs: 5_000 },
+					expectedRevision: revisionWhenClaimed,
+					expectedSignalSequence: 0,
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "event_wait_timeout", id: runId, rank: computeRank({ dueAt: parkedAt + 5_000 }) },
+			]);
+		}));
+
+	test("a park on an event with no timeout adds no timer", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "awaiting_event", eventName: "paymentReceived" },
+				expectedRevision: revisionWhenClaimed,
+				expectedSignalSequence: 0,
+			});
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([]);
+		}));
+
+	test("a park on a child with a timeout adds the run's timeout timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			const parkedAt = Date.now();
+			await withFakeClock(parkedAt, () =>
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: parent.runId,
+					state: { status: "awaiting_child_workflow", childWorkflowRunId: child.runId, timeoutInMs: 5_000 },
+					expectedRevision: parent.revisionWhenClaimed,
+					expectedSignalSequence: 0,
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "child_wait_timeout", id: parent.runId, rank: computeRank({ dueAt: parkedAt + 5_000 }) },
+			]);
+		}));
+
+	test("a transition into awaiting_retry adds the run's retry timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			const failedAt = Date.now();
+			await withFakeClock(failedAt, () =>
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: runId,
+					state: {
+						status: "awaiting_retry",
+						cause: "self",
+						error: { name: "Error", message: "boom" },
+						nextAttemptInMs: 5_000,
+					},
+					expectedRevision: revisionWhenClaimed,
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "retry", id: runId, rank: computeRank({ dueAt: failedAt + 5_000 }) },
+			]);
+		}));
+
+	test("a park on a retrying task adds the run's task retry timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedAwaitingRetryTask(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ nextAttemptAt: 1 }
+			);
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentRunTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				})
+			);
+
+			await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "awaiting_task_retry" },
+				expectedRevision: revisionWhenClaimed,
+			});
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "task_retry", id: runId, rank: computeRank({ dueAt: 1 }) },
 			]);
 		}));
 });
