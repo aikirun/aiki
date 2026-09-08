@@ -1,12 +1,11 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import type { NamespaceId } from "@aikirun/types/namespace";
 import type { ScheduleState } from "@aikirun/types/schedule";
-import { TERMINAL_WORKFLOW_RUN_STATUSES, type WorkflowRunState } from "@aikirun/types/workflow/run";
+import type { WorkflowRunState } from "@aikirun/types/workflow/run";
 import type { TaskState } from "@aikirun/types/workflow/task";
-import { and, count, eq, gt, inArray, sql } from "drizzle-orm";
+import { count, eq, inArray, sql } from "drizzle-orm";
 
 import type { PgDb } from "../provider";
-import { stateTransition, workflowRun } from "../schema";
+import { stateTransition } from "../schema";
 
 type _StateTransitionRow = typeof stateTransition.$inferSelect;
 type _StateTransitionRowInsert = typeof stateTransition.$inferInsert;
@@ -125,41 +124,6 @@ export const createStateTransitionRepository = (db: PgDb) => ({
 		]);
 
 		return { rows: rows.map(toScheduleStateTransitionRow), total: countResult[0]?.count ?? 0 };
-	},
-
-	async hasTerminated(
-		namespaceId: NamespaceId,
-		workflowRunId: string,
-		afterStateTransitionId: string
-	): Promise<{ runFound: true; terminated: boolean; latestStateTransitionId: string } | { runFound: false }> {
-		const result = await db
-			.select({
-				terminalStateTransitionId: stateTransition.id,
-				latestStateTransitionId: workflowRun.latestStateTransitionId,
-			})
-			.from(workflowRun)
-			.leftJoin(
-				stateTransition,
-				and(
-					eq(stateTransition.workflowRunId, workflowRun.id),
-					eq(stateTransition.type, "workflow_run"),
-					inArray(stateTransition.status, TERMINAL_WORKFLOW_RUN_STATUSES),
-					gt(stateTransition.id, afterStateTransitionId)
-				)
-			)
-			.where(and(eq(workflowRun.id, workflowRunId), eq(workflowRun.namespaceId, namespaceId)))
-			.limit(1);
-
-		const row = result[0];
-		if (!row) {
-			return { runFound: false };
-		}
-
-		return {
-			runFound: true,
-			terminated: row.terminalStateTransitionId !== null,
-			latestStateTransitionId: row.latestStateTransitionId,
-		};
 	},
 });
 

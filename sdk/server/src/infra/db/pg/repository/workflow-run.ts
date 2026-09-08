@@ -10,8 +10,8 @@ import type {
 	WorkflowRunState,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
-import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
-import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
+import { NON_TERMINAL_WORKFLOW_RUN_STATUSES, TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
+import { and, count, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import { toWorkflowRunState } from "./state-transition";
@@ -221,6 +221,41 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.where(and(eq(workflowRun.namespaceId, namespaceId), eq(workflowRun.id, id)))
 			.limit(1);
 		return result.length > 0;
+	},
+
+	async hasTerminated(
+		namespaceId: NamespaceId,
+		workflowRunId: WorkflowRunId,
+		afterStateTransitionId: string
+	): Promise<{ runFound: true; terminated: boolean; latestStateTransitionId: string } | { runFound: false }> {
+		const result = await db
+			.select({
+				terminalStateTransitionId: stateTransition.id,
+				latestStateTransitionId: workflowRun.latestStateTransitionId,
+			})
+			.from(workflowRun)
+			.leftJoin(
+				stateTransition,
+				and(
+					eq(stateTransition.workflowRunId, workflowRun.id),
+					eq(stateTransition.type, "workflow_run"),
+					inArray(stateTransition.status, TERMINAL_WORKFLOW_RUN_STATUSES),
+					gt(stateTransition.id, afterStateTransitionId)
+				)
+			)
+			.where(and(eq(workflowRun.id, workflowRunId), eq(workflowRun.namespaceId, namespaceId)))
+			.limit(1);
+
+		const row = result[0];
+		if (!row) {
+			return { runFound: false };
+		}
+
+		return {
+			runFound: true,
+			terminated: row.terminalStateTransitionId !== null,
+			latestStateTransitionId: row.latestStateTransitionId,
+		};
 	},
 
 	async getById(filter: { namespaceId: NamespaceId; id: string }, options?: { lock?: "share" }) {
