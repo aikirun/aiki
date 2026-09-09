@@ -2,6 +2,54 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.42.0
+
+`@aikirun/memory` is now published: a server and worker sharing one process get timer dispatch and work delivery without an external service. An event wait reports when it resolved. Two Redis connection hangs are fixed, and a missing `postgres` driver now names itself instead of failing inside a drizzle internal.
+
+### Breaking Changes
+
+- **An event wait result carries a timestamp.** `receivedAt` on the received branch, `timedOutAt` on the timeout branch. Reading the result is unaffected; a test double that constructs one needs the new field.
+
+  ```typescript
+  const result = await run.events.orderShipped.wait({ timeout: { minutes: 30 } });
+  const at = result.timeout ? result.timedOutAt : result.receivedAt;
+  ```
+
+### New Features
+
+- **`@aikirun/memory` is published.** `inMemoryQueue()` pairs a publisher and a subscriber over one in-process broker, and `inMemoryTimerPriorityQueue()` gives an embedded server the timer queue it otherwise lacks — without one, a short sleep or retry waits for the next database scan.
+
+  ```typescript
+  import { inMemoryQueue, inMemoryTimerPriorityQueue } from "@aikirun/memory";
+
+  const queue = inMemoryQueue();
+
+  const aikiServer = server({
+    db: database({ provider: "pg", url: databaseUrl }),
+    runtime: { publisher: queue.publisher },
+    timerPriorityQueue: inMemoryTimerPriorityQueue(),
+  });
+
+  const aikiWorker = worker({ workflows: [orderWorkflowV1], subscriber: queue.subscriber });
+  ```
+
+- **`inMemoryTimerPriorityQueue()` can be cleared.** Its `clear()` drops every queued timer and any wake they left pending. The factory's state outlives a server stop and start, so this is how that state is emptied.
+
+### Improvements
+
+- **A server started without a timer priority queue says so.** It logs a warning: runs may wake seconds later than expected, because due work is found by scanning the database on an interval.
+- **`DATABASE_MAX_CONNECTIONS` is optional.** Left unset, the pool size is the postgres driver's own default rather than Aiki's `10`. The `ssl` option is likewise absent when there is no CA cert, where an explicit `undefined` had been overriding the driver's default.
+
+### Bug Fixes
+
+- **A missing `postgres` driver names itself.** The guard that names the package to install sat below `import("drizzle-orm/postgres-js")`, which imports the driver itself and threw first with a Node resolution error pointing at a drizzle internal.
+- **The Redis timer waiter no longer deadlocks.** Its duplicated client waited for a first command before connecting, while the connection waited to be ready before sending one.
+- **The Redis ready handshake gives up.** A client that never starts connecting emits no events at all, so the handshake waited forever. It now rejects after the connection's own `connectTimeout`, naming the status it was stuck on.
+
+### Documentation
+
+- The install lists gain `postgres`, the driver for the `pg` provider that `@aikirun/server` declares as an optional peer dependency, and the installation page and quick start state that Aiki ships ESM only. A new troubleshooting section covers the macOS quarantine on a downloaded binary and reaching a database on the host from the container.
+
 ## 0.41.1
 
 A run that goes to sleep, parks on a retry, or parks on an event or a child with a timeout now arms its wake-up timer as the transition commits, so a short wait fires on time instead of waiting for the next poll.
