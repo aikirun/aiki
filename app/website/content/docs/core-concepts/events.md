@@ -1,6 +1,6 @@
 ---
 title: Events
-description: Every run has a durable mailbox, so an event sent before the workflow waits for it is held until the workflow is ready.
+description: Every run has a durable mailbox, so an event sent before the workflow waits for it is held.
 ---
 
 Events let external systems communicate with running workflows.

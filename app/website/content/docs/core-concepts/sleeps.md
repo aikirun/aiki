@@ -1,6 +1,6 @@
 ---
 title: Sleeps
-description: Durable timers that survive worker restarts, deployments and server reboots - and hold no process while they wait.
+description: Durable timers that survive restarts and deploys, and hold no process while they wait.
 ---
 
 Sleeps pause workflow execution for a specified duration. Unlike regular `setTimeout`, Aiki sleeps are durable - they survive worker restarts, deployments, and even server reboots.

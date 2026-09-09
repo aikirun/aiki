@@ -1,6 +1,6 @@
 ---
 title: Server
-description: "The orchestrator, shipped as a library: an HTTP handler you mount, and background daemons that drive state."
+description: "The orchestrator, shipped as a library: an HTTP handler you mount, plus background daemons."
 ---
 
 The Aiki server coordinates workflow execution — and it's a library. `server({ db })` returns two pieces:

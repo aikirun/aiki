@@ -1,6 +1,6 @@
 ---
 title: Tasks
-description: The boundary for side effects and nondeterministic work - recorded once, replayed rather than repeated.
+description: The boundary for side effects and nondeterministic work, recorded once and replayed.
 ---
 
 Tasks are the boundary for side effects and nondeterministic work in a workflow. A task handler is where network requests, database writes, reading the clock, and generating random values belong.

@@ -1,6 +1,6 @@
 ---
 title: Runtime Configuration
-description: Tune the server, workers, and endpoints at construction — or live, from your own config source, without redeploying.
+description: Tune the server, workers and endpoints at construction, or live without a redeploy.
 ---
 
 The server runtime, workers, and endpoints each expose runtime tunables — concurrency, polling cadence, timeouts. Every setting has a default, and all three components accept configuration the same way: a `config` parameter that takes either a plain overrides object or a config provider.

@@ -1,6 +1,6 @@
 ---
 title: Workflow Run Claims
-description: How an executor takes sole ownership of a run, refreshes it, and how the server recovers one whose owner died.
+description: How an executor takes sole ownership of a run, and how the server recovers one whose owner died.
 ---
 
 An executor — a worker or a serverless endpoint — owns a workflow run by **claiming** it. The claim guarantees a single live owner: while one executor holds a run, no other executor runs it. If the owner dies mid-execution, the server hands the run to a healthy executor, which resumes from the last checkpoint.

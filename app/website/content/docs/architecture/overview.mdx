@@ -1,6 +1,6 @@
 ---
 title: Architecture Overview
-description: How the server, workers, endpoints and storage fit together - and why the split is architectural, not physical.
+description: How the server, workers, endpoints and storage fit together, and why the split is not physical.
 ---
 
 Aiki separates workflow orchestration from execution: a server orchestrates, workers and endpoints execute. The separation is architectural, not physical — the server is a library, so the components can share a single process or be deployed independently. Workflow code is identical either way.

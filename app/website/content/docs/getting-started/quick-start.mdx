@@ -1,6 +1,6 @@
 ---
 title: Quick Start
-description: Run a workflow that suspends for two weeks waiting on a payment, and resumes where it left off - server, worker and all, in one process.
+description: Run a workflow that waits two weeks for a payment and resumes where it left off, all in one process.
 ---
 
 This example starts a 14-day free trial, then suspends the workflow waiting for a payment event — holding no worker, no thread, no database connection — for up to two weeks. When the payment arrives (or the server restarts mid-wait), the run resumes exactly where it left off. You'll run the server, worker, and workflow in one process and watch it finish in seconds.

@@ -1,6 +1,6 @@
 ---
 title: Workers
-description: Long-lived processes that execute your workflows in your infrastructure, sharing the load and scaling horizontally.
+description: Long-lived processes that execute your workflows in your infrastructure and share the load.
 ---
 
 A worker executes your workflows. It runs in your infrastructure, subscribes to workflow run messages, and executes the workflow logic you've defined. You can run multiple workers to scale horizontally—they automatically share the workload.

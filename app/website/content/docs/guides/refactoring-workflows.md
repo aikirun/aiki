@@ -1,6 +1,6 @@
 ---
 title: Refactoring Workflows
-description: What you can safely change in a workflow that already has runs in flight, and what needs a new version.
+description: What you can safely change in a workflow that already has runs in flight.
 ---
 
 This guide is about refactoring workflow versions while it has in-flight runs. If no runs exist, you can change your code freely - these concerns only arise when running workflows replay with new code.

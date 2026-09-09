@@ -1,6 +1,6 @@
 ---
 title: Workflows
-description: Define workflows as versioned async functions, start them, and follow a run through every state it can rest in.
+description: Define workflows as versioned async functions, and follow a run through every state it rests in.
 ---
 
 A workflow is a recipe for a business process - it defines the steps needed to complete an operation. Workflows in Aiki are durable, versioned, and can contain complex logic.

@@ -1,6 +1,6 @@
 ---
 title: Reference IDs
-description: Address workflows, events and schedules by your own identifiers - for lookup, correlation, and preventing duplicates.
+description: Address workflows, events and schedules by your own identifiers, and prevent duplicates.
 ---
 
 Reference IDs let you assign custom identifiers to workflows, events, and schedules. This enables tracking, correlation with your systems, and lookup by your own IDs. As a secondary benefit, reference IDs prevent duplicate executions when the same reference is reused.
