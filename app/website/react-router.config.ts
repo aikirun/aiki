@@ -40,6 +40,12 @@ export default {
 		// build/client/404.html); push it explicitly in case it is not a static path.
 		paths.push("/404");
 
+		// The host canonicalises `/docs` to `/docs/`, so every visitor lands on the trailing-slash
+		// form. `docs/*` then resolves its empty splat to `/docs/_.data`, a different file from the
+		// `/docs.data` emitted for the slashless path — without this the docs index renders on first
+		// load but 404s on any client navigation back to it.
+		paths.push("/docs/");
+
 		for await (const entry of glob("**/*.{md,mdx}", { cwd: "content/docs" })) {
 			const slugs = getSlugs(entry);
 
