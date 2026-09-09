@@ -22,7 +22,7 @@ You need Node.js 18+ or Bun 1.0+, and a PostgreSQL 14+ database (SQLite and MySQ
 If you will [run the standalone server](#run-the-standalone-server-and-dashboard), skip this step — that section covers migration for each way of running it.
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
+DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
   npx aiki-server migrate apply
 ```
 
@@ -76,7 +76,16 @@ There are three ways to run this stack:
 
 ### With the aiki binary
 
-Download the `aiki` binary for your platform from the [latest release](https://github.com/aikirun/aiki/releases/latest) and put it on your `PATH`. It carries the migrate and server commands plus its own runtime.
+Download the binary for your platform from the [latest release](https://github.com/aikirun/aiki/releases/latest). It carries the migrate and server commands plus its own runtime. Assets are published for macOS on Apple Silicon (`aiki-darwin-arm64`) and Linux (`aiki-linux-arm64`, `aiki-linux-x64`); on any other platform use [Docker](#with-docker) or [From source](#from-source) instead.
+
+The asset is named for its platform and downloads without the executable bit, so rename it and make it executable before putting it on your `PATH`:
+
+```bash
+mv aiki-<platform> aiki
+chmod +x aiki
+```
+
+If macOS then refuses to run it, see [Troubleshooting](#troubleshooting).
 
 ```bash
 export DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
@@ -108,14 +117,16 @@ Create a `.env` next to it with your database URL:
 DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
 ```
 
+Running Postgres on the same machine as the stack? See [Troubleshooting](#troubleshooting).
+
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 - Server: http://localhost:9850
 - Dashboard: http://localhost:9851
 
-The migration step applies the packages listed in `AIKI_MIGRATE_PACKAGES` — by default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set. Override the list to depart from that, for example to create the iam tables before turning auth on: `AIKI_MIGRATE_PACKAGES=server,iam docker-compose up -d`.
+The migration step applies the packages listed in `AIKI_MIGRATE_PACKAGES` — by default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set. Override the list to depart from that, for example to create the iam tables before turning auth on: `AIKI_MIGRATE_PACKAGES=server,iam docker compose up -d`.
 
 #### Without Docker Compose
 
@@ -201,6 +212,24 @@ These apply to the standalone server and the dashboard. If you embed the server 
 | `VITE_AIKI_SERVER_URL` | If on a static host | — | Build-time server URL for a dashboard served outside the docker image |
 
 Which variable applies depends on how you serve the dashboard: the docker image reads `AIKI_SERVER_UPSTREAM_URL` (see [With Docker](#with-docker)), and a static-host build reads `VITE_AIKI_SERVER_URL` (see [Run the dashboard on its own](#run-the-dashboard-on-its-own)). The bundled `docker-compose.yml` sets `AIKI_SERVER_UPSTREAM_URL` for you.
+
+## Troubleshooting
+
+**macOS won't run the binary.** macOS quarantines anything downloaded with a browser. Clear the quarantine, using the name you gave the binary:
+
+```bash
+xattr -c aiki
+```
+
+Downloads fetched with `curl` are not quarantined.
+
+**The server can't reach your database.** The server runs in a container, so `localhost` in the `DATABASE_URL` you set names that container — not your machine. When Postgres runs on your machine, use `host.docker.internal` as the host:
+
+```bash
+DATABASE_URL=postgresql://user:password@host.docker.internal:5432/aiki
+```
+
+The bundled `docker-compose.yml` already maps that name to the host. If you run the images yourself, add `--add-host=host.docker.internal:host-gateway` to each `docker run`.
 
 ---
 
