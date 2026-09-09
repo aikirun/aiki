@@ -120,7 +120,7 @@ mkdir aiki && cd aiki
 curl -fsSL https://github.com/aikirun/aiki/releases/latest/download/docker-compose.yml -o docker-compose.yml
 
 # Create a .env with your DATABASE_URL, then:
-docker-compose up -d
+docker compose up -d
 
 # Server: http://localhost:9850 — Dashboard: http://localhost:9851
 ```
