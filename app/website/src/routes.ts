@@ -7,6 +7,7 @@ export default [
 	route("docs/*", "routes/docs.tsx"),
 	route("api/search", "routes/search.ts"),
 	route("og/docs/*", "routes/og.docs.tsx"),
+	route("og/home/image.webp", "routes/og.home.tsx"),
 
 	route("llms.txt", "llms/index.ts"),
 	route("llms-full.txt", "llms/full.ts"),
