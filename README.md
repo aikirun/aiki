@@ -5,7 +5,7 @@
 <h3 align="center">A durable execution platform</h3>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-beta-764ba2" alt="Status">
+  <img src="https://img.shields.io/badge/status-beta-yellowgreen" alt="Status">
   <a href="https://www.npmjs.com/org/aikirun"><img src="https://img.shields.io/npm/v/@aikirun/workflow?label=npm" alt="npm version"></a>
   <a href="https://aiki.run/docs"><img src="https://img.shields.io/badge/docs-aiki.run-764ba2" alt="Docs"></a>
   <a href="https://discord.aiki.run"><img src="https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
