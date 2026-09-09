@@ -34,8 +34,17 @@ function shortId(id: string): string {
 	return id.length > 10 ? id.slice(-6) : id;
 }
 
+/**
+ * Clock time, gaining a date once the instant is not today — a bare "06:12:07" on a run that ended
+ * last week says nothing about when it happened.
+ */
 function fmtTime(ts: number): string {
-	return new Date(ts).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+	const at = new Date(ts);
+	const time = at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+	const now = new Date();
+	const isToday =
+		at.getFullYear() === now.getFullYear() && at.getMonth() === now.getMonth() && at.getDate() === now.getDate();
+	return isToday ? time : `${at.toLocaleDateString([], { day: "2-digit", month: "2-digit" })} ${time}`;
 }
 
 function timeUntil(ts: number): string {
@@ -767,7 +776,10 @@ function EventWaitRow({ wait }: { wait: EventWait }) {
 			<div style={{ flex: 1, minWidth: 0 }}>
 				<div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
 					<span style={{ fontSize: 10.5, fontWeight: 600, color }}>{isReceived ? "Received" : "Timed out"}</span>
-					<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)" }}>
+					<span
+						title={new Date(isReceived ? wait.receivedAt : wait.timedOutAt).toLocaleString()}
+						style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)" }}
+					>
 						{isReceived ? fmtTime(wait.receivedAt) : fmtTime(wait.timedOutAt)}
 					</span>
 					{isReceived && wait.reference?.id && (

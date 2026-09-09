@@ -79,6 +79,12 @@ function Meta({ label, children }: MetaProps) {
 	);
 }
 
+/**
+ * The active pill nests inside the tab bar, so its radius is the bar's own minus the padding
+ * between them. Any other value leaves the two curves fighting at the first and last tab.
+ */
+const TABBAR_PADDING = 3;
+
 export function RunDetail() {
 	const { id } = useParams<{ id: string }>();
 	const [searchParams, setSearchParams] = useSearchParams();
@@ -521,7 +527,7 @@ export function RunDetail() {
 						border: "1px solid var(--b0)",
 						borderRadius: "var(--r-card)",
 						boxShadow: "var(--shadow-card)",
-						padding: 3,
+						padding: TABBAR_PADDING,
 						gap: 2,
 					}}
 				>
@@ -537,7 +543,7 @@ export function RunDetail() {
 								style={{
 									background: isActive ? "var(--accent-tint)" : "transparent",
 									border: "none",
-									borderRadius: "var(--r-chip)",
+									borderRadius: `calc(var(--r-card) - ${TABBAR_PADDING}px)`,
 									color: isActive ? "var(--accent-ink)" : "var(--t3)",
 									fontFamily: "var(--mono)",
 									fontSize: 11.5,

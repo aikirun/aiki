@@ -20,6 +20,27 @@ function fmtTime(ts: number): string {
 	return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
 
+/** Day label for the separators, e.g. "28 August". */
+function fmtDay(ts: number): string {
+	return new Date(ts).toLocaleDateString([], { day: "numeric", month: "long" });
+}
+
+/** Compact date for the attempt range when it spans days, e.g. "27/08". */
+function fmtShortDate(ts: number): string {
+	return new Date(ts).toLocaleDateString([], { day: "2-digit", month: "2-digit" });
+}
+
+/** The full instant, for the hover title on every rendered time. */
+function fmtFull(ts: number): string {
+	return new Date(ts).toLocaleString();
+}
+
+function isSameDay(a: number, b: number): boolean {
+	const x = new Date(a);
+	const y = new Date(b);
+	return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+
 interface Attempt {
 	number: number;
 	transitions: Array<WorkflowRunStateTransition | TaskStateTransition>;
@@ -84,9 +105,13 @@ function AttemptGroup({
 	lookups?: TimelineLookups;
 }) {
 	const times = attempt.transitions.map((t) => t.createdAt);
-	const firstTime = fmtTime(Math.min(...times));
-	const lastTime = fmtTime(Math.max(...times));
-	const timeRange = times.length > 1 ? `${firstTime} – ${lastTime}` : firstTime;
+	const first = Math.min(...times);
+	const last = Math.max(...times);
+	// A bare "06:12:06 – 06:12:41" reads as 35 seconds whether it is 35 seconds or three days,
+	// so the dates appear once the attempt crosses one.
+	const spansDays = !isSameDay(first, last);
+	const stamp = (ts: number) => (spansDays ? `${fmtShortDate(ts)} ${fmtTime(ts)}` : fmtTime(ts));
+	const timeRange = times.length > 1 ? `${stamp(first)} – ${stamp(last)}` : stamp(first);
 
 	return (
 		<div style={{ marginBottom: 16 }}>
@@ -96,7 +121,10 @@ function AttemptGroup({
 					Attempt {attempt.number}
 				</span>
 				<div style={{ flex: 1, height: 1, background: "var(--b0)" }} />
-				<span style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--t3)", whiteSpace: "nowrap" }}>
+				<span
+					title={times.length > 1 ? `${fmtFull(first)} – ${fmtFull(last)}` : fmtFull(first)}
+					style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--t3)", whiteSpace: "nowrap" }}
+				>
 					{timeRange}
 				</span>
 			</div>
@@ -114,9 +142,15 @@ function AttemptGroup({
 						background: "var(--b0)",
 					}}
 				/>
-				{attempt.transitions.map((t, i) => (
-					<TimelineItem key={t.id} transition={t} globalIndex={attempt.indexOffset + i} lookups={lookups} />
-				))}
+				{attempt.transitions.map((t, i) => {
+					const previous = attempt.transitions[i - 1];
+					return (
+						<div key={t.id}>
+							{previous && !isSameDay(previous.createdAt, t.createdAt) && <DaySeparator ts={t.createdAt} />}
+							<TimelineItem transition={t} globalIndex={attempt.indexOffset + i} lookups={lookups} />
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);
@@ -232,6 +266,7 @@ function TimelineItem({
 				<Dot color={color} isRunning={isRunning} />
 				<Card
 					time={fmtTime(transition.createdAt)}
+					fullTime={fmtFull(transition.createdAt)}
 					content={
 						<span>
 							<span style={{ fontWeight: 500, color: "var(--t1)" }}>{config?.label ?? status}</span>
@@ -264,6 +299,7 @@ function TimelineItem({
 				<Dot color={color} isRunning={status === "running"} />
 				<Card
 					time={fmtTime(transition.createdAt)}
+					fullTime={fmtFull(transition.createdAt)}
 					content={
 						<span>
 							<Link
@@ -305,7 +341,23 @@ function Dot({ color, isRunning }: { color: string; isRunning: boolean }) {
 	);
 }
 
-function Card({ content, time }: { content: React.ReactNode; time: string }) {
+/**
+ * Marks where the timeline crosses midnight. Without it the times appear to run backwards — a row
+ * at 23:59 followed by one at 00:04 — with nothing to say a day passed.
+ */
+function DaySeparator({ ts }: { ts: number }) {
+	return (
+		<div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 12px", marginLeft: -18 }}>
+			<div style={{ flex: 1, height: 1, background: "var(--b0)" }} />
+			<span style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--t3)", whiteSpace: "nowrap" }}>
+				{fmtDay(ts)}
+			</span>
+			<div style={{ flex: 1, height: 1, background: "var(--b0)" }} />
+		</div>
+	);
+}
+
+function Card({ content, time, fullTime }: { content: React.ReactNode; time: string; fullTime?: string }) {
 	return (
 		<div
 			style={{
@@ -319,6 +371,7 @@ function Card({ content, time }: { content: React.ReactNode; time: string }) {
 		>
 			<span style={{ fontSize: 12 }}>{content}</span>
 			<span
+				title={fullTime}
 				style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap", flexShrink: 0 }}
 			>
 				{time}
