@@ -5,7 +5,7 @@
 <h3 align="center">A durable execution platform</h3>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
+  <img src="https://img.shields.io/badge/status-beta-764ba2" alt="Status">
   <a href="https://www.npmjs.com/org/aikirun"><img src="https://img.shields.io/npm/v/@aikirun/workflow?label=npm" alt="npm version"></a>
   <a href="https://aiki.run/docs"><img src="https://img.shields.io/badge/docs-aiki.run-764ba2" alt="Docs"></a>
   <a href="https://discord.aiki.run"><img src="https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
@@ -210,9 +210,13 @@ See the [Installation Guide](https://aiki.run/docs/getting-started/installation)
 - [`@aikirun/memory`](https://www.npmjs.com/package/@aikirun/memory) — Sub-second timer dispatch and work delivery inside a single process
 - [`@aikirun/redis`](https://www.npmjs.com/package/@aikirun/redis) — Sub-second timer dispatch and cross-host work distribution
 
-## Community
+## Stability
 
-Aiki is in alpha — APIs may change between releases. Feedback shapes where it goes:
+Aiki is in beta. The SDK is stable, and breaking changes will get a deprecation path.
+
+Upgrade `@aikirun/*` packages together — they share a version, and a mixed set will not compile.
+
+## Community
 
 - [Discord](https://discord.aiki.run) — questions, feedback, and discussion
 - [GitHub Issues](https://github.com/aikirun/aiki/issues) — bugs and feature requests
