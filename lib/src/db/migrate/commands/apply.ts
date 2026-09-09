@@ -24,8 +24,9 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 
 async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], migrationsTable: string): Promise<void> {
 	const { sql } = await import("drizzle-orm");
-	const { drizzle } = await import("drizzle-orm/postgres-js");
+	// Import the driver first: drizzle-orm/postgres-js imports it too, and would throw before the guard runs.
 	const postgres = await importPostgres();
+	const { drizzle } = await import("drizzle-orm/postgres-js");
 	const client = postgres(config.url, {
 		max: 1,
 		ssl: config.caCert ? { ca: config.caCert, rejectUnauthorized: true } : undefined,

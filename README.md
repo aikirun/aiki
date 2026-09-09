@@ -62,8 +62,10 @@ The Aiki server is a library: `server({ db })` returns a fetch API HTTP handler 
 Install the SDK packages:
 
 ```bash
-npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
+npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server postgres
 ```
+
+`postgres` is the driver for the `pg` provider. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
 
 Apply Aiki's schema migration to your Postgres database:
 

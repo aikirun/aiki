@@ -5,8 +5,10 @@ The Aiki server as a library — orchestrates workflow runs and persists state i
 ## Installation
 
 ```bash
-npm install @aikirun/server
+npm install @aikirun/server postgres
 ```
+
+`postgres` is the driver for the `pg` provider. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
 
 ## Quick Start
 

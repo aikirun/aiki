@@ -9,8 +9,10 @@ This example starts a 14-day free trial, then suspends the workflow waiting for 
 You need Node.js 18+ (or Bun 1.0+) and a PostgreSQL database. Install the SDK and apply the db migrations — the two commands below, covered in full in [Installation](./installation.md).
 
 ```package-install
-@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server postgres
 ```
+
+`postgres` is the driver for the `pg` provider. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
 
 <Tabs groupId="runtime" persist items={["Node", "Bun"]}>
 <Tab value="Node">
@@ -114,6 +116,8 @@ await runtimeHandle.stop();
 
 <Tabs groupId="runtime" persist items={["Node", "Bun"]}>
 <Tab value="Node">
+
+`app.ts` uses top-level `await`, so the project needs `"type": "module"` in `package.json`.
 
 ```bash
 npx tsx app.ts

@@ -9,13 +9,15 @@ How you install Aiki depends on what you're doing:
 
 ## Add Aiki to your project
 
-You need Node.js 18+ or Bun 1.0+, and a PostgreSQL 14+ database (SQLite and MySQL coming soon).
+You need Node.js 18+ or Bun 1.0+, and a PostgreSQL 14+ database (SQLite and MySQL coming soon). Aiki ships as ESM only, so your project must be ESM.
 
 ### Install the SDK packages
 
 ```package-install
-@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server postgres
 ```
+
+`postgres` is the driver for the `pg` provider. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
 
 ### Apply the schema migration
 
