@@ -111,7 +111,7 @@ await workerHandle.stop();
 await runtimeHandle.stop();
 ```
 
-> **Tip:** `wait` waits indefinitely by default. To bound it, pass a timeout: `await handle.wait({ timeout: { seconds: 60 } })`.
+> **Tip:** by default `wait` never gives up. Pass `{ timeout: { seconds: 60 } }` to bound it.
 
 ## Run
 
@@ -210,12 +210,12 @@ await runtimeHandle.stop();
 
 ## What you just used
 
-- **Task** — `activateTrial` / `downgradeToFree`: a unit of work whose result is persisted, so a restart never redoes it. → [Tasks](../core-concepts/tasks.md)
-- **Workflow** — `trialV1`: orchestrates tasks and events, tracked at every step. → [Workflows](../core-concepts/workflows.md)
-- **Event** — `paymentReceived`: `wait()` suspends with nothing held; `send()` or the 14-day timeout resumes it. → [Events](../core-concepts/events.md)
-- **Server** — `server({ db })` + `runtime.start()`: the orchestrator and its background loops. → [Server](../architecture/server.md)
-- **Client** — `client({ handler })`: the in-process connection; workers and your app both attach. → [Client](../core-concepts/client.mdx)
-- **Worker** — `worker({...}).start(client)`: claims ready runs and executes them. → [Workers](../core-concepts/workers.md)
+- **[Task](../core-concepts/tasks.md)** — `activateTrial` / `downgradeToFree`: a unit of work whose result is persisted, so a restart never redoes it.
+- **[Workflow](../core-concepts/workflows.md)** — `trialV1`: orchestrates tasks and events, tracked at every step.
+- **[Event](../core-concepts/events.md)** — `paymentReceived`: `wait()` suspends with nothing held; `send()` or the 14-day timeout resumes it.
+- **[Server](../architecture/server.md)** — `server({ db })` + `runtime.start()`: the orchestrator and its background loops.
+- **[Client](../core-concepts/client.mdx)** — `client({ handler })`: the in-process connection; workers and your app both attach.
+- **[Worker](../core-concepts/workers.md)** — `worker({...}).start(client)`: claims ready runs and executes them.
 
 Everything here runs in one process. The same workflow code runs against a separately deployed server — swap `client({ handler: aikiServer.handler })` for `client({ url: "..." })`.
 

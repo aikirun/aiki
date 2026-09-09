@@ -12,10 +12,11 @@ import {
 
 import type { Route } from "./+types/docs";
 import { getMDXComponents } from "@/components/mdx";
+import { type SectionIndex, SectionPages } from "@/components/section-pages";
 import { baseOptions } from "@/lib/layout.shared";
 import { getPageImagePath } from "@/lib/og";
 import { gitConfig, siteUrl } from "@/lib/shared";
-import { getPageMarkdownUrl, source } from "@/lib/source";
+import { buildSectionIndex, getPageMarkdownUrl, source } from "@/lib/source";
 
 export async function loader({ params }: Route.LoaderArgs) {
 	const slugs = params["*"].split("/").filter((v) => v.length > 0);
@@ -27,6 +28,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 		markdownUrl: getPageMarkdownUrl(page),
 		pageTree: await source.serializePageTree(source.getPageTree()),
 		imagePath: getPageImagePath(slugs),
+		sectionIndex: slugs.length === 0 ? buildSectionIndex() : undefined,
 	};
 }
 
@@ -38,10 +40,12 @@ const clientLoader = browserCollections.docs.createClientLoader({
 			markdownUrl,
 			path,
 			imagePath,
+			sectionIndex,
 		}: {
 			markdownUrl: string;
 			path: string;
 			imagePath: string;
+			sectionIndex?: SectionIndex;
 		}
 	) {
 		return (
@@ -67,7 +71,11 @@ const clientLoader = browserCollections.docs.createClientLoader({
 					/>
 				</div>
 				<DocsBody>
-					<Mdx components={getMDXComponents()} />
+					<Mdx
+						components={getMDXComponents({
+							SectionPages: (props: { section: string }) => <SectionPages {...props} index={sectionIndex} />,
+						})}
+					/>
 				</DocsBody>
 			</DocsPage>
 		);
@@ -75,11 +83,11 @@ const clientLoader = browserCollections.docs.createClientLoader({
 });
 
 export default function Page({ loaderData }: Route.ComponentProps) {
-	const { path, pageTree, imagePath, markdownUrl } = useFumadocsLoader(loaderData);
+	const { path, pageTree, imagePath, markdownUrl, sectionIndex } = useFumadocsLoader(loaderData);
 
 	return (
 		<DocsLayout {...baseOptions()} tree={pageTree}>
-			{clientLoader.useContent(path, { markdownUrl, path, imagePath })}
+			{clientLoader.useContent(path, { markdownUrl, path, imagePath, sectionIndex })}
 		</DocsLayout>
 	);
 }
