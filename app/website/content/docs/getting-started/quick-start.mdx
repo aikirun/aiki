@@ -214,6 +214,8 @@ await runtimeHandle.stop();
 
 Everything here runs in one process. The same workflow code runs against a separately deployed server — swap `client({ handler: aikiServer.handler })` for `client({ url: "..." })`.
 
+Beyond this demo, give the server a timer priority queue so sleeps and timeouts fire exactly when they come due rather than at the next database scan — see [Installation](./installation.md).
+
 ## Next Steps
 
 - **[Workflows](../core-concepts/workflows.md)** — Deep dive into workflow concepts
