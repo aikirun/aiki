@@ -1,5 +1,6 @@
 ---
 title: Workflows
+description: Define workflows as versioned async functions, start them, and follow a run through every state it can rest in.
 ---
 
 A workflow is a recipe for a business process - it defines the steps needed to complete an operation. Workflows in Aiki are durable, versioned, and can contain complex logic.
@@ -121,7 +122,9 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 });
 ```
 
-When a workflow fails (due to an unhandled error or task failure), Aiki will automatically retry it based on your retry strategy. Between retries, the workflow enters an `awaiting_retry` state.
+When a workflow attempt fails — an unhandled error, or a task that has run out of its own retries — Aiki retries it based on your retry strategy. Between attempts the run sits in `awaiting_retry`.
+
+A task backing off between its own attempts is a different state. The run parks in `awaiting_task_retry` and releases its worker until the task is due, and the workflow's own attempt count is untouched. See [Task States](./tasks.md#task-states).
 
 For detailed guidance on retry strategies, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
 
@@ -152,7 +155,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 Schemas work with any validation library that implements [Standard Schema](https://standardschema.dev/) (Zod, Valibot, ArkType, etc.).
 
-**Why use output schemas?** For child workflows, cached outputs are validated against the schema. If the cached shape doesn't match, the parent workflow fails immediately. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
+**Why use output schemas?** The output schema checks what the handler returns, at the moment it returns it, so a run cannot record a result that does not match its declared shape. It runs when the workflow executes, not when a parent reads a recorded result - a child that completed before you changed the shape hands back what it recorded. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
 
 ## Workflow Options
 
@@ -275,7 +278,8 @@ A workflow run is an instance of a workflow execution. It has:
 - `paused` - Paused by user
 - `sleeping` - Waiting for a sleep duration to elapse
 - `awaiting_event` - Waiting for an external event
-- `awaiting_retry` - Waiting to retry after failure
+- `awaiting_retry` - The workflow attempt failed and is backing off before the next attempt
+- `awaiting_task_retry` - A task in the run is backing off before its next attempt; the run releases its worker until the task is due
 - `awaiting_child_workflow` - Waiting for a child workflow to complete
 - `stalled` - Given up after sitting undelivered too long; recoverable by requeue (see [Stalled Runs](../architecture/stalled-runs.md))
 - `completed` - Finished successfully
@@ -332,6 +336,8 @@ await handle.cancel("User requested cancellation");
 ## Child Workflows
 
 Workflows can start other workflows as children. By default, child workflows run in a fire-and-forget manner - the parent continues without waiting.
+
+A child is a workflow run of its own, delivered to whichever worker picks it up. That is the difference from a [task](./tasks.md), which runs inline on the parent's own worker: children are how work spreads across your fleet and how several branches make progress at the same time.
 
 ### Starting a Child Workflow
 

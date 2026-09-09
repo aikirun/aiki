@@ -1,8 +1,13 @@
 ---
 title: Tasks
+description: The boundary for side effects and nondeterministic work - recorded once, replayed rather than repeated.
 ---
 
-Tasks are the building blocks of workflows. Each task represents a single unit of work that can be executed and retried independently.
+Tasks are the boundary for side effects and nondeterministic work in a workflow. A task handler is where network requests, database writes, reading the clock, and generating random values belong.
+
+When your workflow calls a task, the handler runs then and there, on the worker executing the run. Nothing is queued and nothing is handed to another process - a task is an ordinary function call, with its result recorded. [Child workflows](./workflows.md#child-workflows) are what gets dispatched.
+
+Once a task completes, its result is recorded and reused on replay instead of running the handler again. A task can still execute more than once - a worker may fail after the side effect lands but before the result is durably recorded - so task handlers should be idempotent.
 
 ## Defining a Task
 
@@ -43,7 +48,7 @@ const processPayment = task({
 
 ## Executing Tasks
 
-Tasks are executed within workflows using `.start()`:
+Tasks are executed within workflows using `.start()`, which calls the handler and returns its result:
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
@@ -61,6 +66,8 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	},
 });
 ```
+
+Starting several tasks with `Promise.all` works, and interleaves them the way any async code interleaves in one process - useful for overlapping I/O, but it does not spread the work across workers. Reach for [child workflows](./workflows.md#child-workflows) when you want that.
 
 ## Task Retry
 
@@ -81,6 +88,22 @@ const processPayment = task({
 ```
 
 For available strategies and best practices, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
+
+## Task States
+
+A task moves through these states:
+
+- `running` - Executing now
+- `awaiting_retry` - The attempt failed and the task is backing off before the next one; carries the error and the time of the next attempt
+- `completed` - Succeeded; its output is recorded and returned on replay
+- `failed` - The retry strategy has no attempts left
+- `discarded` - An unfinished task the run left behind; it no longer takes part in replay
+
+While a task sits in `awaiting_retry`, its run parks in `awaiting_task_retry` and releases its worker; the server re-queues the run when the task is due. Short backoffs are the exception: a delay within `maxInlineWaitMs` (10ms by default) is waited out in place, so the task stays `running` and the run never parks.
+
+A task's attempts are its own, separate from the run's, so a task backing off does not move the run's attempt count. When the task runs out of attempts it goes `failed`, and that failure becomes the workflow attempt's failure: the run moves to [`awaiting_retry`](./workflows.md#states) if the workflow has attempts left, or to `failed` if it does not, with cause `task` either way.
+
+Only unfinished tasks are ever discarded. Cancelling or stalling a run discards the tasks it left `running` or `awaiting_retry`, since nothing will finish them. Retrying a workflow attempt discards those too, along with any `failed` task, so the new attempt runs them again from their first attempt. A `completed` task is never discarded - its output is kept and replayed, so a retry resumes rather than repeating work that already succeeded.
 
 ## Schema Validation
 
@@ -109,7 +132,7 @@ const processPayment = task({
 
 Schemas work with any validation library that implements [Standard Schema](https://standardschema.dev/) (Zod, Valibot, ArkType, etc.).
 
-**Why use output schemas?** When task results are cached, the schema validates cached data on replay. If the cached shape doesn't match (e.g., after refactoring), the workflow fails immediately rather than silently returning mismatched data. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
+**Why use output schemas?** The output schema checks what the handler returns, at the moment it returns it, so a task cannot record a result that does not match its declared shape. It runs when the task executes, not when a recorded result is replayed - a result recorded before you changed the shape is replayed as it was written. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
 
 ## Task Input and Output
 

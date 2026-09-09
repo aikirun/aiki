@@ -1,8 +1,9 @@
 ---
 title: Subscribers
+description: How workers find work - claiming over HTTP, or push delivery in-process or across instances.
 ---
 
-Workers discover ready workflow runs through **subscribers**. A subscriber is a pluggable component that controls how a worker finds and claims work. Aiki ships two implementations and supports custom ones.
+Workers discover ready workflow runs through **subscribers**. A subscriber is a pluggable component that controls how a worker finds and claims work. Aiki ships multiple implementations and supports custom ones.
 
 ## HTTP Subscriber (Default)
 
@@ -26,9 +27,39 @@ The claim endpoint atomically fetches and claims ready runs. Abandoned claims ar
 | `intervalMs` | 1,000 | Poll interval when no work is found (ms) |
 | `maxRetryIntervalMs` | 30,000 | Max backoff on errors (ms) |
 
+## In-Memory Subscriber (Optional)
+
+When the worker runs in the same process as the server, `inMemoryQueue()` pairs a publisher and a subscriber over one in-process broker:
+
+```package-install
+@aikirun/memory
+```
+
+```typescript
+import { inMemoryQueue } from "@aikirun/memory";
+
+const queue = inMemoryQueue();
+
+const aikiServer = server({
+  db: database({ provider: "pg", url: databaseUrl }),
+  runtime: { publisher: queue.publisher },
+});
+
+const aikiWorker = worker({
+  workflows: [orderWorkflowV1],
+  subscriber: queue.subscriber,
+});
+```
+
+Both halves share one broker object, so both must live in the same process. That is all it asks for — no external service, nothing to connect to, no configuration.
+
+Delivery is shaped exactly like the Redis subscriber below: a queue per workflow version and pool, ordered by when each run became due with priority breaking ties; a publish wakes any worker parked on the queue; and popping a run removes it, so it reaches exactly one worker.
+
+The queues live in the process, so a restart empties them. As with Redis, that costs nothing: the server's database outbox is the source of truth for deliverable work, and anything lost is published again.
+
 ## Redis Subscriber (Optional)
 
-For sub-second work discovery, install the Redis subscriber:
+When the server and workers run as separate processes, the broker has to be one too. The Redis subscriber delivers the same way across instances:
 
 ```package-install
 @aikirun/redis
@@ -120,7 +151,7 @@ There is no `close` hook. The factory receives a `context` whose `signal` is an 
 
 ## Backup Subscriber
 
-When you provide a custom subscriber (including the Redis subscriber), the worker also creates a backup HTTP subscriber. If the primary subscriber fails, the worker switches to the backup to maintain availability. This ensures workflow execution continues even if an external dependency like Redis goes down.
+When you provide a custom subscriber — the in-memory and Redis subscribers included — the worker also creates a backup HTTP subscriber. If the primary subscriber fails, the worker switches to the backup to maintain availability. This ensures workflow execution continues even if an external dependency like Redis goes down.
 
 ## Next Steps
 

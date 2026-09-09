@@ -1,5 +1,6 @@
 ---
 title: Architecture Overview
+description: How the server, workers, endpoints and storage fit together - and why the split is architectural, not physical.
 ---
 
 Aiki separates workflow orchestration from execution: a server orchestrates, workers and endpoints execute. The separation is architectural, not physical — the server is a library, so the components can share a single process or be deployed independently. Workflow code is identical either way.
@@ -89,6 +90,8 @@ Subscriber → Worker → Task Execution → Server
 3. Worker executes workflow logic and tasks
 4. Worker reports results to server
 5. Server updates state in storage
+
+A worker calls each task and carries on, so a run stays with one worker for the whole of step 3 instead of being suspended and re-delivered once per task. It leaves the worker only when it has to wait - on a sleep, an event, a task retry, or a child workflow - and any worker can pick it up from there.
 
 ### 3. Workflow Execution (Push) *(coming soon)*
 

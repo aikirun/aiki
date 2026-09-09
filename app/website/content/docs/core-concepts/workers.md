@@ -1,5 +1,6 @@
 ---
 title: Workers
+description: Long-lived processes that execute your workflows in your infrastructure, sharing the load and scaling horizontally.
 ---
 
 A worker executes your workflows. It runs in your infrastructure, subscribes to workflow run messages, and executes the workflow logic you've defined. You can run multiple workers to scale horizontally—they automatically share the workload.
@@ -76,7 +77,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 | Param | Description |
 |-------|-------------|
 | `workflows` | Workflow versions this worker executes |
-| `subscriber` | Optional subscriber factory for work discovery (default: claims from the server over HTTP). Use `redisSubscriber()` from `@aikirun/redis` for lower-latency delivery |
+| `subscriber` | Optional subscriber factory for work discovery (default: claims from the server over HTTP). Use `inMemoryQueue()` from `@aikirun/memory` or `redisSubscriber()` from `@aikirun/redis` for push delivery |
 
 **Options** are passed via `options` param or `with()` builder:
 
@@ -89,20 +90,7 @@ Worker configuration is split between **params** (identity) and **options** (tun
 
 ## Pluggable Subscribers
 
-By default, workers claim work from the server over HTTP, which requires no setup beyond the Aiki server connection. For sub-second work discovery, install `@aikirun/redis`:
-
-```package-install
-@aikirun/redis
-```
-
-```typescript
-import { redisSubscriber } from "@aikirun/redis";
-
-const aikiWorker = worker({
-  workflows: [orderWorkflowV1],
-  subscriber: redisSubscriber({ url: "redis://localhost:6379" }),
-});
-```
+By default, workers claim work from the server over HTTP, which requires no setup beyond the Aiki server connection. Two subscribers replace that polling with sub-second push delivery. Which one you want follows from where the worker runs.
 
 When the worker runs in the same process as the server, `inMemoryQueue()` pairs a publisher and a subscriber over one in-process broker, with no external service:
 
@@ -125,6 +113,23 @@ const aikiWorker = worker({
   subscriber: queue.subscriber,
 });
 ```
+
+When the server and workers are separate processes, the broker has to be too. `@aikirun/redis` delivers the same way across instances:
+
+```package-install
+@aikirun/redis
+```
+
+```typescript
+import { redisSubscriber } from "@aikirun/redis";
+
+const aikiWorker = worker({
+  workflows: [orderWorkflowV1],
+  subscriber: redisSubscriber({ url: "redis://localhost:6379" }),
+});
+```
+
+Both subscribers pair with a publisher on the server: work reaches a worker only if the server is configured to publish to the same broker. See [Server](../architecture/server.md).
 
 You can also implement your own subscriber by providing a function that matches the `CreateSubscriber` type from `@aikirun/types/infra/queue`. See [Subscribers](../architecture/subscribers.md) for how the implementations work and what custom subscribers must provide.
 

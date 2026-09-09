@@ -1,5 +1,6 @@
 ---
 title: Dependency Injection
+description: Share database connections, API clients and services across every execution with higher-order functions.
 ---
 
 Inject dependencies that are created once at startup and shared by every execution — database connections, API clients, services — into tasks and workflows with higher-order functions. For values created fresh per execution, like trace IDs, use [Context](./context.md) instead.

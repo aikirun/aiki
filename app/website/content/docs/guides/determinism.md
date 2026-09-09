@@ -1,5 +1,6 @@
 ---
 title: Determinism and Idempotency
+description: Keep nondeterminism inside tasks and make them idempotent - the two habits that make replay safe.
 ---
 
 Aiki has two guiding principles for reliable workflows:

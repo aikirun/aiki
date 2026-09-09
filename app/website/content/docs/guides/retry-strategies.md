@@ -1,5 +1,6 @@
 ---
 title: Retry Strategies
+description: Choose between never, fixed, exponential and jittered backoff, and set them per task and per workflow.
 ---
 
 Aiki provides automatic retry capabilities for both tasks and workflows. This guide helps you choose the right retry strategy for your use case.

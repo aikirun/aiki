@@ -1,20 +1,22 @@
 ---
 title: Introduction
-description: Build reliable, long-running workflows in TypeScript.
+description: Durable workflows as plain TypeScript functions - they survive crashes, wait for months, and resume where they left off.
 ---
 
-<img src="../../public/assets/aiki-logo-combo.svg" alt="Aiki" width="200" />
+Some workflows finish in seconds. Others run for days or months - waiting on a payment, on a human approval, on a third-party system that happens to be down right now. Building those out of ordinary code means assembling queues, crons, state machines and recovery logic by hand.
 
-Welcome to the Aiki documentation! This guide will help you build durable, reliable workflows in TypeScript.
+Aiki makes them plain TypeScript instead. A workflow is an async function that survives crashes, restarts and deploys: it can suspend for months without holding a process, then resume where it left off, with the work it already finished replayed rather than repeated.
 
-## 🚀 Getting Started
+A server orchestrates and workers execute, and both ship as libraries. Run everything in one process to start with, and pull the pieces apart when you need to - where each component runs is configuration, and your workflow code does not change.
+
+## Getting Started
 
 New to Aiki? Start here:
 
 - **[Quick Start](./getting-started/quick-start.mdx)** - Get up and running
 - **[Installation](./getting-started/installation.md)** - Detailed setup instructions
 
-## 📚 Core Concepts
+## Core Concepts
 
 Understand the building blocks:
 
@@ -26,7 +28,7 @@ Understand the building blocks:
 - **[Workers](./core-concepts/workers.md)** - Execute workflows in your infrastructure
 - **[Client](./core-concepts/client.mdx)** - Connect to the Aiki server, embedded or remote
 
-## 🎯 Guides
+## Guides
 
 Best practices and patterns:
 
@@ -41,7 +43,7 @@ Best practices and patterns:
 - **[Logging](./guides/logging.md)** - Plug in your own logger and log from workflow code
 - **[IAM](./guides/iam.md)** - Multi-tenancy, API keys, and dashboard auth — optional, off by default
 
-## 🏗 Architecture
+## Architecture
 
 Deep dive into system design:
 
@@ -52,7 +54,7 @@ Deep dive into system design:
 - **[Stalled Runs](./architecture/stalled-runs.md)** - When the server gives up delivering a run, and how to requeue
 - **[Crash recovery](./architecture/cam.md)** - Underlying replay-based crash recovery mechanism
 
-## 🔗 Quick Links
+## Quick Links
 
 - [GitHub Repository](https://github.com/aikirun/aiki)
 - [Discord](https://discord.aiki.run)

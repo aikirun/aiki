@@ -1,5 +1,6 @@
 ---
 title: Schedules
+description: Trigger workflows on a cron expression or interval, with overlap policy, run options and idempotent activation.
 ---
 
 A schedule automatically triggers workflows at defined times or intervals. Use schedules for recurring jobs like daily reports, hourly syncs, or cron-based maintenance tasks.

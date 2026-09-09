@@ -1,5 +1,6 @@
 ---
 title: Reliable Hooks
+description: Run durable follow-up work after a workflow completes, fails or is cancelled, by wrapping it in a parent workflow.
 ---
 
 To trigger a reliable hook after a workflow completes or fails or is cancelled, wrap both the main workflow and the hook in a parent workflow.

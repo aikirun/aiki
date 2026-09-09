@@ -1,5 +1,6 @@
 ---
 title: Stalled Runs
+description: What it means when the server gives up delivering a run, why that is not a failure, and how to requeue it.
 ---
 
 A run **stalls** when the server gives up trying to deliver it. The run sat ready for longer than the retention cap (`maxAgeMs`, 24 hours by default) with no executor taking it. Stalling stops an undeliverable backlog from growing and stops the redelivery churn — the alternative would be re-offering the run forever.

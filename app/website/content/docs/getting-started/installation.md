@@ -1,5 +1,6 @@
 ---
 title: Installation
+description: Add the SDK to a TypeScript project, or host the standalone server and dashboard from a binary, Docker, or source.
 ---
 
 How you install Aiki depends on what you're doing:

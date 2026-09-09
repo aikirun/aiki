@@ -1,5 +1,6 @@
 ---
 title: Refactoring Workflows
+description: What you can safely change in a workflow that already has runs in flight, and what needs a new version.
 ---
 
 This guide is about refactoring workflow versions while it has in-flight runs. If no runs exist, you can change your code freely - these concerns only arise when running workflows replay with new code.
@@ -318,11 +319,9 @@ async handler(run, input) {
 
 1. **Make backwards-compatible changes only** - Add new fields instead of renaming or removing existing ones. This is the safest approach.
 
-2. **Create a new workflow version** - If you need to change a task's output shape, create a new workflow version. Each workflow version has its own cache namespace, so existing runs continue with the old shape while new runs use the new shape.
+2. **Create a new workflow version** - If you need to change a task's output shape, create a new workflow version. Each workflow version has its own cache namespace, so existing runs continue with the old shape while new runs use the new shape. This is the only thing that protects an in-flight run: a cached result is replayed exactly as it was recorded, and an output schema will not catch the mismatch, because it validates a handler's return value and never a replayed one.
 
-3. **Schema validation** - Define output schemas for your tasks and workflows. Aiki validates cached results against the schema, so if a cached result has the old shape, the workflow fails immediately rather than silently returning mismatched data.
-
-4. **Use discriminated unions for output versioning** - Include a version discriminator in your output type:
+3. **Use discriminated unions for output versioning** - Include a version discriminator in your output type:
    ```typescript
    type UserV1 = { version: 1; email: string };
    type UserV2 = { version: 2; emailAddress: string };
@@ -330,7 +329,7 @@ async handler(run, input) {
    ```
    Your workflow code can then handle both shapes based on the version field.
 
-5. **Wait for running workflows to complete** - Deploy the output shape change only after all in-flight workflows finish. This avoids the mismatch entirely, but isn't always practical for long-running workflows.
+4. **Wait for running workflows to complete** - Deploy the output shape change only after all in-flight workflows finish. This avoids the mismatch entirely, but isn't always practical for long-running workflows.
 
 > **Future consideration:** Upcasting (transforming old cached data to new shapes at read time) may be added if there's demand for it.
 

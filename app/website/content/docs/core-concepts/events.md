@@ -1,8 +1,13 @@
 ---
 title: Events
+description: Every run has a durable mailbox, so an event sent before the workflow waits for it is held until the workflow is ready.
 ---
 
-Events let external systems communicate with running workflows. When a workflow waits for an event, it suspends and releases the worker until the event arrives or a timeout elapses.
+Events let external systems communicate with running workflows.
+
+Each workflow run has a durable mailbox. Sending an event drops it in the mailbox and returns; the workflow picks it up when it asks for one. The two are independent, and that is what makes events safe to use from the outside world: an event sent before the workflow reaches its `wait()` call sits in the mailbox until the workflow is ready for it.
+
+So a wait has two outcomes. If the event is already in the mailbox, the workflow takes it and carries on. If not, the run moves to [`awaiting_event`](./workflows.md#states) and releases its worker until the event arrives or the timeout elapses.
 
 ## Defining Events
 
@@ -34,7 +39,7 @@ import { z } from "zod";
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 	async handler(run, input) {
-		// Data is validated when the event is received
+		// Data is validated by the sender, before it is sent
 		const { data } = await run.events.paymentReceived.wait();
 	},
 	events: {
@@ -48,7 +53,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 });
 ```
 
-Schemas validate event data when received, protecting against malformed external data.
+The sender validates event data against the schema before sending it, so malformed data is rejected at its source rather than reaching the workflow.
 
 ## Waiting for Events
 
@@ -77,6 +82,8 @@ if (response.timeout) {
 }
 ```
 
+Once a wait times out, that is its answer for good. The timeout is recorded like any other outcome, so the workflow never sits through the same 24 hours twice.
+
 ## Sending Events
 
 Send events to a workflow using the handle:
@@ -90,6 +97,8 @@ await handle.events.paymentReceived.send({
 	amount: 99.99,
 });
 ```
+
+The send does not need the workflow to be waiting, or even to have started executing. It needs the run to be alive: once a run has completed, failed, or been cancelled, its mailbox is closed and sending to it fails.
 
 ### With Reference ID
 
@@ -170,10 +179,10 @@ await handle.events.orderUpdate.send({
 
 ## Event Deduplication
 
-Events with the same reference ID are silently deduplicated - duplicates are ignored without error:
+Sending the same event twice with the same reference ID adds one entry to the mailbox - the duplicate is ignored without error:
 
 ```typescript
-// First send - event delivered
+// First send - lands in the mailbox
 await handle.events.paymentReceived
 	.with("reference.id", "payment-123")
 	.send({ transactionId: "txn_abc" });
@@ -186,37 +195,39 @@ await handle.events.paymentReceived
 
 This is useful when event sources may retry (webhooks, message queues). See the [Reference IDs Guide](../guides/reference-ids.md) for more patterns.
 
-## Event Queues
+## Mailbox Order
 
-Each event type has its own queue. Events are matched in sequence during replay.
-
-### Why This Matters
-
-When a workflow resumes after waiting for an event, it replays from the beginning. The event queue ensures the same event data is returned:
+The mailbox keeps each event name in the order the events arrived, and each `wait()` takes the next one:
 
 ```typescript
 async handler(run, input) {
-	const first = await run.events.update.wait();   // Reads 1st from queue
-	const second = await run.events.update.wait();  // Reads 2nd from queue
+	const first = await run.events.update.wait();   // the first update sent
+	const second = await run.events.update.wait();  // the second
 	// ...
 }
 ```
 
+The mailbox is durable, so a wait that has been answered keeps its answer. That matters because a workflow resumes by running its handler again from the top: every wait it already passed hands back what it got the first time, the same event or the same timeout.
+
+Event names are kept apart, so reordering waits on different events in your handler does not change what they read.
+
 ### Don't Rely on Same-Named Event Order
 
-Unlike sleeps (which are controlled by the workflow), events come from external systems. Two different processes might trigger the same event type simultaneously, so the order is inherently unpredictable:
+The mailbox order is fixed, but which of two racing senders reaches the server first is not. Two systems sending `statusUpdate` at the same moment will be read in a definite order, just not one you can predict from the outside:
 
 ```typescript
-// DON'T rely on order - external systems may send events in any order
-const first = await run.events.statusUpdate.wait();   // Which update comes first?
+// DON'T rely on which arrives first
+const first = await run.events.statusUpdate.wait();   // Which update is this?
 const second = await run.events.statusUpdate.wait();  // Unpredictable!
 
-// DO use different event types when order matters
+// DO use a distinct event for each thing you are waiting for
 const started = await run.events.started.wait();
 const completed = await run.events.completed.wait();
 ```
 
-This is a design principle, not just a refactoring concern. Different event types can be safely reordered since each has its own queue.
+Distinct event names never contend, so each wait reads what it was written to read.
+
+The other way round is to keep one event name and put the ordering in the data - a step number, a status field - so the workflow can tell which update it is holding instead of trusting the order it arrived in.
 
 ## Next Steps
 
