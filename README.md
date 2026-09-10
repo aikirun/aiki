@@ -70,7 +70,7 @@ npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server po
 Apply Aiki's schema migration to your Postgres database:
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
+DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
   npx aiki-server migrate apply
 ```
 
@@ -83,7 +83,7 @@ import { database, server } from "@aikirun/server";
 import { worker } from "@aikirun/worker";
 import { trialV1 } from "./workflow";
 
-const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@your-db-host:5432/aiki";
 
 // Server and worker, both running in this process
 const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });

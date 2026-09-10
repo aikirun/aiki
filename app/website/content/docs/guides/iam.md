@@ -30,7 +30,7 @@ This is the right shape when the server isn't reachable by anyone you don't trus
 IAM owns its own tables (users, sessions, organizations, namespaces, members, API keys), migrated separately from the server's:
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
+DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
   npx aiki-iam migrate apply
 ```
 
