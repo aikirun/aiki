@@ -121,7 +121,7 @@ export function ApiKeys() {
 				text={`import { client } from "@aikirun/client";
 
 const aikiClient = client({
-  url: "http://localhost:9850",
+  url: "http://app.aiki.run",
   apiKey: "YOUR_API_KEY",
 });`}
 			/>
