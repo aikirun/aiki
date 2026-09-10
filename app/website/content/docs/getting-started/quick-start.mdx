@@ -19,7 +19,7 @@ You need Node.js 18+ (or Bun 1.0+) and a PostgreSQL database. Install the SDK an
 <Tab value="Node">
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
+DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
   npx aiki-server migrate apply
 ```
 
@@ -27,7 +27,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
 <Tab value="Bun">
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/aiki \
+DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
   bunx aiki-server migrate apply
 ```
 
@@ -84,7 +84,7 @@ import { client } from "@aikirun/client";
 import { database, server } from "@aikirun/server";
 import { worker } from "@aikirun/worker";
 
-const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@your-db-host:5432/aiki";
 
 const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
 const runtimeHandle = aikiServer.runtime.start();
@@ -183,7 +183,7 @@ const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
   },
 });
 
-const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@localhost:5432/aiki";
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@your-db-host:5432/aiki";
 
 // Server and worker, both running in this process
 const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
