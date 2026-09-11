@@ -8,7 +8,11 @@ export function getWorkflowQueueName(params: {
 	pool?: string;
 }): string {
 	const { source, name, versionId, pool } = params;
-	return pool ? `aiki:workflow:${source}:${name}:${versionId}:${pool}` : `aiki:workflow:${source}:${name}:${versionId}`;
+	const parts = ["aiki", "workflow", source, name, versionId];
+	if (pool) {
+		parts.push(pool);
+	}
+	return parts.map((part) => part.replaceAll("%", "%25").replaceAll(":", "%3A")).join(":");
 }
 
 export function getWorkflowQueueNames(workflows: WorkflowMeta[], pools?: string[]): string[] {
