@@ -1,6 +1,7 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Logger } from "@aikirun/lib/logger";
 
+import type { ApiClient } from "../../client";
 import type { WorkflowMeta } from "../../workflow";
 import type { WorkflowRunId } from "../../workflow/run";
 
@@ -21,6 +22,7 @@ export interface Subscriber {
 }
 
 export interface SubscriberContext {
+	api: ApiClient;
 	workerId: string;
 	workflows: NonEmptyArray<WorkflowMeta>;
 	pools?: string[];

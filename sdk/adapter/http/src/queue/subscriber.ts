@@ -1,5 +1,4 @@
 import { getRetryParams } from "@aikirun/lib/retry";
-import type { ApiClient } from "@aikirun/types/client";
 import type {
 	CreateSubscriber,
 	Subscriber,
@@ -8,18 +7,12 @@ import type {
 } from "@aikirun/types/infra/queue";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
-export interface HttpSubscriberParams {
-	api: ApiClient;
-	options?: HttpSubscriberOptions;
-}
-
 export interface HttpSubscriberOptions {
 	intervalMs?: number;
 	maxRetryIntervalMs?: number;
 }
 
-export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
-	const { api, options } = params;
+export function httpSubscriber(options?: HttpSubscriberOptions): CreateSubscriber {
 	const intervalMs = options?.intervalMs ?? 1_000;
 	const maxRetryIntervalMs = options?.maxRetryIntervalMs ?? 30_000;
 
@@ -44,7 +37,7 @@ export function httpSubscriber(params: HttpSubscriberParams): CreateSubscriber {
 		}
 	};
 
-	return ({ workflows, pools, signal }): Subscriber => {
+	return ({ api, workflows, pools, signal }): Subscriber => {
 		return {
 			getNextDelay,
 			async getReadyRuns(size: number): Promise<WorkflowRunMessage[]> {

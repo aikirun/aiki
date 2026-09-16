@@ -4,6 +4,10 @@
 	"description": "Core type definitions for Aiki",
 	"type": "module",
 	"exports": {
+		"./api/identity": {
+			"types": "./dist/api/identity.d.ts",
+			"import": "./dist/api/identity.js"
+		},
 		"./api/schedule": {
 			"types": "./dist/api/schedule.d.ts",
 			"import": "./dist/api/schedule.js"

@@ -1,6 +1,9 @@
 import { UnauthorizedError } from "@aikirun/lib/error";
+import { SENTINEL_ULID } from "@aikirun/lib/id";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { Database } from "@aikirun/types/infra/db";
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { OrganizationId } from "@aikirun/types/organization";
 
 import { createHandler } from "./handler";
 import { describe, expect, test } from "bun:test";
@@ -46,5 +49,44 @@ describe("handler API authorization", () => {
 		const response = await handler(new Request("http://localhost/api/workflowRun/getById"));
 
 		expect([response.status, await response.text()]).toEqual([500, "Internal Server Error"]);
+	});
+});
+
+describe("identity API", () => {
+	test("returns the namespace and organization from authenticated credentials", async () => {
+		const handler = await createHandler({
+			db: {} as Database,
+			logger: noopLogger,
+			iam: {
+				api: () => () => ({
+					organizationId: "org-authenticated" as OrganizationId,
+					namespaceId: "ns-authenticated" as NamespaceId,
+				}),
+			},
+		});
+		const response = await handler(
+			new Request("http://localhost/api/identity/getV1", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ json: {} }),
+			})
+		);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({
+			json: { organizationId: "org-authenticated", namespaceId: "ns-authenticated" },
+		});
+	});
+
+	test("returns the default identity without IAM", async () => {
+		const handler = await createHandler({ db: {} as Database, logger: noopLogger });
+		const response = await handler(
+			new Request("http://localhost/api/identity/getV1", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ json: {} }),
+			})
+		);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ json: { organizationId: SENTINEL_ULID, namespaceId: SENTINEL_ULID } });
 	});
 });
