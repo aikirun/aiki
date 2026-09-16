@@ -21,12 +21,8 @@ export function createInMemorySubscriber(broker: Broker): CreateSubscriber {
 		}
 	};
 
-	return ({ workflows, pools, signal }): Subscriber => {
-		const queueNames = getWorkflowQueueNames(workflows, pools) as NonEmptyArray<string>;
-		const queueNamesByIndex = new Map<string, number>();
-		for (const [queueIndex, queueName] of queueNames.entries()) {
-			queueNamesByIndex.set(queueName, queueIndex);
-		}
+	return ({ api, workflows, pools, signal }): Subscriber => {
+		let queues: { names: NonEmptyArray<string>; indexByName: Map<string, number> } | undefined;
 
 		let waiterHandle:
 			| {
@@ -43,6 +39,21 @@ export function createInMemorySubscriber(broker: Broker): CreateSubscriber {
 				if (signal.aborted) {
 					return [];
 				}
+
+				if (queues === undefined) {
+					const { namespaceId } = await api.identity.getV1({}, { signal });
+					if (signal.aborted) {
+						return [];
+					}
+					const names = getWorkflowQueueNames(namespaceId, workflows, pools);
+					const indexByName = new Map<string, number>();
+					for (const [queueIndex, queueName] of names.entries()) {
+						indexByName.set(queueName, queueIndex);
+					}
+					queues = { names, indexByName };
+				}
+
+				const { names: queueNames, indexByName: queueNamesByIndex } = queues;
 
 				const startQueueIndex = Math.floor(Math.random() * queueNames.length);
 				const initialBatch = broker.roundRobinPop({ queueNames, startQueueIndex, limit });

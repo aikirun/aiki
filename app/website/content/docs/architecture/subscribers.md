@@ -78,19 +78,21 @@ It pairs with the server's Redis publisher — work flows through Redis only if 
 
 ### Queue Per Workflow
 
-Each workflow version gets its own queue — a Redis sorted set ordered by when each run became due, with priority breaking ties between runs due at the same moment:
+Each workflow version gets its own queue per namespace — a Redis sorted set ordered by when each run became due, with priority breaking ties between runs due at the same moment:
 
 ```
-aiki:workflow:user:order-processing:1.0.0
-aiki:workflow:user:user-onboarding:1.0.0
+aiki:{<namespace-id>}:workflow:user:order-processing:1.0.0
+aiki:{<namespace-id>}:workflow:user:user-onboarding:1.0.0
 ```
 
 With worker pools in use:
 
 ```
-aiki:workflow:user:order-processing:1.0.0:tenant-acme
-aiki:workflow:user:order-processing:1.0.0:tenant-globex
+aiki:{<namespace-id>}:workflow:user:order-processing:1.0.0:tenant-acme
+aiki:{<namespace-id>}:workflow:user:order-processing:1.0.0:tenant-globex
 ```
+
+Before its first pop, the subscriber asks the server which namespace its API key belongs to, and from then on it watches only that namespace's queues. The braces around the namespace are a Redis Cluster hash tag: all of a namespace's queues land in one hash slot, which the multi-key pop needs, and a per-namespace ACL rule can scope a worker's credentials to `aiki:{<namespace-id>}:*`.
 
 ### Work Distribution
 

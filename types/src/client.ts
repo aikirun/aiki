@@ -1,5 +1,6 @@
 import type { Logger } from "@aikirun/lib/logger";
 
+import type { IdentityApi } from "./api/identity";
 import type { ScheduleApi } from "./api/schedule";
 import type { TaskApi } from "./api/task";
 import type { WorkflowRunApi } from "./api/workflow-run";
@@ -48,6 +49,7 @@ type WithClientOptions<T> = {
 };
 
 export interface ApiClient {
+	identity: WithClientOptions<IdentityApi>;
 	workflowRun: WithClientOptions<WorkflowRunApi>;
 	task: WithClientOptions<TaskApi>;
 	schedule: WithClientOptions<ScheduleApi>;

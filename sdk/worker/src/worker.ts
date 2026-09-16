@@ -177,8 +177,9 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 			this.configProvider = asConfigProvider(() => config);
 		}
 
-		const createPrimarySubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
+		const createPrimarySubscriber = this.params.subscriber ?? httpSubscriber();
 		this.primarySubscriber = createPrimarySubscriber({
+			api: this.client.api,
 			workerId: this.id,
 			workflows: workflowsMeta,
 			pools: this.startOptions.pools,
@@ -190,8 +191,9 @@ class WorkerHandleImpl<Context> implements WorkerHandle {
 		// When the custom subscriber is present, we know for sure that it is not httpSubscriber
 		// because that pacakge is private
 		if (this.params.subscriber) {
-			const createBackupSubscriber = httpSubscriber({ api: this.client.api });
+			const createBackupSubscriber = httpSubscriber();
 			this.backupSubscriber = createBackupSubscriber({
+				api: this.client.api,
 				workerId: this.id,
 				workflows: workflowsMeta,
 				pools: this.startOptions.pools,

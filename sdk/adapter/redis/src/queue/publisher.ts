@@ -29,6 +29,7 @@ export function redisPublisher(redis: Redis): CreatePublisher {
 				const dataByQueueName = new Map<string, QueueData>();
 				for (const run of runs) {
 					const queueName = getWorkflowQueueName({
+						namespaceId: run.namespaceId,
 						source: run.source,
 						name: run.name,
 						versionId: run.versionId,

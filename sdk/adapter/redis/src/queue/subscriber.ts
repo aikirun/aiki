@@ -1,4 +1,4 @@
-import { shuffleArray } from "@aikirun/lib/collection/array";
+import { type NonEmptyArray, shuffleArray } from "@aikirun/lib/collection/array";
 import { getRetryParams } from "@aikirun/lib/retry";
 import type {
 	CreateSubscriber,
@@ -92,7 +92,7 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 		}
 	};
 
-	return ({ workflows, pools, logger, signal }): Subscriber => {
+	return ({ api, workflows, pools, logger, signal }): Subscriber => {
 		const connectTimeoutMs = params.connectTimeoutMs ?? 5_000;
 
 		const redis = new Redis(params.url, {
@@ -113,12 +113,17 @@ export function redisSubscriber(params: RedisConnectionParams, options?: RedisSu
 		);
 
 		let completedReadyHandshake = false;
-		const queueNames = getWorkflowQueueNames(workflows, pools);
+		let queueNames: NonEmptyArray<string> | undefined;
 
 		return {
 			getNextDelay,
 
 			async getReadyRuns(limit: number): Promise<WorkflowRunMessage[]> {
+				if (queueNames === undefined) {
+					const { namespaceId } = await api.identity.getV1({}, { signal });
+					queueNames = getWorkflowQueueNames(namespaceId, workflows, pools);
+				}
+
 				if (!completedReadyHandshake) {
 					await untilReadyHandshake(redis);
 					completedReadyHandshake = true;
