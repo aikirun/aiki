@@ -209,6 +209,7 @@ See the [Installation Guide](https://aiki.run/docs/getting-started/installation)
 - [`@aikirun/iam`](https://www.npmjs.com/package/@aikirun/iam) — Multi-tenancy, API keys, and dashboard auth
 - [`@aikirun/memory`](https://www.npmjs.com/package/@aikirun/memory) — Sub-second timer dispatch and work delivery inside a single process
 - [`@aikirun/redis`](https://www.npmjs.com/package/@aikirun/redis) — Sub-second timer dispatch and cross-host work distribution
+- [`@aikirun/codec`](https://www.npmjs.com/package/@aikirun/codec) — Toolkit for payload encryption 
 
 ## Stability
 

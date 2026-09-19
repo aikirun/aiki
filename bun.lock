@@ -127,6 +127,17 @@
         "postgres": "^3.4.8",
       },
     },
+    "sdk/adapter/codec": {
+      "name": "@aikirun/codec",
+      "version": "0.42.0",
+      "dependencies": {
+        "@aikirun/types": "workspace:*",
+      },
+      "devDependencies": {
+        "@aikirun/lib": "workspace:*",
+        "@aikirun/testing": "workspace:*",
+      },
+    },
     "sdk/adapter/http": {
       "name": "@aikirun/http",
       "version": "0.42.0",
@@ -296,6 +307,8 @@
     "@aikirun/cli": ["@aikirun/cli@workspace:cli"],
 
     "@aikirun/client": ["@aikirun/client@workspace:sdk/client"],
+
+    "@aikirun/codec": ["@aikirun/codec@workspace:sdk/adapter/codec"],
 
     "@aikirun/endpoint": ["@aikirun/endpoint@workspace:sdk/endpoint"],
 
