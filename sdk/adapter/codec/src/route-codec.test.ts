@@ -61,7 +61,7 @@ describe("routeCodecs", () => {
 			name: "UnknownCodecNameInPayloadError(v0)",
 			codecName: "v0",
 			knownCodecNames: ["v2", "v1"],
-			message: 'No routed codec named "v0"; known: "v2", "v1"',
+			message: 'No codec named "v0"; known: "v2", "v1"',
 		});
 		expect(
 			routed.decode({
@@ -82,7 +82,7 @@ describe("routeCodecs", () => {
 	test("rejects duplicate member names at construction", () => {
 		expect(() => routeCodecs({ current, deprecated: [current] })).toThrow(DuplicateRoutedCodecNameError);
 		expect(() => routeCodecs({ current, deprecated: [current] })).toThrow(
-			'Routed codecs must have unique names; "v2" appears more than once'
+			'Codecs for routing must have unique names; "v2" appears more than once'
 		);
 	});
 
