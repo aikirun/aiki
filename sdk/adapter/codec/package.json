@@ -1,7 +1,7 @@
 {
 	"name": "@aikirun/codec",
 	"version": "0.42.0",
-	"description": "Toolkit for payload encryption",
+	"description": "Toolkit for payload transformation",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

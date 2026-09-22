@@ -30,7 +30,7 @@ const aiki = client({
 
 ## Documentation
 
-See the [client](https://aiki.run/docs) docs for how codecs bind to runs and workers.
+See the client docs (TBA) for how codecs bind to runs and workers.
 
 ## License
 
