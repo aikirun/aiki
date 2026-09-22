@@ -1,11 +1,11 @@
 import { noopLogger } from "@aikirun/lib/logger";
 
-import { chainCodecs, DuplicateChainedCodecNameError, UnknownChainedCodecNameError } from "./chain-codec";
 import { codec, InvalidCodecPayloadFormatError } from "./codec";
+import { DuplicateRoutedCodecNameError, routeCodecs, UnknownCodecNameInPayloadError } from "./route-codec";
 import { describe, expect, test } from "bun:test";
 
-describe("chainCodecs", () => {
-	const newCodec = codec({
+describe("routeCodecs", () => {
+	const current = codec({
 		name: "v2",
 		encode: (payload) => ({ v2: payload }),
 		decode: (body) => {
@@ -15,7 +15,7 @@ describe("chainCodecs", () => {
 			return body.v2;
 		},
 	});
-	const oldCodec = codec({
+	const deprecated = codec({
 		name: "v1",
 		encode: (payload) => ({ v1: payload }),
 		decode: (body) => {
@@ -25,11 +25,11 @@ describe("chainCodecs", () => {
 			return body.v1;
 		},
 	});
-	const chained = chainCodecs(newCodec, oldCodec)({ logger: noopLogger });
+	const routed = routeCodecs({ current, deprecated: [deprecated] })({ logger: noopLogger });
 
-	test("encode uses the first member", async () => {
+	test("encode uses the current member", async () => {
 		const payload = { name: "alice" };
-		expect(await chained.encode(payload)).toEqual({
+		expect(await routed.encode(payload)).toEqual({
 			codecName: "v2",
 			body: { v2: payload },
 		});
@@ -38,13 +38,13 @@ describe("chainCodecs", () => {
 	test("decode runs the member that wrote the value", async () => {
 		const payload = { name: "alice" };
 		expect(
-			await chained.decode({
+			await routed.decode({
 				codecName: "v2",
 				body: { v2: payload },
 			})
 		).toEqual(payload);
 		expect(
-			await chained.decode({
+			await routed.decode({
 				codecName: "v1",
 				body: { v1: payload },
 			})
@@ -53,40 +53,40 @@ describe("chainCodecs", () => {
 
 	test("decode rejects a codecName that matches no member", async () => {
 		expect(
-			chained.decode({
+			routed.decode({
 				codecName: "v0",
 				body: { v0: { name: "alice" } },
 			})
 		).rejects.toMatchObject({
-			name: "UnknownChainedCodecNameError(v0)",
+			name: "UnknownCodecNameInPayloadError(v0)",
 			codecName: "v0",
 			knownCodecNames: ["v2", "v1"],
-			message: 'No chained codec named "v0"; known: "v2", "v1"',
+			message: 'No routed codec named "v0"; known: "v2", "v1"',
 		});
 		expect(
-			chained.decode({
+			routed.decode({
 				codecName: "v0",
 				body: { v0: { name: "alice" } },
 			})
-		).rejects.toBeInstanceOf(UnknownChainedCodecNameError);
+		).rejects.toBeInstanceOf(UnknownCodecNameInPayloadError);
 	});
 
 	test("decode rejects a payload without the envelope", async () => {
-		expect(chained.decode({ name: "alice" })).rejects.toMatchObject({
+		expect(routed.decode({ name: "alice" })).rejects.toMatchObject({
 			name: "InvalidCodecPayloadFormatError(v2)",
 			codecName: "v2",
 		});
-		expect(chained.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidCodecPayloadFormatError);
+		expect(routed.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidCodecPayloadFormatError);
 	});
 
 	test("rejects duplicate member names at construction", () => {
-		expect(() => chainCodecs(newCodec, newCodec)).toThrow(DuplicateChainedCodecNameError);
-		expect(() => chainCodecs(newCodec, newCodec)).toThrow(
-			'Chained codecs must have unique names; "v2" appears more than once'
+		expect(() => routeCodecs({ current, deprecated: [current] })).toThrow(DuplicateRoutedCodecNameError);
+		expect(() => routeCodecs({ current, deprecated: [current] })).toThrow(
+			'Routed codecs must have unique names; "v2" appears more than once'
 		);
 	});
 
-	test("exposes the primary codec name", () => {
-		expect(chainCodecs(newCodec, oldCodec).codecName).toBe("v2");
+	test("exposes the current codec name", () => {
+		expect(routeCodecs({ current, deprecated: [deprecated] }).codecName).toBe("v2");
 	});
 });
