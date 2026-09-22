@@ -24,7 +24,11 @@ export function pipeCodecs(first: NamedCreateCodec, ...rest: NamedCreateCodec[])
 				},
 				decode: async (payload) => {
 					let decoded: unknown = payload;
-					for (const instance of instances.slice().reverse()) {
+					for (let index = instances.length - 1; index >= 0; index--) {
+						const instance = instances[index];
+						if (instance === undefined) {
+							continue;
+						}
 						decoded = await instance.decode(decoded);
 					}
 					return decoded;
