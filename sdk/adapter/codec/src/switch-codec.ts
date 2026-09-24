@@ -24,7 +24,7 @@ export class DuplicateRoutedCodecNameError extends Error {
 	}
 }
 
-export interface RouteCodecsOptions {
+export interface SwitchCodecsOptions {
 	current: NamedCreateCodec;
 	deprecated: NamedCreateCodec[];
 }
@@ -36,7 +36,7 @@ export interface RouteCodecsOptions {
  * Throws `UnknownCodecNameInPayloadError` on decode when the payload's `codecName` matches no
  * member.
  */
-export function routeCodecs({ current, deprecated }: RouteCodecsOptions): NamedCreateCodec {
+export function switchCodecs({ current, deprecated }: SwitchCodecsOptions): NamedCreateCodec {
 	const members = [current, ...deprecated];
 	const seenNames = new Set<string>();
 	for (const member of members) {

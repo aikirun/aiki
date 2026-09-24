@@ -1,10 +1,10 @@
 import { noopLogger } from "@aikirun/lib/logger";
 
 import { codec, InvalidCodecPayloadFormatError } from "./codec";
-import { DuplicateRoutedCodecNameError, routeCodecs, UnknownCodecNameInPayloadError } from "./route-codec";
+import { DuplicateRoutedCodecNameError, switchCodecs, UnknownCodecNameInPayloadError } from "./switch-codec";
 import { describe, expect, test } from "bun:test";
 
-describe("routeCodecs", () => {
+describe("switchCodecs", () => {
 	const current = codec({
 		name: "v2",
 		encode: (payload) => ({ v2: payload }),
@@ -25,7 +25,7 @@ describe("routeCodecs", () => {
 			return body.v1;
 		},
 	});
-	const routed = routeCodecs({ current, deprecated: [deprecated] })({ logger: noopLogger });
+	const routed = switchCodecs({ current, deprecated: [deprecated] })({ logger: noopLogger });
 
 	test("encode uses the current member", async () => {
 		const payload = { name: "alice" };
@@ -80,13 +80,13 @@ describe("routeCodecs", () => {
 	});
 
 	test("rejects duplicate member names at construction", () => {
-		expect(() => routeCodecs({ current, deprecated: [current] })).toThrow(DuplicateRoutedCodecNameError);
-		expect(() => routeCodecs({ current, deprecated: [current] })).toThrow(
+		expect(() => switchCodecs({ current, deprecated: [current] })).toThrow(DuplicateRoutedCodecNameError);
+		expect(() => switchCodecs({ current, deprecated: [current] })).toThrow(
 			'Codecs for routing must have unique names; "v2" appears more than once'
 		);
 	});
 
 	test("exposes the current codec name", () => {
-		expect(routeCodecs({ current, deprecated: [deprecated] }).codecName).toBe("v2");
+		expect(switchCodecs({ current, deprecated: [deprecated] }).codecName).toBe("v2");
 	});
 });

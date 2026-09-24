@@ -8,7 +8,7 @@ export {
 export { pipeCodecs } from "./pipe-codec";
 export {
 	DuplicateRoutedCodecNameError,
-	type RouteCodecsOptions,
-	routeCodecs,
+	type SwitchCodecsOptions,
+	switchCodecs,
 	UnknownCodecNameInPayloadError,
-} from "./route-codec";
+} from "./switch-codec";

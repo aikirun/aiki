@@ -10,6 +10,8 @@ npm install @aikirun/codec
 
 ## Quick Start
 
+`codec()` wraps each encoded payload as `{ codecName, body }` and unwraps that envelope on decode, so the stored form always records which codec produced it:
+
 ```typescript
 import { client } from "@aikirun/client";
 import { codec } from "@aikirun/codec";
@@ -26,7 +28,27 @@ const aiki = client({
 });
 ```
 
-`codec()` wraps each encoded payload as `{ codecName, body }` and unwraps that envelope on decode, so the stored form always records which codec produced it.
+`pipeCodecs()` runs codecs in order on encode and reverses them on decode — for example compress, then encrypt, then offload:
+
+```typescript
+import { codec, pipeCodecs } from "@aikirun/codec";
+
+const stacked = pipeCodecs(compress, encrypt, offloadToS3);
+```
+
+`switchCodecs()` always encodes with the current codec. On decode it reads the stored `codecName` and runs only the member that wrote that value, so you can roll forward while still reading payloads written by deprecated codecs:
+
+```typescript
+import { codec, switchCodecs } from "@aikirun/codec";
+
+const v1 = codec({ name: "v1", encode, decode });
+const v2 = codec({ name: "v2", encode: encodeV2, decode: decodeV2 });
+
+const migrating = switchCodecs({
+	current: v2,
+	deprecated: [v1],
+});
+```
 
 ## Documentation
 
