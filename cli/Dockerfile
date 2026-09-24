@@ -8,6 +8,7 @@ COPY types/package.json ./types/
 COPY sdk/client/package.json ./sdk/client/
 COPY sdk/endpoint/package.json ./sdk/endpoint/
 COPY sdk/adapter/http/package.json ./sdk/adapter/http/
+COPY sdk/adapter/codec/package.json ./sdk/adapter/codec/
 COPY sdk/adapter/memory/package.json ./sdk/adapter/memory/
 COPY sdk/adapter/redis/package.json ./sdk/adapter/redis/
 COPY sdk/iam/package.json ./sdk/iam/
