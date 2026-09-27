@@ -281,6 +281,13 @@
 			"when": 1788821222107,
 			"tag": "0040_lazy_mordo",
 			"breakpoints": true
+		},
+		{
+			"idx": 41,
+			"version": "7",
+			"when": 1790533764392,
+			"tag": "0041_quiet_mantis",
+			"breakpoints": true
 		}
 	]
 }

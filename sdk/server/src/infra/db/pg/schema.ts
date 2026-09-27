@@ -81,6 +81,7 @@ export const schedule = pgTable(
 		status: scheduleStatusEnum("status").notNull(),
 		clientHasherApplied: boolean("client_hasher_applied").notNull(),
 		clientCodecApplied: boolean("client_codec_applied").notNull(),
+		revision: integer("revision").notNull().default(0),
 
 		type: scheduleTypeEnum("type").notNull(),
 		cronExpression: text("cron_expression"),
