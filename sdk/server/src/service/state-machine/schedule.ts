@@ -64,6 +64,7 @@ export async function writeScheduleStateInTx(
 		id: transitionId,
 		type: "schedule",
 		scheduleId: row.id,
+		revision: row.revision,
 		state: params.state,
 	});
 	return row;

@@ -794,7 +794,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			| "awaiting_child_workflow",
 		runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
 		options?: { incrementAttempts?: boolean }
-	): Promise<string[]> {
+	): Promise<Array<{ id: string; revision: number }>> {
 		// Locked in id order so concurrent bulk promoters acquire the same rows the same way.
 		const sortedRuns = [...runs].sort((a, b) => (a.filter.id < b.filter.id ? -1 : 1));
 		const valueRows = sortedRuns.map(({ filter, update }, index) => {
@@ -824,9 +824,9 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 					sql`${workflowRun.revision} = v.revision`
 				)
 			)
-			.returning({ id: workflowRun.id });
+			.returning({ id: workflowRun.id, revision: workflowRun.revision });
 
-		return result.map((row) => row.id);
+		return result;
 	},
 
 	async bulkTransitionToCancelledInNamespace(namespaceId: NamespaceId, runIds: NonEmptyArray<string>) {
@@ -849,6 +849,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			)
 			.returning({
 				id: workflowRun.id,
+				revision: workflowRun.revision,
 				attempts: workflowRun.attempts,
 				options: workflowRun.options,
 				parentWorkflowRunId: workflowRun.parentWorkflowRunId,
@@ -872,6 +873,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.returning({
 				id: workflowRun.id,
 				namespaceId: workflowRun.namespaceId,
+				revision: workflowRun.revision,
 				attempts: workflowRun.attempts,
 				options: workflowRun.options,
 				parentWorkflowRunId: workflowRun.parentWorkflowRunId,
@@ -892,7 +894,12 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				nextAttemptAt: null,
 			})
 			.where(and(inArray(workflowRun.id, runIds), eq(workflowRun.status, "queued")))
-			.returning({ id: workflowRun.id, namespaceId: workflowRun.namespaceId, attempts: workflowRun.attempts });
+			.returning({
+				id: workflowRun.id,
+				namespaceId: workflowRun.namespaceId,
+				revision: workflowRun.revision,
+				attempts: workflowRun.attempts,
+			});
 
 		return result;
 	},
@@ -909,7 +916,12 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				nextAttemptAt: null,
 			})
 			.where(and(inArray(workflowRun.id, runIds), eq(workflowRun.status, "running")))
-			.returning({ id: workflowRun.id, namespaceId: workflowRun.namespaceId, attempts: workflowRun.attempts });
+			.returning({
+				id: workflowRun.id,
+				namespaceId: workflowRun.namespaceId,
+				revision: workflowRun.revision,
+				attempts: workflowRun.attempts,
+			});
 
 		return result;
 	},

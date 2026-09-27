@@ -485,6 +485,7 @@ async function createSchedule(
 		id: transitionId,
 		type: "schedule",
 		scheduleId: created.id,
+		revision: created.revision,
 		state: { status: "active", reason: "activated" },
 	});
 	return created;

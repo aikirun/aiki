@@ -116,6 +116,7 @@ async function transitionStateInTx(
 			type: "task",
 			taskId,
 			attempt: attempts,
+			revision: run.revision,
 			state: taskState,
 		});
 
@@ -169,6 +170,7 @@ async function transitionStateInTx(
 		type: "task",
 		taskId,
 		attempt: attempts,
+		revision: run.revision,
 		state: taskState,
 	});
 

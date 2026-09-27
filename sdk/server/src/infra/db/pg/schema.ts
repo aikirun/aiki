@@ -250,6 +250,7 @@ export const stateTransition = pgTable(
 			.notNull()
 			.generatedAlwaysAs((): SQL => sql`${stateTransition.state}->>'status'`),
 		attempt: integer("attempt"),
+		revision: integer("revision").notNull(),
 		state: jsonb("state").notNull(),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
@@ -269,11 +270,13 @@ export const stateTransition = pgTable(
 			columns: [table.scheduleId],
 			foreignColumns: [schedule.id],
 		}),
+		// The type enum declares workflow_run before task, so within one revision the run's
+		// transition sorts before the task transitions stamped with the revision it produced.
 		index("idx_state_transition_workflow_run_id")
-			.on(table.workflowRunId, table.id)
+			.on(table.workflowRunId, table.revision, table.type, table.id)
 			.where(sql`${table.workflowRunId} IS NOT NULL`),
 		index("idx_state_transition_schedule_id")
-			.on(table.scheduleId, table.id)
+			.on(table.scheduleId, table.revision, table.id)
 			.where(sql`${table.scheduleId} IS NOT NULL`),
 		check(
 			"chk_state_transition_columns_match_type",

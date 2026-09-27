@@ -3,8 +3,9 @@ import { ulid } from "ulidx";
 
 import type { Repositories } from "./types";
 import { describe, expect, test } from "bun:test";
+import { createChildRunCanceller } from "../../service/cancel-child-runs";
 import { createScheduleService } from "../../service/schedule";
-import { withFakeClock } from "../../testing/clock";
+import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
 import { createServiceHarness } from "../../testing/harness";
 import { seedClaimedRun, seedCompletedRun, seedScheduledRun } from "../../testing/seed/run";
 import { seedActiveSchedule } from "../../testing/seed/schedule";
@@ -214,25 +215,34 @@ describe("state transition repository getByIds", () => {
 });
 
 describe("state transition repository listByRunId", () => {
-	// Rows come back by id, which orders transitions minted in different milliseconds only; no
-	// test here asserts that order.
-	function orderByTypeThenStatus(a: { type: string; status: string }, b: { type: string; status: string }): number {
-		return `${a.type}:${a.status}`.localeCompare(`${b.type}:${b.status}`);
-	}
-
-	test("lists the run's own and its tasks' transitions with the total", () =>
+	test("lists the run's own and its tasks' transitions newest first with the total", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, taskInfo } = await seedRunningTask({ namespaceRequestContext: context, repos, publisher });
 
-			const { rows, total } = await repos.stateTransition.listByRunId(runId);
+			expect(await repos.stateTransition.listByRunId(runId)).toEqual({
+				rows: [
+					expect.objectContaining({ type: "task", taskId: taskInfo.id, workflowRunId: runId, status: "running" }),
+					expect.objectContaining({ type: "workflow_run", workflowRunId: runId, status: "running" }),
+					expect.objectContaining({ type: "workflow_run", workflowRunId: runId, status: "queued" }),
+					expect.objectContaining({ type: "workflow_run", workflowRunId: runId, status: "scheduled" }),
+				],
+				total: 4,
+			});
+		}));
 
-			expect([...rows].sort(orderByTypeThenStatus)).toEqual([
-				expect.objectContaining({ type: "task", taskId: taskInfo.id, workflowRunId: runId, status: "running" }),
-				expect.objectContaining({ type: "workflow_run", workflowRunId: runId, status: "queued" }),
-				expect.objectContaining({ type: "workflow_run", workflowRunId: runId, status: "running" }),
-				expect.objectContaining({ type: "workflow_run", workflowRunId: runId, status: "scheduled" }),
-			]);
-			expect(total).toBe(4);
+	test("lists oldest first when asked", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedRunningTask({ namespaceRequestContext: context, repos, publisher });
+
+			expect(await repos.stateTransition.listByRunId(runId, 50, 0, { order: "asc" })).toEqual({
+				rows: [
+					expect.objectContaining({ type: "workflow_run", status: "scheduled" }),
+					expect.objectContaining({ type: "workflow_run", status: "queued" }),
+					expect.objectContaining({ type: "workflow_run", status: "running" }),
+					expect.objectContaining({ type: "task", taskId: taskInfo.id, status: "running" }),
+				],
+				total: 4,
+			});
 		}));
 
 	test("pages by limit and offset and still reports the full total", () =>
@@ -240,9 +250,54 @@ describe("state transition repository listByRunId", () => {
 			const { runId } = await seedRunningTask({ namespaceRequestContext: context, repos, publisher });
 
 			expect(await repos.stateTransition.listByRunId(runId, 1, 1)).toEqual({
-				rows: [expect.anything()],
+				rows: [expect.objectContaining({ type: "workflow_run", status: "running" })],
 				total: 4,
 			});
+		}));
+
+	test("lists a task transition after the run transition at its revision even when its id is older", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			const runningTransitionId = await getRunLatestTransitionId(repos, context.namespaceId, runId);
+			const olderTaskTransitionId = ulid(Date.now() - ONE_MINUTE);
+			await repos.stateTransition.append({
+				id: olderTaskTransitionId,
+				workflowRunId: runId,
+				type: "task",
+				taskId: taskInfo.id,
+				attempt: 1,
+				revision: revisionWhenClaimed,
+				state: { status: "running" },
+			});
+
+			const { rows } = await repos.stateTransition.listByRunId(runId, 50, 0, { order: "asc" });
+
+			expect(rows.map((row) => row.id).slice(2, 4)).toEqual([runningTransitionId, olderTaskTransitionId]);
+		}));
+
+	test("lists a discarded task right after the run transition that discarded it", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedRunningTask({ namespaceRequestContext: context, repos, publisher });
+			const workflowRunStateMachine = createWorkflowRunStateMachine({
+				repos,
+				childRunCanceller: createChildRunCanceller(),
+			});
+			await workflowRunStateMachine.transitionState(context, {
+				type: "pessimistic",
+				id: runId,
+				state: { status: "cancelled" },
+			});
+
+			const { rows } = await repos.stateTransition.listByRunId(runId, 2);
+
+			expect(rows).toEqual([
+				expect.objectContaining({ type: "task", taskId: taskInfo.id, status: "discarded" }),
+				expect.objectContaining({ type: "workflow_run", status: "cancelled" }),
+			]);
 		}));
 
 	test("leaves out other runs' transitions", () =>
@@ -260,12 +315,9 @@ describe("state transition repository listByRunId", () => {
 describe("state transition repository listByScheduleId", () => {
 	test("lists the schedule's transitions newest first with the total", () =>
 		withHarness(async ({ context, repos }) => {
-			const base = Date.now();
-			const { schedule } = await withFakeClock(base, () =>
-				seedActiveSchedule({ repos, namespaceRequestContext: context })
-			);
+			const { schedule } = await seedActiveSchedule({ repos, namespaceRequestContext: context });
 			const scheduleService = createScheduleService({ repos });
-			await withFakeClock(base + ONE_MINUTE, () => scheduleService.pauseSchedule(context.namespaceId, schedule.id));
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
 
 			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({
 				rows: [
@@ -282,12 +334,9 @@ describe("state transition repository listByScheduleId", () => {
 
 	test("lists oldest first when asked", () =>
 		withHarness(async ({ context, repos }) => {
-			const base = Date.now();
-			const { schedule } = await withFakeClock(base, () =>
-				seedActiveSchedule({ repos, namespaceRequestContext: context })
-			);
+			const { schedule } = await seedActiveSchedule({ repos, namespaceRequestContext: context });
 			const scheduleService = createScheduleService({ repos });
-			await withFakeClock(base + ONE_MINUTE, () => scheduleService.pauseSchedule(context.namespaceId, schedule.id));
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
 
 			expect(await repos.stateTransition.listByScheduleId(schedule.id, 50, 0, { order: "asc" })).toEqual({
 				rows: [
@@ -300,18 +349,41 @@ describe("state transition repository listByScheduleId", () => {
 
 	test("pages by limit and offset and still reports the full total", () =>
 		withHarness(async ({ context, repos }) => {
-			const base = Date.now();
-			const { schedule } = await withFakeClock(base, () =>
-				seedActiveSchedule({ repos, namespaceRequestContext: context })
-			);
+			const { schedule } = await seedActiveSchedule({ repos, namespaceRequestContext: context });
 			const scheduleService = createScheduleService({ repos });
-			await withFakeClock(base + ONE_MINUTE, () => scheduleService.pauseSchedule(context.namespaceId, schedule.id));
-			await withFakeClock(base + 2 * ONE_MINUTE, () =>
-				scheduleService.resumeSchedule(context.namespaceId, schedule.id)
-			);
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
+			await scheduleService.resumeSchedule(context.namespaceId, schedule.id);
 
 			expect(await repos.stateTransition.listByScheduleId(schedule.id, 1, 1)).toEqual({
 				rows: [expect.objectContaining({ scheduleId: schedule.id, state: { status: "paused" } })],
+				total: 3,
+			});
+		}));
+
+	test("lists a transition by its revision even when its id is older", () =>
+		withHarness(async ({ context, repos }) => {
+			const { schedule } = await seedActiveSchedule({ repos, namespaceRequestContext: context });
+			const scheduleService = createScheduleService({ repos });
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
+			const pausedRow = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+			if (!pausedRow) {
+				throw new Error(`Schedule not found: ${schedule.id}`);
+			}
+			const olderResumeTransitionId = ulid(Date.now() - ONE_MINUTE);
+			await repos.stateTransition.append({
+				id: olderResumeTransitionId,
+				type: "schedule",
+				scheduleId: schedule.id,
+				revision: pausedRow.revision + 1,
+				state: { status: "active", reason: "resumed" },
+			});
+
+			expect(await repos.stateTransition.listByScheduleId(schedule.id, 50, 0, { order: "asc" })).toEqual({
+				rows: [
+					expect.objectContaining({ state: { status: "active", reason: "activated" } }),
+					expect.objectContaining({ state: { status: "paused" } }),
+					expect.objectContaining({ id: olderResumeTransitionId }),
+				],
 				total: 3,
 			});
 		}));

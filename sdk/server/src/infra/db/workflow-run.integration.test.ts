@@ -1357,7 +1357,7 @@ describe("getRunCounts", () => {
 });
 
 describe("bulkTransitionToQueued", () => {
-	test("queues the runs whose expected revision matches, points them at their transition, and returns their ids", () =>
+	test("queues the runs whose expected revision matches, points them at their transition, and returns their ids and revisions", () =>
 		withHarness(async ({ context, repos }) => {
 			const matchedRun = await seedScheduledRun({ repos, namespaceRequestContext: context });
 			const staleRevisionRun = await seedScheduledRun({ repos, namespaceRequestContext: context });
@@ -1368,10 +1368,11 @@ describe("bulkTransitionToQueued", () => {
 				workflowRunId: matchedRun.runId,
 				type: "workflow_run",
 				attempt: matchedRun.attemptsWhenScheduled,
+				revision: matchedRun.revisionWhenScheduled + 1,
 				state: { status: "queued", reason: "new" },
 			});
 
-			const queuedIds = await repos.workflowRun.bulkTransitionToQueued(daemonContextFactory.build(), "scheduled", [
+			const queuedRuns = await repos.workflowRun.bulkTransitionToQueued(daemonContextFactory.build(), "scheduled", [
 				{
 					filter: { id: matchedRun.runId, revision: matchedRun.revisionWhenScheduled },
 					update: { stateTransitionId: transitionId },
@@ -1382,7 +1383,7 @@ describe("bulkTransitionToQueued", () => {
 				},
 			]);
 
-			expect(queuedIds).toEqual([matchedRun.runId]);
+			expect(queuedRuns).toEqual([{ id: matchedRun.runId, revision: matchedRun.revisionWhenScheduled + 1 }]);
 			expect(
 				await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: matchedRun.runId })
 			).toEqual({
@@ -1413,17 +1414,18 @@ describe("bulkTransitionToQueued", () => {
 				workflowRunId: runId,
 				type: "workflow_run",
 				attempt: attemptsWhenClaimed + 1,
+				revision: revisionWhenParked + 1,
 				state: { status: "queued", reason: "retry" },
 			});
 
-			const queuedIds = await repos.workflowRun.bulkTransitionToQueued(
+			const queuedRuns = await repos.workflowRun.bulkTransitionToQueued(
 				daemonContextFactory.build(),
 				"awaiting_retry",
 				[{ filter: { id: runId, revision: revisionWhenParked }, update: { stateTransitionId: transitionId } }],
 				{ incrementAttempts: true }
 			);
 
-			expect(queuedIds).toEqual([runId]);
+			expect(queuedRuns).toEqual([{ id: runId, revision: revisionWhenParked + 1 }]);
 			expect(await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId })).toEqual({
 				run: expect.objectContaining({
 					id: runId,
@@ -1442,11 +1444,11 @@ describe("bulkTransitionToQueued", () => {
 				{ sleepName: "cooldown", durationMs: 60_000 }
 			);
 
-			const queuedIds = await repos.workflowRun.bulkTransitionToQueued(daemonContextFactory.build(), "sleeping", [
+			const queuedRuns = await repos.workflowRun.bulkTransitionToQueued(daemonContextFactory.build(), "sleeping", [
 				{ filter: { id: runId, revision: revisionWhenAsleep }, update: { stateTransitionId: ulid() } },
 			]);
 
-			expect(queuedIds).toEqual([runId]);
+			expect(queuedRuns).toEqual([{ id: runId, revision: revisionWhenAsleep + 1 }]);
 			expect(await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId })).toEqual({
 				id: runId,
 				revision: revisionWhenAsleep + 1,
@@ -1476,11 +1478,11 @@ describe("bulkTransitionToQueued", () => {
 				const rowBefore = await getRunRow(repos, context.namespaceId, runId);
 				expect(rowBefore).toEqual(expect.objectContaining({ status }));
 
-				const queuedIds = await repos.workflowRun.bulkTransitionToQueued(daemonContextFactory.build(), "scheduled", [
+				const queuedRuns = await repos.workflowRun.bulkTransitionToQueued(daemonContextFactory.build(), "scheduled", [
 					{ filter: { id: runId, revision: rowBefore.revision }, update: { stateTransitionId: ulid() } },
 				]);
 
-				expect(queuedIds).toEqual([]);
+				expect(queuedRuns).toEqual([]);
 				expect(await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId })).toEqual(rowBefore);
 			}));
 	}
@@ -1505,6 +1507,7 @@ describe("bulkTransitionToScheduled", () => {
 				workflowRunId: matchedRun.runId,
 				type: "workflow_run",
 				attempt: matchedRun.attemptsWhenClaimed,
+				revision: matchedRun.revisionWhenParked + 1,
 				state: { status: "scheduled", reason: "event", scheduledAt },
 			});
 
@@ -1645,7 +1648,7 @@ describe("bulkTransitionToScheduled", () => {
 });
 
 describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", () => {
-	test("bulkTransitionToCancelledInNamespace cancels the namespace's runs and returns each run's attempts, options and parent", () =>
+	test("bulkTransitionToCancelledInNamespace cancels the namespace's runs and returns each run's revision, attempts, options and parent", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const pooledRun = await seedClaimedRun(
 				{ namespaceRequestContext: context, repos, publisher },
@@ -1662,12 +1665,14 @@ describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", (
 				[
 					{
 						id: pooledRun.runId,
+						revision: pooledRun.revisionWhenClaimed + 1,
 						attempts: pooledRun.attemptsWhenClaimed,
 						options: { pool: "warehouse-eu" },
 						parentWorkflowRunId: null,
 					},
 					{
 						id: parkedParentRun.child.runId,
+						revision: parkedParentRun.child.revisionWhenClaimed + 1,
 						attempts: parkedParentRun.child.attemptsWhenClaimed,
 						options: null,
 						parentWorkflowRunId: parkedParentRun.runId,
@@ -1698,7 +1703,7 @@ describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", (
 			expect(await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId })).toEqual(rowBefore);
 		}));
 
-	test("bulkTransitionToCancelled cancels runs from any namespace and returns each run's namespace", () =>
+	test("bulkTransitionToCancelled cancels runs from any namespace and returns each run's namespace and revision", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const otherNamespaceContext = namespaceRequestContextFactory.build();
 			const runInOwnNamespace = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
@@ -1718,6 +1723,7 @@ describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", (
 					{
 						id: runInOwnNamespace.runId,
 						namespaceId: context.namespaceId,
+						revision: runInOwnNamespace.revisionWhenClaimed + 1,
 						attempts: runInOwnNamespace.attemptsWhenClaimed,
 						options: null,
 						parentWorkflowRunId: null,
@@ -1725,6 +1731,7 @@ describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", (
 					{
 						id: runInOtherNamespace.runId,
 						namespaceId: otherNamespaceContext.namespaceId,
+						revision: runInOtherNamespace.revisionWhenClaimed + 1,
 						attempts: runInOtherNamespace.attemptsWhenClaimed,
 						options: null,
 						parentWorkflowRunId: null,
@@ -1792,7 +1799,7 @@ describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", (
 });
 
 describe("bulkTransitionToStalled", () => {
-	test("stalls queued runs and returns each run's namespace and attempts", () =>
+	test("stalls queued runs and returns each run's namespace, revision and attempts", () =>
 		withHarness(async ({ context, db, repos }) => {
 			const { runId, revisionWhenQueued, attemptsWhenQueued } = await seedQueuedRun({
 				repos,
@@ -1800,7 +1807,7 @@ describe("bulkTransitionToStalled", () => {
 			});
 
 			expect(await repos.workflowRun.bulkTransitionToStalled(daemonContextFactory.build(), [runId])).toEqual([
-				{ id: runId, namespaceId: context.namespaceId, attempts: attemptsWhenQueued },
+				{ id: runId, namespaceId: context.namespaceId, revision: revisionWhenQueued + 1, attempts: attemptsWhenQueued },
 			]);
 			expect(await readWorkflowRunDueTimes(db, runId)).toEqual(NO_DUE_TIMES);
 			expect(await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId })).toEqual({
@@ -1824,7 +1831,7 @@ describe("bulkTransitionToStalled", () => {
 });
 
 describe("bulkReleaseToQueued", () => {
-	test("returns running runs to queued and returns each run's namespace and attempts", () =>
+	test("returns running runs to queued and returns each run's namespace, revision and attempts", () =>
 		withHarness(async ({ context, db, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
 				namespaceRequestContext: context,
@@ -1833,7 +1840,12 @@ describe("bulkReleaseToQueued", () => {
 			});
 
 			expect(await repos.workflowRun.bulkReleaseToQueued(daemonContextFactory.build(), [runId])).toEqual([
-				{ id: runId, namespaceId: context.namespaceId, attempts: attemptsWhenClaimed },
+				{
+					id: runId,
+					namespaceId: context.namespaceId,
+					revision: revisionWhenClaimed + 1,
+					attempts: attemptsWhenClaimed,
+				},
 			]);
 			expect(await readWorkflowRunDueTimes(db, runId)).toEqual(NO_DUE_TIMES);
 			expect(await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId })).toEqual({
@@ -1874,6 +1886,7 @@ describe("bulkSetLatestStateTransitionId", () => {
 					workflowRunId: firstRun.runId,
 					type: "workflow_run",
 					attempt: firstRun.attemptsWhenClaimed,
+					revision: firstRun.revisionWhenClaimed + 1,
 					state: { status: "paused" },
 				},
 				{
@@ -1881,6 +1894,7 @@ describe("bulkSetLatestStateTransitionId", () => {
 					workflowRunId: secondRun.runId,
 					type: "workflow_run",
 					attempt: secondRun.attemptsWhenClaimed,
+					revision: secondRun.revisionWhenClaimed + 1,
 					state: { status: "paused" },
 				},
 			]);

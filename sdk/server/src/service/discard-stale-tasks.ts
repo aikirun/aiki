@@ -7,28 +7,39 @@ import type { TxRepositories } from "../infra/db/types";
 import type { TaskStateTransitionRowInsert } from "../infra/db/types/state-transition";
 
 export async function discardStaleTasks(
-	workflowRunIds: string | NonEmptyArray<string>,
+	runs: NonEmptyArray<{ id: string; revision: number }>,
 	staleStatuses: NonEmptyArray<DiscardableTaskStatus>,
 	txRepos: TxRepositories
 ): Promise<void> {
-	const staleTasks = await txRepos.task.listByWorkflowRunIdsAndStatuses(workflowRunIds, staleStatuses);
+	const revisionByRunId = new Map(runs.map((run) => [run.id, run.revision]));
+	const staleTasks = await txRepos.task.listByWorkflowRunIdsAndStatuses(
+		asNonEmptyArray(Array.from(revisionByRunId.keys())),
+		staleStatuses
+	);
 	if (!isNonEmptyArray(staleTasks)) {
 		return;
 	}
 
 	const taskUpdatesById = new Map(
-		staleTasks.map((task) => [
-			task.id,
-			{
-				filter: {
-					id: task.id,
-					workflowRunId: task.workflowRunId,
-					status: task.status as DiscardableTaskStatus,
-					attempts: task.attempts,
+		staleTasks.map((task) => {
+			const revision = revisionByRunId.get(task.workflowRunId);
+			if (revision === undefined) {
+				throw new Error(`Attempted to discard unexpected task ${task.id}`);
+			}
+			return [
+				task.id,
+				{
+					filter: {
+						id: task.id,
+						workflowRunId: task.workflowRunId,
+						status: task.status as DiscardableTaskStatus,
+						attempts: task.attempts,
+					},
+					update: { latestStateTransitionId: ulid() },
+					revision,
 				},
-				update: { latestStateTransitionId: ulid() },
-			},
-		])
+			];
+		})
 	);
 	const taskUpdates = Array.from(taskUpdatesById.values());
 	const discardedTaskIds = await txRepos.task.bulkTransitionToDiscarded(asNonEmptyArray(taskUpdates));
@@ -41,7 +52,7 @@ export async function discardStaleTasks(
 	for (const discardedTaskId of discardedTaskIds) {
 		const taskUpdate = taskUpdatesById.get(discardedTaskId);
 		if (!taskUpdate) {
-			continue;
+			throw new Error(`Task ${discardedTaskId} was discarded unexpectedly`);
 		}
 		stateTransitionEntries.push({
 			id: taskUpdate.update.latestStateTransitionId,
@@ -49,6 +60,7 @@ export async function discardStaleTasks(
 			type: "task",
 			taskId: discardedTaskId,
 			attempt: taskUpdate.filter.attempts,
+			revision: taskUpdate.revision,
 			state: { status: "discarded" } satisfies TaskStateDiscarded,
 		});
 	}

@@ -55,7 +55,7 @@ async function stallByRunIdsInTx(context: DaemonContext, runIds: NonEmptyArray<s
 	}
 	const stalledRunIds = stalledRuns.map((run) => run.id) as NonEmptyArray<string>;
 
-	await discardStaleTasks(stalledRunIds, ["running", "awaiting_retry"], txRepos);
+	await discardStaleTasks(stalledRuns, ["running", "awaiting_retry"], txRepos);
 
 	await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(stalledRunIds);
 
@@ -72,6 +72,7 @@ async function stallByRunIdsInTx(context: DaemonContext, runIds: NonEmptyArray<s
 			workflowRunId: run.id,
 			type: "workflow_run",
 			attempt: run.attempts,
+			revision: run.revision,
 			state: { status: "stalled" } satisfies WorkflowRunStateStalled,
 		});
 		stalledRunStateTransitionUpdates.push({

@@ -105,6 +105,7 @@ export async function deliverTerminatedSignalToParentRun(
 			workflowRunId: parentRun.id,
 			type: "workflow_run",
 			attempt: parentRun.attempts,
+			revision: parentRun.revision + 1,
 			state: {
 				status: "scheduled",
 				reason: "child_workflow",

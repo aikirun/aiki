@@ -86,15 +86,20 @@ export const createStateTransitionRepository = (db: PgDb) => ({
 		offset = 0,
 		sort?: { order: "asc" | "desc" }
 	): Promise<{ rows: Array<WorkflowRunStateTransitionRow | TaskStateTransitionRow>; total: number }> {
-		const sortOrder = sort?.order ?? "desc";
-		const orderBy = sql`${stateTransition.id} ${sql.raw(sortOrder)}`;
+		const sortOrder = sql.raw(sort?.order ?? "desc");
 
 		const [rows, countResult] = await Promise.all([
 			db
 				.select()
 				.from(stateTransition)
 				.where(eq(stateTransition.workflowRunId, runId))
-				.orderBy(orderBy)
+				// The type enum declares workflow_run before task, so within one revision the run's
+				// transition sorts before the task transitions stamped with the revision it produced.
+				.orderBy(
+					sql`${stateTransition.revision} ${sortOrder}`,
+					sql`${stateTransition.type} ${sortOrder}`,
+					sql`${stateTransition.id} ${sortOrder}`
+				)
 				.limit(limit)
 				.offset(offset),
 			db.select({ count: count() }).from(stateTransition).where(eq(stateTransition.workflowRunId, runId)),
@@ -109,15 +114,14 @@ export const createStateTransitionRepository = (db: PgDb) => ({
 		offset = 0,
 		sort?: { order: "asc" | "desc" }
 	): Promise<{ rows: ScheduleStateTransitionRow[]; total: number }> {
-		const sortOrder = sort?.order ?? "desc";
-		const orderBy = sql`${stateTransition.id} ${sql.raw(sortOrder)}`;
+		const sortOrder = sql.raw(sort?.order ?? "desc");
 
 		const [rows, countResult] = await Promise.all([
 			db
 				.select()
 				.from(stateTransition)
 				.where(eq(stateTransition.scheduleId, scheduleId))
-				.orderBy(orderBy)
+				.orderBy(sql`${stateTransition.revision} ${sortOrder}`, sql`${stateTransition.id} ${sortOrder}`)
 				.limit(limit)
 				.offset(offset),
 			db.select({ count: count() }).from(stateTransition).where(eq(stateTransition.scheduleId, scheduleId)),
@@ -152,7 +156,7 @@ export function toTaskState(raw: unknown): TaskState {
 }
 
 function toStateTransitionRow(row: _StateTransitionRow): StateTransitionRow {
-	const { id, status, createdAt } = row;
+	const { id, status, revision, createdAt } = row;
 	switch (row.type) {
 		case "workflow_run": {
 			if (row.workflowRunId === null || row.attempt === null || row.taskId !== null || row.scheduleId !== null) {
@@ -161,6 +165,7 @@ function toStateTransitionRow(row: _StateTransitionRow): StateTransitionRow {
 			return {
 				id,
 				status,
+				revision,
 				createdAt,
 				type: "workflow_run",
 				workflowRunId: row.workflowRunId,
@@ -177,6 +182,7 @@ function toStateTransitionRow(row: _StateTransitionRow): StateTransitionRow {
 			return {
 				id,
 				status,
+				revision,
 				createdAt,
 				type: "task",
 				workflowRunId: row.workflowRunId,
@@ -193,6 +199,7 @@ function toStateTransitionRow(row: _StateTransitionRow): StateTransitionRow {
 			return {
 				id,
 				status,
+				revision,
 				createdAt,
 				type: "schedule",
 				workflowRunId: null,

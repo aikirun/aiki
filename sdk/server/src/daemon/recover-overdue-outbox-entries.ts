@@ -113,6 +113,7 @@ async function releaseStaleClaimsInTx(
 				workflowRunId: run.id,
 				type: "workflow_run",
 				attempt: run.attempts,
+				revision: run.revision,
 				state: { status: "queued", reason: "recovery" } satisfies WorkflowRunStateQueued,
 			});
 			stateTransitionUpdates.push({

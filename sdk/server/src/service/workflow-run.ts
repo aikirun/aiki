@@ -400,6 +400,7 @@ async function createWorkflowRunInTx(
 		workflowRunId: runId,
 		type: "workflow_run",
 		attempt: 1,
+		revision: 0,
 		state,
 	});
 
@@ -435,7 +436,7 @@ async function cancelByIdsInTx(
 	const cancelledRunIds = cancelledRuns.map((run) => run.id) as NonEmptyArray<string>;
 
 	const now = Date.now() as TimestampMs;
-	await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+	await discardStaleTasks(cancelledRuns, ["running", "awaiting_retry"], txRepos);
 	await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now);
 	await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
@@ -454,6 +455,7 @@ async function cancelByIdsInTx(
 			workflowRunId: run.id,
 			type: "workflow_run",
 			attempt: run.attempts,
+			revision: run.revision,
 			state: { status: "cancelled" } satisfies WorkflowRunStateCancelled,
 		});
 		cancelledRunStateTransitionUpdates.push({ filter: { namespaceId, id: run.id }, update: { stateTransitionId } });

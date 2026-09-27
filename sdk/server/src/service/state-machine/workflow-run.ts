@@ -259,6 +259,7 @@ async function transitionStateInTx(
 		workflowRunId: runId,
 		type: "workflow_run",
 		attempt: attempts,
+		revision: updatedRun.revision,
 		state: toState,
 	});
 
@@ -270,7 +271,7 @@ async function transitionStateInTx(
 	}
 
 	if (toState.status === "cancelled") {
-		await discardStaleTasks(runId, ["running", "awaiting_retry"], txRepos);
+		await discardStaleTasks([{ id: runId, revision: updatedRun.revision }], ["running", "awaiting_retry"], txRepos);
 		await childRunCanceller.cancel(
 			[{ namespaceId, id: runId, pool: run.options?.pool, priority: run.options?.priority }],
 			txRepos,

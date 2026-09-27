@@ -263,6 +263,7 @@ async function processOverlapAllowSchedules(
 				workflowRunId: runId,
 				type: "workflow_run",
 				attempt: 1,
+				revision: 0,
 				state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 			});
 			const rank = computeRank({ dueAt: occurrence, priority: schedule.workflowRunOptions?.priority });
@@ -395,6 +396,7 @@ async function processOverlapSkipSchedules(
 			workflowRunId: runId,
 			type: "workflow_run",
 			attempt: 1,
+			revision: 0,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
 		const rank = computeRank({ dueAt: occurrence, priority: schedule.workflowRunOptions?.priority });
@@ -538,6 +540,7 @@ async function processOverlapCancelPreviousSchedules(
 			workflowRunId: runId,
 			type: "workflow_run",
 			attempt: 1,
+			revision: 0,
 			state: { status: "queued", reason: "new" } satisfies WorkflowRunStateQueued,
 		});
 		const rank = computeRank({ dueAt: occurrence, priority: schedule.workflowRunOptions?.priority });
@@ -631,7 +634,7 @@ async function cancelPreviousAndInsertRunsInTx(
 	// cancel state transitions only for actually cancelled runs and set latestStateTransitionId
 	if (cancelledRunsById.size) {
 		const cancelledRunIds = asNonEmptyArray(Array.from(cancelledRunsById.keys()));
-		await discardStaleTasks(cancelledRunIds, ["running", "awaiting_retry"], txRepos);
+		await discardStaleTasks(asNonEmptyArray(cancelledRuns), ["running", "awaiting_retry"], txRepos);
 		await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now);
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
 
@@ -655,6 +658,7 @@ async function cancelPreviousAndInsertRunsInTx(
 				workflowRunId: run.id,
 				type: "workflow_run",
 				attempt: run.attempts,
+				revision: cancelledRun.revision,
 				state: { status: "cancelled", explanation: "Schedule overlap policy" } satisfies WorkflowRunStateCancelled,
 			});
 			cancelledRunStateTransitionIdUpdates.push({

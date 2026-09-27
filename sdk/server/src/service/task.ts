@@ -85,6 +85,7 @@ async function setTaskStateInTx(
 		type: "task",
 		taskId: existingTaskRow.id,
 		attempt: attempts,
+		revision: run.revision,
 		state: state,
 	});
 	const updatedTask = await txRepos.task.update(

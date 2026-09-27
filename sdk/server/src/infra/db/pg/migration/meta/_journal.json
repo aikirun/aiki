@@ -288,6 +288,13 @@
 			"when": 1790533764392,
 			"tag": "0041_quiet_mantis",
 			"breakpoints": true
+		},
+		{
+			"idx": 42,
+			"version": "7",
+			"when": 1790536566461,
+			"tag": "0042_perpetual_kat_farrell",
+			"breakpoints": true
 		}
 	]
 }
