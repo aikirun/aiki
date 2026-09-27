@@ -26,6 +26,7 @@ import type {
 	WorkflowRunStateCancelled,
 	WorkflowRunStateScheduledByNew,
 } from "@aikirun/types/workflow/run";
+import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type {
 	TaskInfo,
 	TaskStartOptions,
@@ -301,19 +302,12 @@ export const createWorkflowRunService = ({
 		);
 	},
 
-	async hasTerminated(context: NamespaceRequestContext, runId: string, afterStateTransitionId: string) {
-		const result = await repos.workflowRun.hasTerminated(
-			context.namespaceId,
-			runId as WorkflowRunId,
-			afterStateTransitionId
-		);
-		if (!result.runFound) {
+	async hasTerminated(context: NamespaceRequestContext, runId: string) {
+		const run = await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId });
+		if (!run) {
 			throw new NotFoundError(`Workflow run not found: ${runId}`);
 		}
-		return {
-			terminated: result.terminated,
-			latestStateTransitionId: result.latestStateTransitionId,
-		};
+		return { terminated: isTerminalWorkflowRunStatus(run.status) };
 	},
 });
 

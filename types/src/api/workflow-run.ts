@@ -276,10 +276,8 @@ export interface WorkflowRunClaimRefreshRequestV1 {
 
 export interface WorkflowRunHasTerminatedRequestV1 {
 	id: string;
-	afterStateTransitionId: string;
 }
 
 export interface WorkflowRunHasTerminatedResponseV1 {
 	terminated: boolean;
-	latestStateTransitionId: string;
 }

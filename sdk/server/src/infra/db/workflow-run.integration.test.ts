@@ -2,7 +2,6 @@ import { hashInput } from "@aikirun/lib/crypto";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 import { asOpaquePayload } from "@aikirun/testing/payload";
-import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
 import type {
@@ -18,14 +17,12 @@ import type { DueWorkflowRun } from "./types/workflow-run";
 import { describe, expect, test } from "bun:test";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import { createChildRunCanceller } from "../../service/cancel-child-runs";
-import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
 import { createWorkflowRunService } from "../../service/workflow-run";
 import { END_OF_TIME, withFakeClock } from "../../testing/clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../../testing/harness";
 import { readWorkflowRunDueTimes } from "../../testing/infra/db/workflow-run";
 import {
-	completeRun,
 	type SeedRunDeps,
 	seedAwaitingChildRun,
 	seedAwaitingEventRun,
@@ -41,7 +38,7 @@ import {
 	seedStalledRun,
 } from "../../testing/seed/run";
 import { seedActiveSchedule, seedRunFromSchedule } from "../../testing/seed/schedule";
-import { seedAwaitingTaskRetryRun, seedCompletedTask } from "../../testing/seed/task";
+import { seedAwaitingTaskRetryRun } from "../../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
@@ -236,112 +233,6 @@ describe("exists", () => {
 			expect(await repos.workflowRun.exists(context.namespaceId, runId)).toBe(true);
 			expect(await repos.workflowRun.exists(otherNamespaceId, runId)).toBe(false);
 			expect(await repos.workflowRun.exists(context.namespaceId, absentRunId)).toBe(false);
-		}));
-});
-
-describe("hasTerminated", () => {
-	async function getRunLatestTransitionId(repos: Repositories, namespaceId: NamespaceId, runId: string) {
-		const row = await repos.workflowRun.getByIdWithState({ namespaceId, id: runId });
-		if (!row) {
-			throw new Error(`Run not found: ${runId}`);
-		}
-		return row.run.latestStateTransitionId;
-	}
-
-	test("reports no run for an unknown id or another namespace", () =>
-		withHarness(async ({ context, repos, publisher }) => {
-			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
-			const claimedTransitionId = await getRunLatestTransitionId(repos, context.namespaceId, runId);
-			const otherNamespaceId = namespaceRequestContextFactory.build().namespaceId;
-			const absentRunId = ulid();
-
-			expect(
-				await repos.workflowRun.hasTerminated(context.namespaceId, absentRunId as WorkflowRunId, claimedTransitionId)
-			).toEqual({ runFound: false });
-			expect(
-				await repos.workflowRun.hasTerminated(otherNamespaceId, runId as WorkflowRunId, claimedTransitionId)
-			).toEqual({ runFound: false });
-		}));
-
-	test("a running run has not terminated and reports its latest transition", () =>
-		withHarness(async ({ context, repos, publisher }) => {
-			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
-			const claimedTransitionId = await getRunLatestTransitionId(repos, context.namespaceId, runId);
-
-			expect(
-				await repos.workflowRun.hasTerminated(context.namespaceId, runId as WorkflowRunId, claimedTransitionId)
-			).toEqual({ runFound: true, terminated: false, latestStateTransitionId: claimedTransitionId });
-		}));
-
-	type TerminateRun = (
-		context: NamespaceRequestContext,
-		stateMachine: WorkflowRunStateMachine,
-		run: { runId: string; revisionWhenClaimed: number }
-	) => Promise<WorkflowRunTransitionStateResponseV1>;
-
-	const terminateRunByStatus = {
-		completed: (context, stateMachine, run) =>
-			stateMachine.transitionState(context, {
-				type: "optimistic",
-				id: run.runId,
-				state: { status: "completed", output: asOpaquePayload({ receiptId: "rcp-3" }) },
-				expectedRevision: run.revisionWhenClaimed,
-			}),
-		failed: (context, stateMachine, run) =>
-			stateMachine.transitionState(context, {
-				type: "optimistic",
-				id: run.runId,
-				state: { status: "failed", cause: "self", error: { name: "Error", message: "inventory service unavailable" } },
-				expectedRevision: run.revisionWhenClaimed,
-			}),
-		cancelled: (context, stateMachine, run) =>
-			stateMachine.transitionState(context, { type: "pessimistic", id: run.runId, state: { status: "cancelled" } }),
-	} satisfies Record<TerminalWorkflowRunStatus, TerminateRun>;
-
-	for (const [status, terminateRun] of Object.entries(terminateRunByStatus)) {
-		test(`a run that reached ${status} after the given transition has terminated, with the terminal transition as latest`, () =>
-			withHarness(async ({ context, repos, publisher }) => {
-				const claimedRun = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
-				const claimedTransitionId = await getRunLatestTransitionId(repos, context.namespaceId, claimedRun.runId);
-
-				const stateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() });
-				await terminateRun(context, stateMachine, claimedRun);
-				const terminalTransitionId = await getRunLatestTransitionId(repos, context.namespaceId, claimedRun.runId);
-
-				expect(
-					await repos.workflowRun.hasTerminated(
-						context.namespaceId,
-						claimedRun.runId as WorkflowRunId,
-						claimedTransitionId
-					)
-				).toEqual({ runFound: true, terminated: true, latestStateTransitionId: terminalTransitionId });
-			}));
-	}
-
-	test("a termination at the given transition does not count", () =>
-		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed } = await seedClaimedRun({
-				namespaceRequestContext: context,
-				repos,
-				publisher,
-			});
-			await completeRun({ context, repos, runId, expectedRevision: revisionWhenClaimed });
-			const completedTransitionId = await getRunLatestTransitionId(repos, context.namespaceId, runId);
-
-			expect(
-				await repos.workflowRun.hasTerminated(context.namespaceId, runId as WorkflowRunId, completedTransitionId)
-			).toEqual({ runFound: true, terminated: false, latestStateTransitionId: completedTransitionId });
-		}));
-
-	test("a task reaching a terminal status does not terminate its run", () =>
-		withHarness(async ({ context, repos, publisher }) => {
-			const { runId } = await seedCompletedTask({ namespaceRequestContext: context, repos, publisher });
-			// The run's own latest transition predates its task's completion.
-			const claimedTransitionId = await getRunLatestTransitionId(repos, context.namespaceId, runId);
-
-			expect(
-				await repos.workflowRun.hasTerminated(context.namespaceId, runId as WorkflowRunId, claimedTransitionId)
-			).toEqual({ runFound: true, terminated: false, latestStateTransitionId: claimedTransitionId });
 		}));
 });
 

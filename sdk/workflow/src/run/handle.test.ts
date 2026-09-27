@@ -280,13 +280,10 @@ describe("workflowRunHandle", () => {
 	describe("wait", () => {
 		test("resolves with the state when the run terminates", () =>
 			withFakeClient(async (client) => {
-				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0" });
+				const record = runningWorkflowRunRecordFactory.build();
 				const handle = workflowRunHandle(client, record);
 
-				client.api.workflowRun.hasTerminatedV1.once(
-					{ id: record.id, afterStateTransitionId: "t0" },
-					{ terminated: true, latestStateTransitionId: "t1" }
-				);
+				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
 					state: { status: "completed", output: asOpaquePayload("done") },
@@ -308,13 +305,10 @@ describe("workflowRunHandle", () => {
 						return "done";
 					},
 				};
-				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0", clientCodecApplied: true });
+				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 				const handle = workflowRunHandle(client, record);
 
-				client.api.workflowRun.hasTerminatedV1.once(
-					{ id: record.id, afterStateTransitionId: "t0" },
-					{ terminated: true, latestStateTransitionId: "t1" }
-				);
+				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id, clientCodecApplied: true }),
 					state: { status: "completed", output: storedOutput },
@@ -328,13 +322,10 @@ describe("workflowRunHandle", () => {
 
 		test("resolves with whatever terminal state the run reached", () =>
 			withFakeClient(async (client) => {
-				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0" });
+				const record = runningWorkflowRunRecordFactory.build();
 				const handle = workflowRunHandle(client, record);
 
-				client.api.workflowRun.hasTerminatedV1.once(
-					{ id: record.id, afterStateTransitionId: "t0" },
-					{ terminated: true, latestStateTransitionId: "t1" }
-				);
+				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
 				const failed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
 					state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
@@ -349,14 +340,14 @@ describe("workflowRunHandle", () => {
 				});
 			}));
 
-		test("polls until the run terminates, advancing the state-transition cursor", () =>
+		test("polls until the run terminates", () =>
 			withFakeClient(async (client) => {
-				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0" });
+				const record = runningWorkflowRunRecordFactory.build();
 				const handle = workflowRunHandle(client, record);
 
 				client.api.workflowRun.hasTerminatedV1
-					.once({ id: record.id, afterStateTransitionId: "t0" }, { terminated: false, latestStateTransitionId: "t1" })
-					.once({ id: record.id, afterStateTransitionId: "t1" }, { terminated: true, latestStateTransitionId: "t2" });
+					.once({ id: record.id }, { terminated: false })
+					.once({ id: record.id }, { terminated: true });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
 					state: { status: "completed", output: asOpaquePayload(42) },
@@ -370,12 +361,12 @@ describe("workflowRunHandle", () => {
 
 		test("returns timeout after a final poll at the deadline", () =>
 			withFakeClient(async (client) => {
-				const record = runningWorkflowRunRecordFactory.build({ stateTransitionId: "t0" });
+				const record = runningWorkflowRunRecordFactory.build();
 				const handle = workflowRunHandle(client, record);
 
 				client.api.workflowRun.hasTerminatedV1
-					.once({ id: record.id, afterStateTransitionId: "t0" }, { terminated: false, latestStateTransitionId: "t1" })
-					.once({ id: record.id, afterStateTransitionId: "t1" }, { terminated: false, latestStateTransitionId: "t2" });
+					.once({ id: record.id }, { terminated: false })
+					.once({ id: record.id }, { terminated: false });
 
 				// timeout < interval: the sleep after the first poll is capped to the remaining
 				// budget, and exactly one more poll happens at the deadline before giving up

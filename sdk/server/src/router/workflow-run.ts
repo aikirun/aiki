@@ -104,7 +104,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 		}),
 
 		hasTerminatedV1: os.hasTerminatedV1.handler(async ({ input: request, context }) => {
-			return workflowRunService.hasTerminated(context, request.id, request.afterStateTransitionId);
+			return workflowRunService.hasTerminated(context, request.id);
 		}),
 	});
 }
