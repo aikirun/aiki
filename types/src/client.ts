@@ -9,23 +9,25 @@ import type { CreateHasher, Hasher } from "./infra/hasher";
 import { INTERNAL } from "./symbols";
 import type { WorkflowRunRecord } from "./workflow/run";
 
-interface BaseClientParams<Context = null> {
+interface BaseClientParams<Context = null, Encoded = unknown> {
 	logger?: Logger;
 	context?: (run: Readonly<WorkflowRunRecord>) => Context | Promise<Context>;
 	hasher?: CreateHasher;
-	codec?: CreateCodec;
+	codec?: CreateCodec<Encoded>;
 }
 
-export interface RemoteClientParams<Context = null> extends BaseClientParams<Context> {
+export interface RemoteClientParams<Context = null, Encoded = unknown> extends BaseClientParams<Context, Encoded> {
 	url: string;
 	apiKey?: string;
 }
 
-export interface EmbeddedClientParams<Context = null> extends BaseClientParams<Context> {
+export interface EmbeddedClientParams<Context = null, Encoded = unknown> extends BaseClientParams<Context, Encoded> {
 	handler: (request: Request) => Promise<Response>;
 }
 
-export type ClientParams<Context = null> = RemoteClientParams<Context> | EmbeddedClientParams<Context>;
+export type ClientParams<Context = null, Encoded = unknown> =
+	| RemoteClientParams<Context, Encoded>
+	| EmbeddedClientParams<Context, Encoded>;
 
 export interface Client<Context = null> {
 	api: ApiClient;
@@ -33,7 +35,7 @@ export interface Client<Context = null> {
 	[INTERNAL]: {
 		context?: (run: WorkflowRunRecord) => Context | Promise<Context>;
 		hasher?: Hasher;
-		codec?: Codec;
+		codec?: Codec<unknown>;
 	};
 }
 

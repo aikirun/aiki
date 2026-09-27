@@ -6,13 +6,8 @@ import { describe, expect, test } from "bun:test";
 describe("codec", () => {
 	const created = codec({
 		name: "test-codec",
-		encode: (payload) => ({ wrapped: payload }),
-		decode: (encoded) => {
-			if (typeof encoded !== "object" || encoded === null || !("wrapped" in encoded)) {
-				throw new Error("unexpected encoded value");
-			}
-			return encoded.wrapped;
-		},
+		encode: (payload) => ({ wrapped: JSON.stringify(payload) }),
+		decode: (encoded) => JSON.parse(encoded.wrapped),
 	});
 	const instance = created({ logger: noopLogger });
 
@@ -20,7 +15,7 @@ describe("codec", () => {
 		const payload = { name: "alice" };
 		expect(await instance.encode(payload)).toEqual({
 			codecName: "test-codec",
-			body: { wrapped: payload },
+			body: { wrapped: JSON.stringify(payload) },
 		});
 	});
 
@@ -29,7 +24,7 @@ describe("codec", () => {
 		expect(
 			await instance.decode({
 				codecName: "test-codec",
-				body: { wrapped: payload },
+				body: { wrapped: JSON.stringify(payload) },
 			})
 		).toEqual(payload);
 	});
@@ -47,7 +42,7 @@ describe("codec", () => {
 		expect(
 			instance.decode({
 				codecName: "other-codec",
-				body: { wrapped: { name: "alice" } },
+				body: { wrapped: JSON.stringify({ name: "alice" }) },
 			})
 		).rejects.toMatchObject({
 			name: "CodecNameMismatchError",
@@ -58,7 +53,7 @@ describe("codec", () => {
 		expect(
 			instance.decode({
 				codecName: "other-codec",
-				body: { wrapped: { name: "alice" } },
+				body: { wrapped: JSON.stringify({ name: "alice" }) },
 			})
 		).rejects.toBeInstanceOf(CodecNameMismatchError);
 	});
@@ -77,5 +72,48 @@ describe("codec", () => {
 			body: `enc:${JSON.stringify(payload)}`,
 		});
 		expect(await asyncCodec.decode(encoded)).toEqual(payload);
+	});
+});
+
+describe("codec output must survive a JSON round trip", () => {
+	test("accepts a string", () => {
+		codec({ name: "json", encode: (payload) => JSON.stringify(payload), decode: (encoded) => JSON.parse(encoded) });
+	});
+
+	test("accepts a reference to offloaded data", () => {
+		codec({ name: "offload", encode: async () => ({ ref: "bucket/key" }), decode: async (encoded) => encoded.ref });
+	});
+
+	test("accepts the payload embedded as a string", () => {
+		codec({
+			name: "tag",
+			encode: (payload) => ({ tagged: JSON.stringify(payload) }),
+			decode: (encoded) => JSON.parse(encoded.tagged),
+		});
+	});
+
+	test("rejects the payload embedded as-is, since its type is unknown", () => {
+		// @ts-expect-error encoded.tagged is unknown
+		codec({ name: "tag", encode: (payload) => ({ tagged: payload }), decode: (encoded) => encoded.tagged });
+	});
+
+	test("rejects raw bytes", () => {
+		// @ts-expect-error encoded is binary data
+		codec({ name: "gzip", encode: () => new Uint8Array(4), decode: (encoded) => encoded });
+	});
+
+	test("rejects bytes nested in the output", () => {
+		// @ts-expect-error encoded.iv is binary data
+		codec({ name: "aes", encode: () => ({ iv: new Uint8Array(12), ct: "…" }), decode: (encoded) => encoded.ct });
+	});
+
+	test("rejects a Date nested in the output", () => {
+		// @ts-expect-error encoded.writtenAt is Date
+		codec({ name: "stamp", encode: () => ({ writtenAt: new Date(), body: "…" }), decode: (encoded) => encoded.body });
+	});
+
+	test("rejects an output typed any", () => {
+		// @ts-expect-error encoded is any
+		codec({ name: "loose", encode: (payload) => JSON.parse(JSON.stringify(payload)), decode: (encoded) => encoded });
 	});
 });

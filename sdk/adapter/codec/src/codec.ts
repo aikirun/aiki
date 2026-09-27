@@ -1,12 +1,13 @@
+import type { Serializable } from "@aikirun/lib/serializable";
 import type { Codec, CreateCodec } from "@aikirun/types/infra/codec";
 
-export type CodecParams = {
+export type CodecParams<Encoded> = {
 	name: string;
-	encode: (payload: unknown) => unknown | Promise<unknown>;
-	decode: (encoded: unknown) => unknown | Promise<unknown>;
+	encode: (payload: unknown) => Encoded | Promise<Encoded>;
+	decode: (encoded: Encoded) => unknown | Promise<unknown>;
 };
 
-export type NamedCreateCodec = CreateCodec & {
+export type NamedCreateCodec<Encoded = unknown> = CreateCodec<Encoded> & {
 	readonly codecName: string;
 };
 
@@ -32,9 +33,9 @@ export class CodecNameMismatchError extends Error {
 	}
 }
 
-export type EncodedValue = {
+export type EncodedValue<Body = unknown> = {
 	codecName: string;
-	body: unknown;
+	body: Body;
 };
 
 export function isEncodedValue(payload: unknown): payload is EncodedValue {
@@ -47,9 +48,18 @@ export function isEncodedValue(payload: unknown): payload is EncodedValue {
 	);
 }
 
-export function codec({ name, encode, decode }: CodecParams): NamedCreateCodec {
-	const create: NamedCreateCodec = Object.assign(
-		(): Codec => ({
+/** A value carrying this codec's name was written by its `encode`, so its body has that codec's `Encoded` type. */
+function isWrittenBy<Encoded>(encoded: EncodedValue, codecName: string): encoded is EncodedValue<Encoded> {
+	return encoded.codecName === codecName;
+}
+
+export function codec<Encoded = never>({
+	name,
+	encode,
+	decode,
+}: CodecParams<Encoded> & Serializable<Encoded, "encoded">): NamedCreateCodec<EncodedValue<Encoded>> {
+	const create: NamedCreateCodec<EncodedValue<Encoded>> = Object.assign(
+		(): Codec<EncodedValue<Encoded>> => ({
 			encode: async (payload) => {
 				const body = encode(payload);
 				return {
@@ -62,7 +72,7 @@ export function codec({ name, encode, decode }: CodecParams): NamedCreateCodec {
 					throw new InvalidEncodedValueError(name);
 				}
 
-				if (encoded.codecName !== name) {
+				if (!isWrittenBy<Encoded>(encoded, name)) {
 					throw new CodecNameMismatchError(name, encoded.codecName);
 				}
 

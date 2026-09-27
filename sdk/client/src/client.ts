@@ -1,4 +1,5 @@
 import { createConsoleLogger } from "@aikirun/lib/logger";
+import type { Serializable } from "@aikirun/lib/serializable";
 import type { ApiClient, Client, ClientParams, EmbeddedClientParams, RemoteClientParams } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { createORPCClient } from "@orpc/client";
@@ -31,8 +32,12 @@ const EMBEDDED_BASE_URL = "aiki://embedded/api";
  * const result = await handle.wait({ timeout: { seconds: 60 } });
  * ```
  */
-export function client<Context = null>(params: RemoteClientParams<Context>): Client<Context>;
-export function client<Context = null>(params: EmbeddedClientParams<Context>): Client<Context>;
+export function client<Context = null, Encoded = never>(
+	params: RemoteClientParams<Context, Encoded> & Serializable<Encoded, "encoded">
+): Client<Context>;
+export function client<Context = null, Encoded = never>(
+	params: EmbeddedClientParams<Context, Encoded> & Serializable<Encoded, "encoded">
+): Client<Context>;
 export function client<Context = null>(params: ClientParams<Context>): Client<Context> {
 	const logger = params.logger ?? createConsoleLogger();
 	const hasher = params.hasher?.({ logger });
