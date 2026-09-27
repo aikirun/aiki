@@ -1,11 +1,10 @@
-import { databaseConfigSchema } from "@aikirun/server/config";
 import { type } from "arktype";
 
 import { logLevels } from "../logger";
 
 const coerceBool = type("'true' | 'false' | '1' | '0'").pipe((v) => v === "true" || v === "1");
 
-const uniqueCommaSeparatedToItems = type("string > 0").pipe((v) =>
+const uniqueCommaSeparatedToItems = type("string").pipe((v) =>
 	Array.from(
 		new Set(
 			v
@@ -17,9 +16,7 @@ const uniqueCommaSeparatedToItems = type("string > 0").pipe((v) =>
 );
 
 export const redisConfigSchema = type({
-	host: "string > 0 = 'localhost'",
-	port: "string.integer.parse | number.integer > 0 = 6379",
-	"password?": "string | undefined",
+	url: "string > 0",
 });
 
 export const authConfigSchema = type({
@@ -29,13 +26,21 @@ export const authConfigSchema = type({
 export const configSchema = type({
 	host: "string > 0 = '0.0.0.0'",
 	port: "string.integer.parse | number.integer > 0 = 9850",
-	baseURL: "string > 0",
-	corsOrigins: uniqueCommaSeparatedToItems,
+	"baseURL?": "string > 0",
+	corsOrigins: uniqueCommaSeparatedToItems.default("http://localhost:9851"),
 	"redis?": redisConfigSchema.or(type("undefined")),
-	db: databaseConfigSchema,
-	auth: authConfigSchema,
+	"auth?": authConfigSchema.or(type("undefined")),
 	logLevel: type.enumerated(...logLevels).default("info"),
 	prettyLogs: type("boolean").or(coerceBool).default(false),
+}).narrow((config, context) => {
+	if (config.auth && !config.baseURL) {
+		return context.reject({
+			code: "predicate",
+			path: ["baseURL"],
+			expected: "set when auth is configured",
+		});
+	}
+	return true;
 });
 
 export type RedisConfig = typeof redisConfigSchema.infer;

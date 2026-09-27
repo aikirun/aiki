@@ -2,9 +2,9 @@ import type { Serializable } from "@aikirun/lib/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
-import type { EventsDefinition } from "./run/event";
+import type { EventsData, EventsDefinition } from "./run/event";
 import {
-	type UnknownWorkflowVersion,
+	type AnyWorkflowVersion,
 	type WorkflowVersion,
 	WorkflowVersionImpl,
 	type WorkflowVersionParams,
@@ -57,65 +57,48 @@ import {
  *
  * @see {@link https://github.com/aikirun/aiki} for complete documentation
  */
-export function workflow(params: WorkflowParams): Workflow {
-	return new WorkflowImpl(params);
+export function workflow<Context = null>(params: WorkflowParams): Workflow<Context> {
+	const name = params.name as WorkflowName;
+	const workflowVersions = new Map<WorkflowVersionId, AnyWorkflowVersion>();
+
+	return {
+		name,
+
+		v(versionId, versionParams) {
+			if (workflowVersions.has(versionId as WorkflowVersionId)) {
+				throw new Error(`Workflow "${name}:${versionId}" already exists`);
+			}
+
+			const workflowVersion = new WorkflowVersionImpl(name, versionId as WorkflowVersionId, versionParams);
+			workflowVersions.set(versionId as WorkflowVersionId, workflowVersion);
+
+			return workflowVersion;
+		},
+
+		[INTERNAL]: {
+			getAllVersions: () => Array.from(workflowVersions.values()),
+			getVersion: (versionId) => workflowVersions.get(versionId),
+		},
+	};
 }
 
 export interface WorkflowParams {
 	name: string;
 }
 
-export interface Workflow {
+export interface Workflow<Context> {
 	name: WorkflowName;
 
-	v: <
-		Input extends Serializable,
-		Output extends Serializable,
-		AppContext = null,
-		TEvents extends EventsDefinition = Record<string, never>,
-	>(
+	v: <Input = void, Output = void, TEvents extends EventsDefinition = Record<string, never>>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
-	) => WorkflowVersion<Input, Output, AppContext, TEvents>;
+		params: WorkflowVersionParams<Input, Output, Context, TEvents> &
+			Serializable<Input, "input"> &
+			Serializable<Output, "output"> &
+			Serializable<EventsData<TEvents>, "events">
+	) => WorkflowVersion<Input, Output, Context, TEvents>;
 
 	[INTERNAL]: {
-		getAllVersions: () => UnknownWorkflowVersion[];
-		getVersion: (versionId: WorkflowVersionId) => UnknownWorkflowVersion | undefined;
+		getAllVersions: () => AnyWorkflowVersion[];
+		getVersion: (versionId: WorkflowVersionId) => AnyWorkflowVersion | undefined;
 	};
-}
-
-class WorkflowImpl implements Workflow {
-	public readonly name: WorkflowName;
-	public readonly [INTERNAL]: Workflow[typeof INTERNAL];
-	private workflowVersions = new Map<WorkflowVersionId, UnknownWorkflowVersion>();
-
-	constructor(params: WorkflowParams) {
-		this.name = params.name as WorkflowName;
-		this[INTERNAL] = {
-			getAllVersions: this.getAllVersions.bind(this),
-			getVersion: this.getVersion.bind(this),
-		};
-	}
-
-	v<Input extends Serializable, Output extends Serializable, AppContext, TEvents extends EventsDefinition>(
-		versionId: string,
-		params: WorkflowVersionParams<Input, Output, AppContext, TEvents>
-	): WorkflowVersion<Input, Output, AppContext, TEvents> {
-		if (this.workflowVersions.has(versionId as WorkflowVersionId)) {
-			throw new Error(`Workflow "${this.name}:${versionId}" already exists`);
-		}
-
-		const workflowVersion = new WorkflowVersionImpl(this.name, versionId as WorkflowVersionId, params);
-		this.workflowVersions.set(versionId as WorkflowVersionId, workflowVersion as unknown as UnknownWorkflowVersion);
-
-		return workflowVersion;
-	}
-
-	private getAllVersions(): UnknownWorkflowVersion[] {
-		return Array.from(this.workflowVersions.values());
-	}
-
-	private getVersion(versionId: WorkflowVersionId): UnknownWorkflowVersion | undefined {
-		return this.workflowVersions.get(versionId);
-	}
 }

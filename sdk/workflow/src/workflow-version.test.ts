@@ -1,0 +1,1374 @@
+import { asConfigProvider } from "@aikirun/lib/config";
+import { hashInput } from "@aikirun/lib/crypto";
+import { getCompositeId } from "@aikirun/lib/id";
+import { withFakeClient } from "@aikirun/testing/client";
+import {
+	baseWorkflowRunRecordFactory,
+	childWorkflowRunInfoFactory,
+	pausedWorkflowRunRecordFactory,
+	runningWorkflowRunRecordFactory,
+	workflowRunStateByStatus,
+} from "@aikirun/testing/data-factory/workflow/run";
+import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
+import { asOpaquePayload } from "@aikirun/testing/payload";
+import type { Client } from "@aikirun/types/client";
+import { INTERNAL } from "@aikirun/types/symbols";
+import { SchemaValidationError } from "@aikirun/types/validator";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
+import {
+	ClientCodecMissingError,
+	NonDeterminismError,
+	WORKFLOW_RUN_STATUSES,
+	WorkflowRunFailedError,
+	WorkflowRunNotExecutableError,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
+
+import type { WorkflowRun } from "./run";
+import { workflowRunHandle } from "./run/handle";
+import { createReplayManifest } from "./run/replay-manifest";
+import { taskExecutionTracker } from "./run/task-execution-tracker";
+import { task } from "./task";
+import { workflow } from "./workflow";
+import { describe, expect, test } from "bun:test";
+
+function createTestWorkflowRun(client: Client, record: WorkflowRunRecord): WorkflowRun<null, Record<string, never>> {
+	const handle = workflowRunHandle(client, record);
+	return {
+		id: record.id as WorkflowRunId,
+		name: record.name as WorkflowName,
+		versionId: record.versionId as WorkflowVersionId,
+		options: record.options ?? {},
+		logger: client.logger,
+		sleep: () => {
+			throw new Error("sleep is not used in these unit tests");
+		},
+		events: {},
+		context: null,
+		[INTERNAL]: {
+			handle,
+			replayManifest: createReplayManifest(record),
+			createTaskExecutionTracker: taskExecutionTracker(handle, client.logger).create,
+			configProvider: asConfigProvider(() => ({ claimRefreshIntervalMs: 30_000, maxInlineWaitMs: 10 })),
+			hasher: hashInput,
+		},
+	};
+}
+
+describe("workflow version execution", () => {
+	describe("retry strategy precedence", () => {
+		test("uses the run's persisted strategy over the workflow definition strategy", () =>
+			withFakeClient((client) => {
+				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
+					async handler() {
+						throw new Error("boom");
+					},
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({ options: { retry: { type: "never" } } });
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "failed",
+								cause: "self",
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+
+		test("falls back to the workflow definition retry strategy when the run has none", () =>
+			withFakeClient((client) => {
+				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
+					async handler() {
+						throw new Error("boom");
+					},
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "awaiting_retry",
+								cause: "self",
+								nextAttemptInMs: 1,
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: {
+								status: "awaiting_retry",
+								cause: "self",
+								nextAttemptAt: 0,
+								error: { name: "Error", message: "boom" },
+							},
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			}));
+
+		test("falls back to no retries when neither the run nor the workflow defines a strategy", () =>
+			withFakeClient((client) => {
+				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
+					async handler() {
+						throw new Error("boom");
+					},
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "failed",
+								cause: "self",
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+	});
+
+	describe("successful execution", () => {
+		for (const status of ["queued", "running"] as const) {
+			test(`completes the run and persists the handler output when the run is ${status}`, () =>
+				withFakeClient(async (client) => {
+					const workflowVersion = workflow({ name: "completing-workflow" }).v("1.0.0", {
+						async handler() {
+							return "done";
+						},
+					});
+					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
+					const run = createTestWorkflowRun(client, runRecord);
+
+					client.api.workflowRun.transitionStateV1
+						.once(
+							{
+								type: "optimistic",
+								id: runRecord.id,
+								state: { status: "running" },
+								expectedRevision: runRecord.revision,
+							},
+							{ revision: runRecord.revision, state: { status: "running" }, attempts: runRecord.attempts }
+						)
+						.once(
+							{
+								type: "optimistic",
+								id: runRecord.id,
+								state: { status: "completed", output: asOpaquePayload("done") },
+								expectedRevision: runRecord.revision,
+							},
+							{
+								revision: runRecord.revision,
+								state: { status: "completed", output: asOpaquePayload("done") },
+								attempts: runRecord.attempts,
+							}
+						);
+
+					expect(await workflowVersion[INTERNAL].handler(run)).toBeUndefined();
+				}));
+		}
+
+		test("encodes the handler output with the run's codec before persisting it", () =>
+			withFakeClient(async (client) => {
+				const encodedOutput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("done");
+						return encodedOutput;
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "completing-workflow" }).v("1.0.0", {
+					async handler() {
+						return "done";
+					},
+				});
+				const runRecord = {
+					...baseWorkflowRunRecordFactory.build({ clientCodecApplied: true }),
+					state: workflowRunStateByStatus.running,
+				};
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: { status: "running" }, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "completed", output: encodedOutput },
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "completed", output: encodedOutput },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(await workflowVersion[INTERNAL].handler(run)).toBeUndefined();
+			}));
+
+		test("persists the schema-parsed value when an output schema is provided", () =>
+			withFakeClient(async (client) => {
+				const toUpperCase: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: (value) => ({ value: String(value).toUpperCase() }),
+					},
+				};
+				const workflowVersion = workflow({ name: "validated-output-workflow" }).v("1.0.0", {
+					async handler() {
+						return "done";
+					},
+					schema: { output: toUpperCase },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "completed", output: asOpaquePayload("DONE") },
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "completed", output: asOpaquePayload("DONE") },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(await workflowVersion[INTERNAL].handler(run)).toBeUndefined();
+			}));
+
+		test("fails without retrying when the output schema rejects, even with a retry strategy", () =>
+			withFakeClient((client) => {
+				const alwaysInvalid: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: () => ({ issues: [{ message: "invalid output" }] }),
+					},
+				};
+				const workflowVersion = workflow({ name: "invalid-output-workflow" }).v("1.0.0", {
+					async handler() {
+						return "done";
+					},
+					schema: { output: alwaysInvalid },
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "failed",
+								cause: "self",
+								error: expect.objectContaining({ name: "SchemaValidationError" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: {
+								status: "failed",
+								cause: "self",
+								error: { name: "SchemaValidationError", message: JSON.stringify([{ message: "invalid output" }]) },
+							},
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+	});
+
+	describe("task failures", () => {
+		test("fails with cause 'task' when retries are exhausted", () =>
+			withFakeClient(async (client) => {
+				const chargeCard = task({
+					name: "charge-card",
+					handler: async () => {
+						throw new Error("declined");
+					},
+				});
+				const workflowVersion = workflow({ name: "task-failing-workflow" }).v("1.0.0", {
+					async handler(run) {
+						await chargeCard.start(run);
+					},
+					retry: { type: "never" },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+				const inputHash = await hashInput(undefined);
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: undefined,
+							inputHash,
+							taskName: chargeCard.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "failed",
+								error: expect.objectContaining({ message: "declined" }),
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+
+		test("awaits retry with cause 'task' when retries remain", () =>
+			withFakeClient(async (client) => {
+				const chargeCard = task({
+					name: "charge-card",
+					handler: async () => {
+						throw new Error("declined");
+					},
+				});
+				const workflowVersion = workflow({ name: "task-retrying-workflow" }).v("1.0.0", {
+					async handler(run) {
+						await chargeCard.start(run);
+					},
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+				const inputHash = await hashInput(undefined);
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: undefined,
+							inputHash,
+							taskName: chargeCard.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "failed",
+								error: expect.objectContaining({ message: "declined" }),
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+						},
+						{ taskInfo: runningTaskInfo }
+					);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "awaiting_retry", cause: "task", nextAttemptInMs: 1, taskId: runningTaskInfo.id },
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "awaiting_retry", cause: "task", nextAttemptAt: 0, taskId: runningTaskInfo.id },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			}));
+	});
+
+	describe("control-flow errors propagate unchanged", () => {
+		const controlFlowErrorCases: Array<{ name: string; create: (id: WorkflowRunId, attempts: number) => Error }> = [
+			{ name: "WorkflowRunSuspendedError", create: (id) => new WorkflowRunSuspendedError(id) },
+			{ name: "WorkflowRunFailedError", create: (id, attempts) => new WorkflowRunFailedError(id, attempts) },
+			{ name: "WorkflowRunRevisionConflictError", create: (id) => new WorkflowRunRevisionConflictError(id) },
+			{
+				name: "NonDeterminismError",
+				create: (id, attempts) => new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
+			},
+			{ name: "ClientCodecMissingError", create: (id) => new ClientCodecMissingError(id) },
+		];
+
+		for (const errorCase of controlFlowErrorCases) {
+			test(`rethrows ${errorCase.name} as-is without an additional state transition`, () =>
+				withFakeClient((client) => {
+					const runRecord = runningWorkflowRunRecordFactory.build();
+					const thrownError = errorCase.create(runRecord.id as WorkflowRunId, runRecord.attempts);
+					const workflowVersion = workflow({ name: "control-flow-workflow" }).v("1.0.0", {
+						async handler() {
+							throw thrownError;
+						},
+						retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+					});
+					const run = createTestWorkflowRun(client, runRecord);
+
+					client.api.workflowRun.transitionStateV1.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					);
+
+					expect(workflowVersion[INTERNAL].handler(run)).rejects.toBe(thrownError);
+				}));
+		}
+	});
+
+	describe("execution guard", () => {
+		for (const status of WORKFLOW_RUN_STATUSES) {
+			if (status === "queued" || status === "running") {
+				continue;
+			}
+
+			test(`throws WorkflowRunNotExecutableError and performs no transition when the run is ${status}`, () =>
+				withFakeClient((client) => {
+					const workflowVersion = workflow({ name: "guarded-workflow" }).v("1.0.0", {
+						async handler() {
+							return "should not run";
+						},
+					});
+					const runRecord = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus[status] };
+					const run = createTestWorkflowRun(client, runRecord);
+
+					expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunNotExecutableError);
+				}));
+		}
+	});
+});
+
+describe("creating a workflow run", () => {
+	describe("start", () => {
+		test("creates the run with the given input and returns a handle to it", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return `Hello ${name}`;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("encodes the input with the client's codec and declares it applied", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("world");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return `Hello ${name}`;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("hashes the input with the client's hasher and declares it applied", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].hasher = Object.assign(
+					async (input: unknown) => {
+						expect(input).toBe("world");
+						return { value: "client-hash" };
+					},
+					{ for: async () => null }
+				);
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return `Hello ${name}`;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: true,
+						clientCodecApplied: false,
+						inputHash: { value: "client-hash" },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("forwards the schema-parsed value to createV1 when an input schema is provided", () =>
+			withFakeClient(async (client) => {
+				const toUpperCase: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: (value) => ({ value: String(value).toUpperCase() }),
+					},
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					schema: { input: toUpperCase },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("WORLD");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("WORLD"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("throws SchemaValidationError and does not create a run when the input schema rejects", () =>
+			withFakeClient((client) => {
+				const alwaysInvalid: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: () => ({ issues: [{ message: "invalid input" }] }),
+					},
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					schema: { input: alwaysInvalid },
+				});
+
+				expect(workflowVersion.start(client, "world")).rejects.toBeInstanceOf(SchemaValidationError);
+			}));
+
+		test("passes the definition retry strategy as start options", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					retry: { type: "fixed", maxAttempts: 3, delayMs: 100 },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+	});
+
+	describe("with", () => {
+		test("overrides the definition start options", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					retry: { type: "fixed", maxAttempts: 3, delayMs: 100 },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: { retry: { type: "never" } },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with("retry", { type: "never" }).start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("merges overrides with the definition start options", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					retry: { type: "fixed", maxAttempts: 3, delayMs: 100 },
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, pool: "eu-west" },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with("pool", "eu-west").start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("passes the priority option to the run creation", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: { priority: 2 },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with("priority", 2).start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+	});
+
+	describe("startAsChild", () => {
+		test("creates a child run linked to the parent and returns a handle to it", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("encodes the child input with the parent's bound codec and inherits the parent's declaration", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("payload");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("hashes the child input with the parent run's hasher, not the client's", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				parentRun[INTERNAL].hasher = async () => "run-bound-hash";
+				client[INTERNAL].hasher = Object.assign(async () => ({ value: "client-hash" }), {
+					for: async () => async () => "client-bound-hash",
+				});
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: "run-bound-hash" },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("the child declares the parent's hasher, since its hash was made under it", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				parentRun[INTERNAL].hasher = async () => "run-bound-hash";
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: true,
+						clientCodecApplied: false,
+						inputHash: { value: "run-bound-hash" },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("throws WorkflowRunRevisionConflictError when the parent revision is stale", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.rejectsOnce(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					Object.assign(new Error("Revision conflict"), { code: "WORKFLOW_RUN_REVISION_CONFLICT" })
+				);
+
+				expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toThrow(WorkflowRunRevisionConflictError);
+			}));
+
+		test("propagates the parent's pool to the child run", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ options: { pool: "eu-west" } });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: { pool: "eu-west" },
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("the child's own pool wins over the parent's", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ options: { pool: "eu-west" } });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: { pool: "us-east" },
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.with("pool", "us-east").startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("the child inherits the parent's priority when it sets none", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ options: { priority: 2 } });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: { priority: 2 },
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("the child's own priority wins over the parent's", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ options: { priority: 7 } });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: { priority: 1 },
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.with("priority", 1).startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("returns the recorded child run on replay without creating a new one", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+
+				const inputHash = await hashInput("payload");
+				const address = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: inputHash,
+				});
+				const recordedChildRun = childWorkflowRunInfoFactory.build({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRuns: { [address]: [recordedChildRun] },
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				client.api.workflowRun.getByIdV1.once(
+					{ id: recordedChildRun.id },
+					{ run: runningWorkflowRunRecordFactory.build({ id: recordedChildRun.id }) }
+				);
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(recordedChildRun.id);
+			}));
+
+		test("fails the parent with a non-determinism error when no recorded child matches", () =>
+			withFakeClient((client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+
+				const mismatchedAddress = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: "different-input-hash",
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRuns: {
+						[mismatchedAddress]: [childWorkflowRunInfoFactory.build()],
+					},
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: parentRunRecord.id,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: expect.objectContaining({ name: "NonDeterminismError" }),
+						},
+						expectedRevision: parentRunRecord.revision,
+					},
+					{
+						revision: parentRunRecord.revision,
+						state: { status: "failed", cause: "self", error: { name: "NonDeterminismError", message: "divergence" } },
+						attempts: parentRunRecord.attempts,
+					}
+				);
+
+				expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(NonDeterminismError);
+			}));
+
+		test("throws WorkflowRunNotExecutableError when the parent is not executable", () =>
+			withFakeClient((client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRun = createTestWorkflowRun(client, pausedWorkflowRunRecordFactory.build());
+
+				expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(WorkflowRunNotExecutableError);
+			}));
+
+		test("forwards the schema-parsed input to createV1", () =>
+			withFakeClient(async (client) => {
+				const toUpperCase: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: (value) => ({ value: String(value).toUpperCase() }),
+					},
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+					schema: { input: toUpperCase },
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("PAYLOAD");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("PAYLOAD"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("fails the parent when the input schema rejects", () =>
+			withFakeClient((client) => {
+				const alwaysInvalid: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: () => ({ issues: [{ message: "invalid input" }] }),
+					},
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+					schema: { input: alwaysInvalid },
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: parentRunRecord.id,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: expect.objectContaining({ name: "SchemaValidationError" }),
+						},
+						expectedRevision: parentRunRecord.revision,
+					},
+					{
+						revision: parentRunRecord.revision,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: { name: "SchemaValidationError", message: JSON.stringify([{ message: "invalid input" }]) },
+						},
+						attempts: parentRunRecord.attempts,
+					}
+				);
+
+				expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+	});
+});
+
+describe("getting a run handle", () => {
+	test("getHandleById returns a handle to the run fetched by id", () =>
+		withFakeClient(async (client) => {
+			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
+				async handler() {},
+			});
+			const runRecord = runningWorkflowRunRecordFactory.build();
+
+			client.api.workflowRun.getByIdV1.once({ id: runRecord.id }, { run: runRecord });
+
+			const handle = await workflowVersion.getHandleById(client, runRecord.id);
+
+			expect(handle.run.id).toBe(runRecord.id);
+		}));
+
+	test("getHandleByReferenceId looks the run up by the workflow name, version, and reference id", () =>
+		withFakeClient(async (client) => {
+			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
+				async handler() {},
+			});
+			const runRecord = runningWorkflowRunRecordFactory.build();
+
+			client.api.workflowRun.getByReferenceIdV1.once(
+				{ name: "orders", versionId: "1.0.0", referenceId: "order-42" },
+				{ run: runRecord }
+			);
+
+			const handle = await workflowVersion.getHandleByReferenceId(client, "order-42");
+
+			expect(handle.run.id).toBe(runRecord.id);
+		}));
+});

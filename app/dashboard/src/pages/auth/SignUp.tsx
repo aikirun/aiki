@@ -3,8 +3,10 @@ import { Link, useLocation } from "react-router-dom";
 
 import { createNamespace } from "../../api/client";
 import { authClient } from "../../auth/client";
+import { getSafeRedirect } from "../../auth/redirect";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 import { FormInput } from "../../components/auth/FormInput";
+import { btnPrimary, primaryHover } from "../../components/common/ui";
 
 function generatePersonalSlug(email: string): string {
 	const username = email.split("@")[0] || "user";
@@ -19,9 +21,7 @@ function generatePersonalSlug(email: string): string {
 
 export function SignUp() {
 	const location = useLocation();
-	// Extract and validate the redirect param — only allow same-origin paths to prevent open redirect
-	const redirectParam = new URLSearchParams(location.search).get("redirect");
-	const safeRedirect = redirectParam?.startsWith("/") ? redirectParam : null;
+	const safeRedirect = getSafeRedirect(location.search);
 
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
@@ -87,10 +87,10 @@ export function SignUp() {
 					<div
 						style={{
 							padding: 10,
-							borderRadius: 8,
-							background: "rgba(248,113,113,0.08)",
-							border: "1px solid rgba(248,113,113,0.2)",
-							color: "#F87171",
+							borderRadius: "var(--r-control)",
+							background: "color-mix(in srgb, var(--accent-red) var(--tint-mix), transparent)",
+							border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
+							color: "var(--accent-red)",
 							fontSize: 13,
 						}}
 					>
@@ -137,18 +137,14 @@ export function SignUp() {
 					type="submit"
 					disabled={isLoading}
 					style={{
+						...btnPrimary(),
 						width: "100%",
-						padding: "10px 16px",
-						background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-						color: "#fff",
+						padding: "11px 16px",
 						fontSize: 14,
-						fontWeight: 700,
-						borderRadius: 8,
-						border: "none",
 						cursor: isLoading ? "not-allowed" : "pointer",
 						opacity: isLoading ? 0.5 : 1,
-						fontFamily: "inherit",
 					}}
+					{...(isLoading ? {} : primaryHover)}
 				>
 					{isLoading ? "Creating account..." : "Create account"}
 				</button>
@@ -156,8 +152,8 @@ export function SignUp() {
 				<p style={{ textAlign: "center", fontSize: 13, color: "var(--t2)" }}>
 					Already have an account?{" "}
 					<Link
-						to={safeRedirect ? `/auth/sign-in?redirect=${encodeURIComponent(safeRedirect)}` : "/auth/sign-in"}
-						style={{ color: "#667eea", fontWeight: 600, textDecoration: "none" }}
+						to={safeRedirect ? `/sign-in?redirect=${encodeURIComponent(safeRedirect)}` : "/sign-in"}
+						style={{ color: "var(--accent-ink)", fontWeight: 600, textDecoration: "none" }}
 					>
 						Sign in
 					</Link>

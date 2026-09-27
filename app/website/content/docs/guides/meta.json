@@ -1,0 +1,15 @@
+{
+	"title": "Guides",
+	"pages": [
+		"dependency-injection",
+		"context",
+		"reference-ids",
+		"retry-strategies",
+		"determinism",
+		"refactoring-workflows",
+		"reliable-hooks",
+		"configuration",
+		"logging",
+		"iam"
+	]
+}

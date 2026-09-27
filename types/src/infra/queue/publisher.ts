@@ -1,21 +1,42 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Logger } from "@aikirun/lib/logger";
+import type { WorkflowSource } from "@aikirun/types/workflow";
 
 export interface ReadyWorkflowRun {
 	namespaceId: string;
 	id: string;
+	source: WorkflowSource;
 	name: string;
 	versionId: string;
 	rank: number;
-	shard?: string;
+	pool?: string;
+}
+
+export interface PublishRunsResultBucket {
+	runs: Array<{ run: ReadyWorkflowRun }>;
+}
+export interface TimedPublishRunsResultBucket {
+	runs: Array<{ run: ReadyWorkflowRun; nextPublishAttemptAt: number }>;
+}
+
+export interface PublishRunsResult {
+	/** Handoff to broker confirmed. */
+	published?: PublishRunsResultBucket;
+	/** Deliverable, but withheld by policy (admission, fairness, throttling). */
+	deferred?: TimedPublishRunsResultBucket;
+	/** Delivery failure. */
+	failed?: PublishRunsResultBucket;
+	/** Not handled. */
+	declined?: PublishRunsResultBucket;
 }
 
 export interface Publisher {
-	publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<void>;
+	publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult>;
 }
 
 export interface PublisherContext {
 	logger: Logger;
+	signal: AbortSignal;
 }
 
 export type CreatePublisher = (context: PublisherContext) => Publisher;

@@ -1,2 +1,7 @@
-export type { Worker, WorkerParams } from "./worker";
+export type { ConfigProvider, ConfigProviderContext, CreateConfigProvider } from "@aikirun/lib/config";
+export { asConfigProvider } from "@aikirun/lib/config";
+
+export type { WorkerConfig, WorkerConfigOverrides } from "./config";
+export { defaultWorkerConfig, dynamicWorkerConfigProvider, staticWorkerConfigProvider } from "./config";
+export type { Worker, WorkerHandle, WorkerParams, WorkerStartOptions } from "./worker";
 export { worker } from "./worker";

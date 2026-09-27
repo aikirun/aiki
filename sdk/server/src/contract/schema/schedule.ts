@@ -1,6 +1,8 @@
 import { type } from "arktype";
 
+import { opaquePayloadSchema } from "./payload";
 import { workflowSourceSchema } from "./workflow";
+import { workflowRunOptionsSchema } from "./workflow-run";
 
 export const overlapPolicySchema = type("'allow' | 'skip' | 'cancel_previous'");
 
@@ -13,21 +15,23 @@ export const cronScheduleSpecSchema = type({
 
 export const intervalScheduleSpecSchema = type({
 	type: "'interval'",
-	everyMs: "number > 0",
+	everyMs: "number.integer > 0",
 	"overlapPolicy?": overlapPolicySchema.or("undefined"),
 });
 
 export const scheduleSpecSchema = cronScheduleSpecSchema.or(intervalScheduleSpecSchema);
 
-export const scheduleStatusSchema = type("'active' | 'paused' | 'deleted'");
+export const scheduleStatusSchema = type("'active' | 'paused' | 'inactive'");
 
-export const scheduleReferenceOptionsSchema = type({
+export const scheduleConflictPolicySchema = type("'error' | 'return_existing'");
+
+export const scheduleReferenceSchema = type({
 	id: "string > 0",
-	"conflictPolicy?": "'upsert' | 'error'",
+	"conflictPolicy?": scheduleConflictPolicySchema.or("undefined"),
 });
 
 export const scheduleActivateOptionsSchema = type({
-	"reference?": scheduleReferenceOptionsSchema.or("undefined"),
+	"reference?": scheduleReferenceSchema.or("undefined"),
 });
 
 export const scheduleWorkflowFilterSchema = type({
@@ -38,12 +42,16 @@ export const scheduleWorkflowFilterSchema = type({
 
 export const scheduleSchema = type({
 	id: "string > 0",
+	workflowSource: workflowSourceSchema,
 	workflowName: "string > 0",
 	workflowVersionId: "string > 0",
-	"input?": "unknown",
+	"workflowRunInput?": opaquePayloadSchema,
+	clientHasherApplied: "boolean",
+	clientCodecApplied: "boolean",
 	spec: scheduleSpecSchema,
 	status: scheduleStatusSchema,
-	"options?": scheduleActivateOptionsSchema.or("undefined"),
+	"referenceId?": "string > 0 | undefined",
+	"workflowRunOptions?": workflowRunOptionsSchema.or("undefined"),
 	createdAt: "number > 0",
 	updatedAt: "number > 0",
 	"lastOccurrence?": "number > 0 | undefined",

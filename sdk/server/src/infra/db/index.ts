@@ -1,29 +1,64 @@
-import type { Database } from "@aikirun/types/infra/db";
+import type { DatabaseConfig } from "@aikirun/lib/db";
+import type { CreateDatabase, Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { type } from "arktype";
 
-import { createPgClient } from "./pg/provider";
-import { createSqliteClient } from "./sqlite/provider";
-import { type DatabaseConfig, databaseConfigSchema } from "../../config";
+import type { PgClient } from "./pg/provider";
 
-export function database(params: DatabaseConfig): Database {
-	const validationResult = databaseConfigSchema(params);
-	if (validationResult instanceof type.errors) {
-		throw new Error(`Invalid database config: ${validationResult.summary}`);
-	}
+export function database(config: DatabaseConfig): CreateDatabase {
+	let createDbPromise: Promise<Database> | undefined;
 
-	switch (params.provider) {
-		case "pg": {
-			const client = createPgClient(params);
-			return { provider: params.provider, [INTERNAL]: { client } };
-		}
-		case "sqlite": {
-			const client = createSqliteClient(params);
-			return { provider: params.provider, [INTERNAL]: { client } };
-		}
-		case "mysql":
-			throw new Error("MySQL support not yet implemented");
-		default:
-			return params satisfies never;
+	const createDbFn = () => {
+		createDbPromise ??= (async () => {
+			switch (config.provider) {
+				case "pg": {
+					const postgres = await importPostgres();
+					// Keys must be absent, not undefined: the driver merges options by key presence,
+					// so an explicit undefined beats its own default.
+					const client = postgres(config.url, {
+						...(config.maxConnections !== undefined && { max: config.maxConnections }),
+						...(config.caCert !== undefined && { ssl: { ca: config.caCert, rejectUnauthorized: true } }),
+					});
+					return { provider: "pg", [INTERNAL]: { client } };
+				}
+				// case "sqlite":
+				// 	throw new Error("SQLite support not yet implemented");
+				// case "mysql":
+				// 	throw new Error("MySQL support not yet implemented");
+				default:
+					return config.provider satisfies never;
+			}
+		})();
+		return createDbPromise;
+	};
+
+	return Object.assign(createDbFn, {
+		close: async (): Promise<void> => {
+			if (!createDbPromise) {
+				return;
+			}
+			const db = await createDbPromise;
+			switch (db.provider) {
+				case "pg": {
+					const client = db[INTERNAL].client as PgClient;
+					await client.end();
+					return;
+				}
+				// case "sqlite":
+				// 	throw new Error("SQLite support not yet implemented");
+				// case "mysql":
+				// 	throw new Error("MySQL support not yet implemented");
+				default:
+					db.provider satisfies never;
+			}
+		},
+	});
+}
+
+async function importPostgres() {
+	try {
+		const { default: postgres } = await import("postgres");
+		return postgres;
+	} catch {
+		throw new Error("the pg provider requires the postgres driver, install it with: npm install postgres");
 	}
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_run_outbox" RENAME COLUMN "attempts" TO "dispatch_attempts";

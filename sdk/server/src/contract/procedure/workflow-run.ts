@@ -5,6 +5,7 @@ import type {
 	WorkflowRunCancelByIdsResponseV1,
 	WorkflowRunClaimReadyRequestV1,
 	WorkflowRunClaimReadyResponseV1,
+	WorkflowRunClaimRefreshRequestV1,
 	WorkflowRunCreateRequestV1,
 	WorkflowRunCreateResponseV1,
 	WorkflowRunGetByIdRequestV1,
@@ -15,7 +16,6 @@ import type {
 	WorkflowRunGetStateResponseV1,
 	WorkflowRunHasTerminatedRequestV1,
 	WorkflowRunHasTerminatedResponseV1,
-	WorkflowRunHeartbeatRequestV1,
 	WorkflowRunListChildRunsRequestV1,
 	WorkflowRunListChildRunsResponseV1,
 	WorkflowRunListRequestV1,
@@ -24,40 +24,32 @@ import type {
 	WorkflowRunListTransitionsResponseV1,
 	WorkflowRunMulticastEventByReferenceRequestV1,
 	WorkflowRunMulticastEventRequestV1,
+	WorkflowRunMulticastEventResponseV1,
 	WorkflowRunSendEventRequestV1,
-	WorkflowRunSetTaskStateRequestV1,
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
-	WorkflowRunTransitionTaskStateRequestV1,
-	WorkflowRunTransitionTaskStateResponseV1,
 } from "@aikirun/types/api/workflow-run";
 import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
-import { stateTransitionSchema } from "../schema/state-transition";
-import {
-	taskInfoSchema,
-	taskOptionsSchema,
-	taskStateAwaitingRetryRequestSchema,
-	taskStateCompletedRequestSchema,
-	taskStateFailedSchema,
-	taskStateRunningRequestSchema,
-} from "../schema/task";
+import { inputHashSchema } from "../schema/hash";
+import { opaquePayloadSchema } from "../schema/payload";
+import { taskStateTransitionSchema, workflowRunStateTransitionSchema } from "../schema/state-transition";
 import { workflowSourceSchema } from "../schema/workflow";
 import {
 	cancelByIdsRequestSchema,
 	cancelByIdsResponseSchema,
 	listChildRunsRequestSchema,
 	listChildRunsResponseSchema,
-	workflowOptionsSchema,
-	workflowRunSchema,
-	workflowRunSetTaskStateRequestSchema,
-	workflowRunStateAwaitingChildWorkflowRequestSchema,
-	workflowRunStateAwaitingEventRequestSchema,
-	workflowRunStateAwaitingRetryRequestSchema,
+	multicastEventResponseSchema,
+	workflowRunRecordSchema,
+	workflowRunStateAwaitingChildWorkflowSchema,
+	workflowRunStateAwaitingEventSchema,
+	workflowRunStateAwaitingRetrySchema,
+	workflowRunStateAwaitingTaskRetrySchema,
 	workflowRunStateCancelledSchema,
-	workflowRunStateCompletedRequestSchema,
+	workflowRunStateCompletedSchema,
 	workflowRunStateFailedSchema,
 	workflowRunStatePausedSchema,
 	workflowRunStateQueuedSchema,
@@ -65,8 +57,10 @@ import {
 	workflowRunStateScheduledRequestOptimisticSchema,
 	workflowRunStateScheduledRequestPessimisticSchema,
 	workflowRunStateSchema,
-	workflowRunStateSleepingRequestSchema,
+	workflowRunStateSleepingSchema,
+	workflowRunStateStalledSchema,
 	workflowRunStatusSchema,
+	workflowStartOptionsSchema,
 } from "../schema/workflow-run";
 
 const listV1: ContractProcedure<WorkflowRunListRequestV1, WorkflowRunListResponseV1> = oc
@@ -128,7 +122,7 @@ const getByIdV1: ContractProcedure<WorkflowRunGetByIdRequestV1, WorkflowRunGetBy
 	)
 	.output(
 		type({
-			run: workflowRunSchema,
+			run: workflowRunRecordSchema,
 		})
 	);
 
@@ -145,7 +139,7 @@ const getByReferenceIdV1: ContractProcedure<
 	)
 	.output(
 		type({
-			run: workflowRunSchema,
+			run: workflowRunRecordSchema,
 		})
 	);
 
@@ -166,9 +160,12 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 		type({
 			name: "string > 0",
 			versionId: "string > 0",
-			"input?": "unknown",
-			"parentWorkflowRunId?": "string > 0 | undefined",
-			"options?": workflowOptionsSchema,
+			"input?": opaquePayloadSchema,
+			inputHash: inputHashSchema,
+			clientHasherApplied: "boolean",
+			clientCodecApplied: "boolean",
+			"parent?": type({ workflowRunId: "string > 0", expectedRevision: "number.integer >= 0" }).or("undefined"),
+			"options?": workflowStartOptionsSchema,
 		})
 	)
 	.output(
@@ -183,23 +180,46 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 			type({
 				type: "'optimistic'",
 				id: "string > 0",
-				state: workflowRunStateScheduledRequestOptimisticSchema
-					.or(workflowRunStateQueuedSchema)
-					.or(workflowRunStateRunningSchema)
-					.or(workflowRunStateSleepingRequestSchema)
-					.or(workflowRunStateAwaitingEventRequestSchema)
-					.or(workflowRunStateAwaitingRetryRequestSchema)
-					.or(workflowRunStateAwaitingChildWorkflowRequestSchema)
-					.or(workflowRunStateCompletedRequestSchema)
-					.or(workflowRunStateFailedSchema),
 				expectedRevision: "number.integer >= 0",
-			}).or({
-				type: "'pessimistic'",
-				id: "string > 0",
-				state: workflowRunStateScheduledRequestPessimisticSchema
-					.or(workflowRunStatePausedSchema)
-					.or(workflowRunStateCancelledSchema),
 			})
+				.and(
+					type({
+						state: workflowRunStateScheduledRequestOptimisticSchema
+							.or(workflowRunStateQueuedSchema)
+							.or(workflowRunStateRunningSchema)
+							.or(
+								workflowRunStateSleepingSchema
+									.omit("wakeupAt")
+									.and({ durationMs: "0 < number.integer <= 315360000000" }) // max of 10 years
+							)
+							.or(
+								workflowRunStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" })
+							)
+							.or(workflowRunStateAwaitingTaskRetrySchema.omit("nextAttemptAt"))
+							.or(workflowRunStateCompletedSchema.omit("output").and({ "output?": opaquePayloadSchema }))
+							.or(workflowRunStateFailedSchema),
+					}).or({
+						expectedSignalSequence: "number.integer >= 0",
+						state: workflowRunStateAwaitingEventSchema
+							.omit("timeoutAt")
+							.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
+							.or(
+								workflowRunStateAwaitingChildWorkflowSchema
+									.omit("timeoutAt")
+									.and({ "timeoutInMs?": "number.integer > 0 | undefined" })
+							),
+					})
+				)
+				.or(
+					type({
+						type: "'pessimistic'",
+						id: "string > 0",
+						state: workflowRunStateScheduledRequestPessimisticSchema
+							.or(workflowRunStatePausedSchema)
+							.or(workflowRunStateStalledSchema)
+							.or(workflowRunStateCancelledSchema),
+					})
+				)
 		)
 		.output(
 			type({
@@ -208,56 +228,6 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 				attempts: "number.integer >= 0",
 			})
 		);
-
-const transitionTaskStateV1: ContractProcedure<
-	WorkflowRunTransitionTaskStateRequestV1,
-	WorkflowRunTransitionTaskStateResponseV1
-> = oc
-	.input(
-		type({
-			type: "'create'",
-			id: "string > 0",
-			taskName: "string > 0",
-			"options?": taskOptionsSchema,
-			taskState: taskStateRunningRequestSchema,
-			expectedWorkflowRunRevision: "number.integer >= 0",
-		})
-			.or({
-				type: "'retry'",
-				id: "string > 0",
-				taskId: "string > 0",
-				"options?": taskOptionsSchema,
-				taskState: taskStateRunningRequestSchema,
-				expectedWorkflowRunRevision: "number.integer >= 0",
-			})
-			.or({
-				id: "string > 0",
-				taskId: "string > 0",
-				taskState: taskStateCompletedRequestSchema,
-				expectedWorkflowRunRevision: "number.integer >= 0",
-			})
-			.or({
-				id: "string > 0",
-				taskId: "string > 0",
-				taskState: taskStateFailedSchema,
-				expectedWorkflowRunRevision: "number.integer >= 0",
-			})
-			.or({
-				id: "string > 0",
-				taskId: "string > 0",
-				taskState: taskStateAwaitingRetryRequestSchema,
-				expectedWorkflowRunRevision: "number.integer >= 0",
-			})
-	)
-	.output(
-		type({
-			taskInfo: taskInfoSchema,
-		})
-	);
-
-const setTaskStateV1: ContractProcedure<WorkflowRunSetTaskStateRequestV1, void> = oc
-	.input(workflowRunSetTaskStateRequestSchema)
-	.output(type("undefined"));
 
 const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, WorkflowRunListTransitionsResponseV1> =
 	oc
@@ -273,7 +243,7 @@ const listTransitionsV1: ContractProcedure<WorkflowRunListTransitionsRequestV1, 
 		)
 		.output(
 			type({
-				transitions: stateTransitionSchema.array(),
+				transitions: workflowRunStateTransitionSchema.or(taskStateTransitionSchema).array(),
 				total: "number.integer >= 0",
 			})
 		);
@@ -283,7 +253,8 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, void> = oc
 		type({
 			id: "string > 0",
 			eventName: "string > 0",
-			"data?": "unknown",
+			"data?": opaquePayloadSchema,
+			clientCodecApplied: "boolean",
 			"options?": {
 				"reference?": { id: "string > 0" },
 			},
@@ -291,20 +262,24 @@ const sendEventV1: ContractProcedure<WorkflowRunSendEventRequestV1, void> = oc
 	)
 	.output(type("undefined"));
 
-const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, void> = oc
+const multicastEventV1: ContractProcedure<WorkflowRunMulticastEventRequestV1, WorkflowRunMulticastEventResponseV1> = oc
 	.input(
 		type({
 			ids: type("string > 0").array().atLeastLength(1).atMostLength(10),
 			eventName: "string > 0",
-			"data?": "unknown",
+			"data?": opaquePayloadSchema,
+			clientCodecApplied: "boolean",
 			"options?": {
 				"reference?": { id: "string > 0" },
 			},
 		})
 	)
-	.output(type("undefined"));
+	.output(multicastEventResponseSchema);
 
-const multicastEventByReferenceV1: ContractProcedure<WorkflowRunMulticastEventByReferenceRequestV1, void> = oc
+const multicastEventByReferenceV1: ContractProcedure<
+	WorkflowRunMulticastEventByReferenceRequestV1,
+	WorkflowRunMulticastEventResponseV1
+> = oc
 	.input(
 		type({
 			references: type({
@@ -316,13 +291,14 @@ const multicastEventByReferenceV1: ContractProcedure<WorkflowRunMulticastEventBy
 				.atLeastLength(1)
 				.atMostLength(10),
 			eventName: "string > 0",
-			"data?": "unknown",
+			"data?": opaquePayloadSchema,
+			clientCodecApplied: "boolean",
 			"options?": {
 				"reference?": { id: "string > 0" },
 			},
 		})
 	)
-	.output(type("undefined"));
+	.output(multicastEventResponseSchema);
 
 const listChildRunsV1: ContractProcedure<WorkflowRunListChildRunsRequestV1, WorkflowRunListChildRunsResponseV1> = oc
 	.input(listChildRunsRequestSchema)
@@ -336,14 +312,14 @@ const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRu
 	.input(
 		type({
 			workflows: type({
+				source: workflowSourceSchema,
 				name: "string > 0",
 				versionId: "string > 0",
 			})
 				.array()
 				.atLeastLength(1),
-			"shards?": type("string > 0").array().or("undefined"),
+			"pools?": type("string > 0").array().or("undefined"),
 			limit: "number.integer > 0",
-			claimMinIdleTimeMs: "number.integer > 0",
 		})
 	)
 	.output(
@@ -352,7 +328,7 @@ const claimReadyV1: ContractProcedure<WorkflowRunClaimReadyRequestV1, WorkflowRu
 		})
 	);
 
-const heartbeatV1: ContractProcedure<WorkflowRunHeartbeatRequestV1, void> = oc
+const claimRefreshV1: ContractProcedure<WorkflowRunClaimRefreshRequestV1, void> = oc
 	.input(
 		type({
 			id: "string > 0",
@@ -364,13 +340,11 @@ const hasTerminatedV1: ContractProcedure<WorkflowRunHasTerminatedRequestV1, Work
 	.input(
 		type({
 			id: "string > 0",
-			afterStateTransitionId: "string > 0",
 		})
 	)
 	.output(
 		type({
 			terminated: "boolean",
-			latestStateTransitionId: "string > 0",
 		})
 	);
 
@@ -381,8 +355,6 @@ export const workflowRunContract = {
 	getStateV1,
 	createV1,
 	transitionStateV1,
-	transitionTaskStateV1,
-	setTaskStateV1,
 	listTransitionsV1,
 	sendEventV1,
 	multicastEventV1,
@@ -390,7 +362,7 @@ export const workflowRunContract = {
 	listChildRunsV1,
 	cancelByIdsV1,
 	claimReadyV1,
-	heartbeatV1,
+	claimRefreshV1,
 	hasTerminatedV1,
 };
 

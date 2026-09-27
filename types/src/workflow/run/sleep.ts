@@ -9,7 +9,7 @@ interface SleepBase {
 
 export interface SleepSleeping extends SleepBase {
 	status: "sleeping";
-	awakeAt: number;
+	wakeupAt: number;
 }
 
 export interface SleepCompleted extends SleepBase {
@@ -24,10 +24,6 @@ export interface SleepCancelled extends SleepBase {
 }
 
 export type Sleep = SleepSleeping | SleepCompleted | SleepCancelled;
-
-export interface SleepQueue {
-	sleeps: Sleep[];
-}
 
 export interface SleepResult {
 	cancelled: boolean;

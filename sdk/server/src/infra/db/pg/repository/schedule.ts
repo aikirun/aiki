@@ -1,199 +1,258 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import { and, count, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
+import { and, count, eq, getTableColumns, inArray, isNull, lte, sql } from "drizzle-orm";
 
-import { timerStreamCursorFilter } from "./lib/timer-stream";
-import type { TimerStreamCursor } from "../../../../lib/timer-stream";
+import { keysetStreamCursorFilter } from "./lib/keyset-stream";
+import { ScheduleConflictError } from "../../../../errors";
+import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { schedule, workflow } from "../schema";
 
 export type ScheduleRow = typeof schedule.$inferSelect;
 type ScheduleRowInsert = typeof schedule.$inferInsert;
-type ScheduleRowUpdate = Partial<
+export type ScheduleRowUpdate = Partial<
 	Pick<
 		ScheduleRowInsert,
 		| "status"
-		| "type"
-		| "cronExpression"
-		| "intervalMs"
-		| "overlapPolicy"
+		| "latestStateTransitionId"
+		| "referenceId"
 		| "workflowRunInput"
 		| "workflowRunInputHash"
+		| "clientHasherApplied"
+		| "clientCodecApplied"
 		| "definitionHash"
-		| "referenceId"
-		| "conflictPolicy"
-		| "lastOccurrence"
-		| "nextRunAt"
-		| "workflowId"
 	>
 >;
+export interface ScheduleOccurrenceUpdate {
+	filter: { id: string; nextRunAt: TimestampMs };
+	update: { lastOccurrence?: TimestampMs; nextRunAt: TimestampMs };
+}
 
-export function createScheduleRepository(db: PgDb) {
-	return {
-		async create(input: ScheduleRowInsert): Promise<ScheduleRow> {
-			const result = await db.insert(schedule).values(input).returning();
-			const created = result[0];
-			if (!created) {
-				throw new Error("Failed to create schedule - no row returned");
-			}
-			return created;
-		},
-
-		async update(namespaceId: NamespaceId, id: string, updates: ScheduleRowUpdate): Promise<ScheduleRow | null> {
-			const result = await db
-				.update(schedule)
-				.set(updates)
-				.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.id, id)))
-				.returning();
-			return result[0] ?? null;
-		},
-
-		async bulkUpdateOccurrence(
-			entries: NonEmptyArray<{ id: string; lastOccurrence?: Date; nextRunAt: Date }>
-		): Promise<void> {
-			const valueRows = entries.map((entry, index) => {
-				const lastOccurrenceIso = entry.lastOccurrence ? entry.lastOccurrence.toISOString() : null;
-				const nextRunAtIso = entry.nextRunAt.toISOString();
-				if (index === 0) {
-					return sql`(${entry.id}::text, ${nextRunAtIso}::timestamptz, ${lastOccurrenceIso}::timestamptz)`;
-				}
-				return sql`(${entry.id}, ${nextRunAtIso}, ${lastOccurrenceIso})`;
+export const createScheduleRepository = (db: PgDb) => ({
+	async create(input: ScheduleRowInsert): Promise<ScheduleRow> {
+		const [created] = await db.insert(schedule).values(input).onConflictDoNothing().returning();
+		if (!created) {
+			throw new ScheduleConflictError({
+				definitionHash: input.definitionHash,
+				referenceId: input.referenceId ?? undefined,
 			});
+		}
+		return created;
+	},
 
-			await db
-				.update(schedule)
-				.set({
-					nextRunAt: sql`v.next_run_at`,
-					lastOccurrence: sql`COALESCE(v.last_occurrence, ${schedule.lastOccurrence})`,
-				})
-				.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, next_run_at, last_occurrence)`)
-				.where(sql`${schedule.id} = v.id`);
-		},
+	async update(
+		namespaceId: NamespaceId,
+		filter: { id: string; referenceId?: string | null },
+		updates: ScheduleRowUpdate
+	): Promise<ScheduleRow | null> {
+		const conditions = [eq(schedule.namespaceId, namespaceId)];
 
-		async getByReferenceId(namespaceId: NamespaceId, referenceId: string): Promise<ScheduleRow | null> {
-			const result = await db
-				.select()
-				.from(schedule)
-				.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.referenceId, referenceId)))
-				.limit(1);
-			return result[0] ?? null;
-		},
-
-		async getByDefinitionHash(namespaceId: NamespaceId, definitionHash: string): Promise<ScheduleRow | null> {
-			const result = await db
-				.select()
-				.from(schedule)
-				.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.definitionHash, definitionHash)))
-				.limit(1);
-			return result[0] ?? null;
-		},
-
-		async listByFilters(
-			namespaceId: NamespaceId,
-			filter: {
-				id?: string;
-				referenceId?: string;
-				status?: string[];
-				workflowIds?: string[];
-			},
-			limit = 50,
-			offset = 0
-		) {
-			const conditions = [eq(schedule.namespaceId, namespaceId)];
-
-			if (filter.id) {
-				conditions.push(eq(schedule.id, filter.id));
-			}
-			if (filter.referenceId) {
+		if (filter.id) {
+			conditions.push(eq(schedule.id, filter.id));
+		}
+		if (filter.referenceId !== undefined) {
+			if (filter.referenceId === null) {
+				conditions.push(isNull(schedule.referenceId));
+			} else {
 				conditions.push(eq(schedule.referenceId, filter.referenceId));
 			}
-			if (filter.status && filter.status.length > 0) {
-				conditions.push(inArray(schedule.status, filter.status as typeof schedule.status.enumValues));
+		}
+
+		const result = await db
+			.update(schedule)
+			.set(
+				updates.latestStateTransitionId === undefined
+					? updates
+					: { ...updates, revision: sql`${schedule.revision} + 1` }
+			)
+			.where(and(...conditions))
+			.returning();
+		return result[0] ?? null;
+	},
+
+	async bulkUpdateOccurrence(entries: NonEmptyArray<ScheduleOccurrenceUpdate>): Promise<void> {
+		// Locked in id order so concurrent bulk promoters acquire the same rows the same way.
+		const sortedEntries = [...entries].sort((a, b) => (a.filter.id < b.filter.id ? -1 : 1));
+		const valueRows = sortedEntries.map(({ filter, update }, index) => {
+			const expectedNextRunAtIso = new Date(filter.nextRunAt).toISOString();
+			const lastOccurrenceIso = update.lastOccurrence ? new Date(update.lastOccurrence).toISOString() : null;
+			const nextRunAtIso = new Date(update.nextRunAt).toISOString();
+			if (index === 0) {
+				return sql`(${filter.id}::text, ${expectedNextRunAtIso}::timestamptz, ${lastOccurrenceIso}::timestamptz, ${nextRunAtIso}::timestamptz)`;
 			}
-			if (filter.workflowIds && filter.workflowIds.length > 0) {
-				conditions.push(inArray(schedule.workflowId, filter.workflowIds));
+			return sql`(${filter.id}, ${expectedNextRunAtIso}, ${lastOccurrenceIso}, ${nextRunAtIso})`;
+		});
+
+		// The update applies only while nextRunAt still holds the value the caller read.
+		// Every occurrence advance changes nextRunAt, so an update built from an outdated
+		// read matches nothing.
+		await db
+			.update(schedule)
+			.set({
+				nextRunAt: sql`v.next_run_at`,
+				lastOccurrence: sql`COALESCE(v.last_occurrence, ${schedule.lastOccurrence})`,
+			})
+			.from(sql`(VALUES ${sql.join(valueRows, sql`, `)}) AS v(id, expected_next_run_at, last_occurrence, next_run_at)`)
+			.where(sql`${schedule.id} = v.id AND ${schedule.nextRunAt} = v.expected_next_run_at`);
+	},
+
+	async get(
+		namespaceId: NamespaceId,
+		filter: { id?: string; definitionHashes?: string[]; referenceId?: string | null },
+		options?: { lock?: "update" }
+	): Promise<ScheduleRow | null> {
+		const conditions = [eq(schedule.namespaceId, namespaceId)];
+
+		if (filter.id) {
+			conditions.push(eq(schedule.id, filter.id));
+		}
+		if (filter.definitionHashes && filter.definitionHashes.length > 0) {
+			conditions.push(inArray(schedule.definitionHash, filter.definitionHashes));
+		}
+		if (filter.referenceId !== undefined) {
+			if (filter.referenceId === null) {
+				conditions.push(isNull(schedule.referenceId));
+			} else {
+				conditions.push(eq(schedule.referenceId, filter.referenceId));
 			}
+		}
 
-			const whereClause = and(...conditions);
+		const query = db
+			.select()
+			.from(schedule)
+			.where(and(...conditions))
+			.limit(1);
 
-			const [rows, countResult] = await Promise.all([
-				db
-					.select({
-						schedule: getTableColumns(schedule),
-						workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
-					})
-					.from(schedule)
-					.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
-					.where(whereClause)
-					.orderBy(schedule.createdAt)
-					.limit(limit)
-					.offset(offset),
-				db.select({ count: count() }).from(schedule).where(whereClause),
-			]);
+		const result = options?.lock ? await query.for(options.lock) : await query;
+		return result[0] ?? null;
+	},
 
-			return { rows, total: countResult[0]?.count ?? 0 };
+	async listByFilters(
+		namespaceId: NamespaceId,
+		filter: {
+			id?: string;
+			referenceId?: string;
+			status?: string[];
+			workflowIds?: string[];
 		},
+		limit = 50,
+		offset = 0
+	) {
+		const conditions = [eq(schedule.namespaceId, namespaceId)];
 
-		async listActiveByIds(_context: DaemonContext, ids: NonEmptyArray<string>) {
-			return db
+		if (filter.id) {
+			conditions.push(eq(schedule.id, filter.id));
+		}
+		if (filter.referenceId) {
+			conditions.push(eq(schedule.referenceId, filter.referenceId));
+		}
+		if (filter.status && filter.status.length > 0) {
+			conditions.push(inArray(schedule.status, filter.status as typeof schedule.status.enumValues));
+		}
+		if (filter.workflowIds && filter.workflowIds.length > 0) {
+			conditions.push(inArray(schedule.workflowId, filter.workflowIds));
+		}
+
+		const whereClause = and(...conditions);
+
+		const [rows, countResult] = await Promise.all([
+			db
 				.select({
 					schedule: getTableColumns(schedule),
-					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
-				})
-				.from(schedule)
-				.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
-				.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
-		},
-
-		async listDueSchedules(_context: DaemonContext, before: Date, limit: number, cursor?: TimerStreamCursor) {
-			return db
-				.select({
-					schedule: {
-						...getTableColumns(schedule),
-						nextRunAt: sql<Date>`${schedule.nextRunAt}`.mapWith(schedule.nextRunAt),
+					workflow: {
+						workflowSource: workflow.source,
+						workflowName: workflow.name,
+						workflowVersionId: workflow.versionId,
 					},
-					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
 				})
 				.from(schedule)
 				.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
-				.where(
-					and(
-						eq(schedule.status, "active"),
-						lte(schedule.nextRunAt, before),
-						timerStreamCursorFilter(schedule.nextRunAt, schedule.id, cursor)
-					)
+				.where(whereClause)
+				.orderBy(schedule.createdAt)
+				.limit(limit)
+				.offset(offset),
+			db.select({ count: count() }).from(schedule).where(whereClause),
+		]);
+
+		return { rows, total: countResult[0]?.count ?? 0 };
+	},
+
+	async listActiveByIds(_context: DaemonContext, ids: NonEmptyArray<string>) {
+		return db
+			.select({
+				schedule: getTableColumns(schedule),
+				workflow: {
+					workflowSource: workflow.source,
+					workflowName: workflow.name,
+					workflowVersionId: workflow.versionId,
+				},
+			})
+			.from(schedule)
+			.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
+			.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
+	},
+
+	async listDueSchedules(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: KeysetStreamCursor) {
+		return db
+			.select({
+				schedule: {
+					...getTableColumns(schedule),
+					nextRunAt: sql<Date>`${schedule.nextRunAt}`.mapWith(schedule.nextRunAt),
+				},
+				workflow: {
+					workflowSource: workflow.source,
+					workflowName: workflow.name,
+					workflowVersionId: workflow.versionId,
+				},
+			})
+			.from(schedule)
+			.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
+			.where(
+				and(
+					eq(schedule.status, "active"),
+					lte(schedule.nextRunAt, before),
+					keysetStreamCursorFilter(schedule.nextRunAt, schedule.id, cursor)
 				)
-				.orderBy(schedule.nextRunAt, schedule.id)
-				.limit(limit);
-		},
+			)
+			.orderBy(schedule.nextRunAt, schedule.id)
+			.limit(limit);
+	},
 
-		async getByIdWithWorkflow(namespaceId: NamespaceId, id: string) {
-			const result = await db
-				.select({
-					schedule: getTableColumns(schedule),
-					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
-				})
-				.from(schedule)
-				.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
-				.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.id, id)))
-				.limit(1);
-			return result[0] ?? null;
-		},
+	async getByIdWithWorkflow(namespaceId: NamespaceId, id: string) {
+		const result = await db
+			.select({
+				schedule: getTableColumns(schedule),
+				workflow: {
+					workflowSource: workflow.source,
+					workflowName: workflow.name,
+					workflowVersionId: workflow.versionId,
+				},
+			})
+			.from(schedule)
+			.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
+			.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.id, id)))
+			.limit(1);
+		return result[0] ?? null;
+	},
 
-		async getByReferenceIdWithWorkflow(namespaceId: NamespaceId, referenceId: string) {
-			const result = await db
-				.select({
-					schedule: getTableColumns(schedule),
-					workflow: { workflowName: workflow.name, workflowVersionId: workflow.versionId },
-				})
-				.from(schedule)
-				.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
-				.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.referenceId, referenceId)))
-				.limit(1);
-			return result[0] ?? null;
-		},
-	};
-}
+	async getByReferenceIdWithWorkflow(namespaceId: NamespaceId, referenceId: string) {
+		const result = await db
+			.select({
+				schedule: getTableColumns(schedule),
+				workflow: {
+					workflowSource: workflow.source,
+					workflowName: workflow.name,
+					workflowVersionId: workflow.versionId,
+				},
+			})
+			.from(schedule)
+			.innerJoin(workflow, eq(schedule.workflowId, workflow.id))
+			.where(and(eq(schedule.namespaceId, namespaceId), eq(schedule.referenceId, referenceId)))
+			.limit(1);
+		return result[0] ?? null;
+	},
+});
 
 export type ScheduleRepository = ReturnType<typeof createScheduleRepository>;

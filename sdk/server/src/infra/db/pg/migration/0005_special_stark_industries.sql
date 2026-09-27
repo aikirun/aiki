@@ -1,0 +1,1 @@
+ALTER TABLE "schedule" ADD COLUMN "workflow_run_options" jsonb;

@@ -2,6 +2,1124 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.42.0
+
+`@aikirun/memory` is now published: a server and worker sharing one process get timer dispatch and work delivery without an external service. An event wait reports when it resolved. Two Redis connection hangs are fixed, and a missing `postgres` driver now names itself instead of failing inside a drizzle internal.
+
+### Breaking Changes
+
+- **An event wait result carries a timestamp.** `receivedAt` on the received branch, `timedOutAt` on the timeout branch. Reading the result is unaffected; a test double that constructs one needs the new field.
+
+  ```typescript
+  const result = await run.events.orderShipped.wait({ timeout: { minutes: 30 } });
+  const at = result.timeout ? result.timedOutAt : result.receivedAt;
+  ```
+
+### New Features
+
+- **`@aikirun/memory` is published.** `inMemoryQueue()` pairs a publisher and a subscriber over one in-process broker, and `inMemoryTimerPriorityQueue()` gives an embedded server the timer queue it otherwise lacks — without one, a short sleep or retry waits for the next database scan.
+
+  ```typescript
+  import { inMemoryQueue, inMemoryTimerPriorityQueue } from "@aikirun/memory";
+
+  const queue = inMemoryQueue();
+
+  const aikiServer = server({
+    db: database({ provider: "pg", url: databaseUrl }),
+    runtime: { publisher: queue.publisher },
+    timerPriorityQueue: inMemoryTimerPriorityQueue(),
+  });
+
+  const aikiWorker = worker({ workflows: [orderWorkflowV1], subscriber: queue.subscriber });
+  ```
+
+- **`inMemoryTimerPriorityQueue()` can be cleared.** Its `clear()` drops every queued timer and any wake they left pending. The factory's state outlives a server stop and start, so this is how that state is emptied.
+
+### Improvements
+
+- **A server started without a timer priority queue says so.** It logs a warning: runs may wake seconds later than expected, because due work is found by scanning the database on an interval.
+- **`DATABASE_MAX_CONNECTIONS` is optional.** Left unset, the pool size is the postgres driver's own default rather than Aiki's `10`. The `ssl` option is likewise absent when there is no CA cert, where an explicit `undefined` had been overriding the driver's default.
+
+### Bug Fixes
+
+- **A missing `postgres` driver names itself.** The guard that names the package to install sat below `import("drizzle-orm/postgres-js")`, which imports the driver itself and threw first with a Node resolution error pointing at a drizzle internal.
+- **The Redis timer waiter no longer deadlocks.** Its duplicated client waited for a first command before connecting, while the connection waited to be ready before sending one.
+- **The Redis ready handshake gives up.** A client that never starts connecting emits no events at all, so the handshake waited forever. It now rejects after the connection's own `connectTimeout`, naming the status it was stuck on.
+
+### Documentation
+
+- The install lists gain `postgres`, the driver for the `pg` provider that `@aikirun/server` declares as an optional peer dependency, and the installation page and quick start state that Aiki ships ESM only. A new troubleshooting section covers the macOS quarantine on a downloaded binary and reaching a database on the host from the container.
+
+## 0.41.1
+
+A run that goes to sleep, parks on a retry, or parks on an event or a child with a timeout now arms its wake-up timer as the transition commits, so a short wait fires on time instead of waiting for the next poll.
+
+### Improvements
+
+- **A parked run arms its own wake-up timer.** Transitioning a run into `sleeping`, `awaiting_retry`, `awaiting_task_retry`, or a timed wait on an event or a child queues that timer on commit when the wake-up falls inside the lookahead window. Only a run entering `scheduled` did this before, so a five-second sleep waited for the next poll of the daemon that scans for it — 10 seconds apart by default. A wait with no timeout has no timer; the event, or the child finishing, wakes the run.
+
+## 0.41.0
+
+This release reworks how a schedule catches up after a gap. A schedule counts what it owes from its stored next run and fires at most three occurrences per pass, arming its own timer for whatever is left, so a long backlog is worked through in batches rather than all at once. Schedule status changes are now validated transitions recorded as history: pausing a deactivated schedule is refused instead of silently applied, and activating a paused schedule leaves it paused. `trigger` is gone from the start options, replaced by a plain `delay`, and a duration is always an object — the raw-milliseconds form is no longer accepted. Three database migrations (`0038` through `0040`) ship with this release.
+
+### Breaking Changes
+
+- **`trigger` is replaced by `delay`.** A delayed start takes a duration directly, counted from the moment the run is created. The `TriggerStrategy` type and the `@aikirun/types/workflow/run/trigger` module are gone, and `{ type: "immediate" }` has no replacement — omit `delay` and the run is due immediately.
+
+  ```typescript
+  // Before
+  await notify.with("trigger", { type: "delayed", delay: { seconds: 5 } }).start(client, input);
+  await notify.with("trigger", { type: "delayed", delayMs: 5_000 }).start(client, input);
+
+  // After
+  await notify.with("delay", { seconds: 5 }).start(client, input);
+  ```
+
+- **A duration is always an object.** The `Duration` type — `number | DurationObject` — is removed from `@aikirun/lib/duration` and `@aikirun/workflow`. `run.sleep` and `toMilliseconds` take a `DurationObject` carrying at least one of `days`, `hours`, `minutes`, `seconds`, `milliseconds`.
+
+  ```typescript
+  // Before
+  await run.sleep("short-delay", 5_000);
+
+  // After
+  await run.sleep("short-delay", { milliseconds: 5_000 });
+  ```
+
+- **`StateTransition` no longer exists as a union.** `@aikirun/types/workflow/state-transition` exports `WorkflowRunStateTransition` and `TaskStateTransition` on their own; `StateTransitionBase`, `STATE_TRANSITION_TYPES`, and `StateTransitionType` are gone. `WorkflowRunListTransitionsResponseV1.transitions` is typed as the union of the two.
+
+  ```typescript
+  // Before
+  import type { StateTransition } from "@aikirun/types/workflow/state-transition";
+  function render(transitions: StateTransition[]) {}
+
+  // After
+  import type { TaskStateTransition, WorkflowRunStateTransition } from "@aikirun/types/workflow/state-transition";
+  function render(transitions: Array<WorkflowRunStateTransition | TaskStateTransition>) {}
+  ```
+
+- **Activating a paused schedule leaves it paused.** Only `resume()` ends a pause. Activation is otherwise idempotent as before, and a deactivated schedule still comes back on activation, recorded as `reactivated`.
+
+- **Activation no longer resets a schedule's next run.** A schedule picks up from the next run it was holding, so a reactivated schedule under `"allow"` works through the occurrences it missed while it was inactive. Attaching a reference id to an existing schedule leaves its next run untouched too.
+
+- **`pause()` and `resume()` are refused on a deactivated schedule.** Both fail with a 400 instead of silently succeeding; `activate()` is what brings a deactivated schedule back. Pausing an already-paused schedule, or deactivating an already-deactivated one, stays a no-op and writes no history.
+
+- **Three migrations ship with this release.** `0038` makes `schedule.next_run_at` `NOT NULL`. `0039` adds `schedule` to the `state_transition_type` enum. `0040` adds `schedule.latest_state_transition_id` (`NOT NULL`, backfilled with a minted transition row per existing schedule) and `state_transition.schedule_id`, makes `state_transition.workflow_run_id` and `attempt` nullable, and turns `state_transition.status` into a column generated from `state`.
+
+### New Features
+
+- **Schedules catch up in batches.** A schedule counts what it owes from its stored next run and fires at most `maxOccurrencesPerSchedule` occurrences per pass — default 3, under `daemons.imminentRecurringRuns`. Whatever is left stays due, and where a timer queue is configured the schedule arms a timer that is due at once, so the rest go on the next pass. With `overlapPolicy: "allow"` every missed occurrence runs, oldest first, whether the gap came from downtime or from the schedule being deactivated; `"skip"` and `"cancel_previous"` run only the most recent one, as before.
+
+- **A schedule arms its own next timer.** When the next occurrence falls inside the lookahead window, firing a schedule queues that timer on commit instead of leaving it to the next poll.
+
+- **Schedule status history.** Every status change is recorded as a `state_transition` row the schedule points at, and an active schedule carries the reason it became active: `activated` on creation, `resumed` from paused, `reactivated` from inactive. `ScheduleState`, `ScheduleStateActive`, `ScheduleStatePaused`, `ScheduleStateInactive`, `ScheduleActiveReason`, and `SCHEDULE_ACTIVE_REASONS` are exported from `@aikirun/types/schedule`. The history is stored but not yet served over the API or shown in the dashboard.
+
+### Improvements
+
+- **Schedule writes lock the row they matched.** Activation, pause, resume, and deactivation take `FOR UPDATE` on the matching schedule inside a transaction, so concurrent activations, a payload upgrade racing a reactivation, and a reference adoption racing a status change all settle on one schedule.
+
+- **`state_transition.status` is generated from `state`.** The database computes the column from the state it describes, so the two cannot disagree.
+
+- **Every table with `updated_at` is checked for its trigger.** A new integration test in `@aikirun/server` and `@aikirun/iam` fails if a table declares the column without the trigger that maintains it.
+
+### Bug Fixes
+
+- **Adopting a reference id no longer duplicates a schedule.** When the reference id was free and the definition already existed unreferenced, an activation that lost the race to attach it fell through and created a second schedule for the same definition. The locked lookup settles the race, and both activations return the same schedule.
+
+- **Adopting a reference id no longer activates a paused schedule.** Attaching a reference used to set the schedule active and reset its next run; it now records the activating client's payload and leaves the status alone.
+
+### Documentation
+
+- New **Delayed Start** section in the workflows doc. The schedules doc says what each overlap policy does with missed occurrences, and spells out that re-activating does not resume a paused schedule. The sleeps doc drops the milliseconds form. Endpoint publishing is marked coming soon across the README, the architecture docs, and the landing page, which also gains an "Infrastructure is optional" section.
+
+## 0.40.0
+
+This release lets a client bring its own codec, so payloads can be encrypted or compressed end to end without the server knowing, and adds a `priority` run option. A run whose task is waiting out a retry delay now has its own status instead of sitting in `running`. Inputs, outputs, and event data that are not plain JSON are rejected at compile time, with the offending path in the error. Under load, run creation no longer serializes on the workflow row, bulk transitions lock rows in id order, and every daemon works through its pages in bounded concurrent chunks. The dashboard is usable at phone width. Nine database migrations (`0029` through `0037`) ship with this release.
+
+### Breaking Changes
+
+- **Non-serializable inputs, outputs, and event data fail to compile.** `task()` and `workflow.v()` check every input, output, and event data type. A `Date`, `Map`, `Set`, `bigint`, function, class instance, or `any` anywhere inside them is a compile error naming the path. The `Serializable` type is no longer exported from `@aikirun/workflow`.
+
+  ```typescript
+  const fetchOrder = task({
+  	name: "fetch-order",
+  	async handler(orderId: string) {
+  		return { orderId, placedAt: new Date() };
+  	},
+  });
+  // error: ... '{ "Aiki: not serializable": "output.placedAt is Date" }'
+  ```
+
+- **Run, task, and event records no longer carry type parameters.** `WorkflowRunRecord<Input, Output>`, `WorkflowRunState<Output>`, `TerminalWorkflowRunState<Output>`, `WorkflowRunStateCompleted<Output>`, `TaskRecord<Input, Output>`, `TaskState<Output>`, `TaskStateCompleted<Output>`, and `EventWait<Data>` are all non-generic. A stored `input`, `output`, or event `data` is typed `OpaquePayload` — the form the server holds, which a codec may have transformed — so it cannot be read as the domain type off a record. Decoded, typed values arrive where the SDK hands them to you: the handler's `input`, a task's return value, an event waiter's `data`, and the `state.output` of a `wait()` result.
+
+- **`WorkflowRunHandle` and `WorkflowRun` dropped their `Input` type parameter.** `WorkflowRunHandle<Input, Output, Context, TEvents>` is now `WorkflowRunHandle<Output, Context, TEvents>`, `ChildWorkflowRunHandle` likewise, and the `run` a handler receives is `WorkflowRun<Context, TEvents>`.
+
+  ```typescript
+  // Before
+  function report(run: WorkflowRun<OrderInput, MyContext>) { ... }
+  let handle: WorkflowRunHandle<OrderInput, OrderOutput, MyContext>;
+
+  // After
+  function report(run: WorkflowRun<MyContext>) { ... }
+  let handle: WorkflowRunHandle<OrderOutput, MyContext>;
+  ```
+
+- **`attempts` moved off task states onto the task.** `TaskInfo` and `TaskRecord` carry `attempts` and `options` at the top level; `TaskStateRunning`, `TaskStateCompleted`, `TaskStateFailed`, `TaskStateAwaitingRetry`, and `TaskStateDiscarded` no longer have `attempts`. On the wire, `task.transitionStateV1` names its state `state` instead of `taskState`, takes `attempts` beside it, and the `retry` variant carries only `id` and `attempts`.
+
+  ```typescript
+  // Before
+  taskInfo.state.attempts
+
+  // After
+  taskInfo.attempts
+  ```
+
+- **Workflow stats are gone from the API.** `workflow.getStatsV1` is removed with no replacement. `workflow.listV1` and `listVersionsV1` no longer take `sort`, and their items no longer carry `runCount`, `lastRunAt`, or `firstSeenAt`. The `Workflow`, `WorkflowVersionStats`, `WorkflowStats`, `WorkflowGetStatsRequestV1`, and `WorkflowGetStatsResponseV1` types are removed.
+
+- **The API contract declares what the client applied.** `workflowRun.createV1` and `schedule.activateV1` require `clientHasherApplied` and `clientCodecApplied`; `sendEventV1`, `multicastEventV1`, and `multicastEventByReferenceV1` require `clientCodecApplied`. Run, schedule, and event-wait records carry the same flags. Upgrade the server and SDKs together.
+
+- **Server runtime config: `limit` is now `pageSize`, and `daemons.imminentRetryableTasks` is now `daemons.imminentTaskRetryableRuns`.** This applies to every daemon block in `ServerRuntimeConfigOverrides` and to `dueTimersConsumer`; an override under an old key is ignored. The daemon's log and span name changes from `process-imminent-retryable-tasks` to `process-imminent-task-retryable-runs`.
+
+  ```typescript
+  // Before
+  staticRuntimeConfigProvider({ daemons: { imminentRetryableTasks: { limit: 500 } } });
+
+  // After
+  staticRuntimeConfigProvider({ daemons: { imminentTaskRetryableRuns: { pageSize: 500 } } });
+  ```
+
+- **A sleep must be a whole number of milliseconds, at most ten years.** The server now enforces on `transitionStateV1` what the SDK already enforced, so a fractional or longer `durationMs` is rejected.
+
+- **A fenced-out worker sees a revision conflict.** A state transition with a stale `expectedRevision` fails with `WorkflowRunRevisionConflictError` before the transition's legality is checked, where it could previously surface as `InvalidWorkflowRunStateTransitionError`.
+
+### New Features
+
+- **Bring your own codec.** `client({ codec })` takes a `CreateCodec`. The SDK runs `encode` over workflow input, task input and output, workflow output, event data, and schedule input before they leave the process, and `decode` on the way back, so the server only ever sees the encoded form. Every record declares whether the client's codec was applied, and a worker honours the declaration: a run written with a codec is executed only by a worker that has one, and a worker without it logs `ClientCodecMissingError` and leaves the run for another. Event data decodes by its sender's declaration, not the run's, so a client with a codec can send to a run created by one without. The `Codec` and `CreateCodec` types live in `@aikirun/types/infra/codec`, and `OpaquePayload` in `@aikirun/types/payload`.
+
+  ```typescript
+  const aiki = client({
+  	url: "http://localhost:9876",
+  	codec: ({ logger }) => ({
+  		encode: async (payload) => encrypt(payload),
+  		decode: async (payload) => decrypt(payload),
+  	}),
+  });
+  ```
+
+- **Run priority.** `.with("priority", n)` on a workflow version, integer 0 (highest) to 9 (lowest), default 5. It breaks dispatch ties among runs due in the same millisecond and never moves a run ahead of its due time. It follows the run through wakeups, retries, and event resumptions, travels through schedules like `retry` and `pool`, and a child run inherits it unless it sets its own.
+
+  ```typescript
+  const handle = await orderWorkflowV1.with("priority", 2).start(client, { orderId: "123" });
+  ```
+
+- **`awaiting_task_retry` run status.** A run whose task is waiting out a retry delay longer than the worker's inline wait budget is parked in `awaiting_task_retry` with `nextAttemptAt`, instead of staying `running`. The task-retry scanner queues it when the earliest task retry is due, and it can be cancelled while parked. Shorter delays are still waited out in place. Migration `0032` moves runs already in this situation and bumps their revision, so a worker still holding one is fenced out.
+
+- **Hasher rotation announcements.** A `Hash` can carry `nextValue`, the hash under a rotation the hasher has been told about but has not switched to. The server matches it like `value` when deduplicating runs by reference and reusing schedules, but never stores it, so instances on either side of a rotation keep finding each other's records.
+
+### Web UI
+
+- **The dashboard works at phone width.** Below tablet width the sidebar floats over the page and closes after navigation; page and card padding shrink; the run detail header, tabs, and loading skeleton stay inside their cards; filter rows, member rows, and schedule rows wrap instead of collapsing; long IDs and names truncate or break instead of overflowing. iOS no longer zooms into form fields, and overscroll no longer triggers pull-to-refresh.
+
+- **Awaiting Task Retry** appears as a status in the runs filter, badges, and timeline.
+
+### Improvements
+
+- **Run creation no longer serializes on the workflow row.** Concurrent starts of the same workflow used an upsert that locked the row and left dead tuples on every call; the workflow row is now looked up and inserted with `ON CONFLICT DO NOTHING`.
+
+- **Bulk transitions lock rows in id order.** Every bulk update sorts its rows before writing, so daemons updating overlapping sets cannot deadlock each other.
+
+- **Every daemon processes pages in bounded chunks.** Each polling daemon and the outbox publish, recover, and stall daemons split a page into `chunk.size` chunks and run `chunk.maxConcurrency` at a time (defaults 100 and 10), configurable per daemon.
+
+- **Status-keyed indexes are partial.** The due-run and due-schedule indexes are keyed on the time column with a status predicate (migration `0029`), keeping them small on tables dominated by terminal rows.
+
+- **Queue fills start at a random queue.** The in-memory and Redis subscribers begin each round-robin fill at a random position, so the first workflow and pool in a worker's list no longer wins every fill.
+
+- **A child run keeps its own pool.** A child workflow that sets `pool` now runs there; previously the parent's pool overrode it. Without one of its own it inherits the parent's, as before. `priority` follows the same rule.
+
+- **Schedules store their activation payload as one unit.** Input, input hash, and the codec and hasher declarations are written together, so a reused schedule never mixes one client's input with another's hash, and a schedule already recorded under the newer hash rotation is not rewritten. Due occurrences and the next run time are computed in a single walk of the spec.
+
+- **Input hashing is cheaper.** `stableStringify`, on the path of every input hash, is about twice as fast on large inputs.
+
+- **The dashboard deploys independently of a release.** The Deploy dashboard workflow takes an optional `ref` (blank for `main`, or a tag), so a dashboard-only fix ships without cutting a version. The hosted server stays on the last release, so a `main` deploy must not depend on unreleased server APIs.
+
+### Bug Fixes
+
+- **A task's first-run output matches its replay.** The value a task handler returns now goes through a JSON round trip before the workflow sees it, so a field that is `undefined` is absent on the first run as well as after a replay.
+
+- **Two inputs differing only in a `Date` no longer hash the same.** `stableStringify` serialized any non-plain object as `{}`, so inputs that differed only in a `Date`, `Map`, or `Set` deduplicated into one run. It now throws for those values, which the compile-time check catches first in TypeScript.
+
+### Documentation
+
+- New **Inputs and Outputs** and **Priority** sections in the workflows doc, with the tasks and events docs linking to them. The schedules doc now lists `"skip"` as the default overlap policy, which is what the server has always done. The home page event snippet sends straight from the workflow version.
+
+## 0.39.0
+
+This release closes the race that could lose a wake-up signal on a waiting run, collapses the option builders into a single `with`, and lets a client bring its own input hasher. A run now carries a signal sequence, every write into a waiting state is guarded on it, and a terminal child run signals its parent the moment it finishes. `waitForStatus` becomes `wait`, resolving on whichever terminal status the run reaches. The dashboard and the website now share one design language. Six database migrations (`0022` through `0028`) ship with this release.
+
+### Breaking Changes
+
+- **The option builders collapsed into `with`.** Everything that took `.with().opt(path, value)` — workflow versions, tasks, workers, schedules, event senders, event multicasters — now takes `.with(path, value)` directly. Each call sets one option and returns a copy; the original is unchanged.
+
+  ```typescript
+  // Before
+  await notify.with().opt("trigger", { type: "delayed", delay: { seconds: 5 } }).start(client, input);
+
+  // After
+  await notify.with("trigger", { type: "delayed", delay: { seconds: 5 } }).start(client, input);
+  ```
+
+  The builder types (`WorkflowBuilder`, `TaskBuilder`, `WorkerBuilder`, `ScheduleBuilder`, `EventSenderBuilder`, `EventMulticasterBuilder`) are gone. Setting an option about one particular run (`reference`, `trigger`) on a workflow version returns a `WorkflowVersionStart` — that single start and nothing else. A schedule or a worker will not accept it: a schedule mints its own starts, and a worker executes runs that already exist.
+
+- **Schedules no longer take `workflowRun.*` option paths.** A schedule's `with` sets `ScheduleActivateOptions` only. The runs it fires carry the options of the workflow version handed to `activate` — configure those with the workflow's own `with`.
+
+- **`waitForStatus` is now `wait`, and any terminal status resolves it.** On run handles and child-run handles. There is no target status argument and no `"run_terminated"` outcome — the result carries the terminal state, and `state.status` says which. Without `timeout` or `signal` options the wait always succeeds, so you can go straight to the state.
+
+  ```typescript
+  // Before
+  const result = await handle.waitForStatus("completed");
+  if (result.success) console.log(result.state.output);
+
+  // After
+  const result = await handle.wait();
+  if (result.state.status === "completed") console.log(result.state.output);
+  ```
+
+- **Manual task writes are completion-only.** `task.setStateV1` writes a completed or failed state onto an existing task named by `id`; the `type: "new"` variant that minted a task on the fly is gone, along with `TaskSetStateRequestNew` and `TaskSetStateRequestExisting`. The write is validated against the task state machine and rejected once the run itself has terminated.
+
+- **The cancelled state's `reason` is now `explanation`.** On `WorkflowRunStateCancelled`.
+
+- **Run records carry their waits differently.** `WorkflowRunRecord` gains `signalSequence` and a record-level `childWorkflowRunWaits` map keyed by child run id; `ChildWorkflowRunInfo.waits` and the `ChildWorkflowRunWait*` types are gone. This affects code reading run records directly.
+
+- **The API contract moved to hash objects and sequence guards.** `workflowRun.createV1` and `schedule.activateV1` take a `Hash` (`{ value, deprecatedValues? }`) instead of a string, `activateV1` requires `workflowRunInputHash` (the client computes it now), a `transitionStateV1` into a waiting state requires `expectedSignalSequence`, and the multicast procedures return a result body. Upgrade the server and SDKs together.
+
+- **Renamed and removed types.** `WORKFLOW_RUN_SCHEDULED_REASON` is now `WORKFLOW_RUN_SCHEDULED_REASONS`, `WorkflowDefinitionStartOptions` is gone (a version's defaults are plain `WorkflowRunOptions`), and `TerminalWorkflowRunState` takes an `Output` type parameter.
+
+### New Features
+
+- **Bring your own input hasher.** `client({ hasher })` accepts a custom hasher for workflow and task input hashing; the built-in SHA-256 hasher remains the default. A `Hash` can carry `deprecatedValues` — prior hashes that still identify the same definition — and the server accepts a deprecated hash when starting a run or activating a schedule, so a hash algorithm can change without breaking replay or run deduplication. A worker resolves the hasher bound to each run's recorded hash before executing it.
+
+- **Event multicast reports per-run outcomes.** `events.<name>.send(...)` and `sendByReferenceId(...)` on a workflow version resolve with `{ sentIds, failedIds }` instead of `void`, so one unreachable run no longer hides which of the others got the event.
+
+### Web UI
+
+- **The dashboard wears the marketing site's design language.** New theme, typography, sidebar, and status treatment, and a reworked execution tab on the run detail page. Routes are unchanged; a set of dead components was removed along the way.
+
+- **The website landing page was redesigned**, and the dashboard demo was re-recorded on the new design — shipped as mp4/webm with a poster instead of a 7 MB gif.
+
+### Improvements
+
+- **Errors carry their own code and status.** SDK errors extend a new `AikiError` base with a stable `code` (`NOT_FOUND`, `CONFLICT`, …) and an HTTP `status`; `asAikiError(err)` narrows an unknown error to one. Server error handlers map them uniformly.
+
+- **Terminal child runs signal their parents.** A delivery service wakes a waiting parent the moment its child reaches a terminal state, instead of the parent discovering it on its next poll.
+
+- **Daemon names are pinned.** Daemons register kebab-case names (`process-imminent-scheduled-runs`, …) instead of inferring them from function names, so log and metric labels survive bundling. Worker logger metadata now separates `component` from `subComponent`.
+
+### Bug Fixes
+
+- **Lost wake-ups on event and child waits.** A signal landing while a run was writing its `awaiting_event` or `awaiting_child_workflow` state could be swallowed, parking the run until its timeout. Every write into a waiting state is now guarded on the run's signal sequence, so a concurrent signal forces the write to retry and observe it.
+
+- **`runConcurrently` throws even when its first error settles as `null`.** Errors that cannot propagate to the caller are logged instead of vanishing.
+
+### Documentation
+
+- The workflows doc gains a state-transition table and an explanation of how cancellation behaves. The repository now has a Contributor License Agreement with a CI check.
+
+## 0.38.0
+
+A sleeping run can now be woken from the dashboard.
+
+### Web UI
+
+- **Wake a sleeping run.** A run's detail page shows a Wake action while the run is sleeping, alongside Pause, Requeue, and Cancel. It schedules the run immediately and cancels the pending sleep — the same early wakeup `handle.wakeup()` performs from the SDK.
+
+## 0.37.1
+
+A completed task read back through `task.getByIdV1` lost its `output` key when the task completed without an output, which failed the response contract.
+
+### Bug Fixes
+
+- **`task.getByIdV1` returns the `output` key on completed tasks.** The task read path returned the stored state column verbatim instead of normalizing it. Postgres drops `undefined` values on write, so a task that completed with no output came back as `{ status: "completed", attempts: 1 }` — no `output` key — and the response failed validation against the completed-state schema, which requires it. The state is now normalized on read, so `output` is present and `undefined`.
+
+## 0.37.0
+
+This release cuts the delay between creating a run and a worker starting it, and hardens the writes that guard a run's ownership. A run parked for immediate pickup now hands its timer to the priority queue the moment its transaction commits instead of waiting for a poll tick, and the standalone server always runs such a queue — Redis-backed when `REDIS_URL` is set, in-process otherwise. Outbox delivery gains a lease and a backoff on every publish outcome, so replicas stop re-offering batches another replica is already sending. Tasks get their own API namespace, with input stored once on the task row and detail fetched on demand. Task, child-run, and schedule-occurrence writes are now compare-and-set, and a stalled run can finally be requeued. Two vocabulary changes run through the whole surface: `shard` is now `pool`, and `awake` is now `wakeup`. Database migrations `0013` through `0021` ship with this release.
+
+### Breaking Changes
+
+- **`shard` renamed to `pool`.** A named group of workers is a pool, not a shard — nothing is partitioned by key. Migration 0014 renames the outbox column and converts the key in stored run and schedule options.
+
+  ```typescript
+  // Before
+  await orderWorkflowV1.with().opt("shard", "us-east").start(client, input);
+  myWorker.start(client, { shards: ["us-east"] });
+
+  // After
+  await orderWorkflowV1.with().opt("pool", "us-east").start(client, input);
+  myWorker.start(client, { pools: ["us-east"] });
+  ```
+
+  Custom publishers and subscribers are affected too: `ReadyWorkflowRun.shard` is now `pool`, `SubscriberContext.shards` is now `pools`, and the claim request's `shards` filter is now `pools`.
+
+- **`handle.awake()` renamed to `handle.wakeup()`.** The lexeme is unified on "wakeup" across the surface: the sleeping state's `awakeAt` is now `wakeupAt`, and the scheduled reason `awake_early` is now `wakeup_early`. Migrations 0013 and 0015 rename the columns and convert the stored state JSON.
+
+  ```typescript
+  // Before
+  await handle.awake();
+  if (run.state.status === "sleeping") console.log(run.state.awakeAt);
+
+  // After
+  await handle.wakeup();
+  if (run.state.status === "sleeping") console.log(run.state.wakeupAt);
+  ```
+
+- **Task write endpoints moved to the task API.** `workflowRun.transitionTaskStateV1` is now `task.transitionStateV1` and `workflowRun.setTaskStateV1` is now `task.setStateV1`. In the new requests `id` names the task and `workflowRunId` names the run. The request and response types moved from `@aikirun/types/workflow/task` to `@aikirun/types/api/task`.
+
+  ```typescript
+  // Before
+  await client.api.workflowRun.transitionTaskStateV1({ type: "retry", id: runId, taskId, expectedWorkflowRunRevision, taskState });
+
+  // After
+  await client.api.task.transitionStateV1({ type: "retry", id: taskId, workflowRunId, expectedWorkflowRunRevision, taskState });
+  ```
+
+- **`TaskStateRunning` no longer carries `input`**, and `TaskState` is generic over `Output` only. Task input is written once to the task row instead of into every running-state transition; a create request carries `input` and `inputHash` at the top level and no `attempts` (the server sets the first attempt to 1), and a retry request carries no input. The run record and the transitions listing no longer include task input — read it with `task.getByIdV1`.
+
+  ```typescript
+  // Before
+  interface TaskStateRunning<Input> { status: "running"; attempts: number; input: Input }
+
+  // After
+  interface TaskStateRunning { status: "running"; attempts: number }
+  ```
+
+- **Run record collections are flat.** The one-field wrapper types are gone; each collection is a `Record<string, T[]>` keyed by address, and a child run's per-status waits live under `waits`.
+
+  ```typescript
+  // Before
+  Object.values(run.taskQueues).flatMap((queue) => queue.tasks);
+  child.childWorkflowRunWaitQueues["completed"].childWorkflowRunWaits;
+
+  // After
+  Object.values(run.tasks).flat();
+  child.waits["completed"];
+  ```
+
+  `sleepQueues` → `sleeps`, `eventWaitQueues` → `eventWaits`, `childWorkflowRunQueues` → `childWorkflowRuns`. Migration 0016 renames the matching tables (`sleep_queue` → `sleep`, `event_wait_queue` → `event_wait`, `child_workflow_run_wait_queue` → `child_workflow_run_wait`).
+
+- **Run options are split into what the run keeps and what the create call consumes.** `WorkflowRunOptions` holds `retry` and `pool` — the values read for the rest of the run's life. `WorkflowStartOptions` extends it with `trigger` and `reference`, which the create call turns into `scheduledAt` and a `reference_id` column. The row and the record now store only `WorkflowRunOptions`, and both runs and schedules expose the reference as a plain `referenceId`. `ScheduledWorkflowStartOptions` is deleted — a schedule stores the same `WorkflowRunOptions` for the runs it mints.
+
+  ```typescript
+  // Before
+  run.options?.reference?.id;
+  schedule.options?.reference?.id;
+
+  // After
+  run.referenceId;
+  schedule.referenceId;
+  ```
+
+  The migration drops the `conflict_policy` column from both `workflow_run` and `schedule` (nothing read it) and strips `reference` and `trigger` from stored run options.
+
+- **Creating a child run must present the parent's revision**, and input hashing moved to the caller. Naming a parent without proving your view of it no longer typechecks, so a worker that has already lost the run cannot create children.
+
+  ```typescript
+  // Before
+  await client.api.workflowRun.createV1({ name, versionId, input, parentWorkflowRunId });
+
+  // After
+  await client.api.workflowRun.createV1({ name, versionId, input, inputHash, parent: { workflowRunId, expectedRevision } });
+  ```
+
+- **Scheduled and queued reasons changed.** `WorkflowRunScheduledReason` drops `retry`, `task_retry`, and `wakeup` — nothing produced them and the validator rejected them from every origin — and gains `redelivery`. `WorkflowRunQueuedReason` gains `event_wait_timeout` and `child_workflow_wait_timeout`, so a wait that times out no longer claims an event arrived. Renames across both unions: `resume` → `resumption`, `awake` → `wakeup`, `awake_early` → `wakeup_early`, `recovered` → `recovery`. The optimistic scheduled transition request narrows to reasons `event | child_workflow`, and `stalled` moves from the optimistic to the pessimistic branch of `transitionStateV1`. Migration 0015 converts the reasons already stored in the transition history.
+
+- **The state machine rejects `stalled → queued`.** Every path into `queued` mints the run's outbox row in the same transaction, so honoring the direct edge would have produced a queued run with no row — invisible to publish, claim, recovery, and the retention sweep alike. Requeueing a stalled run is `stalled → scheduled` with reason `redelivery`.
+
+- **`Publisher` contract changed** — only relevant if you implement a custom queue adapter. `publishReadyRuns` is now `publishRuns`, and each result bucket is an object wrapping its `runs` array so a bucket can later carry facts about itself without breaking implementations again.
+
+  ```typescript
+  // Before
+  publishReadyRuns(runs): Promise<PublishRunsResult>;
+  type PublishRunsResultBucket = Array<{ run: ReadyWorkflowRun }>;
+
+  // After
+  publishRuns(runs): Promise<PublishRunsResult>;
+  interface PublishRunsResultBucket { runs: Array<{ run: ReadyWorkflowRun }> }
+  ```
+
+- **`TimerPriorityQueue` contract changed** — only relevant if you implement a custom timer queue. The contract now speaks one currency, rank: a `TimerEntry` no longer carries `dueAt`, and a wake carries the batch's minimum rank. `null` replaces the `0` sentinel, since rank `0` is a real value.
+
+  ```typescript
+  // Before
+  interface TimerEntry { type: TimerType; id: string; dueAt: number; rank: number }
+  popDue(maxRank: number, limit: number): Promise<DueTimer[]>;
+  peekNextRank(): Promise<number | null>;
+  createSignalWaiter(): TimerSignalWaiter;                    // wait(): Promise<number>
+
+  // After
+  interface TimerEntry { type: TimerType; id: string; rank: number }
+  popDue(params: { maxRank: number; limit: number }): Promise<DueTimer[]>;
+  peekNext(): Promise<{ rank: number } | null>;
+  createWaiter(): TimerPriorityQueueWaiter;                   // wait(): Promise<{ rank: number } | null>
+  ```
+
+  Closing a waiter is now part of the contract: it resolves a parked wait with `null`. `TimerPriorityQueueContext.signal` is optional.
+
+- **`timerPriorityQueue` moved from `ServerRuntimeParams` to `ServerParams`**, so the request handler and the runtime share one queue and both halves can enqueue.
+
+  ```typescript
+  // Before
+  server({ db, runtime: { publisher, timerPriorityQueue } });
+
+  // After
+  server({ db, timerPriorityQueue, runtime: { publisher } });
+  ```
+
+- **Redis configuration is a single URL.** `REDIS_HOST`, `REDIS_PORT`, and `REDIS_PASSWORD` are replaced by `REDIS_URL`, whose presence is also the enable toggle — previously setting only `REDIS_PASSWORD` left the server silently running without Redis. Host, port, password, and db index all ride the URL, and TLS comes free through the `rediss://` scheme.
+
+  ```typescript
+  // Before
+  redisSubscriber({ host, port, password, db });
+
+  // After
+  redisSubscriber({ url: "redis://:password@host:6379/0" });
+  ```
+
+- **Server runtime config: the publish daemon is renamed and the polling cadence relaxed.** `daemons.publishReadyRuns` is now `daemons.publishPendingOutboxEntries`, gaining `leaseDurationMs` (default 5s) and `republishBackoff.declinedBackoffMs` (default 30s). Default daemon intervals move from 1s to 10s and promoter lookaheads from 3s to 30s, because the request path now carries the latency — **a deployment with no timer priority queue will see slower pickup**; configure a queue or tighten the intervals. `StartDaemonsDeps.workflowRunPublisher` is now `publisher`.
+
+- **Workflow identity now includes its source.** `source` (`user` or `system`) travels with name and version through the outbox, the claim request, the dispatch queue name, and the SDK registry, so Aiki's own workflows can no longer collide with yours. The dispatch queue name gains a source segment (`order-processing:1.0.0` → `user:order-processing:1.0.0`), the claim request sends a source per workflow, the schedule response returns one, and registry methods (`add`, `addMany`, `remove`, `removeMany`, `get`) take a source as their first argument. **The `aiki:` name prefix is gone** — source does the separating. Migration 0018 adds the outbox column, backfills it through each row's run, and rebuilds the claim index.
+
+  Two consequences on upgrade: runs sitting in the old queue keys are returned to pending by the recovery daemon and republished under the new keys, and in-flight cancellation-cascade runs stall, because their rows still name `aiki:cancel-child-runs`. Renaming those rows would make them deliverable and then fail them on replay — a task's identity includes its name — so stalling is the better failure.
+
+- **`WorkflowRunConflictError` renamed to `WorkflowRunReferenceConflictError`.** The conflict is on the run's reference, not the run.
+
+- **`WorkflowRunListChildRunsRequestV1` fields renamed:** `parentRunId` → `id`, `status` → `childRunStatus`.
+
+- **Executor-plumbing barrel exports removed from `@aikirun/workflow`:** `createEventSenders`, `createEventWaiters`, `workflowRunHandle`, `createReplayManifest`, and `createSleeper`. They had no consumers outside the package.
+
+### New Features
+
+- **A task API namespace with on-demand detail.** `task.getByIdV1({ id })` returns the task record — input from the row, options, and the latest state — in one query that joins the task to its run and to its latest transition. Because task input now lives on the task row, a *finished* task's input is readable for the first time; previously it was buried in the running state and dropped at the first terminal transition.
+- **Requeue a stalled run.** Requeue rides the scheduled route the same way Resume does: `stalled → scheduled`, due immediately, reason `redelivery`. The scheduled-runs producer then promotes the run and mints a fresh `pending` outbox row, so the producers remain the only writers of outbox rows and the requeued run gets the full `maxAgeMs` again — a new delivery episode, not a resumed one. It charges no execution attempt.
+- **The standalone server always runs a timer priority queue** — Redis-backed when `REDIS_URL` is set, in-process otherwise. Previously the choice was Redis or nothing, and a no-Redis deployment fired every timer (sleeps, retries, schedules, wait timeouts) up to one scan interval late. Multi-instance deployments should still use Redis: per-instance in-process queues hold the same timers, so all instances wake at the deadline and one transition wins while the rest match nothing — correct, but duplicated.
+- **Eager creation-time promotion of imminent runs.** The request that parks a due-soon run already knows what the poll would later rediscover, so the parking write hands the timer to the priority queue itself and the poll becomes a backstop. Pickup drops from a poll tick to under 100ms. The add fires strictly after commit — a rolled-back run must not wake the consumer — via a new `onCommit` hook on transaction repositories, and is not awaited, because a failed add costs latency only. Runs due beyond a lookahead window are skipped; the window is the new `ServerHandlerConfig.imminentRuns.lookaheadWindowMs` (default 30s) on `ServerHandlerParams.config`.
+- **An exportable timer priority queue conformance suite.** The tests that define what the server expects from a queue now ship from `@aikirun/testing/infra/timer` as `timerPriorityQueueTestSuite`, taking the caller's test framework and a per-test lifecycle combinator as arguments. bun:test, vitest, and jest all satisfy the `{ describe, test, expect }` shape structurally. Aiki's own in-memory and Redis adapters bind it in their own packages, so the published tests and the enforced tests cannot drift. It certifies pop ordering, due cutoffs, and waiter wake semantics — not durability, reconnects, or concurrent consumers, which stay the implementer's job.
+- **`WorkflowRunRecord` exposes `source`,** and schedules return their workflow's source. The activate request still does not take one: the server pins new schedules to `user`, so a client cannot write into Aiki's half of the namespace.
+
+### Web UI
+
+- **Task cards fetch their detail on open.** Every card expands now, showing Input, Output or Error, and Options. The detail query's key includes the task's status and attempts from the polled run record, so an open card refetches exactly when the poll sees the task change, and an unchanged task never refetches.
+- **A Requeue button on the run page,** shown for stalled runs beside Cancel.
+- **The timeline tells a wait timeout from an arrival** using the new `event_wait_timeout` and `child_workflow_wait_timeout` reasons, instead of joining the wait record to work it out. Rows written before the split are still classified the old way.
+- Reference badges on runs and schedules read the new `referenceId` field, and the schedule metadata row shows **Pool** where it showed Shard.
+
+### Improvements
+
+- **A publish pass leases the rows it takes.** Every server replica scanned the same pending outbox rows on every tick and offered the same runs to the broker. The revision compare-and-set made the duplicates harmless, but each one was a wasted broker send, and a pass that died mid-send left nothing behind to time a retry against. A pass now marks the rows it took as not due again for `leaseDurationMs` (default 5s) before offering them, so the other replicas skip them. Nothing has to repossess an expired lease — the row simply becomes due again, and the duplicate send that follows is absorbed the same way it always was.
+- **A backed-off row costs the delivery scan nothing.** The scan has to do two things at once: skip rows whose retry time has not arrived, and take the first N of the rest in dispatch order. A timestamp column could serve one or the other, not both — so with the broker down, every tick walked the entire pending set just to skip it. The retry time is now stored in the same units as the dispatch order (`next_publish_attempt_at` becomes `next_publish_attempt_rank`, migration 0017), which lets one index serve both: the scan reads from the front, everything it meets is due and already in order, and it stops at the limit. The row's own `rank` is left untouched, so a broker backoff can never reorder a run or hide it from the workers that poll for work directly.
+- **Every publish outcome now schedules its retry.** Previously only `published` wrote anything, so a `deferred`, `failed`, or `declined` row was re-offered on the very next tick: failing publishes had no backoff, and the retry time a transport returned for a deferred run was ignored. `deferred` now honors the transport's time, `failed` follows the age-derived curve, and `declined` waits a fixed `declinedBackoffMs` — a decline is a routing gap that clears by external change, not a struggling dependency to back off from.
+- **The timer queue wakes the consumer only on a new earliest.** A timer that is not the new front is already covered by the wake the consumer has scheduled, so backstop re-adds — the bulk of all adds — now stay silent, removing a wake plus a round-trip each on the Redis adapter.
+- **Polling daemons keep a minimum gap and jitter it.** A tick that runs longer than the interval used to leave a negative delay, so the daemon scanned again immediately — hitting the database hardest exactly when it was slowest. The floor is 20% of the interval and the jitter is ±10%, which also drifts daemons that started together out of lockstep.
+- **A checked run revision is pinned through commit.** Task transitions and child creation check the revision without incrementing it, so they now hold a share lock on the run row until commit. The share lock does not block other checkers — parallel task writes in one session still proceed together — and only blocks a run transition, which writes the run row exclusively.
+- **Reading a run record takes 6 queries in 2 steps** instead of 11 in 5: the header joins run, workflow, and latest state, and each collection read joins its own states. The cancel, stall, and release updates return the values they already knew instead of re-reading rows inside their own transaction, and every query selects only the columns its callers use.
+- **Namespace filters live in the repository.** Namespaced methods take a filter object that includes the namespace (`getById({ namespaceId, id })`) so it cannot be forgotten, and cross-namespace methods take a `DaemonContext` first, so only daemons can call them.
+
+### Bug Fixes
+
+- **A cron schedule's timezone is now stored.** It was accepted by the API and hashed into the definition, but the table had no column for it, so every read rebuilt the spec without it and the daemon parsed the expression in the server's default zone. Nothing failed; the schedule just fired at the wrong time. A new nullable `cron_timezone` column fixes it going forward — existing rows cannot be backfilled, because the value was never stored, and keep firing in the server's default zone until re-activated.
+- **Two impossible schedule rows no longer become dangerous specs.** A cron row with no expression used to read back as `expression: ""`, which throws inside the daemon, and an interval row with no interval as `everyMs: 0`, which blocks the occurrence computation loop. A check constraint now pairs each schedule type with its spec columns, and the row-to-domain mapper throws on a missing column instead of defaulting.
+- **A stalled schedule pass can no longer un-skip an occurrence.** The occurrence update matched on the schedule id alone, so a pass that computed a `nextRunAt` and then stalled could commit it after a later pass had already moved the schedule forward — leaving the schedule due again and, if the active run finished first, creating a run for an occurrence the `skip` overlap policy had already dropped. Each update now carries the `nextRunAt` it read and applies only if the row still holds it.
+- **Task writes no longer overwrite each other from stale reads.** Each writer — the task state machine, `setTaskState`, and the stale-task discard on cancel/stall/retry — read a task, validated the transition, then wrote with a filter of `(id, workflowRunId)`, which applied regardless of what the row held by then; a discard could land on a task that had just completed. `(status, attempts)` is a complete version key for a task (the only transition that keeps the status is a retry, which bumps attempts), so every write now carries the read-time pair and throws `TaskStateConflictError` (409) when it matches nothing. The discard path appends history only for the ids it actually discarded.
+- **A task can no longer be read or written across tenants.** The task write endpoints verified the caller's run but then fetched the task by bare id, so a caller holding any run of their own could transition a foreign tenant's task. The repository methods now require `workflowRunId` alongside `id`, and `getByIdV1` joins through the run filtered by the caller's namespace, making a foreign task indistinguishable from a missing one.
+- **Cancelling runs by id no longer touches other namespaces.** The ids fed a namespace-blind bulk update, while the read that appends the cancel transition was namespace-scoped — so a foreign run ended up cancelled with its latest recorded transition still describing the old state. The daemon path that cancels by its own query keeps a global variant.
+- **Cancelling a run finalizes its active sleep.** The `sleeping → cancelled` transition now cancels the sleep row the same way an early wakeup does, and both bulk cancel paths do the same beside their task and outbox cleanup.
+- **`waitForStatus` honors its timeout as wall-clock time.** The budget was approximated as `ceil(timeout / interval)` poll attempts, so API latency stretched the wait past what was asked for. The loop now tracks a deadline, caps its last sleep to the remaining budget so exactly one final poll happens at the deadline, and logs and tolerates a failed poll instead of ending the wait.
+- **Blocking Redis connections gate their first command on the ready handshake.** The timer waiter's duplicated connection and the subscriber's connection both disable the offline queue, so a command sent before the connection's first ready event failed instead of queueing — every server boot logged a transient `Due timers consumer failed, will retry`. Only the first command is gated; a mid-run drop still fails fast into the caller's retry loop.
+- **Timers popped from the priority queue are deduplicated** before the consumer acts on them.
+
+### Documentation
+
+- **New Stalled Runs architecture page** — what stalling means, why nothing retries it automatically, how to requeue, and the `maxAgeMs` knob. The run-states list gains its missing `stalled` entry and the server daemon table its missing retention-sweep row.
+- The Sharding section is now **Worker Pools**, framed around which part of your fleet should execute a workflow rather than partitioning.
+- Redis docs, compose files, and env examples document the single `REDIS_URL` variable. The Redis adapter README's quick-start example, which passed the subscriber factory to itself, now shows a valid call.
+- CONTRIBUTING documents the full integration-test service setup: `bun run test:integration` now always needs a local Redis, where previously only one CI matrix row did.
+
+## 0.36.0
+
+This release reworks how the server delivers ready runs to workers and how it gives up on runs it cannot deliver. Delivery now flows through a single claimable state: a recovery daemon returns in-flight outbox rows to the claimable pool and releases a dead worker's run back to `queued`, while a run that stays undelivered past a configurable age moves to a new `stalled` state instead of being re-offered on a timer without end. Broker re-publishing now backs off by the run's age rather than retrying on every poll. The release also renames several server daemons and worker config keys for clarity, and closes a database connection that leaked on shutdown.
+
+### Breaking Changes
+
+- **Worker config `workflowRun.spinThresholdMs` renamed to `workflowRun.maxInlineWaitMs`.** This is the retry delay below which a task waits inline rather than transitioning to `awaiting_retry`; the new name states the bound directly.
+
+  ```typescript
+  // Before
+  worker({ workflows, config: { workflowRun: { spinThresholdMs: 10 } } });
+
+  // After
+  worker({ workflows, config: { workflowRun: { maxInlineWaitMs: 10 } } });
+  ```
+
+- **Server runtime config: daemons renamed and the outbox sweep split in two.** Only relevant if you override `ServerRuntimeConfig`. The imminent daemons' `imminenceThresholdMs` is now `lookaheadWindowMs`; `imminentRetryableTaskRuns` is now `imminentRetryableTasks`; `imminentRecurringWorkflows` is now `imminentRecurringRuns`. The old `republishStaleRuns` daemon is replaced by two daemons, and `publishReadyRuns` gains a `republishBackoff`.
+
+  ```typescript
+  // Before
+  {
+    imminentScheduledRuns: { imminenceThresholdMs: 3_000, /* ... */ },
+    imminentRetryableTaskRuns: { /* ... */ },
+    imminentRecurringWorkflows: { /* ... */ },
+    publishReadyRuns: { intervalMs: 1_000, limit: 1_000 },
+    republishStaleRuns: { claimMinIdleTimeMs: 90_000, /* ... */ },
+  }
+
+  // After
+  {
+    imminentScheduledRuns: { lookaheadWindowMs: 3_000, /* ... */ },
+    imminentRetryableTasks: { /* ... */ },
+    imminentRecurringRuns: { /* ... */ },
+    publishReadyRuns: {
+      intervalMs: 1_000,
+      limit: 1_000,
+      republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000 },
+    },
+    recoverOverdueOutboxEntries: { claimIdleTimeoutMs: 90_000, /* ... */ },
+    stallUndeliverableRuns: { maxAgeMs: 24 * 60 * 60 * 1_000, /* ... */ },
+  }
+  ```
+
+- **Exported constant `DEFAULT_CLAIM_MIN_IDLE_TIME_MS` renamed to `DEFAULT_CLAIM_IDLE_TIMEOUT_MS`.** It names the idle time after which the server treats a claimed run as abandoned and makes it claimable again.
+
+- **`Publisher` contract changed** — only relevant if you implement a custom queue adapter. `publishReadyRuns` now returns `PublishRunsResult` (was `PublishResult`). Each bucket is now an array of `{ run }` objects rather than bare runs, `deferred` entries carry a `nextPublishAttemptAt`, and every bucket is optional.
+
+  ```typescript
+  // Before — PublishResult, all buckets required, bare runs
+  { published: ReadyWorkflowRun[], deferred: ReadyWorkflowRun[], failed: ReadyWorkflowRun[], declined: ReadyWorkflowRun[] }
+
+  // After — PublishRunsResult, all buckets optional, wrapped runs
+  {
+    published?: Array<{ run: ReadyWorkflowRun }>,
+    deferred?: Array<{ run: ReadyWorkflowRun; nextPublishAttemptAt: number }>,
+    failed?: Array<{ run: ReadyWorkflowRun }>,
+    declined?: Array<{ run: ReadyWorkflowRun }>,
+  }
+  ```
+
+- **`WorkflowRunClaimReadyRequestV1.previousClaimMinIdleTimeMs` removed** — only relevant if you implement a custom transport. The claim idle timeout is now a server setting (`recoverOverdueOutboxEntries.claimIdleTimeoutMs`) rather than a per-request field.
+
+### New Features
+
+- **New `stalled` run status for runs that cannot be delivered.** A run that sits undelivered past `maxAgeMs` (default 24 hours) — for example a `queued` run whose workflow has no worker to claim it — now moves to `stalled` instead of being re-offered without end. `stalled` is non-terminal and recoverable, not a failure: the run made no progress rather than failing, so it is kept distinct from `failed` and `cancelled` and holds no outbox row. The new `stallUndeliverableRuns` daemon performs the transition and discards the run's in-flight tasks.
+
+### Web UI
+
+- **New "Stalled" run-status chip** in the dashboard status filter, with its own gray tint and `⊡` glyph. The filter list is now derived from the shared `WORKFLOW_RUN_STATUSES` set rather than a hardcoded array, so future statuses appear automatically.
+
+### Improvements
+
+- **Broker re-publishing now backs off.** When a run is published but no worker claims it, the server re-offers it to the broker on an age-derived schedule — the wait grows with how long the run has been trying to get through, clamped to `[baseDelayMs, maxDelayMs]` (defaults 5s–300s) — rather than re-publishing on every poll. Configure it under `publishReadyRuns.republishBackoff`.
+- **A dead worker's run is recovered through `queued`, and the claim path is a single scan.** When a worker holding a run goes silent past `claimIdleTimeoutMs`, the `recoverOverdueOutboxEntries` daemon returns the run to `queued` (reason `recovered`) for another worker to claim, so a run with no live executor reports as `queued` rather than a phantom `running`. The claim API now scans only the single claimable state, dropping the previous multi-state stale-claim stealing.
+
+### Bug Fixes
+
+- **The database connection is now closed on server shutdown.** Previously it was never closed when the app stopped, leaking the connection. `CreateDatabase` now exposes a `close()` that the shutdown path calls.
+
+## 0.35.0
+
+This release renames a few worker and schedule APIs for clarity, makes the worker's claim-refresh cadence runtime-configurable, and adds a system theme picker to the dashboard. Workers now reclaim a freed slot immediately instead of waiting out the next poll.
+
+### Breaking Changes
+
+- **`worker.spawn()` renamed to `worker.start()`.** "spawn" wrongly suggested a child process; the call just begins execution and returns a handle. `WorkerSpawnOptions` is now `WorkerStartOptions`.
+
+  ```typescript
+  // Before
+  const handle = myWorker.spawn(client);
+
+  // After
+  const handle = myWorker.start(client);
+  ```
+
+- **`schedule.delete()` renamed to `schedule.deactivate()`.** Deactivating a schedule stops it firing without erasing it. The `"deleted"` schedule status is now `"inactive"`, and the API method `schedule.deleteV1` is now `schedule.deactivateV1`.
+
+  ```typescript
+  // Before
+  await handle.delete();
+  await client.api.schedule.deleteV1({ id });
+
+  // After
+  await handle.deactivate();
+  await client.api.schedule.deactivateV1({ id });
+  ```
+
+- **Worker config `workflowRun.heartbeatIntervalMs` renamed to `workflowRun.claimRefreshIntervalMs`.** The interval controls how often a worker refreshes its server-side claim on an executing run, so it now reads as a claim refresh rather than a heartbeat.
+
+  ```typescript
+  // Before
+  worker({ workflows, config: { workflowRun: { heartbeatIntervalMs: 30_000 } } });
+
+  // After
+  worker({ workflows, config: { workflowRun: { claimRefreshIntervalMs: 30_000 } } });
+  ```
+
+- **Client and subscriber contracts renamed** — only relevant if you implement a custom transport or subscriber. `WorkflowRunApi.heartbeatV1` is now `claimRefreshV1`, and `WorkflowRunClaimReadyRequestV1.claimMinIdleTimeMs` is now `previousClaimMinIdleTimeMs`. A `Subscriber`'s `heartbeat` is now an object `{ send, intervalMs }` instead of a bare function.
+
+  ```typescript
+  // Before
+  heartbeat?: (workflowRunId) => Promise<void>;
+
+  // After
+  heartbeat?: { send: (workflowRunId) => Promise<void>; intervalMs: number | (() => number) };
+  ```
+
+### Web UI
+
+- **System theme picker in the dashboard.** Choose light, dark, or system. With no stored choice the dashboard follows the OS preference and tracks OS changes live. The schedules list reflects the rename above: the status reads **Inactive** and its action button is **Deactivate**.
+
+### Improvements
+
+- **Workers reclaim a freed slot immediately.** When a run finishes and capacity opens up, the worker re-polls for work right away instead of waiting out the next poll delay.
+- **The claim-refresh interval is now runtime-configurable** through `claimRefreshIntervalMs` and read live from the config provider, rather than being a fixed constant.
+- **New exports from `@aikirun/worker`:** `defaultWorkerConfig`, `asConfigProvider`, and the config-provider types (`ConfigProvider`, `ConfigProviderContext`, `CreateConfigProvider`).
+
+### Bug Fixes
+
+- **Replay no longer re-validates event data against its schema.** Event waiters return the recorded data directly. Previously a run could be forced to `failed` with a `SchemaValidationError` during replay; validating a producer's output on the consumer side was the wrong place to do it.
+- **`runOnInterval` no longer schedules a timer when its abort signal is already aborted.**
+
+### Documentation
+
+- New docs site at **aiki.run**: a rewritten quick start, tab switchers for install / runtime / client transport, corrected schedule conflict-policy and identity docs, documented run options, a `CONTRIBUTING` guide, and an architecture diagram that now distinguishes claim refresh from subscriber heartbeats.
+
+## 0.34.1
+
+This release keeps a worker's server-side run claim alive on its own fixed cadence, independent of `heartbeatIntervalMs`, so a large heartbeat interval no longer lets a still-running claim be reassigned to another worker.
+
+### Bug Fixes
+
+- **Run claims no longer expire under a large `heartbeatIntervalMs`.** A worker keeps its server-side claim on an executing run alive on a fixed 30s cadence, derived from the ~90s reclaim threshold and independent of `heartbeatIntervalMs`. Previously the server keepalive rode on the configurable execution heartbeat and was throttled but never floored — setting `heartbeatIntervalMs` above the reclaim threshold let a still-running claim be treated as abandoned and picked up by a second worker.
+
+### Improvements
+
+- **`claimMinIdleTimeMs` is optional on the claim API.** The server fills the default (90s) when it's omitted.
+
+## 0.34.0
+
+This release changes how the database TLS connection is configured: the `DATABASE_SSL` flag is gone, TLS is now driven by the connection URL's `sslmode`, and a new `DATABASE_CA_CERT` lets you verify the server certificate against a private CA.
+
+### Breaking Changes
+
+- **`DATABASE_SSL` removed; TLS now driven by the connection URL's `sslmode`, with `DATABASE_CA_CERT` for private CAs.** The boolean `DATABASE_SSL` flag is gone. Enable TLS via the standard `sslmode` parameter on `DATABASE_URL`, and set `DATABASE_CA_CERT` (PEM contents) when you need to verify the server certificate against a private CA (e.g. DigitalOcean, RDS). When a CA cert is provided, the connection verifies with `rejectUnauthorized: true`.
+
+  ```bash
+  # Before
+  DATABASE_URL=postgresql://user:password@host:5432/aiki
+  DATABASE_SSL=true
+
+  # After — enable TLS via the URL, verify against a private CA if needed
+  DATABASE_URL=postgresql://user:password@host:5432/aiki?sslmode=require
+  DATABASE_CA_CERT="-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+  ```
+
+  This affects the `DATABASE_*` env vars across `.env.example`, both `docker-compose.yml` files, the release workflow, and the installation docs. Update any deployment that set `DATABASE_SSL`.
+
+## 0.33.0
+
+This release ships a self-contained `aiki` binary for hosting the server without Node, Bun, or Docker, and reshapes schedules around a reference-first identity model — schedules are now identified by reference, with per-run retry and shard options.
+
+### New Features
+
+- **Retry and shard options for scheduled runs.** A schedule can now set the retry policy and shard for every run it fires, via the builder's `workflowRun.*` paths. When you set nothing, each fired run inherits the workflow's declared `retry` default; a schedule-level override replaces it.
+
+  ```typescript
+  await everyFiveSeconds
+    .with()
+    .opt("reference.id", "my-correlation-xxx")
+    .opt("workflowRun.retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1_000 })
+    .opt("workflowRun.shard", "eu")
+    .activate(client, notify, "This is a reminder");
+  ```
+
+- **Prebuilt `aiki` binary in every release.** A single self-contained executable — its own runtime, no Node, Bun, or Docker — carrying the `migrate` and `server` commands. Download it from the release, put it on `PATH`, and run `aiki migrate apply` then `aiki server start`.
+
+- **Per-package migration bins.** `aiki-server` and `aiki-iam` each ship their own migrate CLI (`aiki-server migrate apply`), replacing the single `aiki migrate apply --package <name>` entrypoint. SDK users no longer need `@aikirun/cli` as a devDependency.
+
+- **`--env-file` for the standalone server.** Both `migrate` and `server` commands read config from the environment; pass `--env-file <path>` to load it from a file instead.
+
+### Web UI
+
+- Reworked the runs list and sidebar layout; polished run and schedule metadata rows and runs-list back navigation.
+- Overhauled the schedules list page.
+
+### Improvements
+
+- **`PathFromObject` treats union-typed properties as atomic leaves.** Builder `.opt()` paths (schedules, etc.) no longer descend into the branches of a union, discriminated union, or optional union — the whole union is set as one value.
+- Migration apply is decoupled from the filesystem via a pluggable migration source, so migrations can be embedded in the `aiki` binary.
+- The app-server boot function was extracted (`startAppServer` now takes config), and a sensible local CORS default was added.
+- The `sha256` helpers are now documented as content-addressing hashes — fingerprints and high-entropy secrets only, never user passwords.
+
+### Bug Fixes
+
+- **Prototype pollution guard** — object merge and overrider now skip own `__proto__` keys.
+- **Open-redirect fix** — the dashboard auth redirect param is resolved against the origin to close a bypass.
+- **LIKE-pattern escaping** — backslashes in the workflow-name prefix filter are now escaped.
+
+### Breaking Changes
+
+- **Schedule `input` renamed to `workflowRunInput`** — in the activate request and the `Schedule` type.
+
+  ```typescript
+  // Before
+  { workflowName, workflowVersionId, input, spec, options }
+  // After
+  { workflowName, workflowVersionId, workflowRunInput, spec, options, workflowRunOptions }
+  ```
+
+- **`ScheduleReferenceOptions` renamed to `ScheduleReference`** — the `Options` suffix was dropped from the reference identity type.
+
+- **Schedule conflict policies changed** from `["upsert", "error"]` to `["error", "return_existing"]` (default `error`). Re-activating with the same reference id now either errors or returns the existing schedule; definitions are immutable (no upsert or redefine). This is the reference-first schedule identity model: reference is identity, definition hash is the idempotency key.
+
+- **CLI and db-script reshape (ops-facing):**
+
+  ```bash
+  # Before                                    # After
+  npx aiki migrate apply --package server  →  npx aiki-server migrate apply
+  bun run db:migrate:server                →  bun run db:migrate:apply:server
+  bun run db:migrate:iam                   →  bun run db:migrate:apply:iam
+  ```
+
+## 0.32.0
+
+This release makes Aiki self-hostable from published container images — no clone, no local build — and fixes workflow replay to stop re-validating already-persisted outputs.
+
+### New Features
+
+- **Official container images on GitHub Container Registry.** `ghcr.io/aikirun/server`, `ghcr.io/aikirun/dashboard`, and `ghcr.io/aikirun/cli` are published per release, multi-arch (amd64 + arm64). The standalone stack now runs from a one-command download instead of a clone:
+
+  ```bash
+  mkdir aiki && cd aiki
+  curl -fsSL https://github.com/aikirun/aiki/releases/latest/download/docker-compose.yml -o docker-compose.yml
+  # add a .env with DATABASE_URL, then:
+  docker compose up -d
+  ```
+
+  The stack runs a migrate container first — driven by `AIKI_MIGRATE_PACKAGES` (default `server`, plus `iam` when `AIKI_SERVER_AUTH_SECRET` is set) — then starts the server once it completes.
+
+- **`aiki migrate list --package <server|iam>`.** Lists the migrations a package ships, reading its migration journal without connecting to a database.
+
+- **The dashboard Docker image is configured at runtime.** nginx in the image serves the SPA and reverse-proxies API calls to `AIKI_SERVER_UPSTREAM_URL`, read at container start. Browser traffic stays same-origin, so the image needs no CORS setup.
+
+### Bug Fixes
+
+- **Workflow replay no longer re-validates already-persisted task and child-workflow outputs.** An output is validated against its schema when it's produced, before it's persisted. On replay, the stored output is now returned as-is rather than re-parsed. Re-parsing was unsafe: a validator that mutates its value (e.g. appends to a string) would double-apply on every replay, and a schema that changed after the run was persisted could falsely reject a previously-valid output.
+
+### Improvements
+
+- **Unsupported database providers fail fast.** Configuring a not-yet-implemented provider (`sqlite`, `mysql`) now throws synchronously when the database is constructed, instead of erroring later on first use.
+- **`/capabilities` reports the running server version.** The response gained a `version` field.
+
+### Breaking Changes
+
+- **The standalone compose stack no longer defaults `CORS_ORIGINS`.** It was `http://localhost:9851`; both compose files now leave it empty. It's optional behind the dashboard image's proxy, but a **cross-origin** dashboard (e.g. a static-host build) must now set `CORS_ORIGINS` on the server explicitly.
+
+- **Dashboard image: the `VITE_AIKI_SERVER_URL` build arg is replaced by the `AIKI_SERVER_UPSTREAM_URL` runtime env.** The prebuilt image no longer bakes the server URL at build time:
+
+  ```bash
+  # Before — server URL baked at build time
+  docker build --build-arg VITE_AIKI_SERVER_URL=http://your-server:9850 -t dashboard .
+
+  # After — read at container start
+  docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 ghcr.io/aikirun/dashboard:<version>
+  ```
+
+  Building the dashboard for a **static host** still uses `VITE_AIKI_SERVER_URL` at build time — that path is unchanged.
+
+- **Self-hosting pulls published images instead of building from a clone.** Download the compose file from a release (`releases/latest/download/docker-compose.yml`) rather than `git clone`. A build-from-source compose override remains for contributors.
+
+### Documentation
+
+- Rewrote the installation guide's self-hosting section for the image/compose flow, and added workflow-versioning docs.
+
+## 0.31.0
+
+This release centers on a rework of runtime configuration and teardown. Config is now a snapshot-based provider shared by the server, worker, and endpoint; the server runtime tears down through a single abort signal; and `start()`/`spawn()` return synchronously.
+
+### New Features
+
+- **Pluggable runtime config for `@aikirun/worker` and `@aikirun/endpoint`.** Workers and endpoints join the server's config-provider model. The `config` field on `worker()`, `endpoint()`, and `server({ runtime })` accepts either a plain overrides object (deep-merged onto defaults) or a provider:
+  - `staticWorkerConfigProvider(overrides?)` — worker config fixed at spawn (`maxConcurrentWorkflowRuns`, `gracefulShutdownTimeoutMs`, `workflowRun.heartbeatIntervalMs`, `workflowRun.spinThresholdMs`).
+  - `dynamicWorkerConfigProvider({ initial?, refresh, refreshIntervalMs })` — reloads worker config on a timer so an operator can retune a running worker without redeploying; the loop runs off the teardown signal, and a failed refresh keeps the last-good snapshot with jittered backoff.
+  - `staticEndpointConfigProvider(overrides?)` — endpoint config fixed at construction (`signatureMaxAgeMs`, `workflowRun.heartbeatIntervalMs`, `workflowRun.spinThresholdMs`).
+
+### Bug Fixes
+
+- **Server graceful shutdown no longer hangs when `gracefulShutdownTimeoutMs <= 0`.** Previously a non-positive timeout (a value the config accepted) made `runtime.stop()` `await` the daemon drain with no bound, so a busy or stuck daemon could block shutdown indefinitely. A non-positive timeout now means "shut down immediately" — `stop()` returns without waiting. A positive timeout bounds the drain wait and logs a warning if it elapses. (The worker's shutdown already guarded on `> 0` and was not affected.)
+
+### Improvements
+
+- **Single abort signal for runtime teardown.** The server runtime creates one `AbortController` and threads its signal through every daemon, the publisher, the timer-priority queue, and the config refresh loop. `stop()` aborts once and waits (bounded) for everything to unwind via a single `daemonsPromise`. Per-component `AbortController`s, the daemons handle's `stop()`, the config provider's `stop()`, and `Subscriber.close()` are all gone — components clean up off the injected signal. A runtime that fails to start is caught and logged (`"Server runtime failed to start"`) instead of rejecting, and `stop()` is still safe to call.
+- **Config is read as a snapshot, not by path.** `ConfigProvider` now exposes a `.config` snapshot and `.scope(key)` narrowing in place of `.get("a.b.c")` string-path reads. Polling daemons re-read `configProvider.config` each cycle, so dynamic changes still take effect live.
+- **Server config is deep-merged, not schema-parsed.** `ServerRuntimeConfig` is now a plain interface with a `defaultServerRuntimeConfig` constant; overrides are deep-merged via the new `merge` / `DeepPartial` utilities in `@aikirun/lib/object`. This drops the `arktype` dependency and the `parseServerConfig` step — note that invalid config values are no longer rejected at runtime.
+- **Dynamic config no longer blocks startup.** The dynamic provider starts on `initial`/defaults and refreshes in the background; previously the first refresh ran (and was awaited) before startup could complete.
+- **Fewer microtasks on the workflow hot path.** `workflowRunHandle()` and `childWorkflowRunHandle()` return synchronously when handed a run record, returning a promise only when a run must be fetched by id. Workflow-run heartbeats moved from a fixed `setInterval` to a self-rescheduling `setTimeout`.
+- **Persisted retry strategy takes precedence.** At execution time a workflow run's persisted retry strategy now wins over the strategy defined on the workflow version.
+
+### Breaking Changes
+
+- **`runtime.start()` and `worker.spawn()` are now synchronous.** Both return a handle directly instead of a `Promise`; startup happens in the background and `stop()` stays async.
+  ```typescript
+  // Before
+  const runtimeHandle = await aikiServer.runtime.start();
+  const workerHandle = await worker({ workflows: [trialV1] }).spawn(client);
+
+  // After
+  const runtimeHandle = aikiServer.runtime.start();
+  const workerHandle = worker({ workflows: [trialV1] }).spawn(client);
+  ```
+- **`server()` moves `cache` and `iam` under a `handler` key.** They were top-level fields; the new `ServerHandlerParams` groups them.
+  ```typescript
+  // Before
+  server({ db, cache, iam, runtime: { ... } });
+
+  // After
+  server({ db, handler: { cache, iam }, runtime: { ... } });
+  ```
+- **`retry` is now a top-level field on task and workflow definitions.** It was nested under `options`; the `TaskDefinitionOptions` and `WorkflowDefinitionOptions` types are removed.
+  ```typescript
+  // Before
+  task({ name, handler, options: { retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 } } });
+
+  // After
+  task({ name, handler, retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 } });
+  ```
+  The same change applies to `workflow.v("1.0.0", { handler, retry: { ... } })`.
+- **`worker()` uses `config` instead of `options`.** The `options` field (`WorkerDefinitionOptions`) is replaced by a `config` field accepting either a `WorkerConfigOverrides` object or a config provider (`staticWorkerConfigProvider` / `dynamicWorkerConfigProvider`). Config is no longer overridable at spawn time — only `shards`, `reference`, and the like remain on `WorkerSpawnOptions`.
+  ```typescript
+  // Before
+  worker({ workflows, options: { maxConcurrentWorkflowRuns: 10 } });
+
+  // After
+  worker({ workflows, config: { maxConcurrentWorkflowRuns: 10 } });
+  ```
+- **`endpoint()` uses `config` instead of `options`.** The `options` field (`EndpointOptions`) is replaced by a `config` field accepting either an `EndpointConfigOverrides` object or a config provider (`staticEndpointConfigProvider`).
+  ```typescript
+  // Before
+  endpoint({ workflows, client, secret, options: { signatureMaxAgeMs: 30_000 } });
+
+  // After
+  endpoint({ workflows, client, secret, config: { signatureMaxAgeMs: 30_000 } });
+  ```
+- **Server config provider exports renamed** (and `server({ config })` now also accepts a plain overrides object, not only a provider; the dynamic variant gained an optional `initial`):
+  - `ServerConfig` → `ServerRuntimeConfig`
+  - `ServerConfigOverrides` → `ServerRuntimeConfigOverrides`
+  - `dynamicConfigProvider` → `dynamicRuntimeConfigProvider`
+  - `staticConfigProvider` → `staticRuntimeConfigProvider`
+- **The `ConfigProvider` contract moved and changed shape.** Import from `@aikirun/lib/config`; `@aikirun/types/infra/config` is removed. `get(path)` is replaced by `config` + `scope(key)`, `CreateConfigProvider` is now synchronous (no `Promise` return), its context carries a required `signal`, and the provider's `stop()` method is gone (teardown is via the signal). Only affects code implementing a custom provider.
+- **The `signal` option replaces `abortSignal`** across the public async APIs:
+  ```typescript
+  // Before
+  await delay(1000, { abortSignal });
+  await withRetry(fn, strategy, { abortSignal }).run();          // type: WithRetryOptions
+  await handle.waitForStatus("completed", { abortSignal });
+
+  // After
+  await delay(1000, { signal });
+  await withRetry(fn, strategy, { signal }).run();               // type: RetryOptions
+  await handle.waitForStatus("completed", { signal });
+  ```
+  The `WithRetryOptions` type is renamed `RetryOptions`.
+- **Custom queue/timer adapters: signal in context, no `close()`.** `SubscriberContext`, `PublisherContext`, and `TimerPriorityQueueContext` now include a required `signal: AbortSignal`. On `Subscriber`, `close()` is removed (clean up off the signal) and `getReadyRuns(limit, options?)` drops its options argument — it is now `getReadyRuns(limit)`, taking its signal from the context.
+- **`WorkflowExecutionOptions` renamed to `WorkflowExecutionConfig`** (exported from `@aikirun/workflow`).
+- **Task and workflow `Input`/`Output` default to `void`.** The generics previously had no default. A task or workflow that declares no input schema/type can no longer be passed input; declare an input schema or type parameter to accept one.
+
+### Build / Tooling
+
+- **New `@aikirun/testing` package** (in-repo, not yet published). A fake `Client` whose every API endpoint is a mock with queued `.once(request, response)` expectations and a `verify()` that fails on unmet calls, exposed via `withFakeClient`. Includes fishery data factories for schedules, workflow runs, and tasks.
+- Added SDK test coverage for tasks, schedules, the replay manifest, the due-timers consumer, the config provider, deep-merge, and `settleWithin`.
+
+## 0.30.0
+
+### New Features
+
+- **Pluggable runtime config for `@aikirun/server`.** The server now takes a config *provider* instead of a fixed options object. Two ship in the box:
+  - `staticConfigProvider(overrides?)` — config fixed at startup (the default when none is supplied).
+  - `dynamicConfigProvider({ refreshIntervalMs, refresh })` — reloads config on a timer so an operator can retune a running server without redeploying. The first load completes before startup finishes; if a later refresh throws, it's logged and the last-good config is kept.
+
+  Every daemon's interval, batch limit, and imminence threshold, plus `gracefulShutdownTimeoutMs`, are now part of `ServerConfig` and individually tunable. Each polling daemon re-reads its config every cycle, so dynamic changes take effect live.
+
+### Bug Fixes
+
+- **Outbox entries are no longer marked published until delivery is confirmed.** Previously the publish daemon marked every entry `published` the moment `publishReadyRuns` returned, even when delivery silently failed. The run was never lost — the outbox is durable — but a falsely-`published` entry then had to wait for the republish-stale-runs daemon to sweep it up as stale (after `claimMinIdleTimeMs`, default 90s) and resend it. Publishing now returns a structured `PublishResult` (`published` / `deferred` / `failed` / `declined`); only confirmed-`published` entries are marked done, and failed, deferred, and declined runs stay pending for the next publish cycle (default ~1s) rather than waiting for the stale sweep. The republish-stale-runs daemon got the same treatment.
+- **Fail-fast Redis adapters.** A shared connection tracker watches each Redis client's lifecycle, including the "socket accepted but never served" case (e.g. a stopped container's still-forwarded port) that previously wedged the client with no events. When the connection is down, `redisPublisher` returns the runs as `failed` instead of silently dropping them, and `redisTimerPriorityQueue.add` returns `{ status: "failed" }` rather than blocking. The connection supervisor also installs a no-op `error` listener so a client without one can't crash the process.
+- **The built-in console logger now prints error stack traces.** `Error` values in log metadata now print with their stack trace (falling back to `name: message`) rather than the empty `{}` that `JSON.stringify` produces for an Error's non-enumerable properties. Errors are also logged under a consistent `err` metadata key across the SDK, so a pino-based logger applies its default error serializer.
+
+### Improvements
+
+- **Skip schema validation on the hot path.** Workflow- and task-level input/output validation no longer creates an `async` microtask when no `schema` is defined — the common (schema-less) case now runs synchronously.
+- **`TimestampMs` branded type for DB timestamps.** Row timestamps are now a branded `number` (epoch ms) consistently across SDK packages, removing per-row `Date` allocations in hot read paths. No database migration is required — columns still persist as `timestamp with time zone`, and wire/JSON shapes are unchanged.
+- **`withRetry` callbacks accept sync results.** `shouldRetryOnResult` and `shouldNotRetryOnError` now accept `boolean | Promise<boolean>` instead of requiring a `Promise`.
+- **Docker Compose defaults.** `host.docker.internal` is mapped to `host-gateway` so the default database URL works on Linux too, and `AIKI_SERVER_AUTH_SECRET` is now unset by default so Aiki starts without IAM out of the box.
+
+### Breaking Changes
+
+- **`ServerRuntimeParams.options` replaced by `ServerRuntimeParams.config`.** The `ServerRuntimeOptions` interface (and its `gracefulShutdownTimeoutMs`) is removed; the timeout moved into `ServerConfig`.
+  ```typescript
+  // Before
+  server({
+    runtime: { options: { gracefulShutdownTimeoutMs: 10_000 } },
+  });
+
+  // After
+  import { staticConfigProvider } from "@aikirun/server";
+
+  server({
+    runtime: { config: staticConfigProvider({ gracefulShutdownTimeoutMs: 10_000 }) },
+  });
+  ```
+- **`jitterFactor` renamed to `factor`** on the jittered retry strategy (both the SDK type and the server contract schema).
+  ```typescript
+  // Before
+  { type: "jittered", maxAttempts: 5, baseDelayMs: 1000, jitterFactor: 2 }
+
+  // After
+  { type: "jittered", maxAttempts: 5, baseDelayMs: 1000, factor: 2 }
+  ```
+- **Custom queue adapters: result types instead of `void`.** The `@aikirun/types` infra interfaces changed — `Publisher.publishReadyRuns` now returns `PublishResult`, and `TimerPriorityQueue.add` now returns `TimerAddResult` (`{ status: "added" | "failed" }`). Custom adapter implementations must return these.
+- **`UnknownWorkflowVersion` type removed — use `AnyWorkflowVersion`.** The workflow registry (`add` / `addMany` / `remove` / `removeMany`) now accepts `AnyWorkflowVersion`.
+
+### Build / Tooling
+
+- Broad unit tests added across `@aikirun/lib` (retry, min-heap, streams, hashing, duration, stable-stringify, object/array utils) and the workflow registry/factory, with tests now running in CI.
+
+### Documentation
+
+- New IAM setup guide (`docs/guides/iam.md`).
+- Architecture and core-concepts docs refreshed to the current design; landing page repositioned; conference deck moved out of the web root; `llms.txt` relocated under `docs/`; README overhauled.
+
+## 0.29.2
+
+Maintenance release — no functional or API changes. The only substantive change is the release-tooling fix below; all `@aikirun/*` packages were version-bumped together.
+
+### Build / Tooling
+
+- **Release publishing fails fast.** `release:publish` now aborts on the first failed `bun publish` (`|| exit 1` instead of `|| true`), so a single failing publish no longer leaves a release half-applied — some workspace packages on the registry at the new version while others stay pinned to the previous one.
+
+## 0.29.1
+
+### Bug Fixes
+
+- **Restore type variance on `WorkflowVersion`, `WorkflowBuilder`, and `EventMulticaster`.** Methods declared as arrow-function properties (`name: (...) => T`) are checked with strict function variance, which broke assignability of generic workflow types. Rewrote `start`, `startAsChild`, `getHandleById`, `getHandleByReferenceId`, `send`, and `sendByReferenceId` as method signatures (`name(...): T`) so they're checked bivariantly and accept the same inputs they did before.
+
+### Build / Tooling
+
+- Pin `better-auth` to `1.6.11` via root `overrides` so a transitive `kysely` upgrade can't break the build on fresh installs.
+
+## 0.29.0
+
+### New Features
+
+- **Embedded transport.** `client({ handler: aiki.handler })` runs client and server in the same process with no network hop. Workers and workflows are unchanged; switching transports is a config-only change.
+  ```typescript
+  const aiki = server({ db });
+  const aikiClient = client({ handler: aiki.handler });
+  ```
+
+- **`@aikirun/memory` adapter package.** Exports `inMemoryQueue` and `inMemoryTimerPriorityQueue` — the in-memory analog of the Redis adapter, useful for embedded / single-process setups and tests.
+
+- **`@aikirun/iam` package — pluggable identity & access management.** Extracted from `@aikirun/server`. The server's `iam` parameter is optional: omit it and the server runs with a no-op API authorizer; the dashboard probes a capabilities endpoint and renders a no-op UI.
+  ```typescript
+  import { iam } from "@aikirun/iam";
+  server({ db, iam: iam({ db, secret, baseURL, trustedOrigins }) });
+  ```
+
+- **Optional client API key.** `client({ url })` works without an `apiKey`, paired with a server running without IAM.
+
+- **Lazy DB provider loading.** The server defers loading the `postgres` driver until the handler or runtime actually starts. `postgres` is now a peer dependency of `@aikirun/server` and `@aikirun/iam`, so hosts that don't use Postgres no longer pull the driver into their bundle.
+
+### Improvements
+
+- **Discard in-flight tasks on workflow cancel.** Cancelling a run now discards its in-flight tasks rather than letting them complete.
+- **Outbox cleanup on task retry and bulk cancel.** Closes missing cleanup paths.
+- **Sleep queue / `state_transition` fix.** Only complete sleep queue entries of runs that actually transitioned, preventing dangling `state_transition` rows when revisions mismatch.
+- **Backup subscriber bug fix.** The backup subscriber was only being created when there was *no* primary; the condition was inverted.
+- **`AIKI_SERVER_AUTH_SECRET` and `AIKI_SERVER_BASE_URL` are optional** in `app/server`.
+- **`@aikirun/lib` reorganization.** `@aikirun/lib/array` → `@aikirun/lib/collection/array`, `@aikirun/lib/heap` → `@aikirun/lib/collection/heap`.
+- **GitHub PR workflow** for typecheck, lint, and build.
+
+### Breaking Changes
+
+- **`WorkflowRun` (the persisted record) renamed to `WorkflowRunRecord`.** A new `WorkflowRun` exists in `@aikirun/workflow` for the handler's `run` object (previously `WorkflowRunContext`).
+  ```typescript
+  // Before
+  import type { WorkflowRun } from "@aikirun/types/workflow/run";
+
+  // After
+  import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
+  ```
+
+- **`WorkflowRunContext` removed.** The handler's `run` parameter is now typed as `WorkflowRun` from `@aikirun/workflow`.
+
+- **`appContext` → `context`, and accessed via `run.context` instead of the handler's third parameter.** Bind `Context` on `workflow<Context>()` and `client<Context>()`.
+  ```typescript
+  // Before
+  const myWorkflow = workflow({ name: "x" });
+  myWorkflow.v("1", {
+    async handler(run, input, appContext: AppContext) { /* ... */ },
+  });
+  client<AppContext>({ url, apiKey, appContext: (run) => ({ /* ... */ }) });
+
+  // After
+  const myWorkflow = workflow<Context>({ name: "x" });
+  myWorkflow.v("1", {
+    async handler(run, input) {
+      const ctx = run.context;
+    },
+  });
+  client<Context>({ url, apiKey, context: (run) => ({ /* ... */ }) });
+  ```
+
+- **`TimerSortedSet` → `TimerPriorityQueue`** (type, `CreateTimerSortedSet` → `CreateTimerPriorityQueue`, `redisTimerSortedSet` → `redisTimerPriorityQueue`). Server runtime param renamed accordingly:
+  ```typescript
+  // Before
+  server({ runtime: { timerSortedSet: redisTimerSortedSet(redis, "aiki:timers") } });
+
+  // After
+  server({ runtime: { timerPriorityQueue: redisTimerPriorityQueue(redis, "aiki:timers") } });
+  ```
+
+- **`server()` shape changed.** `db` is now a `CreateDatabase` factory built via `database(...)`; auth config moved out of `handler` and into the optional `iam` parameter. `ServerHandlerParams` / `ServerHandlerAuthParams` removed.
+  ```typescript
+  // Before
+  import { server } from "@aikirun/server";
+  server({
+    db: { provider: "pg", url: "..." },
+    handler: { auth: { secret, baseURL, trustedOrigins } },
+  });
+
+  // After
+  import { database, server } from "@aikirun/server";
+  import { iam } from "@aikirun/iam";
+  const db = database({ provider: "pg", url: "..." });
+  server({
+    db,
+    iam: iam({ db, secret, baseURL, trustedOrigins }),
+  });
+  ```
+
+- **`aiki migrate` requires `--package`.** Pick `server` or `iam`; each owns its own migration table (`__drizzle_migrations__server`, `__drizzle_migrations__iam`).
+  ```bash
+  # Before
+  aiki migrate apply
+  aiki migrate generate
+
+  # After
+  aiki migrate apply --package server
+  aiki migrate generate --package iam
+  ```
+
+- **`@aikirun/server/config` subpath export removed.** `loadDatabaseConfig` and `DatabaseProvider` moved out of `@aikirun/server`. Use `DATABASE_PROVIDERS` / `isDatabaseProvider` from `@aikirun/types/infra/db`.
+
+- **`@aikirun/types/api/api-key` and `@aikirun/types/api/namespace` exports removed.** These schemas are now internal to `@aikirun/iam`.
+
+- **`app/web` renamed to `app/dashboard`.** Npm script is now `bun run dashboard`; Docker image is `aiki-dashboard`. Env var `AIKI_WEB_PORT` → `AIKI_DASHBOARD_PORT`.
+
 ## 0.28.0
 
 ### New Features

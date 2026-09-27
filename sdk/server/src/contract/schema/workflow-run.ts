@@ -1,50 +1,54 @@
 import { type } from "arktype";
 
-import { eventWaitQueueSchema } from "./event";
+import { durationObjectSchema } from "./duration";
+import { eventWaitSchema } from "./event";
+import { opaquePayloadSchema } from "./payload";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
-import { sleepQueueSchema } from "./sleep";
-import { taskQueueSchema } from "./task";
-import { triggerStrategySchema } from "./trigger";
+import { sleepSchema } from "./sleep";
+import { taskInfoSchema } from "./task";
+import { workflowSourceSchema } from "./workflow";
 
 export const workflowRunStatusSchema = type(
-	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_child_workflow' | 'cancelled' | 'failed' | 'completed'"
+	"'scheduled' | 'queued' | 'running' | 'paused' | 'sleeping' | 'awaiting_event' | 'awaiting_retry' | 'awaiting_task_retry' | 'awaiting_child_workflow' | 'stalled' | 'cancelled' | 'failed' | 'completed'"
 );
 
 export const terminalWorkflowRunStatusSchema = type("'cancelled' | 'failed' | 'completed'");
 
-const workflowReferenceOptionsSchema = type({
+const workflowReferenceSchema = type({
 	id: "string > 0",
 	"conflictPolicy?": "'error' | 'return_existing' | undefined",
 });
 
-export const workflowOptionsSchema = type({
-	"reference?": workflowReferenceOptionsSchema,
-	"trigger?": triggerStrategySchema,
-	"shard?": "string | undefined",
+export const workflowRunOptionsSchema = type({
+	"pool?": "string | undefined",
 	"retry?": retryStrategySchema,
+	"priority?": "0 <= number.integer <= 9 | undefined",
 });
 
-const workflowRunScheduledReasonSchema = type(
-	"'new' | 'retry' | 'task_retry' | 'awake' | 'awake_early' | 'resume' | 'event' | 'child_workflow'"
-);
+export const workflowStartOptionsSchema = workflowRunOptionsSchema.and({
+	"reference?": workflowReferenceSchema,
+	"delay?": durationObjectSchema,
+});
 
 export const workflowRunStateScheduledSchema = type({
 	status: "'scheduled'",
-	scheduledAt: "number > 0",
 	reason: "'new'",
+	scheduledAt: "number > 0",
 })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'retry'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'task_retry'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'awake'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'awake_early'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'resume'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'event'" })
-	.or({ status: "'scheduled'", scheduledAt: "number > 0", reason: "'child_workflow'" });
+	.or({ status: "'scheduled'", reason: "'wakeup_early'", scheduledAt: "number > 0" })
+	.or({ status: "'scheduled'", reason: "'resumption'", scheduledAt: "number > 0" })
+	.or({ status: "'scheduled'", reason: "'event'", scheduledAt: "number > 0" })
+	.or({ status: "'scheduled'", reason: "'child_workflow'", scheduledAt: "number > 0" })
+	.or({ status: "'scheduled'", reason: "'redelivery'", scheduledAt: "number > 0" });
+
+const workflowRunQueuedReasonSchema = type(
+	"'new' | 'retry' | 'task_retry' | 'wakeup' | 'wakeup_early' | 'resumption' | 'event' | 'event_wait_timeout' | 'child_workflow' | 'child_workflow_wait_timeout' | 'recovery' | 'redelivery'"
+);
 
 export const workflowRunStateQueuedSchema = type({
 	status: "'queued'",
-	reason: workflowRunScheduledReasonSchema,
+	reason: workflowRunQueuedReasonSchema,
 });
 
 export const workflowRunStateRunningSchema = type({
@@ -58,7 +62,7 @@ export const workflowRunStatePausedSchema = type({
 export const workflowRunStateSleepingSchema = type({
 	status: "'sleeping'",
 	sleepName: "string > 0",
-	awakeAt: "number > 0",
+	wakeupAt: "number > 0",
 });
 
 export const workflowRunStateAwaitingEventSchema = type({
@@ -70,37 +74,45 @@ export const workflowRunStateAwaitingEventSchema = type({
 export const workflowRunStateAwaitingRetrySchema = type({
 	status: "'awaiting_retry'",
 	cause: "'task'",
-	nextAttemptAt: "number > 0",
 	taskId: "string > 0",
+	nextAttemptAt: "number > 0",
 })
 	.or({
 		status: "'awaiting_retry'",
 		cause: "'child_workflow'",
-		nextAttemptAt: "number > 0",
 		childWorkflowRunId: "string > 0",
+		nextAttemptAt: "number > 0",
 	})
 	.or({
 		status: "'awaiting_retry'",
 		cause: "'self'",
-		nextAttemptAt: "number > 0",
 		error: serializedErrorSchema,
+		nextAttemptAt: "number > 0",
 	});
+
+export const workflowRunStateAwaitingTaskRetrySchema = type({
+	status: "'awaiting_task_retry'",
+	nextAttemptAt: "number > 0",
+});
 
 export const workflowRunStateAwaitingChildWorkflowSchema = type({
 	status: "'awaiting_child_workflow'",
 	childWorkflowRunId: "string > 0",
-	childWorkflowRunStatus: terminalWorkflowRunStatusSchema,
 	"timeoutAt?": "number > 0 | undefined",
+});
+
+export const workflowRunStateStalledSchema = type({
+	status: "'stalled'",
 });
 
 export const workflowRunStateCancelledSchema = type({
 	status: "'cancelled'",
-	"reason?": "string > 0 | undefined",
+	"explanation?": "string > 0 | undefined",
 });
 
 export const workflowRunStateCompletedSchema = type({
 	status: "'completed'",
-	output: "unknown",
+	output: opaquePayloadSchema,
 });
 
 export const workflowRunStateFailedSchema = type({
@@ -126,7 +138,9 @@ export const workflowRunStateSchema = workflowRunStateScheduledSchema
 	.or(workflowRunStateSleepingSchema)
 	.or(workflowRunStateAwaitingEventSchema)
 	.or(workflowRunStateAwaitingRetrySchema)
+	.or(workflowRunStateAwaitingTaskRetrySchema)
 	.or(workflowRunStateAwaitingChildWorkflowSchema)
+	.or(workflowRunStateStalledSchema)
 	.or(workflowRunStateCancelledSchema)
 	.or(workflowRunStateCompletedSchema)
 	.or(workflowRunStateFailedSchema);
@@ -135,121 +149,70 @@ export const terminalWorkflowRunStateSchema = workflowRunStateCancelledSchema
 	.or(workflowRunStateCompletedSchema)
 	.or(workflowRunStateFailedSchema);
 
-const childWorkflowRunWaitSchema = type({
-	status: "'completed'",
-	completedAt: "number > 0",
-	childWorkflowRunState: terminalWorkflowRunStateSchema,
-}).or({
-	status: "'timeout'",
-	timedOutAt: "number > 0",
-});
-
-const childWorkflowRunWaitQueueSchema = type({
-	childWorkflowRunWaits: childWorkflowRunWaitSchema.array(),
-});
-
 const childWorkflowRunInfoSchema = type({
 	id: "string > 0",
 	name: "string > 0",
 	versionId: "string > 0",
 	inputHash: "string > 0",
-	childWorkflowRunWaitQueues: type({ "['cancelled'|'completed'|'failed']": childWorkflowRunWaitQueueSchema }),
 });
 
-const childWorkflowRunQueueSchema = type({
-	childWorkflowRuns: childWorkflowRunInfoSchema.array(),
+const childWorkflowRunWaitsSchema = type({
+	timeouts: type({
+		timedOutAt: "number > 0",
+	}).array(),
+	"terminal?": type({
+		state: terminalWorkflowRunStateSchema,
+		completedAt: "number > 0",
+	}).or("undefined"),
 });
 
-export const workflowRunSchema = type({
+export const workflowRunRecordSchema = type({
 	id: "string > 0",
 	name: "string > 0",
 	versionId: "string > 0",
+	source: workflowSourceSchema,
 	createdAt: "number > 0",
-	revision: "number >= 0",
+	revision: "number.integer >= 0",
+	signalSequence: "number.integer >= 0",
 	stateTransitionId: "string > 0",
-	"input?": "unknown",
+	"input?": opaquePayloadSchema,
 	inputHash: "string > 0",
-	"options?": workflowOptionsSchema.or("undefined"),
+	clientHasherApplied: "boolean",
+	clientCodecApplied: "boolean",
+	"referenceId?": "string > 0 | undefined",
+	"options?": workflowRunOptionsSchema.or("undefined"),
 	attempts: "number.integer >= 0",
 	state: workflowRunStateSchema,
-	taskQueues: type({ "[string]": taskQueueSchema }),
-	sleepQueues: type({ "[string]": sleepQueueSchema }),
-	eventWaitQueues: type({ "[string]": eventWaitQueueSchema }),
-	childWorkflowRunQueues: type({ "[string]": childWorkflowRunQueueSchema }),
+	tasks: type({ "[string]": taskInfoSchema.array() }),
+	sleeps: type({ "[string]": sleepSchema.array() }),
+	eventWaits: type({ "[string]": eventWaitSchema.array() }),
+	childWorkflowRuns: type({ "[string]": childWorkflowRunInfoSchema.array() }),
+	childWorkflowRunWaits: type({ "[string]": childWorkflowRunWaitsSchema }),
 	"parentWorkflowRunId?": "string > 0 | undefined",
 });
 
-export const workflowRunStateScheduledRequestOptimisticSchema = type({
-	status: "'scheduled'",
-	scheduledInMs: "number.integer >= 0",
-	reason: "'retry'",
-})
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'task_retry'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'awake'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'event'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'child_workflow'" });
+const workflowRunStateScheduledRequestSchema = workflowRunStateScheduledSchema
+	.omit("scheduledAt")
+	.and({ scheduledInMs: "number.integer >= 0" });
 
-export const workflowRunStateScheduledRequestPessimisticSchema = type({
-	status: "'scheduled'",
-	scheduledInMs: "number.integer >= 0",
-	reason: "'new'",
-})
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'awake_early'" })
-	.or({ status: "'scheduled'", scheduledInMs: "number.integer >= 0", reason: "'resume'" });
-
-export const workflowRunStateSleepingRequestSchema = type({
-	status: "'sleeping'",
-	sleepName: "string > 0",
-	durationMs: "number > 0",
+export const workflowRunStateScheduledRequestPessimisticSchema = workflowRunStateScheduledRequestSchema.extract({
+	reason: "'new' | 'wakeup_early' | 'resumption' | 'redelivery'",
 });
 
-export const workflowRunStateAwaitingEventRequestSchema = type({
-	status: "'awaiting_event'",
-	eventName: "string > 0",
-	"timeoutInMs?": "number.integer > 0 | undefined",
-});
-
-export const workflowRunStateAwaitingRetryRequestSchema = type({
-	status: "'awaiting_retry'",
-	cause: "'task'",
-	taskId: "string > 0",
-	nextAttemptInMs: "number.integer > 0",
-})
-	.or({
-		status: "'awaiting_retry'",
-		cause: "'child_workflow'",
-		childWorkflowRunId: "string > 0",
-		nextAttemptInMs: "number.integer > 0",
-	})
-	.or({
-		status: "'awaiting_retry'",
-		cause: "'self'",
-		error: serializedErrorSchema,
-		nextAttemptInMs: "number.integer > 0",
-	});
-
-export const workflowRunStateAwaitingChildWorkflowRequestSchema = type({
-	status: "'awaiting_child_workflow'",
-	childWorkflowRunId: "string > 0",
-	childWorkflowRunStatus: terminalWorkflowRunStatusSchema,
-	"timeoutInMs?": "number.integer > 0 | undefined",
-});
-
-export const workflowRunStateCompletedRequestSchema = type({
-	status: "'completed'",
-	"output?": "unknown",
-});
+export const workflowRunStateScheduledRequestOptimisticSchema = workflowRunStateScheduledRequestSchema.exclude(
+	workflowRunStateScheduledRequestPessimisticSchema
+);
 
 export const listChildRunsRequestSchema = type({
-	parentRunId: "string > 0",
-	"status?": workflowRunStatusSchema.array(),
+	id: "string > 0",
+	"childRunStatus?": workflowRunStatusSchema.array(),
 });
 
 export const listChildRunsResponseSchema = type({
 	runs: type({
 		id: "string > 0",
 		"options?": type({
-			"shard?": "string | undefined",
+			"pool?": "string | undefined",
 		}).or("undefined"),
 	}).array(),
 });
@@ -262,23 +225,7 @@ export const cancelByIdsResponseSchema = type({
 	cancelledIds: type("string > 0").array(),
 });
 
-const taskStateOutputSchema = type({
-	status: "'completed'",
-	output: "unknown",
-}).or({
-	status: "'failed'",
-	error: serializedErrorSchema,
-});
-
-export const workflowRunSetTaskStateRequestSchema = type({
-	type: "'new'",
-	id: "string > 0",
-	taskName: "string > 0",
-	"input?": "unknown",
-	state: taskStateOutputSchema,
-}).or({
-	type: "'existing'",
-	id: "string > 0",
-	taskId: "string > 0",
-	state: taskStateOutputSchema,
+export const multicastEventResponseSchema = type({
+	sentIds: type("string > 0").array(),
+	failedIds: type("string > 0").array(),
 });

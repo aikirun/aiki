@@ -1,20 +1,20 @@
-export function delay(ms: number, options?: { abortSignal?: AbortSignal }): Promise<void> {
-	const abortSignal = options?.abortSignal;
-	if (abortSignal?.aborted) {
-		return Promise.reject(abortSignal.reason);
+export function delay(ms: number, options?: { signal?: AbortSignal }): Promise<void> {
+	const signal = options?.signal;
+	if (signal?.aborted) {
+		return Promise.reject(signal.reason);
 	}
 
 	return new Promise((resolve, reject) => {
 		const abort = () => {
 			clearTimeout(timeout);
-			reject(abortSignal?.reason);
+			reject(signal?.reason);
 		};
 
 		const timeout = setTimeout(() => {
-			abortSignal?.removeEventListener("abort", abort);
+			signal?.removeEventListener("abort", abort);
 			resolve();
 		}, ms);
 
-		abortSignal?.addEventListener("abort", abort, { once: true });
+		signal?.addEventListener("abort", abort, { once: true });
 	});
 }

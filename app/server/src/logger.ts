@@ -28,13 +28,11 @@ export function createLogger(logLevel: LogLevel, prettyLogs: boolean): Logger {
 	return adaptPino(pinoLogger);
 }
 
-function adaptPino(pinoLogger: pino.Logger): Logger {
-	return {
-		trace: (message, metadata) => pinoLogger.trace(metadata ?? {}, message),
-		debug: (message, metadata) => pinoLogger.debug(metadata ?? {}, message),
-		info: (message, metadata) => pinoLogger.info(metadata ?? {}, message),
-		warn: (message, metadata) => pinoLogger.warn(metadata ?? {}, message),
-		error: (message, metadata) => pinoLogger.error(metadata ?? {}, message),
-		child: (bindings) => adaptPino(pinoLogger.child(bindings)),
-	};
-}
+const adaptPino = (pinoLogger: pino.Logger): Logger => ({
+	trace: (message, metadata) => pinoLogger.trace(metadata ?? {}, message),
+	debug: (message, metadata) => pinoLogger.debug(metadata ?? {}, message),
+	info: (message, metadata) => pinoLogger.info(metadata ?? {}, message),
+	warn: (message, metadata) => pinoLogger.warn(metadata ?? {}, message),
+	error: (message, metadata) => pinoLogger.error(metadata ?? {}, message),
+	child: (bindings) => adaptPino(pinoLogger.child(bindings)),
+});

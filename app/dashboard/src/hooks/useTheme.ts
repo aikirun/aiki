@@ -1,44 +1,64 @@
 import { useCallback, useSyncExternalStore } from "react";
 
-type Theme = "dark" | "light";
+export type ThemePreference = "light" | "dark" | "system";
+type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "aiki-theme";
 
-function getSnapshot(): Theme {
-	return (document.documentElement.dataset.theme as Theme) || "dark";
+const prefersLight = window.matchMedia("(prefers-color-scheme: light)");
+
+function readStoredPreference(): ThemePreference {
+	const stored = localStorage.getItem(STORAGE_KEY);
+	if (stored === "light" || stored === "dark") {
+		return stored;
+	}
+	return "system";
 }
 
-function getServerSnapshot(): Theme {
-	return "dark";
+let preference = readStoredPreference();
+
+function resolveTheme(): ResolvedTheme {
+	if (preference === "system") {
+		return prefersLight.matches ? "light" : "dark";
+	}
+	return preference;
 }
+
+const listeners = new Set<() => void>();
 
 function subscribe(callback: () => void): () => void {
-	const observer = new MutationObserver(callback);
-	observer.observe(document.documentElement, {
-		attributes: true,
-		attributeFilter: ["data-theme"],
-	});
-	return () => observer.disconnect();
+	listeners.add(callback);
+	return () => {
+		listeners.delete(callback);
+	};
 }
 
-// Initialize on module load — apply before first React render to avoid flash
-const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-if (stored === "light") {
-	document.documentElement.dataset.theme = "light";
+function applyAndNotify(): void {
+	document.documentElement.dataset.theme = resolveTheme();
+	for (const listener of listeners) {
+		listener();
+	}
 }
+
+prefersLight.addEventListener("change", () => {
+	if (preference === "system") {
+		applyAndNotify();
+	}
+});
 
 export function useTheme() {
-	const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+	const themePreference = useSyncExternalStore(subscribe, () => preference);
+	const resolvedTheme = useSyncExternalStore(subscribe, resolveTheme);
 
-	const setTheme = useCallback((next: Theme) => {
-		document.documentElement.dataset.theme = next;
-		localStorage.setItem(STORAGE_KEY, next);
+	const setPreference = useCallback((next: ThemePreference) => {
+		preference = next;
+		if (next === "system") {
+			localStorage.removeItem(STORAGE_KEY);
+		} else {
+			localStorage.setItem(STORAGE_KEY, next);
+		}
+		applyAndNotify();
 	}, []);
 
-	const toggleTheme = useCallback(() => {
-		const next = getSnapshot() === "dark" ? "light" : "dark";
-		setTheme(next);
-	}, [setTheme]);
-
-	return { theme, setTheme, toggleTheme } as const;
+	return { preference: themePreference, resolvedTheme, setPreference } as const;
 }

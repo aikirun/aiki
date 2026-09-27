@@ -1,27 +1,23 @@
-import { isNonEmptyArray } from "@aikirun/lib/array";
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
-import { objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
-import type { Serializable } from "@aikirun/lib/serializable";
-import type { ApiClient, Client } from "@aikirun/types/client";
+import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
+import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
+	EventMulticastResult,
 	EventName,
 	EventSendOptions,
-	EventWait,
 	EventWaitOptions,
 	EventWaitResult,
 	WorkflowRunId,
 } from "@aikirun/types/workflow/run";
-import {
-	WorkflowRunFailedError,
-	WorkflowRunRevisionConflictError,
-	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow/run";
+import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
+import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./bound-codec";
 import type { WorkflowRunHandle } from "./handle";
 
 /**
@@ -46,7 +42,7 @@ import type { WorkflowRunHandle } from "./handle";
  * ```
  */
 export function event(): EventDefinition<void>;
-export function event<Data extends Serializable>(params?: EventParams<Data>): EventDefinition<Data>;
+export function event<Data>(params?: EventParams<Data>): EventDefinition<Data>;
 export function event<Data>(params?: EventParams<Data>): EventDefinition<Data> {
 	return {
 		// biome-ignore lint/style/useNamingConvention: phantom type marker
@@ -68,8 +64,12 @@ export type EventsDefinition = Record<string, EventDefinition<unknown>>;
 
 export type EventData<TEvent> = TEvent extends EventDefinition<infer Data> ? Data : never;
 
+export type EventsData<TEvents extends EventsDefinition> = {
+	[Name in keyof TEvents]: EventData<TEvents[Name]>;
+};
+
 export type EventWaiters<TEvents extends EventsDefinition> = {
-	[K in keyof TEvents]: EventWaiter<EventData<TEvents[K]>>;
+	[Name in keyof TEvents]: EventWaiter<EventData<TEvents[Name]>>;
 };
 
 export interface EventWaiter<Data> {
@@ -78,69 +78,51 @@ export interface EventWaiter<Data> {
 }
 
 export type EventSenders<TEvents extends EventsDefinition> = {
-	[K in keyof TEvents]: EventSender<EventData<TEvents[K]>>;
+	[Name in keyof TEvents]: EventSender<EventData<TEvents[Name]>>;
 };
 
 export interface EventSender<Data> {
-	with(): EventSenderBuilder<Data>;
-	send: (...args: Data extends void ? [] : [Data]) => Promise<void>;
-}
-
-export interface EventSenderBuilder<Data> {
-	opt<Path extends PathFromObject<EventSendOptions>>(
+	/** Sets one send option and returns of {@link EventSender}. The original is unchanged. */
+	with<Path extends PathFromObject<EventSendOptions>>(
 		path: Path,
 		value: TypeOfValueAtPath<EventSendOptions, Path>
-	): EventSenderBuilder<Data>;
+	): EventSender<Data>;
 	send: (...args: Data extends void ? [] : [Data]) => Promise<void>;
 }
 
 export type EventMulticasters<TEvents extends EventsDefinition> = {
-	[K in keyof TEvents]: EventMulticaster<EventData<TEvents[K]>>;
+	[Name in keyof TEvents]: EventMulticaster<EventData<TEvents[Name]>>;
 };
 
 export interface EventMulticaster<Data> {
-	with(): EventMulticasterBuilder<Data>;
-	send: <AppContext>(
-		client: Client<AppContext>,
-		runId: string | string[],
-		...args: Data extends void ? [] : [Data]
-	) => Promise<void>;
-	sendByReferenceId: <AppContext>(
-		client: Client<AppContext>,
-		referenceId: string | string[],
-		...args: Data extends void ? [] : [Data]
-	) => Promise<void>;
-}
-
-export interface EventMulticasterBuilder<Data> {
-	opt<Path extends PathFromObject<EventSendOptions>>(
+	/** Sets one send option and returns a copy of {@link EventMulticaster}. The original is unchanged. */
+	with<Path extends PathFromObject<EventSendOptions>>(
 		path: Path,
 		value: TypeOfValueAtPath<EventSendOptions, Path>
-	): EventMulticasterBuilder<Data>;
-	send: <AppContext>(
-		client: Client<AppContext>,
+	): EventMulticaster<Data>;
+	send: <Context>(
+		client: Client<Context>,
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	) => Promise<void>;
-	sendByReferenceId: <AppContext>(
-		client: Client<AppContext>,
+	) => Promise<EventMulticastResult>;
+	sendByReferenceId<Context>(
+		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	) => Promise<void>;
+	): Promise<EventMulticastResult>;
 }
 
 export function createEventWaiters<TEvents extends EventsDefinition>(
-	handle: WorkflowRunHandle<unknown, unknown, unknown, TEvents>,
+	handle: WorkflowRunHandle<unknown, unknown, TEvents>,
 	eventsDefinition: TEvents,
 	logger: Logger
 ): EventWaiters<TEvents> {
 	const waiters = {} as EventWaiters<TEvents>;
 
-	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
+	for (const eventName of Object.keys(eventsDefinition)) {
 		const waiter = createEventWaiter(
 			handle,
 			eventName as EventName,
-			eventDefinition.schema,
 			logger.child({ "aiki.eventName": eventName })
 		) as EventWaiter<EventData<TEvents[keyof TEvents]>>;
 		waiters[eventName as keyof TEvents] = waiter;
@@ -149,10 +131,9 @@ export function createEventWaiters<TEvents extends EventsDefinition>(
 	return waiters;
 }
 
-export function createEventWaiter<TEvents extends EventsDefinition, Data>(
-	handle: WorkflowRunHandle<unknown, unknown, unknown, TEvents>,
+function createEventWaiter<TEvents extends EventsDefinition, Data>(
+	handle: WorkflowRunHandle<unknown, unknown, TEvents>,
 	eventName: EventName,
-	schema: StandardSchemaV1<Data> | undefined,
 	logger: Logger
 ): EventWaiter<Data> {
 	let nextIndex = 0;
@@ -160,41 +141,29 @@ export function createEventWaiter<TEvents extends EventsDefinition, Data>(
 	async function wait(options?: EventWaitOptions<false>): Promise<EventWaitResult<Data, false>>;
 	async function wait(options: EventWaitOptions<true>): Promise<EventWaitResult<Data, true>>;
 	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitResult<Data, boolean>> {
-		await handle.refresh();
+		const eventWaits = handle.run.eventWaits[eventName] ?? [];
 
-		const eventWaits = handle.run.eventWaitQueues[eventName]?.eventWaits ?? [];
-
-		const existingEventWait = eventWaits[nextIndex] as EventWait<Data> | undefined;
+		const existingEventWait = eventWaits[nextIndex];
 		if (existingEventWait) {
 			nextIndex++;
 
 			if (existingEventWait.status === "timeout") {
 				logger.debug("Timed out waiting for event");
-				return { timeout: true };
+				return { timeout: true, timedOutAt: existingEventWait.timedOutAt };
 			}
 
-			let data = existingEventWait.data;
-			if (schema) {
-				const schemaValidation = schema["~standard"].validate(existingEventWait.data);
-				const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
-				if (!schemaValidationResult.issues) {
-					data = schemaValidationResult.value;
-				} else {
-					logger.error("Invalid event data", { "aiki.issues": schemaValidationResult.issues });
-					await handle[INTERNAL].transitionState({
-						status: "failed",
-						cause: "self",
-						error: {
-							name: "SchemaValidationError",
-							message: JSON.stringify(schemaValidationResult.issues),
-						},
-					});
-					throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
-				}
-			}
-
+			// The data decodes by its sender's declaration, not the run's: the sender's client
+			// wrote it, and that client may hold a codec this run's creator did not, or vice versa.
+			const codec = bindDeclaredCodec(handle[INTERNAL].client, {
+				runId: handle.run.id as WorkflowRunId,
+				clientCodecApplied: existingEventWait.clientCodecApplied,
+			});
 			logger.debug("Event received");
-			return { timeout: false, data: data as Data };
+			return {
+				timeout: false,
+				data: (await codec.decode(existingEventWait.data)) as Data,
+				receivedAt: existingEventWait.receivedAt,
+			};
 		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
@@ -208,11 +177,11 @@ export function createEventWaiter<TEvents extends EventsDefinition, Data>(
 			logger.info("Waiting for event", {
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
-		} catch (error) {
-			if (error instanceof WorkflowRunRevisionConflictError) {
+		} catch (err) {
+			if (err instanceof WorkflowRunRevisionConflictError) {
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
-			throw error;
+			throw err;
 		}
 
 		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
@@ -221,8 +190,8 @@ export function createEventWaiter<TEvents extends EventsDefinition, Data>(
 	return { wait };
 }
 
-export function createEventSenders<TEvents extends EventsDefinition>(
-	api: ApiClient,
+export function createEventSenders<TEvents extends EventsDefinition, Context>(
+	client: Client<Context>,
 	workflowRunId: string,
 	eventsDefinition: TEvents,
 	logger: Logger
@@ -230,11 +199,13 @@ export function createEventSenders<TEvents extends EventsDefinition>(
 	const senders = {} as EventSenders<TEvents>;
 
 	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
+		const optionsBuilder = objectOverrider<EventSendOptions>({})();
 		const sender = createEventSender(
-			api,
+			client,
 			workflowRunId,
 			eventName as EventName,
 			eventDefinition.schema,
+			optionsBuilder,
 			logger.child({ "aiki.eventName": eventName })
 		) as EventSender<EventData<TEvents[keyof TEvents]>>;
 		senders[eventName as keyof TEvents] = sender;
@@ -243,22 +214,14 @@ export function createEventSenders<TEvents extends EventsDefinition>(
 	return senders;
 }
 
-function createEventSender<Data>(
-	api: ApiClient,
+function createEventSender<Data, Context>(
+	client: Client<Context>,
 	workflowRunId: string,
 	eventName: EventName,
 	schema: StandardSchemaV1<Data> | undefined,
-	logger: Logger,
-	options?: EventSendOptions
+	optionsBuilder: ObjectBuilder<EventSendOptions>,
+	logger: Logger
 ): EventSender<Data> {
-	const optionsOverrider = objectOverrider(options ?? {});
-
-	const createBuilder = (optionsBuilder: ReturnType<typeof optionsOverrider>): EventSenderBuilder<Data> => ({
-		opt: (path, value) => createBuilder(optionsBuilder.with(path, value)),
-		send: (...args: Data extends void ? [] : [Data]) =>
-			createEventSender(api, workflowRunId, eventName, schema, logger, optionsBuilder.build()).send(...args),
-	});
-
 	async function send(...args: Data extends void ? [] : [Data]): Promise<void> {
 		let data = args[0];
 		if (schema) {
@@ -271,10 +234,15 @@ function createEventSender<Data>(
 			data = schemaValidationResult.value;
 		}
 
-		await api.workflowRun.sendEventV1({
+		const options = optionsBuilder.build();
+		const { codec: clientCodec } = client[INTERNAL];
+		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+
+		await client.api.workflowRun.sendEventV1({
 			id: workflowRunId,
 			eventName,
-			data,
+			data: await codec.encode(data),
+			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});
 
@@ -284,7 +252,8 @@ function createEventSender<Data>(
 	}
 
 	return {
-		with: () => createBuilder(optionsOverrider()),
+		with: (path, value) =>
+			createEventSender(client, workflowRunId, eventName, schema, optionsBuilder.with(path, value), logger),
 		send,
 	};
 }
@@ -297,11 +266,13 @@ export function createEventMulticasters<TEvents extends EventsDefinition>(
 	const senders = {} as EventMulticasters<TEvents>;
 
 	for (const [eventName, eventDefinition] of Object.entries(eventsDefinition)) {
+		const optionsBuilder = objectOverrider<EventSendOptions>({})();
 		const sender = createEventMulticaster(
 			workflowName,
 			workflowVersionId,
 			eventName as EventName,
-			eventDefinition.schema
+			eventDefinition.schema,
+			optionsBuilder
 		) as EventMulticaster<EventData<TEvents[keyof TEvents]>>;
 		senders[eventName as keyof TEvents] = sender;
 	}
@@ -314,41 +285,13 @@ function createEventMulticaster<Data>(
 	workflowVersionId: WorkflowVersionId,
 	eventName: EventName,
 	schema: StandardSchemaV1<Data> | undefined,
-	options?: EventSendOptions
+	optionsBuilder: ObjectBuilder<EventSendOptions>
 ): EventMulticaster<Data> {
-	const optionsOverrider = objectOverrider(options ?? {});
-
-	const createBuilder = (optionsBuilder: ReturnType<typeof optionsOverrider>): EventMulticasterBuilder<Data> => ({
-		opt: (path, value) => createBuilder(optionsBuilder.with(path, value)),
-		send: <AppContext>(
-			client: Client<AppContext>,
-			runId: string | string[],
-			...args: Data extends void ? [] : [Data]
-		) =>
-			createEventMulticaster(workflowName, workflowVersionId, eventName, schema, optionsBuilder.build()).send(
-				client,
-				runId,
-				...args
-			),
-		sendByReferenceId: <AppContext>(
-			client: Client<AppContext>,
-			referenceId: string | string[],
-			...args: Data extends void ? [] : [Data]
-		) =>
-			createEventMulticaster(
-				workflowName,
-				workflowVersionId,
-				eventName,
-				schema,
-				optionsBuilder.build()
-			).sendByReferenceId(client, referenceId, ...args),
-	});
-
-	async function send<AppContext>(
-		client: Client<AppContext>,
+	async function send<Context>(
+		client: Client<Context>,
 		runId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	): Promise<void> {
+	): Promise<EventMulticastResult> {
 		let data = args[0];
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(data);
@@ -367,30 +310,38 @@ function createEventMulticaster<Data>(
 
 		const runIds = Array.isArray(runId) ? runId : [runId];
 		if (!isNonEmptyArray(runIds)) {
-			return;
+			return { sentIds: [], failedIds: [] };
 		}
 
-		await client.api.workflowRun.multicastEventV1({
+		const options = optionsBuilder.build();
+		const { codec: clientCodec } = client[INTERNAL];
+		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+
+		const result = await client.api.workflowRun.multicastEventV1({
 			ids: runIds,
 			eventName,
-			data,
+			data: await codec.encode(data),
+			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});
 
 		client.logger.info("Multicasted event to workflows", {
 			"aiki.workflowName": workflowName,
 			"aiki.workflowVersionId": workflowVersionId,
-			"aiki.workflowRunIds": runIds,
+			"aiki.sentWorkflowRunIds": result.sentIds,
+			"aiki.failedWorkflowRunIds": result.failedIds,
 			"aiki.eventName": eventName,
 			...(options?.reference ? { "aiki.eventReferenceId": options.reference.id } : {}),
 		});
+
+		return result;
 	}
 
-	async function sendByReferenceId<AppContext>(
-		client: Client<AppContext>,
+	async function sendByReferenceId<Context>(
+		client: Client<Context>,
 		referenceId: string | string[],
 		...args: Data extends void ? [] : [Data]
-	): Promise<void> {
+	): Promise<EventMulticastResult> {
 		let data = args[0];
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(data);
@@ -409,17 +360,22 @@ function createEventMulticaster<Data>(
 
 		const referenceIds = Array.isArray(referenceId) ? referenceId : [referenceId];
 		if (!isNonEmptyArray(referenceIds)) {
-			return;
+			return { sentIds: [], failedIds: [] };
 		}
 
-		await client.api.workflowRun.multicastEventByReferenceV1({
+		const options = optionsBuilder.build();
+		const { codec: clientCodec } = client[INTERNAL];
+		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+
+		const result = await client.api.workflowRun.multicastEventByReferenceV1({
 			references: referenceIds.map((referenceId) => ({
 				name: workflowName,
 				versionId: workflowVersionId,
 				referenceId,
 			})),
 			eventName,
-			data,
+			data: await codec.encode(data),
+			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});
 
@@ -427,13 +383,18 @@ function createEventMulticaster<Data>(
 			"aiki.workflowName": workflowName,
 			"aiki.workflowVersionId": workflowVersionId,
 			"aiki.referenceIds": referenceIds,
+			"aiki.sentWorkflowRunIds": result.sentIds,
+			"aiki.failedWorkflowRunIds": result.failedIds,
 			"aiki.eventName": eventName,
 			...(options?.reference ? { "aiki.eventReferenceId": options.reference.id } : {}),
 		});
+
+		return result;
 	}
 
 	return {
-		with: () => createBuilder(optionsOverrider()),
+		with: (path, value) =>
+			createEventMulticaster(workflowName, workflowVersionId, eventName, schema, optionsBuilder.with(path, value)),
 		send,
 		sendByReferenceId,
 	};

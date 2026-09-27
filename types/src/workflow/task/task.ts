@@ -1,6 +1,7 @@
-import type { OptionalProp } from "@aikirun/lib/object";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { SerializableError } from "@aikirun/lib/serializable";
+
+import type { OpaquePayload } from "../../payload";
 
 export type TaskId = string & { _brand: "task_id" };
 
@@ -11,98 +12,59 @@ export type TaskAddress = string & { _brand: "task_address" };
 export const TASK_STATUSES = ["running", "awaiting_retry", "completed", "failed", "discarded"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-export interface TaskDefinitionOptions {
+export type DiscardableTaskStatus = "running" | "awaiting_retry" | "failed";
+
+export interface TaskStartOptions {
 	retry?: RetryStrategy;
 }
 
-export interface TaskStartOptions extends TaskDefinitionOptions {}
-
-interface TaskStateBase {
-	status: TaskStatus;
-	attempts: number;
-}
-
-export interface TaskStateRunning<Input> extends TaskStateBase {
+export interface TaskStateRunning {
 	status: "running";
-	input: Input;
 }
 
-export interface TaskStateAwaitingRetry extends TaskStateBase {
+export interface TaskStateAwaitingRetry {
 	status: "awaiting_retry";
 	error: SerializableError;
 	nextAttemptAt: number;
 }
 
-export interface TaskStateCompleted<Output> extends TaskStateBase {
+export interface TaskStateCompleted {
 	status: "completed";
-	output: Output;
+	output?: OpaquePayload;
 }
 
-export interface TaskStateFailed extends TaskStateBase {
+export interface TaskStateFailed {
 	status: "failed";
 	error: SerializableError;
 }
 
-export interface TaskStateDiscarded extends TaskStateBase {
+export interface TaskStateDiscarded {
 	status: "discarded";
 }
 
-export type TaskState<Input = unknown, Output = unknown> =
-	| TaskStateRunning<Input>
+export type TaskState =
+	| TaskStateRunning
 	| TaskStateAwaitingRetry
-	| TaskStateCompleted<Output>
+	| TaskStateCompleted
 	| TaskStateFailed
 	| TaskStateDiscarded;
 
 export interface TaskInfo {
 	id: string;
 	name: string;
-	state: Exclude<TaskState, TaskStateDiscarded>;
 	inputHash: string;
+	options?: TaskStartOptions;
+	attempts: number;
+	state: Exclude<TaskState, TaskStateDiscarded>;
 }
 
-export interface TransitionTaskStateBase {
+export interface TaskRecord {
 	id: string;
-	expectedWorkflowRunRevision: number;
-}
-
-export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateBase {
-	type: "create";
-	taskName: string;
+	name: string;
+	workflowRunId: string;
+	input?: OpaquePayload;
+	inputHash: string;
 	options?: TaskStartOptions;
-	taskState: TaskStateRunningRequest;
-}
-
-export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBase {
-	type: "retry";
-	taskId: string;
-	options?: TaskStartOptions;
-	taskState: TaskStateRunningRequest;
-}
-
-export type TaskStateRunningRequest = OptionalProp<TaskStateRunning<unknown>, "input">;
-
-export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
-	taskId: string;
-	taskState: TaskStateCompletedRequest;
-}
-
-export type TaskStateCompletedRequest = OptionalProp<TaskStateCompleted<unknown>, "output">;
-
-export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
-	taskId: string;
-	taskState: TaskStateFailed;
-}
-
-export interface TransitionTaskStateToAwaitingRetry extends TransitionTaskStateBase {
-	taskId: string;
-	taskState: TaskStateAwaitingRetryRequest;
-}
-
-export type TaskStateAwaitingRetryRequest = Omit<TaskStateAwaitingRetry, "nextAttemptAt"> & {
-	nextAttemptInMs: number;
-};
-
-export interface TaskQueue {
-	tasks: TaskInfo[];
+	attempts: number;
+	state: TaskState;
 }

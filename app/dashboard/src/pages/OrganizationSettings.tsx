@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { createNamespace, namespaceManagementClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { authClient } from "../auth/client";
+import { btnPrimary, eyebrow, inputStyle as sharedInputStyle } from "../components/common/ui";
 import { getNamespaceDotColor } from "../constants/namespace";
 
 // --- Types ---
@@ -170,9 +171,9 @@ export function OrganizationSettings() {
 						display: "flex",
 						gap: 4,
 						background: "var(--s1)",
-						borderRadius: 8,
+						borderRadius: "var(--r-control)",
 						padding: 4,
-						border: "1px solid rgba(255,255,255,0.04)",
+						border: "1px solid var(--b0)",
 					}}
 				>
 					{(["members", "namespaces"] as const).map((tab) => {
@@ -194,15 +195,16 @@ export function OrganizationSettings() {
 									setState({ mode: "idle" });
 								}}
 								style={{
-									background: isActive ? "var(--s3)" : "transparent",
+									background: isActive ? "var(--accent-tint)" : "transparent",
 									border: "none",
-									borderRadius: 6,
-									color: isActive ? "var(--t0)" : "var(--t3)",
-									fontSize: 12,
-									fontWeight: 600,
-									padding: "5px 13px",
+									borderRadius: "var(--r-chip)",
+									color: isActive ? "var(--accent-ink)" : "var(--t3)",
+									fontFamily: "var(--mono)",
+									fontSize: 11.5,
+									fontWeight: 500,
+									letterSpacing: "0.02em",
+									padding: "6px 14px",
 									cursor: "pointer",
-									fontFamily: "inherit",
 									transition: "background 0.1s, color 0.1s",
 								}}
 							>
@@ -457,7 +459,7 @@ function CreateOrganizationInline({
 						Only lowercase letters, numbers, and hyphens.
 					</p>
 				</div>
-				{error && <p style={{ fontSize: 11, color: "#F87171" }}>{error}</p>}
+				{error && <p style={{ fontSize: 11, color: "var(--accent-red)" }}>{error}</p>}
 				<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 					<button
 						type="submit"
@@ -563,7 +565,7 @@ function InviteMemberInline({
 					</button>
 					<CancelButton onClick={onCancel} />
 				</div>
-				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 8 }}>{error}</p>}
+				{error && <p style={{ fontSize: 11, color: "var(--accent-red)", marginTop: 8 }}>{error}</p>}
 			</form>
 		</div>
 	);
@@ -622,7 +624,7 @@ function CreateNamespaceInline({ onCreated, onCancel }: { onCreated: () => void;
 					</button>
 					<CancelButton onClick={onCancel} />
 				</div>
-				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 8 }}>{error}</p>}
+				{error && <p style={{ fontSize: 11, color: "var(--accent-red)", marginTop: 8 }}>{error}</p>}
 			</form>
 		</div>
 	);
@@ -669,10 +671,7 @@ function MemberRow({
 
 	return (
 		<div style={rowStyle}>
-			<div style={{ flex: 1, minWidth: 0 }}>
-				<span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--t0)" }}>{member.user.name}</span>
-				<span style={{ fontSize: 11, color: "var(--t3)", marginLeft: 6 }}>({member.user.email})</span>
-			</div>
+			<Identity name={member.user.name} email={member.user.email} />
 			<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
 				{isOwner || !canManage ? (
 					<Badge>{member.role}</Badge>
@@ -683,10 +682,10 @@ function MemberRow({
 						disabled={isUpdating}
 						style={{
 							background: "var(--s2)",
-							border: "1px solid rgba(255,255,255,0.08)",
-							borderRadius: 5,
+							border: "1px solid var(--b1)",
+							borderRadius: "var(--r-chip)",
 							padding: "3px 8px",
-							fontSize: 11,
+							fontSize: "var(--field-size)",
 							color: "var(--t1)",
 							cursor: isUpdating ? "not-allowed" : "pointer",
 							fontFamily: "inherit",
@@ -698,7 +697,7 @@ function MemberRow({
 				)}
 				{canManage && !isOwner && !isSelf && <DangerButton onClick={onRemove}>Remove</DangerButton>}
 			</div>
-			{error && <span style={{ fontSize: 11, color: "#F87171", flexShrink: 0 }}>{error}</span>}
+			{error && <span style={{ fontSize: 11, color: "var(--accent-red)", flexShrink: 0 }}>{error}</span>}
 		</div>
 	);
 }
@@ -719,7 +718,7 @@ function ConfirmRemoveRow({
 		<div style={rowStyle}>
 			<div style={{ flex: 1 }}>
 				<span style={{ fontSize: 12.5, color: "var(--t1)" }}>Remove {name}?</span>
-				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 4 }}>{error}</p>}
+				{error && <p style={{ fontSize: 11, color: "var(--accent-red)", marginTop: 4 }}>{error}</p>}
 			</div>
 			<div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
 				<DangerButton
@@ -773,27 +772,38 @@ function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; on
 
 	return (
 		<div style={rowStyle}>
-			<div style={{ flex: 1, minWidth: 0 }}>
-				<span style={{ fontSize: 12.5, color: "var(--t1)" }}>{invitation.email}</span>
-				{error && <p style={{ fontSize: 11, color: "#F87171", marginTop: 4 }}>{error}</p>}
+			<div style={{ flex: "1 1 190px", minWidth: 0 }}>
+				<div
+					style={{
+						fontSize: 12.5,
+						color: "var(--t1)",
+						overflow: "hidden",
+						textOverflow: "ellipsis",
+						whiteSpace: "nowrap",
+					}}
+					title={invitation.email}
+				>
+					{invitation.email}
+				</div>
+				<div style={{ fontSize: 11, color: "var(--t3)" }}>as {invitation.role}</div>
+				{error && <p style={{ fontSize: 11, color: "var(--accent-red)", marginTop: 4 }}>{error}</p>}
 			</div>
-			<span style={{ fontSize: 11, color: "var(--t3)", marginRight: 8, flexShrink: 0 }}>as {invitation.role}</span>
 			<button
 				type="button"
 				onClick={handleCopyLink}
 				style={{
 					background: "none",
-					border: "1px solid rgba(255,255,255,0.12)",
-					borderRadius: 5,
+					border: "1px solid var(--b1)",
+					borderRadius: "var(--r-chip)",
 					padding: "3px 10px",
 					fontSize: 11,
 					fontWeight: 600,
-					color: isCopied ? "#4ADE80" : "var(--t1)",
+					color: isCopied ? "var(--accent-green)" : "var(--t1)",
 					cursor: "pointer",
 					whiteSpace: "nowrap",
 					flexShrink: 0,
 					transition: "color 0.15s, border-color 0.15s",
-					borderColor: isCopied ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.12)",
+					borderColor: isCopied ? "var(--accent-green)" : "var(--b1)",
 				}}
 			>
 				{isCopied ? "Copied!" : "Copy Link"}
@@ -928,9 +938,15 @@ function NamespaceRow({
 
 	return (
 		<div>
-			<div style={rowStyle}>
-				<div style={{ flex: 1, minWidth: 0 }}>
-					<span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+			<div
+				style={{
+					...rowStyle,
+					borderRadius: showMembers ? "var(--r-chip) var(--r-chip) 0 0" : "var(--r-chip)",
+					borderBottom: showMembers ? "none" : rowStyle.border,
+				}}
+			>
+				<div style={{ flex: "1 1 130px", minWidth: 0 }}>
+					<span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
 						<span
 							style={{
 								width: 7,
@@ -943,9 +959,13 @@ function NamespaceRow({
 						<span
 							style={{
 								fontSize: 12.5,
-								fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+								fontFamily: "var(--mono)",
 								color: "var(--t1)",
+								overflow: "hidden",
+								textOverflow: "ellipsis",
+								whiteSpace: "nowrap",
 							}}
+							title={namespace.name}
 						>
 							{namespace.name}
 						</span>
@@ -960,13 +980,13 @@ function NamespaceRow({
 								loadMembers();
 							}}
 							style={{
-								background: showMembers ? "rgba(102,126,234,0.1)" : "rgba(102,126,234,0.08)",
-								border: `1px solid ${showMembers ? "rgba(102,126,234,0.3)" : "rgba(102,126,234,0.2)"}`,
-								borderRadius: 5,
+								background: "var(--accent-tint)",
+								border: `1px solid ${showMembers ? "var(--accent-tint-border)" : "transparent"}`,
+								borderRadius: "var(--r-chip)",
 								padding: "3px 10px",
 								fontSize: 11,
 								fontWeight: 600,
-								color: "#667eea",
+								color: "var(--accent-ink)",
 								cursor: "pointer",
 								whiteSpace: "nowrap",
 								transition: "background 0.15s, border-color 0.15s",
@@ -987,7 +1007,15 @@ function NamespaceRow({
 				</div>
 			</div>
 			{showMembers && canViewMembers && (
-				<div style={{ padding: "8px 12px 10px" }}>
+				<div
+					style={{
+						background: "var(--s2)",
+						border: "1px solid var(--b0)",
+						borderTop: "1px solid var(--b0)",
+						borderRadius: "0 0 var(--r-chip) var(--r-chip)",
+						padding: "10px 12px 12px",
+					}}
+				>
 					{membersLoading ? (
 						<span style={{ fontSize: 11, color: "var(--t3)" }}>Loading...</span>
 					) : (
@@ -996,26 +1024,26 @@ function NamespaceRow({
 								<p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 8 }}>No members</p>
 							)}
 							{nsMembers?.map((m) => (
-								<div key={m.userId} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-									<span style={{ flex: 1, fontSize: 11, color: "var(--t1)" }}>
-										{m.name || m.email}
-										{m.name && <span style={{ color: "var(--t3)", marginLeft: 4 }}>({m.email})</span>}
-									</span>
+								<div
+									key={m.userId}
+									style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}
+								>
+									<Identity name={m.name} email={m.email} />
 									{isNsAdmin ? (
-										<>
+										<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
 											<select
 												value={m.role}
 												onChange={(e) => handleRoleChange(m.userId, e.target.value as NamespaceRole)}
 												disabled={isSaving}
 												style={{
-													background: "var(--s2)",
-													border: "1px solid rgba(255,255,255,0.08)",
-													borderRadius: 5,
-													padding: "2px 6px",
-													fontSize: 10,
+													background: "var(--s1)",
+													border: "1px solid var(--b0)",
+													borderRadius: "var(--r-chip)",
+													padding: "3px 7px",
+													fontSize: "var(--field-size)",
 													color: "var(--t1)",
 													cursor: isSaving ? "not-allowed" : "pointer",
-													fontFamily: "inherit",
+													fontFamily: "var(--sans)",
 												}}
 											>
 												<option value="admin">admin</option>
@@ -1025,7 +1053,7 @@ function NamespaceRow({
 											<DangerButton onClick={() => handleRemoveMember(m.userId)} disabled={isSaving}>
 												Remove
 											</DangerButton>
-										</>
+										</div>
 									) : (
 										<Badge>{m.role}</Badge>
 									)}
@@ -1080,7 +1108,6 @@ function NamespaceRow({
 										style={{
 											...inputStyle,
 											flex: 1,
-											fontSize: 11,
 											padding: "4px 8px",
 										}}
 									>
@@ -1097,7 +1124,6 @@ function NamespaceRow({
 										style={{
 											...inputStyle,
 											width: 80,
-											fontSize: 11,
 											padding: "4px 8px",
 										}}
 									>
@@ -1112,7 +1138,7 @@ function NamespaceRow({
 					)}
 				</div>
 			)}
-			{error && <p style={{ fontSize: 11, color: "#F87171", padding: "0 12px 4px" }}>{error}</p>}
+			{error && <p style={{ fontSize: 11, color: "var(--accent-red)", padding: "0 12px 4px" }}>{error}</p>}
 		</div>
 	);
 }
@@ -1124,8 +1150,8 @@ function Section({ children }: { children: React.ReactNode }) {
 		<div
 			style={{
 				background: "var(--s1)",
-				border: "1px solid rgba(255,255,255,0.04)",
-				borderRadius: 8,
+				border: "1px solid var(--b0)",
+				borderRadius: "var(--r-card)",
 			}}
 		>
 			{children}
@@ -1134,22 +1160,7 @@ function Section({ children }: { children: React.ReactNode }) {
 }
 
 function SectionLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-	return (
-		<div
-			style={{
-				padding: "12px 16px 8px",
-				fontSize: 10,
-				fontWeight: 700,
-				letterSpacing: "0.08em",
-				color: "var(--t3)",
-				fontFamily: "IBM Plex Mono, ui-monospace, monospace",
-				textTransform: "uppercase",
-				...style,
-			}}
-		>
-			{children}
-		</div>
-	);
+	return <div style={{ ...eyebrow(), padding: "14px 16px 8px", ...style }}>{children}</div>;
 }
 
 function InfoRow({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
@@ -1169,10 +1180,10 @@ function Badge({ children }: { children: React.ReactNode }) {
 				fontSize: 10,
 				fontWeight: 600,
 				padding: "2px 8px",
-				borderRadius: 4,
-				background: "rgba(167,139,250,0.12)",
-				color: "#A78BFA",
-				fontFamily: "IBM Plex Mono, ui-monospace, monospace",
+				borderRadius: "var(--r-chip)",
+				background: "var(--accent-tint)",
+				color: "var(--accent-ink)",
+				fontFamily: "var(--mono)",
 			}}
 		>
 			{children}
@@ -1186,12 +1197,12 @@ function ActionButton({ onClick, children }: { onClick: () => void; children: Re
 			type="button"
 			onClick={onClick}
 			style={{
-				background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+				background: "var(--accent)",
 				color: "#fff",
 				fontSize: 11,
 				fontWeight: 700,
 				padding: "6px 12px",
-				borderRadius: 6,
+				borderRadius: "var(--r-chip)",
 				border: "none",
 				cursor: "pointer",
 				whiteSpace: "nowrap",
@@ -1221,12 +1232,12 @@ function DangerButton({
 			title={title}
 			style={{
 				background: "none",
-				border: "1px solid rgba(248, 113, 113, 0.25)",
-				borderRadius: 5,
+				border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
+				borderRadius: "var(--r-chip)",
 				padding: "3px 10px",
 				fontSize: 11,
 				fontWeight: 600,
-				color: "#F87171",
+				color: "var(--accent-red)",
 				cursor: disabled ? "not-allowed" : "pointer",
 				opacity: disabled ? 0.4 : 1,
 				whiteSpace: "nowrap",
@@ -1264,7 +1275,11 @@ function LoadingRows({ count }: { count: number }) {
 	return (
 		<>
 			{SKELETON_KEYS.slice(0, count).map((key) => (
-				<div key={key} style={{ height: 42, borderRadius: 6, background: "var(--s2)" }} className="animate-pulse" />
+				<div
+					key={key}
+					style={{ height: 42, borderRadius: "var(--r-chip)", background: "var(--s2)" }}
+					className="animate-pulse"
+				/>
 			))}
 		</>
 	);
@@ -1299,40 +1314,73 @@ function getOrgType(activeOrganization: { slug: string }, orgData: FullOrganizat
 // --- Shared Styles ---
 
 const inputStyle: React.CSSProperties = {
-	background: "var(--s2)",
-	border: "1px solid rgba(255,255,255,0.08)",
-	borderRadius: 6,
+	...sharedInputStyle,
+	fontFamily: "var(--sans)",
+	fontSize: "var(--field-size)",
 	padding: "8px 12px",
-	fontSize: 12,
-	color: "var(--t0)",
-	outline: "none",
-	fontFamily: "inherit",
+	width: "auto",
 };
 
 const primaryButtonStyle: React.CSSProperties = {
-	background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-	color: "#fff",
+	...btnPrimary(),
 	fontSize: 12,
-	fontWeight: 700,
-	padding: "8px 14px",
-	borderRadius: 6,
-	border: "none",
-	whiteSpace: "nowrap",
+	padding: "7px 14px",
 };
 
 const rowStyle: React.CSSProperties = {
 	background: "var(--s2)",
-	border: "1px solid rgba(255,255,255,0.04)",
-	borderRadius: 6,
+	border: "1px solid var(--b0)",
+	borderRadius: "var(--r-chip)",
 	padding: "8px 12px",
 	display: "flex",
 	alignItems: "center",
 	gap: 8,
+	// Identity is elastic, the controls are not; without wrapping they get pushed
+	// off the row on a narrow screen.
+	flexWrap: "wrap",
 };
+
+/**
+ * Name over email, each truncating on its own line. Inline `name (email)` cannot
+ * shrink below the email's width, so on a phone it either overlaps the row's
+ * controls or shoves them off the edge.
+ */
+function Identity({ name, email }: { name?: string; email: string }) {
+	return (
+		<div style={{ flex: "1 1 190px", minWidth: 0 }}>
+			{name && (
+				<div
+					style={{
+						fontSize: 12.5,
+						fontWeight: 600,
+						color: "var(--t0)",
+						overflow: "hidden",
+						textOverflow: "ellipsis",
+						whiteSpace: "nowrap",
+					}}
+				>
+					{name}
+				</div>
+			)}
+			<div
+				style={{
+					fontSize: 11,
+					color: "var(--t3)",
+					overflow: "hidden",
+					textOverflow: "ellipsis",
+					whiteSpace: "nowrap",
+				}}
+				title={email}
+			>
+				{email}
+			</div>
+		</div>
+	);
+}
 
 const inlineFormContainerStyle: React.CSSProperties = {
 	background: "var(--s2)",
-	border: "1px solid rgba(255,255,255,0.06)",
-	borderRadius: 6,
+	border: "1px solid var(--b0)",
+	borderRadius: "var(--r-chip)",
 	padding: "12px 14px",
 };

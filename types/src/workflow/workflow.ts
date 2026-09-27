@@ -5,19 +5,7 @@ export const WORKFLOW_SOURCES = ["user", "system"] as const;
 export type WorkflowSource = (typeof WORKFLOW_SOURCES)[number];
 
 export interface WorkflowMeta {
+	source: WorkflowSource;
 	name: WorkflowName;
 	versionId: WorkflowVersionId;
-}
-
-export interface WorkflowVersionStats {
-	firstSeenAt: number;
-	lastRunAt: number;
-	runCount: number;
-}
-
-export interface Workflow {
-	name: WorkflowName;
-	versions: Record<string, WorkflowVersionStats>;
-	runCount: number;
-	lastRunAt: number;
 }

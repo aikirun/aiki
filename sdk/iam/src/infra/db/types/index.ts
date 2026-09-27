@@ -8,5 +8,11 @@ export interface Repositories {
 	organization: OrganizationRepository;
 	session: SessionRepository;
 	apiKey: ApiKeyRepository;
-	transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T>;
+	transaction<T>(fn: (txRepos: TxRepositories) => Promise<T>): Promise<T>;
 }
+
+declare const inTransaction: unique symbol;
+
+export type TxRepositories = Omit<Repositories, "transaction"> & {
+	readonly [inTransaction]: true;
+};

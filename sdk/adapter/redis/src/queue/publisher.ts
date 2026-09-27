@@ -1,30 +1,98 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
-import type { CreatePublisher, Publisher, PublisherContext, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type {
+	CreatePublisher,
+	Publisher,
+	PublishRunsResult,
+	PublishRunsResultBucket,
+	ReadyWorkflowRun,
+} from "@aikirun/types/infra/queue";
 import type { Redis } from "ioredis";
 
 import { getWorkflowQueueName } from "./key";
+import { connectionTracker } from "../connection";
+
+interface QueueData {
+	runs: ReadyWorkflowRun[];
+	args: (string | number)[];
+}
 
 export function redisPublisher(redis: Redis): CreatePublisher {
-	return (_context: PublisherContext): Publisher => ({
-		async publishReadyRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<void> {
-			const redisPipeline = redis.pipeline();
+	return ({ logger }): Publisher => {
+		const redisTracker = connectionTracker(redis);
 
-			const argsByQueueName = new Map<string, (string | number)[]>();
-			for (const { id, name, versionId, rank, shard } of runs) {
-				const queueName = getWorkflowQueueName(name, versionId, shard);
-				const args = argsByQueueName.get(queueName);
-				if (!args) {
-					argsByQueueName.set(queueName, [rank, id]);
-				} else {
-					args.push(rank, id);
+		return {
+			async publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
+				if (!redisTracker.isAvailable()) {
+					return { failed: { runs: runs.map((run) => ({ run })) } };
 				}
-			}
 
-			for (const [queueName, args] of argsByQueueName) {
-				redisPipeline.zadd(queueName, ...args);
-			}
+				const dataByQueueName = new Map<string, QueueData>();
+				for (const run of runs) {
+					const queueName = getWorkflowQueueName({
+						namespaceId: run.namespaceId,
+						source: run.source,
+						name: run.name,
+						versionId: run.versionId,
+						pool: run.pool,
+					});
+					const queueData = dataByQueueName.get(queueName);
+					if (!queueData) {
+						dataByQueueName.set(queueName, { runs: [run], args: [run.rank, run.id] });
+					} else {
+						queueData.runs.push(run);
+						queueData.args.push(run.rank, run.id);
+					}
+				}
 
-			await redisPipeline.exec();
-		},
-	});
+				const redisPipeline = redis.pipeline();
+				const queueDataBatch: QueueData[] = [];
+				for (const [queueName, queueData] of dataByQueueName) {
+					redisPipeline.zadd(queueName, ...queueData.args);
+					queueDataBatch.push(queueData);
+				}
+
+				const results = await redisPipeline.exec();
+				if (results === null) {
+					logger.warn("Publish pipeline returned no results, treating runs as failed", {
+						"aiki.count": runs.length,
+					});
+					return { failed: { runs: runs.map((run) => ({ run })) } };
+				}
+
+				const published: PublishRunsResultBucket = { runs: [] };
+				const failed: PublishRunsResultBucket = { runs: [] };
+				let err: Error | undefined;
+				for (const [i, queueData] of queueDataBatch.entries()) {
+					const result = results[i];
+					const commandError = result === undefined ? new Error("Pipeline returned no result for command") : result[0];
+					if (commandError !== null) {
+						err ??= commandError;
+						for (const run of queueData.runs) {
+							failed.runs.push({ run });
+						}
+					} else {
+						for (const run of queueData.runs) {
+							published.runs.push({ run });
+						}
+					}
+				}
+
+				if (err) {
+					logger.warn("Publish command failed, treating its runs as failed", {
+						err,
+						"aiki.count": failed.runs.length,
+					});
+				}
+
+				const result: PublishRunsResult = {};
+				if (published.runs.length > 0) {
+					result.published = published;
+				}
+				if (failed.runs.length > 0) {
+					result.failed = failed;
+				}
+				return result;
+			},
+		};
+	};
 }

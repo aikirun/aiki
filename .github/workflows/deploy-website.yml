@@ -1,0 +1,47 @@
+name: Deploy website
+
+# Builds the marketing and docs website and deploys the static output to
+# Cloudflare Pages. The website is built from the ref this runs against, so a
+# rollback is just running this workflow at an older v* tag.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy (blank = the branch you run this from)
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to deploy (blank = the caller's ref)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize website deploys; never cancel a publish already in flight.
+concurrency:
+  group: deploy-website
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Build and deploy the website to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          bun run build:website
+          bunx wrangler@4 pages deploy app/website/build/client --project-name "${{ vars.CLOUDFLARE_WEBSITE_PAGES_PROJECT }}" --branch=main

@@ -1,4 +1,4 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Logger } from "@aikirun/lib/logger";
 
 export type TimerType =
@@ -13,7 +13,6 @@ export type TimerType =
 export interface TimerEntry {
 	type: TimerType;
 	id: string;
-	dueAt: number;
 	rank: number;
 }
 
@@ -23,20 +22,28 @@ export interface DueTimer {
 	rank: number;
 }
 
-export interface TimerSignalWaiter {
-	wait(timeoutSeconds: number): Promise<number>;
+export interface TimerPriorityQueueWaiter {
+	/**
+	 * Resolves when a new timer whose rank is lower than the
+	 * queue front's rank arrives, or null on timeout or close.
+	 * `timeoutSeconds` of 0 waits indefinitely.
+	 */
+	wait(timeoutSeconds: number): Promise<{ rank: number } | null>;
 	close(): Promise<void>;
 }
 
-export interface TimerSortedSet {
-	add(timers: NonEmptyArray<TimerEntry>): Promise<void>;
-	popDue(maxRank: number, limit: number): Promise<DueTimer[]>;
-	peekNextRank(): Promise<number | null>;
-	createSignalWaiter(): TimerSignalWaiter;
+export type TimerAddResult = { status: "added" } | { status: "failed" };
+
+export interface TimerPriorityQueue {
+	add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult>;
+	popDue(params: { maxRank: number; limit: number }): Promise<DueTimer[]>;
+	peekNext(): Promise<{ rank: number } | null>;
+	createWaiter(): TimerPriorityQueueWaiter;
 }
 
-export interface TimerSortedSetContext {
+export interface TimerPriorityQueueContext {
 	logger: Logger;
+	signal?: AbortSignal;
 }
 
-export type CreateTimerSortedSet = (context: TimerSortedSetContext) => TimerSortedSet;
+export type CreateTimerPriorityQueue = (context: TimerPriorityQueueContext) => TimerPriorityQueue;

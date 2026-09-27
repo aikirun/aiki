@@ -1,45 +1,52 @@
 import { httpSubscriber } from "@aikirun/http";
-import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/array";
-import { createBinaryLatch, delay } from "@aikirun/lib/async";
+import { createBinaryLatch, delay, settleWithin } from "@aikirun/lib/async";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import { asConfigProvider, type ConfigProvider, type CreateConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
-import { type ObjectBuilder, objectOverrider, type PathFromObject, type TypeOfValueAtPath } from "@aikirun/lib/object";
+import {
+	merge,
+	type ObjectBuilder,
+	objectOverrider,
+	type PathFromObject,
+	type TypeOfValueAtPath,
+} from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { CreateSubscriber, Subscriber, WorkflowRunMessage } from "@aikirun/types/infra/queue";
 import type { WorkerId } from "@aikirun/types/worker";
-import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { WorkflowMeta, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	type AnyWorkflowVersion,
 	executeWorkflowRun,
 	getSystemWorkflows,
-	type WorkflowExecutionOptions,
 	type WorkflowRegistry,
 	type WorkflowVersion,
 	workflowRegistry,
 } from "@aikirun/workflow";
 import { ulid } from "ulidx";
 
+import { defaultWorkerConfig, type WorkerConfig, type WorkerConfigOverrides } from "./config";
+
 /**
  * Creates an Aiki worker definition for executing workflows.
  *
- * Worker definitions are static and reusable. Call `spawn(client)` to begin
+ * Worker definitions are static and reusable. Call `start(client)` to begin
  * execution, which returns a handle for controlling the running worker.
  *
  * @param params - Worker configuration parameters
  * @param params.workflows - Array of workflow versions this worker can execute
- * @param params.subscriber - Optional subscriber factory for work discovery (default: DB polling)
- * @returns Worker definition, call spawn(client) to begin execution
+ * @param params.subscriber - Optional subscriber factory for work discovery (default: claims work from the server over HTTP)
+ * @param params.config - Optional runtime tunables: a plain overrides object, or a config provider (e.g. `dynamicWorkerConfigProvider`) for live reloads
+ * @returns Worker definition, call start(client) to begin execution
  *
  * @example
  * ```typescript
  * export const myWorker = worker({
  *   workflows: [orderWorkflowV1, paymentWorkflowV1],
- *   options: {
- *     maxConcurrentWorkflowRuns: 10,
- *   },
+ *   config: { maxConcurrentWorkflowRuns: 10 },
  * });
  *
- * const handle = await myWorker.spawn(client);
+ * const handle = myWorker.start(client);
  *
  * process.on("SIGINT", async () => {
  *   await handle.stop();
@@ -53,22 +60,16 @@ export function worker(params: WorkerParams): Worker {
 export interface WorkerParams {
 	workflows: AnyWorkflowVersion[];
 	subscriber?: CreateSubscriber;
-	options?: WorkerDefinitionOptions;
+	config?: WorkerConfigOverrides | CreateConfigProvider<WorkerConfig>;
 }
 
-export interface WorkerDefinitionOptions {
-	maxConcurrentWorkflowRuns?: number;
-	workflowRun?: WorkflowExecutionOptions;
-	gracefulShutdownTimeoutMs?: number;
-}
-
-export interface WorkerSpawnOptions extends WorkerDefinitionOptions {
+export interface WorkerStartOptions {
 	/**
-	 * Optional array of shards this worker should process.
-	 * When provided, the worker will only subscribe to registered workflows within that shard.
-	 * When omitted, the worker subscribes to unsharded registered workflows.
+	 * Optional array of pools this worker should process.
+	 * When provided, the worker will only subscribe to registered workflows within those pools.
+	 * When omitted, the worker subscribes to registered workflows not assigned to a pool.
 	 */
-	shards?: string[];
+	pools?: string[];
 	/**
 	 * Optional reference for external correlation.
 	 * Use this to associate the worker with external identifiers.
@@ -79,8 +80,12 @@ export interface WorkerSpawnOptions extends WorkerDefinitionOptions {
 }
 
 export interface Worker {
-	with(): WorkerBuilder;
-	spawn: <AppContext>(client: Client<AppContext>) => Promise<WorkerHandle>;
+	/** Sets one start option and returns a copy of {@link Worker}. The original is unchanged. */
+	with<Path extends PathFromObject<WorkerStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkerStartOptions, Path>
+	): Worker;
+	start: <Context>(client: Client<Context>) => WorkerHandle;
 }
 
 export interface WorkerHandle {
@@ -89,195 +94,180 @@ export interface WorkerHandle {
 }
 
 class WorkerImpl implements Worker {
-	constructor(private readonly params: WorkerParams) {}
+	private readonly startOptionsBuilder: ObjectBuilder<WorkerStartOptions>;
 
-	public with(): WorkerBuilder {
-		const spawnOptions: WorkerSpawnOptions = this.params.options ?? {};
-		const spawnOptionsOverrider = objectOverrider(spawnOptions);
-		return new WorkerBuilderImpl(this, spawnOptionsOverrider());
+	constructor(
+		private readonly params: WorkerParams,
+		startOptionsBuilder?: ObjectBuilder<WorkerStartOptions>
+	) {
+		this.startOptionsBuilder = startOptionsBuilder ?? objectOverrider<WorkerStartOptions>({})();
 	}
 
-	public async spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
-		return this.spawnWithOptions(client, this.params.options ?? {});
+	public with<Path extends PathFromObject<WorkerStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<WorkerStartOptions, Path>
+	): Worker {
+		return new WorkerImpl(this.params, this.startOptionsBuilder.with(path, value));
 	}
 
-	public async spawnWithOptions<AppContext>(
-		client: Client<AppContext>,
-		spawnOptions: WorkerSpawnOptions
-	): Promise<WorkerHandle> {
-		const handle = new WorkerHandleImpl(client, this.params, spawnOptions);
-		await handle._start();
-		return handle;
+	public start<Context>(client: Client<Context>): WorkerHandle {
+		return new WorkerHandleImpl(client, this.params, this.startOptionsBuilder.build());
 	}
 }
 
 interface ActiveWorkflowRun {
-	run: WorkflowRun;
+	run: WorkflowRunRecord;
 	executionPromise: Promise<void>;
 }
 
-class WorkerHandleImpl<AppContext> implements WorkerHandle {
+class WorkerHandleImpl<Context> implements WorkerHandle {
 	public readonly id: WorkerId;
-	private readonly workflowRunOptions: Required<WorkflowExecutionOptions>;
 	private readonly registry: WorkflowRegistry;
 	private readonly logger: Logger;
-	private abortController: AbortController | undefined;
-	private primarySubscriber: Subscriber | undefined;
-	private backupSubscriber: Subscriber | undefined;
-	private subscriberLoopPromise: Promise<void> | undefined;
+	private readonly abortController: AbortController;
+	private readonly configProvider: ConfigProvider<WorkerConfig>;
+	private readonly primarySubscriber: Subscriber;
+	private readonly backupSubscriber: Subscriber | undefined;
+	private readonly subscriberLoopPromise: Promise<void>;
 	private primarySubscriberFailedAttempts = 0;
 	private primarySubscriberNextAttemptAt = 0;
 	private backupSubscriberFailedAttempts = 0;
-	private availableCapacityLatch = createBinaryLatch();
-	private pendingWorkflowRunIds = new Set<string>();
-	private activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
-	private lastServerHeartbeatByRunId = new Map<string, number>();
+	private readonly availableCapacityLatch = createBinaryLatch();
+	private readonly pendingWorkflowRunIds = new Set<string>();
+	private readonly activeWorkflowRunsById = new Map<string, ActiveWorkflowRun>();
 	private stopPromise: Promise<void> | undefined;
 
 	constructor(
-		private readonly client: Client<AppContext>,
-		private readonly params: Omit<WorkerParams, "options">,
-		private readonly spawnOptions: WorkerSpawnOptions
+		private readonly client: Client<Context>,
+		private readonly params: WorkerParams,
+		private readonly startOptions: WorkerStartOptions
 	) {
 		this.id = ulid() as WorkerId;
-		this.workflowRunOptions = {
-			heartbeatIntervalMs: this.spawnOptions.workflowRun?.heartbeatIntervalMs ?? 30_000,
-			spinThresholdMs: this.spawnOptions.workflowRun?.spinThresholdMs ?? 10,
-		};
-		this.registry = workflowRegistry().addMany(getSystemWorkflows(client.api)).addMany(this.params.workflows);
+		this.registry = workflowRegistry()
+			.addMany("system", getSystemWorkflows(this.client.api))
+			.addMany("user", this.params.workflows);
+		const workflows = this.registry.getAll();
+		const workflowsMeta: WorkflowMeta[] = workflows.map(({ source, workflow }) => ({
+			source,
+			name: workflow.name,
+			versionId: workflow.versionId,
+		}));
+		if (!isNonEmptyArray(workflowsMeta)) {
+			throw new Error("No workflow registered");
+		}
 
-		const reference = this.spawnOptions.reference;
-		this.logger = client.logger.child({
+		const reference = this.startOptions.reference;
+		this.logger = this.client.logger.child({
 			"aiki.component": "worker",
 			"aiki.workerId": this.id,
 			...(reference && { "aiki.workerReferenceId": reference.id }),
 		});
-	}
-
-	async _start(): Promise<void> {
-		const workflows = this.registry.getAll();
-		if (!isNonEmptyArray(workflows)) {
-			throw new Error("No workflow registered");
-		}
-
-		const createPrimarySubscriber = this.params.subscriber ?? httpSubscriber({ api: this.client.api });
-		this.primarySubscriber = createPrimarySubscriber({
-			workerId: this.id,
-			workflows,
-			shards: this.spawnOptions.shards,
-			logger: this.logger.child({ "aiki.subscriber": "primary" }),
-		});
-		this.primarySubscriber.heartbeat = this.withServerHeartbeatForwarding(
-			this.primarySubscriber.heartbeat?.bind(this.primarySubscriber)
-		);
-
-		if (!this.params.subscriber) {
-			const createBackupSubscriber = httpSubscriber({ api: this.client.api });
-			this.backupSubscriber = createBackupSubscriber({
-				workerId: this.id,
-				workflows,
-				shards: this.spawnOptions.shards,
-				logger: this.logger.child({ "aiki.subscriber": "backup" }),
-			});
-			this.backupSubscriber.heartbeat = this.withServerHeartbeatForwarding(
-				this.backupSubscriber.heartbeat?.bind(this.backupSubscriber)
-			);
-		}
 
 		this.abortController = new AbortController();
-		const abortSignal = this.abortController.signal;
+		const signal = this.abortController.signal;
 
-		this.subscriberLoopPromise = this.subscriberLoop(abortSignal).catch((error) => {
-			if (!abortSignal.aborted) {
-				this.logger.error("Unexpected error", {
-					"aiki.error": error.message,
-				});
+		const configParam = this.params.config;
+		if (typeof configParam === "function") {
+			this.configProvider = configParam({
+				logger: this.logger.child({ "aiki.subComponent": "config-provider" }),
+				signal,
+			});
+		} else {
+			const config = merge(defaultWorkerConfig, configParam);
+			this.configProvider = asConfigProvider(() => config);
+		}
+
+		const createPrimarySubscriber = this.params.subscriber ?? httpSubscriber();
+		this.primarySubscriber = createPrimarySubscriber({
+			api: this.client.api,
+			workerId: this.id,
+			workflows: workflowsMeta,
+			pools: this.startOptions.pools,
+			logger: this.logger.child({ "aiki.subComponent": "primary-subscriber" }),
+			signal,
+		});
+
+		// Backup subscriber is only created if the user provided a custom subscriber.
+		// When the custom subscriber is present, we know for sure that it is not httpSubscriber
+		// because that pacakge is private
+		if (this.params.subscriber) {
+			const createBackupSubscriber = httpSubscriber();
+			this.backupSubscriber = createBackupSubscriber({
+				api: this.client.api,
+				workerId: this.id,
+				workflows: workflowsMeta,
+				pools: this.startOptions.pools,
+				logger: this.logger.child({ "aiki.subComponent": "backup-subscriber" }),
+				signal,
+			});
+		}
+
+		this.subscriberLoopPromise = this.subscriberLoop(signal).catch((err) => {
+			if (!signal.aborted) {
+				this.logger.error("Unexpected error", { err });
 			}
 		});
 	}
 
 	public stop(): Promise<void> {
-		if (!this.stopPromise) {
-			this.stopPromise = this._stop();
-		}
+		this.stopPromise ??= this._stop();
 		return this.stopPromise;
 	}
 
 	private async _stop(): Promise<void> {
 		this.logger.info("Worker stopping");
 
-		this.abortController?.abort();
+		this.abortController.abort();
 		this.availableCapacityLatch.signal();
-
-		await Promise.all([this.primarySubscriber?.close?.(), this.backupSubscriber?.close?.()]);
 
 		await this.subscriberLoopPromise;
 
 		const activeWorkflowRuns = Array.from(this.activeWorkflowRunsById.values());
 		if (activeWorkflowRuns.length > 0) {
-			const timeoutMs = this.spawnOptions.gracefulShutdownTimeoutMs ?? 5_000;
-			if (timeoutMs > 0) {
-				await Promise.race([Promise.allSettled(activeWorkflowRuns.map((w) => w.executionPromise)), delay(timeoutMs)]);
+			const gracefulShutdownTimeoutMs = this.configProvider.config.gracefulShutdownTimeoutMs;
+			if (gracefulShutdownTimeoutMs > 0) {
+				await settleWithin(
+					Promise.allSettled(activeWorkflowRuns.map((run) => run.executionPromise)),
+					gracefulShutdownTimeoutMs
+				);
 			}
 
 			const stillActiveRuns = Array.from(this.activeWorkflowRunsById.values());
 			if (stillActiveRuns.length > 0) {
-				const ids = stillActiveRuns.map((w) => w.run.id).join(", ");
-				this.logger.warn("Worker shutdown with active workflows", {
-					"aiki.activeWorkflowRunIds": ids,
+				const runIds = stillActiveRuns.map(({ run }) => run.id).join(", ");
+				this.logger.warn("Worker stopped while some workflows were active", {
+					"aiki.activeWorkflowRunIds": runIds,
 				});
 			}
 		}
 
 		this.pendingWorkflowRunIds.clear();
 		this.activeWorkflowRunsById.clear();
-		this.lastServerHeartbeatByRunId.clear();
 	}
 
-	private withServerHeartbeatForwarding(heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>) {
-		const serverHeartbeatIntervalMs = 30_000;
-
-		return async (workflowRunId: WorkflowRunId) => {
-			if (heartbeat) {
-				await heartbeat(workflowRunId);
-			}
-
-			const now = Date.now();
-			const lastServerHeartbeat = this.lastServerHeartbeatByRunId.get(workflowRunId) ?? 0;
-			if (now - lastServerHeartbeat >= serverHeartbeatIntervalMs) {
-				this.lastServerHeartbeatByRunId.set(workflowRunId, now);
-				await this.client.api.workflowRun.heartbeatV1({ id: workflowRunId });
-			}
-		};
-	}
-
-	private async subscriberLoop(abortSignal: AbortSignal): Promise<void> {
-		if (!this.primarySubscriber) {
-			throw new Error("Subscriber not initialized");
-		}
-
+	private async subscriberLoop(signal: AbortSignal): Promise<void> {
 		this.logger.info("Worker started", {
-			"aiki.registeredWorkflows": this.params.workflows.map((w) => `${w.name}:${w.versionId}`),
+			"aiki.registeredWorkflows": this.params.workflows.map(({ name, versionId }) => `${name}:${versionId}`),
 		});
-
-		const maxConcurrentWorkflowRuns = this.spawnOptions.maxConcurrentWorkflowRuns ?? 1;
 
 		let activeSubscriber: Subscriber = this.primarySubscriber;
 		let nextDelayMs = activeSubscriber.getNextDelay({ type: "no_work" });
 
-		while (!abortSignal.aborted) {
+		while (!signal.aborted) {
 			if (nextDelayMs > 0) {
-				await delay(nextDelayMs, { abortSignal });
+				await delay(nextDelayMs, { signal });
 			}
 
+			const maxConcurrentWorkflowRuns = this.configProvider.config.maxConcurrentWorkflowRuns;
 			const availableCapacity =
 				maxConcurrentWorkflowRuns - this.pendingWorkflowRunIds.size - this.activeWorkflowRunsById.size;
 			if (availableCapacity <= 0) {
 				await this.availableCapacityLatch.wait();
+				nextDelayMs = 0;
 				continue;
 			}
 
-			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, abortSignal);
+			const nextBatchResponse = await this.fetchNextWorkflowRunBatch(availableCapacity, signal);
 			if (!nextBatchResponse.success) {
 				nextDelayMs = nextBatchResponse.retryDelayMs;
 				continue;
@@ -299,37 +289,33 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				continue;
 			}
 
-			this.enqueueWorkflowRunBatch(workflowRunIdsToEnqueue, activeSubscriber, abortSignal);
+			this.enqueueWorkflowRunBatch(workflowRunIdsToEnqueue, activeSubscriber, signal);
 			nextDelayMs = 0;
 		}
 	}
 
 	private async fetchNextWorkflowRunBatch(
 		size: number,
-		abortSignal: AbortSignal
+		signal: AbortSignal
 	): Promise<
 		| { success: true; batch: WorkflowRunMessage[]; activeSubscriber: Subscriber }
 		| { success: false; retryDelayMs: number }
 	> {
-		if (!this.primarySubscriber) {
-			throw new Error("Subscriber not initialized");
-		}
-
 		if (Date.now() >= this.primarySubscriberNextAttemptAt) {
 			try {
-				const batch = await this.primarySubscriber.getReadyRuns(size, { abortSignal });
+				const batch = await this.primarySubscriber.getReadyRuns(size);
 				this.primarySubscriberFailedAttempts = 0;
 				this.backupSubscriberFailedAttempts = 0;
 				this.primarySubscriberNextAttemptAt = 0;
 				return { success: true, batch, activeSubscriber: this.primarySubscriber };
-			} catch (error) {
-				if (abortSignal.aborted) {
+			} catch (err) {
+				if (signal.aborted) {
 					return { success: false, retryDelayMs: 0 };
 				}
 
 				this.logger.error("Subscriber failed", {
 					"aiki.subscriber": "primary",
-					"aiki.error": error instanceof Error ? error.message : String(error),
+					err,
 				});
 
 				this.primarySubscriberFailedAttempts++;
@@ -349,17 +335,17 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 		}
 
 		try {
-			const batch = await this.backupSubscriber.getReadyRuns(size, { abortSignal });
+			const batch = await this.backupSubscriber.getReadyRuns(size);
 			this.backupSubscriberFailedAttempts = 0;
 			return { success: true, batch, activeSubscriber: this.backupSubscriber };
-		} catch (error) {
-			if (abortSignal.aborted) {
+		} catch (err) {
+			if (signal.aborted) {
 				return { success: false, retryDelayMs: 0 };
 			}
 
 			this.logger.error("Subscriber failed", {
 				"aiki.subscriber": "backup",
-				"aiki.error": error instanceof Error ? error.message : String(error),
+				err,
 			});
 
 			this.backupSubscriberFailedAttempts++;
@@ -377,34 +363,35 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 	private enqueueWorkflowRunBatch(
 		workflowRunIds: NonEmptyArray<WorkflowRunId>,
 		subscriber: Subscriber,
-		abortSignal: AbortSignal
+		signal: AbortSignal
 	): void {
 		const enqueue = async () => {
 			for (const workflowRunId of workflowRunIds) {
-				if (abortSignal.aborted) {
+				if (signal.aborted) {
 					return;
 				}
 
 				// TODO: maybe load multiple workflows in one request
-				let workflowRun: WorkflowRun | undefined;
+				let workflowRun: WorkflowRunRecord | undefined;
 				try {
 					const response = await this.client.api.workflowRun.getByIdV1({ id: workflowRunId });
 					workflowRun = response.run;
-				} catch (error) {
+				} catch (err) {
 					this.logger.warn("Failed to fetch workflow run", {
 						"aiki.workflowRunId": workflowRunId,
-						"aiki.error": error instanceof Error ? error.message : String(error),
+						err,
 					});
 					this.pendingWorkflowRunIds.delete(workflowRunId);
 					this.availableCapacityLatch.signal();
 					continue;
 				}
 
-				if (abortSignal.aborted) {
+				if (signal.aborted) {
 					return;
 				}
 
 				const workflowVersion = this.registry.get(
+					workflowRun.source,
 					workflowRun.name as WorkflowName,
 					workflowRun.versionId as WorkflowVersionId
 				);
@@ -420,7 +407,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				}
 
 				this.pendingWorkflowRunIds.delete(workflowRunId);
-				const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber, abortSignal);
+				const workflowExecutionPromise = this.executeWorkflow(workflowRun, workflowVersion, subscriber, signal);
 				this.activeWorkflowRunsById.set(workflowRun.id, {
 					run: workflowRun,
 					executionPromise: workflowExecutionPromise,
@@ -428,20 +415,18 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			}
 		};
 
-		enqueue().catch((error) => {
-			if (!abortSignal.aborted) {
-				this.logger.error("Error enqueuing workflow run batch", {
-					"aiki.error": error instanceof Error ? error.message : String(error),
-				});
+		enqueue().catch((err) => {
+			if (!signal.aborted) {
+				this.logger.error("Error enqueuing workflow run batch", { err });
 			}
 		});
 	}
 
 	private async executeWorkflow(
-		workflowRun: WorkflowRun,
+		workflowRun: WorkflowRunRecord,
 		workflowVersion: WorkflowVersion<unknown, unknown, unknown>,
 		subscriber: Subscriber,
-		abortSignal: AbortSignal
+		signal: AbortSignal
 	): Promise<void> {
 		const workflowRunId = workflowRun.id as WorkflowRunId;
 
@@ -459,23 +444,22 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 				workflowRun,
 				workflowVersion,
 				logger,
-				options: {
-					spinThresholdMs: this.workflowRunOptions.spinThresholdMs,
-					heartbeatIntervalMs: this.workflowRunOptions.heartbeatIntervalMs,
-				},
-				heartbeat: heartbeat ? () => heartbeat(workflowRunId) : undefined,
-				abortSignal,
+				configProvider: this.configProvider.scope("workflowRun"),
+				heartbeat: heartbeat
+					? { send: () => heartbeat.send(workflowRunId), intervalMs: heartbeat.intervalMs }
+					: undefined,
+				signal,
 			});
 
-			if (!abortSignal.aborted && subscriber.acknowledge) {
+			if (!signal.aborted && subscriber.acknowledge) {
 				if (success) {
 					try {
 						await subscriber.acknowledge(workflowRunId);
-					} catch (error) {
-						if (!abortSignal.aborted) {
+					} catch (err) {
+						if (!signal.aborted) {
 							logger.error("Failed to acknowledge message, it may be reprocessed", {
 								"aiki.errorType": "MESSAGE_ACK_FAILED",
-								"aiki.error": error instanceof Error ? error.message : String(error),
+								err,
 							});
 						}
 					}
@@ -485,34 +469,7 @@ class WorkerHandleImpl<AppContext> implements WorkerHandle {
 			}
 		} finally {
 			this.activeWorkflowRunsById.delete(workflowRunId);
-			this.lastServerHeartbeatByRunId.delete(workflowRunId);
 			this.availableCapacityLatch.signal();
 		}
-	}
-}
-
-export interface WorkerBuilder {
-	opt<Path extends PathFromObject<WorkerSpawnOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<WorkerSpawnOptions, Path>
-	): WorkerBuilder;
-	spawn: Worker["spawn"];
-}
-
-class WorkerBuilderImpl implements WorkerBuilder {
-	constructor(
-		private readonly worker: WorkerImpl,
-		private readonly spawnOptionsBuilder: ObjectBuilder<WorkerSpawnOptions>
-	) {}
-
-	opt<Path extends PathFromObject<WorkerSpawnOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<WorkerSpawnOptions, Path>
-	): WorkerBuilder {
-		return new WorkerBuilderImpl(this.worker, this.spawnOptionsBuilder.with(path, value));
-	}
-
-	spawn<AppContext>(client: Client<AppContext>): Promise<WorkerHandle> {
-		return this.worker.spawnWithOptions(client, this.spawnOptionsBuilder.build());
 	}
 }

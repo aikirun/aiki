@@ -1,0 +1,122 @@
+import process from "node:process";
+import { iam } from "@aikirun/iam";
+import type { Logger } from "@aikirun/lib/logger";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { attachConnectionSupervisor, redisCache, redisPublisher, redisTimerPriorityQueue } from "@aikirun/redis";
+import { database, server } from "@aikirun/server";
+import { Redis } from "ioredis";
+
+import type { AppServerConfig } from "./config/loader";
+import type { RedisConfig } from "./config/schema";
+import { createCorsHelpers } from "./cors";
+import { createLogger } from "./logger";
+
+export async function startAppServer({ config }: { config: AppServerConfig }): Promise<void> {
+	const db = database(config.db);
+	const logger = createLogger(config.logLevel, config.prettyLogs);
+	const redis = config.redis && createRedis(config.redis, logger);
+	const cache = redis && redisCache(redis.client);
+
+	const aiki = server({
+		db,
+		logger,
+		timerPriorityQueue: redis ? redisTimerPriorityQueue(redis.client, "aiki:timers") : inMemoryTimerPriorityQueue(),
+		handler: {
+			cache,
+			iam:
+				config.auth && config.baseURL
+					? iam({
+							db,
+							cache,
+							secret: config.auth.secret,
+							baseURL: config.baseURL,
+							trustedOrigins: config.corsOrigins,
+						})
+					: undefined,
+		},
+		runtime: {
+			publisher: redis ? redisPublisher(redis.client) : undefined,
+		},
+	});
+
+	const runtimeHandle = aiki.runtime.start();
+
+	const { createCorsResponse, withCorsHeaders } = createCorsHelpers(config.corsOrigins);
+
+	Bun.serve({
+		hostname: config.host,
+		port: config.port,
+		fetch: async (request) => {
+			if (request.method === "OPTIONS") {
+				return createCorsResponse(request);
+			}
+			const response = await aiki.handler(request);
+			return withCorsHeaders(request, response);
+		},
+	});
+
+	let shutdownPromise: Promise<void> | undefined;
+	const shutdown = () => {
+		shutdownPromise ??= (async () => {
+			if (redis) {
+				redis.close();
+			}
+			await runtimeHandle.stop();
+			await db.close();
+			process.exit(0);
+		})();
+		return shutdownPromise;
+	};
+
+	process.on("SIGTERM", shutdown);
+	process.on("SIGINT", shutdown);
+
+	logger.info(`Server running on ${config.host}:${config.port}`);
+}
+
+function createRedis(config: RedisConfig, logger: Logger) {
+	const redis = new Redis(config.url);
+	const connectionSupervisor = attachConnectionSupervisor(redis, { logger });
+
+	type State =
+		| { status: "connecting"; errorReported: boolean }
+		| { status: "connected" }
+		| { status: "disconnected"; errorReported: boolean };
+
+	let currentState: State = { status: "connecting", errorReported: false };
+
+	redis.on("ready", () => {
+		if (currentState.status === "connecting") {
+			logger.info("Redis connection established");
+		} else if (currentState.status === "disconnected") {
+			logger.info("Redis connection restored");
+		}
+		currentState = { status: "connected" };
+	});
+	// A clean disconnect emits "close" without ever emitting "error" — the
+	// first "error" only arrives once a reconnect attempt fails at the
+	// socket level, which can take up to connectTimeout per attempt.
+	redis.on("close", () => {
+		if (currentState.status === "connected") {
+			logger.warn("Redis connection lost");
+			currentState = { status: "disconnected", errorReported: false };
+		}
+	});
+	redis.on("error", (err: Error) => {
+		if (currentState.status === "connected") {
+			logger.error("Redis connection error", { err });
+			currentState = { status: "disconnected", errorReported: true };
+		} else if (!currentState.errorReported) {
+			logger.error("Redis connection error", { err });
+			currentState.errorReported = true;
+		}
+	});
+
+	return {
+		client: redis,
+		close() {
+			connectionSupervisor.detach();
+			redis.disconnect();
+		},
+	};
+}

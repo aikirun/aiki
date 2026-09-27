@@ -1,0 +1,2 @@
+ALTER TABLE "schedule" ADD COLUMN "cron_timezone" text;--> statement-breakpoint
+ALTER TABLE "schedule" ADD CONSTRAINT "chk_schedule_spec_matches_type" CHECK (("schedule"."type" = 'cron' AND "schedule"."cron_expression" IS NOT NULL AND "schedule"."interval_ms" IS NULL) OR ("schedule"."type" = 'interval' AND "schedule"."interval_ms" > 0 AND "schedule"."cron_expression" IS NULL AND "schedule"."cron_timezone" IS NULL));

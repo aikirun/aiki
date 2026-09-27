@@ -1,6 +1,7 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Logger } from "@aikirun/lib/logger";
 
+import type { ApiClient } from "../../client";
 import type { WorkflowMeta } from "../../workflow";
 import type { WorkflowRunId } from "../../workflow/run";
 
@@ -11,18 +12,22 @@ export interface WorkflowRunMessage {
 export type SubscriberDelayParams = { type: "no_work" } | { type: "retry"; attemptNumber: number };
 
 export interface Subscriber {
-	getNextDelay: (context: SubscriberDelayParams) => number;
-	getReadyRuns: (size: number, options?: { abortSignal?: AbortSignal }) => Promise<WorkflowRunMessage[]>;
-	heartbeat?: (workflowRunId: WorkflowRunId) => Promise<void>;
+	getNextDelay: (params: SubscriberDelayParams) => number;
+	getReadyRuns: (limit: number) => Promise<WorkflowRunMessage[]>;
+	heartbeat?: {
+		send: (workflowRunId: WorkflowRunId) => Promise<void>;
+		intervalMs: number | (() => number);
+	};
 	acknowledge?: (workflowRunId: WorkflowRunId) => Promise<void>;
-	close?: () => Promise<void>;
 }
 
 export interface SubscriberContext {
+	api: ApiClient;
 	workerId: string;
 	workflows: NonEmptyArray<WorkflowMeta>;
-	shards?: string[];
+	pools?: string[];
 	logger: Logger;
+	signal: AbortSignal;
 }
 
 export type CreateSubscriber = (context: SubscriberContext) => Subscriber;

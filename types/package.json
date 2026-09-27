@@ -1,12 +1,20 @@
 {
 	"name": "@aikirun/types",
-	"version": "0.28.0",
-	"description": "Core type definitions for Aiki - including workflow, task, client, and trigger types",
+	"version": "0.42.0",
+	"description": "Core type definitions for Aiki",
 	"type": "module",
 	"exports": {
+		"./api/identity": {
+			"types": "./dist/api/identity.d.ts",
+			"import": "./dist/api/identity.js"
+		},
 		"./api/schedule": {
 			"types": "./dist/api/schedule.d.ts",
 			"import": "./dist/api/schedule.js"
+		},
+		"./api/task": {
+			"types": "./dist/api/task.d.ts",
+			"import": "./dist/api/task.js"
 		},
 		"./api/workflow": {
 			"types": "./dist/api/workflow.d.ts",
@@ -28,9 +36,17 @@
 			"types": "./dist/infra/cache.d.ts",
 			"import": "./dist/infra/cache.js"
 		},
+		"./infra/codec": {
+			"types": "./dist/infra/codec.d.ts",
+			"import": "./dist/infra/codec.js"
+		},
 		"./infra/db": {
 			"types": "./dist/infra/db.d.ts",
 			"import": "./dist/infra/db.js"
+		},
+		"./infra/hash": {
+			"types": "./dist/infra/hash.d.ts",
+			"import": "./dist/infra/hash.js"
 		},
 		"./infra/queue": {
 			"types": "./dist/infra/queue/index.d.ts",
@@ -47,6 +63,10 @@
 		"./organization": {
 			"types": "./dist/organization.d.ts",
 			"import": "./dist/organization.js"
+		},
+		"./payload": {
+			"types": "./dist/payload.d.ts",
+			"import": "./dist/payload.js"
 		},
 		"./schedule": {
 			"types": "./dist/schedule.d.ts",

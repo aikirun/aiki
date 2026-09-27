@@ -1,0 +1,143 @@
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type {
+	CreateSubscriber,
+	Subscriber,
+	SubscriberDelayParams,
+	WorkflowRunMessage,
+} from "@aikirun/types/infra/queue";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+
+import type { Broker } from "./broker";
+import { getWorkflowQueueNames } from "./key";
+
+export function createInMemorySubscriber(broker: Broker): CreateSubscriber {
+	const getNextDelay = (delayParams: SubscriberDelayParams): number => {
+		switch (delayParams.type) {
+			case "no_work":
+			case "retry":
+				return 0;
+			default:
+				return delayParams satisfies never;
+		}
+	};
+
+	return ({ api, workflows, pools, signal }): Subscriber => {
+		let queues: { names: NonEmptyArray<string>; indexByName: Map<string, number> } | undefined;
+
+		let waiterHandle:
+			| {
+					abortHandler: () => void;
+					wake: (wakeQueueName: string) => void;
+					close: () => void;
+			  }
+			| undefined;
+
+		return {
+			getNextDelay,
+
+			async getReadyRuns(limit: number): Promise<WorkflowRunMessage[]> {
+				if (signal.aborted) {
+					return [];
+				}
+
+				if (queues === undefined) {
+					const { namespaceId } = await api.identity.getV1({}, { signal });
+					if (signal.aborted) {
+						return [];
+					}
+					const names = getWorkflowQueueNames(namespaceId, workflows, pools);
+					const indexByName = new Map<string, number>();
+					for (const [queueIndex, queueName] of names.entries()) {
+						indexByName.set(queueName, queueIndex);
+					}
+					queues = { names, indexByName };
+				}
+
+				const { names: queueNames, indexByName: queueNamesByIndex } = queues;
+
+				const startQueueIndex = Math.floor(Math.random() * queueNames.length);
+				const initialBatch = broker.roundRobinPop({ queueNames, startQueueIndex, limit });
+				if (initialBatch.length > 0) {
+					return initialBatch;
+				}
+
+				return new Promise<WorkflowRunMessage[]>((resolve) => {
+					const detach = (): void => {
+						if (waiterHandle) {
+							signal.removeEventListener("abort", waiterHandle.abortHandler);
+							waiterHandle = undefined;
+						}
+					};
+
+					const handle = {
+						wake: (wakeQueueName: string) => {
+							// Walk declared queues round-robin starting at
+							// the wake queue, popping items up to capacity and removing
+							// this handle from each visited queue's waiter set.
+
+							const queueCount = queueNames.length;
+
+							const visited = new Array<boolean>(queueCount).fill(false);
+							let visitedCount = 0;
+
+							const isEmpty = new Array<boolean>(queueCount).fill(false);
+							let emptyCount = 0;
+
+							const wakeQueueIndex = queueNamesByIndex.get(wakeQueueName) ?? 0;
+							let queueIndex = wakeQueueIndex - 1;
+
+							const runs: WorkflowRunMessage[] = [];
+
+							while (true) {
+								queueIndex = (queueIndex + 1) % queueCount;
+								const queueName = queueNames[queueIndex];
+								const queue = queueName !== undefined ? broker.getQueue(queueName) : undefined;
+
+								if (!visited[queueIndex]) {
+									queue?.waiterHandles.delete(handle);
+									visited[queueIndex] = true;
+									visitedCount += 1;
+								}
+
+								if (runs.length < limit && !isEmpty[queueIndex]) {
+									const item = queue?.popMin();
+									if (item === undefined) {
+										isEmpty[queueIndex] = true;
+										emptyCount += 1;
+									} else {
+										runs.push({ data: { id: item.id as WorkflowRunId } });
+									}
+								}
+
+								if (visitedCount === queueCount && (runs.length === limit || emptyCount === queueCount)) {
+									break;
+								}
+							}
+
+							detach();
+							resolve(runs);
+						},
+
+						close: () => {
+							for (const queueName of queueNames) {
+								broker.getQueue(queueName)?.waiterHandles.delete(handle);
+							}
+							detach();
+							resolve([]);
+						},
+
+						abortHandler: () => handle.close(),
+					};
+
+					waiterHandle = handle;
+
+					signal.addEventListener("abort", handle.abortHandler, { once: true });
+
+					for (const queueName of queueNames) {
+						broker.getOrCreateQueue(queueName).waiterHandles.add(handle);
+					}
+				});
+			},
+		};
+	};
+}

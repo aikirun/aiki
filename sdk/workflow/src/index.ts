@@ -1,4 +1,4 @@
-export type { Duration, DurationObject } from "@aikirun/lib/duration";
+export type { DurationObject } from "@aikirun/lib/duration";
 export type {
 	ExponentialRetryStrategy,
 	FixedRetryStrategy,
@@ -6,26 +6,25 @@ export type {
 	NeverRetryStrategy,
 	RetryStrategy,
 } from "@aikirun/lib/retry";
-export type { Serializable, SerializableError } from "@aikirun/lib/serializable";
+export type { SerializableError } from "@aikirun/lib/serializable";
 export type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
 export { SchemaValidationError } from "@aikirun/types/validator";
 export type {
 	EventName,
-	EventReferenceOptions,
+	EventReference,
 	EventSendOptions,
 	EventWait,
 	EventWaitOptions,
-	EventWaitQueue,
 	EventWaitResult,
 	ReplayManifest,
-	TriggerStrategy,
 	UnconsumedManifestEntries,
-	WorkflowRun,
 	WorkflowRunId,
+	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
 export {
+	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
@@ -37,7 +36,7 @@ export { TaskFailedError } from "@aikirun/types/workflow/task";
 
 export type { WorkflowRegistry } from "./registry";
 export { workflowRegistry } from "./registry";
-export type { WorkflowRunContext } from "./run/context";
+export type { WorkflowRun } from "./run";
 export type {
 	EventDefinition,
 	EventMulticaster,
@@ -47,13 +46,10 @@ export type {
 	EventWaiter,
 	EventWaiters,
 } from "./run/event";
-export { createEventSenders, createEventWaiters, event } from "./run/event";
-export type { ExecuteWorkflowParams, WorkflowExecutionOptions } from "./run/execute";
+export { event } from "./run/event";
+export type { ExecuteWorkflowParams, WorkflowExecutionConfig } from "./run/execute";
 export { executeWorkflowRun } from "./run/execute";
 export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/handle";
-export { workflowRunHandle } from "./run/handle";
-export { createReplayManifest } from "./run/replay-manifest";
-export { createSleeper } from "./run/sleeper";
 export type { ScheduleDefinition, ScheduleHandle, ScheduleParams } from "./schedule";
 export { schedule } from "./schedule";
 export { getSystemWorkflows } from "./system";
@@ -61,4 +57,9 @@ export type { Task, TaskParams } from "./task";
 export { task } from "./task";
 export type { Workflow, WorkflowParams } from "./workflow";
 export { workflow } from "./workflow";
-export type { AnyWorkflowVersion, WorkflowVersion, WorkflowVersionParams } from "./workflow-version";
+export type {
+	AnyWorkflowVersion,
+	WorkflowVersion,
+	WorkflowVersionParams,
+	WorkflowVersionStart,
+} from "./workflow-version";

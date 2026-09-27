@@ -1,41 +1,46 @@
+import { asConfigProvider, type ConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
+import { merge } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";
-import {
-	type AnyWorkflowVersion,
-	executeWorkflowRun,
-	getSystemWorkflows,
-	type WorkflowExecutionOptions,
-	workflowRegistry,
-} from "@aikirun/workflow";
+import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
+import { type AnyWorkflowVersion, executeWorkflowRun, getSystemWorkflows, workflowRegistry } from "@aikirun/workflow";
 
+import { defaultEndpointConfig, type EndpointConfig, type EndpointConfigOverrides } from "./config";
 import { verifySignature } from "./signature";
 
 export interface EndpointParams {
 	workflows: AnyWorkflowVersion[];
 	client: Client;
 	secret: string;
-	options?: EndpointOptions;
-}
-
-export interface EndpointOptions {
-	signatureMaxAgeMs?: number;
-	workflowRun?: WorkflowExecutionOptions;
+	config?: EndpointConfigOverrides | CreatePassiveConfigProvider<EndpointConfig>;
 }
 
 export function endpoint(params: EndpointParams): (request: Request) => Promise<Response> {
-	const { client, secret, options } = params;
-	const signatureMaxAgeMs = options?.signatureMaxAgeMs ?? 30_000;
-	const workflowRunOptions = {
-		heartbeatIntervalMs: options?.workflowRun?.heartbeatIntervalMs ?? 30_000,
-		spinThresholdMs: options?.workflowRun?.spinThresholdMs ?? 10,
-	};
+	const { client, secret } = params;
+	const configParam = params.config;
 
-	const registry = workflowRegistry().addMany(getSystemWorkflows(client.api)).addMany(params.workflows);
+	const registry = workflowRegistry()
+		.addMany("system", getSystemWorkflows(client.api))
+		.addMany("user", params.workflows);
 
 	const logger = client.logger.child({ "aiki.component": "endpoint" });
 
+	let configProvider: ConfigProvider<EndpointConfig> | undefined;
+	const getConfigProvider = (): ConfigProvider<EndpointConfig> => {
+		if (!configProvider) {
+			if (typeof configParam === "function") {
+				configProvider = configParam({ logger: logger.child({ "aiki.subComponent": "config-provider" }) });
+			} else {
+				const config = merge(defaultEndpointConfig, configParam);
+				configProvider = asConfigProvider(() => config);
+			}
+		}
+		return configProvider;
+	};
+
 	return async (request: Request): Promise<Response> => {
+		const configProvider = getConfigProvider();
+
 		const signatureHeader = request.headers.get("x-aiki-signature");
 		if (!signatureHeader) {
 			return jsonResponse(401);
@@ -47,7 +52,7 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 			header: signatureHeader,
 			body,
 			secret,
-			signatureMaxAgeMs,
+			signatureMaxAgeMs: configProvider.config.signatureMaxAgeMs,
 		});
 		if (!valid) {
 			return jsonResponse(401);
@@ -64,14 +69,14 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 			return jsonResponse(400);
 		}
 
-		let workflowRun: WorkflowRun | undefined;
+		let workflowRun: WorkflowRunRecord | undefined;
 		try {
 			const response = await client.api.workflowRun.getByIdV1({ id: workflowRunId });
 			workflowRun = response.run;
-		} catch (error) {
+		} catch (err) {
 			logger.warn("Failed to fetch workflow run", {
 				"aiki.workflowRunId": workflowRunId,
-				"aiki.error": error instanceof Error ? error.message : String(error),
+				err,
 			});
 			return jsonResponse(404);
 		}
@@ -82,7 +87,11 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 			"aiki.workflowRunId": workflowRun.id,
 		});
 
-		const workflowVersion = registry.get(workflowRun.name as WorkflowName, workflowRun.versionId as WorkflowVersionId);
+		const workflowVersion = registry.get(
+			workflowRun.source,
+			workflowRun.name as WorkflowName,
+			workflowRun.versionId as WorkflowVersionId
+		);
 		if (!workflowVersion) {
 			runLogger.warn("Workflow version not found");
 			return jsonResponse(404);
@@ -93,11 +102,7 @@ export function endpoint(params: EndpointParams): (request: Request) => Promise<
 			workflowRun,
 			workflowVersion,
 			logger: runLogger,
-			options: {
-				spinThresholdMs: workflowRunOptions.spinThresholdMs,
-				heartbeatIntervalMs: workflowRunOptions.heartbeatIntervalMs,
-			},
-			heartbeat: () => client.api.workflowRun.heartbeatV1({ id: workflowRun.id as WorkflowRunId }),
+			configProvider: configProvider.scope("workflowRun"),
 		});
 
 		return jsonResponse(success ? 200 : 500);

@@ -1,4 +1,4 @@
-import type { Duration } from "@aikirun/lib/duration";
+import type { DurationObject } from "@aikirun/lib/duration";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -10,12 +10,12 @@ import type { WorkflowRunHandle } from "./handle";
 const MAX_SLEEP_YEARS = 10;
 const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1_000;
 
-export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknown>, logger: Logger) {
+export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logger: Logger) {
 	const nextIndexBySleepName: Record<SleepName, number> = {};
 
-	return async (name: string, duration: Duration): Promise<SleepResult> => {
+	return async (name: string, duration: DurationObject): Promise<SleepResult> => {
 		const sleepName = name as SleepName;
-		let durationMs = toMilliseconds(duration);
+		const durationMs = toMilliseconds(duration);
 
 		if (durationMs > MAX_SLEEP_MS) {
 			throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years`);
@@ -23,8 +23,8 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 
 		const nextIndex = nextIndexBySleepName[sleepName] ?? 0;
 
-		const sleepQueue = handle.run.sleepQueues[sleepName] ?? { sleeps: [] };
-		const existingSleep = sleepQueue.sleeps[nextIndex];
+		const sleeps = handle.run.sleeps[sleepName] ?? [];
+		const existingSleep = sleeps[nextIndex];
 
 		if (!existingSleep) {
 			try {
@@ -33,11 +33,11 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 					"aiki.sleepName": sleepName,
 					"aiki.durationMs": durationMs,
 				});
-			} catch (error) {
-				if (error instanceof WorkflowRunRevisionConflictError) {
+			} catch (err) {
+				if (err instanceof WorkflowRunRevisionConflictError) {
 					throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 				}
-				throw error;
+				throw err;
 			}
 
 			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
@@ -46,7 +46,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 		if (existingSleep.status === "sleeping") {
 			logger.debug("Already sleeping", {
 				"aiki.sleepName": sleepName,
-				"aiki.awakeAt": existingSleep.awakeAt,
+				"aiki.wakeupAt": existingSleep.wakeupAt,
 			});
 			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 		}
@@ -71,28 +71,27 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown, unknow
 			return { cancelled: false };
 		}
 
-		if (durationMs > existingSleep.durationMs) {
-			logger.warn("Higher sleep duration encountered during replay. Sleeping for remaining duration", {
-				"aiki.sleepName": sleepName,
-				"aiki.historicDurationMs": existingSleep.durationMs,
-				"aiki.latestDurationMs": durationMs,
-			});
-			durationMs -= existingSleep.durationMs;
-		} else {
+		if (durationMs < existingSleep.durationMs) {
 			return { cancelled: false };
 		}
 
+		logger.warn("Higher sleep duration encountered during replay. Sleeping for remaining duration", {
+			"aiki.sleepName": sleepName,
+			"aiki.historicDurationMs": existingSleep.durationMs,
+			"aiki.latestDurationMs": durationMs,
+		});
+		const durationLeftMs = durationMs - existingSleep.durationMs;
 		try {
-			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
+			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs: durationLeftMs });
 			logger.info("Sleeping", {
 				"aiki.sleepName": sleepName,
-				"aiki.durationMs": durationMs,
+				"aiki.durationMs": durationLeftMs,
 			});
-		} catch (error) {
-			if (error instanceof WorkflowRunRevisionConflictError) {
+		} catch (err) {
+			if (err instanceof WorkflowRunRevisionConflictError) {
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
-			throw error;
+			throw err;
 		}
 
 		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);

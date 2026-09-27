@@ -1,0 +1,141 @@
+---
+title: Workers
+description: Long-lived processes that execute your workflows in your infrastructure and share the load.
+---
+
+A worker executes your workflows. It runs in your infrastructure, subscribes to workflow run messages, and executes the workflow logic you've defined. You can run multiple workers to scale horizontally—they automatically share the workload.
+
+## Creating a Worker
+
+```typescript
+import { client } from "@aikirun/client";
+import { worker } from "@aikirun/worker";
+import { orderWorkflowV1, userWorkflowV1 } from "./workflows";
+
+const aikiClient = client({
+  url: "http://localhost:9850",
+  apiKey: "your-api-key",
+});
+
+const aikiWorker = worker({
+  workflows: [orderWorkflowV1, userWorkflowV1],
+  options: {
+    maxConcurrentWorkflowRuns: 10,
+  },
+});
+
+const handle = aikiWorker.start(aikiClient);
+```
+
+Worker definitions are static and reusable. The `worker()` function creates a definition with a `workflows` array specifying which workflow versions it can execute. Call `start(client)` to begin execution; it returns a handle for controlling the running worker.
+
+## How Workers Operate
+
+When you call `start()`, the worker begins discovering ready workflow runs through its subscriber — claiming them from the server by default. When a workflow run is triggered, the worker picks it up, looks up the workflow definition in its registry, and begins execution.
+
+During execution, the worker periodically refreshes its claim on the run. This prevents other workers from thinking it's stuck. If a worker crashes mid-execution, the claim expires after a configurable idle time (default: 90 seconds) and the run is handed to a healthy worker. The workflow then re-executes from its last checkpoint. [Workflow Run Claims](../architecture/workflow-run-claims.md) covers this ownership and recovery in full.
+
+When execution completes or fails, the worker reports the terminal state to the server.
+
+## Scaling
+
+Workers scale naturally. You can add capacity in several ways:
+
+**Run multiple instances** of the same worker to share load. Each gets a portion of the work automatically:
+
+```typescript
+const worker1 = worker({ workflows: [orderWorkflowV1] });
+const worker2 = worker({ workflows: [orderWorkflowV1] });
+
+const handle1 = worker1.start(aikiClient);
+const handle2 = worker2.start(aikiClient);
+```
+
+**Specialize workers** by registering different workflows on different workers. Each worker only handles the workflows it knows about.
+
+**Split fleets by capability, tenant, or region** using `pools`. A worker with `pools: ["tenant-acme"]` only processes workflow runs routed to that pool.
+
+## Graceful Shutdown
+
+Always handle shutdown signals to let active workflows complete:
+
+```typescript
+process.on("SIGTERM", async () => {
+  await handle.stop();
+  process.exit(0);
+});
+```
+
+The `stop()` method on the handle signals the worker to stop accepting new work, waits for active executions to finish (up to `gracefulShutdownTimeoutMs`), then returns. Any workflows that don't complete in time keep their state in the database; once their claims go stale, the server recovers them and other workers pick them up.
+
+## Configuration Reference
+
+Worker configuration is split between **params** (identity) and **options** (tuning).
+
+**Params** are passed directly to `worker()`:
+
+| Param | Description |
+|-------|-------------|
+| `workflows` | Workflow versions this worker executes |
+| `subscriber` | Optional subscriber factory for work discovery (default: claims from the server over HTTP). Use `inMemoryQueue()` from `@aikirun/memory` or `redisSubscriber()` from `@aikirun/redis` for push delivery |
+
+**Options** are passed via `options` param or `with()` builder:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `maxConcurrentWorkflowRuns` | 1 | Max parallel executions |
+| `gracefulShutdownTimeoutMs` | 5,000 | Shutdown wait time (ms) |
+| `workflowRun.claimRefreshIntervalMs` | 30,000 | How often the worker refreshes its run claim (ms) |
+| `pools` | — | Worker pools to process |
+
+## Pluggable Subscribers
+
+By default, workers claim work from the server over HTTP, which requires no setup beyond the Aiki server connection. Two subscribers replace that polling with sub-second push delivery. Which one you want follows from where the worker runs.
+
+When the worker runs in the same process as the server, `inMemoryQueue()` pairs a publisher and a subscriber over one in-process broker, with no external service:
+
+```package-install
+@aikirun/memory
+```
+
+```typescript
+import { inMemoryQueue } from "@aikirun/memory";
+
+const queue = inMemoryQueue();
+
+const aikiServer = server({
+  db: database({ provider: "pg", url: databaseUrl }),
+  runtime: { publisher: queue.publisher },
+});
+
+const aikiWorker = worker({
+  workflows: [orderWorkflowV1],
+  subscriber: queue.subscriber,
+});
+```
+
+When the server and workers are separate processes, the broker has to be too. `@aikirun/redis` delivers the same way across instances:
+
+```package-install
+@aikirun/redis
+```
+
+```typescript
+import { redisSubscriber } from "@aikirun/redis";
+
+const aikiWorker = worker({
+  workflows: [orderWorkflowV1],
+  subscriber: redisSubscriber({ url: "redis://localhost:6379" }),
+});
+```
+
+Both subscribers pair with a publisher on the server: work reaches a worker only if the server is configured to publish to the same broker. See [Server](../architecture/server.md).
+
+You can also implement your own subscriber by providing a function that matches the `CreateSubscriber` type from `@aikirun/types/infra/queue`. See [Subscribers](../architecture/subscribers.md) for how the implementations work and what custom subscribers must provide.
+
+## Next Steps
+
+- **[Client](./client.mdx)** — Connect to Aiki server
+- **[Workflows](./workflows.md)** — Define workflow logic
+- **[Tasks](./tasks.md)** — Create reusable task units
+- **[Workflow Run Claims](../architecture/workflow-run-claims.md)** — How runs are owned and recovered

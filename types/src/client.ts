@@ -1,22 +1,41 @@
 import type { Logger } from "@aikirun/lib/logger";
 
+import type { IdentityApi } from "./api/identity";
 import type { ScheduleApi } from "./api/schedule";
+import type { TaskApi } from "./api/task";
 import type { WorkflowRunApi } from "./api/workflow-run";
+import type { Codec, CreateCodec } from "./infra/codec";
+import type { CreateHasher, Hasher } from "./infra/hasher";
 import { INTERNAL } from "./symbols";
-import type { WorkflowRun } from "./workflow/run";
+import type { WorkflowRunRecord } from "./workflow/run";
 
-export interface ClientParams<AppContext = null> {
-	url: string;
-	apiKey?: string;
+interface BaseClientParams<Context = null, Encoded = unknown> {
 	logger?: Logger;
-	appContext?: (run: Readonly<WorkflowRun>) => AppContext | Promise<AppContext>;
+	context?: (run: Readonly<WorkflowRunRecord>) => Context | Promise<Context>;
+	hasher?: CreateHasher;
+	codec?: CreateCodec<Encoded>;
 }
 
-export interface Client<AppContext = null> {
+export interface RemoteClientParams<Context = null, Encoded = unknown> extends BaseClientParams<Context, Encoded> {
+	url: string;
+	apiKey?: string;
+}
+
+export interface EmbeddedClientParams<Context = null, Encoded = unknown> extends BaseClientParams<Context, Encoded> {
+	handler: (request: Request) => Promise<Response>;
+}
+
+export type ClientParams<Context = null, Encoded = unknown> =
+	| RemoteClientParams<Context, Encoded>
+	| EmbeddedClientParams<Context, Encoded>;
+
+export interface Client<Context = null> {
 	api: ApiClient;
 	logger: Logger;
 	[INTERNAL]: {
-		appContext?: (run: WorkflowRun) => AppContext | Promise<AppContext>;
+		context?: (run: WorkflowRunRecord) => Context | Promise<Context>;
+		hasher?: Hasher;
+		codec?: Codec<unknown>;
 	};
 }
 
@@ -26,12 +45,14 @@ export interface Client<AppContext = null> {
  * requests without polluting the wire contract types.
  */
 type WithClientOptions<T> = {
-	[K in keyof T]: T[K] extends (input: infer I) => Promise<infer O>
-		? (input: I, options?: { signal?: AbortSignal }) => Promise<O>
+	[K in keyof T]: T[K] extends (input: infer Input) => Promise<infer Output>
+		? (input: Input, options?: { signal?: AbortSignal }) => Promise<Output>
 		: T[K];
 };
 
 export interface ApiClient {
+	identity: WithClientOptions<IdentityApi>;
 	workflowRun: WithClientOptions<WorkflowRunApi>;
+	task: WithClientOptions<TaskApi>;
 	schedule: WithClientOptions<ScheduleApi>;
 }

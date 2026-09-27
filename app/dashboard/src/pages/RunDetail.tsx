@@ -11,11 +11,12 @@ import { SpinnerIcon } from "../components/common/Icons";
 import { NotFound } from "../components/common/NotFound";
 import { RelativeTime } from "../components/common/RelativeTime";
 import { StatusBadge, StatusDot } from "../components/common/StatusBadge";
+import { btnSecondary, btnTinted, card, chipStatus, fieldLabel, secondaryHover } from "../components/common/ui";
 import { DataTab } from "../components/run-detail/DataTab";
 import { ExecutionTab } from "../components/run-detail/ExecutionTab";
 import { TimelineTab } from "../components/run-detail/TimelineTab";
 import { buildTimelineLookups } from "../components/run-detail/timeline-lookups";
-import { WORKFLOW_RUN_STATUS_COLORS } from "../constants/status-colors";
+import { edge, tint, WORKFLOW_RUN_STATUS_COLORS } from "../constants/status-colors";
 
 const POLLING_INTERVAL_MS = 2000;
 
@@ -35,13 +36,11 @@ function timeUntil(ms: number): string {
 function ActionBtn({
 	label,
 	color,
-	textColor,
 	onClick,
 	loading,
 }: {
 	label: string;
 	color: string;
-	textColor?: string;
 	onClick: () => void;
 	loading?: boolean;
 }) {
@@ -51,19 +50,11 @@ function ActionBtn({
 			onClick={onClick}
 			disabled={loading}
 			style={{
-				background: `${color}30`,
-				border: `1px solid ${color}50`,
-				color: textColor ?? color,
+				...btnTinted(color),
 				fontSize: 11.5,
-				fontWeight: 600,
-				padding: "5px 13px",
-				borderRadius: 7,
+				padding: "5px 12px",
 				cursor: loading ? "not-allowed" : "pointer",
 				opacity: loading ? 0.5 : 1,
-				fontFamily: "inherit",
-				display: "inline-flex",
-				alignItems: "center",
-				gap: 5,
 			}}
 		>
 			{loading && <SpinnerIcon />}
@@ -80,28 +71,24 @@ interface MetaProps {
 function Meta({ label, children }: MetaProps) {
 	return (
 		<div>
-			<div
-				style={{
-					fontSize: 9,
-					fontWeight: 600,
-					letterSpacing: "0.07em",
-					color: "var(--t3)",
-					textTransform: "uppercase",
-					marginBottom: 3,
-				}}
-			>
-				{label}
-			</div>
-			<div style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 500, color: "var(--t0)", lineHeight: "22px" }}>
+			<div style={{ ...fieldLabel(), marginBottom: 4 }}>{label}</div>
+			<div style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 500, color: "var(--t0)", lineHeight: "22px" }}>
 				{children}
 			</div>
 		</div>
 	);
 }
 
+/**
+ * The active pill nests inside the tab bar, so its radius is the bar's own minus the padding
+ * between them. Any other value leaves the two curves fighting at the first and last tab.
+ */
+const TABBAR_PADDING = 3;
+
 export function RunDetail() {
 	const { id } = useParams<{ id: string }>();
 	const [searchParams, setSearchParams] = useSearchParams();
+	const runsListSearch = sessionStorage.getItem("runsListSearch") ?? "";
 	const queryClient = useQueryClient();
 	const [actionLoading, setActionLoading] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
@@ -142,18 +129,15 @@ export function RunDetail() {
 	const childWorkflowRuns = useMemo(() => {
 		if (!currentRun) return {};
 		const result: Record<string, ChildWorkflowRunInfo> = {};
-		for (const queue of Object.values(currentRun.childWorkflowRunQueues)) {
-			for (const child of queue.childWorkflowRuns) {
+		for (const addressChildRuns of Object.values(currentRun.childWorkflowRuns)) {
+			for (const child of addressChildRuns) {
 				result[child.id] = child;
 			}
 		}
 		return result;
 	}, [currentRun]);
 
-	const tasks = useMemo(
-		() => (currentRun ? Object.values(currentRun.taskQueues).flatMap((q) => q.tasks) : []),
-		[currentRun]
-	);
+	const tasks = useMemo(() => (currentRun ? Object.values(currentRun.tasks).flat() : []), [currentRun]);
 
 	const childRunCount = useMemo(() => Object.keys(childWorkflowRuns).length, [childWorkflowRuns]);
 
@@ -169,9 +153,10 @@ export function RunDetail() {
 		if (!currentRun || !transitions?.transitions) return undefined;
 		return buildTimelineLookups(
 			transitions.transitions,
-			currentRun.eventWaitQueues,
-			currentRun.sleepQueues,
+			currentRun.eventWaits,
+			currentRun.sleeps,
 			childWorkflowRuns,
+			currentRun.childWorkflowRunWaits,
 			taskById
 		);
 	}, [transitions?.transitions, currentRun, childWorkflowRuns, taskById]);
@@ -209,11 +194,13 @@ export function RunDetail() {
 	}
 
 	const status = currentRun.state.status;
-	const statusColor = WORKFLOW_RUN_STATUS_COLORS[status].tint;
+	const statusColor = WORKFLOW_RUN_STATUS_COLORS[status];
 	const isTerminal = isTerminalWorkflowRunStatus(status);
 	const canCancel = !isTerminal;
 	const canPause = ["scheduled", "queued", "running"].includes(status);
 	const canResume = status === "paused";
+	const canRequeue = status === "stalled";
+	const canWake = status === "sleeping";
 
 	const executionCount = tasks.length + childRunCount;
 
@@ -222,21 +209,9 @@ export function RunDetail() {
 			{/* Nav bar */}
 			<div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
 				<Link
-					to="/"
-					style={{
-						background: "var(--s2)",
-						border: "1px solid var(--b0)",
-						color: "var(--t2)",
-						fontSize: 12,
-						fontWeight: 600,
-						padding: "5px 12px",
-						borderRadius: 7,
-						textDecoration: "none",
-						display: "inline-flex",
-						alignItems: "center",
-						gap: 4,
-						fontFamily: "inherit",
-					}}
+					to={{ pathname: "/", search: runsListSearch }}
+					style={{ ...btnSecondary(), fontSize: 12, padding: "5px 12px", textDecoration: "none" }}
+					{...secondaryHover}
 				>
 					← Runs
 				</Link>
@@ -244,18 +219,10 @@ export function RunDetail() {
 					<Link
 						to={`/runs/${currentRun.parentWorkflowRunId}`}
 						style={{
-							background: "rgba(192,132,252,0.18)",
-							border: "1px solid rgba(192,132,252,0.4)",
-							color: "var(--accent-purple)",
-							fontSize: 11,
-							fontWeight: 600,
+							...btnTinted("var(--accent-purple)"),
+							fontSize: 11.5,
 							padding: "5px 12px",
-							borderRadius: 7,
 							textDecoration: "none",
-							display: "inline-flex",
-							alignItems: "center",
-							gap: 4,
-							fontFamily: "inherit",
 						}}
 					>
 						↑ Parent run {shortId(currentRun.parentWorkflowRunId)}
@@ -264,20 +231,7 @@ export function RunDetail() {
 				{currentRun.scheduleId && (
 					<Link
 						to={`/schedules?id=${currentRun.scheduleId}`}
-						style={{
-							background: "rgba(56,189,248,0.18)",
-							border: "1px solid rgba(56,189,248,0.4)",
-							color: "var(--accent-sky)",
-							fontSize: 11,
-							fontWeight: 600,
-							padding: "5px 12px",
-							borderRadius: 7,
-							textDecoration: "none",
-							display: "inline-flex",
-							alignItems: "center",
-							gap: 4,
-							fontFamily: "inherit",
-						}}
+						style={{ ...btnTinted("var(--accent-sky)"), fontSize: 11.5, padding: "5px 12px", textDecoration: "none" }}
 					>
 						⏱ Schedule {shortId(currentRun.scheduleId)}
 					</Link>
@@ -287,60 +241,65 @@ export function RunDetail() {
 			{/* Hero card */}
 			<div
 				style={{
-					background: "var(--s1)",
-					border: "1px solid var(--b0)",
-					borderRadius: 12,
-					padding: "20px 22px 18px",
-					marginBottom: 14,
-					borderTop: `2px solid ${statusColor}40`,
+					...card,
+					padding: "22px var(--pad-card) 20px",
+					marginBottom: 16,
+					borderTop: `2px solid ${edge(statusColor)}`,
 				}}
 			>
-				{/* Top row: name + pill + actions */}
-				<div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-					<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-						<span
-							style={{
-								fontSize: 20,
-								fontWeight: 800,
-								color: "var(--t0)",
-								letterSpacing: "-0.03em",
-							}}
-						>
-							{currentRun.name}
-						</span>
+				{/*
+				 * Name, status and actions. The status travels with the actions rather than
+				 * with the name: on a narrow card the name takes the first line on its own,
+				 * and status and actions share the second instead of each claiming a line.
+				 * The auto margin does the pushing — `space-between` alone would centre the
+				 * status between the two once all three sit on one line.
+				 */}
+				<div
+					style={{
+						display: "flex",
+						alignItems: "center",
+						flexWrap: "wrap",
+						gap: 12,
+						marginBottom: 8,
+					}}
+				>
+					<h1
+						style={{
+							margin: 0,
+							fontSize: "clamp(20px, 3.4vw, 26px)",
+							fontWeight: 800,
+							color: "var(--t0)",
+							letterSpacing: "-0.038em",
+							lineHeight: 1.1,
+							flex: "0 1 auto",
+							minWidth: 0,
+							// A workflow name is one hyphenated token; without this it keeps its
+							// full width as the flex item shrinks and paints over the actions.
+							overflowWrap: "break-word",
+						}}
+					>
+						{currentRun.name}
+					</h1>
+
+					<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginRight: "auto" }}>
 						<StatusBadge status={status} size="md" />
-						{currentRun.parentWorkflowRunId && (
-							<span
-								style={{
-									fontSize: 10,
-									fontWeight: 600,
-									color: "var(--accent-purple)",
-									background: "rgba(192,132,252,0.18)",
-									border: "1px solid rgba(192,132,252,0.3)",
-									padding: "2px 8px",
-									borderRadius: 999,
-								}}
-							>
-								child
-							</span>
-						)}
+						{currentRun.parentWorkflowRunId && <span style={chipStatus("var(--accent-purple)")}>child</span>}
 					</div>
 
 					{/* Action buttons — only shown for non-terminal runs */}
 					{!isTerminal && (
-						<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 12 }}>
+						<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>
 							{canResume && (
 								<ActionBtn
 									label="Resume"
-									color="#34D399"
-									textColor="var(--accent-green)"
+									color="var(--accent-green)"
 									loading={actionLoading === "resume"}
 									onClick={() =>
 										handleAction("resume", () =>
 											namespaceAuthedClient.workflowRun.transitionStateV1({
 												type: "pessimistic",
 												id: currentRun.id,
-												state: { status: "scheduled", scheduledInMs: 0, reason: "resume" },
+												state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" },
 											})
 										)
 									}
@@ -349,8 +308,7 @@ export function RunDetail() {
 							{canPause && (
 								<ActionBtn
 									label="Pause"
-									color="#FBBF24"
-									textColor="var(--accent-amber)"
+									color="var(--accent-amber)"
 									loading={actionLoading === "pause"}
 									onClick={() =>
 										handleAction("pause", () =>
@@ -363,11 +321,42 @@ export function RunDetail() {
 									}
 								/>
 							)}
+							{canRequeue && (
+								<ActionBtn
+									label="Requeue"
+									color="var(--accent-sky)"
+									loading={actionLoading === "requeue"}
+									onClick={() =>
+										handleAction("requeue", () =>
+											namespaceAuthedClient.workflowRun.transitionStateV1({
+												type: "pessimistic",
+												id: currentRun.id,
+												state: { status: "scheduled", scheduledInMs: 0, reason: "redelivery" },
+											})
+										)
+									}
+								/>
+							)}
+							{canWake && (
+								<ActionBtn
+									label="Wake"
+									color="var(--accent-indigo)"
+									loading={actionLoading === "wake"}
+									onClick={() =>
+										handleAction("wake", () =>
+											namespaceAuthedClient.workflowRun.transitionStateV1({
+												type: "pessimistic",
+												id: currentRun.id,
+												state: { status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" },
+											})
+										)
+									}
+								/>
+							)}
 							{canCancel && (
 								<ActionBtn
 									label="Cancel"
-									color="#F87171"
-									textColor="var(--accent-red)"
+									color="var(--accent-red)"
 									loading={actionLoading === "cancel"}
 									onClick={() =>
 										handleAction("cancel", () =>
@@ -385,8 +374,18 @@ export function RunDetail() {
 				</div>
 
 				{/* Full ID */}
-				<div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14 }}>
-					<span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--t3)" }}>{currentRun.id}</span>
+				<div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14, minWidth: 0 }}>
+					<span
+						style={{
+							fontFamily: "var(--mono)",
+							fontSize: 11,
+							color: "var(--t3)",
+							minWidth: 0,
+							overflowWrap: "break-word",
+						}}
+					>
+						{currentRun.id}
+					</span>
 					<CopyButton text={currentRun.id} />
 				</div>
 
@@ -404,7 +403,7 @@ export function RunDetail() {
 						<span style={{ display: "inline-flex", alignItems: "center", minHeight: 22 }}>v{currentRun.versionId}</span>
 					</Meta>
 
-					{currentRun.options?.reference && (
+					{currentRun.referenceId && (
 						<Meta label="Reference">
 							<span
 								style={{
@@ -414,12 +413,12 @@ export function RunDetail() {
 									fontWeight: 700,
 									maxWidth: 160,
 								}}
-								title={currentRun.options.reference.id}
+								title={currentRun.referenceId}
 							>
 								<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-									{currentRun.options.reference.id}
+									{currentRun.referenceId}
 								</span>
-								<CopyButton text={currentRun.options.reference.id} />
+								<CopyButton text={currentRun.referenceId} />
 							</span>
 						</Meta>
 					)}
@@ -442,7 +441,7 @@ export function RunDetail() {
 					{/* Contextual: sleeping */}
 					{currentRun.state.status === "sleeping" && (
 						<Meta label="Awakes">
-							<span style={{ color: "var(--accent-indigo)" }}>{timeUntil(currentRun.state.awakeAt)}</span>
+							<span style={{ color: "var(--accent-indigo)" }}>{timeUntil(currentRun.state.wakeupAt)}</span>
 						</Meta>
 					)}
 
@@ -486,24 +485,24 @@ export function RunDetail() {
 			{actionError && (
 				<div
 					style={{
-						background: "#F8717110",
-						border: "1px solid #F8717130",
-						borderRadius: 8,
-						padding: "10px 16px",
+						background: tint("var(--accent-red)"),
+						border: `1px solid ${edge("var(--accent-red)")}`,
+						borderRadius: "var(--r-panel)",
+						padding: "11px 16px",
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "space-between",
 						marginBottom: 14,
 					}}
 				>
-					<span style={{ color: "#F87171", fontSize: 13 }}>{actionError}</span>
+					<span style={{ color: "var(--accent-red)", fontSize: 13 }}>{actionError}</span>
 					<button
 						type="button"
 						onClick={() => setActionError(null)}
 						style={{
 							background: "none",
 							border: "none",
-							color: "#F87171",
+							color: "var(--accent-red)",
 							cursor: "pointer",
 							padding: 0,
 							display: "flex",
@@ -518,14 +517,17 @@ export function RunDetail() {
 			)}
 
 			{/* Pill-style tabs */}
-			<div style={{ marginBottom: 12 }}>
+			<div className="no-scrollbar" style={{ marginBottom: 12, maxWidth: "100%", overflowX: "auto" }}>
+				{/* `display` lives in the stylesheet so a phone can spread the pill to full width. */}
 				<div
+					className="tabbar"
 					style={{
-						display: "inline-flex",
+						flexWrap: "nowrap",
 						background: "var(--s1)",
 						border: "1px solid var(--b0)",
-						borderRadius: 8,
-						padding: 3,
+						borderRadius: "var(--r-card)",
+						boxShadow: "var(--shadow-card)",
+						padding: TABBAR_PADDING,
 						gap: 2,
 					}}
 				>
@@ -539,16 +541,18 @@ export function RunDetail() {
 								type="button"
 								onClick={() => setActiveTab(tab)}
 								style={{
-									background: isActive ? "var(--s3)" : "transparent",
+									background: isActive ? "var(--accent-tint)" : "transparent",
 									border: "none",
-									borderRadius: 6,
-									color: isActive ? "var(--t0)" : "var(--t3)",
-									fontSize: 12,
-									fontWeight: 600,
-									padding: "5px 13px",
+									borderRadius: `calc(var(--r-card) - ${TABBAR_PADDING}px)`,
+									color: isActive ? "var(--accent-ink)" : "var(--t3)",
+									fontFamily: "var(--mono)",
+									fontSize: 11.5,
+									fontWeight: 500,
+									letterSpacing: "0.02em",
+									padding: "6px 14px",
+									whiteSpace: "nowrap",
 									cursor: "pointer",
-									fontFamily: "inherit",
-									transition: "background 0.1s, color 0.1s",
+									transition: "background .14s ease, color .14s ease",
 								}}
 							>
 								{label}
@@ -575,31 +579,27 @@ export function RunDetail() {
 }
 
 function RunDetailSkeleton() {
+	// Every bar is capped at the width of its card and the metadata row wraps, so a
+	// phone gets the shape of the page it is waiting for rather than bars running
+	// out through the side of every box.
+	const bar = { background: "var(--s2)", borderRadius: "var(--r-chip)", maxWidth: "100%" };
+
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-			<div style={{ height: 30, background: "var(--s2)", borderRadius: 7, width: 80 }} />
-			<div
-				style={{
-					background: "var(--s1)",
-					border: "1px solid var(--b0)",
-					borderRadius: 12,
-					padding: "20px 22px 18px",
-				}}
-			>
-				<div style={{ height: 24, background: "var(--s2)", borderRadius: 6, width: 200, marginBottom: 12 }} />
-				<div style={{ height: 14, background: "var(--s2)", borderRadius: 4, width: 320, marginBottom: 16 }} />
-				<div style={{ display: "flex", gap: 20 }}>
+			<div style={{ ...bar, height: 30, borderRadius: "var(--r-control)", width: 80 }} />
+			<div style={{ ...card, padding: "22px var(--pad-card) 20px" }}>
+				<div style={{ ...bar, height: 24, width: 200, marginBottom: 12 }} />
+				<div style={{ ...bar, height: 14, width: 320, marginBottom: 16 }} />
+				<div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
 					{["a", "b", "c", "d", "e"].map((key) => (
 						<div key={key}>
-							<div style={{ height: 10, background: "var(--s2)", borderRadius: 3, width: 40, marginBottom: 6 }} />
-							<div style={{ height: 14, background: "var(--s2)", borderRadius: 4, width: 70 }} />
+							<div style={{ ...bar, height: 10, borderRadius: 3, width: 40, marginBottom: 6 }} />
+							<div style={{ ...bar, height: 14, width: 70 }} />
 						</div>
 					))}
 				</div>
 			</div>
-			<div
-				style={{ height: 36, background: "var(--s1)", borderRadius: 8, width: 260, border: "1px solid var(--b0)" }}
-			/>
+			<div style={{ ...card, height: 36, width: 260, maxWidth: "100%" }} />
 			<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 				{["a", "b", "c"].map((key) => (
 					<div key={key} style={{ height: 48, background: "var(--s2)", borderRadius: 8 }} />

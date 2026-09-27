@@ -1,0 +1,1088 @@
+import { asConfigProvider } from "@aikirun/lib/config";
+import { hashInput } from "@aikirun/lib/crypto";
+import { NotFoundError } from "@aikirun/lib/error";
+import { noopLogger } from "@aikirun/lib/logger";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { asOpaquePayload } from "@aikirun/testing/payload";
+import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
+import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
+import type { NamespaceId } from "@aikirun/types/namespace";
+import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
+import { ulid } from "ulidx";
+
+import { createTaskStateMachine } from "./state-machine/task";
+import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./state-machine/workflow-run";
+import { describe, expect, test } from "bun:test";
+import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
+import type { Repositories } from "../infra/db/types";
+import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import { computeRank } from "../lib/rank";
+import type { NamespaceRequestContext } from "../middleware/context";
+import { createChildRunCanceller } from "../service/cancel-child-runs";
+import { createEventService } from "../service/event";
+import { createWorkflowRunService } from "../service/workflow-run";
+import { withFakeClock } from "../testing/clock";
+import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
+import { createServiceHarness } from "../testing/harness";
+import { seedClaimedRun } from "../testing/seed/run";
+import { seedCompletedTask, seedRunningTask } from "../testing/seed/task";
+
+const withHarness = createServiceHarness();
+
+function createService(repos: Repositories, imminentRunTimerQueue?: ImminentRunTimerQueue) {
+	const childRunCanceller = createChildRunCanceller(imminentRunTimerQueue);
+	const workflowRunStateMachine = createWorkflowRunStateMachine({
+		repos,
+		childRunCanceller,
+		imminentRunTimerQueue,
+	});
+	return {
+		service: createWorkflowRunService({
+			repos,
+			childRunCanceller,
+			imminentRunTimerQueue,
+		}),
+		stateMachine: workflowRunStateMachine,
+	};
+}
+
+function createTimerPriorityQueue() {
+	return inMemoryTimerPriorityQueue()({ logger: noopLogger });
+}
+
+function createTestImminentRunTimerQueue(params: {
+	timerPriorityQueue: TimerPriorityQueue;
+	lookaheadWindowMs: number;
+}): ImminentRunTimerQueue {
+	return createImminentRunTimerQueue({
+		timerPriorityQueue: params.timerPriorityQueue,
+		configProvider: asConfigProvider(() => ({ lookaheadWindowMs: params.lookaheadWindowMs })),
+		logger: noopLogger,
+	});
+}
+
+describe("WorkflowRunService getWorkflowRunById", () => {
+	test("returns workflow run record content including source", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: inputHash },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				options: { pool: "eu-west" },
+			});
+
+			const run = await service.getWorkflowRunById(context, runId);
+
+			expect(run).toEqual(
+				expect.objectContaining({
+					id: runId,
+					name: "checkout",
+					versionId: "v1",
+					source: "user",
+					createdAt: expect.any(Number),
+					revision: 0,
+					stateTransitionId: expect.any(String),
+					input: asOpaquePayload({ orderId: "order-1" }),
+					inputHash,
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					options: { pool: "eu-west" },
+					attempts: 1,
+					tasks: {},
+					sleeps: {},
+					eventWaits: {},
+					childWorkflowRuns: {},
+					state: expect.objectContaining({
+						status: "scheduled",
+						reason: "new",
+						scheduledAt: expect.any(Number),
+					}),
+				})
+			);
+		}));
+
+	test("records that the client codec was applied", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const input = { orderId: "order-1" };
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: await hashInput(input) },
+				clientHasherApplied: false,
+				clientCodecApplied: true,
+			});
+
+			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+				expect.objectContaining({ id: runId, clientCodecApplied: true })
+			);
+		}));
+
+	test("records that a client hasher was applied", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload({ orderId: "order-1" }),
+				inputHash: { value: "client-hash" },
+				clientHasherApplied: true,
+				clientCodecApplied: false,
+			});
+
+			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+				expect.objectContaining({ id: runId, clientHasherApplied: true })
+			);
+		}));
+
+	test("returns the run's tasks", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const { service } = createService(repos);
+			const run = await service.getWorkflowRunById(context, runId);
+			expect(Object.values(run.tasks)).toEqual([
+				[
+					{
+						id: taskInfo.id,
+						name: taskInfo.name,
+						state: { status: "running" },
+						inputHash: taskInfo.inputHash,
+						options: undefined,
+						attempts: 1,
+					},
+				],
+			]);
+		}));
+
+	test("returns the run's received event waits with each sender's declaration", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			// The seeded run declares no client codec; the sender declares one.
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const { service, stateMachine } = createService(repos);
+			const encodedData = asOpaquePayload({ encoded: "TRK-1" });
+
+			await createEventService({ repos, workflowRunStateMachine: stateMachine }).sendEventToWorkflowRun(context, {
+				runId: runId as WorkflowRunId,
+				eventName: "orderShipped",
+				data: encodedData,
+				clientCodecApplied: true,
+				reference: undefined,
+			});
+
+			const run = await service.getWorkflowRunById(context, runId);
+			expect(run.eventWaits).toEqual({
+				orderShipped: [expect.objectContaining({ status: "received", data: encodedData, clientCodecApplied: true })],
+			});
+		}));
+});
+
+describe("WorkflowRunService hasTerminated", () => {
+	test("throws not found for an unknown run or a run in another namespace", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { service } = createService(repos);
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const otherNamespaceContext = namespaceRequestContextFactory.build();
+
+			expect(service.hasTerminated(context, ulid())).rejects.toThrow(NotFoundError);
+			expect(service.hasTerminated(otherNamespaceContext, runId)).rejects.toThrow(NotFoundError);
+		}));
+
+	test("a running run has not terminated", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { service } = createService(repos);
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			expect(await service.hasTerminated(context, runId)).toEqual({ terminated: false });
+		}));
+
+	Object.entries({
+		completed: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: seed.runId,
+				state: { status: "completed", output: asOpaquePayload({ receiptId: "rcp-3" }) },
+				expectedRevision: seed.revisionWhenClaimed,
+			}),
+		failed: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: seed.runId,
+				state: { status: "failed", cause: "self", error: { name: "Error", message: "inventory service unavailable" } },
+				expectedRevision: seed.revisionWhenClaimed,
+			}),
+		cancelled: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, { type: "pessimistic", id: seed.runId, state: { status: "cancelled" } }),
+	} satisfies Record<
+		TerminalWorkflowRunStatus,
+		(
+			context: NamespaceRequestContext,
+			stateMachine: WorkflowRunStateMachine,
+			seed: { runId: string; revisionWhenClaimed: number }
+		) => Promise<WorkflowRunTransitionStateResponseV1>
+	>).forEach(([status, terminateRun]) => {
+		test(`a ${status} run has terminated`, () =>
+			withHarness(async ({ context, repos, publisher }) => {
+				const { service, stateMachine } = createService(repos);
+				const seed = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+				await terminateRun(context, stateMachine, seed);
+
+				expect(await service.hasTerminated(context, seed.runId)).toEqual({ terminated: true });
+			}));
+	});
+
+	test("a task reaching a terminal status does not say its run is terminated", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { service } = createService(repos);
+			const { runId } = await seedCompletedTask({ namespaceRequestContext: context, repos, publisher });
+
+			expect(await service.hasTerminated(context, runId)).toEqual({ terminated: false });
+		}));
+});
+
+describe("WorkflowRunService cancelByIds", () => {
+	test("cancels a claimed run with reason Cancelled", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const { service } = createService(repos);
+			const result = await service.cancelByIds(context, { ids: [runId] });
+			expect(result).toEqual({ cancelledIds: [runId] });
+
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: runId,
+						status: "cancelled",
+						revision: revisionWhenClaimed + 1,
+						attempts: attemptsWhenClaimed,
+					}),
+					state: { status: "cancelled" },
+				})
+			);
+		}));
+
+	test("cancelling a claimed run deletes its outbox row", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toEqual(expect.objectContaining({ workflowRunId: runId }));
+
+			const { service } = createService(repos);
+			await service.cancelByIds(context, { ids: [runId] });
+
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toBeNull();
+		}));
+
+	test("an empty ids request cancels nothing", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const { service } = createService(repos);
+			expect(await service.cancelByIds(context, { ids: [] })).toEqual({ cancelledIds: [] });
+
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({ id: runId, status: "running", revision: revisionWhenClaimed }),
+				})
+			);
+		}));
+
+	test("cancelling a sleeping run cancels its active sleep", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const { service, stateMachine } = createService(repos);
+			await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "sleeping", sleepName: "nap", durationMs: 60_000 },
+				expectedRevision: revisionWhenClaimed,
+			});
+
+			const cancelledAt = Date.now();
+			const result = await withFakeClock(cancelledAt, () => service.cancelByIds(context, { ids: [runId] }));
+			expect(result).toEqual({ cancelledIds: [runId] });
+
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: runId,
+						status: "cancelled",
+					}),
+					state: { status: "cancelled" },
+				})
+			);
+
+			const sleeps = await repos.sleep.listByWorkflowRunId(runId);
+			expect(sleeps).toEqual([expect.objectContaining({ name: "nap", status: "cancelled", cancelledAt })]);
+		}));
+
+	test("cancelling a child writes the terminal wait row", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const { service } = createService(repos);
+			await service.cancelByIds(context, { ids: [child.runId] });
+
+			expect(await repos.childWorkflowRunWait.listByParentRunIdWithChildState(parent.runId)).toEqual([
+				expect.objectContaining({
+					parentWorkflowRunId: parent.runId,
+					childWorkflowRunId: child.runId,
+					childWorkflowRunStatus: "cancelled",
+					status: "completed",
+					childWorkflowRunState: { status: "cancelled" },
+				}),
+			]);
+		}));
+
+	test("cancelling a child bumps its parent's signal sequence", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const { service } = createService(repos);
+			await service.cancelByIds(context, { ids: [child.runId] });
+
+			const parentRecord = await repos.workflowRun.getByIdWithState({
+				namespaceId: context.namespaceId,
+				id: parent.runId,
+			});
+			expect(parentRecord).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: parent.runId,
+						revision: parent.revisionWhenClaimed,
+						signalSequence: 1,
+					}),
+					state: { status: "running" },
+				})
+			);
+		}));
+
+	test("cancelling two children together bumps their parent once", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const firstChild = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+			const secondChild = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const { service } = createService(repos);
+			await service.cancelByIds(context, { ids: [firstChild.runId, secondChild.runId] });
+
+			const parentRecord = await repos.workflowRun.getByIdWithState({
+				namespaceId: context.namespaceId,
+				id: parent.runId,
+			});
+			expect(parentRecord).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: parent.runId,
+						revision: parent.revisionWhenClaimed,
+						signalSequence: 1,
+					}),
+					state: { status: "running" },
+				})
+			);
+			// Both siblings were delivered by the one bump, so their rows share its stamp.
+			// The bulk cancellation decides which child's row is written first, so the set
+			// is compared sorted rather than in listing order.
+			const waitRows = await repos.childWorkflowRunWait.listByParentRunIdWithChildState(parent.runId);
+			expect(
+				waitRows
+					.map((row) => ({
+						childWorkflowRunId: row.childWorkflowRunId,
+						status: row.status,
+						signalSequence: row.signalSequence,
+					}))
+					.sort((a, b) => (a.childWorkflowRunId < b.childWorkflowRunId ? -1 : 1))
+			).toEqual(
+				[
+					{ childWorkflowRunId: firstChild.runId, status: "completed" as const, signalSequence: 1 },
+					{ childWorkflowRunId: secondChild.runId, status: "completed" as const, signalSequence: 1 },
+				].sort((a, b) => (a.childWorkflowRunId < b.childWorkflowRunId ? -1 : 1))
+			);
+		}));
+
+	test("cancelling a child adds the woken parent's timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service, stateMachine } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+			await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: parent.runId,
+				state: { status: "awaiting_child_workflow", childWorkflowRunId: child.runId },
+				expectedRevision: parent.revisionWhenClaimed,
+				expectedSignalSequence: 0,
+			});
+
+			const cancelledAt = Date.now();
+			await withFakeClock(cancelledAt, () => service.cancelByIds(context, { ids: [child.runId] }));
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: parent.runId, rank: computeRank({ dueAt: cancelledAt }) },
+			]);
+		}));
+
+	test("cancelling a child wakes a parent parked on it", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const child = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const { service, stateMachine } = createService(repos);
+			const parked = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: parent.runId,
+				state: {
+					status: "awaiting_child_workflow",
+					childWorkflowRunId: child.runId,
+				},
+				expectedRevision: parent.revisionWhenClaimed,
+				expectedSignalSequence: 0,
+			});
+
+			const cancelledAt = Date.now();
+			await withFakeClock(cancelledAt, () => service.cancelByIds(context, { ids: [child.runId] }));
+
+			const parentRun = await repos.workflowRun.getByIdWithState({
+				namespaceId: context.namespaceId,
+				id: parent.runId,
+			});
+			expect(parentRun).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: parent.runId,
+						status: "scheduled",
+						revision: parked.revision + 1,
+						signalSequence: 1,
+					}),
+					state: { status: "scheduled", reason: "child_workflow", scheduledAt: cancelledAt },
+				})
+			);
+		}));
+
+	Object.entries({
+		cancelled: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, {
+				type: "pessimistic",
+				id: seed.runId,
+				state: { status: "cancelled" },
+			}),
+		completed: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: seed.runId,
+				state: { status: "completed", output: asOpaquePayload("receipt-9") },
+				expectedRevision: seed.revisionWhenClaimed,
+			}),
+		failed: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: seed.runId,
+				state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+				expectedRevision: seed.revisionWhenClaimed,
+			}),
+	} satisfies Record<
+		TerminalWorkflowRunStatus,
+		(
+			context: NamespaceRequestContext,
+			stateMachine: WorkflowRunStateMachine,
+			seed: { runId: string; revisionWhenClaimed: number }
+		) => Promise<WorkflowRunTransitionStateResponseV1>
+	>).forEach(([status, terminateRun]) => {
+		test(`does not cancel a ${status} run`, () =>
+			withHarness(async ({ context, repos, publisher }) => {
+				const terminalRunSeed = await seedClaimedRun({
+					namespaceRequestContext: context,
+					repos,
+					publisher,
+				});
+				const { service, stateMachine } = createService(repos);
+				const terminal = await terminateRun(context, stateMachine, terminalRunSeed);
+
+				const { runId: cancellableRunId } = await seedClaimedRun({
+					namespaceRequestContext: context,
+					repos,
+					publisher,
+				});
+
+				const result = await service.cancelByIds(context, { ids: [terminalRunSeed.runId, cancellableRunId] });
+				expect(result).toEqual({ cancelledIds: [cancellableRunId] });
+
+				const terminalRun = await repos.workflowRun.getByIdWithState({
+					namespaceId: context.namespaceId,
+					id: terminalRunSeed.runId,
+				});
+				expect(terminalRun).toEqual(
+					expect.objectContaining({
+						run: expect.objectContaining({
+							id: terminalRunSeed.runId,
+							status,
+							revision: terminal.revision,
+						}),
+						state: terminal.state,
+					})
+				);
+			}));
+	});
+
+	test("does not cancel a run from another namespace", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const otherNamespaceContext = namespaceRequestContextFactory.build({ namespaceId: "other-ns" as NamespaceId });
+			const foreignRunSeed = await seedClaimedRun({
+				namespaceRequestContext: otherNamespaceContext,
+				repos,
+				publisher,
+			});
+
+			const { service } = createService(repos);
+			expect(await service.cancelByIds(context, { ids: [foreignRunSeed.runId] })).toEqual({ cancelledIds: [] });
+
+			const foreignRun = await repos.workflowRun.getByIdWithState({
+				namespaceId: otherNamespaceContext.namespaceId,
+				id: foreignRunSeed.runId,
+			});
+			expect(foreignRun).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: foreignRunSeed.runId,
+						status: "running",
+						revision: foreignRunSeed.revisionWhenClaimed,
+					}),
+				})
+			);
+		}));
+
+	test("cancelling a run discards its running task", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const taskStateMachine = createTaskStateMachine({ repos });
+			const taskInput = { amountCents: 1250 };
+			const taskInfo = await taskStateMachine.transitionState(context, {
+				type: "create",
+				workflowRunId: runId,
+				expectedWorkflowRunRevision: revisionWhenClaimed,
+				taskName: "charge-card",
+				input: asOpaquePayload(taskInput),
+				inputHash: await hashInput(taskInput),
+			});
+
+			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"])).toBeEmpty();
+			const runningTasks = await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["running"]);
+			expect(runningTasks).toEqual([expect.objectContaining({ id: taskInfo.id, workflowRunId: runId })]);
+
+			const { service } = createService(repos);
+			await service.cancelByIds(context, { ids: [runId] });
+
+			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["running"])).toBeEmpty();
+			const discardedTasks = await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"]);
+			expect(discardedTasks).toEqual([expect.objectContaining({ id: taskInfo.id, workflowRunId: runId })]);
+		}));
+
+	test("does not create a child when the parent revision is stale", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			// A running → running transition moves only the revision
+			const { service, stateMachine } = createService(repos);
+			await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: parent.runId,
+				state: { status: "running" },
+				expectedRevision: parent.revisionWhenClaimed,
+			});
+
+			const childInput = { orderId: "order-9" };
+			expect(
+				service.createWorkflowRun(context, {
+					name: parent.workflowName,
+					versionId: parent.workflowVersionId,
+					input: asOpaquePayload(childInput),
+					inputHash: { value: await hashInput(childInput) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
+				})
+			).rejects.toThrow(WorkflowRunRevisionConflictError);
+
+			expect(await repos.workflowRun.getChildRuns({ namespaceId: context.namespaceId, id: parent.runId })).toBeEmpty();
+		}));
+
+	test("cancelling a parent with a live child schedules the cancel-child-runs workflow", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			const { service } = createService(repos);
+			const childInput = { orderId: "order-9" };
+			const childRunId = await service.createWorkflowRun(context, {
+				name: parent.workflowName,
+				versionId: parent.workflowVersionId,
+				input: asOpaquePayload(childInput),
+				inputHash: { value: await hashInput(childInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
+			});
+
+			await service.cancelByIds(context, { ids: [parent.runId] });
+
+			// The child is not cancelled inline: a system workflow run is scheduled to cascade the
+			// cancellation, and the child stays untouched until that run executes.
+			const scheduledRuns = await repos.workflowRun.listByFilters(
+				{ namespaceId: context.namespaceId, status: ["scheduled"] },
+				10,
+				0,
+				{
+					order: "asc",
+				}
+			);
+			expect(scheduledRuns).toEqual({
+				rows: [
+					expect.objectContaining({ id: childRunId, status: "scheduled", name: parent.workflowName }),
+					expect.objectContaining({ status: "scheduled", name: "cancel-child-runs" }),
+				],
+				total: 2,
+			});
+
+			const cascadeRuns = scheduledRuns.rows.filter((row) => row.name === "cancel-child-runs");
+			expect(await Promise.all(cascadeRuns.map((row) => service.getWorkflowRunById(context, row.id)))).toEqual([
+				expect.objectContaining({ name: "cancel-child-runs", clientCodecApplied: false }),
+			]);
+		}));
+});
+
+describe("WorkflowRunService listWorkflowRunTransitions", () => {
+	test("lists a task's transitions with their stored states", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const taskStateMachine = createTaskStateMachine({ repos });
+			await taskStateMachine.transitionState(context, {
+				type: "retry",
+				workflowRunId: runId,
+				expectedWorkflowRunRevision: revisionWhenClaimed,
+				id: taskInfo.id,
+				attempts: 2,
+			});
+
+			const { service } = createService(repos);
+			const { transitions } = await service.listWorkflowRunTransitions(context, {
+				id: runId,
+				sort: { order: "asc" },
+			});
+			const taskTransitions = transitions.filter((transition) => transition.type === "task");
+			expect(taskTransitions).toEqual([
+				{
+					id: expect.any(String),
+					createdAt: expect.any(Number),
+					type: "task",
+					attempt: 1,
+					taskId: taskInfo.id,
+					taskState: { status: "running" },
+				},
+				{
+					id: expect.any(String),
+					createdAt: expect.any(Number),
+					type: "task",
+					attempt: 2,
+					taskId: taskInfo.id,
+					taskState: { status: "running" },
+				},
+			]);
+		}));
+});
+
+describe("WorkflowRunService createWorkflowRun reference matching", () => {
+	test("returns the existing run when the stored hash is the current value", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const request = {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				inputHash: { value: inputHash },
+				options: { reference: { id: "order-ref-1" } },
+			};
+
+			const runId = await service.createWorkflowRun(context, request);
+
+			expect(await service.createWorkflowRun(context, request)).toBe(runId);
+		}));
+
+	test("returns the existing run when the stored hash is a deprecated value", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const previousHash = "previous-hash";
+			const currentHash = await hashInput(input);
+			const options = { reference: { id: "order-ref-1" } };
+
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				inputHash: { value: previousHash },
+				options,
+			});
+
+			const matchedRunId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				inputHash: { value: currentHash, deprecatedValues: [previousHash] },
+				options,
+			});
+
+			expect(matchedRunId).toBe(runId);
+		}));
+
+	test("returns the existing run when the stored hash is the announced value", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const announcedHash = "announced-hash";
+			const options = { reference: { id: "order-ref-1" } };
+
+			// Stored by a client already writing under the announced key.
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				inputHash: { value: announcedHash },
+				options,
+			});
+
+			// Retried by a client that only recognises that key so far.
+			const matchedRunId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				inputHash: { value: await hashInput(input), nextValue: announcedHash },
+				options,
+			});
+
+			expect(matchedRunId).toBe(runId);
+		}));
+
+	test("rejects when the stored hash is neither the current value nor a deprecated value", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const options = { reference: { id: "order-ref-1" } };
+
+			await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				inputHash: { value: "previous-hash" },
+				options,
+			});
+
+			expect(
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					inputHash: { value: await hashInput(input) },
+					options,
+				})
+			).rejects.toThrow(WorkflowRunReferenceConflictError);
+		}));
+});
+
+describe("WorkflowRunService imminent run timers", () => {
+	test("creating a due run adds its timer to the priority queue", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const createdAtMs = Date.now();
+			const runId = await withFakeClock(createdAtMs, () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					inputHash: { value: inputHash },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: createdAtMs }) },
+			]);
+		}));
+
+	test("the created run's timer carries its priority", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const createdAtMs = Date.now();
+			const runId = await withFakeClock(createdAtMs, () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					inputHash: { value: inputHash },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					options: { priority: 2 },
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: createdAtMs, priority: 2 }) },
+			]);
+		}));
+
+	test("a run due beyond the lookahead window adds no timer", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const input = { orderId: "order-1" };
+			await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: await hashInput(input) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				options: { delay: { minutes: 1 } },
+			});
+
+			expect(await timerPriorityQueue.peekNext()).toBeNull();
+		}));
+
+	test("returning an existing run from a reference adds no timer", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const input = { orderId: "order-1" };
+			const inputHash = await hashInput(input);
+			const request = {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				inputHash: { value: inputHash },
+				options: { reference: { id: "order-ref-1" } },
+			};
+			const createdAtMs = Date.now();
+			const runId = await withFakeClock(createdAtMs, () => service.createWorkflowRun(context, request));
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: runId, rank: computeRank({ dueAt: createdAtMs }) },
+			]);
+
+			const existingRunId = await service.createWorkflowRun(context, request);
+			expect(existingRunId).toBe(runId);
+
+			expect(await timerPriorityQueue.peekNext()).toBeNull();
+		}));
+
+	test("cancelling a parent with a live child adds the cancellation run's timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			const childInput = { orderId: "order-9" };
+			const childInputHash = await hashInput(childInput);
+			const childCreatedAtMs = Date.now();
+			const childRunId = await withFakeClock(childCreatedAtMs, () =>
+				service.createWorkflowRun(context, {
+					name: parent.workflowName,
+					versionId: parent.workflowVersionId,
+					input: asOpaquePayload(childInput),
+					inputHash: { value: childInputHash },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
+				})
+			);
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: childRunId, rank: computeRank({ dueAt: childCreatedAtMs }) },
+			]);
+
+			const cancelledAtMs = childCreatedAtMs + 5;
+			await withFakeClock(cancelledAtMs, () => service.cancelByIds(context, { ids: [parent.runId] }));
+
+			const scheduledRuns = await repos.workflowRun.listByFilters(
+				{ namespaceId: context.namespaceId, status: ["scheduled"] },
+				10,
+				0,
+				{ order: "asc" }
+			);
+			const cancellationRun = scheduledRuns.rows.find((row) => row.id !== childRunId);
+			if (!cancellationRun) {
+				throw new Error("cancel-child-runs run was not scheduled");
+			}
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: cancellationRun.id, rank: computeRank({ dueAt: cancelledAtMs }) },
+			]);
+		}));
+
+	test("the cancellation run inherits the cancelled parent's priority", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ options: { priority: 2 } }
+			);
+			const timerPriorityQueue = createTimerPriorityQueue();
+			const { service } = createService(
+				repos,
+				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+			);
+
+			// The child carries no priority of its own: the cascade's priority can only come
+			// from the cancelled parent.
+			const childInput = { orderId: "order-9" };
+			const childRunId = await service.createWorkflowRun(context, {
+				name: parent.workflowName,
+				versionId: parent.workflowVersionId,
+				input: asOpaquePayload(childInput),
+				inputHash: { value: await hashInput(childInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
+			});
+			await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 });
+
+			const cancelledAtMs = Date.now();
+			await withFakeClock(cancelledAtMs, () => service.cancelByIds(context, { ids: [parent.runId] }));
+
+			const scheduledRuns = await repos.workflowRun.listByFilters(
+				{ namespaceId: context.namespaceId, status: ["scheduled"] },
+				10,
+				0,
+				{ order: "asc" }
+			);
+			const cancellationRun = scheduledRuns.rows.find((row) => row.id !== childRunId);
+			if (!cancellationRun) {
+				throw new Error("cancel-child-runs run was not scheduled");
+			}
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "scheduled", id: cancellationRun.id, rank: computeRank({ dueAt: cancelledAtMs, priority: 2 }) },
+			]);
+
+			const cancellationRunRecord = await repos.workflowRun.getByIdWithState({
+				namespaceId: context.namespaceId,
+				id: cancellationRun.id,
+			});
+			expect(cancellationRunRecord).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: cancellationRun.id,
+						options: expect.objectContaining({ priority: 2 }),
+					}),
+				})
+			);
+		}));
+});

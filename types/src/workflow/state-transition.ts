@@ -1,25 +1,19 @@
 import type { WorkflowRunState } from "./run";
 import type { TaskState } from "./task";
 
-export const STATE_TRANSITION_TYPES = ["workflow_run", "task"] as const;
-export type StateTransitionType = (typeof STATE_TRANSITION_TYPES)[number];
-
-export interface StateTransitionBase {
+export interface WorkflowRunStateTransition {
 	id: string;
 	createdAt: number;
-	type: StateTransitionType;
-	attempt: number;
-}
-
-export interface WorkflowRunStateTransition extends StateTransitionBase {
 	type: "workflow_run";
+	attempt: number;
 	state: WorkflowRunState;
 }
 
-export interface TaskStateTransition extends StateTransitionBase {
+export interface TaskStateTransition {
+	id: string;
+	createdAt: number;
 	type: "task";
+	attempt: number;
 	taskId: string;
 	taskState: TaskState;
 }
-
-export type StateTransition = WorkflowRunStateTransition | TaskStateTransition;

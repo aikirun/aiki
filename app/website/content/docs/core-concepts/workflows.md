@@ -1,0 +1,459 @@
+---
+title: Workflows
+description: Define workflows as versioned async functions, and follow a run through every state it rests in.
+---
+
+A workflow is a recipe for a business process - it defines the steps needed to complete an operation. Workflows in Aiki are durable, versioned, and can contain complex logic.
+
+## Defining a Workflow
+
+Workflows are created in two steps:
+
+1. **Create the workflow definition** with a name
+2. **Add versions** with implementation logic
+
+```typescript
+import { workflow } from "@aikirun/workflow";
+
+// Step 1: Create workflow definition
+const orderWorkflow = workflow({
+	name: "order-processing",
+});
+
+// Step 2: Create a version
+const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	async handler(run, input: { orderId: string; amount: number }) {
+		// Your workflow logic here
+		const validation = await validateOrder.start(run, input);
+		const payment = await processPayment.start(run, {
+			orderId: validation.orderId,
+			amount: input.amount,
+		});
+
+		return { success: true, orderId: validation.orderId };
+	},
+});
+```
+
+## Inputs and Outputs
+
+Aiki stores workflow inputs and outputs, task inputs and outputs, and event data as JSON. So they must be plain JSON data: strings, numbers, booleans, `null`, arrays, and plain objects.
+
+Anything else is a compile error, and the error names the field:
+
+```typescript
+const fetchOrder = task({
+	name: "fetch-order",
+	async handler(orderId: string) {
+		return { orderId, placedAt: new Date() };
+	},
+});
+// error: ... '{ "Aiki: not serializable": "output.placedAt is Date" }'
+```
+
+The same applies to `Map`, `Set`, `bigint`, class instances, and functions.
+
+## Workflow Versioning
+
+Versioning allows safe updates to workflows without breaking existing runs.
+
+```typescript
+const userOnboardingWorkflow = workflow({
+	name: "user-onboarding",
+});
+
+// Version 1.0.0: Simple onboarding
+const userOnboardingV1 = userOnboardingWorkflow.v("1.0.0", {
+	async handler(run, input: { userId: string }) {
+		await sendWelcomeEmail.start(run, {
+			userId: input.userId,
+		});
+	},
+});
+
+// Version 2.0.0: Add profile creation
+const userOnboardingV2 = userOnboardingWorkflow.v("2.0.0", {
+	async handler(run, input: { userId: string }) {
+		await sendWelcomeEmail.start(run, {
+			userId: input.userId,
+		});
+
+		await createUserProfile.start(run, {
+			userId: input.userId,
+		});
+	},
+});
+```
+
+### Registering Versions
+
+A worker runs only the versions it registers. List every version you still need to serve in the `workflows` array. Versions coexist, on the same worker or across separate ones:
+
+```typescript
+const onboardingWorker = worker({
+	workflows: [userOnboardingV1, userOnboardingV2],
+});
+```
+
+### How Runs Resolve to a Version
+
+- **A run is pinned to its version when it is created.** A run started against `1.0.0` always executes and replays against `1.0.0`, even after `2.0.0` is deployed. The version is never reselected mid-run.
+- **Each version has its own queue.** A worker subscribes only to the versions in its registry, so a `1.0.0` run reaches only workers that register `1.0.0`. See [Subscribers](../architecture/subscribers.md) for the queue model.
+- **An unregistered version is never silently upgraded.** Stop registering `1.0.0` and its in-flight runs are no longer delivered. Aiki never reroutes them to `2.0.0`. A run that reaches a worker without its version in the registry is rejected, not coerced onto another version.
+
+A version bump is therefore the safe way to ship a breaking change. Publish the new version for new runs, keep the old version registered until its in-flight runs drain, then retire it. Because old runs stay on the handler that created them, the new version's handler can change shape freely.
+
+To change a single version's handler in place instead of publishing a new one, follow the determinism rules. See [Refactoring Workflows](../guides/refactoring-workflows.md) and [Determinism](../guides/determinism.md).
+
+## Workflow Retry
+
+Configure automatic retries for failed workflows using the `retry` property:
+
+```typescript
+const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	async handler(run, input: { orderId: string }) {
+		// Workflow logic...
+	},
+	retry: {
+		type: "exponential",
+		maxAttempts: 3,
+		baseDelayMs: 5000,
+	},
+});
+```
+
+When a workflow attempt fails — an unhandled error, or a task that has run out of its own retries — Aiki retries it based on your retry strategy. Between attempts the run sits in `awaiting_retry`.
+
+A task backing off between its own attempts is a different state. The run parks in `awaiting_task_retry` and releases its worker until the task is due, and the workflow's own attempt count is untouched. See [Task States](./tasks.md#task-states).
+
+For detailed guidance on retry strategies, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
+
+## Schema Validation
+
+Define schemas to validate workflow input and output:
+
+```typescript
+import { z } from "zod";
+
+const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	schema: {
+		input: z.object({
+			orderId: z.string(),
+			items: z.array(z.string()),
+		}),
+		output: z.object({
+			success: z.boolean(),
+			total: z.number(),
+		}),
+	},
+	async handler(run, input) {
+		// ...
+		return { success: true, total: 100 };
+	},
+});
+```
+
+Schemas work with any validation library that implements [Standard Schema](https://standardschema.dev/) (Zod, Valibot, ArkType, etc.).
+
+**Why use output schemas?** The output schema checks what the handler returns, at the moment it returns it, so a run cannot record a result that does not match its declared shape. It runs when the workflow executes, not when a parent reads a recorded result - a child that completed before you changed the shape hands back what it recorded. See [Refactoring Workflows](../guides/refactoring-workflows.md#changing-task-or-child-workflow-output-shapes).
+
+## Workflow Options
+
+`with()` sets one option and returns a copy, leaving the original untouched. Chain it to set several:
+
+```typescript
+const configured = orderWorkflowV1
+	.with("pool", "tenant-acme")
+	.with("retry", { type: "exponential", maxAttempts: 3, baseDelayMs: 1000 });
+```
+
+The paths are type checked string literals (with auto-complete in your editor). `with()` takes only paths that exist on the options, and will only compile if the provided value matches the type at that path:
+
+```typescript
+orderWorkflowV1.with("reference.id", "order-123");   // ✅︎
+orderWorkflowV1.with("reference.di", "order-123");   // ❌ compile error, no such option
+orderWorkflowV1.with("reference.id", 123);           // ❌ compile error, reference.id must be a string
+```
+
+Look at what each option answers and they fall into two groups.
+
+`retry` answers "if this fails, try three more times". `pool` answers "run on this kind of workers". `priority` answers "when several runs are due at the same instant, this one goes first". Answers like those fit any run — the one you start now, or one that goes next Tuesday. Set one and you get back something you can go on starting as often as you like.
+
+`reference` answers "this particular run is order-123" - a second run cannot be referenced as order-123. `delay` answers "execute this particular run five minutes from now" - scheduled runs are triggered on a pre-configured cadence. Both are about one particular run — which one it is, when it goes. Set one and you get back a single start — you can `start()` it, and that is all.
+
+The difference is important because some things make or execute many runs out of one workflow: a schedule fires a run every tick, a worker executes whatever runs turn up. Hand either of them a single start and it will not compile:
+
+```typescript
+const oneOff = orderWorkflowV1.with("reference.id", "order-123");
+
+await oneOff.start(client, { orderId: "123" });        // ✅︎ fine
+await hourlySync.activate(client, oneOff);             // ❌ does not compile
+worker({ workflows: [oneOff] });                       // ❌ does not compile
+```
+
+## Worker Pools
+
+Route workflows to a named worker pool when only part of your fleet should execute them — a fleet with special hardware, a fleet dedicated to one tenant, or a regional deployment:
+
+```typescript
+const handle = await orderWorkflowV1
+	.with("pool", "tenant-acme")
+	.start(client, { orderId: "123" });
+```
+
+Workers must be configured to serve the same pool. A workflow routed to `"tenant-acme"` will only be picked up by workers with `pools: ["tenant-acme"]` in their configuration. See **[Workers](./workers.md)** for worker-side setup.
+
+## Delayed Start
+
+Hold a run back before it becomes due:
+
+```typescript
+const handle = await orderWorkflowV1
+	.with("delay", { seconds: 30 })
+	.start(client, { orderId: "123" });
+```
+
+The delay is counted from the moment the run is created. Until it is due the run sits in `scheduled`; after that it dispatches like any other run.
+
+A duration names its units — `days`, `hours`, `minutes`, `seconds`, `milliseconds` — and you can combine them: `{ hours: 1, minutes: 30 }`. Set at least one field.
+
+A delay moves one run. To start a run on a repeating cadence, use a **[Schedule](./schedules.md)** instead.
+
+## Priority
+
+When many runs become due at the same instant — a burst of starts, schedules firing on the same tick — priority decides who dispatches first:
+
+```typescript
+const handle = await orderWorkflowV1
+	.with("priority", 2)
+	.start(client, { orderId: "123" });
+```
+
+Priority is an integer from 0 (highest) to 9 (lowest), defaulting to 5. It follows the run through its whole life: a wakeup after a sleep, a retry, or an event resumption dispatches with the same priority as the original start. Child workflows inherit their parent's priority unless they set their own.
+
+Priority never moves a run ahead of its due time. A run due earlier always dispatches first, whatever the priorities — `delay` decides *when* a run becomes due, priority only breaks the tie among runs due at the same millisecond.
+
+## Starting Workflows
+
+Execute workflows using the version's `.start()` method:
+
+```typescript
+const handle = await workflowVersion.start(client, {
+	userId: "123",
+	email: "user@example.com",
+});
+
+// Access run data
+console.log("Started:", handle.run.id);
+console.log("Status:", handle.run.state.status);
+
+// Wait for the run to finish
+const result = await handle.wait();
+if (result.state.status === "completed") {
+	console.log("Output:", result.state.output);
+} else {
+	console.log("Ended with:", result.state.status);
+}
+```
+
+Use reference IDs for idempotent workflow starts:
+
+```typescript
+const handle = await orderWorkflowV1
+	.with("reference.id", "order-123")
+	.start(client, { orderId: "123" });
+```
+
+With a reference ID, calling `start()` again with the same input returns the existing run. If the input differs, the default behavior throws an error. Use `conflictPolicy: "return_existing"` to return the existing run regardless of input differences. See the [Reference IDs guide](../guides/reference-ids.md) for more details.
+
+## Workflow Runs
+
+A workflow run is an instance of a workflow execution. It has:
+
+### States
+
+- `scheduled` - Scheduled for future execution
+- `queued` - Queued, waiting to be picked up by a worker
+- `running` - Currently executing
+- `paused` - Paused by user
+- `sleeping` - Waiting for a sleep duration to elapse
+- `awaiting_event` - Waiting for an external event
+- `awaiting_retry` - The workflow attempt failed and is backing off before the next attempt
+- `awaiting_task_retry` - A task in the run is backing off before its next attempt; the run releases its worker until the task is due
+- `awaiting_child_workflow` - Waiting for a child workflow to complete
+- `stalled` - Given up after sitting undelivered too long; recoverable by requeue (see [Stalled Runs](../architecture/stalled-runs.md))
+- `completed` - Finished successfully
+- `failed` - Encountered a non-retryable error or exhausted all retries
+- `cancelled` - Cancelled by user
+
+### Workflow Handle
+
+A handle is a reference to a workflow run that lets you interact with it from outside the workflow - check its status, wait for completion, send events, or control execution.
+
+The handle returned from `.start()` provides:
+
+| Property/Method | Description |
+|-----------------|-------------|
+| `run` | The workflow run data (id, state, input, output, etc.) |
+| `events` | Send events to the workflow |
+| `refresh()` | Refresh run data from the server |
+| `wait()` | Wait for a terminal status (`completed`, `failed`, `cancelled`) |
+| `cancel(explanation?)` | Cancel the workflow run |
+| `pause()` | Pause the workflow |
+| `resume()` | Resume a paused workflow |
+| `wakeup()` | Wake a sleeping workflow |
+
+#### Waiting for the Run to Finish
+
+The `wait()` method resolves when the run reaches any terminal status; the state says
+which one. With a timeout, the result can also report that the timeout elapsed:
+
+```typescript
+const result = await handle.wait({ timeout: { minutes: 5 } });
+
+if (!result.success) {
+	console.log("Timed out waiting for the run");
+} else if (result.state.status === "completed") {
+	console.log("Output:", result.state.output);
+} else {
+	console.log("Ended with:", result.state.status);
+}
+```
+
+#### Controlling Workflow Execution
+
+```typescript
+// Pause a running workflow
+await handle.pause();
+
+// Resume a paused workflow
+await handle.resume();
+
+// Cancel a workflow
+await handle.cancel("User requested cancellation");
+```
+
+## Child Workflows
+
+Workflows can start other workflows as children. By default, child workflows run in a fire-and-forget manner - the parent continues without waiting.
+
+A child is a workflow run of its own, delivered to whichever worker picks it up. That is the difference from a [task](./tasks.md), which runs inline on the parent's own worker: children are how work spreads across your fleet and how several branches make progress at the same time.
+
+### Starting a Child Workflow
+
+```typescript
+const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
+	async handler(run, input) {
+		// Fire and forget - parent continues immediately
+		await childWorkflowV1.startAsChild(run, { userId: input.userId });
+
+		// Parent continues without waiting for child
+		await doOtherWork.start(run, input);
+	},
+});
+```
+
+### Waiting for Child Completion
+
+To wait for a child workflow to finish, call `wait()` on the child handle. The wait
+resolves when the child reaches any terminal status (`completed`, `failed`, or
+`cancelled`), and the result carries the state the child ended in:
+
+```typescript
+const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
+	async handler(run, input) {
+		const childHandle = await childWorkflowV1.startAsChild(run, { userId: input.userId });
+
+		// Parent suspends until the child finishes
+		const { state } = await childHandle.wait();
+
+		if (state.status === "completed") {
+			return { childOutput: state.output };
+		} else {
+			throw new Error(`Child ended ${state.status}`);
+		}
+	},
+});
+```
+
+You can also wait with a timeout:
+
+```typescript
+const result = await childHandle.wait({
+	timeout: { hours: 1 },
+});
+
+if (!result.success) {
+	// Child didn't finish within 1 hour
+}
+```
+
+Like sleeps and events, child workflow waits have an internal queue. On replay, if the parent already waited for a child to complete, the cached result is returned immediately instead of waiting again.
+
+### Parallel Child Workflows
+
+Start multiple child workflows and wait for all of them using `Promise.all`:
+
+```typescript
+const parentWorkflowV1 = parentWorkflow.v("1.0.0", {
+	async handler(run, input) {
+		// Start all child workflows
+		const [userHandle, orderHandle, notifyHandle] = await Promise.all([
+			processUserV1.startAsChild(run, { userId: input.userId }),
+			processOrderV1.startAsChild(run, { orderId: input.orderId }),
+			sendNotificationV1.startAsChild(run, { userId: input.userId }),
+		]);
+
+		// Wait for all to finish
+		const [userResult, orderResult, notifyResult] = await Promise.all([
+			userHandle.wait(),
+			orderHandle.wait(),
+			notifyHandle.wait(),
+		]);
+
+		return {
+			user: userResult.state.output,
+			order: orderResult.state.output,
+		};
+	},
+});
+```
+
+### Reference IDs for Child Workflows
+
+Use reference IDs to ensure idempotent child workflow creation:
+
+```typescript
+const childHandle = await childWorkflowV1
+	.with("reference.id", `process-user-${input.userId}`)
+	.startAsChild(run, { userId: input.userId });
+```
+
+Without a reference ID, child workflows are deduplicated by input hash.
+
+### Conflict Policies
+
+When starting a child workflow multiple times with the same reference ID but different inputs, Aiki provides two conflict policies:
+
+```typescript
+// Default: "error" - fails the parent workflow
+const childHandle = await childWorkflowV1
+	.with("reference.id", "unique-id")
+	.startAsChild(run, input);
+
+// Alternative: "return_existing" - returns the existing child run
+const childHandle = await childWorkflowV1
+	.with("reference", { id: "unique-id", conflictPolicy: "return_existing" })
+	.startAsChild(run, input);
+```
+
+| Policy | Behavior |
+|--------|----------|
+| `"error"` (default) | Fails the parent workflow if reference ID exists with different inputs |
+| `"return_existing"` | Returns the existing child workflow run |
+
+## Next Steps
+
+- **[Tasks](./tasks.md)** - Learn about task execution
+- **[Workers](./workers.md)** - Understand worker configuration
+- **[Determinism](../guides/determinism.md)** - Write reliable workflows

@@ -1,5 +1,6 @@
 import { type } from "arktype";
 
+import { opaquePayloadSchema } from "./payload";
 import { retryStrategySchema } from "./retry";
 import { serializedErrorSchema } from "./serializable";
 
@@ -7,65 +8,59 @@ export const taskOptionsSchema = type({
 	"retry?": retryStrategySchema,
 });
 
-export const taskStateRunningRequestSchema = type({
+export const taskStateRunningSchema = type({
 	status: "'running'",
-	attempts: "number.integer > 0",
-	"input?": "unknown",
 });
 
-export const taskStateCompletedRequestSchema = type({
+export const taskStateAwaitingRetrySchema = type({
+	status: "'awaiting_retry'",
+	error: serializedErrorSchema,
+	nextAttemptAt: "number > 0",
+});
+
+export const taskStateCompletedSchema = type({
 	status: "'completed'",
-	attempts: "number.integer > 0",
-	"output?": "unknown",
+	output: opaquePayloadSchema,
 });
 
 export const taskStateFailedSchema = type({
 	status: "'failed'",
-	attempts: "number.integer > 0",
 	error: serializedErrorSchema,
 });
 
-export const taskStateAwaitingRetryRequestSchema = type({
-	status: "'awaiting_retry'",
-	attempts: "number.integer > 0",
-	error: serializedErrorSchema,
-	nextAttemptInMs: "number.integer > 0",
-});
-
-const nonDiscardedTaskStateSchema = type({
-	status: "'running'",
-	attempts: "number.integer > 0",
-	input: "unknown",
-})
-	.or({
-		status: "'awaiting_retry'",
-		attempts: "number.integer > 0",
-		error: serializedErrorSchema,
-		nextAttemptAt: "number > 0",
-	})
-	.or({
-		status: "'completed'",
-		attempts: "number.integer > 0",
-		output: "unknown",
-	})
-	.or({
-		status: "'failed'",
-		attempts: "number.integer > 0",
-		error: serializedErrorSchema,
-	});
-
-export const taskStateSchema = nonDiscardedTaskStateSchema.or({
+const taskStateDiscardedSchema = type({
 	status: "'discarded'",
-	attempts: "number.integer > 0",
 });
+
+const nonDiscardedTaskStateSchema = taskStateRunningSchema
+	.or(taskStateAwaitingRetrySchema)
+	.or(taskStateCompletedSchema)
+	.or(taskStateFailedSchema);
+
+export const taskStateSchema = nonDiscardedTaskStateSchema.or(taskStateDiscardedSchema);
 
 export const taskInfoSchema = type({
 	id: "string > 0",
 	name: "string > 0",
 	state: nonDiscardedTaskStateSchema,
 	inputHash: "string > 0",
+	"options?": taskOptionsSchema.or("undefined"),
+	attempts: "number.integer > 0",
 });
 
-export const taskQueueSchema = type({
-	tasks: taskInfoSchema.array(),
+export const taskRecordSchema = type({
+	id: "string > 0",
+	name: "string > 0",
+	workflowRunId: "string > 0",
+	"input?": opaquePayloadSchema,
+	inputHash: "string > 0",
+	"options?": taskOptionsSchema.or("undefined"),
+	attempts: "number.integer > 0",
+	state: taskStateSchema,
+});
+
+export const taskSetStateRequestSchema = type({
+	id: "string > 0",
+	workflowRunId: "string > 0",
+	state: taskStateCompletedSchema.or(taskStateFailedSchema),
 });

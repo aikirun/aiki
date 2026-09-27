@@ -1,35 +1,21 @@
 import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
-import { createPgRepos } from "./pg";
-import { createPgHandle, type PgClient } from "./pg/provider";
-import { createSqliteRepos } from "./sqlite";
-import { createSqliteHandle, type SqliteClient } from "./sqlite/provider";
+import type { PgClient } from "./pg/provider";
 import type { Repositories } from "./types";
 
-export function extractDbClient(db: Database): unknown {
-	const internal = db[INTERNAL];
-	if (!internal || internal.client === undefined) {
-		throw new Error("Database must be created via database().");
-	}
-	return internal.client;
-}
-
-export function createRepos(database: Database): Repositories {
-	switch (database.provider) {
+export async function createRepos(db: Database): Promise<Repositories> {
+	switch (db.provider) {
 		case "pg": {
-			const client = extractDbClient(database) as PgClient;
-			const handle = createPgHandle(client);
-			return createPgRepos(handle);
+			const { createPgRepos } = await import("./pg");
+			const client = db[INTERNAL].client as PgClient;
+			return createPgRepos(client);
 		}
-		case "mysql":
-			throw new Error("MySQL support not yet implemented");
-		case "sqlite": {
-			const client = extractDbClient(database) as SqliteClient;
-			const handle = createSqliteHandle(client);
-			return createSqliteRepos(handle, client);
-		}
+		// case "mysql":
+		// 	throw new Error("MySQL support not yet implemented");
+		// case "sqlite":
+		// 	throw new Error("SQLite support not yet implemented");
 		default:
-			return database.provider satisfies never;
+			return db.provider satisfies never;
 	}
 }

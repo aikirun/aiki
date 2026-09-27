@@ -67,3 +67,13 @@ export class NonDeterminismError extends Error {
 		this.unconsumedManifestEntries = unconsumedManifestEntries;
 	}
 }
+
+export class ClientCodecMissingError extends Error {
+	public readonly id: WorkflowRunId;
+
+	constructor(id: WorkflowRunId) {
+		super(`Workflow ${id} expects a client codec, but none present`);
+		this.name = "ClientCodecMissingError";
+		this.id = id;
+	}
+}

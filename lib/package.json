@@ -1,21 +1,29 @@
 {
 	"name": "@aikirun/lib",
-	"version": "0.28.0",
+	"version": "0.42.0",
 	"private": true,
 	"description": "Internal utilities library for Aiki - including duration conversion, retry strategies, async helpers, and polling utilities",
 	"type": "module",
 	"exports": {
-		"./address": {
-			"types": "./dist/address/index.d.ts",
-			"import": "./dist/address/index.js"
-		},
-		"./array": {
-			"types": "./dist/array/index.d.ts",
-			"import": "./dist/array/index.js"
-		},
 		"./async": {
 			"types": "./dist/async/index.d.ts",
 			"import": "./dist/async/index.js"
+		},
+		"./collection/array": {
+			"types": "./dist/collection/array/index.d.ts",
+			"import": "./dist/collection/array/index.js"
+		},
+		"./collection/heap": {
+			"types": "./dist/collection/heap/index.d.ts",
+			"import": "./dist/collection/heap/index.js"
+		},
+		"./collection/map": {
+			"types": "./dist/collection/map/index.d.ts",
+			"import": "./dist/collection/map/index.js"
+		},
+		"./config": {
+			"types": "./dist/config/index.d.ts",
+			"import": "./dist/config/index.js"
 		},
 		"./context": {
 			"types": "./dist/context/index.d.ts",
@@ -24,6 +32,18 @@
 		"./crypto": {
 			"types": "./dist/crypto/index.d.ts",
 			"import": "./dist/crypto/index.js"
+		},
+		"./db": {
+			"types": "./dist/db/index.d.ts",
+			"import": "./dist/db/index.js"
+		},
+		"./db/migrate": {
+			"types": "./dist/db/migrate/index.d.ts",
+			"import": "./dist/db/migrate/index.js"
+		},
+		"./db/migrate/cli": {
+			"types": "./dist/db/migrate/cli.d.ts",
+			"import": "./dist/db/migrate/cli.js"
 		},
 		"./duration": {
 			"types": "./dist/duration/index.d.ts",
@@ -49,10 +69,6 @@
 			"types": "./dist/object/index.d.ts",
 			"import": "./dist/object/index.js"
 		},
-		"./polling": {
-			"types": "./dist/polling/index.d.ts",
-			"import": "./dist/polling/index.js"
-		},
 		"./retry": {
 			"types": "./dist/retry/index.d.ts",
 			"import": "./dist/retry/index.js"
@@ -64,6 +80,10 @@
 		"./testing/expect": {
 			"types": "./dist/testing/expect/index.d.ts",
 			"import": "./dist/testing/expect/index.js"
+		},
+		"./timestamp": {
+			"types": "./dist/timestamp/index.d.ts",
+			"import": "./dist/timestamp/index.js"
 		}
 	},
 	"files": [
@@ -71,6 +91,13 @@
 	],
 	"scripts": {
 		"build": "tsup"
+	},
+	"devDependencies": {
+		"arktype": "^2.1.29",
+		"cac": "^6.7.14",
+		"dotenv": "^16.4.5",
+		"drizzle-orm": "^0.45.1",
+		"postgres": "^3.4.8"
 	},
 	"license": "Apache-2.0"
 }

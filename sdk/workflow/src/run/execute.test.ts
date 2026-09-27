@@ -1,0 +1,497 @@
+import { createBinaryLatch, delay } from "@aikirun/lib/async";
+import { asConfigProvider } from "@aikirun/lib/config";
+import { hashInput } from "@aikirun/lib/crypto";
+import { getCompositeId } from "@aikirun/lib/id";
+import { withFakeClient } from "@aikirun/testing/client";
+import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
+import { awaitingRetryTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
+import { asOpaquePayload } from "@aikirun/testing/payload";
+import { INTERNAL } from "@aikirun/types/symbols";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import {
+	ClientCodecMissingError,
+	NonDeterminismError,
+	WorkflowRunFailedError,
+	WorkflowRunNotExecutableError,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
+
+import type { EventsDefinition } from "./event";
+import { executeWorkflowRun } from "./execute";
+import type { WorkflowRun } from "./index";
+import { describe, expect, spyOn, test } from "bun:test";
+import { task } from "../task";
+import type { AnyWorkflowVersion } from "../workflow-version";
+
+const configProvider = asConfigProvider(() => ({
+	claimRefreshIntervalMs: 30_000,
+	maxInlineWaitMs: 10,
+}));
+
+function fakeWorkflowVersion(
+	handler: (run: WorkflowRun<unknown, EventsDefinition>, input: unknown) => Promise<void>
+): AnyWorkflowVersion {
+	return {
+		name: "dummy-workflow" as WorkflowName,
+		versionId: "1.0.0" as WorkflowVersionId,
+		[INTERNAL]: { eventsDefinition: {}, handler },
+	} as unknown as AnyWorkflowVersion;
+}
+
+describe("executeWorkflowRun", () => {
+	describe("error classification", () => {
+		const controlFlowErrors: Array<{ name: string; make: () => Error }> = [
+			{
+				name: "WorkflowRunNotExecutableError",
+				make: () => new WorkflowRunNotExecutableError("run-1" as WorkflowRunId, "paused"),
+			},
+			{ name: "WorkflowRunSuspendedError", make: () => new WorkflowRunSuspendedError("run-1" as WorkflowRunId) },
+			{ name: "WorkflowRunFailedError", make: () => new WorkflowRunFailedError("run-1" as WorkflowRunId, 1) },
+			{
+				name: "WorkflowRunRevisionConflictError",
+				make: () => new WorkflowRunRevisionConflictError("run-1" as WorkflowRunId),
+			},
+			{
+				name: "NonDeterminismError",
+				make: () => new NonDeterminismError("run-1" as WorkflowRunId, 1, { taskIds: [], childWorkflowRunIds: [] }),
+			},
+		];
+
+		for (const errorCase of controlFlowErrors) {
+			test(`returns true when the handler throws ${errorCase.name}`, () =>
+				withFakeClient(async (client) => {
+					const workflowRun = runningWorkflowRunRecordFactory.build();
+					const workflowVersion = fakeWorkflowVersion(async () => {
+						throw errorCase.make();
+					});
+
+					const result = await executeWorkflowRun({
+						client,
+						workflowRun,
+						workflowVersion,
+						logger: client.logger,
+						configProvider,
+					});
+
+					expect(result).toBe(true);
+				}));
+		}
+
+		test("returns false when the handler throws ClientCodecMissingError, so the run is redelivered", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new ClientCodecMissingError(workflowRun.id as WorkflowRunId);
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
+
+		test("returns false and logs when the handler throws an unexpected error", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new Error("boom");
+				});
+				const errorLog = spyOn(client.logger, "error");
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+				expect(errorLog).toHaveBeenCalled();
+			}));
+
+		test("returns true when the handler resolves", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(true);
+			}));
+	});
+
+	describe("awaiting_task_retry", () => {
+		test("a replayed task whose retry is not due transitions the run to awaiting_task_retry", () =>
+			withFakeClient(async (client) => {
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => "charged",
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
+				// The clock cannot be pinned in unit tests (files run concurrently), so "not due"
+				// is a deadline a day out — far beyond the lifetime of a test run.
+				const nextAttemptAt = Date.now() + 24 * 60 * 60 * 1000;
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({
+					name: chargeCard.name,
+					options: { retry },
+					state: { nextAttemptAt },
+				});
+				const workflowRun = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [awaitingRetryTaskInfo] },
+				});
+				const workflowVersion = fakeWorkflowVersion(async (run) => {
+					await chargeCard.start(run, input);
+				});
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: { status: "awaiting_task_retry" },
+						expectedRevision: workflowRun.revision,
+					},
+					{
+						revision: workflowRun.revision + 1,
+						state: { status: "awaiting_task_retry", nextAttemptAt },
+						attempts: workflowRun.attempts,
+					}
+				);
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(true);
+			}));
+	});
+
+	describe("context", () => {
+		test("passes null context when the client has no context factory", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				let capturedContext: unknown = "unset";
+				const workflowVersion = fakeWorkflowVersion(async (run) => {
+					capturedContext = run.context;
+				});
+
+				await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(capturedContext).toBeNull();
+			}));
+
+		test("resolves a synchronous context factory", () =>
+			withFakeClient({ context: () => ({ tenantId: "t1" }) }, async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				let capturedContext: unknown;
+				const workflowVersion = fakeWorkflowVersion(async (run) => {
+					capturedContext = run.context;
+				});
+
+				await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(capturedContext).toEqual({ tenantId: "t1" });
+			}));
+
+		test("awaits an asynchronous context factory", () =>
+			withFakeClient({ context: async () => ({ tenantId: "t2" }) }, async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				let capturedContext: unknown;
+				const workflowVersion = fakeWorkflowVersion(async (run) => {
+					capturedContext = run.context;
+				});
+
+				await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(capturedContext).toEqual({ tenantId: "t2" });
+			}));
+	});
+
+	test("invokes the handler with the run input decoded by the client's codec", () =>
+		withFakeClient(async (client) => {
+			const encodedInput = asOpaquePayload({ encoded: true });
+			const decodedInput = { orderId: "o1" };
+			client[INTERNAL].codec = {
+				encode: async (payload) => payload,
+				decode: async (payload) => {
+					expect(payload).toEqual(encodedInput);
+					return decodedInput;
+				},
+			};
+			const workflowRun = runningWorkflowRunRecordFactory.build({ input: encodedInput, clientCodecApplied: true });
+			let capturedInput: unknown;
+			const workflowVersion = fakeWorkflowVersion(async (_run, input) => {
+				capturedInput = input;
+			});
+
+			await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(capturedInput).toEqual(decodedInput);
+		}));
+
+	test("returns false when the run was recorded with the client codec applied but the client has none", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
+			});
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	test("hashes inside the run with the plain function when the run declares no client hasher, whatever the client holds", () =>
+		withFakeClient(async (client) => {
+			client[INTERNAL].hasher = Object.assign(async () => ({ value: "client-hash" }), {
+				for: async () => async () => "client-bound-hash",
+			});
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: false });
+			const workflowVersion = fakeWorkflowVersion(async (run) => {
+				expect(await run[INTERNAL].hasher({ orderId: "order-1" })).toBe(await hashInput({ orderId: "order-1" }));
+			});
+
+			expect(
+				await executeWorkflowRun({ client, workflowRun, workflowVersion, logger: client.logger, configProvider })
+			).toBe(true);
+		}));
+
+	test("hashes inside the run with the client's hasher under the rotation that produced the run's hash", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+			client[INTERNAL].hasher = Object.assign(async () => ({ value: "client-hash" }), {
+				for: async (hash: string) => {
+					expect(hash).toBe(workflowRun.inputHash);
+					return async () => "client-bound-hash";
+				},
+			});
+			const workflowVersion = fakeWorkflowVersion(async (run) => {
+				expect(await run[INTERNAL].hasher({ orderId: "order-1" })).toBe("client-bound-hash");
+			});
+
+			expect(
+				await executeWorkflowRun({ client, workflowRun, workflowVersion, logger: client.logger, configProvider })
+			).toBe(true);
+		}));
+
+	test("returns false when the run declares a client hasher but the client has none", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
+			});
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false when the client's hasher cannot hash under the rotation that produced the run's hash", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
+			});
+			client[INTERNAL].hasher = Object.assign(async () => ({ value: "unused" }), {
+				for: async () => null,
+			});
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	describe("claim refresh", () => {
+		test("keeps the claim alive by refreshing it while the handler runs", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const firstClaimRefresh = createBinaryLatch();
+				client.api.workflowRun.claimRefreshV1.onNextCall(() => firstClaimRefresh.signal());
+				client.api.workflowRun.claimRefreshV1.once({ id: workflowRun.id });
+
+				// The handler blocks until the first claim refresh fires.
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					await firstClaimRefresh.wait();
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider: asConfigProvider(() => ({
+						...configProvider.config,
+						claimRefreshIntervalMs: 10,
+					})),
+				});
+
+				expect(result).toBe(true);
+			}));
+
+		test("stops refreshing the claim once the signal is aborted", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const controller = new AbortController();
+				const handlerReleased = createBinaryLatch();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					await handlerReleased.wait();
+				});
+
+				controller.abort();
+
+				const executionPromise = executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider: asConfigProvider(() => ({
+						...configProvider.config,
+						claimRefreshIntervalMs: 1,
+					})),
+					signal: controller.signal,
+				});
+
+				// Absence check: a 1ms claimRefreshIntervalMs would fire within this window had abort not torn it down.
+				await delay(20);
+
+				handlerReleased.signal();
+				expect(await executionPromise).toBe(true);
+			}));
+	});
+
+	describe("heartbeats", () => {
+		test("fires the provided heartbeat on its configured interval", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				let heartbeatCalls = 0;
+				const firstHeartbeat = createBinaryLatch();
+				const sendHeartbeat = async () => {
+					heartbeatCalls++;
+					firstHeartbeat.signal();
+				};
+				// The handler blocks until the heartbeat has fired once.
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					await firstHeartbeat.wait();
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider: asConfigProvider(() => ({
+						...configProvider.config,
+						// Claim refresh is never fired because claimRefreshIntervalMs >> heartbeat.intervalMs
+						claimRefreshIntervalMs: 30_000,
+					})),
+					heartbeat: { send: sendHeartbeat, intervalMs: 1 },
+				});
+
+				expect(result).toBe(true);
+				expect(heartbeatCalls).toBeGreaterThanOrEqual(1);
+			}));
+
+		test("stops firing the heartbeat once the signal is aborted", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const controller = new AbortController();
+				const handlerReleased = createBinaryLatch();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					await handlerReleased.wait();
+				});
+				let heartbeatCalls = 0;
+				const sendHeartbeat = async () => {
+					heartbeatCalls++;
+				};
+
+				controller.abort();
+
+				const executionPromise = executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+					heartbeat: { send: sendHeartbeat, intervalMs: 1 },
+					signal: controller.signal,
+				});
+
+				// Absence check: a 1ms heartbeat would fire within this window had abort not torn it down.
+				await delay(20);
+				expect(heartbeatCalls).toBe(0);
+
+				handlerReleased.signal();
+				expect(await executionPromise).toBe(true);
+			}));
+	});
+});

@@ -1,12 +1,13 @@
-import type { StateTransition } from "@aikirun/types/workflow/state-transition";
+import type { TaskStateTransition, WorkflowRunStateTransition } from "@aikirun/types/workflow/state-transition";
 import { Link } from "react-router-dom";
 
 import type { ScheduledContext, TimelineLookups } from "./timeline-lookups";
-import { TASK_STATUS_COLORS, WORKFLOW_RUN_STATUS_COLORS } from "../../constants/status-colors";
+import { edge, TASK_STATUS_COLORS, WORKFLOW_RUN_STATUS_COLORS } from "../../constants/status-colors";
 import { WORKFLOW_STATUS_CONFIG } from "../../constants/workflow-status";
+import { card, eyebrow } from "../common/ui";
 
 interface TimelineTabProps {
-	transitions: StateTransition[];
+	transitions: Array<WorkflowRunStateTransition | TaskStateTransition>;
 	isLoading: boolean;
 	lookups?: TimelineLookups;
 }
@@ -19,13 +20,34 @@ function fmtTime(ts: number): string {
 	return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
 
+/** Day label for the separators, e.g. "28 August". */
+function fmtDay(ts: number): string {
+	return new Date(ts).toLocaleDateString([], { day: "numeric", month: "long" });
+}
+
+/** Compact date for the attempt range when it spans days, e.g. "27/08". */
+function fmtShortDate(ts: number): string {
+	return new Date(ts).toLocaleDateString([], { day: "2-digit", month: "2-digit" });
+}
+
+/** The full instant, for the hover title on every rendered time. */
+function fmtFull(ts: number): string {
+	return new Date(ts).toLocaleString();
+}
+
+function isSameDay(a: number, b: number): boolean {
+	const x = new Date(a);
+	const y = new Date(b);
+	return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+
 interface Attempt {
 	number: number;
-	transitions: StateTransition[];
+	transitions: Array<WorkflowRunStateTransition | TaskStateTransition>;
 	indexOffset: number;
 }
 
-function groupIntoAttempts(transitions: StateTransition[]): Attempt[] {
+function groupIntoAttempts(transitions: Array<WorkflowRunStateTransition | TaskStateTransition>): Attempt[] {
 	const attempts: Attempt[] = [];
 
 	for (let i = 0; i < transitions.length; i++) {
@@ -83,26 +105,26 @@ function AttemptGroup({
 	lookups?: TimelineLookups;
 }) {
 	const times = attempt.transitions.map((t) => t.createdAt);
-	const firstTime = fmtTime(Math.min(...times));
-	const lastTime = fmtTime(Math.max(...times));
-	const timeRange = times.length > 1 ? `${firstTime} – ${lastTime}` : firstTime;
+	const first = Math.min(...times);
+	const last = Math.max(...times);
+	// A bare "06:12:06 – 06:12:41" reads as 35 seconds whether it is 35 seconds or three days,
+	// so the dates appear once the attempt crosses one.
+	const spansDays = !isSameDay(first, last);
+	const stamp = (ts: number) => (spansDays ? `${fmtShortDate(ts)} ${fmtTime(ts)}` : fmtTime(ts));
+	const timeRange = times.length > 1 ? `${stamp(first)} – ${stamp(last)}` : stamp(first);
 
 	return (
 		<div style={{ marginBottom: 16 }}>
 			{/* Attempt header */}
 			<div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-				<span
-					style={{
-						fontSize: 11,
-						fontWeight: 700,
-						color: isLatest ? "var(--t0)" : "var(--t2)",
-						whiteSpace: "nowrap",
-					}}
-				>
+				<span style={{ ...eyebrow(isLatest ? "var(--accent-ink)" : "var(--t3)"), whiteSpace: "nowrap" }}>
 					Attempt {attempt.number}
 				</span>
 				<div style={{ flex: 1, height: 1, background: "var(--b0)" }} />
-				<span style={{ fontSize: 10, fontFamily: "monospace", color: "var(--t3)", whiteSpace: "nowrap" }}>
+				<span
+					title={times.length > 1 ? `${fmtFull(first)} – ${fmtFull(last)}` : fmtFull(first)}
+					style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--t3)", whiteSpace: "nowrap" }}
+				>
 					{timeRange}
 				</span>
 			</div>
@@ -120,9 +142,15 @@ function AttemptGroup({
 						background: "var(--b0)",
 					}}
 				/>
-				{attempt.transitions.map((t, i) => (
-					<TimelineItem key={t.id} transition={t} globalIndex={attempt.indexOffset + i} lookups={lookups} />
-				))}
+				{attempt.transitions.map((t, i) => {
+					const previous = attempt.transitions[i - 1];
+					return (
+						<div key={t.id}>
+							{previous && !isSameDay(previous.createdAt, t.createdAt) && <DaySeparator ts={t.createdAt} />}
+							<TimelineItem transition={t} globalIndex={attempt.indexOffset + i} lookups={lookups} />
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);
@@ -171,7 +199,7 @@ function ScheduledContextInfo({ ctx, color }: { ctx: ScheduledContext; color: st
 	if (ctx.scheduledByChildWorkflowRunId) {
 		const outcome = ctx.childWorkflowTimedOut ? "timed out" : (ctx.childWorkflowStatus ?? "resolved");
 		parts.push(
-			<span key="child" style={{ ...contextStyle, color: "#C084FC" }}>
+			<span key="child" style={{ ...contextStyle, color: "var(--accent-purple)" }}>
 				child{" "}
 				<ChildWorkflowLink id={ctx.scheduledByChildWorkflowRunId}>
 					{shortId(ctx.scheduledByChildWorkflowRunId)}
@@ -190,14 +218,14 @@ function TimelineItem({
 	globalIndex,
 	lookups,
 }: {
-	transition: StateTransition;
+	transition: WorkflowRunStateTransition | TaskStateTransition;
 	globalIndex: number;
 	lookups?: TimelineLookups;
 }) {
 	if (transition.type === "workflow_run") {
 		const { status } = transition.state;
 		const config = WORKFLOW_STATUS_CONFIG[status];
-		const color = WORKFLOW_RUN_STATUS_COLORS[status]?.tint ?? "var(--t3)";
+		const color = WORKFLOW_RUN_STATUS_COLORS[status] ?? "var(--t3)";
 		const isRunning = status === "running";
 
 		let reason: string | undefined;
@@ -234,10 +262,11 @@ function TimelineItem({
 		}
 
 		return (
-			<div style={{ position: "relative", marginBottom: 4 }}>
+			<div style={{ position: "relative", marginBottom: 6 }}>
 				<Dot color={color} isRunning={isRunning} />
 				<Card
 					time={fmtTime(transition.createdAt)}
+					fullTime={fmtFull(transition.createdAt)}
 					content={
 						<span>
 							<span style={{ fontWeight: 500, color: "var(--t1)" }}>{config?.label ?? status}</span>
@@ -252,7 +281,7 @@ function TimelineItem({
 
 	if (transition.type === "task") {
 		const { status } = transition.taskState;
-		const color = TASK_STATUS_COLORS[status]?.tint ?? "var(--t3)";
+		const color = TASK_STATUS_COLORS[status] ?? "var(--t3)";
 		const taskId = transition.taskId;
 
 		const taskName = lookups?.taskById.get(taskId)?.name;
@@ -262,19 +291,20 @@ function TimelineItem({
 			transition.taskState.status === "awaiting_retry" ||
 			transition.taskState.status === "completed" ||
 			transition.taskState.status === "failed"
-				? transition.taskState.attempts
+				? transition.attempt
 				: undefined;
 
 		return (
-			<div style={{ position: "relative", marginBottom: 4 }}>
+			<div style={{ position: "relative", marginBottom: 6 }}>
 				<Dot color={color} isRunning={status === "running"} />
 				<Card
 					time={fmtTime(transition.createdAt)}
+					fullTime={fmtFull(transition.createdAt)}
 					content={
 						<span>
 							<Link
 								to="?tab=execution"
-								style={{ ...inlineLinkStyle, fontFamily: "monospace", color: "var(--t3)", fontSize: 10 }}
+								style={{ ...inlineLinkStyle, fontFamily: "var(--mono)", color: "var(--t3)", fontSize: 10 }}
 							>
 								{taskName ?? shortId(taskId)}
 							</Link>{" "}
@@ -305,20 +335,34 @@ function Dot({ color, isRunning }: { color: string; isRunning: boolean }) {
 				borderRadius: "50%",
 				background: color,
 				border: "2px solid var(--bg)",
-				boxShadow: `0 0 0 1px ${color}30`,
+				boxShadow: `0 0 0 1px ${edge(color)}`,
 			}}
 		/>
 	);
 }
 
-function Card({ content, time }: { content: React.ReactNode; time: string }) {
+/**
+ * Marks where the timeline crosses midnight. Without it the times appear to run backwards — a row
+ * at 23:59 followed by one at 00:04 — with nothing to say a day passed.
+ */
+function DaySeparator({ ts }: { ts: number }) {
+	return (
+		<div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 12px", marginLeft: -18 }}>
+			<div style={{ flex: 1, height: 1, background: "var(--b0)" }} />
+			<span style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--t3)", whiteSpace: "nowrap" }}>
+				{fmtDay(ts)}
+			</span>
+			<div style={{ flex: 1, height: 1, background: "var(--b0)" }} />
+		</div>
+	);
+}
+
+function Card({ content, time, fullTime }: { content: React.ReactNode; time: string; fullTime?: string }) {
 	return (
 		<div
 			style={{
-				padding: "8px 12px",
-				background: "var(--s1)",
-				border: "1px solid var(--b0)",
-				borderRadius: 8,
+				...card,
+				padding: "9px 14px",
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "space-between",
@@ -326,7 +370,10 @@ function Card({ content, time }: { content: React.ReactNode; time: string }) {
 			}}
 		>
 			<span style={{ fontSize: 12 }}>{content}</span>
-			<span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap", flexShrink: 0 }}>
+			<span
+				title={fullTime}
+				style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap", flexShrink: 0 }}
+			>
 				{time}
 			</span>
 		</div>
@@ -337,15 +384,7 @@ function TimelineSkeleton() {
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 			{["a", "b", "c", "d"].map((key) => (
-				<div
-					key={key}
-					style={{
-						height: 36,
-						background: "var(--s1)",
-						borderRadius: 8,
-						opacity: 0.5,
-					}}
-				/>
+				<div key={key} style={{ ...card, height: 36, opacity: 0.5 }} />
 			))}
 		</div>
 	);

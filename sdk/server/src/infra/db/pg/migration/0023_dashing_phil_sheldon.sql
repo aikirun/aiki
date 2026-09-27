@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_run" ADD COLUMN "signal_sequence" integer DEFAULT 0 NOT NULL;

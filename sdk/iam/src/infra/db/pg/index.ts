@@ -1,24 +1,23 @@
-import type { PgDb, PgHandle } from "./provider";
+import { createPgHandle, type PgClient, type PgDb } from "./provider";
 import { createApiKeyRepository } from "./repository/api-key";
 import { createNamespaceRepository } from "./repository/namespace";
 import { createOrganizationRepository } from "./repository/organization";
 import { createSessionRepository } from "./repository/session";
-import type { Repositories } from "../types";
+import type { Repositories, TxRepositories } from "../types";
 
-export function createPgRepos(db: PgHandle): Repositories {
+const createRepos = (db: PgDb): Omit<Repositories, "transaction"> => ({
+	namespace: createNamespaceRepository(db),
+	organization: createOrganizationRepository(db),
+	session: createSessionRepository(db),
+	apiKey: createApiKeyRepository(db),
+});
+
+export function createPgRepos(client: PgClient): Repositories {
+	const db = createPgHandle(client);
 	return {
 		...createRepos(db),
-		async transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T> {
-			return db.transaction(async (tx) => fn(createRepos(tx)));
+		async transaction<T>(fn: (txRepos: TxRepositories) => Promise<T>): Promise<T> {
+			return db.transaction(async (tx) => fn(createRepos(tx) as TxRepositories));
 		},
-	};
-}
-
-function createRepos(db: PgDb): Omit<Repositories, "transaction"> {
-	return {
-		namespace: createNamespaceRepository(db),
-		organization: createOrganizationRepository(db),
-		session: createSessionRepository(db),
-		apiKey: createApiKeyRepository(db),
 	};
 }

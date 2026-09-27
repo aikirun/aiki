@@ -1,6 +1,6 @@
-import { getTaskAddress } from "@aikirun/lib/address";
 import { delay } from "@aikirun/lib/async";
-import { hashInput } from "@aikirun/lib/crypto";
+import type { ConfigProvider } from "@aikirun/lib/config";
+import { getCompositeId } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
 import {
 	type ObjectBuilder,
@@ -23,27 +23,40 @@ import {
 } from "@aikirun/types/workflow/run";
 import type {
 	TaskAddress,
-	TaskDefinitionOptions,
 	TaskId,
 	TaskInfo,
 	TaskName,
 	TaskStartOptions,
+	TaskStateAwaitingRetry,
 } from "@aikirun/types/workflow/task";
 import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import type { WorkflowRunContext } from "./run/context";
+import type { WorkflowRun } from "./run";
+import type { WorkflowExecutionConfig } from "./run/execute";
 import type { WorkflowRunHandle } from "./run/handle";
+import { validateWithSchema } from "./run/schema-validation";
+import type { TaskExecutionTracker } from "./run/task-execution-tracker";
 
-type UnknownWorkflowRunContext = WorkflowRunContext<unknown, unknown>;
-type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
+type UnknownWorkflowRun = WorkflowRun<unknown>;
+type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown>;
 
 /**
  * Defines a durable task with deterministic execution and automatic retries.
  *
- * Tasks must be deterministic - the same input should always produce the same output.
- * Tasks can be retried multiple times, so they should be idempotent when possible.
- * Tasks execute within a workflow context and can access logging.
+ * Tasks are the boundary for side effects and nondeterministic work in a workflow.
+ * A task handler may perform operations such as network requests, database writes,
+ * reading the current time, or generating random values.
+ *
+ * Once a task completes, its result is persisted and reused during workflow
+ * replay instead of executing the handler again.
+ *
+ * Side-effecting tasks should be idempotent because a task may be executed more
+ * than once if the worker fails after the side effect succeeds but before the result
+ * is durably recorded.
+ *
+ * Task identity is derived from the task name and its validated input, so
+ * changing either can affect replay compatibility for existing workflow runs.
  *
  * @template Input - Type of task input (must be JSON serializable)
  * @template Output - Type of task output (must be JSON serializable)
@@ -68,12 +81,10 @@ type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
  *   handler(input: { cardId: string; amount: number }) {
  *     return paymentService.charge(input.cardId, input.amount);
  *   },
- *   options: {
- *     retry: {
- *       type: "fixed",
- *       maxAttempts: 3,
- *       delayMs: 1_000,
- *     },
+ *   retry: {
+ *     type: "fixed",
+ *     maxAttempts: 3,
+ *     delayMs: 1_000,
  *   },
  * });
  *
@@ -81,8 +92,8 @@ type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown, unknown>;
  * const result = await chargeCard.start(run, { cardId: "123", amount: 9999 });
  * ```
  */
-export function task<Input extends Serializable, Output extends Serializable>(
-	params: TaskParams<Input, Output>
+export function task<Input = void, Output = void>(
+	params: TaskParams<Input, Output> & Serializable<Input, "input"> & Serializable<Output, "output">
 ): Task<Input, Output> {
 	return new TaskImpl(params);
 }
@@ -90,7 +101,7 @@ export function task<Input extends Serializable, Output extends Serializable>(
 export interface TaskParams<Input, Output> {
 	name: string;
 	handler: (input: Input) => Promise<Output>;
-	options?: TaskDefinitionOptions;
+	retry?: RetryStrategy;
 	schema?: RequireAtLeastOneProp<{
 		input?: StandardSchemaV1<Input>;
 		output?: StandardSchemaV1<Output>;
@@ -99,49 +110,72 @@ export interface TaskParams<Input, Output> {
 
 export interface Task<Input, Output> {
 	name: TaskName;
-	with(): TaskBuilder<Input, Output>;
-	start: (run: UnknownWorkflowRunContext, ...args: Input extends void ? [] : [Input]) => Promise<Output>;
+	/** Sets one start option and returns a copy of {@link Task}. The original is unchanged. */
+	with<Path extends PathFromObject<TaskStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<TaskStartOptions, Path>
+	): Task<Input, Output>;
+	start: (run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]) => Promise<Output>;
 }
 
 class TaskImpl<Input, Output> implements Task<Input, Output> {
 	public readonly name: TaskName;
+	private readonly startOptionsBuilder: ObjectBuilder<TaskStartOptions>;
 
-	constructor(private readonly params: TaskParams<Input, Output>) {
+	constructor(
+		private readonly params: TaskParams<Input, Output>,
+		startOptionsBuilder?: ObjectBuilder<TaskStartOptions>
+	) {
 		this.name = params.name as TaskName;
+		this.startOptionsBuilder = startOptionsBuilder ?? objectOverrider<TaskStartOptions>({ retry: this.params.retry })();
 	}
 
-	public with(): TaskBuilder<Input, Output> {
-		const startOptions: TaskStartOptions = this.params.options ?? {};
-		const startOptionsOverrider = objectOverrider(startOptions);
-		return new TaskBuilderImpl(this, startOptionsOverrider());
+	public with<Path extends PathFromObject<TaskStartOptions>>(
+		path: Path,
+		value: TypeOfValueAtPath<TaskStartOptions, Path>
+	): Task<Input, Output> {
+		return new TaskImpl(this.params, this.startOptionsBuilder.with(path, value));
 	}
 
-	public async start(run: UnknownWorkflowRunContext, ...args: Input extends void ? [] : [Input]): Promise<Output> {
-		return this.startWithOptions(run, this.params.options ?? {}, ...args);
+	public async start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
+		const executionTracker = run[INTERNAL].createTaskExecutionTracker();
+		try {
+			return await this.startWithOptions(run, this.startOptionsBuilder.build(), executionTracker, ...args);
+		} finally {
+			executionTracker.end();
+		}
 	}
 
-	public async startWithOptions(
-		run: UnknownWorkflowRunContext,
+	private async startWithOptions(
+		run: UnknownWorkflowRun,
 		startOptions: TaskStartOptions,
+		executionTracker: TaskExecutionTracker,
 		...args: Input extends void ? [] : [Input]
 	): Promise<Output> {
-		const handle = run[INTERNAL].handle;
+		const {
+			logger,
+			[INTERNAL]: { handle, hasher, replayManifest, configProvider },
+		} = run;
+
 		handle[INTERNAL].assertExecutionAllowed();
 
 		const inputRaw = args[0];
-		const input = await this.parse(handle, this.params.schema?.input, inputRaw, run.logger);
-		const inputHash = await hashInput(input);
-		const address = getTaskAddress(this.name, inputHash) as TaskAddress;
-
-		const replayManifest = run[INTERNAL].replayManifest;
+		const inputSchema = this.params.schema?.input;
+		const inputSchemaValidationResult = inputSchema
+			? validateWithSchema(handle, inputSchema, inputRaw, logger, "Invalid task data")
+			: (inputRaw as Input);
+		const input =
+			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
+		const inputHash = await hasher(input);
+		const address = getCompositeId<TaskAddress>({ name: this.name, referenceId: inputHash });
 
 		if (replayManifest.hasUnconsumedEntries()) {
 			const existingTaskInfo = replayManifest.consumeNextTask(address);
 			if (existingTaskInfo) {
-				return this.getExistingTaskResult(run, handle, startOptions, input, existingTaskInfo);
+				return this.getExistingTaskResult(handle, executionTracker, input, existingTaskInfo, configProvider, logger);
 			}
 
-			await this.throwNonDeterminismError(run, handle, inputHash, replayManifest.getUnconsumedEntries());
+			await this.throwNonDeterminismError(handle, inputHash, replayManifest.getUnconsumedEntries(), logger);
 		}
 
 		const attempts = 1;
@@ -151,142 +185,148 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			type: "create",
 			taskName: this.name,
 			options: startOptions,
-			taskState: { status: "running", attempts, input },
+			input: await handle[INTERNAL].codec.encode(input),
+			inputHash,
 		});
 
-		const logger = run.logger.child({
+		const taskLogger = logger.child({
 			"aiki.taskName": this.name,
 			"aiki.taskId": taskInfo.id,
 		});
 
-		logger.info("Task started", { "aiki.attempts": attempts });
+		taskLogger.info("Task started", { "aiki.attempts": attempts });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(
 			handle,
+			executionTracker,
 			input,
 			taskInfo.id as TaskId,
 			retryStrategy,
 			attempts,
-			run[INTERNAL].options.spinThresholdMs,
-			logger
+			configProvider,
+			taskLogger
 		);
 
 		await handle[INTERNAL].transitionTaskState({
-			taskId: taskInfo.id,
-			taskState: { status: "completed", attempts: lastAttempt, output },
+			id: taskInfo.id,
+			attempts: lastAttempt,
+			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
 		});
-		logger.info("Task complete", { "aiki.attempts": lastAttempt });
+		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
 	}
 
 	private async getExistingTaskResult(
-		run: UnknownWorkflowRunContext,
 		handle: UnknownWorkflowRunHandle,
-		startOptions: TaskStartOptions,
+		executionTracker: TaskExecutionTracker,
 		input: Input,
-		existingTaskInfo: TaskInfo
+		existingTaskInfo: TaskInfo,
+		configProvider: ConfigProvider<WorkflowExecutionConfig>,
+		logger: Logger
 	) {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return this.parse(handle, this.params.schema?.output, existingTaskState.output, run.logger);
+			return (await handle[INTERNAL].codec.decode(existingTaskState.output)) as Output;
 		}
 
 		if (existingTaskState.status === "failed") {
 			throw new TaskFailedError(
 				existingTaskInfo.id as TaskId,
-				existingTaskState.attempts,
+				existingTaskInfo.attempts,
 				existingTaskState.error.message
 			);
 		}
 
 		existingTaskState.status satisfies "running" | "awaiting_retry";
 
-		const attempts = existingTaskState.attempts;
-		const retryStrategy = startOptions.retry ?? { type: "never" };
-		this.assertRetryAllowed(existingTaskInfo.id as TaskId, attempts, retryStrategy, run.logger);
+		const attempts = existingTaskInfo.attempts;
+		const retryStrategy = existingTaskInfo.options?.retry ?? { type: "never" };
+		this.assertRetryAttemptsLeft(existingTaskInfo.id as TaskId, attempts, retryStrategy, logger);
+		if (existingTaskState.status === "awaiting_retry") {
+			await this.assertRetryIsDue(
+				handle,
+				executionTracker,
+				existingTaskInfo.id as TaskId,
+				existingTaskState,
+				configProvider,
+				logger
+			);
+		}
 
-		run.logger.debug("Retrying task", {
+		logger.debug("Retrying task", {
 			"aiki.taskName": this.name,
 			"aiki.taskId": existingTaskInfo.id,
 			"aiki.attempts": attempts,
 			"aiki.taskStatus": existingTaskState.status,
 		});
 
-		return this.retryAndExecute(run, handle, input, existingTaskInfo.id, startOptions, retryStrategy, attempts);
+		return this.retryExecute(
+			handle,
+			executionTracker,
+			input,
+			existingTaskInfo.id,
+			retryStrategy,
+			attempts,
+			configProvider,
+			logger
+		);
 	}
 
-	private async throwNonDeterminismError(
-		run: UnknownWorkflowRunContext,
+	private async retryExecute(
 		handle: UnknownWorkflowRunHandle,
-		inputHash: string,
-		unconsumedManifestEntries: UnconsumedManifestEntries
-	) {
-		run.logger.error("Replay divergence", {
-			"aiki.taskName": this.name,
-			"aiki.inputHash": inputHash,
-			"aiki.unconsumedManifestEntries": unconsumedManifestEntries,
-		});
-		const error = new NonDeterminismError(run.id, handle.run.attempts, unconsumedManifestEntries);
-		await handle[INTERNAL].transitionState({
-			status: "failed",
-			cause: "self",
-			error: createSerializableError(error),
-		});
-		throw error;
-	}
-
-	private async retryAndExecute(
-		run: UnknownWorkflowRunContext,
-		handle: UnknownWorkflowRunHandle,
+		executionTracker: TaskExecutionTracker,
 		input: Input,
 		taskId: string,
-		startOptions: TaskStartOptions,
 		retryStrategy: RetryStrategy,
-		previousAttempts: number
+		previousAttempts: number,
+		configProvider: ConfigProvider<WorkflowExecutionConfig>,
+		logger: Logger
 	): Promise<Output> {
 		const attempts = previousAttempts + 1;
 
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "retry",
-			taskId,
-			options: startOptions,
-			taskState: { status: "running", attempts, input },
+			id: taskId,
+			attempts,
 		});
 
-		const logger = run.logger.child({
+		const taskLogger = logger.child({
 			"aiki.taskName": this.name,
 			"aiki.taskId": taskInfo.id,
 		});
-		logger.info("Task started", { "aiki.attempts": attempts });
+		taskLogger.info("Task started", { "aiki.attempts": attempts });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(
 			handle,
+			executionTracker,
 			input,
 			taskInfo.id as TaskId,
 			retryStrategy,
 			attempts,
-			run[INTERNAL].options.spinThresholdMs,
-			logger
+			configProvider,
+			taskLogger
 		);
 
 		await handle[INTERNAL].transitionTaskState({
-			taskId: taskInfo.id,
-			taskState: { status: "completed", attempts: lastAttempt, output },
+			id: taskInfo.id,
+			attempts: lastAttempt,
+			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
 		});
-		logger.info("Task complete", { "aiki.attempts": lastAttempt });
+		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
 	}
 
 	private async tryExecuteTask(
 		handle: UnknownWorkflowRunHandle,
+		executionTracker: TaskExecutionTracker,
 		input: Input,
 		taskId: TaskId,
 		retryStrategy: RetryStrategy,
 		currentAttempt: number,
-		spinThresholdMs: number,
+		configProvider: ConfigProvider<WorkflowExecutionConfig>,
 		logger: Logger
 	): Promise<{ output: Output; lastAttempt: number }> {
 		let attempts = currentAttempt;
@@ -295,23 +335,33 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		// Infra changes like transitioning of task state should not consume retry budget.
 		// Even if task crashes while trying to transition state, it will be picked up
 		// by another worker, who will either fail the task if retry budget is
-		// exhaused or retry the task
+		// exhausted or retry the task
 
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(input);
-				const output = await this.parse(handle, this.params.schema?.output, outputRaw, logger);
-				return { output, lastAttempt: attempts };
-			} catch (error) {
+				const outputSchema = this.params.schema?.output;
+				const outputSchemaValidationResult = outputSchema
+					? validateWithSchema(handle, outputSchema, outputRaw, logger, "Invalid task data")
+					: (outputRaw as Output);
+				const output =
+					outputSchemaValidationResult instanceof Promise
+						? await outputSchemaValidationResult
+						: outputSchemaValidationResult;
+				return {
+					output: output !== undefined ? JSON.parse(JSON.stringify(output)) : output,
+					lastAttempt: attempts,
+				};
+			} catch (err) {
 				if (
-					error instanceof WorkflowRunSuspendedError ||
-					error instanceof WorkflowRunFailedError ||
-					error instanceof WorkflowRunRevisionConflictError
+					err instanceof WorkflowRunSuspendedError ||
+					err instanceof WorkflowRunFailedError ||
+					err instanceof WorkflowRunRevisionConflictError
 				) {
-					throw error;
+					throw err;
 				}
 
-				const serializableError = createSerializableError(error);
+				const serializableError = createSerializableError(err);
 
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {
@@ -320,8 +370,9 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 						"aiki.reason": serializableError.message,
 					});
 					await handle[INTERNAL].transitionTaskState({
-						taskId,
-						taskState: { status: "failed", attempts, error: serializableError },
+						id: taskId,
+						attempts,
+						state: { status: "failed", error: serializableError },
 					});
 					throw new TaskFailedError(taskId, attempts, serializableError.message);
 				}
@@ -332,27 +383,53 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					"aiki.reason": serializableError.message,
 				});
 
-				if (retryParams.delayMs <= spinThresholdMs) {
+				if (retryParams.delayMs <= configProvider.config.maxInlineWaitMs) {
 					await delay(retryParams.delayMs);
 					attempts++;
 					continue;
 				}
 
 				await handle[INTERNAL].transitionTaskState({
-					taskId,
-					taskState: {
+					id: taskId,
+					attempts,
+					state: {
 						status: "awaiting_retry",
-						attempts,
 						error: serializableError,
 						nextAttemptInMs: retryParams.delayMs,
 					},
 				});
+				executionTracker.awaitingRetry();
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
 		}
 	}
 
-	private assertRetryAllowed(taskId: TaskId, attempts: number, retryStrategy: RetryStrategy, logger: Logger): void {
+	private async throwNonDeterminismError(
+		handle: UnknownWorkflowRunHandle,
+		inputHash: string,
+		unconsumedManifestEntries: UnconsumedManifestEntries,
+		logger: Logger
+	): Promise<never> {
+		logger.error("Replay divergence", {
+			"aiki.taskName": this.name,
+			"aiki.inputHash": inputHash,
+			"aiki.unconsumedManifestEntries": unconsumedManifestEntries,
+		});
+		const err = new NonDeterminismError(handle.run.id as WorkflowRunId, handle.run.attempts, unconsumedManifestEntries);
+		await handle[INTERNAL].transitionState({
+			status: "failed",
+			cause: "self",
+			error: createSerializableError(err),
+		});
+		throw err;
+	}
+
+	private assertRetryAttemptsLeft(
+		taskId: TaskId,
+		attempts: number,
+		retryStrategy: RetryStrategy,
+		logger: Logger
+	): void {
 		const retryParams = getRetryParams(attempts, retryStrategy);
 		if (!retryParams.retriesLeft) {
 			logger.error("Task retry not allowed", {
@@ -364,57 +441,26 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		}
 	}
 
-	private async parse<T>(
+	private async assertRetryIsDue(
 		handle: UnknownWorkflowRunHandle,
-		schema: StandardSchemaV1<T> | undefined,
-		data: unknown,
+		executionTracker: TaskExecutionTracker,
+		taskId: TaskId,
+		taskState: TaskStateAwaitingRetry,
+		configProvider: ConfigProvider<WorkflowExecutionConfig>,
 		logger: Logger
-	): Promise<T> {
-		if (!schema) {
-			return data as T;
+	): Promise<void> {
+		const remainingDelayMs = taskState.nextAttemptAt - Date.now();
+		if (remainingDelayMs > configProvider.config.maxInlineWaitMs) {
+			executionTracker.awaitingRetry();
+			logger.debug("Task retry not due, suspending", {
+				"aiki.taskName": this.name,
+				"aiki.taskId": taskId,
+				"aiki.remainingDelayMs": remainingDelayMs,
+			});
+			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 		}
-
-		const schemaValidation = schema["~standard"].validate(data);
-		const schemaValidationResult = schemaValidation instanceof Promise ? await schemaValidation : schemaValidation;
-		if (!schemaValidationResult.issues) {
-			return schemaValidationResult.value;
+		if (remainingDelayMs > 0) {
+			await delay(remainingDelayMs);
 		}
-
-		logger.error("Invalid task data", { "aiki.issues": schemaValidationResult.issues });
-		await handle[INTERNAL].transitionState({
-			status: "failed",
-			cause: "self",
-			error: {
-				name: "SchemaValidationError",
-				message: JSON.stringify(schemaValidationResult.issues),
-			},
-		});
-		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
-	}
-}
-
-export interface TaskBuilder<Input, Output> {
-	opt<Path extends PathFromObject<TaskStartOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<TaskStartOptions, Path>
-	): TaskBuilder<Input, Output>;
-	start: Task<Input, Output>["start"];
-}
-
-class TaskBuilderImpl<Input, Output> implements TaskBuilder<Input, Output> {
-	constructor(
-		private readonly task: TaskImpl<Input, Output>,
-		private readonly startOptionsBuilder: ObjectBuilder<TaskStartOptions>
-	) {}
-
-	opt<Path extends PathFromObject<TaskStartOptions>>(
-		path: Path,
-		value: TypeOfValueAtPath<TaskStartOptions, Path>
-	): TaskBuilder<Input, Output> {
-		return new TaskBuilderImpl(this.task, this.startOptionsBuilder.with(path, value));
-	}
-
-	start(run: UnknownWorkflowRunContext, ...args: Input extends void ? [] : [Input]): Promise<Output> {
-		return this.task.startWithOptions(run, this.startOptionsBuilder.build(), ...args);
 	}
 }

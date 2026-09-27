@@ -1,0 +1,33 @@
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import type {
+	CreatePublisher,
+	Publisher,
+	PublisherContext,
+	PublishRunsResult,
+	ReadyWorkflowRun,
+} from "@aikirun/types/infra/queue";
+
+import type { Broker, Queue } from "./broker";
+import { getWorkflowQueueName } from "./key";
+
+export function createInMemoryPublisher(broker: Broker): CreatePublisher {
+	return (_context: PublisherContext): Publisher => ({
+		async publishRuns(runs: NonEmptyArray<ReadyWorkflowRun>): Promise<PublishRunsResult> {
+			const touchedQueues = new Map<string, Queue>();
+			for (const { id, namespaceId, source, name, versionId, rank, pool } of runs) {
+				const queueName = getWorkflowQueueName({ namespaceId, source, name, versionId, pool });
+				const queue = broker.getOrCreateQueue(queueName);
+				queue.push({ rank, id });
+				touchedQueues.set(queueName, queue);
+			}
+
+			for (const [queueName, queue] of touchedQueues) {
+				while (queue.size > 0 && queue.waiterHandles.size > 0) {
+					queue.waiterHandles.values().next().value?.wake(queueName);
+				}
+			}
+
+			return { published: { runs: runs.map((run) => ({ run })) } };
+		},
+	});
+}

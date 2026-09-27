@@ -19,7 +19,7 @@ export const childWorkflowV1 = workflow({ name: "cascade-child" }).v("1.0.0", {
 export const parentWorkflowV1 = workflow({ name: "cascade-parent" }).v("1.0.0", {
 	async handler(run) {
 		const child = await childWorkflowV1.startAsChild(run);
-		await child.waitForStatus("completed");
+		await child.wait();
 		return { level: "parent" };
 	},
 });
@@ -27,7 +27,7 @@ export const parentWorkflowV1 = workflow({ name: "cascade-parent" }).v("1.0.0", 
 export const grandparentWorkflowV1 = workflow({ name: "cascade-grandparent" }).v("1.0.0", {
 	async handler(run) {
 		const parent = await parentWorkflowV1.startAsChild(run);
-		await parent.waitForStatus("completed");
+		await parent.wait();
 		return { level: "grandparent" };
 	},
 });

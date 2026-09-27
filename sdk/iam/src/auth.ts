@@ -1,48 +1,48 @@
 import type { Database } from "@aikirun/types/infra/db";
+import { INTERNAL } from "@aikirun/types/symbols";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
-import { drizzle as bunSqliteDrizzle } from "drizzle-orm/bun-sqlite";
-import { drizzle } from "drizzle-orm/postgres-js";
 
 import type { PgClient } from "./infra/db/pg/provider";
-import * as schema from "./infra/db/pg/schema";
-import { extractDbClient } from "./infra/db/repo";
-import { sqliteBetterAuthSchema } from "./infra/db/sqlite/better-auth";
-import type { SqliteClient } from "./infra/db/sqlite/provider";
 
-const pgBetterAuthSchema = {
-	user: schema.user,
-	session: schema.session,
-	account: schema.account,
-	verification: schema.verification,
-	organization: schema.organization,
-	organization_member: schema.organizationMember,
-	organization_invitation: schema.organizationInvitation,
-	namespace: schema.namespace,
-	namespace_member: schema.namespaceMember,
-};
+type BetterAuthSchema = Record<
+	| "user"
+	| "session"
+	| "account"
+	| "verification"
+	| "organization"
+	| "organization_member"
+	| "organization_invitation"
+	| "namespace"
+	| "namespace_member",
+	unknown
+>;
 
-// Inferred from PG's betterAuthSchema — enforces that all providers
-// export a schema object with the same keys.
-// The values are `unknown` because PG uses pgTable objects and SQLite
-// uses sqliteTable objects — different types, same key structure.
-// type BetterAuthSchema = Record<keyof typeof pgBetterAuthSchema, unknown>;
-
-function createDrizzleAdapter(db: Database) {
+async function createDrizzleAdapter(db: Database) {
 	switch (db.provider) {
 		case "pg": {
-			const client = extractDbClient(db) as PgClient;
-			const handle = drizzle(client, { schema: pgBetterAuthSchema });
-			return drizzleAdapter(handle, { provider: db.provider, schema: pgBetterAuthSchema });
+			const schema = await import("./infra/db/pg/schema");
+			const betterAuthSchema = {
+				user: schema.user,
+				session: schema.session,
+				account: schema.account,
+				verification: schema.verification,
+				organization: schema.organization,
+				organization_member: schema.organizationMember,
+				organization_invitation: schema.organizationInvitation,
+				namespace: schema.namespace,
+				namespace_member: schema.namespaceMember,
+			} satisfies BetterAuthSchema;
+			const client = db[INTERNAL].client as PgClient;
+			const { drizzle } = await import("drizzle-orm/postgres-js");
+			const handle = drizzle(client, { schema: betterAuthSchema });
+			return drizzleAdapter(handle, { provider: db.provider, schema: betterAuthSchema });
 		}
-		case "mysql":
-			throw new Error("MySQL support not yet implemented");
-		case "sqlite": {
-			const client = extractDbClient(db) as SqliteClient;
-			const handle = bunSqliteDrizzle(client, { schema: sqliteBetterAuthSchema });
-			return drizzleAdapter(handle, { provider: db.provider, schema: sqliteBetterAuthSchema });
-		}
+		// case "mysql":
+		// 	throw new Error("MySQL support not yet implemented");
+		// case "sqlite":
+		// 	throw new Error("SQLite support not yet implemented");
 		default:
 			return db.provider satisfies never;
 	}
@@ -55,9 +55,9 @@ export interface AuthServiceParams {
 	trustedOrigins: string[];
 }
 
-export function createAuthService(params: AuthServiceParams) {
+export async function createAuthService(params: AuthServiceParams) {
 	return betterAuth({
-		database: createDrizzleAdapter(params.db),
+		database: await createDrizzleAdapter(params.db),
 		baseURL: params.baseURL,
 		basePath: "/auth",
 		secret: params.secret,
@@ -125,4 +125,4 @@ export function createAuthService(params: AuthServiceParams) {
 	});
 }
 
-export type AuthService = ReturnType<typeof createAuthService>;
+export type AuthService = Awaited<ReturnType<typeof createAuthService>>;

@@ -1,5 +1,6 @@
 import { fireAndForget } from "@aikirun/lib/async";
 import { ForbiddenError, NotFoundError } from "@aikirun/lib/error";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
 import { organizationAuthedImplementer } from "./implementer";
@@ -35,7 +36,7 @@ export function createApiKeyRouter(apiKeyService: ApiKeyService, namespaceServic
 			namespaceId,
 			createdByUserId: context.userId,
 			name: input.name,
-			expiresAt: input.expiresAt ?? null,
+			expiresAt: (input.expiresAt as TimestampMs | undefined) ?? null,
 		});
 
 		return {

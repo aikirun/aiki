@@ -5,16 +5,16 @@ export interface SerializableError {
 	cause?: SerializableError;
 }
 
-export function createSerializableError(error: unknown): SerializableError {
-	return error instanceof Error
+export function createSerializableError(err: unknown): SerializableError {
+	return err instanceof Error
 		? {
-				message: error.message,
-				name: error.name,
-				stack: error.stack,
-				cause: error.cause ? createSerializableError(error.cause) : undefined,
+				message: err.message,
+				name: err.name,
+				stack: err.stack,
+				cause: err.cause ? createSerializableError(err.cause) : undefined,
 			}
 		: {
-				message: String(error),
+				message: String(err),
 				name: "UnknownError",
 			};
 }

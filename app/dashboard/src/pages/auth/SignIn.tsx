@@ -3,17 +3,17 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../auth/AuthProvider";
 import { authClient } from "../../auth/client";
+import { getSafeRedirect } from "../../auth/redirect";
 import { AuthLayout } from "../../components/auth/AuthLayout";
 import { FormInput } from "../../components/auth/FormInput";
+import { btnPrimary, primaryHover } from "../../components/common/ui";
 
 export function SignIn() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { refetchSession } = useAuth();
 
-	// Extract and validate the redirect param — only allow same-origin paths to prevent open redirect
-	const redirectParam = new URLSearchParams(location.search).get("redirect");
-	const safeRedirect = redirectParam?.startsWith("/") ? redirectParam : null;
+	const safeRedirect = getSafeRedirect(location.search);
 
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
@@ -59,10 +59,10 @@ export function SignIn() {
 					<div
 						style={{
 							padding: 10,
-							borderRadius: 8,
-							background: "rgba(248,113,113,0.08)",
-							border: "1px solid rgba(248,113,113,0.2)",
-							color: "#F87171",
+							borderRadius: "var(--r-control)",
+							background: "color-mix(in srgb, var(--accent-red) var(--tint-mix), transparent)",
+							border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
+							color: "var(--accent-red)",
 							fontSize: 13,
 						}}
 					>
@@ -97,18 +97,14 @@ export function SignIn() {
 					type="submit"
 					disabled={isLoading}
 					style={{
+						...btnPrimary(),
 						width: "100%",
-						padding: "10px 16px",
-						background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-						color: "#fff",
+						padding: "11px 16px",
 						fontSize: 14,
-						fontWeight: 700,
-						borderRadius: 8,
-						border: "none",
 						cursor: isLoading ? "not-allowed" : "pointer",
 						opacity: isLoading ? 0.5 : 1,
-						fontFamily: "inherit",
 					}}
+					{...(isLoading ? {} : primaryHover)}
 				>
 					{isLoading ? "Signing in..." : "Sign in"}
 				</button>
@@ -116,8 +112,8 @@ export function SignIn() {
 				<p style={{ textAlign: "center", fontSize: 13, color: "var(--t2)" }}>
 					Don't have an account?{" "}
 					<Link
-						to={safeRedirect ? `/auth/sign-up?redirect=${encodeURIComponent(safeRedirect)}` : "/auth/sign-up"}
-						style={{ color: "#667eea", fontWeight: 600, textDecoration: "none" }}
+						to={safeRedirect ? `/sign-up?redirect=${encodeURIComponent(safeRedirect)}` : "/sign-up"}
+						style={{ color: "var(--accent-ink)", fontWeight: 600, textDecoration: "none" }}
 					>
 						Sign up
 					</Link>

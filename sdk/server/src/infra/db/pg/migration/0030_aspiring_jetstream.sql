@@ -1,0 +1,1 @@
+ALTER TYPE "public"."workflow_run_status" ADD VALUE 'awaiting_task_retry' BEFORE 'awaiting_child_workflow';

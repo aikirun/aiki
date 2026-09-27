@@ -1,0 +1,1 @@
+ALTER TABLE "schedule" ALTER COLUMN "next_run_at" SET NOT NULL;

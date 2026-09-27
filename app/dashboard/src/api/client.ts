@@ -1,5 +1,6 @@
 import type { ApiKeyContract, NamespaceContract } from "@aikirun/iam/contract";
 import type { ScheduleApi } from "@aikirun/types/api/schedule";
+import type { TaskApi } from "@aikirun/types/api/task";
 import type { WorkflowApi } from "@aikirun/types/api/workflow";
 import type { WorkflowRunApi } from "@aikirun/types/api/workflow-run";
 import { createORPCClient } from "@orpc/client";
@@ -23,6 +24,7 @@ const organizationAuthedLink = new RPCLink({
 
 export const namespaceAuthedClient = createORPCClient(namespaceAuthedLink) as unknown as {
 	schedule: ScheduleApi;
+	task: TaskApi;
 	workflow: WorkflowApi;
 	workflowRun: WorkflowRunApi;
 };

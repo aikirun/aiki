@@ -1,0 +1,575 @@
+import { withFakeClient } from "@aikirun/testing/client";
+import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
+import { asOpaquePayload } from "@aikirun/testing/payload";
+import { INTERNAL } from "@aikirun/types/symbols";
+import { SchemaValidationError } from "@aikirun/types/validator";
+import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import { ClientCodecMissingError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
+
+import { createEventMulticasters, createEventSenders, createEventWaiters, event } from "./event";
+import { workflowRunHandle } from "./handle";
+import { describe, expect, test } from "bun:test";
+
+const appendBangSchema: StandardSchemaV1<string> = {
+	"~standard": {
+		version: 1,
+		vendor: "test",
+		validate: (value) => ({ value: `${String(value)}!` }),
+	},
+};
+
+const alwaysInvalidSchema: StandardSchemaV1<string> = {
+	"~standard": {
+		version: 1,
+		vendor: "test",
+		validate: () => ({ issues: [{ message: "invalid event data" }] }),
+	},
+};
+
+describe("event", () => {
+	test("carries no schema by default", () => {
+		expect(event().schema).toBeUndefined();
+	});
+
+	test("carries the provided schema", () => {
+		expect(event({ schema: appendBangSchema }).schema).toBe(appendBangSchema);
+	});
+});
+
+describe("createEventWaiters", () => {
+	test("returns the recorded data when the event was received", () =>
+		withFakeClient(async (client) => {
+			const record = runningWorkflowRunRecordFactory.build({
+				eventWaits: {
+					orderShipped: [
+						{
+							status: "received",
+							data: asOpaquePayload({ trackingId: "T1" }),
+							clientCodecApplied: false,
+							receivedAt: 0,
+						},
+					],
+				},
+			});
+			const definition = { orderShipped: event<{ trackingId: string }>() };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect((await waiters.orderShipped.wait()).data).toEqual({ trackingId: "T1" });
+		}));
+
+	test("returns the time the event was received alongside its data", () =>
+		withFakeClient(async (client) => {
+			const record = runningWorkflowRunRecordFactory.build({
+				eventWaits: {
+					orderShipped: [
+						{
+							status: "received",
+							data: asOpaquePayload({ trackingId: "T1" }),
+							clientCodecApplied: false,
+							receivedAt: 1_700_000_000_000,
+						},
+					],
+				},
+			});
+			const definition = { orderShipped: event<{ trackingId: string }>() };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect(await waiters.orderShipped.wait({ timeout: { seconds: 1 } })).toEqual({
+				timeout: false,
+				data: { trackingId: "T1" },
+				receivedAt: 1_700_000_000_000,
+			});
+		}));
+
+	test("returns a timeout with the time the wait expired", () =>
+		withFakeClient(async (client) => {
+			const record = runningWorkflowRunRecordFactory.build({
+				eventWaits: { orderShipped: [{ status: "timeout", timedOutAt: 1_700_000_060_000 }] },
+			});
+			const definition = { orderShipped: event() };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect(await waiters.orderShipped.wait({ timeout: { seconds: 1 } })).toEqual({
+				timeout: true,
+				timedOutAt: 1_700_000_060_000,
+			});
+		}));
+
+	test("returns recorded data as-is, without applying the event schema", () =>
+		withFakeClient(async (client) => {
+			const record = runningWorkflowRunRecordFactory.build({
+				eventWaits: {
+					orderShipped: [
+						{ status: "received", data: asOpaquePayload("raw"), clientCodecApplied: false, receivedAt: 0 },
+					],
+				},
+			});
+			const definition = { orderShipped: event({ schema: appendBangSchema }) };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect((await waiters.orderShipped.wait()).data).toBe("raw");
+		}));
+
+	test("decodes the recorded data by the sender's declaration, not the run's", () =>
+		withFakeClient(async (client) => {
+			client[INTERNAL].codec = {
+				encode: async (payload) => payload,
+				decode: async (payload) => ({ unmarked: payload }),
+			};
+			const record = runningWorkflowRunRecordFactory.build({
+				clientCodecApplied: false,
+				eventWaits: {
+					orderShipped: [
+						{ status: "received", data: asOpaquePayload("marked"), clientCodecApplied: true, receivedAt: 0 },
+					],
+				},
+			});
+			const definition = { orderShipped: event<{ unmarked: string }>() };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect((await waiters.orderShipped.wait()).data).toEqual({ unmarked: "marked" });
+		}));
+
+	test("returns the recorded data as-is when the sender declared no client codec, even on a run that applied it", () =>
+		withFakeClient(async (client) => {
+			client[INTERNAL].codec = {
+				encode: async (payload) => payload,
+				decode: async (payload) => ({ unmarked: payload }),
+			};
+			const record = runningWorkflowRunRecordFactory.build({
+				clientCodecApplied: true,
+				eventWaits: {
+					orderShipped: [
+						{ status: "received", data: asOpaquePayload("raw"), clientCodecApplied: false, receivedAt: 0 },
+					],
+				},
+			});
+			const definition = { orderShipped: event<string>() };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect((await waiters.orderShipped.wait()).data).toBe("raw");
+		}));
+
+	test("throws ClientCodecMissingError when the recorded data expects a client codec the client lacks", () =>
+		withFakeClient((client) => {
+			const record = runningWorkflowRunRecordFactory.build({
+				clientCodecApplied: false,
+				eventWaits: {
+					orderShipped: [
+						{ status: "received", data: asOpaquePayload("marked"), clientCodecApplied: true, receivedAt: 0 },
+					],
+				},
+			});
+			const definition = { orderShipped: event() };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(ClientCodecMissingError);
+		}));
+
+	test("transitions to awaiting_event and suspends when no wait is recorded", () =>
+		withFakeClient((client) => {
+			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
+			const definition = { orderShipped: event() };
+			const handle = workflowRunHandle(client, record, definition);
+			client.api.workflowRun.transitionStateV1.once(
+				{
+					type: "optimistic",
+					id: record.id,
+					state: { status: "awaiting_event", eventName: "orderShipped" },
+					expectedRevision: 0,
+					expectedSignalSequence: 0,
+				},
+				{ revision: 1, state: workflowRunStateByStatus.awaiting_event, attempts: record.attempts }
+			);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+		}));
+
+	test("carries the timeout into the awaiting_event transition", () =>
+		withFakeClient((client) => {
+			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
+			const definition = { orderShipped: event() };
+			const handle = workflowRunHandle(client, record, definition);
+			client.api.workflowRun.transitionStateV1.once(
+				{
+					type: "optimistic",
+					id: record.id,
+					state: { status: "awaiting_event", eventName: "orderShipped", timeoutInMs: 30_000 },
+					expectedRevision: 0,
+					expectedSignalSequence: 0,
+				},
+				{ revision: 1, state: workflowRunStateByStatus.awaiting_event, attempts: record.attempts }
+			);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect(waiters.orderShipped.wait({ timeout: { seconds: 30 } })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+		}));
+
+	test("maps a revision conflict on the awaiting_event transition to a suspension", () =>
+		withFakeClient((client) => {
+			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
+			const definition = { orderShipped: event() };
+			const handle = workflowRunHandle(client, record, definition);
+			client.api.workflowRun.transitionStateV1.rejectsOnce(
+				{
+					type: "optimistic",
+					id: record.id,
+					state: { status: "awaiting_event", eventName: "orderShipped" },
+					expectedRevision: 0,
+					expectedSignalSequence: 0,
+				},
+				{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
+			);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+		}));
+
+	test("advances the cursor across calls, consuming recorded waits in order", () =>
+		withFakeClient(async (client) => {
+			const record = runningWorkflowRunRecordFactory.build({
+				eventWaits: {
+					orderShipped: [
+						{ status: "received", data: asOpaquePayload("first"), clientCodecApplied: false, receivedAt: 0 },
+						{ status: "received", data: asOpaquePayload("second"), clientCodecApplied: false, receivedAt: 0 },
+					],
+				},
+			});
+			const definition = { orderShipped: event<string>() };
+			const handle = workflowRunHandle(client, record, definition);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			expect((await waiters.orderShipped.wait()).data).toBe("first");
+			expect((await waiters.orderShipped.wait()).data).toBe("second");
+		}));
+});
+
+describe("createEventSenders", () => {
+	test("sends the event data to the run", () =>
+		withFakeClient(async (client) => {
+			const senders = createEventSenders(
+				client,
+				"run-1",
+				{ orderShipped: event<{ trackingId: string }>() },
+				client.logger
+			);
+			client.api.workflowRun.sendEventV1.once({
+				id: "run-1",
+				eventName: "orderShipped",
+				data: asOpaquePayload({ trackingId: "T1" }),
+				clientCodecApplied: false,
+				options: {},
+			});
+
+			await senders.orderShipped.send({ trackingId: "T1" });
+		}));
+
+	test("sends the schema-parsed value", () =>
+		withFakeClient(async (client) => {
+			const senders = createEventSenders(client, "run-1", { note: event({ schema: appendBangSchema }) }, client.logger);
+			client.api.workflowRun.sendEventV1.once({
+				id: "run-1",
+				eventName: "note",
+				data: asOpaquePayload("raw!"),
+				clientCodecApplied: false,
+				options: {},
+			});
+
+			await senders.note.send("raw");
+		}));
+
+	test("throws SchemaValidationError and sends nothing when the data fails the schema", () =>
+		withFakeClient((client) => {
+			const senders = createEventSenders(
+				client,
+				"run-1",
+				{ note: event({ schema: alwaysInvalidSchema }) },
+				client.logger
+			);
+
+			expect(senders.note.send("bad")).rejects.toBeInstanceOf(SchemaValidationError);
+		}));
+
+	test("threads builder options into the send", () =>
+		withFakeClient(async (client) => {
+			const senders = createEventSenders(
+				client,
+				"run-1",
+				{ orderShipped: event<{ trackingId: string }>() },
+				client.logger
+			);
+			client.api.workflowRun.sendEventV1.once({
+				id: "run-1",
+				eventName: "orderShipped",
+				data: asOpaquePayload({ trackingId: "T1" }),
+				clientCodecApplied: false,
+				options: { reference: { id: "ref-1" } },
+			});
+
+			await senders.orderShipped.with("reference.id", "ref-1").send({ trackingId: "T1" });
+		}));
+
+	test("encodes the data with the client's codec and declares it applied", () =>
+		withFakeClient(async (client) => {
+			const encodedData = asOpaquePayload({ encoded: true });
+			client[INTERNAL].codec = {
+				encode: async (payload) => {
+					expect(payload).toEqual({ trackingId: "T1" });
+					return encodedData;
+				},
+				decode: async (payload) => payload,
+			};
+			const senders = createEventSenders(
+				client,
+				"run-1",
+				{ orderShipped: event<{ trackingId: string }>() },
+				client.logger
+			);
+			client.api.workflowRun.sendEventV1.once({
+				id: "run-1",
+				eventName: "orderShipped",
+				data: encodedData,
+				clientCodecApplied: true,
+				options: {},
+			});
+
+			await senders.orderShipped.send({ trackingId: "T1" });
+		}));
+});
+
+describe("createEventMulticasters", () => {
+	const workflowName = "order-workflow" as WorkflowName;
+	const versionId = "1.0.0" as WorkflowVersionId;
+
+	test("multicasts the event to the given run ids", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1", "run-2"],
+					eventName: "orderShipped",
+					data: asOpaquePayload({ trackingId: "T1" }),
+					clientCodecApplied: false,
+					options: {},
+				},
+				{ sentIds: ["run-1", "run-2"], failedIds: [] }
+			);
+
+			expect(await multicasters.orderShipped.send(client, ["run-1", "run-2"], { trackingId: "T1" })).toEqual({
+				sentIds: ["run-1", "run-2"],
+				failedIds: [],
+			});
+		}));
+
+	test("wraps a single run id in an array", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1"],
+					eventName: "orderShipped",
+					data: asOpaquePayload({ trackingId: "T1" }),
+					clientCodecApplied: false,
+					options: {},
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
+
+			await multicasters.orderShipped.send(client, "run-1", { trackingId: "T1" });
+		}));
+
+	test("sends nothing when the run id list is empty", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+
+			expect(await multicasters.orderShipped.send(client, [], { trackingId: "T1" })).toEqual({
+				sentIds: [],
+				failedIds: [],
+			});
+		}));
+
+	test("multicasts by reference id, tagging each with the workflow name and version", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventByReferenceV1.once(
+				{
+					references: [
+						{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" },
+						{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-2" },
+					],
+					eventName: "orderShipped",
+					data: asOpaquePayload({ trackingId: "T1" }),
+					clientCodecApplied: false,
+					options: {},
+				},
+				{ sentIds: ["run-1", "run-2"], failedIds: [] }
+			);
+
+			expect(
+				await multicasters.orderShipped.sendByReferenceId(client, ["ref-1", "ref-2"], { trackingId: "T1" })
+			).toEqual({ sentIds: ["run-1", "run-2"], failedIds: [] });
+		}));
+
+	test("wraps a single reference id in an array", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventByReferenceV1.once(
+				{
+					references: [{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" }],
+					eventName: "orderShipped",
+					data: asOpaquePayload({ trackingId: "T1" }),
+					clientCodecApplied: false,
+					options: {},
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
+
+			await multicasters.orderShipped.sendByReferenceId(client, "ref-1", { trackingId: "T1" });
+		}));
+
+	test("sends nothing when the reference id list is empty", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+
+			expect(await multicasters.orderShipped.sendByReferenceId(client, [], { trackingId: "T1" })).toEqual({
+				sentIds: [],
+				failedIds: [],
+			});
+		}));
+
+	test("reports the runs the server could not reach alongside the ones it did", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1", "run-2", "run-3"],
+					eventName: "orderShipped",
+					data: asOpaquePayload({ trackingId: "T1" }),
+					clientCodecApplied: false,
+					options: {},
+				},
+				{ sentIds: ["run-1", "run-3"], failedIds: ["run-2"] }
+			);
+
+			expect(await multicasters.orderShipped.send(client, ["run-1", "run-2", "run-3"], { trackingId: "T1" })).toEqual({
+				sentIds: ["run-1", "run-3"],
+				failedIds: ["run-2"],
+			});
+		}));
+
+	test("throws SchemaValidationError and sends nothing when the data fails the schema", () =>
+		withFakeClient((client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				note: event({ schema: alwaysInvalidSchema }),
+			});
+
+			expect(multicasters.note.send(client, "run-1", "bad")).rejects.toBeInstanceOf(SchemaValidationError);
+		}));
+
+	test("threads builder options into the multicast", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1"],
+					eventName: "orderShipped",
+					data: asOpaquePayload({ trackingId: "T1" }),
+					clientCodecApplied: false,
+					options: { reference: { id: "ref-1" } },
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
+
+			await multicasters.orderShipped.with("reference.id", "ref-1").send(client, "run-1", { trackingId: "T1" });
+		}));
+
+	test("encodes the data with the client's codec and declares it applied", () =>
+		withFakeClient(async (client) => {
+			const encodedData = asOpaquePayload({ encoded: true });
+			client[INTERNAL].codec = {
+				encode: async (payload) => {
+					expect(payload).toEqual({ trackingId: "T1" });
+					return encodedData;
+				},
+				decode: async (payload) => payload,
+			};
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1"],
+					eventName: "orderShipped",
+					data: encodedData,
+					clientCodecApplied: true,
+					options: {},
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
+
+			await multicasters.orderShipped.send(client, "run-1", { trackingId: "T1" });
+		}));
+
+	test("encodes the data with the client's codec and declares it applied when multicasting by reference", () =>
+		withFakeClient(async (client) => {
+			const encodedData = asOpaquePayload({ encoded: true });
+			client[INTERNAL].codec = {
+				encode: async (payload) => {
+					expect(payload).toEqual({ trackingId: "T1" });
+					return encodedData;
+				},
+				decode: async (payload) => payload,
+			};
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ trackingId: string }>(),
+			});
+			client.api.workflowRun.multicastEventByReferenceV1.once(
+				{
+					references: [{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" }],
+					eventName: "orderShipped",
+					data: encodedData,
+					clientCodecApplied: true,
+					options: {},
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
+
+			await multicasters.orderShipped.sendByReferenceId(client, "ref-1", { trackingId: "T1" });
+		}));
+});

@@ -1,0 +1,1 @@
+DROP INDEX "idx_task_due_awaiting_retry";

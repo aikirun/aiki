@@ -1,10 +1,7 @@
 import type { ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
-import type {
-	WorkflowGetStatsRequestV1,
-	WorkflowListRequestV1,
-	WorkflowListVersionsRequestV1,
-} from "@aikirun/types/api/workflow";
+import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/api/workflow";
 import type { WorkflowRunListRequestV1, WorkflowRunListTransitionsRequestV1 } from "@aikirun/types/api/workflow-run";
+import type { TaskInfo } from "@aikirun/types/workflow/task";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { namespaceAuthedClient, organizationAuthedClient } from "./client";
@@ -25,13 +22,6 @@ export function useWorkflowVersions(
 		queryKey: ["workflow-versions", name, params],
 		queryFn: () => namespaceAuthedClient.workflow.listVersionsV1({ name, ...params }),
 		enabled: !!name,
-	});
-}
-
-export function useWorkflowStats(params: WorkflowGetStatsRequestV1 = undefined) {
-	return useQuery({
-		queryKey: ["workflow-stats", params],
-		queryFn: () => namespaceAuthedClient.workflow.getStatsV1(params),
 	});
 }
 
@@ -59,6 +49,18 @@ export function useWorkflowRun(
 		queryFn: () => namespaceAuthedClient.workflowRun.getByIdV1({ id }),
 		enabled: !!id,
 		refetchInterval: options?.refetchInterval,
+	});
+}
+
+// The task's status and attempts from the polled run record are part of the key:
+// every task transition that changes anything visible changes at least one of them,
+// so a poll that observes a change refetches the detail, and an unchanged task
+// never refetches.
+export function useTask(task: TaskInfo) {
+	return useQuery({
+		queryKey: ["task", task.id, task.state.status, task.attempts],
+		queryFn: () => namespaceAuthedClient.task.getByIdV1({ id: task.id }),
+		placeholderData: keepPreviousData,
 	});
 }
 

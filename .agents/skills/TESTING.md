@@ -1,0 +1,368 @@
+# Testing
+
+Two tiers: `*.test.ts` are hermetic unit tests (`bun run test:unit`, no database);
+`*.integration.test.ts` run against a live Postgres (`bun run test:integration`, credentials in
+`.env.test` — see DB.md).
+
+Before writing any test, study the exemplars for its tier and match their idioms:
+
+- `sdk/server/src/daemon/publish-pending-outbox-entries.integration.test.ts` — minimal integration shape.
+- `sdk/server/src/daemon/recover-overdue-outbox-entries.integration.test.ts` — service-path
+  seeding, fake clock, assertion shapes.
+- `sdk/workflow/src/run/sleeper.test.ts` — timestamps as authored data.
+- `sdk/workflow/src/task.test.ts` — boundary-value config knobs, file-local helpers.
+- `sdk/server/src/service/workflow-run-state-machine.test.ts` — exhaustive legality matrix driven
+  from a typed case table.
+- `sdk/server/src/infra/db/workflow-run-outbox.integration.test.ts` — provider-contract suite,
+  two-connection concurrency choreography.
+- `sdk/server/src/infra/db/workflow-run.integration.test.ts` — one describe per repository method,
+  a status-keyed seed table driving the guard loops, a test-side column read for reset assertions.
+- `testing/src/infra/timer.ts` — infra contract suite, wake and absence checks;
+  runner-injected so implementers can run it too, with each adapter binding it in its own
+  package (`sdk/adapter/*/src/timer/`).
+
+## Determinism
+
+- Never assume real time elapses between test operations — no minimums ("ops take ≥1ms") and no
+  maximums ("the test finishes within 1s"). `Date.now()` in a test is a smell.
+- Make time-dependent behavior deterministic three ways:
+  - **Boundary-value config**: choose knob values that decide the branch by arithmetic, not by
+    timing — a `-1` idle threshold makes every claim stale; `Number.MAX_SAFE_INTEGER` makes none
+    ever stale; `maxInlineWaitMs: 0` forces the suspend branch.
+  - **Timestamps as authored data**: write sentinel absolutes (`wakeupAt: 0`, an epoch constant)
+    into rows; a value at the epoch is due/aged for any threshold.
+  - **`withFakeClock(seedTimestampMs, fn)`** (`sdk/server/src/testing/clock.ts`): freezes the JS
+    clock so aged state is minted through the real code paths. Clock placement follows
+    necessity: wrap at the call site when aging is the test's own policy; a seed that
+    constitutively requires aged state (a stalled run) owns its clock internally.
+    Integration-only (test files run sequentially in one process). Freeze at 1 or later,
+    never 0: bun's `setSystemTime(new Date(0))` resets to the real clock instead of freezing.
+- Ulids embed their mint time, so rows minted under a clock frozen in the past sort before
+  rows minted earlier in real time. A read ordered by id (`listByRunId`) returns them in that
+  order — author expectations in id order, not in the order the test took its steps. Two rows
+  minted in the same millisecond order at random, so a read ordered by id promises nothing about
+  rows one seed mints in a burst. Don't force that order with a seed that freezes the clock a
+  step apart (`seedClaimedRunWithSpacedTransitions` existed for that and was removed):
+  assert the set and the total, and treat the missing order as a missing sequence column on the
+  row, like a run's revision or a wait's signal sequence.
+- Use these tools only where the test's semantics need them. The fake clock earns its place
+  where state must look aged, where an expectation pins an exact written timestamp, or where
+  a premise needs pinning — not where a status check suffices. Derive each piece of harness
+  machinery from what the test asserts, not from the neighboring test.
+- Author the premises, not just the expectations. A verdict often rests on facts no line
+  states: "this row is due" (its rank against the real clock), or "the attempted overwrite
+  differs from the stored value". Pin the clock so such facts become arithmetic the reader
+  can check — even when the premise looks unbreakable; a pinned suite reads as arithmetic
+  throughout. Comment a premise only when the pinned values don't speak for themselves: a
+  value sitting exactly at a cutoff, a deliberate divergence between two columns, a number
+  chosen to defeat a specific wrong implementation. "Rank 1 is due under a pinned clock"
+  needs no comment. Where pinning is genuinely impossible, a comment saying why the premise
+  holds is the floor.
+- Don't assert a premise the test itself authored two lines up. Asserting an input back to
+  yourself is ceremony; where the value's origin is what matters, a one-line comment
+  attributing it to its source carries it.
+- Waits ride event signals, never polling loops or sized sleeps. The one legitimate fixed wait
+  is an absence check: wait a window, assert nothing changed.
+- The signal primitive is `createBinaryLatch` (`lib/src/async/latch.ts`), not a hand-rolled
+  resolve-captured promise. The two behave identically for one signal/one wait, but the latch
+  re-arms after each wait — a later wait that should block hangs loudly instead of silently
+  falling through a permanently resolved promise. Hand-roll a promise only when the resolution
+  must carry a value.
+- To catch the moment the code under test reaches a blocking call, wrap the dependency it
+  blocks on: an object that fires a latch on entry, then forwards to the real thing. This turns
+  "has it parked yet?" into an event instead of sleeping for a while and hoping:
+
+  ```ts
+  const waitReached = createBinaryLatch();
+  const timerPriorityQueue: TimerPriorityQueue = {
+  	...realTimerPriorityQueue,
+  	createWaiter: () => {
+  		const realWaiter = realTimerPriorityQueue.createWaiter();
+  		return {
+  			...realWaiter,
+  			wait: (timeoutSeconds: number) => {
+  				waitReached.signal();
+  				return realWaiter.wait(timeoutSeconds);
+  			},
+  		};
+  	},
+  };
+  ```
+- Assert async rejections with a floating `expect(promise).rejects.toThrow(...)` — do not await
+  it and do not rewrite it as try/catch.
+
+## Seeding (integration tests)
+
+- Seed through the paths production takes: create runs via the services, promote and publish via
+  the daemons, claim via the state machine transition. A hand-built row can encode a state the
+  system cannot produce, and a test seeded with an impossible state can pass against machinery
+  that never works in production.
+- Layering: routers are not a seeding layer (they add auth/serialization noise and have their
+  own tests); services and daemons are the invariant-enforcing seams; repositories are for
+  assertion reads only.
+- Two harnesses in `sdk/server/src/testing/harness.ts` share one lifecycle (the database
+  connection, per-test reset, a scriptable fake publisher verified on teardown) and differ only
+  in the injected context: `createDaemonHarness` injects a `DaemonContext`,
+  `createServiceHarness` a `NamespaceRequestContext`. Pick by the SUT's seam.
+- Seeds (`sdk/server/src/testing/seed/`, one module per domain: `run.ts`, `task.ts`) take
+  `{ repos, daemonContext?, namespaceRequestContext?, publisher }`: always feed the context your
+  harness injected; the other may be omitted (factory default). Take pure filler data (contexts,
+  rows) from the fishery factories under `sdk/server/src/testing/data-factory/`, at the path
+  mirroring the type each one builds.
+- Data factories (fishery `Factory.define`) live under a `data-factory/` subtree, kept apart from
+  fakes and harnesses. The same split holds in the `@aikirun/testing` package: factory exports are
+  namespaced `@aikirun/testing/data-factory/*`, while the fakes stay at `@aikirun/testing/client`
+  and `@aikirun/testing/infra/queue`.
+- A seed is a lifecycle prefix — stop at the exact stage the test needs. Reaching a state by
+  running a longer seed and transitioning back out of it hides which stage the behavior actually
+  depends on. When no seed stops where the test needs it to, add one (`seedScheduledRun` is
+  create-only, with the promoter left out) rather than contorting an existing one.
+- A seed returns what it made and what a test will assert against it: the ids, the revision and
+  attempts it left the row at, the input hash it authored. A test that has to read those back
+  has found a seed that stops short.
+- Seeds compose. `seedRunningTask` is `seedClaimedRun` followed by `seedRunningTaskOnRun`; a test
+  that needs one more task on an existing run calls the second alone. Don't give one seed an
+  override that makes it skip half of itself.
+- A seed may drive a daemon when that is how production reaches the state (the promoter, the
+  publisher, the recurring-runs daemon). Name it for the state it produces
+  (`seedRunFromSchedule`), not for the daemon it runs, and return the row the daemon created.
+- Seed through a production writer even when the repository under test has its own. A bare
+  `bulkTransitionToDiscarded` points the task at a transition nothing wrote, and a list that
+  inner-joins that transition drops the task whether or not its status filter exists, so the
+  test passes with the filter deleted.
+
+## Assertions
+
+- Expectations compare whole arrays with matchers —
+  `expect(rows).toEqual([expect.objectContaining({ ... })])` — never `rows[0]?.field` inside an
+  `expect`. This pins count and content together.
+- Captures (reading a value out to reuse later) are a last resort. Prefer authoring the
+  value: then the whole-array assertion carries every field and nothing needs reading out.
+  When a value genuinely cannot be authored, capture the field with optional chaining and
+  guard the captured value with its own expect:
+  `const originalRank = (await get(...))?.rank; expect(originalRank).toBeGreaterThan(0)`.
+  The guard fails loudly on absence, so the possibly-undefined value is safe in a later
+  matcher. Reach for `rows[0]!` — after `toHaveLength`, with the
+  `biome-ignore ...: the length has already been asserted` comment — only when the narrowed
+  object itself is needed, and treat it as a prompt to ask whether authoring would do.
+- An expected value never derives from the result being asserted. Take it from authored data
+  or from a read taken before the action. `expect(rows).toEqual([objectContaining({ x:
+  rows[0]?.x })])` feeds the assertion with itself.
+- Assert only properties the statement promises. `UPDATE … RETURNING` emits rows in plan
+  order — an id-subselect's `ORDER BY` under `LIMIT` chooses which rows win, not the sequence
+  they come back in. For such statements assert the selected set (compare sorted ids); pin
+  ordering only against reads whose own query carries the `ORDER BY`.
+- Merge related equality fields into one `objectContaining` (include ids). An ordered comparison
+  (`toBeGreaterThan`) gets its own assertion line — no asymmetric ordering matcher exists.
+- Review step: grep every new or edited test file for `[0]`. Each hit is either inside an
+  `expect` (rewrite as a whole-array matcher compare with an independently-sourced expected
+  value) or a capture (precede with `toHaveLength`). Run it over every file a subagent
+  delivered, not just the largest one. After a structural edit, `grep -n '^describe('` shows
+  what moved (a cut by text markers once nested a whole describe inside its neighbour and every
+  test still passed); after a rename, read the test titles, because a regex rename that does
+  not exclude string literals rewrites them too ("matches only an unreferencedSchedule schedule").
+- Timestamps in expectations are exact values, never `expect.any(Number)`. Presence-only
+  survives a dropped duration or a seconds/ms mix-up. Capture an instant, freeze the clock
+  around the one mutating call, and assert the arithmetic
+  (`wakeupAt: sleepStartedAt + durationMs`). Seeding the freeze from `Date.now()` is fine:
+  nothing depends on the value, and a current-time seed keeps ulids causally ordered after
+  earlier real-time steps. Scope the freeze to the call under assertion. Rows written in one
+  transaction share one `now`, so asserting them against the same instant pins that too. If
+  the clock cannot be frozen, bracket from both sides — a one-sided bound still passes a
+  doubled duration.
+- A captured row pins stability, not exactness: comparing against an earlier read proves the
+  row didn't change, while its timestamps stay unfrozen wall-clock values. When exactness is
+  the point, freeze the instant that minted the row and assert the authored value — the
+  whole-array form then needs no capture at all.
+- An absence assertion must be a read that would have shown the row if it existed.
+- A batch read (`getByIds`) gets the same coverage as its single-row sibling (`getById`),
+  including the row normalisation they share. Sharing an implementation is not sharing a test:
+  the batch variant can stop calling the normaliser and only its own test would notice.
+- When a test claims "X prevents Y", first prove Y was actually going to happen: assert the
+  seeded state is one Y would hit (the claim is old enough to be recovered), then do X, then
+  assert Y didn't happen. Without that first assertion the test can pass for a reason other
+  than X — a threshold that spares every claim, say — and nothing in the test shows which.
+
+## Shape
+
+- One behavior per test. The name is one honest sentence — it must not claim anything the body
+  doesn't assert.
+- Test a behavior in the suite of the component that owns it: what a service writes is the
+  service suite's contract; how a daemon reads it belongs to the daemon's suite. Don't place a
+  test by where you happen to be working. A loop or wiring test stops at the seam where it
+  hands work off — proving a popped timer reached the run lookup is the loop's claim; what
+  processing then writes belongs to the processing suite, driven directly at its own seam.
+- A repository suite has one `describe` per method, named for the method. A facet with several
+  tests (a guard table) nests inside it; a single test sits directly in it. Don't group by theme
+  (`state reads`, `compare-and-swap guards`, `claimPending — pool filter`): the reader looks for
+  a method. A helper used by one describe is declared inside it; module level is for helpers
+  two or more describes share.
+- Observe the code under test through a dependency it calls on purpose — a repos lookup, a
+  queue pop — never through a side effect like the names bound via `logger.child`. A
+  logger-based observation only holds while the logging sits at a particular line inside the
+  function; move that line and the test starts passing before the behavior it claims to check
+  has happened.
+- Name tests and write their comments in the vocabulary of the interface under test. A
+  timer-queue consumer waits and wakes; "signal" is one adapter's way of waking it, and
+  another adapter may wake it differently. A word that only makes sense inside one
+  implementation doesn't belong in tests of the interface.
+- Pluggable infra is a provider contract — the database, the timer priority queue. Write the
+  suite once, provider-neutral; an adapter never gets its own assertions. Where the suite
+  runs follows who may implement the contract. The database is pluggable only by Aiki: its
+  suite stays internal at `sdk/server/src/infra/db/`, `DATABASE_PROVIDER` picks the
+  implementation, and CI supplies the matrix — a new provider adds a matrix row. The timer
+  priority queue is pluggable by users: the suite body is exported from
+  `@aikirun/testing/infra/timer` with the test runner and queue provider injected, so
+  third-party implementations run the identical suite, and each adapter binds it in its own
+  package with its own `withQueue` — the in-memory binder is a unit test, the redis binder
+  an integration test reading `REDIS_URL`, and a new provider adds a binder file, not a
+  matrix row. Assert outcomes, not locking or notification mechanics; that is what keeps one
+  suite valid for every provider.
+- Code that uses a contract may assume any conforming implementation, so its tests can run
+  against the cheapest one: the consumer's unit tests hardcode the in-memory queue as a
+  stand-in for "anything the contract suite has proven". The other half of that bargain:
+  every behavior a consumer leans on must actually be a contract test. The consumer's
+  shutdown always relied on close resolving a parked wait — nothing proved it, and when the
+  contract test was finally written, one adapter turned out to get it wrong.
+- Pick fixture data semantically orthogonal to the subject: don't give a time-based test
+  time-shaped input.
+- Capture baselines from operation responses (a transition's returned revision, attempts) rather
+  than re-fetching state before the action.
+- Mutation-test your assertions: if the behavior under test were deleted, would this test fail?
+  Baselines captured before an intermediate step, or comparisons that hold vacuously (0 === 0),
+  are the common failure.
+- When the claim is "X leaves the other rows untouched", each other row must be able to show a
+  leaked write. Give it a status X cannot write (a sleep finalized `completed` against a bulk
+  cancel), and give a same-status row an authored column value the write would move
+  (`completedAt: 2_000_000` against a completion at `3_000_000`). Cover every status the guard
+  excludes, not one of them, and assert each row's outcome columns with their null complements
+  (`completedAt` set, `cancelledAt: null`).
+- When a behavior applies only to one status (a guard like `status = 'claimed'`), test every
+  excluded status, not one representative. Build the case table as an object keyed by the
+  excluded statuses and pin it with
+  `satisfies Record<Exclude<StatusUnion, "claimed">, unknown>`, then `Object.entries(...)` into
+  a test per key. The `Record` over `Exclude` makes the table complete by construction: a new
+  union member fails the build until it gets an entry, and a typo'd key never compiles.
+- When a case table's cells carry a payload, type the payload so a degenerate entry cannot
+  compile. The legality-matrix cell shape is `{ reasons?: NonEmptyArray<string> }`: an absent
+  cell is the illegal case, `{}` is legal-unguarded, and `NonEmptyArray` forbids the empty guard
+  list a plain `string[]` would accept — `{ reasons: [] }` would generate zero accepts tests and
+  silently decline every reason.
+- A case-table cell is data only while every case is exercised identically. When cases differ
+  in how the action is performed (a different transition variant, a different seed), the cell
+  is a function that performs the action and the loop just calls it — the refreshClaim guard
+  table's cells are the seed functions themselves. A data cell that forces the loop to branch
+  on the case puts per-case knowledge in the wrong place.
+- Type a case table per key with a mapped type —
+  `{ [S in Exclude<Union, transformed>]: Extract<Request, { status: S }> }` — not a uniform
+  `Record<Exclude<…>, Request>`. The mapped form keeps each entry's precise member type, so
+  `toEqual(entry)` typechecks without widening. Name the parts valid/accepts/declines
+  (`validTransitions`, `validDestination`, `validReason`) and derive the rejects as the
+  `=== undefined` complement of the legality table.
+- Exhaustiveness extends to secondary axes. For each guarded destination, loop the full reason
+  union and assert every non-valid reason is declined — not one representative wrong reason.
+- When the code under test reads only a couple of fields, feed it a minimal typed literal with
+  one cast at the seam (`attemptTransition(from, { status, reason? })`). A per-case request
+  builder that has to know every variant is the sign that the test is following the
+  implementation instead of the behavior; deleting it beats making it exhaustive.
+- A guarded write's test payload must be a write a real caller would produce from the stale read
+  the filter encodes. `{ status: "completed", attempts: 2 }` against a read of `attempts: 1`
+  implies that completing increments attempts, which nothing does — a fabricated payload makes
+  the reader doubt semantics that don't exist.
+- For a multi-predicate compare-and-set, each mismatch test moves exactly one predicate and
+  holds the rest at their read-time values, so a failure names which predicate did the work.
+- Repository tests exercise the interface, not the race story. Author the mismatching filter
+  value directly (`readValue - 60_000`) and leave two-party choreography to the suite of the
+  component that races. Their comments follow the same package-audience rule as
+  TYPESCRIPT.md §5: repository tests don't explain themselves in daemon vocabulary.
+- When a bulk method's SET clause writes a small fixed set of columns, assert exactly those
+  columns against authored values rather than capturing the row before the write. The write
+  surface is the assertion surface, and the premise stays visible in the test. Resets are part
+  of that surface: `bulkReleaseToQueued` nulls four due-time columns, and a test that checks
+  only the status has not tested the method. When the repository exposes no read for a column,
+  add a test-side read under `sdk/server/src/testing/infra/db/` that dispatches on the provider
+  like `resetDatabase` does (`readWorkflowRunDueTimes`), seed a row that has the column set, and
+  assert the exact column set before and after (`{ ...NO_DUE_TIMES, wakeupAt }`, then
+  `NO_DUE_TIMES`).
+- A fixture name is a claim, and it has to hold at every use site. `NO_CLAIM_GOES_STALE_MS`
+  stopped being true the moment a test made a claim stale under it; the honest name was
+  `ONE_HOUR_MS`.
+- Two tests that look alike must each kill a distinct mutant, and you should be able to say
+  which one. If you can't name it, the second test is noise.
+
+## Naming
+
+- A local says what it is: the role and the noun. `pooledChildRun`, `referencedSchedule`,
+  `staleRevisionRun`, `runInOtherNamespace`. Never the role alone (`pooled`, `scheduled`,
+  `first`, `own`, `asChild`) and never how the value was made (`matchedSeed`, `SeedDeps`): the
+  reader meets the name far from the line that assigned it.
+- Use the words the interface under test uses. The outbox marks, claims, publishes and backs
+  off; a schedule has occurrences; a run has revisions. A word the interface never uses
+  (`settle`, `reach`, `move`, `bystander`) is a word the reader has to decode, and a helper named
+  for a mechanism its callers don't see (`backOffRowAs`) fails the caller-side rule in
+  TYPESCRIPT.md §2. A domain word can still read badly out of its home: `seedRunFromSchedule`
+  beat `seedScheduleOccurrenceRun`.
+- Match the neighbours before naming a helper: `orderById`, `getScheduleRow`,
+  `getRunLatestTransitionId`, `seedRunByStatus`. Read two sibling suites in the directory first;
+  a second spelling of the same helper (`byId`, `latestRunTransitionId`) is entropy.
+- A status-keyed table of seeding functions is `seed<Thing>ByStatus`, every cell creates the
+  thing (`seedOutboxRowByStatus.pending` inserts a row), and the loop variable is the singular
+  verb (`seedRun`, `terminateRun`). A cell that does nothing means the table is named for the
+  wrong action.
+- An id that must not exist is minted where it is used: `const absentWorkflowId = ulid()`. Its
+  absence follows from the per-test reset, which the reader can see; a module constant
+  (`ABSENT_WORKFLOW_ID`) or a magic string (`"run-missing"`) asks them to trust a convention.
+- A sentinel many tests may need (`END_OF_TIME`) lives once, next to the tool it belongs with
+  (`sdk/server/src/testing/clock.ts`), with its claim in the name and the reason for its value
+  in a comment. Copies per file drift.
+- Test titles are one honest sentence in the interface's vocabulary. No method prefix inside the
+  method's describe; no claim the body doesn't check ("then id" with no tied rows); say what
+  the write does, not what a caller does with it (`returnToPending` makes the row due at once
+  and keeps the publish times its backoff is anchored on).
+
+## Concurrency
+
+- A two-party test opens its second connection with `withRepos`
+  (`sdk/server/src/testing/harness.ts`) inside the normal harness. It is a scoped combinator,
+  like `withFakeClock` — not a second harness.
+- Hold a transaction open by awaiting a latch inside `repos.transaction`, and signal another
+  latch once the statement under test has run. Return the result from the callback: awaiting
+  the transaction promise then yields the result only after the commit completed. Inside an
+  open transaction every statement executes and returns immediately — the transaction defers
+  visibility to other connections, not execution.
+- Latches order only what the client controls: A claimed before B was dispatched, B
+  dispatched before A was released. Nothing orders arrival at the server across two
+  connections. So assert outcomes that are correct under every interleaving — disjoint sets
+  that together cover the seeds — never the mechanics of one interleaving, such as "B
+  blocked". Forcing the blocking path would take provider-specific lock inspection, which the
+  contract suite's provider-blindness rules out.
+- The full choreography:
+
+  ```ts
+  withHarness(async ({ repos: primaryRepos }) =>
+    withRepos(async (secondaryRepos) => {
+      // ...seed rows...
+
+      const primaryChunkClaimed = createBinaryLatch();
+      const commitPrimaryTx = createBinaryLatch();
+
+      // A claims a strict subset, signals, then holds its transaction open —
+      // locks held, uncommitted.
+      const primaryChunkPromise = primaryRepos.transaction(async (txRepos) => {
+        const claimedRows = await txRepos.workflowRunOutbox.claimPending(/* subset */);
+        primaryChunkClaimed.signal();
+        await commitPrimaryTx.wait();
+        return claimedRows;
+      });
+      await primaryChunkClaimed.wait();
+
+      // B is dispatched while A is still open — deliberately not awaited yet.
+      const secondaryChunkPromise = secondaryRepos.workflowRunOutbox.claimPending(/* all */);
+
+      commitPrimaryTx.signal();
+      const primaryClaimedRows = await primaryChunkPromise; // resolves after the COMMIT
+      const secondaryClaimedRows = await secondaryChunkPromise;
+
+      // Assert: no overlap, and the two chunks together cover every seeded row.
+    }));
+  ```

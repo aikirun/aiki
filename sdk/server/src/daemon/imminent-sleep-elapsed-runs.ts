@@ -1,0 +1,190 @@
+import { chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
+import type { Publisher } from "@aikirun/types/infra/queue";
+import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
+import type { WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
+import { ulid } from "ulidx";
+
+import { publishOutboxEntries, type RepublishBackoff } from "./publish-pending-outbox-entries";
+import type { PageProcessingConfig } from "../config/runtime";
+import type { Repositories, TxRepositories } from "../infra/db/types";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { WorkflowRow } from "../infra/db/types/workflow";
+import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
+import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
+import { runConcurrently } from "../lib/concurrency";
+import type { Ranked } from "../lib/rank";
+import { streamTimers } from "../lib/timer-stream";
+import type { DaemonContext } from "../middleware/context";
+
+export interface ProcessImminentSleepElapsedRunsDeps {
+	repos: Repositories;
+	publisher?: Publisher;
+	timerPriorityQueue?: TimerPriorityQueue;
+}
+
+export async function processImminentSleepElapsedRuns(
+	context: DaemonContext,
+	{ repos, publisher, timerPriorityQueue }: ProcessImminentSleepElapsedRunsDeps,
+	config: PageProcessingConfig & { lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
+) {
+	const { pageSize, lookaheadWindowMs, republishBackoff, chunk } = config;
+	const dueBefore = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
+
+	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
+		(cursor) => repos.workflowRun.listSleepElapsedRuns(context, dueBefore, pageSize, cursor),
+		{ until: (page) => page.length < pageSize }
+	)) {
+		if (isNonEmptyArray(runsDueNow)) {
+			await queueSleepElapsedRuns(context, repos, publisher, republishBackoff, runsDueNow, { chunk });
+		}
+
+		if (timerPriorityQueue && isNonEmptyArray(runsDueSoon)) {
+			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
+				type: "sleep",
+				id: run.id,
+				rank: run.rank,
+			}));
+			const result = await timerPriorityQueue.add(timers as NonEmptyArray<TimerEntry>);
+			if (result.status === "failed") {
+				context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
+			}
+		}
+	}
+}
+
+export async function queueSleepElapsedRuns(
+	context: DaemonContext,
+	repos: Repositories,
+	publisher: Publisher | undefined,
+	republishBackoff: RepublishBackoff,
+	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
+	options?: { chunk?: { size?: number; maxConcurrency?: number } }
+) {
+	const { size: chunkSize = runs.length, maxConcurrency } = options?.chunk ?? {};
+
+	const workflowIds = Array.from(new Set(runs.map((run) => run.workflowId))) as NonEmptyArray<string>;
+	const workflows = await repos.workflow.getByIds(context, workflowIds);
+	const workflowsById = new Map(workflows.map((workflow) => [workflow.id, workflow]));
+
+	await runConcurrently(
+		context,
+		chunkLazy(runs, chunkSize),
+		async (chunk, spanCtx) => {
+			try {
+				await processChunk(spanCtx, repos, publisher, republishBackoff, chunk, workflowsById);
+			} catch (err) {
+				spanCtx.logger.warn("Failed to process chunk, will retry next tick", { err, "aiki.chunkSize": chunk.length });
+			}
+		},
+		maxConcurrency ? { concurrency: maxConcurrency } : undefined
+	);
+}
+
+async function processChunk(
+	context: DaemonContext,
+	repos: Repositories,
+	publisher: Publisher | undefined,
+	republishBackoff: RepublishBackoff,
+	runs: NonEmptyArray<Ranked<WorkflowRunMeta>>,
+	workflowsById: Map<string, WorkflowRow>
+): Promise<void> {
+	const completedAt = Date.now() as TimestampMs;
+
+	const stateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
+	const workflowRunUpdates: Array<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }> =
+		[];
+	const outboxEntries: WorkflowRunOutboxRowInsertPending[] = [];
+
+	for (const run of runs) {
+		const workflow = workflowsById.get(run.workflowId);
+		if (!workflow) {
+			continue;
+		}
+
+		const stateTransitionId = ulid();
+		const state: WorkflowRunStateQueued = { status: "queued", reason: "wakeup" };
+		stateTransitionEntries.push({
+			id: stateTransitionId,
+			workflowRunId: run.id,
+			type: "workflow_run",
+			attempt: run.attempts,
+			revision: run.revision + 1,
+			state,
+		});
+		workflowRunUpdates.push({
+			filter: {
+				id: run.id,
+				revision: run.revision,
+			},
+			update: {
+				stateTransitionId,
+			},
+		});
+		outboxEntries.push({
+			id: ulid(),
+			namespaceId: run.namespaceId,
+			workflowRunId: run.id,
+			workflowSource: workflow.source,
+			workflowName: workflow.name,
+			workflowVersionId: workflow.versionId,
+			pool: run.options?.pool,
+			rank: run.rank,
+			nextPublishAttemptRank: run.rank,
+			status: "pending",
+		});
+	}
+
+	if (!isNonEmptyArray(workflowRunUpdates)) {
+		return;
+	}
+
+	const insertedOutboxEntries = await repos.transaction(async (txRepos) =>
+		transitionToQueuedInTx(context, { workflowRunUpdates, stateTransitionEntries, outboxEntries }, completedAt, txRepos)
+	);
+
+	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
+		await publishOutboxEntries(context, repos, publisher, insertedOutboxEntries, republishBackoff);
+	}
+}
+
+async function transitionToQueuedInTx(
+	context: DaemonContext,
+	entries: {
+		workflowRunUpdates: NonEmptyArray<{
+			filter: { id: string; revision: number };
+			update: { stateTransitionId: string };
+		}>;
+		stateTransitionEntries: WorkflowRunStateTransitionRowInsert[];
+		outboxEntries: WorkflowRunOutboxRowInsertPending[];
+	},
+	completedAt: TimestampMs,
+	txRepos: TxRepositories
+): Promise<WorkflowRunOutboxRowInsertPending[]> {
+	const { workflowRunUpdates, stateTransitionEntries, outboxEntries } = entries;
+	const transitionedRuns = await txRepos.workflowRun.bulkTransitionToQueued(context, "sleeping", workflowRunUpdates);
+	const transitionedRunIds = transitionedRuns.map((run) => run.id);
+	if (!isNonEmptyArray(transitionedRunIds)) {
+		return [];
+	}
+
+	await txRepos.sleep.bulkCompleteByWorkflowRunIds(transitionedRunIds, completedAt);
+
+	let stateTransitionEntriesToInsert = stateTransitionEntries;
+	let outboxEntriesToInsert = outboxEntries;
+	if (transitionedRunIds.length !== stateTransitionEntries.length) {
+		const transitionedRunIdsSet = new Set(transitionedRunIds);
+		stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
+			transitionedRunIdsSet.has(entry.workflowRunId)
+		);
+		outboxEntriesToInsert = outboxEntries.filter((entry) => transitionedRunIdsSet.has(entry.workflowRunId));
+	}
+
+	if (!isNonEmptyArray(stateTransitionEntriesToInsert) || !isNonEmptyArray(outboxEntriesToInsert)) {
+		return [];
+	}
+
+	await txRepos.stateTransition.appendBatch(stateTransitionEntriesToInsert);
+	await txRepos.workflowRunOutbox.createBatch(outboxEntriesToInsert);
+	return outboxEntriesToInsert;
+}

@@ -23,8 +23,14 @@ export const childV1 = workflow({ name: "fan-out-child" }).v("1.0.0", {
 export const fanOutGatherV1 = workflow({ name: "fan-out-gather" }).v("1.0.0", {
 	async handler(run, input: { items: string[] }) {
 		const handles = await Promise.all(input.items.map((item) => childV1.startAsChild(run, { item })));
-		const results = await Promise.all(handles.map((h) => h.waitForStatus("completed")));
+		const results = await Promise.all(handles.map((h) => h.wait()));
 
-		return results.filter((r) => r.success).map((r) => r.state.output);
+		return results.flatMap(({ state }) => {
+			if (state.status !== "completed") {
+				run.logger.warn(`Child ended ${state.status}`);
+				return [];
+			}
+			return [state.output];
+		});
 	},
 });

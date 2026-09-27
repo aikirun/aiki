@@ -1,0 +1,1 @@
+ALTER TYPE "public"."state_transition_type" ADD VALUE 'schedule';

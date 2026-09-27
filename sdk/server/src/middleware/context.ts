@@ -1,5 +1,6 @@
 import type { AuthedRequestContextBase, ContextBase, PublicRequestContext } from "@aikirun/lib/context";
 import type { Logger } from "@aikirun/lib/logger";
+import type { RequiredProp } from "@aikirun/lib/object";
 import type { ApiAuthorizer } from "@aikirun/types/iam";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
@@ -13,7 +14,7 @@ export interface NamespaceRequestContext extends AuthedRequestContextBase {
 
 export type RequestContext = PublicRequestContext | NamespaceRequestContext;
 
-export interface DaemonContext extends ContextBase {
+export interface DaemonContext extends RequiredProp<ContextBase, "signal"> {
 	type: "daemon";
 	name: string;
 }
@@ -29,10 +30,10 @@ export function createPublicRequestContext(params: { request: Request; logger: L
 		traceId,
 		spanId,
 		logger: logger.child({
-			method: request.method,
-			url: request.url,
-			traceId,
-			spanId,
+			"aiki.method": request.method,
+			"aiki.url": request.url,
+			"aiki.traceId": traceId,
+			"aiki.spanId": spanId,
 		}),
 		requestType: "public",
 		headers: request.headers,
@@ -58,10 +59,10 @@ export async function createNamespaceRequestContext(params: {
 		traceId,
 		spanId,
 		logger: logger.child({
-			method: request.method,
-			url: request.url,
-			traceId,
-			spanId,
+			"aiki.method": request.method,
+			"aiki.url": request.url,
+			"aiki.traceId": traceId,
+			"aiki.spanId": spanId,
 		}),
 		requestType: "authed",
 		headers: request.headers,
@@ -73,7 +74,7 @@ export async function createNamespaceRequestContext(params: {
 	};
 }
 
-export function createDaemonContext(params: { name: string; logger: Logger; signal?: AbortSignal }): DaemonContext {
+export function createDaemonContext(params: { name: string; logger: Logger; signal: AbortSignal }): DaemonContext {
 	const { name, logger, signal } = params;
 	const traceId = ulid();
 	const spanId = ulid();
@@ -81,7 +82,7 @@ export function createDaemonContext(params: { name: string; logger: Logger; sign
 		type: "daemon",
 		traceId,
 		spanId,
-		logger: logger.child({ daemonName: name, traceId, spanId }),
+		logger: logger.child({ "aiki.daemonName": name, "aiki.traceId": traceId, "aiki.spanId": spanId }),
 		name,
 		signal,
 	};
@@ -92,6 +93,6 @@ export function forkContext<TContext extends Context>(context: TContext): TConte
 	return {
 		...context,
 		spanId,
-		logger: context.logger.child({ spanId }),
+		logger: context.logger.child({ "aiki.spanId": spanId }),
 	};
 }

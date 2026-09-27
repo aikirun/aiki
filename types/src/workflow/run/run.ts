@@ -1,10 +1,12 @@
+import type { DurationObject } from "@aikirun/lib/duration";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import type { SerializableError } from "@aikirun/lib/serializable";
 
-import type { EventWaitQueue } from "./event";
-import type { SleepQueue } from "./sleep";
-import type { TriggerStrategy } from "./trigger";
-import type { TaskQueue } from "../task";
+import type { EventWait } from "./event";
+import type { Sleep } from "./sleep";
+import type { OpaquePayload } from "../../payload";
+import type { TaskInfo } from "../task";
+import type { WorkflowSource } from "../workflow";
 
 export type WorkflowRunId = string & { _brand: "workflow_run_id" };
 export type WorkflowRunAddress = string & { _brand: "workflow_run_address" };
@@ -17,7 +19,9 @@ export const WORKFLOW_RUN_STATUSES = [
 	"sleeping",
 	"awaiting_event",
 	"awaiting_retry",
+	"awaiting_task_retry",
 	"awaiting_child_workflow",
+	"stalled",
 	"cancelled",
 	"completed",
 	"failed",
@@ -42,39 +46,58 @@ export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status i
 	return false;
 }
 
+/**
+ * The statuses a run can rest at while waiting for something external it to arrive, so a write into
+ * one is guarded on the signal sequence.
+ */
+export type WaitingForSignalWorkflowRunStatus = "awaiting_event" | "awaiting_child_workflow";
+
 export const WORKFLOW_RUN_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type WorkflowRunConflictPolicy = (typeof WORKFLOW_RUN_CONFLICT_POLICIES)[number];
 
-export interface WorkflowReferenceOptions {
+export interface WorkflowReference {
 	id: string;
 	conflictPolicy?: WorkflowRunConflictPolicy;
 }
 
-export interface WorkflowDefinitionOptions {
+export interface WorkflowRunOptions {
 	retry?: RetryStrategy;
+	pool?: string;
+	/**
+	 * Integer 0 (highest) to 9 (lowest), default 5. Breaks dispatch ties between runs due in the
+	 * same millisecond; a run due earlier always dispatches first, whatever the priorities.
+	 */
+	priority?: number;
 }
 
-export interface WorkflowStartOptions extends WorkflowDefinitionOptions {
-	trigger?: TriggerStrategy;
-	reference?: WorkflowReferenceOptions;
-	shard?: string;
+export interface WorkflowStartOptions extends WorkflowRunOptions {
+	/** How long to wait before the run becomes due. Omit it and the run is due immediately. */
+	delay?: DurationObject;
+	reference?: WorkflowReference;
 }
 
 interface WorkflowRunStateBase {
 	status: WorkflowRunStatus;
 }
 
-export const WORKFLOW_RUN_SCHEDULED_REASON = [
+export const WORKFLOW_RUN_SCHEDULED_REASONS = [
 	"new",
-	"retry",
-	"task_retry",
-	"awake",
-	"awake_early",
-	"resume",
+	"wakeup_early",
+	"resumption",
 	"event",
 	"child_workflow",
+	"redelivery",
 ] as const;
-export type WorkflowRunScheduledReason = (typeof WORKFLOW_RUN_SCHEDULED_REASON)[number];
+export type WorkflowRunScheduledReason = (typeof WORKFLOW_RUN_SCHEDULED_REASONS)[number];
+
+export function isWorkflowRunScheduledReason(reason: string): reason is WorkflowRunScheduledReason {
+	for (const scheduledReason of WORKFLOW_RUN_SCHEDULED_REASONS) {
+		if (reason === scheduledReason) {
+			return true;
+		}
+	}
+	return false;
+}
 
 export interface WorkflowRunStateScheduledBase extends WorkflowRunStateBase {
 	status: "scheduled";
@@ -86,24 +109,12 @@ export interface WorkflowRunStateScheduledByNew extends WorkflowRunStateSchedule
 	reason: "new";
 }
 
-export interface WorkflowRunStateScheduledByRetry extends WorkflowRunStateScheduledBase {
-	reason: "retry";
-}
-
-export interface WorkflowRunStateScheduledByTaskRetry extends WorkflowRunStateScheduledBase {
-	reason: "task_retry";
-}
-
-export interface WorkflowRunStateScheduledByAwake extends WorkflowRunStateScheduledBase {
-	reason: "awake";
-}
-
-export interface WorkflowRunStateScheduledByAwakeEarly extends WorkflowRunStateScheduledBase {
-	reason: "awake_early";
+export interface WorkflowRunStateScheduledByWakeupEarly extends WorkflowRunStateScheduledBase {
+	reason: "wakeup_early";
 }
 
 export interface WorkflowRunStateScheduledByResume extends WorkflowRunStateScheduledBase {
-	reason: "resume";
+	reason: "resumption";
 }
 
 export interface WorkflowRunStateScheduledByEvent extends WorkflowRunStateScheduledBase {
@@ -114,19 +125,37 @@ export interface WorkflowRunStateScheduledByChildWorkflow extends WorkflowRunSta
 	reason: "child_workflow";
 }
 
+export interface WorkflowRunStateScheduledByRedelivery extends WorkflowRunStateScheduledBase {
+	reason: "redelivery";
+}
+
 export type WorkflowRunStateScheduled =
 	| WorkflowRunStateScheduledByNew
-	| WorkflowRunStateScheduledByRetry
-	| WorkflowRunStateScheduledByTaskRetry
-	| WorkflowRunStateScheduledByAwake
-	| WorkflowRunStateScheduledByAwakeEarly
+	| WorkflowRunStateScheduledByWakeupEarly
 	| WorkflowRunStateScheduledByResume
 	| WorkflowRunStateScheduledByEvent
-	| WorkflowRunStateScheduledByChildWorkflow;
+	| WorkflowRunStateScheduledByChildWorkflow
+	| WorkflowRunStateScheduledByRedelivery;
+
+export const WORKFLOW_RUN_QUEUED_REASON = [
+	"new",
+	"retry",
+	"task_retry",
+	"wakeup",
+	"wakeup_early",
+	"resumption",
+	"event",
+	"event_wait_timeout",
+	"child_workflow",
+	"child_workflow_wait_timeout",
+	"recovery",
+	"redelivery",
+] as const;
+export type WorkflowRunQueuedReason = (typeof WORKFLOW_RUN_QUEUED_REASON)[number];
 
 export interface WorkflowRunStateQueued extends WorkflowRunStateBase {
 	status: "queued";
-	reason: WorkflowRunScheduledReason;
+	reason: WorkflowRunQueuedReason;
 }
 
 export interface WorkflowRunStateRunning extends WorkflowRunStateBase {
@@ -140,7 +169,7 @@ export interface WorkflowRunStatePaused extends WorkflowRunStateBase {
 export interface WorkflowRunStateSleeping extends WorkflowRunStateBase {
 	status: "sleeping";
 	sleepName: string;
-	awakeAt: number;
+	wakeupAt: number;
 }
 
 export interface WorkflowRunStateAwaitingEvent extends WorkflowRunStateBase {
@@ -178,21 +207,29 @@ export type WorkflowRunStateAwaitingRetry =
 	| WorkflowRunStateAwaitingRetryCausedByChildWorkflow
 	| WorkflowRunStateAwaitingRetryCausedBySelf;
 
+export interface WorkflowRunStateAwaitingTaskRetry extends WorkflowRunStateBase {
+	status: "awaiting_task_retry";
+	nextAttemptAt: number;
+}
+
 export interface WorkflowRunStateAwaitingChildWorkflow extends WorkflowRunStateBase {
 	status: "awaiting_child_workflow";
 	childWorkflowRunId: string;
-	childWorkflowRunStatus: TerminalWorkflowRunStatus;
 	timeoutAt?: number;
+}
+
+export interface WorkflowRunStateStalled extends WorkflowRunStateBase {
+	status: "stalled";
 }
 
 export interface WorkflowRunStateCancelled extends WorkflowRunStateBase {
 	status: "cancelled";
-	reason?: string;
+	explanation?: string;
 }
 
-export interface WorkflowRunStateCompleted<Output> extends WorkflowRunStateBase {
+export interface WorkflowRunStateCompleted extends WorkflowRunStateBase {
 	status: "completed";
-	output: Output;
+	output?: OpaquePayload;
 }
 
 interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
@@ -228,41 +265,45 @@ export type WorkflowRunStateInComplete =
 	| WorkflowRunStateSleeping
 	| WorkflowRunStateAwaitingEvent
 	| WorkflowRunStateAwaitingRetry
+	| WorkflowRunStateAwaitingTaskRetry
 	| WorkflowRunStateAwaitingChildWorkflow
+	| WorkflowRunStateStalled
 	| WorkflowRunStateCancelled
 	| WorkflowRunStateFailed;
 
-export type WorkflowRunState<Output = unknown> = WorkflowRunStateInComplete | WorkflowRunStateCompleted<Output>;
+export type WorkflowRunState = WorkflowRunStateInComplete | WorkflowRunStateCompleted;
 
 export type TerminalWorkflowRunState = Extract<WorkflowRunState, { status: "cancelled" | "completed" | "failed" }>;
 
-export interface WorkflowRun<Input = unknown, Output = unknown> {
+export interface WorkflowRunRecord {
 	id: string;
 	name: string;
 	versionId: string;
+	source: WorkflowSource;
 	createdAt: number;
 	revision: number;
+	signalSequence: number;
 	stateTransitionId: string;
-	input?: Input;
+	input?: OpaquePayload;
 	inputHash: string;
-	options?: WorkflowStartOptions;
+	clientHasherApplied: boolean;
+	clientCodecApplied: boolean;
+	referenceId?: string;
+	options?: WorkflowRunOptions;
 	attempts: number;
-	state: WorkflowRunState<Output>;
+	state: WorkflowRunState;
 	// TODO:
 	// for workflows with a large number of tasks/sleeps/eventWaits/childWorkflowRuns,
 	// prefetching all results might be problematic.
 	// Instead we might explore on-demand loading.
 	// A hybrid approach is also possible, where we pre-fetch a chunk and load other chunks on demand
-	taskQueues: Record<string, TaskQueue>;
-	sleepQueues: Record<string, SleepQueue>;
-	eventWaitQueues: Record<string, EventWaitQueue<unknown>>;
-	childWorkflowRunQueues: Record<string, ChildWorkflowRunQueue>;
+	tasks: Record<string, TaskInfo[]>;
+	sleeps: Record<string, Sleep[]>;
+	eventWaits: Record<string, EventWait[]>;
+	childWorkflowRuns: Record<string, ChildWorkflowRunInfo[]>;
+	childWorkflowRunWaits: Record<string, ChildWorkflowRunWaits>;
 	parentWorkflowRunId?: string;
 	scheduleId?: string;
-}
-
-export interface ChildWorkflowRunQueue {
-	childWorkflowRuns: ChildWorkflowRunInfo[];
 }
 
 export interface ChildWorkflowRunInfo {
@@ -270,29 +311,14 @@ export interface ChildWorkflowRunInfo {
 	name: string;
 	versionId: string;
 	inputHash: string;
-	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>;
 }
 
-export const CHILD_WORKFLOW_RUN_WAIT_STATUSES = ["completed", "timeout"] as const;
-export type ChildWorkflowRunWaitStatus = (typeof CHILD_WORKFLOW_RUN_WAIT_STATUSES)[number];
-
-export interface ChildWorkflowRunWaitBase {
-	status: ChildWorkflowRunWaitStatus;
-}
-
-export interface ChildWorkflowRunWaitCompleted extends ChildWorkflowRunWaitBase {
-	status: "completed";
-	completedAt: number;
-	childWorkflowRunState: TerminalWorkflowRunState;
-}
-
-export interface ChildWorkflowRunWaitTimeout extends ChildWorkflowRunWaitBase {
-	status: "timeout";
-	timedOutAt: number;
-}
-
-export type ChildWorkflowRunWait = ChildWorkflowRunWaitCompleted | ChildWorkflowRunWaitTimeout;
-
-export interface ChildWorkflowRunWaitQueue {
-	childWorkflowRunWaits: ChildWorkflowRunWait[];
+export interface ChildWorkflowRunWaits {
+	timeouts: {
+		timedOutAt: number;
+	}[];
+	terminal?: {
+		state: TerminalWorkflowRunState;
+		completedAt: number;
+	};
 }

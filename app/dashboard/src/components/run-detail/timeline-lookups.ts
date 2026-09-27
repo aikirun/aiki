@@ -1,5 +1,5 @@
-import type { ChildWorkflowRunInfo, EventWaitQueue, SleepQueue } from "@aikirun/types/workflow/run";
-import type { StateTransition } from "@aikirun/types/workflow/state-transition";
+import type { ChildWorkflowRunInfo, ChildWorkflowRunWaits, EventWait, Sleep } from "@aikirun/types/workflow/run";
+import type { TaskStateTransition, WorkflowRunStateTransition } from "@aikirun/types/workflow/state-transition";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 export interface TimelineLookups {
@@ -29,10 +29,11 @@ export function formatDuration(ms: number): string {
 }
 
 export function buildTimelineLookups(
-	transitions: StateTransition[],
-	eventWaitQueues: Record<string, EventWaitQueue<unknown>>,
-	sleepQueues: Record<string, SleepQueue>,
+	transitions: Array<WorkflowRunStateTransition | TaskStateTransition>,
+	eventWaits: Record<string, EventWait[]>,
+	sleeps: Record<string, Sleep[]>,
 	childWorkflowRuns: Record<string, ChildWorkflowRunInfo>,
+	childWorkflowRunWaits: Record<string, ChildWorkflowRunWaits>,
 	taskById: Map<string, TaskInfo>
 ): TimelineLookups {
 	const childWorkflowById = new Map<string, ChildWorkflowRunInfo>();
@@ -52,14 +53,14 @@ export function buildTimelineLookups(
 			const reason = state.reason;
 			const context: ScheduledContext = {};
 
-			// Handle awake/awake_early - look up the previous sleeping transition
-			if (reason === "awake" || reason === "awake_early") {
+			// Handle wakeup/wakeup_early - look up the previous sleeping transition
+			if (reason === "wakeup" || reason === "wakeup_early") {
 				for (let j = i - 1; j >= 0; j--) {
 					const prev = transitions[j];
 					if (prev.type === "workflow_run" && prev.state.status === "sleeping") {
 						const sleepName = prev.state.sleepName;
-						const queue = sleepQueues[sleepName];
-						if (queue?.sleeps.length > 0) {
+						const nameSleeps = sleeps[sleepName];
+						if (nameSleeps && nameSleeps.length > 0) {
 							let sleepIndex = 0;
 							for (let k = 0; k < j; k++) {
 								const t2 = transitions[k];
@@ -67,7 +68,7 @@ export function buildTimelineLookups(
 									sleepIndex++;
 								}
 							}
-							const sleep = queue.sleeps[sleepIndex];
+							const sleep = nameSleeps[sleepIndex];
 							if (sleep?.status === "completed") {
 								context.actualSleepDuration = formatDuration(sleep.durationMs);
 							}
@@ -78,14 +79,20 @@ export function buildTimelineLookups(
 			}
 
 			// Handle event - look up the previous awaiting_event transition
-			if (reason === "event") {
+			if (reason === "event" || reason === "event_wait_timeout") {
 				for (let j = i - 1; j >= 0; j--) {
 					const prev = transitions[j];
 					if (prev.type === "workflow_run" && prev.state.status === "awaiting_event") {
 						const eventName = prev.state.eventName;
 						context.eventDataName = eventName;
-						const queue = eventWaitQueues[eventName];
-						if (queue?.eventWaits.length > 0) {
+						if (reason === "event_wait_timeout") {
+							context.eventTimedOut = true;
+							break;
+						}
+						// The wait row carries the event data; it also classifies rows written before the
+						// reason split, whose timed-out waits are labelled "event".
+						const nameEventWaits = eventWaits[eventName];
+						if (nameEventWaits && nameEventWaits.length > 0) {
 							let eventIndex = 0;
 							for (let k = 0; k < j; k++) {
 								const t2 = transitions[k];
@@ -97,7 +104,7 @@ export function buildTimelineLookups(
 									eventIndex++;
 								}
 							}
-							const event = queue.eventWaits[eventIndex];
+							const event = nameEventWaits[eventIndex];
 							if (event?.status === "received") {
 								context.eventData = event.data;
 							} else if (event?.status === "timeout") {
@@ -110,34 +117,20 @@ export function buildTimelineLookups(
 			}
 
 			// Handle child_workflow - look up the previous awaiting_child_workflow transition
-			if (reason === "child_workflow") {
+			if (reason === "child_workflow" || reason === "child_workflow_wait_timeout") {
 				for (let j = i - 1; j >= 0; j--) {
 					const prev = transitions[j];
 					if (prev.type === "workflow_run" && prev.state.status === "awaiting_child_workflow") {
 						const childId = prev.state.childWorkflowRunId;
-						const waitForStatus = prev.state.childWorkflowRunStatus;
 						context.scheduledByChildWorkflowRunId = childId;
-						const childInfo = childWorkflowById.get(childId);
-						const waitQueue = childInfo?.childWorkflowRunWaitQueues[waitForStatus];
-						const waits = waitQueue?.childWorkflowRunWaits;
-						if (waits && waits.length > 0) {
-							let waitIndex = 0;
-							for (let k = 0; k < j; k++) {
-								const t2 = transitions[k];
-								if (
-									t2.type === "workflow_run" &&
-									t2.state.status === "awaiting_child_workflow" &&
-									t2.state.childWorkflowRunId === childId
-								) {
-									waitIndex++;
-								}
-							}
-							const result = waits[waitIndex];
-							if (result?.status === "completed") {
-								context.childWorkflowStatus = result.childWorkflowRunState.status;
-							} else if (result?.status === "timeout") {
-								context.childWorkflowTimedOut = true;
-							}
+						if (reason === "child_workflow_wait_timeout") {
+							context.childWorkflowTimedOut = true;
+							break;
+						}
+						// A wake means the child reached a terminal state; the terminal wait carries it.
+						const terminal = childWorkflowRunWaits[childId]?.terminal;
+						if (terminal) {
+							context.childWorkflowStatus = terminal.state.status;
 						}
 						break;
 					}

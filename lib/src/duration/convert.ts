@@ -10,10 +10,6 @@ export interface DurationFields {
 
 export type DurationObject = RequireAtLeastOneProp<DurationFields>;
 
-type DurationMs = number;
-
-export type Duration = DurationMs | DurationObject;
-
 const MS_PER_SECOND = 1_000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
@@ -23,11 +19,11 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
  * Converts a Duration to milliseconds.
  *
  * Accepts either raw milliseconds (number) or a DurationObject with time units.
- * All values must be non-negative and finite. The maximum duration is 1 year (31,536,000,000ms).
+ * All values must be non-negative and finite.
  *
  * @param duration - Duration as milliseconds or object with time units (days, hours, minutes, seconds, milliseconds)
  * @returns Duration in milliseconds
- * @throws {Error} If duration is invalid (negative, non-finite, zero value, or exceeds 1 year)
+ * @throws {Error} If duration is invalid (negative or non-finite)
  *
  * @example
  * // Using milliseconds
@@ -39,12 +35,7 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
  * toMilliseconds({ minutes: 1, seconds: 30 }) // => 90_000
  * toMilliseconds({ days: 1, hours: 2 }) // => 93_600_000
  */
-export function toMilliseconds(duration: Duration): number {
-	if (typeof duration === "number") {
-		assertIsPositiveNumber(duration);
-		return duration;
-	}
-
+export function toMilliseconds(duration: DurationObject): number {
 	let totalMs = 0;
 
 	if (duration.days !== undefined) {

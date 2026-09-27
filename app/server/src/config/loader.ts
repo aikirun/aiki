@@ -1,68 +1,46 @@
-import { dirname, join } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { type DatabaseConfig, loadDatabaseConfig } from "@aikirun/lib/db";
 import { omitUndefined } from "@aikirun/lib/object";
-import { DATABASE_PROVIDERS, isDatabaseProvider } from "@aikirun/types/infra/db";
 import { type } from "arktype";
-import { config } from "dotenv";
+import { config as loadEnv } from "dotenv";
 
 import { type Config, configSchema } from "./schema";
 
-export async function loadConfig(): Promise<Config> {
-	const __filename = fileURLToPath(import.meta.url);
-	const __dirname = dirname(__filename);
-	const envPath = join(__dirname, "../../.env");
+export async function loadAppServerConfig(params?: { path?: string }): Promise<Config & { db: DatabaseConfig }> {
+	if (params?.path) {
+		loadEnv({ path: params.path });
+	}
 
-	config({ path: envPath });
+	const db = loadDatabaseConfig();
 
-	const redis = process.env.REDIS_HOST
+	const redisRaw = process.env.REDIS_URL
 		? {
-				host: process.env.REDIS_HOST,
-				port: process.env.REDIS_PORT,
-				password: process.env.REDIS_PASSWORD,
+				url: process.env.REDIS_URL,
 			}
 		: undefined;
 
-	const raw = {
+	const authRaw = process.env.AIKI_SERVER_AUTH_SECRET
+		? {
+				secret: process.env.AIKI_SERVER_AUTH_SECRET,
+			}
+		: undefined;
+
+	const raw = omitUndefined({
 		host: process.env.AIKI_SERVER_HOST,
 		port: process.env.AIKI_SERVER_PORT,
 		baseURL: process.env.AIKI_SERVER_BASE_URL,
 		corsOrigins: process.env.CORS_ORIGINS,
-		redis,
-		db: readDatabaseEnv(),
-		auth: {
-			secret: process.env.AIKI_SERVER_AUTH_SECRET,
-		},
+		redis: redisRaw,
+		auth: authRaw,
 		logLevel: process.env.LOG_LEVEL,
 		prettyLogs: process.env.PRETTY_LOGS,
-	};
+	});
 
-	const result = configSchema(omitUndefined(raw));
+	const result = configSchema(raw);
 	if (result instanceof type.errors) {
 		throw new Error(`Invalid config: ${result.summary}`);
 	}
-
-	return result;
+	return { ...result, db };
 }
 
-function readDatabaseEnv() {
-	const provider = process.env.DATABASE_PROVIDER ?? "pg";
-	if (!isDatabaseProvider(provider)) {
-		throw new Error(`Unsupported DATABASE_PROVIDER: ${provider}. Must be one of: ${DATABASE_PROVIDERS.join(", ")}`);
-	}
-
-	switch (provider) {
-		case "sqlite":
-			return { provider, path: process.env.DATABASE_PATH };
-		case "pg":
-		case "mysql":
-			return {
-				provider,
-				url: process.env.DATABASE_URL,
-				maxConnections: process.env.DATABASE_MAX_CONNECTIONS,
-				ssl: process.env.DATABASE_SSL,
-			};
-		default:
-			return provider satisfies never;
-	}
-}
+export type AppServerConfig = Awaited<ReturnType<typeof loadAppServerConfig>>;

@@ -6,16 +6,24 @@
 .claude
 
 .env
-app/server/.env
-app/server/.env.prod
-examples/.env
+.env.test
+.env.prod
 
-*.db
-*.db-shm
-*.db-wal
-
-notes/
+/notes
 
 **/dist/
 *.tsbuildinfo
 node_modules/
+
+build/
+.react-router/
+.source/
+.playwright-mcp/
+
+*.data
+
+benchmark/
+
+*.db
+*.db-shm
+*.db-wal

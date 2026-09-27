@@ -1,0 +1,32 @@
+import { delay } from "./delay";
+import { describe, expect, test } from "bun:test";
+
+describe("delay", () => {
+	test("does not resolve synchronously and resolves after the timer fires", async () => {
+		let resolved = false;
+		const promise = delay(10).then(() => {
+			resolved = true;
+		});
+
+		// Resolution is deferred to the timer — nothing has run on this synchronous tick yet.
+		expect(resolved).toBe(false);
+
+		await promise;
+		expect(resolved).toBe(true);
+	});
+
+	test("rejects immediately when abort signal is already aborted", () => {
+		const controller = new AbortController();
+		controller.abort("cancelled");
+
+		expect(delay(1_000, { signal: controller.signal })).rejects.toBe("cancelled");
+	});
+
+	test("rejects when abort signal fires during delay", () => {
+		const controller = new AbortController();
+		const promise = delay(5_000, { signal: controller.signal });
+		controller.abort("stopped");
+
+		expect(promise).rejects.toBe("stopped");
+	});
+});

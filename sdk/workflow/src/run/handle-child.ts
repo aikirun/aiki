@@ -4,181 +4,133 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
-	type ChildWorkflowRunWaitQueue,
-	isTerminalWorkflowRunStatus,
-	type TerminalWorkflowRunStatus,
-	type WorkflowRun,
+	type WorkflowRunId,
+	type WorkflowRunRecord,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 
-import type { WorkflowRunContext } from "./context";
 import type { EventsDefinition } from "./event";
 import {
+	decodeWaitResultState,
 	type WorkflowRunHandle,
-	type WorkflowRunWaitResult,
 	type WorkflowRunWaitResultSuccess,
 	workflowRunHandle,
 } from "./handle";
 
-export async function childWorkflowRunHandle<Input, Output, AppContext, TEvents extends EventsDefinition>(
-	client: Client<AppContext>,
-	run: WorkflowRun<Input, Output>,
-	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
-	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
+export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
+	client: Client<Context>,
+	run: WorkflowRunRecord,
+	parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 	logger: Logger,
 	eventsDefinition?: TEvents
-): Promise<ChildWorkflowRunHandle<Input, Output, AppContext, TEvents>> {
-	const handle = await workflowRunHandle(client, run, eventsDefinition, logger);
+): ChildWorkflowRunHandle<Output, Context, TEvents> {
+	const handle = workflowRunHandle<Output, Context, TEvents>(client, run, eventsDefinition, logger);
 
 	return {
 		run: handle.run,
 		events: handle.events,
 		refresh: handle.refresh.bind(handle),
-		waitForStatus: createStatusWaiter(handle, parentRun, childWorkflowRunWaitQueues, logger),
+		wait: createWaiter(handle, parentRunHandle, logger),
 		cancel: handle.cancel.bind(handle),
 		pause: handle.pause.bind(handle),
 		resume: handle.resume.bind(handle),
-		awake: handle.awake.bind(handle),
+		wakeup: handle.wakeup.bind(handle),
 		[INTERNAL]: handle[INTERNAL],
 	};
 }
 
-export type ChildWorkflowRunHandle<
-	Input,
-	Output,
-	AppContext,
-	TEvents extends EventsDefinition = EventsDefinition,
-> = Omit<WorkflowRunHandle<Input, Output, AppContext, TEvents>, "waitForStatus"> & {
+export type ChildWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition> = Omit<
+	WorkflowRunHandle<Output, Context, TEvents>,
+	"wait"
+> & {
 	/**
 	 * Waits for the child workflow run to reach a terminal status.
 	 *
-	 * This method suspends the parent workflow until the child reaches the expected terminal status
-	 * or the optional timeout elapses.
+	 * This method suspends the parent workflow until the child reaches any terminal status
+	 * (`completed`, `failed`, or `cancelled`) or the optional timeout elapses.
 	 *
 	 * When the parent resumes, the result is deterministically replayed from stored wait results.
 	 *
 	 * Returns a result object:
-	 * - `{ success: true, state }` - child reached the expected status
-	 * - `{ success: false, cause }` - child did not reach status
+	 * - `{ success: true, state }` - the child reached a terminal status; `state.status` says which
+	 * - `{ success: false, cause: "timeout" }` - the timeout elapsed (only when a timeout is provided)
 	 *
-	 * Possible failure causes:
-	 * - `"run_terminated"` - child reached a different terminal state than expected
-	 * - `"timeout"` - timeout elapsed (only when timeout option provided)
-	 *
-	 * @param status - The target terminal status to wait for
 	 * @param options - Optional configuration with timeout
 	 *
 	 * @example
-	 * // Wait indefinitely for child to complete
-	 * const result = await childHandle.waitForStatus("completed");
-	 * if (result.success) {
+	 * // Wait indefinitely for the child to finish
+	 * const result = await childHandle.wait();
+	 * if (result.state.status === "completed") {
 	 *   console.log(result.state.output);
 	 * } else {
-	 *   console.log(`Child terminated: ${result.cause}`);
+	 *   console.log(`Child ended ${result.state.status}`);
 	 * }
 	 *
 	 * @example
 	 * // Wait with a timeout
-	 * const result = await childHandle.waitForStatus("completed", {
-	 *   timeout: { minutes: 5 }
-	 * });
-	 * if (!result.success && result.cause === "timeout") {
+	 * const result = await childHandle.wait({ timeout: { minutes: 5 } });
+	 * if (!result.success) {
 	 *   console.log("Child workflow took too long");
 	 * }
 	 */
-	waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options?: ChildWorkflowRunWaitOptions<false>
-	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
-	waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options: ChildWorkflowRunWaitOptions<true>
-	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
+	wait(options?: ChildWorkflowRunWaitOptions<false>): Promise<ChildWorkflowRunWaitResult<Output, false>>;
+	wait(options: ChildWorkflowRunWaitOptions<true>): Promise<ChildWorkflowRunWaitResult<Output, true>>;
 };
 
 export interface ChildWorkflowRunWaitOptions<Timed extends boolean> {
 	timeout?: Timed extends true ? DurationObject : never;
 }
 
-function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDefinition>(
-	handle: WorkflowRunHandle<Input, Output, AppContext, TEvents>,
-	parentRun: WorkflowRunContext<unknown, AppContext, EventsDefinition>,
-	childWorkflowRunWaitQueues: Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>,
+export type ChildWorkflowRunWaitResult<Output, Timed extends boolean> = Timed extends true
+	?
+			| {
+					success: true;
+					state: WorkflowRunWaitResultSuccess<Output>;
+			  }
+			| {
+					success: false;
+					cause: "timeout";
+			  }
+	: {
+			success: true;
+			state: WorkflowRunWaitResultSuccess<Output>;
+		};
+
+function createWaiter<Output, Context, TEvents extends EventsDefinition>(
+	handle: WorkflowRunHandle<Output, Context, TEvents>,
+	parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 	logger: Logger
 ) {
-	const nextIndexByStatus: Record<TerminalWorkflowRunStatus, number> = {
-		cancelled: 0,
-		completed: 0,
-		failed: 0,
-	};
+	let nextTimeoutIndex = 0;
 
-	async function waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options?: ChildWorkflowRunWaitOptions<false>
-	): Promise<WorkflowRunWaitResult<Status, Output, false, false>>;
+	async function wait(options?: ChildWorkflowRunWaitOptions<false>): Promise<ChildWorkflowRunWaitResult<Output, false>>;
+	async function wait(options: ChildWorkflowRunWaitOptions<true>): Promise<ChildWorkflowRunWaitResult<Output, true>>;
 
-	async function waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		status: Status,
-		options: ChildWorkflowRunWaitOptions<true>
-	): Promise<WorkflowRunWaitResult<Status, Output, true, false>>;
-
-	async function waitForStatus<Status extends TerminalWorkflowRunStatus>(
-		expectedStatus: Status,
+	async function wait(
 		options?: ChildWorkflowRunWaitOptions<boolean>
-	): Promise<WorkflowRunWaitResult<Status, Output, boolean, false>> {
-		const parentRunHandle = parentRun[INTERNAL].handle;
-
-		const nextIndex = nextIndexByStatus[expectedStatus];
-
+	): Promise<ChildWorkflowRunWaitResult<Output, boolean>> {
 		const { run } = handle;
+		const waits = parentRunHandle.run.childWorkflowRunWaits[run.id] ?? { timeouts: [] };
 
-		const childWorkflowRunWaits = childWorkflowRunWaitQueues[expectedStatus].childWorkflowRunWaits;
-		const existingChildWorkflowRunWait = childWorkflowRunWaits[nextIndex];
+		const timedOutWait = waits.timeouts[nextTimeoutIndex];
+		if (timedOutWait) {
+			nextTimeoutIndex++;
 
-		if (existingChildWorkflowRunWait) {
-			nextIndexByStatus[expectedStatus] = nextIndex + 1;
-
-			if (existingChildWorkflowRunWait.status === "timeout") {
-				logger.debug("Timed out waiting for child workflow status", {
-					"aiki.childWorkflowExpectedStatus": expectedStatus,
-				});
-				return {
-					success: false,
-					cause: "timeout",
-				};
-			}
-
-			const childWorkflowRunStatus = existingChildWorkflowRunWait.childWorkflowRunState.status;
-
-			if (childWorkflowRunStatus === expectedStatus) {
-				return {
-					success: true,
-					state: existingChildWorkflowRunWait.childWorkflowRunState as WorkflowRunWaitResultSuccess<Status, Output>,
-				};
-			}
-
-			if (isTerminalWorkflowRunStatus(childWorkflowRunStatus)) {
-				logger.debug("Child workflow run reached termnial state", {
-					"aiki.childWorkflowTerminalStatus": childWorkflowRunStatus,
-				});
-				return {
-					success: false,
-					cause: "run_terminated",
-				};
-			}
-
-			childWorkflowRunStatus satisfies never;
+			logger.debug("Timed out waiting for child workflow");
+			return {
+				success: false,
+				cause: "timeout",
+			};
 		}
 
-		// TODO: if the child workflow is already in the expectedStatus or a terminal status,
-		// 		 we might return early, but it is tricky and could lead to bugs.
-		// Example:
-		// - wait for child to complete
-		// - realises child already completed, so return early
-		// - on replay, wait for child to complete, but child is not longer in completed state
-		// - now it starts waiting, which is a different outcome from the first run
-		// For now, let's persist this waiting in the server, so that the replay will work nicely
+		const { terminal } = waits;
+		if (terminal) {
+			return {
+				success: true,
+				state: await decodeWaitResultState<Output>(handle[INTERNAL].codec, terminal.state),
+			};
+		}
 
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
 
@@ -186,22 +138,20 @@ function createStatusWaiter<Input, Output, AppContext, TEvents extends EventsDef
 			await parentRunHandle[INTERNAL].transitionState({
 				status: "awaiting_child_workflow",
 				childWorkflowRunId: run.id,
-				childWorkflowRunStatus: expectedStatus,
 				timeoutInMs,
 			});
 			logger.info("Waiting for child Workflow", {
-				"aiki.childWorkflowExpectedStatus": expectedStatus,
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
-		} catch (error) {
-			if (error instanceof WorkflowRunRevisionConflictError) {
-				throw new WorkflowRunSuspendedError(parentRun.id);
+		} catch (err) {
+			if (err instanceof WorkflowRunRevisionConflictError) {
+				throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);
 			}
-			throw error;
+			throw err;
 		}
 
-		throw new WorkflowRunSuspendedError(parentRun.id);
+		throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);
 	}
 
-	return waitForStatus;
+	return wait;
 }

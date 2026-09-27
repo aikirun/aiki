@@ -2,10 +2,7 @@ import type { Logger } from "@aikirun/lib/logger";
 import type { Redis } from "ioredis";
 
 export interface RedisConnectionParams {
-	host: string;
-	port: number;
-	password?: string;
-	db?: number;
+	url: string;
 	connectTimeoutMs?: number;
 }
 
@@ -13,15 +10,122 @@ interface RedisConnectionSupervisorOptions {
 	logger?: Logger;
 }
 
+interface RedisConnectionTracker {
+	isAvailable(now?: number): boolean;
+	assertIsAvailable(now?: number): void;
+}
+
 /**
- * Attaches connection-lifecycle supervision to an existing Redis client. The
- * client is expected to already be configured in fail-fast mode.
- * Adds a supervisor over the "connect → ready" handshake and forces a reconnect
- * if that handshake stalls.
+ * Tracks whether a connection is usable right now by listening to it:
+ * "close" means the connection dropped, "ready" means it works.
+ *
+ * One failure emits no events at all: a connect accepted by something dead —
+ * e.g. a stopped container's forwarded port — that never answers. The
+ * connection then just waits, and the optimistic starting verdict would never
+ * be corrected. The grace check covers it: if no "ready" has arrived within
+ * the connection's own connect timeout, stop assuming it is fine.
+ *
+ * The listeners only observe — the connection is never configured or acted on.
+ *
+ * The time predicates take the current time as a parameter, defaulting to Date.now().
+ */
+function createConnectionTracker(redis: Redis): RedisConnectionTracker {
+	const readyGraceMs = redis.options.connectTimeout ?? 10_000;
+	const { status } = redis;
+	let available = status !== "reconnecting" && status !== "close" && status !== "end";
+	let lastReadyObservedAt = Date.now();
+
+	redis.on("ready", () => {
+		available = true;
+		lastReadyObservedAt = Date.now();
+	});
+	redis.on("close", () => {
+		available = false;
+	});
+
+	const isAvailable = (now = Date.now()) => {
+		if (available && redis.status !== "ready" && now - lastReadyObservedAt > readyGraceMs) {
+			available = false;
+		}
+		return available;
+	};
+
+	return {
+		isAvailable,
+		assertIsAvailable(now = Date.now()) {
+			if (!isAvailable(now)) {
+				throw new Error("Redis connection unavailable");
+			}
+		},
+	};
+}
+
+export const connectionTracker = (() => {
+	const trackers = new WeakMap<Redis, RedisConnectionTracker>();
+	return (redis: Redis): RedisConnectionTracker => {
+		let tracker = trackers.get(redis);
+		if (!tracker) {
+			tracker = createConnectionTracker(redis);
+			trackers.set(redis, tracker);
+		}
+		return tracker;
+	};
+})();
+
+/**
+ * Resolves when the connection's connect → ready handshake completes, rejecting
+ * if the connection closes first, or if it is still not ready after the
+ * connection's own connect timeout.
+ *
+ * A client that never starts connecting emits no events at all, so without the
+ * timeout this would wait forever. The rejection includes the connection's
+ * status, so the log shows what it was stuck on.
+ */
+export function untilReadyHandshake(redis: Redis): Promise<void> {
+	if (redis.status === "ready") {
+		return Promise.resolve();
+	}
+
+	const handshakeTimeoutMs = redis.options.connectTimeout ?? 10_000;
+
+	return new Promise((resolve, reject) => {
+		const onReady = () => {
+			clearTimeout(handshakeTimeout);
+			redis.off("close", onClose);
+			resolve();
+		};
+		const onClose = () => {
+			clearTimeout(handshakeTimeout);
+			redis.off("ready", onReady);
+			reject(new Error("Redis connection closed before completing the ready handshake"));
+		};
+		const handshakeTimeout = setTimeout(() => {
+			redis.off("ready", onReady);
+			redis.off("close", onClose);
+			reject(
+				new Error(
+					`Redis connection did not complete the ready handshake within ${handshakeTimeoutMs}ms (status: ${redis.status})`
+				)
+			);
+		}, handshakeTimeoutMs);
+
+		redis.once("ready", onReady);
+		redis.once("close", onClose);
+	});
+}
+
+/**
+ * Attaches connection-lifecycle supervision to an existing Redis client: a
+ * watchdog over the "connect → ready" handshake that forces a reconnect if the
+ * handshake stalls. ioredis's connectTimeout only covers the TCP connect; a
+ * socket that is accepted but never served (e.g. a stopped container's
+ * forwarded port) would otherwise wedge the client in "connect" forever,
+ * emitting no events. Also installs a no-op "error" listener so a client
+ * without one cannot crash the process.
  */
 export function attachConnectionSupervisor(redis: Redis, options?: RedisConnectionSupervisorOptions) {
 	const logger = options?.logger;
-	const connectTimeoutMs = redis.options.connectTimeout ?? 5_000;
+	const connectTimeoutMs = redis.options.connectTimeout ?? 10_000;
 
 	type State =
 		| { status: "disconnected" }

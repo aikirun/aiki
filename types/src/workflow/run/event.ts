@@ -1,5 +1,7 @@
 import type { DurationObject } from "@aikirun/lib/duration";
 
+import type { OpaquePayload } from "../../payload";
+
 export type EventName = string & { _brand: "event_name" };
 
 export const EVENT_WAIT_STATUSES = ["received", "timeout"] as const;
@@ -9,11 +11,12 @@ interface EventWaitBase {
 	status: EventWaitStatus;
 }
 
-export interface EventWaitReceived<Data> extends EventWaitBase {
+export interface EventWaitReceived extends EventWaitBase {
 	status: "received";
-	data?: Data;
+	data?: OpaquePayload;
+	clientCodecApplied: boolean;
 	receivedAt: number;
-	reference?: EventReferenceOptions;
+	reference?: EventReference;
 }
 
 export interface EventWaitTimeout extends EventWaitBase {
@@ -21,24 +24,25 @@ export interface EventWaitTimeout extends EventWaitBase {
 	timedOutAt: number;
 }
 
-export type EventWait<Data> = EventWaitReceived<Data> | EventWaitTimeout;
-
-export interface EventWaitQueue<Data> {
-	eventWaits: EventWait<Data>[];
-}
+export type EventWait = EventWaitReceived | EventWaitTimeout;
 
 export interface EventWaitOptions<Timed extends boolean> {
 	timeout?: Timed extends true ? DurationObject : never;
 }
 
 export type EventWaitResult<Data, Timed extends boolean> = Timed extends false
-	? { data: Data }
-	: { timeout: false; data: Data } | { timeout: true };
+	? { data: Data; receivedAt: number }
+	: { timeout: false; data: Data; receivedAt: number } | { timeout: true; timedOutAt: number };
 
 export interface EventSendOptions {
-	reference?: EventReferenceOptions;
+	reference?: EventReference;
 }
 
-export interface EventReferenceOptions {
+export interface EventMulticastResult {
+	sentIds: string[];
+	failedIds: string[];
+}
+
+export interface EventReference {
 	id: string;
 }

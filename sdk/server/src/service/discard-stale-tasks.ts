@@ -1,48 +1,71 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
-import { isNonEmptyArray } from "@aikirun/lib/array";
-import type { TaskStateDiscarded } from "@aikirun/types/workflow/task";
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import { asNonEmptyArray, isNonEmptyArray } from "@aikirun/lib/collection/array";
+import type { DiscardableTaskStatus, TaskStateDiscarded } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 
-import type { Repositories } from "../infra/db/types";
-import type { StateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { TxRepositories } from "../infra/db/types";
+import type { TaskStateTransitionRowInsert } from "../infra/db/types/state-transition";
 
 export async function discardStaleTasks(
-	workflowRunIds: string | NonEmptyArray<string>,
-	txRepos: Pick<Repositories, "task" | "stateTransition">
+	runs: NonEmptyArray<{ id: string; revision: number }>,
+	staleStatuses: NonEmptyArray<DiscardableTaskStatus>,
+	txRepos: TxRepositories
 ): Promise<void> {
-	const staleTasks = await txRepos.task.listByWorkflowRunIdsAndStatuses(workflowRunIds, [
-		"running",
-		"awaiting_retry",
-		"failed",
-	]);
+	const revisionByRunId = new Map(runs.map((run) => [run.id, run.revision]));
+	const staleTasks = await txRepos.task.listByWorkflowRunIdsAndStatuses(
+		asNonEmptyArray(Array.from(revisionByRunId.keys())),
+		staleStatuses
+	);
 	if (!isNonEmptyArray(staleTasks)) {
 		return;
 	}
 
-	const stateTransitionEntries: StateTransitionRowInsert[] = [];
-	const taskUpdates: Array<{ filter: { id: string }; update: { latestStateTransitionId: string } }> = [];
-
-	for (const task of staleTasks) {
-		const transitionId = ulid();
-		stateTransitionEntries.push({
-			id: transitionId,
-			workflowRunId: task.workflowRunId,
-			type: "task",
-			taskId: task.id,
-			status: "discarded",
-			attempt: task.attempts,
-			state: { status: "discarded", attempts: task.attempts } satisfies TaskStateDiscarded,
-		});
-		taskUpdates.push({
-			filter: { id: task.id },
-			update: { latestStateTransitionId: transitionId },
-		});
-	}
-
-	if (!isNonEmptyArray(stateTransitionEntries) || !isNonEmptyArray(taskUpdates)) {
+	const taskUpdatesById = new Map(
+		staleTasks.map((task) => {
+			const revision = revisionByRunId.get(task.workflowRunId);
+			if (revision === undefined) {
+				throw new Error(`Attempted to discard unexpected task ${task.id}`);
+			}
+			return [
+				task.id,
+				{
+					filter: {
+						id: task.id,
+						workflowRunId: task.workflowRunId,
+						status: task.status as DiscardableTaskStatus,
+						attempts: task.attempts,
+					},
+					update: { latestStateTransitionId: ulid() },
+					revision,
+				},
+			];
+		})
+	);
+	const taskUpdates = Array.from(taskUpdatesById.values());
+	const discardedTaskIds = await txRepos.task.bulkTransitionToDiscarded(asNonEmptyArray(taskUpdates));
+	if (!isNonEmptyArray(discardedTaskIds)) {
 		return;
 	}
 
-	await txRepos.stateTransition.appendBatch(stateTransitionEntries);
-	await txRepos.task.bulkDiscard(taskUpdates);
+	const stateTransitionEntries: TaskStateTransitionRowInsert[] = [];
+
+	for (const discardedTaskId of discardedTaskIds) {
+		const taskUpdate = taskUpdatesById.get(discardedTaskId);
+		if (!taskUpdate) {
+			throw new Error(`Task ${discardedTaskId} was discarded unexpectedly`);
+		}
+		stateTransitionEntries.push({
+			id: taskUpdate.update.latestStateTransitionId,
+			workflowRunId: taskUpdate.filter.workflowRunId,
+			type: "task",
+			taskId: discardedTaskId,
+			attempt: taskUpdate.filter.attempts,
+			revision: taskUpdate.revision,
+			state: { status: "discarded" } satisfies TaskStateDiscarded,
+		});
+	}
+
+	if (isNonEmptyArray(stateTransitionEntries)) {
+		await txRepos.stateTransition.appendBatch(stateTransitionEntries);
+	}
 }

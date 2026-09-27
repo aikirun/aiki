@@ -1,6 +1,10 @@
+import type { OpaquePayload } from "./payload";
+import type { WorkflowSource } from "./workflow";
+import type { WorkflowRunOptions } from "./workflow/run";
+
 export type ScheduleId = string & { _brand: "schedule_id" };
 
-export const SCHEDULE_STATUSES = ["active", "paused", "deleted"] as const;
+export const SCHEDULE_STATUSES = ["active", "paused", "inactive"] as const;
 export type ScheduleStatus = (typeof SCHEDULE_STATUSES)[number];
 
 export const SCHEDULE_TYPES = ["cron", "interval"] as const;
@@ -27,26 +31,48 @@ export interface IntervalScheduleSpec extends ScheduleSpecBase {
 
 export type ScheduleSpec = CronScheduleSpec | IntervalScheduleSpec;
 
-export const SCHEDULE_CONFLICT_POLICIES = ["upsert", "error"] as const;
+export const SCHEDULE_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type ScheduleConflictPolicy = (typeof SCHEDULE_CONFLICT_POLICIES)[number];
 
-export interface ScheduleReferenceOptions {
+export interface ScheduleReference {
 	id: string;
 	conflictPolicy?: ScheduleConflictPolicy;
 }
 
 export interface ScheduleActivateOptions {
-	reference?: ScheduleReferenceOptions;
+	reference?: ScheduleReference;
 }
+
+export const SCHEDULE_ACTIVE_REASONS = ["activated", "resumed", "reactivated"] as const;
+export type ScheduleActiveReason = (typeof SCHEDULE_ACTIVE_REASONS)[number];
+
+export interface ScheduleStateActive {
+	status: "active";
+	reason: ScheduleActiveReason;
+}
+
+export interface ScheduleStatePaused {
+	status: "paused";
+}
+
+export interface ScheduleStateInactive {
+	status: "inactive";
+}
+
+export type ScheduleState = ScheduleStateActive | ScheduleStatePaused | ScheduleStateInactive;
 
 export interface Schedule {
 	id: string;
+	workflowSource: WorkflowSource;
 	workflowName: string;
 	workflowVersionId: string;
 	status: ScheduleStatus;
 	spec: ScheduleSpec;
-	input?: unknown;
-	options?: ScheduleActivateOptions;
+	workflowRunInput?: OpaquePayload;
+	clientHasherApplied: boolean;
+	clientCodecApplied: boolean;
+	referenceId?: string;
+	workflowRunOptions?: WorkflowRunOptions;
 	createdAt: number;
 	updatedAt: number;
 	lastOccurrence?: number;

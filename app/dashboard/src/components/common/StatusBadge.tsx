@@ -1,5 +1,6 @@
 import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 
+import { chipStatus } from "./ui";
 import { WORKFLOW_STATUS_CONFIG } from "../../constants/workflow-status";
 
 interface StatusBadgeProps {
@@ -14,19 +15,13 @@ export function StatusBadge({ status, size = "sm" }: StatusBadgeProps) {
 	return (
 		<span
 			style={{
-				display: "inline-flex",
-				alignItems: "center",
+				...chipStatus(config.color),
 				gap: big ? 6 : 4,
-				padding: big ? "3px 11px" : "2px 8px",
-				borderRadius: 999,
-				background: `${config.color}30`,
-				border: `1px solid ${config.color}50`,
-				fontSize: big ? 12 : 10.5,
-				fontWeight: 600,
-				color: config.textColor,
+				padding: big ? "3px 10px" : "2px 7px",
+				fontSize: big ? 11 : 10,
 			}}
 		>
-			<span className={config.live ? "anim-blink" : undefined} style={{ fontSize: big ? 10 : 8 }}>
+			<span className={config.live ? "anim-blink" : undefined} style={{ fontSize: big ? 9 : 8 }}>
 				{config.glyph}
 			</span>
 			{config.label}

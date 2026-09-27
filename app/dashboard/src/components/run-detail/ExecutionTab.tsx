@@ -1,21 +1,30 @@
 import type {
 	ChildWorkflowRunInfo,
-	ChildWorkflowRunWaitCompleted,
-	EventWaitQueue,
-	SleepQueue,
+	ChildWorkflowRunWaits,
+	EventWait,
+	Sleep,
 	TerminalWorkflowRunStatus,
-	WorkflowRun,
+	WorkflowRunRecord,
 } from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { TASK_STATUS_COLORS, TASK_STATUS_GLYPHS, WORKFLOW_RUN_STATUS_COLORS } from "../../constants/status-colors";
+import { useTask } from "../../api/hooks";
+import {
+	edge,
+	TASK_STATUS_COLORS,
+	TASK_STATUS_GLYPHS,
+	tint,
+	WORKFLOW_RUN_STATUS_COLORS,
+} from "../../constants/status-colors";
 import { CopyButton } from "../common/CopyButton";
+import { DataBlock } from "../common/DataBlock";
 import { StatusBadge } from "../common/StatusBadge";
+import { chipNeutral, chipStatus, eyebrow } from "../common/ui";
 
 interface ExecutionTabProps {
-	run: WorkflowRun;
+	run: WorkflowRunRecord;
 	scrollToTaskId?: string | null;
 }
 
@@ -25,8 +34,17 @@ function shortId(id: string): string {
 	return id.length > 10 ? id.slice(-6) : id;
 }
 
+/**
+ * Clock time, gaining a date once the instant is not today — a bare "06:12:07" on a run that ended
+ * last week says nothing about when it happened.
+ */
 function fmtTime(ts: number): string {
-	return new Date(ts).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+	const at = new Date(ts);
+	const time = at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+	const now = new Date();
+	const isToday =
+		at.getFullYear() === now.getFullYear() && at.getMonth() === now.getMonth() && at.getDate() === now.getDate();
+	return isToday ? time : `${at.toLocaleDateString([], { day: "2-digit", month: "2-digit" })} ${time}`;
 }
 
 function timeUntil(ts: number): string {
@@ -58,10 +76,10 @@ function ChevronIcon({ open }: { open: boolean }) {
 // ── Root component ────────────────────────────────────────────────────────────
 
 export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
-	const tasks = Object.values(run.taskQueues).flatMap((q) => q.tasks);
-	const childWorkflows = Object.values(run.childWorkflowRunQueues).flatMap((q) => q.childWorkflowRuns);
-	const sleepEntries = Object.entries(run.sleepQueues);
-	const eventEntries = Object.entries(run.eventWaitQueues);
+	const tasks = Object.values(run.tasks).flat();
+	const childWorkflows = Object.values(run.childWorkflowRuns).flat();
+	const sleepEntries = Object.entries(run.sleeps);
+	const eventEntries = Object.entries(run.eventWaits);
 
 	const awaitingChildId = run.state.status === "awaiting_child_workflow" ? run.state.childWorkflowRunId : undefined;
 
@@ -77,7 +95,7 @@ export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
 	}
 
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+		<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
 			{tasks.length > 0 && (
 				<>
 					<SectionHeader label="Tasks" />
@@ -91,7 +109,12 @@ export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
 				<>
 					<SectionHeader label="Child Workflows" />
 					{childWorkflows.map((child) => (
-						<ChildWorkflowCard key={child.id} child={child} isAwaited={child.id === awaitingChildId} />
+						<ChildWorkflowCard
+							key={child.id}
+							child={child}
+							waits={run.childWorkflowRunWaits[child.id]}
+							isAwaited={child.id === awaitingChildId}
+						/>
 					))}
 				</>
 			)}
@@ -99,8 +122,8 @@ export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
 			{sleepEntries.length > 0 && (
 				<>
 					<SectionHeader label="Sleeps" />
-					{sleepEntries.map(([name, queue]) => (
-						<SleepRow key={name} name={name} queue={queue} />
+					{sleepEntries.map(([name, sleeps]) => (
+						<SleepRow key={name} name={name} sleeps={sleeps} />
 					))}
 				</>
 			)}
@@ -108,11 +131,11 @@ export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
 			{eventEntries.length > 0 && (
 				<>
 					<SectionHeader label="Events" />
-					{eventEntries.map(([name, queue]) => (
+					{eventEntries.map(([name, waits]) => (
 						<EventRow
 							key={name}
 							name={name}
-							queue={queue}
+							waits={waits}
 							isWaiting={run.state.status === "awaiting_event" && run.state.eventName === name}
 							timeoutAt={run.state.status === "awaiting_event" ? run.state.timeoutAt : undefined}
 						/>
@@ -127,18 +150,8 @@ export function ExecutionTab({ run, scrollToTaskId }: ExecutionTabProps) {
 
 function SectionHeader({ label }: { label: string }) {
 	return (
-		<div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, marginBottom: 2 }}>
-			<span
-				style={{
-					fontSize: 10,
-					fontWeight: 700,
-					color: "var(--t3)",
-					textTransform: "uppercase",
-					letterSpacing: ".07em",
-				}}
-			>
-				{label}
-			</span>
+		<div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18, marginBottom: 6 }}>
+			<span style={eyebrow()}>{label}</span>
 			<div style={{ flex: 1, height: 1, background: "var(--b0)" }} />
 		</div>
 	);
@@ -146,58 +159,37 @@ function SectionHeader({ label }: { label: string }) {
 
 // ── Task card ─────────────────────────────────────────────────────────────────
 
-function taskHasExpandableData(task: TaskInfo): boolean {
-	const s = task.state;
-	if (s.status === "completed") return s.output !== undefined;
-	if (s.status === "failed" || s.status === "awaiting_retry") return true;
-	if (s.status === "running") return s.input !== undefined;
-	return false;
-}
-
 const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; scrollTo: boolean }) {
 	const [isOpen, setIsOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 
-	const colorEntry = TASK_STATUS_COLORS[task.state.status];
-	const color = colorEntry.tint;
-	const textColor = colorEntry.text;
+	const color = TASK_STATUS_COLORS[task.state.status];
 	const glyph = TASK_STATUS_GLYPHS[task.state.status];
-	const attempts = task.state.attempts;
-	const canExpand = taskHasExpandableData(task);
+	const attempts = task.attempts;
 
 	useEffect(() => {
-		if (scrollTo && ref.current && canExpand) {
+		if (scrollTo && ref.current) {
 			ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
 			setIsOpen(true);
 		}
-	}, [scrollTo, canExpand]);
+	}, [scrollTo]);
 
 	return (
 		<div ref={ref} id={`task-${task.id}`} style={{ scrollMarginTop: 16 }}>
+			{/* The task name is the toggle; the copy buttons sit beside it, not inside it. */}
 			<div
-				{...(canExpand
-					? {
-							role: "button",
-							tabIndex: 0,
-							onClick: () => setIsOpen(!isOpen),
-							onKeyDown: (e: React.KeyboardEvent) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									setIsOpen(!isOpen);
-								}
-							},
-						}
-					: {})}
 				style={{
+					position: "relative",
 					display: "flex",
 					alignItems: "center",
 					gap: 10,
-					padding: "9px 14px",
+					padding: "11px 16px",
 					background: "var(--s1)",
 					border: "1px solid var(--b0)",
-					borderRadius: isOpen ? "8px 8px 0 0" : 8,
-					cursor: canExpand ? "pointer" : "default",
-					transition: "all .12s",
+					borderRadius: isOpen ? "var(--r-card) var(--r-card) 0 0" : "var(--r-card)",
+					boxShadow: isOpen ? "none" : "var(--shadow-card)",
+					cursor: "pointer",
+					transition: "background-color .16s ease, border-color .16s ease",
 				}}
 			>
 				<div
@@ -206,13 +198,13 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 						width: 24,
 						height: 24,
 						borderRadius: "50%",
-						background: `${color}30`,
-						border: `1.5px solid ${color}50`,
+						background: tint(color),
+						border: `1.5px solid ${edge(color)}`,
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",
 						fontSize: 10,
-						color: textColor,
+						color,
 						flexShrink: 0,
 					}}
 				>
@@ -221,9 +213,25 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 
 				<div style={{ flex: 1, minWidth: 0 }}>
 					<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-						<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 600, color: "var(--t0)" }}>
+						<button
+							type="button"
+							className="row-target"
+							aria-expanded={isOpen}
+							onClick={() => setIsOpen(!isOpen)}
+							style={{
+								background: "none",
+								border: "none",
+								padding: 0,
+								cursor: "pointer",
+								fontFamily: "var(--mono)",
+								fontSize: 12,
+								fontWeight: 600,
+								color: "var(--t0)",
+								textAlign: "left",
+							}}
+						>
 							{task.name}
-						</span>
+						</button>
 						{attempts > 1 && (
 							<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--accent-orange)" }}>
 								×{attempts}
@@ -231,49 +239,83 @@ const TaskCard = memo(function TaskCard({ task, scrollTo }: { task: TaskInfo; sc
 						)}
 					</div>
 					<div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
-						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>{shortId(task.id)}</span>
-						<CopyButton text={task.id} />
 						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>
-							· {shortId(task.inputHash)}
+							<span style={{ opacity: 0.62 }}>ID</span> {shortId(task.id)}
+						</span>
+						<CopyButton text={task.id} />
+						<span style={{ fontSize: 9.5, color: "var(--b0)", marginLeft: -2, marginRight: 2 }}>•</span>
+						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>
+							<span style={{ opacity: 0.62 }}>HASH</span> {shortId(task.inputHash)}
 						</span>
 						<CopyButton text={task.inputHash} />
 					</div>
 				</div>
 
-				{canExpand && <ChevronIcon open={isOpen} />}
+				<ChevronIcon open={isOpen} />
 			</div>
 
-			{isOpen && canExpand && (
+			{isOpen && (
 				<div
 					style={{
-						background: "var(--s2)",
+						background: "var(--s1)",
 						border: "1px solid var(--b0)",
 						borderTop: "none",
-						borderRadius: "0 0 8px 8px",
-						padding: "10px 14px",
+						borderRadius: "0 0 var(--r-card) var(--r-card)",
+						boxShadow: "var(--shadow-card)",
+						padding: "4px 16px 16px",
 					}}
 				>
-					<TaskOutput task={task} color={color} />
+					<TaskDetail task={task} color={color} />
 				</div>
 			)}
 		</div>
 	);
 });
 
-function TaskOutput({ task, color }: { task: TaskInfo; color: string }) {
-	const state = task.state;
-	let text: string;
-	if (state.status === "completed") {
-		text = state.output !== undefined ? JSON.stringify(state.output, null, 2) : "(no output)";
-	} else if (state.status === "failed") {
-		text = state.error.message || "Unknown error";
-	} else if (state.status === "running") {
-		text = state.input !== undefined ? JSON.stringify(state.input, null, 2) : "Executing…";
-	} else {
-		state.status satisfies "awaiting_retry";
-		text = `Error: ${state.error.message}\nRetrying…`;
+// Task payloads are not part of the run record; the full detail is fetched per
+// task when the card is opened.
+function TaskDetail({ task, color }: { task: TaskInfo; color: string }) {
+	const { data, isPending, isError } = useTask(task);
+
+	if (isPending) {
+		return <TaskText color={color} text="Loading…" />;
+	}
+	if (isError || !data) {
+		return <TaskText color={color} text="Failed to load task" />;
 	}
 
+	const { input, options, state } = data.task;
+
+	let outcome: { label: string; text: string } | undefined;
+	if (state.status === "completed") {
+		outcome = {
+			label: "Output",
+			text: state.output !== undefined ? JSON.stringify(state.output, null, 2) : "(no output)",
+		};
+	} else if (state.status === "failed") {
+		outcome = { label: "Error", text: state.error.message || "Unknown error" };
+	} else if (state.status === "awaiting_retry") {
+		outcome = { label: "Error", text: `${state.error.message}\nRetrying…` };
+	} else {
+		state.status satisfies "running" | "discarded";
+	}
+
+	return (
+		<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+			<DataBlock label="Input" text={input !== undefined ? JSON.stringify(input, null, 2) : "(no input)"} />
+			{outcome && (
+				<DataBlock
+					label={outcome.label}
+					text={outcome.text}
+					tone={state.status === "completed" ? "var(--on-code-green)" : "var(--on-code-red)"}
+				/>
+			)}
+			{options && <DataBlock label="Options" text={JSON.stringify(options, null, 2)} />}
+		</div>
+	);
+}
+
+function TaskText({ text, color }: { text: string; color: string }) {
 	return (
 		<pre
 			style={{
@@ -293,22 +335,18 @@ function TaskOutput({ task, color }: { task: TaskInfo; color: string }) {
 
 // ── Child workflows ───────────────────────────────────────────────────────────
 
-function resolveChildStatus(child: ChildWorkflowRunInfo): {
+function resolveChildStatus(waits: ChildWorkflowRunWaits | undefined): {
 	status: TerminalWorkflowRunStatus | "running";
-	resolvedWait: ChildWorkflowRunWaitCompleted | null;
+	resolvedWait: TerminalChildWait | null;
 } {
-	const waitQueues = child.childWorkflowRunWaitQueues;
-	for (const terminalStatus of ["completed", "failed", "cancelled"] as const) {
-		const queue = waitQueues[terminalStatus];
-		const wait = queue?.childWorkflowRunWaits[0];
-		if (wait?.status === "completed") {
-			return { status: terminalStatus, resolvedWait: wait };
-		}
+	const terminal = waits?.terminal;
+	if (terminal) {
+		return { status: terminal.state.status, resolvedWait: terminal };
 	}
 	return { status: "running", resolvedWait: null };
 }
 
-function childStatusColor(status: TerminalWorkflowRunStatus | "running"): { tint: string; text: string } {
+function childStatusColor(status: TerminalWorkflowRunStatus | "running"): string {
 	if (status === "completed") return WORKFLOW_RUN_STATUS_COLORS.completed;
 	if (status === "failed") return WORKFLOW_RUN_STATUS_COLORS.failed;
 	if (status === "cancelled") return WORKFLOW_RUN_STATUS_COLORS.cancelled;
@@ -322,9 +360,17 @@ function childStatusGlyph(status: TerminalWorkflowRunStatus | "running"): string
 	return "⑂";
 }
 
-function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; isAwaited: boolean }) {
-	const { status, resolvedWait } = resolveChildStatus(child);
-	const { tint: color, text: textColor } = childStatusColor(status);
+function ChildWorkflowCard({
+	child,
+	waits,
+	isAwaited,
+}: {
+	child: ChildWorkflowRunInfo;
+	waits: ChildWorkflowRunWaits | undefined;
+	isAwaited: boolean;
+}) {
+	const { status, resolvedWait } = resolveChildStatus(waits);
+	const color = childStatusColor(status);
 	const glyph = childStatusGlyph(status);
 	const hasResolvedOutput = resolvedWait !== null;
 	const [isOpen, setIsOpen] = useState(false);
@@ -332,30 +378,19 @@ function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; 
 	return (
 		<div
 			style={{
-				background: isAwaited ? "rgba(192,132,252,0.04)" : "var(--s1)",
-				border: `1px solid ${isAwaited ? "rgba(192,132,252,0.2)" : "var(--b0)"}`,
-				borderRadius: 8,
+				background: isAwaited ? tint("var(--accent-purple)") : "var(--s1)",
+				border: `1px solid ${isAwaited ? edge("var(--accent-purple)") : "var(--b0)"}`,
+				borderRadius: "var(--r-card)",
+				boxShadow: "var(--shadow-card)",
 				overflow: "hidden",
 			}}
 		>
-			{/* Header row — clickable to expand */}
+			{/* Header row — the child's name expands it when there is output to show */}
 			<div
-				{...(hasResolvedOutput
-					? {
-							role: "button",
-							tabIndex: 0,
-							onClick: () => setIsOpen(!isOpen),
-							onKeyDown: (e: React.KeyboardEvent) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									setIsOpen(!isOpen);
-								}
-							},
-						}
-					: {})}
 				style={{
+					position: "relative",
 					display: "flex",
-					alignItems: "center",
+					alignItems: "flex-start",
 					gap: 10,
 					padding: "10px 14px",
 					minWidth: 0,
@@ -368,84 +403,107 @@ function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; 
 						width: 24,
 						height: 24,
 						borderRadius: "50%",
-						background: `${color}30`,
-						border: `1.5px solid ${color}50`,
+						background: tint(color),
+						border: `1.5px solid ${edge(color)}`,
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",
 						fontSize: 10,
-						color: textColor,
+						color,
 						flexShrink: 0,
 					}}
 				>
 					{glyph}
 				</div>
 
-				<div style={{ flex: 1, minWidth: 0 }}>
-					<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-						<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 600, color: "var(--t0)" }}>
-							{child.name}
-						</span>
-						<span
-							style={{
-								fontFamily: "var(--mono)",
-								fontSize: 10,
-								color: "var(--t3)",
-								background: "var(--s3)",
-								padding: "1px 5px",
-								borderRadius: 4,
-							}}
-						>
-							v{child.versionId}
-						</span>
-						{isAwaited && (
-							<span
+				<div style={{ flex: "1 1 auto", minWidth: 0 }}>
+					<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
+						{hasResolvedOutput ? (
+							<button
+								type="button"
+								className="row-target"
+								aria-expanded={isOpen}
+								onClick={() => setIsOpen(!isOpen)}
 								style={{
-									fontSize: 9,
+									background: "none",
+									border: "none",
+									padding: 0,
+									cursor: "pointer",
+									fontFamily: "var(--mono)",
+									fontSize: 12,
 									fontWeight: 600,
-									color: "#C084FC",
-									background: "rgba(192,132,252,0.1)",
-									border: "1px solid rgba(192,132,252,0.2)",
-									padding: "1px 6px",
-									borderRadius: 999,
+									color: "var(--t0)",
+									textAlign: "left",
+									minWidth: 0,
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									whiteSpace: "nowrap",
+									maxWidth: "100%",
 								}}
 							>
-								awaiting
+								{child.name}
+							</button>
+						) : (
+							<span
+								style={{
+									fontFamily: "var(--mono)",
+									fontSize: 12,
+									fontWeight: 600,
+									color: "var(--t0)",
+									minWidth: 0,
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									whiteSpace: "nowrap",
+									maxWidth: "100%",
+								}}
+							>
+								{child.name}
 							</span>
 						)}
+						<span style={chipNeutral()}>v{child.versionId}</span>
+						{isAwaited && <span style={{ ...chipStatus("var(--accent-purple)"), fontSize: 9.5 }}>awaiting</span>}
 						{resolvedWait && <StatusBadge status={status as TerminalWorkflowRunStatus} size="sm" />}
+						{/*
+						 * The link travels with the chips rather than sitting opposite them:
+						 * held out to the right it takes its width off this column, and the
+						 * column is what the name and the two ids have to fit inside.
+						 */}
+						<Link
+							to={`/runs/${child.id}`}
+							onClick={(e) => e.stopPropagation()}
+							style={{
+								position: "relative",
+								zIndex: 1,
+								background: tint("var(--accent-sky)"),
+								border: `1px solid ${edge("var(--accent-sky)")}`,
+								color: "var(--accent-sky)",
+								fontFamily: "var(--sans)",
+								fontSize: 11.5,
+								fontWeight: 600,
+								padding: "4px 10px",
+								borderRadius: "var(--r-chip)",
+								textDecoration: "none",
+								whiteSpace: "nowrap",
+								flexShrink: 0,
+								display: "inline-flex",
+								alignItems: "center",
+								gap: 4,
+							}}
+						>
+							View run →
+						</Link>
 					</div>
-					<div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>{shortId(child.id)}</span>
+					<div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
+						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)", whiteSpace: "nowrap" }}>
+							{shortId(child.id)}
+						</span>
 						<CopyButton text={child.id} />
-						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)" }}>
+						<span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--t3)", whiteSpace: "nowrap" }}>
 							· {shortId(child.inputHash)}
 						</span>
 						<CopyButton text={child.inputHash} />
 					</div>
 				</div>
-
-				<Link
-					to={`/runs/${child.id}`}
-					onClick={(e) => e.stopPropagation()}
-					style={{
-						background: "rgba(56,189,248,0.12)",
-						border: "1px solid rgba(56,189,248,0.35)",
-						color: "var(--accent-sky)",
-						fontSize: 11,
-						fontWeight: 600,
-						padding: "4px 10px",
-						borderRadius: 6,
-						textDecoration: "none",
-						whiteSpace: "nowrap",
-						flexShrink: 0,
-						display: "inline-flex",
-						alignItems: "center",
-						gap: 4,
-					}}
-				>
-					View run →
-				</Link>
 
 				{hasResolvedOutput && <ChevronIcon open={isOpen} />}
 			</div>
@@ -460,8 +518,10 @@ function ChildWorkflowCard({ child, isAwaited }: { child: ChildWorkflowRunInfo; 
 	);
 }
 
-function ChildWorkflowResolvedPre({ wait }: { wait: ChildWorkflowRunWaitCompleted }) {
-	const childState = wait.childWorkflowRunState;
+type TerminalChildWait = NonNullable<ChildWorkflowRunWaits["terminal"]>;
+
+function ChildWorkflowResolvedPre({ wait }: { wait: TerminalChildWait }) {
+	const childState = wait.state;
 
 	if (childState.status === "completed" && childState.output !== undefined) {
 		return (
@@ -469,8 +529,7 @@ function ChildWorkflowResolvedPre({ wait }: { wait: ChildWorkflowRunWaitComplete
 				style={{
 					fontFamily: "var(--mono)",
 					fontSize: 10,
-					color: "#34D399",
-					opacity: 0.7,
+					color: "var(--accent-green)",
 					lineHeight: 1.4,
 					margin: 0,
 					whiteSpace: "pre-wrap",
@@ -489,8 +548,7 @@ function ChildWorkflowResolvedPre({ wait }: { wait: ChildWorkflowRunWaitComplete
 				style={{
 					fontFamily: "var(--mono)",
 					fontSize: 10,
-					color: "#F87171",
-					opacity: 0.7,
+					color: "var(--accent-red)",
 					lineHeight: 1.4,
 					margin: 0,
 					whiteSpace: "pre-wrap",
@@ -508,9 +566,9 @@ function ChildWorkflowResolvedPre({ wait }: { wait: ChildWorkflowRunWaitComplete
 
 // ── Sleeps ────────────────────────────────────────────────────────────────────
 
-function SleepRow({ name, queue }: { name: string; queue: SleepQueue }) {
-	const activeSleep = queue.sleeps.find((s) => s.status === "sleeping");
-	const awakeAt = activeSleep?.status === "sleeping" ? activeSleep.awakeAt : undefined;
+function SleepRow({ name, sleeps }: { name: string; sleeps: Sleep[] }) {
+	const activeSleep = sleeps.find((s) => s.status === "sleeping");
+	const wakeupAt = activeSleep?.status === "sleeping" ? activeSleep.wakeupAt : undefined;
 
 	return (
 		<div
@@ -518,10 +576,11 @@ function SleepRow({ name, queue }: { name: string; queue: SleepQueue }) {
 				display: "flex",
 				alignItems: "center",
 				gap: 10,
-				padding: "10px 14px",
+				padding: "12px 16px",
 				background: "var(--s1)",
 				border: "1px solid var(--b0)",
-				borderRadius: 8,
+				borderRadius: "var(--r-card)",
+				boxShadow: "var(--shadow-card)",
 			}}
 		>
 			<svg
@@ -529,7 +588,7 @@ function SleepRow({ name, queue }: { name: string; queue: SleepQueue }) {
 				height="15"
 				viewBox="0 0 16 16"
 				fill="none"
-				stroke="#818CF8"
+				stroke="var(--accent-indigo)"
 				strokeWidth="1.4"
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -537,66 +596,69 @@ function SleepRow({ name, queue }: { name: string; queue: SleepQueue }) {
 			>
 				<path d="M4 2h8M4 14h8M5 2v2.5a3 3 0 0 0 3 3 3 3 0 0 0 3-3V2M5 14v-2.5a3 3 0 0 1 3-3 3 3 0 0 1 3 3V14" />
 			</svg>
-			<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 600, color: "var(--t0)" }}>{name}</span>
+			<span
+				title={name}
+				style={{
+					fontFamily: "var(--mono)",
+					fontSize: 12,
+					fontWeight: 600,
+					color: "var(--t0)",
+					flex: "0 1 auto",
+					minWidth: 0,
+					overflow: "hidden",
+					textOverflow: "ellipsis",
+					whiteSpace: "nowrap",
+				}}
+			>
+				{name}
+			</span>
 			<span style={{ flex: 1 }} />
-			{awakeAt !== undefined && <SleepCountdown awakeAt={awakeAt} />}
+			{wakeupAt !== undefined && <SleepCountdown wakeupAt={wakeupAt} />}
 		</div>
 	);
 }
 
-function SleepCountdown({ awakeAt }: { awakeAt: number }) {
-	const [remaining, setRemaining] = useState(() => timeUntil(awakeAt));
+function SleepCountdown({ wakeupAt }: { wakeupAt: number }) {
+	const [remaining, setRemaining] = useState(() => timeUntil(wakeupAt));
 	useEffect(() => {
-		const interval = setInterval(() => setRemaining(timeUntil(awakeAt)), 1000);
+		const interval = setInterval(() => setRemaining(timeUntil(wakeupAt)), 1000);
 		return () => clearInterval(interval);
-	}, [awakeAt]);
-	return <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "#818CF8" }}>{remaining}</span>;
+	}, [wakeupAt]);
+	return <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--accent-indigo)" }}>{remaining}</span>;
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
 
 function EventRow({
 	name,
-	queue,
+	waits,
 	isWaiting,
 	timeoutAt,
 }: {
 	name: string;
-	queue: EventWaitQueue<unknown>;
+	waits: EventWait[];
 	isWaiting: boolean;
 	timeoutAt?: number;
 }) {
-	const waits = queue.eventWaits;
 	const hasWaits = waits.length > 0;
 	const [isOpen, setIsOpen] = useState(false);
 
 	return (
 		<div>
-			{/* Header card — clickable */}
+			{/* Header card — the event name expands the received payloads */}
 			<div
-				{...(hasWaits
-					? {
-							role: "button",
-							tabIndex: 0,
-							onClick: () => setIsOpen(!isOpen),
-							onKeyDown: (e: React.KeyboardEvent) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									setIsOpen(!isOpen);
-								}
-							},
-						}
-					: {})}
 				style={{
+					position: "relative",
 					display: "flex",
 					alignItems: "center",
 					gap: 10,
-					padding: "10px 14px",
-					background: isWaiting ? "rgba(244,114,182,0.04)" : "var(--s1)",
-					border: `1px solid ${isWaiting ? "rgba(244,114,182,0.2)" : "var(--b0)"}`,
-					borderRadius: isOpen ? "8px 8px 0 0" : 8,
+					padding: "12px 16px",
+					background: isWaiting ? tint("var(--accent-pink)") : "var(--s1)",
+					border: `1px solid ${isWaiting ? edge("var(--accent-pink)") : "var(--b0)"}`,
+					borderRadius: isOpen ? "var(--r-card) var(--r-card) 0 0" : "var(--r-card)",
+					boxShadow: isOpen ? "none" : "var(--shadow-card)",
 					cursor: hasWaits ? "pointer" : "default",
-					transition: "all .12s",
+					transition: "background-color .16s ease, border-color .16s ease",
 				}}
 			>
 				<svg
@@ -604,7 +666,7 @@ function EventRow({
 					height="16"
 					viewBox="0 0 16 16"
 					fill="none"
-					stroke="#F472B6"
+					stroke="var(--accent-pink)"
 					strokeWidth="1.4"
 					strokeLinecap="round"
 					strokeLinejoin="round"
@@ -612,26 +674,58 @@ function EventRow({
 				>
 					<path d="M8 1.5v1M8 13a1.5 1.5 0 0 1-1.5 1.5h3A1.5 1.5 0 0 1 8 13Zm0 0V12M12 7c0-2.2-1.8-4-4-4S4 4.8 4 7c0 2.5-1.5 4-2 5h12c-.5-1-2-2.5-2-5Z" />
 				</svg>
-				<span style={{ fontFamily: "var(--mono)", fontSize: 12, fontWeight: 600, color: "var(--t0)" }}>{name}</span>
-				{isWaiting && (
-					<span
+				{hasWaits ? (
+					<button
+						type="button"
+						className="row-target"
+						aria-expanded={isOpen}
+						onClick={() => setIsOpen(!isOpen)}
+						title={name}
 						style={{
-							fontSize: 9,
+							background: "none",
+							border: "none",
+							padding: 0,
+							cursor: "pointer",
+							fontFamily: "var(--mono)",
+							fontSize: 12,
 							fontWeight: 600,
-							color: "#F472B6",
-							background: "rgba(244,114,182,0.1)",
-							border: "1px solid rgba(244,114,182,0.2)",
-							padding: "1px 6px",
-							borderRadius: 999,
+							color: "var(--t0)",
+							textAlign: "left",
+							/* Shrinks and truncates rather than pushing the chevron out of the card. */
+							flex: "0 1 auto",
+							minWidth: 0,
+							overflow: "hidden",
+							textOverflow: "ellipsis",
+							whiteSpace: "nowrap",
 						}}
 					>
-						waiting
+						{name}
+					</button>
+				) : (
+					<span
+						title={name}
+						style={{
+							fontFamily: "var(--mono)",
+							fontSize: 12,
+							fontWeight: 600,
+							color: "var(--t0)",
+							flex: "0 1 auto",
+							minWidth: 0,
+							overflow: "hidden",
+							textOverflow: "ellipsis",
+							whiteSpace: "nowrap",
+						}}
+					>
+						{name}
 					</span>
 				)}
+				{isWaiting && <span style={{ ...chipStatus("var(--accent-pink)"), fontSize: 9.5 }}>waiting</span>}
 				<span style={{ flex: 1 }} />
 				{isWaiting && timeoutAt !== undefined && <EventTimeoutCountdown timeoutAt={timeoutAt} />}
 				{hasWaits && (
-					<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)" }}>{waits.length} received</span>
+					<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)", whiteSpace: "nowrap" }}>
+						{waits.length} received
+					</span>
 				)}
 				{hasWaits && <ChevronIcon open={isOpen} />}
 			</div>
@@ -640,11 +734,12 @@ function EventRow({
 			{isOpen && hasWaits && (
 				<div
 					style={{
-						background: "var(--s2)",
+						background: "var(--s1)",
 						border: "1px solid var(--b0)",
 						borderTop: "none",
-						borderRadius: "0 0 8px 8px",
-						padding: "8px 14px",
+						borderRadius: "0 0 var(--r-card) var(--r-card)",
+						boxShadow: "var(--shadow-card)",
+						padding: "10px 16px 14px",
 						display: "flex",
 						flexDirection: "column",
 						gap: 6,
@@ -668,12 +763,12 @@ function EventTimeoutCountdown({ timeoutAt }: { timeoutAt: number }) {
 		const interval = setInterval(() => setLabel(timeUntil(timeoutAt)), 1000);
 		return () => clearInterval(interval);
 	}, [timeoutAt]);
-	return <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "#F472B6" }}>timeout {label}</span>;
+	return <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--accent-pink)" }}>timeout {label}</span>;
 }
 
-function EventWaitRow({ wait }: { wait: EventWaitQueue<unknown>["eventWaits"][number] }) {
+function EventWaitRow({ wait }: { wait: EventWait }) {
 	const isReceived = wait.status === "received";
-	const color = isReceived ? "#34D399" : "#FB923C";
+	const color = isReceived ? "var(--accent-green)" : "var(--accent-orange)";
 
 	return (
 		<div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -681,7 +776,10 @@ function EventWaitRow({ wait }: { wait: EventWaitQueue<unknown>["eventWaits"][nu
 			<div style={{ flex: 1, minWidth: 0 }}>
 				<div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
 					<span style={{ fontSize: 10.5, fontWeight: 600, color }}>{isReceived ? "Received" : "Timed out"}</span>
-					<span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)" }}>
+					<span
+						title={new Date(isReceived ? wait.receivedAt : wait.timedOutAt).toLocaleString()}
+						style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t3)" }}
+					>
 						{isReceived ? fmtTime(wait.receivedAt) : fmtTime(wait.timedOutAt)}
 					</span>
 					{isReceived && wait.reference?.id && (
@@ -693,21 +791,7 @@ function EventWaitRow({ wait }: { wait: EventWaitQueue<unknown>["eventWaits"][nu
 						</span>
 					)}
 				</div>
-				{isReceived && wait.data !== undefined && (
-					<pre
-						style={{
-							fontFamily: "var(--mono)",
-							fontSize: 10.5,
-							color: "var(--t1)",
-							lineHeight: 1.5,
-							whiteSpace: "pre-wrap",
-							wordBreak: "break-word",
-							margin: 0,
-						}}
-					>
-						{JSON.stringify(wait.data, null, 2)}
-					</pre>
-				)}
+				{isReceived && wait.data !== undefined && <DataBlock text={JSON.stringify(wait.data, null, 2)} />}
 			</div>
 		</div>
 	);
@@ -715,7 +799,7 @@ function EventWaitRow({ wait }: { wait: EventWaitQueue<unknown>["eventWaits"][nu
 
 // ── Error block ───────────────────────────────────────────────────────────────
 
-type FailedState = Extract<WorkflowRun["state"], { status: "failed" }>;
+type FailedState = Extract<WorkflowRunRecord["state"], { status: "failed" }>;
 
 function ErrorBlock({ state }: { state: FailedState }) {
 	const error = state.cause === "self" ? state.error : undefined;
@@ -723,39 +807,28 @@ function ErrorBlock({ state }: { state: FailedState }) {
 	return (
 		<div
 			style={{
-				padding: "14px 16px",
-				background: "rgba(248,113,113,0.04)",
-				border: "1px solid rgba(248,113,113,0.12)",
-				borderRadius: 8,
-				marginTop: 4,
+				padding: "16px 18px",
+				background: tint("var(--accent-red)"),
+				border: `1px solid ${edge("var(--accent-red)")}`,
+				borderRadius: "var(--r-card)",
+				marginTop: 10,
 				minWidth: 0,
 				overflow: "hidden",
 			}}
 		>
 			<div
 				style={{
-					fontSize: 12,
+					fontSize: 12.5,
 					fontWeight: 700,
-					color: "#F87171",
-					marginBottom: 6,
+					color: "var(--accent-red)",
+					marginBottom: 8,
 					display: "flex",
 					alignItems: "center",
 					gap: 6,
 				}}
 			>
 				✕ Error
-				<span
-					style={{
-						fontSize: 10,
-						fontWeight: 500,
-						color: "var(--t3)",
-						background: "var(--s3)",
-						padding: "1px 6px",
-						borderRadius: 4,
-					}}
-				>
-					{state.cause}
-				</span>
+				<span style={chipNeutral()}>{state.cause}</span>
 			</div>
 
 			{state.cause === "task" && (
@@ -763,7 +836,7 @@ function ErrorBlock({ state }: { state: FailedState }) {
 					style={{
 						fontFamily: "var(--mono)",
 						fontSize: 11,
-						color: "#FCA5A5",
+						color: "var(--accent-red)",
 						lineHeight: 1.6,
 						whiteSpace: "pre-wrap",
 						wordBreak: "break-word",
@@ -779,7 +852,7 @@ function ErrorBlock({ state }: { state: FailedState }) {
 					style={{
 						fontFamily: "var(--mono)",
 						fontSize: 11,
-						color: "#FCA5A5",
+						color: "var(--accent-red)",
 						lineHeight: 1.6,
 						whiteSpace: "pre-wrap",
 						wordBreak: "break-word",
@@ -800,7 +873,7 @@ function ErrorBlock({ state }: { state: FailedState }) {
 						style={{
 							fontFamily: "var(--mono)",
 							fontSize: 11,
-							color: "#FCA5A5",
+							color: "var(--accent-red)",
 							lineHeight: 1.6,
 							whiteSpace: "pre-wrap",
 							wordBreak: "break-word",

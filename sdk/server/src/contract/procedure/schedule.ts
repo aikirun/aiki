@@ -3,7 +3,7 @@ import type {
 	ScheduleActivateRequestV1,
 	ScheduleActivateResponseV1,
 	ScheduleApi,
-	ScheduleDeleteRequestV1,
+	ScheduleDeactivateRequestV1,
 	ScheduleGetByIdRequestV1,
 	ScheduleGetByIdResponseV1,
 	ScheduleGetByReferenceIdRequestV1,
@@ -17,6 +17,8 @@ import { oc } from "@orpc/contract";
 import { type } from "arktype";
 
 import type { ContractProcedure, ContractProcedureToApi } from "./helper";
+import { inputHashSchema } from "../schema/hash";
+import { opaquePayloadSchema } from "../schema/payload";
 import {
 	scheduleActivateOptionsSchema,
 	scheduleSchema,
@@ -24,15 +26,20 @@ import {
 	scheduleStatusSchema,
 	scheduleWorkflowFilterSchema,
 } from "../schema/schedule";
+import { workflowRunOptionsSchema } from "../schema/workflow-run";
 
 const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateResponseV1> = oc
 	.input(
 		type({
 			workflowName: "string > 0",
 			workflowVersionId: "string > 0",
-			"input?": "unknown",
+			"workflowRunInput?": opaquePayloadSchema,
+			workflowRunInputHash: inputHashSchema,
+			clientHasherApplied: "boolean",
+			clientCodecApplied: "boolean",
 			spec: scheduleSpecSchema,
 			"options?": scheduleActivateOptionsSchema.or("undefined"),
+			"workflowRunOptions?": workflowRunOptionsSchema.or("undefined"),
 		})
 	)
 	.output(
@@ -77,7 +84,7 @@ const resumeV1: ContractProcedure<ScheduleResumeRequestV1, void> = oc
 	.input(type({ id: "string > 0" }))
 	.output(type("undefined"));
 
-const deleteV1: ContractProcedure<ScheduleDeleteRequestV1, void> = oc
+const deactivateV1: ContractProcedure<ScheduleDeactivateRequestV1, void> = oc
 	.input(type({ id: "string > 0" }))
 	.output(type("undefined"));
 
@@ -88,7 +95,7 @@ export const scheduleContract = {
 	listV1,
 	pauseV1,
 	resumeV1,
-	deleteV1,
+	deactivateV1,
 };
 
 export type ScheduleContract = typeof scheduleContract;

@@ -20,13 +20,14 @@
 		"isolatedModules": true,
 		"moduleDetection": "force",
 		"noEmit": true,
+		"incremental": true,
 		"jsx": "react-jsx",
 		"strict": true,
 		"noUnusedLocals": true,
 		"noUnusedParameters": true,
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true,
-		"types": ["vite/client"]
+		"types": ["vite/client", "bun-types"]
 	},
 	"include": ["src"]
 }

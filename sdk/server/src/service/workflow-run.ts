@@ -1,9 +1,8 @@
-import { getTaskAddress, getWorkflowRunAddress } from "@aikirun/lib/address";
-import { isNonEmptyArray } from "@aikirun/lib/array";
-import { hashInput } from "@aikirun/lib/crypto";
+import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { NotFoundError } from "@aikirun/lib/error";
-import { propsRequiredNonNull } from "@aikirun/lib/object";
+import { getCompositeId } from "@aikirun/lib/id";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunCancelByIdsRequestV1,
 	WorkflowRunCreateRequestV1,
@@ -12,181 +11,107 @@ import type {
 	WorkflowRunListResponseV1,
 	WorkflowRunListTransitionsRequestV1,
 	WorkflowRunReference,
-	WorkflowRunSetTaskStateRequestV1,
 } from "@aikirun/types/api/workflow-run";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type {
 	ChildWorkflowRunInfo,
-	ChildWorkflowRunQueue,
-	ChildWorkflowRunWaitQueue,
-	EventReferenceOptions,
-	EventWaitQueue,
-	SleepQueue,
+	ChildWorkflowRunWaits,
+	EventWait,
+	Sleep,
 	TerminalWorkflowRunState,
-	TerminalWorkflowRunStatus,
-	WorkflowRun,
 	WorkflowRunId,
+	WorkflowRunRecord,
 	WorkflowRunState,
 	WorkflowRunStateCancelled,
-	WorkflowStartOptions,
+	WorkflowRunStateScheduledByNew,
 } from "@aikirun/types/workflow/run";
-import type { TaskInfo, TaskQueue, TaskState, TaskStateDiscarded, TaskStatus } from "@aikirun/types/workflow/task";
-import { monotonicFactory, ulid } from "ulidx";
-
-import { WorkflowRunConflictError } from "../errors";
-import type { Repositories } from "../infra/db/types";
-import type { ChildWorkflowRunWaitQueueRow } from "../infra/db/types/child-workflow-run-wait-queue";
-import type { EventWaitQueueRow, EventWaitQueueRowInsert } from "../infra/db/types/event-wait-queue";
-import type { SleepQueueRow } from "../infra/db/types/sleep-queue";
+import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import type {
-	StateTransitionRepository,
-	StateTransitionRow,
-	StateTransitionRowInsert,
-} from "../infra/db/types/state-transition";
-import type { TaskRow } from "../infra/db/types/task";
-import type { WorkflowRepository, WorkflowRow } from "../infra/db/types/workflow";
-import type { WorkflowRunRow } from "../infra/db/types/workflow-run";
+	TaskInfo,
+	TaskStartOptions,
+	TaskState,
+	TaskStateDiscarded,
+	TaskStatus,
+} from "@aikirun/types/workflow/task";
+import { ulid } from "ulidx";
+
+import { getOrCreateWorkflowInTx } from "./workflow";
+import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
+import type { Repositories, TxRepositories } from "../infra/db/types";
+import type { ChildRunWaitWithState } from "../infra/db/types/child-workflow-run-wait";
+import type { EventWaitRow } from "../infra/db/types/event-wait";
+import type { SleepRow } from "../infra/db/types/sleep";
+import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
+import type { ChildRunWithWorkflow, WorkflowRunWithWorkflowAndState } from "../infra/db/types/workflow-run";
+import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import { candidateHashes } from "../lib/hash";
 import type { NamespaceRequestContext } from "../middleware/context";
-import type { CancelledParentRun, ChildRunCanceller } from "../service/cancel-child-runs";
-import type { WorkflowRunStateMachineService } from "../service/workflow-run-state-machine";
+import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
+import { deliverTerminatedSignalToParentRun, type TerminatedChildRun } from "../service/deliver-terminated-signals";
+import { discardStaleTasks } from "../service/discard-stale-tasks";
 
 export interface WorkflowRunServiceDeps {
-	repos: Pick<
-		Repositories,
-		| "workflowRun"
-		| "workflow"
-		| "stateTransition"
-		| "task"
-		| "sleepQueue"
-		| "eventWaitQueue"
-		| "childWorkflowRunWaitQueue"
-		| "transaction"
-	>;
+	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
-	workflowRunStateMachineService: WorkflowRunStateMachineService;
+	imminentRunTimerQueue?: ImminentRunTimerQueue;
 }
 
-export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
-	const { repos, childRunCanceller, workflowRunStateMachineService } = deps;
-
-	const monotonic = monotonicFactory();
-
-	async function createWorkflowRun(
+export const createWorkflowRunService = ({
+	repos,
+	childRunCanceller,
+	imminentRunTimerQueue,
+}: WorkflowRunServiceDeps) => ({
+	async createWorkflowRun(
 		context: NamespaceRequestContext,
 		request: WorkflowRunCreateRequestV1
 	): Promise<WorkflowRunId> {
-		const inputHash = await hashInput(request.input);
-		return repos.transaction(async (txRepos) => createWorkflowRunInTx(context, request, inputHash, txRepos));
-	}
+		return repos.transaction(async (txRepos) =>
+			createWorkflowRunInTx(context, request, txRepos, imminentRunTimerQueue)
+		);
+	},
 
-	async function getWorkflowRunById(context: NamespaceRequestContext, id: string): Promise<WorkflowRun> {
+	async getWorkflowRunById(context: NamespaceRequestContext, id: string): Promise<WorkflowRunRecord> {
 		const { namespaceId } = context;
 
-		const runRow = await repos.workflowRun.getById(namespaceId, id);
-		if (!runRow) {
+		const result = await repos.workflowRun.getByIdWithWorkflowAndState({ namespaceId, id });
+		if (!result) {
 			throw new NotFoundError(`Workflow run not found: ${id}`);
 		}
 
-		const workflowRow = await repos.workflow.getById(namespaceId, runRow.workflowId);
-		if (!workflowRow) {
-			throw new NotFoundError(`Workflow not found for run: ${id}`);
-		}
+		return getWorkflowRun(repos, namespaceId, result);
+	},
 
-		return getWorkflowRun(namespaceId, workflowRow, runRow);
-	}
-
-	async function getWorkflowRunByReferenceId(
+	async getWorkflowRunByReferenceId(
 		context: NamespaceRequestContext,
 		filter: WorkflowRunReference
-	): Promise<WorkflowRun> {
+	): Promise<WorkflowRunRecord> {
 		const { namespaceId } = context;
 		const { name, versionId, referenceId } = filter;
 
-		const workflowRow = await repos.workflow.getByNameAndVersion(namespaceId, { name, versionId, source: "user" });
-		if (!workflowRow) {
-			throw new NotFoundError(`Workflow not found: ${name}:${versionId}`);
-		}
-
-		const runRow = await repos.workflowRun.getByWorkflowAndReferenceId(workflowRow.id, referenceId);
-		if (!runRow) {
-			throw new NotFoundError(`Workflow run not found for reference: ${name}:${versionId}:${referenceId}`);
-		}
-
-		return getWorkflowRun(namespaceId, workflowRow, runRow);
-	}
-
-	async function getWorkflowRun(
-		namespaceId: NamespaceId,
-		workflowRow: WorkflowRow,
-		runRow: WorkflowRunRow
-	): Promise<WorkflowRun> {
-		const [latestTransition, taskRows, sleepRows, eventWaitRows, childRunRows, childWorkflowRunWaitRows] =
-			await Promise.all([
-				repos.stateTransition.getById(runRow.latestStateTransitionId),
-				repos.task.listByWorkflowRunId(runRow.id),
-				repos.sleepQueue.listByWorkflowRunId(runRow.id as WorkflowRunId),
-				repos.eventWaitQueue.listByWorkflowRunId(runRow.id),
-				repos.workflowRun.getChildRuns({ parentRunId: runRow.id }),
-				repos.childWorkflowRunWaitQueue.listByParentRunId(runRow.id),
-			]);
-
-		if (!latestTransition) {
-			throw new Error(`State transition not found: ${runRow.latestStateTransitionId}`);
-		}
-
-		const taskTransitionIds = taskRows.map((task) => task.latestStateTransitionId);
-		const taskTransitionRows = isNonEmptyArray(taskTransitionIds)
-			? await repos.stateTransition.getByIds(taskTransitionIds)
-			: [];
-		const taskTransitionsById = new Map(taskTransitionRows.map((transition) => [transition.id, transition]));
-
-		const tasksByAddress = buildTaskQueuesByAddressRecord(taskRows, taskTransitionsById);
-		const sleepQueuesByName = buildSleepQueuesByNameRecord(sleepRows);
-		const eventWaitQueuesByName = buildEventWaitQueuesByNameRecord(eventWaitRows);
-		const childWorkflowRunsByAddress = await buildChildWorkflowRunQueuesByAddressRecord(
+		const result = await repos.workflowRun.getByReferenceWithWorkflowAndState({
 			namespaceId,
-			childRunRows,
-			childWorkflowRunWaitRows,
-			repos.stateTransition,
-			repos.workflow
-		);
+			name,
+			versionId,
+			source: "user",
+			referenceId,
+		});
+		if (!result) {
+			throw new NotFoundError(`Workflow run ${name}:${versionId} not found for reference: ${referenceId}`);
+		}
 
-		return {
-			id: runRow.id,
-			name: workflowRow.name,
-			versionId: workflowRow.versionId,
-			createdAt: runRow.createdAt.getTime(),
-			revision: runRow.revision,
-			stateTransitionId: runRow.latestStateTransitionId,
-			input: runRow.input,
-			inputHash: runRow.inputHash,
-			options: runRow.options as WorkflowStartOptions | undefined,
-			attempts: runRow.attempts,
-			state: latestTransition.state as WorkflowRunState,
-			taskQueues: tasksByAddress,
-			sleepQueues: sleepQueuesByName,
-			eventWaitQueues: eventWaitQueuesByName,
-			childWorkflowRunQueues: childWorkflowRunsByAddress,
-			parentWorkflowRunId: runRow.parentWorkflowRunId ?? undefined,
-			scheduleId: runRow.scheduleId ?? undefined,
-		};
-	}
+		return getWorkflowRun(repos, namespaceId, result);
+	},
 
-	async function getWorkflowRunState(context: NamespaceRequestContext, id: string): Promise<WorkflowRunState> {
-		const runRow = await repos.workflowRun.getById(context.namespaceId, id);
-		if (!runRow) {
+	async getWorkflowRunState(context: NamespaceRequestContext, id: string): Promise<WorkflowRunState> {
+		const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id });
+		if (!run) {
 			throw new NotFoundError(`Workflow run not found: ${id}`);
 		}
+		return run.state;
+	},
 
-		const transition = await repos.stateTransition.getById(runRow.latestStateTransitionId);
-		if (!transition) {
-			throw new Error(`State transition not found: ${runRow.latestStateTransitionId}`);
-		}
-		return transition.state as WorkflowRunState;
-	}
-
-	async function listWorkflowRuns(
+	async listWorkflowRuns(
 		context: NamespaceRequestContext,
 		request: WorkflowRunListRequestV1
 	): Promise<WorkflowRunListResponseV1> {
@@ -211,8 +136,8 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 		const { rows, total } = workflowFilter
 			? isNonEmptyArray(workflowIds)
 				? await repos.workflowRun.listByFilters(
-						namespaceId,
 						{
+							namespaceId,
 							id: filters?.id,
 							scheduleId: filters?.scheduleId,
 							status: isNonEmptyArray(filters?.status) ? filters.status : undefined,
@@ -227,8 +152,8 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					)
 				: { rows: [], total: 0 }
 			: await repos.workflowRun.listByFilters(
-					namespaceId,
 					{
+						namespaceId,
 						id: filters?.id,
 						scheduleId: filters?.scheduleId,
 						status: isNonEmptyArray(filters?.status) ? filters.status : undefined,
@@ -240,7 +165,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 
 		const runIds = rows.map((row) => row.id);
 		const taskCountsByRunId = isNonEmptyArray(runIds)
-			? await repos.workflowRun.getTaskCountsByRunIds(runIds)
+			? await repos.task.countByWorkflowRunIds(runIds)
 			: new Map<string, Record<TaskStatus, number>>();
 
 		return {
@@ -248,19 +173,16 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				id: row.id,
 				name: row.name,
 				versionId: row.versionId,
-				createdAt: row.createdAt.getTime(),
+				createdAt: row.createdAt,
 				status: row.status,
 				referenceId: row.referenceId ?? undefined,
 				taskCounts: taskCountsByRunId.get(row.id),
 			})),
 			total,
 		};
-	}
+	},
 
-	async function listWorkflowRunTransitions(
-		context: NamespaceRequestContext,
-		request: WorkflowRunListTransitionsRequestV1
-	) {
+	async listWorkflowRunTransitions(context: NamespaceRequestContext, request: WorkflowRunListTransitionsRequestV1) {
 		const { id, limit, offset, sort } = request;
 		const runExists = await repos.workflowRun.exists(context.namespaceId, id);
 		if (!runExists) {
@@ -278,7 +200,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 					return {
 						id: row.id,
 						type: row.type,
-						createdAt: row.createdAt.getTime(),
+						createdAt: row.createdAt,
 						attempt: row.attempt,
 						taskId: row.taskId,
 						taskState: row.state as TaskState,
@@ -287,71 +209,16 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 				return {
 					id: row.id,
 					type: row.type satisfies "workflow_run",
-					createdAt: row.createdAt.getTime(),
+					createdAt: row.createdAt,
 					attempt: row.attempt,
 					state: row.state as WorkflowRunState,
 				};
 			}),
 			total,
 		};
-	}
+	},
 
-	async function sendEventToWorkflowRun(
-		context: NamespaceRequestContext,
-		runId: WorkflowRunId,
-		eventName: string,
-		data: unknown,
-		reference: EventReferenceOptions | undefined
-	): Promise<void> {
-		return repos.transaction(async (txRepos) => {
-			// TODO: should we use getByIdWithState instead?
-			// Con: extra join to get state is pointless if the run is not in awaiting_event state
-			// Pro: If run is awaiting_event, no extra network call to fetch state
-			const run = await txRepos.workflowRun.getById(context.namespaceId, runId);
-			if (!run) {
-				throw new NotFoundError(`Workflow run not found: ${runId}`);
-			}
-
-			const eventWaitEntry: EventWaitQueueRowInsert = {
-				id: ulid(),
-				workflowRunId: runId,
-				name: eventName,
-				status: "received",
-				referenceId: reference?.id,
-				data,
-			};
-			if (propsRequiredNonNull(eventWaitEntry, "referenceId")) {
-				await txRepos.eventWaitQueue.upsert(eventWaitEntry);
-			} else {
-				await txRepos.eventWaitQueue.insert(eventWaitEntry);
-			}
-
-			if (run.status !== "awaiting_event") {
-				return;
-			}
-
-			const latestStateTransition = await txRepos.stateTransition.getById(run.latestStateTransitionId);
-			if (!latestStateTransition) {
-				throw new Error(`State transition not found: ${run.latestStateTransitionId}`);
-			}
-			const currentState = latestStateTransition.state as WorkflowRunState;
-
-			if (currentState.status === "awaiting_event" && currentState.eventName === eventName) {
-				await workflowRunStateMachineService.transitionState(
-					context,
-					{
-						type: "optimistic",
-						id: runId,
-						state: { status: "scheduled", scheduledInMs: 0, reason: "event" },
-						expectedRevision: run.revision,
-					},
-					txRepos
-				);
-			}
-		});
-	}
-
-	async function resolveRunIdsByReferences(
+	async resolveRunIdsByReferences(
 		context: NamespaceRequestContext,
 		references: WorkflowRunReference[]
 	): Promise<WorkflowRunId[]> {
@@ -377,7 +244,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 			if (!workflow) {
 				throw new NotFoundError(`Workflow not found: ${name}:${versionId}`);
 			}
-			return { workflowId: workflow.id, referenceId };
+			return { namespaceId, workflowId: workflow.id, referenceId };
 		});
 		if (!isNonEmptyArray(workflowIdAndReferenceIdPairs)) {
 			return [];
@@ -385,7 +252,7 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 
 		const runs = await repos.workflowRun.listByWorkflowAndReferenceIdPairs({ pairs: workflowIdAndReferenceIdPairs });
 		const runsByKey = new Map(
-			runs.reduce<[string, WorkflowRunRow][]>((acc, run) => {
+			runs.reduce<[string, { id: string }][]>((acc, run) => {
 				if (run.referenceId !== null) {
 					acc.push([`${run.workflowId}:${run.referenceId}`, run]);
 				}
@@ -405,242 +272,98 @@ export function createWorkflowRunService(deps: WorkflowRunServiceDeps) {
 			}
 			return run.id as WorkflowRunId;
 		});
-	}
+	},
 
-	async function setTaskState(
-		context: NamespaceRequestContext,
-		request: WorkflowRunSetTaskStateRequestV1
-	): Promise<void> {
-		const runId = request.id as WorkflowRunId;
-
-		return repos.transaction(async (txRepos) => {
-			const run = await txRepos.workflowRun.getById(context.namespaceId, runId);
-			if (!run) {
-				throw new NotFoundError(`Workflow run not found: ${runId}`);
-			}
-
-			if (request.type === "new") {
-				const inputHash = await hashInput(request.input);
-
-				const taskId = ulid();
-				const runningStateTransitionId = monotonic();
-				const finalStateTransitionId = monotonic();
-
-				context.logger.info("Setting task state (new task)", { runId, taskId, state: request.state });
-
-				const runningState: TaskState = {
-					status: "running",
-					attempts: 1,
-					input: request.input,
-				};
-
-				const finalState: TaskState =
-					request.state.status === "completed"
-						? { status: "completed", attempts: 1, output: request.state.output }
-						: { status: request.state.status satisfies "failed", attempts: 1, error: request.state.error };
-
-				await txRepos.task.create({
-					id: taskId,
-					name: request.taskName,
-					workflowRunId: runId,
-					status: finalState.status,
-					attempts: 1,
-					input: request.input,
-					inputHash: inputHash,
-					options: null,
-					latestStateTransitionId: finalStateTransitionId,
-				});
-				await txRepos.stateTransition.append({
-					id: runningStateTransitionId,
-					workflowRunId: runId,
-					type: "task",
-					taskId,
-					status: runningState.status,
-					attempt: runningState.attempts,
-					state: runningState,
-				});
-				await txRepos.stateTransition.append({
-					id: finalStateTransitionId,
-					workflowRunId: runId,
-					type: "task",
-					taskId,
-					status: finalState.status,
-					attempt: finalState.attempts,
-					state: finalState,
-				});
-
-				return;
-			}
-
-			const existingTaskRow = await txRepos.task.getById(request.taskId);
-			if (!existingTaskRow) {
-				throw new NotFoundError(`Task not found: ${request.taskId}`);
-			}
-
-			context.logger.info("Setting task state (existing task)", {
-				runId,
-				taskId: request.taskId,
-				state: request.state,
-			});
-
-			const attempts = existingTaskRow.attempts;
-
-			const finalState: TaskState =
-				request.state.status === "completed"
-					? { status: "completed", attempts: attempts + 1, output: request.state.output }
-					: { status: request.state.status satisfies "failed", attempts: attempts + 1, error: request.state.error };
-
-			const finalTransitionId = ulid();
-			await txRepos.stateTransition.append({
-				id: finalTransitionId,
-				workflowRunId: runId,
-				type: "task",
-				taskId: existingTaskRow.id,
-				status: finalState.status,
-				attempt: finalState.attempts,
-				state: finalState,
-			});
-
-			await txRepos.task.update(existingTaskRow.id, {
-				status: finalState.status,
-				attempts: finalState.attempts,
-				latestStateTransitionId: finalTransitionId,
-			});
-		});
-	}
-
-	async function listChildRuns(_context: NamespaceRequestContext, request: WorkflowRunListChildRunsRequestV1) {
+	async listChildRuns(context: NamespaceRequestContext, request: WorkflowRunListChildRunsRequestV1) {
 		const childRuns = await repos.workflowRun.getChildRuns({
-			parentRunId: request.parentRunId,
-			status: isNonEmptyArray(request.status) ? request.status : undefined,
+			namespaceId: context.namespaceId,
+			id: request.id,
+			childRunStatus: isNonEmptyArray(request.childRunStatus) ? request.childRunStatus : undefined,
 		});
 		return {
 			runs: childRuns.map((child) => {
-				const shard = (child.options as WorkflowStartOptions | null)?.shard;
+				const pool = child.options?.pool;
 				return {
 					id: child.id,
-					options: shard ? { shard } : undefined,
+					options: pool ? { pool } : undefined,
 				};
 			}),
 		};
-	}
+	},
 
-	async function cancelByIds(context: NamespaceRequestContext, request: WorkflowRunCancelByIdsRequestV1) {
+	async cancelByIds(context: NamespaceRequestContext, request: WorkflowRunCancelByIdsRequestV1) {
 		const ids = request.ids;
 		if (!isNonEmptyArray(ids)) {
 			return { cancelledIds: [] };
 		}
 
-		return repos.transaction(async (txRepos) => {
-			const cancelledRunIds = await txRepos.workflowRun.bulkTransitionToCancelled(ids);
-			if (!isNonEmptyArray(cancelledRunIds)) {
-				return { cancelledIds: [] };
-			}
+		return repos.transaction(async (txRepos) =>
+			cancelByIdsInTx(context, ids, txRepos, childRunCanceller, imminentRunTimerQueue)
+		);
+	},
 
-			const cancelledRuns = await txRepos.workflowRun.getByIds(context.namespaceId, cancelledRunIds);
-
-			const cancelStateTransitionEntries: StateTransitionRowInsert[] = [];
-			const cancelledRunStateTransitionUpdates: { id: string; stateTransitionId: string }[] = [];
-			const cancelledParentRuns: CancelledParentRun[] = [];
-
-			for (const run of cancelledRuns) {
-				const stateTransitionId = ulid();
-				cancelStateTransitionEntries.push({
-					id: stateTransitionId,
-					workflowRunId: run.id,
-					type: "workflow_run",
-					status: "cancelled",
-					attempt: run.attempts,
-					state: { status: "cancelled", reason: "Bulk cancel" } satisfies WorkflowRunStateCancelled,
-				});
-				cancelledRunStateTransitionUpdates.push({ id: run.id, stateTransitionId });
-				cancelledParentRuns.push({
-					namespaceId: context.namespaceId,
-					runId: run.id,
-					shard: (run.options as WorkflowStartOptions | null)?.shard,
-				});
-			}
-
-			if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionUpdates)) {
-				await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
-				await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionUpdates);
-			}
-
-			if (isNonEmptyArray(cancelledParentRuns)) {
-				await childRunCanceller.cancel(cancelledParentRuns, txRepos, context.logger);
-			}
-
-			return { cancelledIds: cancelledRunIds };
-		});
-	}
-
-	async function hasTerminated(context: NamespaceRequestContext, runId: string, afterStateTransitionId: string) {
-		const result = await repos.stateTransition.hasTerminated(context.namespaceId, runId, afterStateTransitionId);
-		if (!result.runFound) {
+	async hasTerminated(context: NamespaceRequestContext, runId: string) {
+		const run = await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId });
+		if (!run) {
 			throw new NotFoundError(`Workflow run not found: ${runId}`);
 		}
-		return {
-			terminated: result.terminated,
-			latestStateTransitionId: result.latestStateTransitionId,
-		};
-	}
-
-	return {
-		createWorkflowRun: createWorkflowRun,
-		getWorkflowRunById: getWorkflowRunById,
-		getWorkflowRunByReferenceId: getWorkflowRunByReferenceId,
-		getWorkflowRunState: getWorkflowRunState,
-		listWorkflowRuns: listWorkflowRuns,
-		listWorkflowRunTransitions: listWorkflowRunTransitions,
-		sendEventToWorkflowRun: sendEventToWorkflowRun,
-		resolveRunIdsByReferences: resolveRunIdsByReferences,
-		setTaskState: setTaskState,
-		listChildRuns: listChildRuns,
-		cancelByIds: cancelByIds,
-		hasTerminated: hasTerminated,
-	};
-}
+		return { terminated: isTerminalWorkflowRunStatus(run.status) };
+	},
+});
 
 export type WorkflowRunService = ReturnType<typeof createWorkflowRunService>;
 
 async function createWorkflowRunInTx(
-	context: NamespaceRequestContext,
+	{ namespaceId, logger }: NamespaceRequestContext,
 	request: WorkflowRunCreateRequestV1,
-	inputHash: string,
-	txRepos: Pick<Repositories, "workflowRun" | "workflow" | "stateTransition">
+	txRepos: TxRepositories,
+	imminentRunTimerQueue?: ImminentRunTimerQueue
 ): Promise<WorkflowRunId> {
-	const namespaceId = context.namespaceId;
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
-	const parentWorkflowRunId = request.parentWorkflowRunId as WorkflowRunId | undefined;
-	const { input, options } = request;
+	const { input, inputHash, options, parent } = request;
 	const referenceId = options?.reference?.id;
 
-	const workflow = await txRepos.workflow.getOrCreate({ namespaceId, name, versionId, source: "user" });
+	if (parent) {
+		const parentRun = await txRepos.workflowRun.getById({ namespaceId, id: parent.workflowRunId }, { lock: "share" });
+		if (!parentRun) {
+			throw new NotFoundError(`Workflow run not found: ${parent.workflowRunId}`);
+		}
+		if (parentRun.revision !== parent.expectedRevision) {
+			throw new WorkflowRunRevisionConflictError(parent.workflowRunId as WorkflowRunId, parent.expectedRevision);
+		}
+	}
+
+	const workflow = await getOrCreateWorkflowInTx({ namespaceId, name, versionId, source: "user" }, txRepos);
 
 	if (referenceId) {
-		const existingRun = await txRepos.workflowRun.getByWorkflowAndReferenceId(workflow.id, referenceId);
+		const existingRun = await txRepos.workflowRun.getByWorkflowAndReferenceId({
+			namespaceId,
+			workflowId: workflow.id,
+			referenceId,
+		});
 		if (existingRun) {
-			if (existingRun.inputHash !== inputHash) {
+			if (!candidateHashes(inputHash).includes(existingRun.inputHash)) {
 				const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 				if (conflictPolicy === "error") {
-					throw new WorkflowRunConflictError(name, versionId, referenceId);
+					throw new WorkflowRunReferenceConflictError(name, versionId, referenceId);
 				}
+				conflictPolicy satisfies "return_existing";
 			}
 
-			context.logger.info("Returning existing run from reference ID", { runId: existingRun.id, referenceId });
+			logger.info("Returning existing run from reference ID", {
+				"aiki.runId": existingRun.id,
+				"aiki.referenceId": referenceId,
+			});
 			return existingRun.id as WorkflowRunId;
 		}
 	}
 
 	const now = Date.now();
 	const runId = ulid() as WorkflowRunId;
-	const trigger = options?.trigger;
+	const delay = options?.delay;
 
-	let scheduledAt = now;
-	if (trigger && trigger.type === "delayed") {
-		scheduledAt = "delayMs" in trigger ? now + trigger.delayMs : now + toMilliseconds(trigger.delay);
-	}
+	const scheduledAt = delay ? now + toMilliseconds(delay) : now;
 
 	const transitionId = ulid();
 
@@ -648,90 +371,223 @@ async function createWorkflowRunInTx(
 		id: runId,
 		namespaceId,
 		workflowId: workflow.id,
-		parentWorkflowRunId,
+		parentWorkflowRunId: parent?.workflowRunId,
 		status: "scheduled",
+		clientHasherApplied: request.clientHasherApplied,
+		clientCodecApplied: request.clientCodecApplied,
 		input,
-		inputHash,
-		options,
+		inputHash: inputHash.value,
+		options: options && { retry: options.retry, pool: options.pool, priority: options.priority },
 		referenceId,
-		conflictPolicy: options?.reference?.conflictPolicy,
 		latestStateTransitionId: transitionId,
-		scheduledAt: new Date(scheduledAt),
+		scheduledAt: scheduledAt as TimestampMs,
 	});
 
-	const state = {
+	const state: WorkflowRunStateScheduledByNew = {
 		status: "scheduled",
 		scheduledAt,
 		reason: "new",
-	} as const;
+	};
 
 	await txRepos.stateTransition.append({
 		id: transitionId,
 		workflowRunId: runId,
 		type: "workflow_run",
-		status: "scheduled",
 		attempt: 1,
+		revision: 0,
 		state,
 	});
 
-	context.logger.info("Created workflow run", { workflowName: name, versionId, runId, referenceId, options });
+	if (imminentRunTimerQueue) {
+		txRepos.onCommit(() =>
+			imminentRunTimerQueue.add([{ type: "scheduled", id: runId, dueAt: scheduledAt, priority: options?.priority }])
+		);
+	}
+
+	logger.info("Created workflow run", {
+		"aiki.workflowName": name,
+		"aiki.versionId": versionId,
+		"aiki.runId": runId,
+		"aiki.referenceId": referenceId,
+		"aiki.options": options,
+	});
 
 	return runId;
 }
 
-function buildTaskQueuesByAddressRecord(
-	tasks: TaskRow[],
-	taskTransitionsById: Map<string, StateTransitionRow>
-): Record<string, TaskQueue> {
-	const taskQueuesByAddress: Record<string, TaskQueue> = {};
+async function cancelByIdsInTx(
+	context: NamespaceRequestContext,
+	ids: NonEmptyArray<string>,
+	txRepos: TxRepositories,
+	childRunCanceller: ChildRunCanceller,
+	imminentRunTimerQueue?: ImminentRunTimerQueue
+) {
+	const { namespaceId, logger } = context;
+	const cancelledRuns = await txRepos.workflowRun.bulkTransitionToCancelledInNamespace(namespaceId, ids);
+	if (!isNonEmptyArray(cancelledRuns)) {
+		return { cancelledIds: [] };
+	}
+	const cancelledRunIds = cancelledRuns.map((run) => run.id) as NonEmptyArray<string>;
+
+	const now = Date.now() as TimestampMs;
+	await discardStaleTasks(cancelledRuns, ["running", "awaiting_retry"], txRepos);
+	await txRepos.sleep.bulkCancelByWorkflowRunIds(cancelledRunIds, now);
+	await txRepos.workflowRunOutbox.deleteByWorkflowRunIds(cancelledRunIds);
+
+	const cancelStateTransitionEntries: WorkflowRunStateTransitionRowInsert[] = [];
+	const cancelledRunStateTransitionUpdates: {
+		filter: { namespaceId: NamespaceId; id: string };
+		update: { stateTransitionId: string };
+	}[] = [];
+	const cancelledRunsMeta: CancelledRunMeta[] = [];
+	const cancelledRunsHavingParent: TerminatedChildRun[] = [];
+
+	for (const run of cancelledRuns) {
+		const stateTransitionId = ulid();
+		cancelStateTransitionEntries.push({
+			id: stateTransitionId,
+			workflowRunId: run.id,
+			type: "workflow_run",
+			attempt: run.attempts,
+			revision: run.revision,
+			state: { status: "cancelled" } satisfies WorkflowRunStateCancelled,
+		});
+		cancelledRunStateTransitionUpdates.push({ filter: { namespaceId, id: run.id }, update: { stateTransitionId } });
+		cancelledRunsMeta.push({
+			namespaceId,
+			id: run.id,
+			pool: run.options?.pool,
+			priority: run.options?.priority,
+		});
+		if (run.parentWorkflowRunId !== null) {
+			cancelledRunsHavingParent.push({
+				namespaceId,
+				id: run.id,
+				latestStateTransitionId: stateTransitionId,
+				parentWorkflowRunId: run.parentWorkflowRunId,
+				status: "cancelled",
+			});
+		}
+	}
+
+	if (isNonEmptyArray(cancelStateTransitionEntries) && isNonEmptyArray(cancelledRunStateTransitionUpdates)) {
+		await txRepos.stateTransition.appendBatch(cancelStateTransitionEntries);
+		await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionUpdates);
+	}
+
+	if (isNonEmptyArray(cancelledRunsHavingParent)) {
+		await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, logger, imminentRunTimerQueue);
+	}
+
+	if (isNonEmptyArray(cancelledRunsMeta)) {
+		await childRunCanceller.cancel(cancelledRunsMeta, txRepos, logger);
+	}
+
+	return { cancelledIds: cancelledRunIds };
+}
+
+async function getWorkflowRun(
+	repos: Repositories,
+	namespaceId: NamespaceId,
+	{ run, workflow, state }: WorkflowRunWithWorkflowAndState
+): Promise<WorkflowRunRecord> {
+	// The run row (carrying signalSequence) is must be read before these rows.
+	// A signal landing between the two reads then shows up in the read event_wait/child_workflow_run_wait
+	// rows but not in the read signalSequence (it will be stale).
+	// A park request using using the stale signalSequence simply reschedules — safe.
+	// In the reverse order i.e. these rows being read before the run row, the signalSequence
+	// will be current but there will be no corresponding event_wait/child_workflow_run_wait rows is
+	// catastrophic because the wait would find no rows to replay against, then attempt park, which succeeds
+	// because the expectedSignalSequence matches, therefore, sleeping through a signal that is already recorded.
+	const [taskRows, sleepRows, eventWaitRows, childRunRows, childWorkflowRunWaitRows] = await Promise.all([
+		repos.task.listByWorkflowRunIdWithState(run.id),
+		repos.sleep.listByWorkflowRunId(run.id as WorkflowRunId),
+		repos.eventWait.listByWorkflowRunId(run.id),
+		repos.workflowRun.getChildRunsWithWorkflow({ namespaceId, id: run.id }),
+		repos.childWorkflowRunWait.listByParentRunIdWithChildState(run.id),
+	]);
+
+	return {
+		id: run.id,
+		name: workflow.name,
+		versionId: workflow.versionId,
+		source: workflow.source,
+		createdAt: run.createdAt,
+		revision: run.revision,
+		signalSequence: run.signalSequence,
+		stateTransitionId: run.latestStateTransitionId,
+		input: run.input ?? undefined,
+		inputHash: run.inputHash,
+		clientHasherApplied: run.clientHasherApplied,
+		clientCodecApplied: run.clientCodecApplied,
+		referenceId: run.referenceId ?? undefined,
+		options: run.options !== null ? run.options : undefined,
+		attempts: run.attempts,
+		state,
+		tasks: buildTasksByAddress(taskRows),
+		sleeps: buildSleepsByName(sleepRows),
+		eventWaits: buildEventWaitsByName(eventWaitRows),
+		childWorkflowRuns: buildChildWorkflowRunsByAddress(childRunRows),
+		childWorkflowRunWaits: buildChildWorkflowRunWaitsByRunId(childWorkflowRunWaitRows),
+		parentWorkflowRunId: run.parentWorkflowRunId ?? undefined,
+		scheduleId: run.scheduleId ?? undefined,
+	};
+}
+
+function buildTasksByAddress(
+	tasks: Array<{
+		id: string;
+		name: string;
+		inputHash: string;
+		options: TaskStartOptions | null;
+		attempts: number;
+		state: TaskState;
+	}>
+): Record<string, TaskInfo[]> {
+	const tasksByAddress: Record<string, TaskInfo[]> = {};
 	for (const task of tasks) {
-		if (task.status === "discarded") {
-			continue;
-		}
-		const address = getTaskAddress(task.name, task.inputHash);
-		const transition = taskTransitionsById.get(task.latestStateTransitionId);
-		if (!transition) {
-			throw new Error(`Task state transition not found: ${task.latestStateTransitionId}`);
-		}
+		const address = getCompositeId({ name: task.name, referenceId: task.inputHash });
 		const taskInfo: TaskInfo = {
 			id: task.id,
 			name: task.name,
-			state: transition.state as Exclude<TaskState, TaskStateDiscarded>,
+			state: task.state as Exclude<TaskState, TaskStateDiscarded>,
 			inputHash: task.inputHash,
+			options: task.options ?? undefined,
+			attempts: task.attempts,
 		};
-		const taskQueue = taskQueuesByAddress[address];
-		if (taskQueue) {
-			taskQueue.tasks.push(taskInfo);
+		const tasksForAddress = tasksByAddress[address];
+		if (tasksForAddress) {
+			tasksForAddress.push(taskInfo);
 		} else {
-			taskQueuesByAddress[address] = { tasks: [taskInfo] };
+			tasksByAddress[address] = [taskInfo];
 		}
 	}
-	return taskQueuesByAddress;
+	return tasksByAddress;
 }
 
-function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<string, SleepQueue> {
-	const sleepQueuesByName: Record<string, SleepQueue> = {};
+function buildSleepsByName(sleepRows: SleepRow[]): Record<string, Sleep[]> {
+	const sleepsByName: Record<string, Sleep[]> = {};
 
-	for (const row of sleepQueueRows) {
-		let queue = sleepQueuesByName[row.name];
-		if (!queue) {
-			queue = { sleeps: [] };
-			sleepQueuesByName[row.name] = queue;
+	for (const row of sleepRows) {
+		let sleeps = sleepsByName[row.name];
+		if (!sleeps) {
+			sleeps = [];
+			sleepsByName[row.name] = sleeps;
 		}
 
 		switch (row.status) {
 			case "sleeping":
-				queue.sleeps.push({ status: row.status, awakeAt: row.awakeAt.getTime() });
+				sleeps.push({ status: row.status, wakeupAt: row.wakeupAt });
 				break;
 			case "completed": {
 				const { completedAt } = row;
 				if (completedAt === null) {
 					throw Error(`Sleep ${row.id} completed but no completedAt timestamp`);
 				}
-				queue.sleeps.push({
+				sleeps.push({
 					status: row.status,
-					durationMs: completedAt.getTime() - row.createdAt.getTime(),
-					completedAt: completedAt.getTime(),
+					durationMs: completedAt - row.createdAt,
+					completedAt: completedAt,
 				});
 				break;
 			}
@@ -740,7 +596,7 @@ function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<s
 				if (cancelledAt === null) {
 					throw Error(`Sleep ${row.id} cancelled but no cancelledAt timestamp`);
 				}
-				queue.sleeps.push({ status: row.status, cancelledAt: cancelledAt.getTime() });
+				sleeps.push({ status: row.status, cancelledAt: cancelledAt });
 				break;
 			}
 			default:
@@ -748,25 +604,26 @@ function buildSleepQueuesByNameRecord(sleepQueueRows: SleepQueueRow[]): Record<s
 		}
 	}
 
-	return sleepQueuesByName;
+	return sleepsByName;
 }
 
-function buildEventWaitQueuesByNameRecord(eventWaitRows: EventWaitQueueRow[]): Record<string, EventWaitQueue<unknown>> {
-	const eventWaitQueuesByName: Record<string, EventWaitQueue<unknown>> = {};
+function buildEventWaitsByName(eventWaitRows: EventWaitRow[]): Record<string, EventWait[]> {
+	const eventWaitsByName: Record<string, EventWait[]> = {};
 
 	for (const row of eventWaitRows) {
-		let queue = eventWaitQueuesByName[row.name];
-		if (!queue) {
-			queue = { eventWaits: [] };
-			eventWaitQueuesByName[row.name] = queue;
+		let eventWaits = eventWaitsByName[row.name];
+		if (!eventWaits) {
+			eventWaits = [];
+			eventWaitsByName[row.name] = eventWaits;
 		}
 
 		switch (row.status) {
 			case "received":
-				queue.eventWaits.push({
+				eventWaits.push({
 					status: row.status,
-					data: row.data,
-					receivedAt: row.createdAt.getTime(),
+					data: row.data ?? undefined,
+					clientCodecApplied: row.clientCodecApplied,
+					receivedAt: row.createdAt,
 					reference: row.referenceId ? { id: row.referenceId } : undefined,
 				});
 				break;
@@ -775,9 +632,9 @@ function buildEventWaitQueuesByNameRecord(eventWaitRows: EventWaitQueueRow[]): R
 				if (timedOutAt === null) {
 					throw Error(`Event wait ${row.id} timed out but no timeoutAt timestamp`);
 				}
-				queue.eventWaits.push({
+				eventWaits.push({
 					status: row.status,
-					timedOutAt: timedOutAt.getTime(),
+					timedOutAt: timedOutAt,
 				});
 				break;
 			}
@@ -786,122 +643,77 @@ function buildEventWaitQueuesByNameRecord(eventWaitRows: EventWaitQueueRow[]): R
 		}
 	}
 
-	return eventWaitQueuesByName;
+	return eventWaitsByName;
 }
 
-async function buildChildWorkflowRunQueuesByAddressRecord(
-	namespaceId: NamespaceId,
-	childRuns: WorkflowRunRow[],
-	childRunWaitQueues: ChildWorkflowRunWaitQueueRow[],
-	stateTransitionRepo: StateTransitionRepository,
-	workflowRepo: WorkflowRepository
-): Promise<Record<string, ChildWorkflowRunQueue>> {
-	const childStateTransitionIds = childRunWaitQueues.reduce((acc: string[], { childWorkflowRunStateTransitionId }) => {
-		if (childWorkflowRunStateTransitionId !== null) {
-			acc.push(childWorkflowRunStateTransitionId);
-		}
-		return acc;
-	}, []);
-	const childStateTransitions = isNonEmptyArray(childStateTransitionIds)
-		? await stateTransitionRepo.getByIds(childStateTransitionIds)
-		: [];
-	const childStateTransitionsById = new Map(childStateTransitions.map((transition) => [transition.id, transition]));
+function buildChildWorkflowRunWaitsByRunId(
+	childRunWaits: ChildRunWaitWithState[]
+): Record<string, ChildWorkflowRunWaits> {
+	const waitsByChildRunId: Record<string, ChildWorkflowRunWaits> = {};
 
-	const waitQueuesByChildRunId = new Map<WorkflowRunId, Record<TerminalWorkflowRunStatus, ChildWorkflowRunWaitQueue>>();
+	for (const childRunWait of childRunWaits) {
+		const childRunId = childRunWait.childWorkflowRunId;
 
-	for (const childRunWaitQueue of childRunWaitQueues) {
-		const childRunId = childRunWaitQueue.childWorkflowRunId as WorkflowRunId;
-
-		let queues = waitQueuesByChildRunId.get(childRunId);
-		if (!queues) {
-			queues = {
-				cancelled: { childWorkflowRunWaits: [] },
-				completed: { childWorkflowRunWaits: [] },
-				failed: { childWorkflowRunWaits: [] },
-			};
-			waitQueuesByChildRunId.set(childRunId, queues);
+		let waits = waitsByChildRunId[childRunId];
+		if (!waits) {
+			waits = { timeouts: [] };
+			waitsByChildRunId[childRunId] = waits;
 		}
 
-		const { childWorkflowRunStatus } = childRunWaitQueue;
-
-		switch (childRunWaitQueue.status) {
+		switch (childRunWait.status) {
 			case "completed": {
-				const { completedAt, childWorkflowRunStateTransitionId } = childRunWaitQueue;
+				const { completedAt, childWorkflowRunState } = childRunWait;
 				if (completedAt === null) {
-					throw new Error(`Child workflow run wait ${childRunWaitQueue.id} completed but no completedAt timestamp`);
+					throw new Error(`Child workflow run wait ${childRunWait.id} completed but no completedAt timestamp`);
 				}
-				if (childWorkflowRunStateTransitionId === null) {
-					throw new Error(`Child workflow run wait ${childRunWaitQueue.id} completed but no state transition id`);
-				}
-
-				const childStateTransition = childStateTransitionsById.get(childWorkflowRunStateTransitionId);
-				if (!childStateTransition) {
-					throw new Error(`State transition not found: ${childWorkflowRunStateTransitionId}`);
+				if (childWorkflowRunState === null) {
+					throw new Error(`Child workflow run wait ${childRunWait.id} completed but no child run state`);
 				}
 
-				queues[childWorkflowRunStatus].childWorkflowRunWaits.push({
-					status: childRunWaitQueue.status,
-					completedAt: completedAt.getTime(),
-					childWorkflowRunState: childStateTransition.state as TerminalWorkflowRunState,
-				});
+				waits.terminal = { state: childWorkflowRunState as TerminalWorkflowRunState, completedAt };
 				break;
 			}
 			case "timeout": {
-				const { timedOutAt } = childRunWaitQueue;
+				const { timedOutAt } = childRunWait;
 				if (timedOutAt === null) {
-					throw new Error(`Child workflow run wait ${childRunWaitQueue.id} timed out but no timedOutAt timestamp`);
+					throw new Error(`Child workflow run wait ${childRunWait.id} timed out but no timedOutAt timestamp`);
 				}
 
-				queues[childWorkflowRunStatus].childWorkflowRunWaits.push({
-					status: childRunWaitQueue.status,
-					timedOutAt: timedOutAt.getTime(),
-				});
+				waits.timeouts.push({ timedOutAt });
 				break;
 			}
 			default:
-				childRunWaitQueue.status satisfies never;
+				childRunWait.status satisfies never;
 		}
 	}
 
-	const childWorkflowIds = Array.from(new Set(childRuns.map((run) => run.workflowId)));
-	const childWorkflows = isNonEmptyArray(childWorkflowIds)
-		? await workflowRepo.getByIds(namespaceId, childWorkflowIds)
-		: [];
-	const childWorkflowsById = new Map(childWorkflows.map((workflow) => [workflow.id, workflow]));
+	return waitsByChildRunId;
+}
 
-	const childRunQueuesByAddress: Record<string, ChildWorkflowRunQueue> = {};
+function buildChildWorkflowRunsByAddress(childRuns: ChildRunWithWorkflow[]): Record<string, ChildWorkflowRunInfo[]> {
+	const childRunsByAddress: Record<string, ChildWorkflowRunInfo[]> = {};
 
-	for (const childRun of childRuns) {
-		const childWorkflow = childWorkflowsById.get(childRun.workflowId);
-		if (!childWorkflow) {
-			throw new Error(`Workflow not found for child run: ${childRun.id}`);
-		}
-
-		const childRunAddress = getWorkflowRunAddress(
-			childWorkflow.name,
-			childWorkflow.versionId,
-			childRun.referenceId ?? childRun.inputHash
-		);
+	for (const { run: childRun, workflow: childWorkflow } of childRuns) {
+		const childRunAddress = getCompositeId({
+			name: childWorkflow.name,
+			versionId: childWorkflow.versionId,
+			referenceId: childRun.referenceId ?? childRun.inputHash,
+		});
 
 		const childRunInfo: ChildWorkflowRunInfo = {
 			id: childRun.id,
 			name: childWorkflow.name,
 			versionId: childWorkflow.versionId,
 			inputHash: childRun.inputHash,
-			childWorkflowRunWaitQueues: waitQueuesByChildRunId.get(childRun.id as WorkflowRunId) ?? {
-				cancelled: { childWorkflowRunWaits: [] },
-				completed: { childWorkflowRunWaits: [] },
-				failed: { childWorkflowRunWaits: [] },
-			},
 		};
 
-		const childRunQueue = childRunQueuesByAddress[childRunAddress];
-		if (childRunQueue) {
-			childRunQueue.childWorkflowRuns.push(childRunInfo);
+		const addressChildRuns = childRunsByAddress[childRunAddress];
+		if (addressChildRuns) {
+			addressChildRuns.push(childRunInfo);
 		} else {
-			childRunQueuesByAddress[childRunAddress] = { childWorkflowRuns: [childRunInfo] };
+			childRunsByAddress[childRunAddress] = [childRunInfo];
 		}
 	}
 
-	return childRunQueuesByAddress;
+	return childRunsByAddress;
 }

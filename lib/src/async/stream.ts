@@ -1,4 +1,4 @@
-import { isNonEmptyArray, type NonEmptyArray } from "../array";
+import { isNonEmptyArray, type NonEmptyArray } from "../collection/array";
 import type { OptionalProp } from "../object";
 
 export interface StreamChunksOptions<Item, Cursor> {
@@ -13,6 +13,14 @@ export interface StreamChunkPartitionsOptions<Item, Cursor, ItemWhenTrue = Item,
 	) => { meetsCondition: true; item: ItemWhenTrue } | { meetsCondition: false; item: ItemWhenFalse };
 }
 
+/**
+ * Async generator that pages through results by calling `next(cursor)` repeatedly.
+ * Stops when `next` returns an empty array, or when `until` returns true for a chunk.
+ *
+ * @param options.advanceCursor - Updates the cursor after each item, passed to the next `next()` call.
+ * @param options.until - Stops iteration after the chunk that satisfies the condition (that chunk is still yielded).
+ * @param options.partition - When provided, each chunk is split into `{ whenTrue, whenFalse }` instead of yielded raw.
+ */
 export function streamChunks<Item, Cursor>(
 	next: (cursor?: Cursor) => Item[] | Promise<Item[]>,
 	options: StreamChunksOptions<Item, Cursor>
@@ -35,7 +43,14 @@ export async function* streamChunks<Item, Cursor, ItemWhenTrue = Item, ItemWhenF
 			return;
 		}
 
-		if (partition) {
+		if (!partition) {
+			if (advanceCursor) {
+				for (const item of chunk) {
+					cursor = advanceCursor(cursor, item);
+				}
+			}
+			yield chunk;
+		} else {
 			const whenTrue: ItemWhenTrue[] = [];
 			const whenFalse: ItemWhenFalse[] = [];
 			for (const item of chunk) {
@@ -50,13 +65,6 @@ export async function* streamChunks<Item, Cursor, ItemWhenTrue = Item, ItemWhenF
 				}
 			}
 			yield { whenTrue, whenFalse };
-		} else {
-			if (advanceCursor) {
-				for (const item of chunk) {
-					cursor = advanceCursor(cursor, item);
-				}
-			}
-			yield chunk;
 		}
 
 		if (until?.(chunk)) {

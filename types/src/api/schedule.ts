@@ -1,5 +1,8 @@
+import type { Hash } from "../infra/hasher";
+import type { OpaquePayload } from "../payload";
 import type { Schedule, ScheduleActivateOptions, ScheduleSpec, ScheduleStatus } from "../schedule";
 import type { WorkflowSource } from "../workflow";
+import type { WorkflowRunOptions } from "../workflow/run";
 
 export interface ScheduleApi {
 	activateV1: (_: ScheduleActivateRequestV1) => Promise<ScheduleActivateResponseV1>;
@@ -8,15 +11,19 @@ export interface ScheduleApi {
 	listV1: (_: ScheduleListRequestV1) => Promise<ScheduleListResponseV1>;
 	pauseV1: (_: SchedulePauseRequestV1) => Promise<void>;
 	resumeV1: (_: ScheduleResumeRequestV1) => Promise<void>;
-	deleteV1: (_: ScheduleDeleteRequestV1) => Promise<void>;
+	deactivateV1: (_: ScheduleDeactivateRequestV1) => Promise<void>;
 }
 
 export interface ScheduleActivateRequestV1 {
 	workflowName: string;
 	workflowVersionId: string;
-	input?: unknown;
+	workflowRunInput?: OpaquePayload;
+	workflowRunInputHash: Hash;
+	clientHasherApplied: boolean;
+	clientCodecApplied: boolean;
 	spec: ScheduleSpec;
 	options?: ScheduleActivateOptions;
+	workflowRunOptions?: WorkflowRunOptions;
 }
 
 export interface ScheduleActivateResponseV1 {
@@ -71,6 +78,6 @@ export interface ScheduleResumeRequestV1 {
 	id: string;
 }
 
-export interface ScheduleDeleteRequestV1 {
+export interface ScheduleDeactivateRequestV1 {
 	id: string;
 }

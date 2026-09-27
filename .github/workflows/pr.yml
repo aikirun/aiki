@@ -1,0 +1,53 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Key on head_ref for PRs (so new pushes supersede in-flight runs) but on the
+# sha for main pushes (head_ref is empty there, so each commit is its own group
+# and none cancel each other).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/check-lockstep
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Generate website types
+        run: bun run website:generate
+
+      - name: Typecheck
+        run: bun run check
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Unit Test
+        run: bun run test:unit
+
+      - uses: ./.github/actions/check-migrations
+
+      - name: Build
+        run: bun run build
+
+  integration-test:
+    uses: ./.github/workflows/integration-test.yml
+
+  image-smoke-test:
+    uses: ./.github/workflows/image-smoke-test.yml
+    with:
+      write-cache: ${{ github.event_name == 'push' }}

@@ -1,0 +1,39 @@
+---
+title: Introduction
+description: Guides, core concepts and architecture for building durable workflows.
+---
+
+Some workflows finish in seconds. Others run for days or months - waiting on a payment, on a human approval, on a third-party system that happens to be down right now. Building those out of ordinary code means assembling queues, crons, state machines and recovery logic by hand.
+
+Aiki makes them plain TypeScript instead. A workflow is an async function that survives crashes, restarts and deploys: it can suspend for months without holding a process, then resume where it left off, with the work it already finished replayed rather than repeated.
+
+A server orchestrates and workers execute, and both ship as libraries. Run everything in one process to start with, and pull the pieces apart when you need to - where each component runs is configuration, and your workflow code does not change.
+
+## Getting Started
+
+<SectionPages section="getting-started" />
+
+## Core Concepts
+
+The pieces you build with.
+
+<SectionPages section="core-concepts" />
+
+## Guides
+
+Patterns for the things that come up past the basics.
+
+<SectionPages section="guides" />
+
+## Architecture
+
+How Aiki works underneath.
+
+<SectionPages section="architecture" />
+
+## Quick Links
+
+- [GitHub Repository](https://github.com/aikirun/aiki)
+- [Discord](https://discord.aiki.run)
+- [Example workflows on GitHub](https://github.com/aikirun/aiki/tree/main/examples/src/workflows)
+- [License](https://github.com/aikirun/aiki/blob/main/LICENSE)

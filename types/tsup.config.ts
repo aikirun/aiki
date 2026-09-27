@@ -2,17 +2,22 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
 	entry: {
+		"api/identity": "src/api/identity.ts",
 		"api/schedule": "src/api/schedule.ts",
+		"api/task": "src/api/task.ts",
 		"api/workflow": "src/api/workflow.ts",
 		"api/workflow-run": "src/api/workflow-run.ts",
 		client: "src/client.ts",
 		iam: "src/iam.ts",
 		"infra/cache": "src/infra/cache.ts",
+		"infra/codec": "src/infra/codec.ts",
 		"infra/db": "src/infra/db.ts",
+		"infra/hasher": "src/infra/hasher.ts",
 		"infra/queue/index": "src/infra/queue/index.ts",
 		"infra/timer": "src/infra/timer.ts",
 		namespace: "src/namespace.ts",
 		organization: "src/organization.ts",
+		payload: "src/payload.ts",
 		schedule: "src/schedule.ts",
 		symbols: "src/symbols.ts",
 		validator: "src/validator.ts",

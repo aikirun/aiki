@@ -1,13 +1,18 @@
-import { fireAndForget } from "@aikirun/lib/async";
+import { runOnInterval } from "@aikirun/lib/async";
+import type { ConfigProvider } from "@aikirun/lib/config";
+import { hashInput } from "@aikirun/lib/crypto";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
+import type { BoundHasher } from "@aikirun/types/infra/hasher";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import type { WorkflowRun, WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
+	type WorkflowRunId,
 	WorkflowRunNotExecutableError,
+	type WorkflowRunRecord,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
@@ -16,102 +21,159 @@ import { createEventWaiters } from "./event";
 import { workflowRunHandle } from "./handle";
 import { createReplayManifest } from "./replay-manifest";
 import { createSleeper } from "./sleeper";
-import type { UnknownWorkflowVersion } from "../workflow-version";
+import { taskExecutionTracker } from "./task-execution-tracker";
+import type { AnyWorkflowVersion } from "../workflow-version";
 
-export interface ExecuteWorkflowParams<AppContext> {
-	client: Client<AppContext>;
-	workflowRun: WorkflowRun;
-	workflowVersion: UnknownWorkflowVersion;
+export interface ExecuteWorkflowParams<Context> {
+	client: Client<Context>;
+	workflowRun: WorkflowRunRecord;
+	workflowVersion: AnyWorkflowVersion;
 	logger: Logger;
-	options: Required<WorkflowExecutionOptions>;
-	heartbeat?: () => Promise<void>;
-	abortSignal?: AbortSignal;
+	configProvider: ConfigProvider<WorkflowExecutionConfig>;
+	heartbeat?: {
+		send: () => Promise<void>;
+		intervalMs: number | (() => number);
+	};
+	signal?: AbortSignal;
 }
 
-export interface WorkflowExecutionOptions {
-	heartbeatIntervalMs?: number;
+export interface WorkflowExecutionConfig {
 	/**
-	 * Threshold for spinning vs persisting task retry delays (default: 10ms).
+	 * Interval at which a worker refreshes its claim on a workflow run it is executing.
+	 */
+	claimRefreshIntervalMs: number;
+	/**
+	 * Longest wait the executor absorbs in process (default: 10ms).
 	 *
-	 * Delays <= threshold: In-memory wait (fast, no task history entry)
-	 * Delays > threshold: Server state transition (recorded in task history)
+	 * Delays <= maxInlineWaitMs: In-memory wait (fast, no task history entry)
+	 * Delays > maxInlineWaitMs: Server state transition (recorded in task history)
 	 *
 	 * Set to 0 to record all task delays in transition history.
 	 */
-	spinThresholdMs?: number;
+	maxInlineWaitMs: number;
 }
 
-export async function executeWorkflowRun<AppContext>(params: ExecuteWorkflowParams<AppContext>): Promise<boolean> {
-	const { client, workflowRun, workflowVersion, logger, options, heartbeat, abortSignal } = params;
+/**
+ * Executes a workflow run: replays recorded progress, then advances the handler until the
+ * run completes, suspends, or fails.
+ *
+ * Returns true when the segment reached a recorded outcome (completed, suspended, failed,
+ * or the run was not executable), so the caller can settle the delivery.
+ * Returns false on an unexpected error, so the caller can leave the delivery eligible for
+ * redelivery.
+ */
+export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
+	const { client, workflowRun, workflowVersion, logger, configProvider, heartbeat, signal } = params;
+	const workflowRunId = workflowRun.id as WorkflowRunId;
 
-	let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
-	let onAbort: (() => void) | undefined;
-
+	const intervals: Array<{ stop: () => void }> = [];
+	let flushTaskExecutions: (() => Promise<void>) | undefined;
 	try {
-		if (heartbeat) {
-			heartbeatInterval = setInterval(() => {
-				fireAndForget(heartbeat(), (error) => {
-					if (!abortSignal?.aborted) {
-						logger.warn("Failed to send heartbeat", {
-							"aiki.error": error.message,
-						});
+		intervals.push(
+			runOnInterval(() => client.api.workflowRun.claimRefreshV1({ id: workflowRunId }), {
+				intervalMs: () => configProvider.config.claimRefreshIntervalMs,
+				onError: (err: Error): void => {
+					if (!signal?.aborted) {
+						logger.warn("Failed to refresh claim", { err });
 					}
-				});
-			}, options.heartbeatIntervalMs);
-
-			if (abortSignal) {
-				onAbort = () => clearInterval(heartbeatInterval);
-				abortSignal.addEventListener("abort", onAbort, { once: true });
-			}
+				},
+				signal,
+			})
+		);
+		if (heartbeat) {
+			intervals.push(
+				runOnInterval(heartbeat.send, {
+					intervalMs: heartbeat.intervalMs,
+					onError: (err: Error): void => {
+						if (!signal?.aborted) {
+							logger.warn("Failed to send heartbeat", { err });
+						}
+					},
+					signal,
+				})
+			);
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
-		const handle = await workflowRunHandle(client, workflowRun, eventsDefinition, logger);
+		const handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
+		const { create: createTaskExecutionTracker, flush: taskExecutionsFlusher } = taskExecutionTracker(handle, logger);
+		flushTaskExecutions = taskExecutionsFlusher;
 
-		const appContext = client[INTERNAL].appContext ? client[INTERNAL].appContext(workflowRun) : null;
+		const createContext = client[INTERNAL].context;
+		const context = createContext ? createContext(workflowRun) : null;
+		const codec = handle[INTERNAL].codec;
+
+		// Every hash inside the run must come from the hasher that made the run's own hash.
+		let hasher: BoundHasher;
+		if (!workflowRun.clientHasherApplied) {
+			hasher = hashInput;
+		} else {
+			const clientHasher = client[INTERNAL].hasher;
+			if (!clientHasher) {
+				logger.error("The workflow run expects a client hasher, but none present", { workflowRunId });
+				return false;
+			}
+
+			const boundHasher = await clientHasher.for(workflowRun.inputHash);
+			if (!boundHasher) {
+				logger.error("The client's hasher cannot hash under the rotation that produced the run's input hash", {
+					workflowRunId,
+					"aiki.inputHash": workflowRun.inputHash,
+				});
+				return false;
+			}
+			hasher = boundHasher;
+		}
 
 		await workflowVersion[INTERNAL].handler(
 			{
-				id: workflowRun.id as WorkflowRunId,
+				id: workflowRunId,
 				name: workflowRun.name as WorkflowName,
 				versionId: workflowRun.versionId as WorkflowVersionId,
 				options: workflowRun.options ?? {},
 				logger,
 				sleep: createSleeper(handle, logger),
 				events: createEventWaiters(handle, eventsDefinition, logger),
+				context: context instanceof Promise ? await context : context,
 				[INTERNAL]: {
 					handle,
 					replayManifest: createReplayManifest(workflowRun),
-					options: { spinThresholdMs: options.spinThresholdMs },
+					createTaskExecutionTracker,
+					configProvider,
+					hasher,
 				},
 			},
-			workflowRun.input,
-			appContext instanceof Promise ? await appContext : appContext
+			await codec.decode(workflowRun.input)
 		);
 
 		return true;
-	} catch (error) {
+	} catch (err) {
+		if (err instanceof ClientCodecMissingError) {
+			logger.error("The workflow run  expects a client codec, but none present", { err });
+			return false;
+		}
+
 		if (
-			error instanceof WorkflowRunNotExecutableError ||
-			error instanceof WorkflowRunSuspendedError ||
-			error instanceof WorkflowRunFailedError ||
-			error instanceof WorkflowRunRevisionConflictError ||
-			error instanceof NonDeterminismError
+			err instanceof WorkflowRunNotExecutableError ||
+			err instanceof WorkflowRunSuspendedError ||
+			err instanceof WorkflowRunFailedError ||
+			err instanceof WorkflowRunRevisionConflictError ||
+			err instanceof NonDeterminismError
 		) {
 			return true;
 		}
 
-		logger.error("Unexpected error during workflow execution", {
-			"aiki.error": error instanceof Error ? error.message : String(error),
-			"aiki.stack": error instanceof Error ? error.stack : undefined,
-		});
+		logger.error("Unexpected error during workflow execution", { err });
+
 		return false;
 	} finally {
-		if (heartbeatInterval) {
-			clearInterval(heartbeatInterval);
+		// Flushed before the claim refresh stops, so the claim stays live while the
+		// tracker waits out task executions that are still running.
+		if (flushTaskExecutions) {
+			await flushTaskExecutions();
 		}
-		if (onAbort) {
-			abortSignal?.removeEventListener("abort", onAbort);
+		for (const interval of intervals) {
+			interval.stop();
 		}
 	}
 }

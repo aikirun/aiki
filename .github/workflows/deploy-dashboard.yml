@@ -1,0 +1,45 @@
+name: Deploy dashboard
+
+# Builds the hosted dashboard and deploys it to Cloudflare Pages. The release
+# runs this at the version's tag; dispatched with a blank ref it deploys the
+# branch you run it from, so a dashboard-only fix can ship from main without
+# cutting a release. The dashboard is a client of the hosted server — deploy
+# from main only when the change needs no server API the hosted server lacks.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy (blank = the branch you run this from)
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to deploy (blank = the caller's ref)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Build and deploy the dashboard to Cloudflare Pages
+        env:
+          VITE_AIKI_SERVER_URL: ${{ vars.AIKI_SERVER_BASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          bun run build:dashboard
+          bunx wrangler@4 pages deploy app/dashboard/dist --project-name "${{ vars.CLOUDFLARE_DASHBOARD_PAGES_PROJECT }}" --branch=main

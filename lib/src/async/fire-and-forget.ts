@@ -1,5 +1,5 @@
-export function fireAndForget(promise: Promise<void>, onError: (error: Error) => void): void {
-	promise.catch((error) => {
-		onError(error instanceof Error ? error : new Error(String(error)));
+export function fireAndForget(promise: Promise<void>, onError: (err: Error) => void): void {
+	promise.catch((err) => {
+		onError(err instanceof Error ? err : new Error(String(err)));
 	});
 }

@@ -1,34 +1,45 @@
-import type { PgDb, PgHandle } from "./provider";
-import { createChildWorkflowRunWaitQueueRepository } from "./repository/child-workflow-run-wait-queue";
-import { createEventWaitQueueRepository } from "./repository/event-wait-queue";
+import { createPgHandle, type PgClient, type PgDb } from "./provider";
+import { createChildWorkflowRunWaitRepository } from "./repository/child-workflow-run-wait";
+import { createEventWaitRepository } from "./repository/event-wait";
 import { createScheduleRepository } from "./repository/schedule";
-import { createSleepQueueRepository } from "./repository/sleep-queue";
+import { createSleepRepository } from "./repository/sleep";
 import { createStateTransitionRepository } from "./repository/state-transition";
 import { createTaskRepository } from "./repository/task";
 import { createWorkflowRepository } from "./repository/workflow";
 import { createWorkflowRunRepository } from "./repository/workflow-run";
 import { createWorkflowRunOutboxRepository } from "./repository/workflow-run-outbox";
-import type { Repositories } from "../types";
+import type { Repositories, TxRepositories } from "../types";
 
-export function createPgRepos(db: PgHandle): Repositories {
+const createRepos = (db: PgDb): Omit<Repositories, "transaction"> => ({
+	workflowRun: createWorkflowRunRepository(db),
+	task: createTaskRepository(db),
+	stateTransition: createStateTransitionRepository(db),
+	schedule: createScheduleRepository(db),
+	workflow: createWorkflowRepository(db),
+	sleep: createSleepRepository(db),
+	eventWait: createEventWaitRepository(db),
+	childWorkflowRunWait: createChildWorkflowRunWaitRepository(db),
+	workflowRunOutbox: createWorkflowRunOutboxRepository(db),
+});
+
+export function createPgRepos(client: PgClient): Repositories {
+	const db = createPgHandle(client);
 	return {
 		...createRepos(db),
-		async transaction<T>(fn: (txRepos: Omit<Repositories, "transaction">) => Promise<T>): Promise<T> {
-			return db.transaction(async (tx) => fn(createRepos(tx)));
+		async transaction<T>(fn: (txRepos: TxRepositories) => Promise<T>): Promise<T> {
+			const effects: Array<() => void> = [];
+			const result = await db.transaction(async (tx) => {
+				const txRepos = Object.assign(createRepos(tx), {
+					onCommit: (effect: () => void): void => {
+						effects.push(effect);
+					},
+				}) as TxRepositories;
+				return fn(txRepos);
+			});
+			for (const effect of effects) {
+				effect();
+			}
+			return result;
 		},
-	};
-}
-
-function createRepos(db: PgDb): Omit<Repositories, "transaction"> {
-	return {
-		workflowRun: createWorkflowRunRepository(db),
-		task: createTaskRepository(db),
-		stateTransition: createStateTransitionRepository(db),
-		schedule: createScheduleRepository(db),
-		workflow: createWorkflowRepository(db),
-		sleepQueue: createSleepQueueRepository(db),
-		eventWaitQueue: createEventWaitQueueRepository(db),
-		childWorkflowRunWaitQueue: createChildWorkflowRunWaitQueueRepository(db),
-		workflowRunOutbox: createWorkflowRunOutboxRepository(db),
 	};
 }

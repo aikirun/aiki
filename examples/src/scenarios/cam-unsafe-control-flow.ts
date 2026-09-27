@@ -1,6 +1,6 @@
 import { delay } from "@aikirun/lib/async";
 
-import { runWithWorker } from "../shared/worker";
+import { runWithWorker } from "../runner";
 import * as cam from "../workflows/cam-divergence";
 
 await runWithWorker([cam.camControlFlowV1], async (client) => {
@@ -9,10 +9,10 @@ await runWithWorker([cam.camControlFlowV1], async (client) => {
 	await delay(5_000);
 	cam.flags.controlFlow = true;
 	await handle.events.proceed.send();
-	const result = await handle.waitForStatus("failed");
-	const passed = !result.success;
+	const result = await handle.wait();
+	const passed = result.state.status === "failed";
 	client.logger.info(`[CAM] Unsafe Control Flow: ${passed ? "PASS" : "FAIL"}`, {
 		expected: "failed",
-		got: result.success ? "completed" : "failed",
+		got: result.state.status,
 	});
 });

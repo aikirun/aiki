@@ -16,7 +16,8 @@ export async function runConcurrently<Item, TContext extends Context>(
 	const failFast = options?.failFast ?? false;
 
 	const iterator = items[Symbol.iterator]();
-	let firstError: unknown = null;
+	let hasError = false;
+	let firstError: unknown;
 	let stopped = false;
 
 	async function worker(): Promise<void> {
@@ -30,12 +31,16 @@ export async function runConcurrently<Item, TContext extends Context>(
 				return;
 			}
 
+			const item = next.value;
 			const spanCtx = forkContext(context);
 			try {
-				await fn(next.value, spanCtx);
-			} catch (error) {
-				if (!firstError) {
-					firstError = error;
+				await fn(item, spanCtx);
+			} catch (err) {
+				if (!hasError) {
+					hasError = true;
+					firstError = err;
+				} else {
+					spanCtx.logger.error("Concurrent call failed", { item, err });
 				}
 				if (failFast) {
 					stopped = true;
@@ -53,7 +58,7 @@ export async function runConcurrently<Item, TContext extends Context>(
 
 	await Promise.all(workers);
 
-	if (firstError) {
+	if (hasError) {
 		throw firstError;
 	}
 }

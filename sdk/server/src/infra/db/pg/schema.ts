@@ -1,24 +1,17 @@
-import {
-	SCHEDULE_CONFLICT_POLICIES,
-	SCHEDULE_OVERLAP_POLICIES,
-	SCHEDULE_STATUSES,
-	SCHEDULE_TYPES,
-} from "@aikirun/types/schedule";
+import type { OpaquePayload } from "@aikirun/types/payload";
+import { SCHEDULE_OVERLAP_POLICIES, SCHEDULE_STATUSES, SCHEDULE_TYPES } from "@aikirun/types/schedule";
 import { WORKFLOW_SOURCES } from "@aikirun/types/workflow";
 import {
-	CHILD_WORKFLOW_RUN_WAIT_STATUSES,
 	EVENT_WAIT_STATUSES,
 	SLEEP_STATUSES,
 	TERMINAL_WORKFLOW_RUN_STATUSES,
-	WORKFLOW_RUN_CONFLICT_POLICIES,
-	WORKFLOW_RUN_FAILURE_CAUSE,
-	WORKFLOW_RUN_SCHEDULED_REASON,
 	WORKFLOW_RUN_STATUSES,
+	type WorkflowRunOptions,
 } from "@aikirun/types/workflow/run";
-import { STATE_TRANSITION_TYPES } from "@aikirun/types/workflow/state-transition";
-import { TASK_STATUSES } from "@aikirun/types/workflow/task";
-import { relations, sql } from "drizzle-orm";
+import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
+import { relations, type SQL, sql } from "drizzle-orm";
 import {
+	boolean,
 	check,
 	doublePrecision,
 	foreignKey,
@@ -28,10 +21,12 @@ import {
 	pgEnum,
 	pgTable,
 	text,
-	timestamp,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { timestampMs } from "./timestamp";
+import { CHILD_WORKFLOW_RUN_WAIT_STATUSES } from "../constants/child-workflow-run-wait";
+import { STATE_TRANSITION_TYPES } from "../constants/state-transition";
 import { WORKFLOW_RUN_OUTBOX_STATUSES } from "../constants/workflow-run-outbox";
 
 export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
@@ -39,13 +34,9 @@ export const workflowSourceEnum = pgEnum("workflow_source", WORKFLOW_SOURCES);
 export const scheduleStatusEnum = pgEnum("schedule_status", SCHEDULE_STATUSES);
 export const scheduleTypeEnum = pgEnum("schedule_type", SCHEDULE_TYPES);
 export const scheduleOverlapPolicyEnum = pgEnum("schedule_overlap_policy", SCHEDULE_OVERLAP_POLICIES);
-export const scheduleConflictPolicyEnum = pgEnum("schedule_conflict_policy", SCHEDULE_CONFLICT_POLICIES);
 
 export const workflowRunStatusEnum = pgEnum("workflow_run_status", WORKFLOW_RUN_STATUSES);
 export const terminalWorkflowRunStatusEnum = pgEnum("terminal_workflow_run_status", TERMINAL_WORKFLOW_RUN_STATUSES);
-export const workflowRunConflictPolicyEnum = pgEnum("workflow_run_conflict_policy", WORKFLOW_RUN_CONFLICT_POLICIES);
-export const workflowRunScheduledReason = pgEnum("workflow_run_scheduled_reason", WORKFLOW_RUN_SCHEDULED_REASON);
-export const workflowRunFailureCause = pgEnum("workflow_run_failure_cause", WORKFLOW_RUN_FAILURE_CAUSE);
 
 export const taskStatusEnum = pgEnum("task_status", TASK_STATUSES);
 
@@ -65,10 +56,10 @@ export const workflow = pgTable(
 	{
 		id: text("id").primaryKey(),
 		namespaceId: text("namespace_id").notNull(),
-		source: workflowSourceEnum("source").notNull().default("user"),
+		source: workflowSourceEnum("source").notNull(),
 		name: text("name").notNull(),
 		versionId: text("version_id").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		uniqueIndex("uqidx_workflow_namespace_source_name_version").on(
@@ -88,25 +79,31 @@ export const schedule = pgTable(
 		workflowId: text("workflow_id").notNull(),
 
 		status: scheduleStatusEnum("status").notNull(),
+		clientHasherApplied: boolean("client_hasher_applied").notNull(),
+		clientCodecApplied: boolean("client_codec_applied").notNull(),
+		revision: integer("revision").notNull().default(0),
 
 		type: scheduleTypeEnum("type").notNull(),
 		cronExpression: text("cron_expression"),
+		cronTimezone: text("cron_timezone"),
 		intervalMs: integer("interval_ms"),
 		overlapPolicy: scheduleOverlapPolicyEnum("overlap_policy"),
 
-		workflowRunInput: jsonb("workflow_run_input"),
+		workflowRunInput: jsonb("workflow_run_input").$type<OpaquePayload>(),
 		workflowRunInputHash: text("workflow_run_input_hash").notNull(),
 
 		definitionHash: text("definition_hash").notNull(),
 
 		referenceId: text("reference_id"),
-		conflictPolicy: scheduleConflictPolicyEnum("conflict_policy"),
 
-		lastOccurrence: timestamp("last_occurrence", { withTimezone: true }),
-		nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+		workflowRunOptions: jsonb("workflow_run_options").$type<WorkflowRunOptions>(),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		lastOccurrence: timestampMs("last_occurrence"),
+		nextRunAt: timestampMs("next_run_at").notNull(),
+		latestStateTransitionId: text("latest_state_transition_id").notNull(),
+
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -118,7 +115,11 @@ export const schedule = pgTable(
 		uniqueIndex("uqidx_schedule_namespace_reference").on(table.namespaceId, table.referenceId),
 		index("idx_schedule_namespace_workflow").on(table.namespaceId, table.workflowId),
 		// TODO: how to prevent certain namespaces from starving others
-		index("idx_schedule_status_next_run_at_id").on(table.status, table.nextRunAt, table.id),
+		index("idx_schedule_due_active").on(table.nextRunAt, table.id).where(sql`${table.status} = 'active'`),
+		check(
+			"chk_schedule_spec_matches_type",
+			sql`(${table.type} = 'cron' AND ${table.cronExpression} IS NOT NULL AND ${table.intervalMs} IS NULL) OR (${table.type} = 'interval' AND ${table.intervalMs} > 0 AND ${table.cronExpression} IS NULL AND ${table.cronTimezone} IS NULL)`
+		),
 	]
 );
 
@@ -132,24 +133,26 @@ export const workflowRun = pgTable(
 		parentWorkflowRunId: text("parent_workflow_run_id"),
 
 		status: workflowRunStatusEnum("status").notNull(),
+		clientHasherApplied: boolean("client_hasher_applied").notNull(),
+		clientCodecApplied: boolean("client_codec_applied").notNull(),
 		revision: integer("revision").notNull().default(0),
+		signalSequence: integer("signal_sequence").notNull().default(0),
 		attempts: integer("attempts").notNull().default(1),
 
-		input: jsonb("input"),
+		input: jsonb("input").$type<OpaquePayload>(),
 		inputHash: text("input_hash").notNull(),
-		options: jsonb("options"),
+		options: jsonb("options").$type<WorkflowRunOptions>(),
 
 		referenceId: text("reference_id"),
-		conflictPolicy: workflowRunConflictPolicyEnum("conflict_policy"),
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
-		scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
-		awakeAt: timestamp("awake_at", { withTimezone: true }),
-		timeoutAt: timestamp("timeout_at", { withTimezone: true }),
-		nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+		scheduledAt: timestampMs("scheduled_at"),
+		wakeupAt: timestampMs("wakeup_at"),
+		timeoutAt: timestampMs("timeout_at"),
+		nextAttemptAt: timestampMs("next_attempt_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -168,7 +171,9 @@ export const workflowRun = pgTable(
 			columns: [table.parentWorkflowRunId],
 			foreignColumns: [table.id],
 		}),
-		uniqueIndex("uqidx_workflow_run_workflow_reference").on(table.workflowId, table.referenceId),
+		uniqueIndex("uqidx_workflow_run_workflow_reference")
+			.on(table.workflowId, table.referenceId)
+			.where(sql`${table.referenceId} IS NOT NULL`),
 
 		index("idx_workflow_run_namespace_id").on(table.namespaceId, table.id),
 		index("idx_workflow_run_namespace_status_id").on(table.namespaceId, table.status, table.id),
@@ -176,15 +181,29 @@ export const workflowRun = pgTable(
 		index("idx_workflow_run_workflow_id").on(table.workflowId, table.id),
 		index("idx_workflow_run_workflow_status_id").on(table.workflowId, table.status, table.id),
 
-		index("idx_workflow_run_schedule").on(table.scheduleId),
-		index("idx_workflow_run_parent_workflow_run_status").on(table.parentWorkflowRunId, table.status),
+		index("idx_workflow_run_schedule_namespace")
+			.on(table.scheduleId, table.namespaceId)
+			.where(sql`${table.scheduleId} IS NOT NULL`),
+		index("idx_workflow_run_parent_workflow_run_status")
+			.on(table.parentWorkflowRunId, table.status)
+			.where(sql`${table.parentWorkflowRunId} IS NOT NULL`),
 
 		// TODO: will adding an index on input hash make conflict resolution faster?
 
-		index("idx_workflow_run_status_scheduled_at_id").on(table.status, table.scheduledAt, table.id),
-		index("idx_workflow_run_status_awake_at_id").on(table.status, table.awakeAt, table.id),
-		index("idx_workflow_run_status_timeout_at_id").on(table.status, table.timeoutAt, table.id),
-		index("idx_workflow_run_status_next_attempt_at_id").on(table.status, table.nextAttemptAt, table.id),
+		index("idx_workflow_run_due_scheduled").on(table.scheduledAt, table.id).where(sql`${table.status} = 'scheduled'`),
+		index("idx_workflow_run_due_sleeping").on(table.wakeupAt, table.id).where(sql`${table.status} = 'sleeping'`),
+		index("idx_workflow_run_due_awaiting_event")
+			.on(table.timeoutAt, table.id)
+			.where(sql`${table.status} = 'awaiting_event'`),
+		index("idx_workflow_run_due_awaiting_child_workflow")
+			.on(table.timeoutAt, table.id)
+			.where(sql`${table.status} = 'awaiting_child_workflow'`),
+		index("idx_workflow_run_due_awaiting_retry")
+			.on(table.nextAttemptAt, table.id)
+			.where(sql`${table.status} = 'awaiting_retry'`),
+		index("idx_workflow_run_due_awaiting_task_retry")
+			.on(table.nextAttemptAt, table.id)
+			.where(sql`${table.status} = 'awaiting_task_retry'`),
 	]
 );
 
@@ -198,15 +217,15 @@ export const task = pgTable(
 		status: taskStatusEnum("status").notNull(),
 		attempts: integer("attempts").notNull(),
 
-		input: jsonb("input"),
+		input: jsonb("input").$type<OpaquePayload>(),
 		inputHash: text("input_hash").notNull(),
-		options: jsonb("options"),
+		options: jsonb("options").$type<TaskStartOptions>(),
 
 		latestStateTransitionId: text("latest_state_transition_id").notNull(),
-		nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+		nextAttemptAt: timestampMs("next_attempt_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -216,7 +235,6 @@ export const task = pgTable(
 		}),
 		index("idx_task_workflow_run_id").on(table.workflowRunId, table.id),
 		index("idx_task_workflow_run_status").on(table.workflowRunId, table.status),
-		index("idx_task_status_next_attempt_at_workflow_run").on(table.status, table.nextAttemptAt, table.workflowRunId),
 	]
 );
 
@@ -224,13 +242,17 @@ export const stateTransition = pgTable(
 	"state_transition",
 	{
 		id: text("id").primaryKey(),
-		workflowRunId: text("workflow_run_id").notNull(),
+		workflowRunId: text("workflow_run_id"),
 		type: stateTransitionTypeEnum("type").notNull(),
 		taskId: text("task_id"),
-		status: text("status").notNull(),
-		attempt: integer("attempt").notNull(),
+		scheduleId: text("schedule_id"),
+		status: text("status")
+			.notNull()
+			.generatedAlwaysAs((): SQL => sql`${stateTransition.state}->>'status'`),
+		attempt: integer("attempt"),
+		revision: integer("revision").notNull(),
 		state: jsonb("state").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
@@ -243,20 +265,32 @@ export const stateTransition = pgTable(
 			columns: [table.taskId],
 			foreignColumns: [task.id],
 		}),
-		index("idx_state_transition_workflow_run_id").on(table.workflowRunId, table.id),
+		foreignKey({
+			name: "fk_state_transition_schedule",
+			columns: [table.scheduleId],
+			foreignColumns: [schedule.id],
+		}),
+		// The type enum declares workflow_run before task, so within one revision the run's
+		// transition sorts before the task transitions stamped with the revision it produced.
+		index("idx_state_transition_workflow_run_id")
+			.on(table.workflowRunId, table.revision, table.type, table.id)
+			.where(sql`${table.workflowRunId} IS NOT NULL`),
+		index("idx_state_transition_schedule_id")
+			.on(table.scheduleId, table.revision, table.id)
+			.where(sql`${table.scheduleId} IS NOT NULL`),
 		check(
-			"chk_task_state_transition_requires_task_id",
-			sql`(${table.type} = 'task' AND ${table.taskId} IS NOT NULL) OR (${table.type} = 'workflow_run' AND ${table.taskId} IS NULL)`
+			"chk_state_transition_columns_match_type",
+			sql`(${table.type} = 'workflow_run' AND ${table.workflowRunId} IS NOT NULL AND ${table.attempt} IS NOT NULL AND ${table.taskId} IS NULL AND ${table.scheduleId} IS NULL) OR (${table.type} = 'task' AND ${table.workflowRunId} IS NOT NULL AND ${table.attempt} IS NOT NULL AND ${table.taskId} IS NOT NULL AND ${table.scheduleId} IS NULL) OR (${table.type} = 'schedule' AND ${table.scheduleId} IS NOT NULL AND ${table.workflowRunId} IS NULL AND ${table.attempt} IS NULL AND ${table.taskId} IS NULL)`
 		),
 		check(
 			"chk_state_transition_status_matches_type",
-			sql`(${table.type} = 'workflow_run' AND ${table.status} = ANY(enum_range(NULL::workflow_run_status)::text[])) OR (${table.type} = 'task' AND ${table.status} = ANY(enum_range(NULL::task_status)::text[]))`
+			sql`(${table.type} = 'workflow_run' AND ${table.status} = ANY(enum_range(NULL::workflow_run_status)::text[])) OR (${table.type} = 'task' AND ${table.status} = ANY(enum_range(NULL::task_status)::text[])) OR (${table.type} = 'schedule' AND ${table.status} = ANY(enum_range(NULL::schedule_status)::text[]))`
 		),
 	]
 );
 
-export const sleepQueue = pgTable(
-	"sleep_queue",
+export const sleep = pgTable(
+	"sleep",
 	{
 		id: text("id").primaryKey(),
 		workflowRunId: text("workflow_run_id").notNull(),
@@ -264,35 +298,33 @@ export const sleepQueue = pgTable(
 		name: text("name").notNull(),
 		status: sleepStatusEnum("status").notNull(),
 
-		awakeAt: timestamp("awake_at", { withTimezone: true }).notNull(),
-		completedAt: timestamp("completed_at", { withTimezone: true }),
-		cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+		wakeupAt: timestampMs("wakeup_at").notNull(),
+		completedAt: timestampMs("completed_at"),
+		cancelledAt: timestampMs("cancelled_at"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_sleep_queue_workflow_run",
+			name: "fk_sleep_workflow_run",
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
-		uniqueIndex("uqidx_sleep_queue_one_active_per_run")
-			.on(table.workflowRunId)
-			.where(sql`${table.status} = 'sleeping'`),
-		index("idx_sleep_queue_workflow_run_id").on(table.workflowRunId, table.id),
+		uniqueIndex("uqidx_sleep_one_active_per_run").on(table.workflowRunId).where(sql`${table.status} = 'sleeping'`),
+		index("idx_sleep_workflow_run_id").on(table.workflowRunId, table.id),
 		check(
-			"chk_sleep_queue_completed_requires_completed_at",
+			"chk_sleep_completed_requires_completed_at",
 			sql`${table.status} != 'completed' OR ${table.completedAt} IS NOT NULL`
 		),
 		check(
-			"chk_sleep_queue_cancelled_requires_cancelled_at",
+			"chk_sleep_cancelled_requires_cancelled_at",
 			sql`${table.status} != 'cancelled' OR ${table.cancelledAt} IS NOT NULL`
 		),
 	]
 );
 
-export const eventWaitQueue = pgTable(
-	"event_wait_queue",
+export const eventWait = pgTable(
+	"event_wait",
 	{
 		id: text("id").primaryKey(),
 		workflowRunId: text("workflow_run_id").notNull(),
@@ -301,71 +333,89 @@ export const eventWaitQueue = pgTable(
 		status: eventWaitStatusEnum("status").notNull(),
 		referenceId: text("reference_id"),
 
-		data: jsonb("data"),
+		// The run's signal_sequence at the moment this row was written. Rows are handed to
+		// the workflow's waits in this order: the value is assigned under the run's row
+		// lock, so it is exactly the order the server accepted the sends — ids order only
+		// down to the millisecond and can invert two sends that land close together on
+		// different server replicas. Timeout rows sit in the same ordered queue as received
+		// rows, so they carry it too. It also lets a worker fetch just the rows written
+		// after the copy it loaded, the same catch-up the child wait column below serves.
+		signalSequence: integer("signal_sequence").notNull(),
 
-		timedOutAt: timestamp("timed_out_at", { withTimezone: true }),
+		data: jsonb("data").$type<OpaquePayload>(),
+		clientCodecApplied: boolean("client_codec_applied").notNull(),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		timedOutAt: timestampMs("timed_out_at"),
+
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_event_wait_queue_workflow_run",
+			name: "fk_event_wait_workflow_run",
 			columns: [table.workflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
-		uniqueIndex("uqidx_event_wait_queue_workflow_run_name_reference").on(
-			table.workflowRunId,
-			table.name,
-			table.referenceId
-		),
-		index("idx_event_wait_queue_workflow_run_id").on(table.workflowRunId, table.id),
+		uniqueIndex("uqidx_event_wait_workflow_run_name_reference").on(table.workflowRunId, table.name, table.referenceId),
+		index("idx_event_wait_workflow_run_signal_sequence_id").on(table.workflowRunId, table.signalSequence, table.id),
 		check(
-			"chk_event_wait_queue_timeout_requires_timed_out_at",
+			"chk_event_wait_timeout_requires_timed_out_at",
 			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
+		),
+		check(
+			"chk_event_wait_timeout_not_codec_applied",
+			sql`${table.status} != 'timeout' OR ${table.clientCodecApplied} = false`
 		),
 	]
 );
 
-export const childWorkflowRunWaitQueue = pgTable(
-	"child_workflow_run_wait_queue",
+export const childWorkflowRunWait = pgTable(
+	"child_workflow_run_wait",
 	{
 		id: text("id").primaryKey(),
 		parentWorkflowRunId: text("parent_workflow_run_id").notNull(),
 		childWorkflowRunId: text("child_workflow_run_id").notNull(),
-		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status").notNull(),
+		childWorkflowRunStatus: terminalWorkflowRunStatusEnum("child_workflow_run_status"),
 
 		status: childWorkflowRunWaitStatusEnum("status").notNull(),
-		completedAt: timestamp("completed_at", { withTimezone: true }),
-		timedOutAt: timestamp("timed_out_at", { withTimezone: true }),
+		completedAt: timestampMs("completed_at"),
+		timedOutAt: timestampMs("timed_out_at"),
 
 		childWorkflowRunStateTransitionId: text("child_workflow_run_state_transition_id"),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		// The parent run's signal_sequence at the moment this row was written. A child can
+		// finish while its parent is executing, so a row can land that the parent's loaded
+		// copy of this table lacks; the value lets the parent fetch just the rows written
+		// after its copy, instead of re-reading everything. A timeout row cannot land that
+		// way — it is written only while the parent is parked, and the parent re-reads
+		// everything when it wakes — so there is nothing to catch up on, and it stays null.
+		signalSequence: integer("signal_sequence"),
+
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		foreignKey({
-			name: "fk_child_workflow_run_wait_queue_parent",
+			name: "fk_child_workflow_run_wait_parent",
 			columns: [table.parentWorkflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
 		foreignKey({
-			name: "fk_child_workflow_run_wait_queue_child",
+			name: "fk_child_workflow_run_wait_child",
 			columns: [table.childWorkflowRunId],
 			foreignColumns: [workflowRun.id],
 		}),
 		foreignKey({
-			name: "fk_child_workflow_run_wait_queue_state_transition",
+			name: "fk_child_workflow_run_wait_state_transition",
 			columns: [table.childWorkflowRunStateTransitionId],
 			foreignColumns: [stateTransition.id],
 		}),
-		index("idx_child_workflow_run_wait_queue_parent_id").on(table.parentWorkflowRunId, table.id),
+		index("idx_child_workflow_run_wait_parent_id").on(table.parentWorkflowRunId, table.id),
 		check(
 			"chk_child_workflow_run_wait_completed_invariants",
-			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL)`
+			sql`${table.status} != 'completed' OR (${table.completedAt} IS NOT NULL AND ${table.childWorkflowRunStateTransitionId} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NOT NULL AND ${table.signalSequence} IS NOT NULL)`
 		),
 		check(
-			"chk_child_workflow_run_wait_timeout_requires_timed_out_at",
-			sql`${table.status} != 'timeout' OR ${table.timedOutAt} IS NOT NULL`
+			"chk_child_workflow_run_wait_timeout_invariants",
+			sql`${table.status} != 'timeout' OR (${table.timedOutAt} IS NOT NULL AND ${table.childWorkflowRunStatus} IS NULL AND ${table.childWorkflowRunStateTransitionId} IS NULL AND ${table.signalSequence} IS NULL)`
 		),
 	]
 );
@@ -376,46 +426,58 @@ export const workflowRunOutbox = pgTable(
 		id: text("id").primaryKey(),
 		namespaceId: text("namespace_id").notNull(),
 		workflowRunId: text("workflow_run_id").notNull(),
+		workflowSource: workflowSourceEnum("workflow_source").notNull(),
 		workflowName: text("workflow_name").notNull(),
 		workflowVersionId: text("workflow_version_id").notNull(),
-		shard: text("shard"),
+		pool: text("pool"),
 		rank: doublePrecision("rank").notNull(),
 
 		status: workflowRunOutboxStatusEnum("status").notNull(),
 
-		publishedAt: timestamp("published_at", { withTimezone: true }),
-		claimedAt: timestamp("claimed_at", { withTimezone: true }),
+		claimedAt: timestampMs("claimed_at"),
+		firstPublishedAt: timestampMs("first_published_at"),
+		lastPublishedAt: timestampMs("last_published_at"),
+		nextPublishAttemptRank: doublePrecision("next_publish_attempt_rank").notNull(),
 
-		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+		dispatchAttempts: integer("dispatch_attempts").notNull().default(0),
+
+		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
+		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},
 	(table) => [
 		uniqueIndex("uqidx_workflow_run_outbox_workflow_run_id").on(table.workflowRunId),
-		index("idx_workflow_run_outbox_status_workflow_rank_id").on(
-			table.namespaceId,
-			table.status,
-			table.workflowName,
-			table.workflowVersionId,
-			table.shard,
-			table.rank,
-			table.id
-		),
-		index("idx_workflow_run_outbox_status_workflow_claimed_rank_id").on(
-			table.namespaceId,
-			table.status,
-			table.workflowName,
-			table.workflowVersionId,
-			table.shard,
-			table.claimedAt,
-			table.rank,
-			table.id
-		),
-		index("idx_workflow_run_outbox_status_rank_id").on(table.status, table.rank, table.id),
-		index("idx_workflow_run_outbox_status_published_id").on(table.status, table.publishedAt, table.id),
-		index("idx_workflow_run_outbox_status_claimed_id").on(table.status, table.claimedAt, table.id),
+
+		// Claim path: worker claims rank ordered pending rows by workflow identity and pool.
+		index("idx_workflow_run_outbox_claim_pending")
+			.on(
+				table.namespaceId,
+				table.workflowSource,
+				table.workflowName,
+				table.workflowVersionId,
+				table.pool,
+				table.rank,
+				table.id
+			)
+			.where(sql`${table.status} = 'pending'`),
+
+		// Daemon list paths: broad scans over one status to feed broker.
+		index("idx_workflow_run_outbox_list_pending")
+			.on(table.nextPublishAttemptRank, table.id)
+			.where(sql`${table.status} = 'pending'`),
+		index("idx_workflow_run_outbox_list_published")
+			.on(table.nextPublishAttemptRank, table.id)
+			.where(sql`${table.status} = 'published'`),
+		index("idx_workflow_run_outbox_list_claimed").on(table.claimedAt, table.id).where(sql`${table.status} = 'claimed'`),
+
+		// Stall path: id-range scan over pending and published rows to stall those past maxAgeMs.
+		// claimed rows are exempt — they are executing, not waiting for delivery.
+		index("idx_workflow_run_outbox_stall_undeliverable")
+			.on(table.id)
+			.where(sql`${table.status} IN ('pending', 'published')`),
+
 		check(
-			"chk_workflow_run_outbox_published_requires_published_at",
-			sql`${table.status} != 'published' OR ${table.publishedAt} IS NOT NULL`
+			"chk_workflow_run_outbox_published_requires_first_published_at",
+			sql`${table.status} != 'published' OR ${table.firstPublishedAt} IS NOT NULL`
 		),
 		check(
 			"chk_workflow_run_outbox_claimed_requires_claimed_at",

@@ -3,13 +3,15 @@ import { type } from "arktype";
 import { taskStateSchema } from "./task";
 import { workflowRunStateSchema } from "./workflow-run";
 
-export const stateTransitionSchema = type({
+export const workflowRunStateTransitionSchema = type({
 	id: "string > 0",
 	createdAt: "number > 0",
 	type: "'workflow_run'",
 	attempt: "number.integer >= 1",
 	state: workflowRunStateSchema,
-}).or({
+});
+
+export const taskStateTransitionSchema = type({
 	id: "string > 0",
 	createdAt: "number > 0",
 	type: "'task'",

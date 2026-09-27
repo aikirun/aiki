@@ -16,9 +16,7 @@ const unreliableTask = task({
 		tasAttempts = 0;
 		return { ok: true };
 	},
-	options: {
-		retry: { type: "fixed", maxAttempts: 5, delayMs: 1_000 },
-	},
+	retry: { type: "fixed", maxAttempts: 5, delayMs: 1_000 },
 });
 
 let workflowAttempts = 0;
@@ -31,7 +29,5 @@ export const retryUntilSuccessV1 = workflow({ name: "retry-until-success" }).v("
 		}
 		await unreliableTask.start(run);
 	},
-	options: {
-		retry: { type: "exponential", maxAttempts: Number.MAX_SAFE_INTEGER, baseDelayMs: 500 },
-	},
+	retry: { type: "exponential", maxAttempts: Number.MAX_SAFE_INTEGER, baseDelayMs: 500 },
 });

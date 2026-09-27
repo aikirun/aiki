@@ -1,73 +1,82 @@
-import type { Logger } from "@aikirun/lib/logger";
-import { ConsoleLogger } from "@aikirun/lib/logger";
-import type { ApiClient, Client, ClientParams } from "@aikirun/types/client";
+import { createConsoleLogger } from "@aikirun/lib/logger";
+import type { Serializable } from "@aikirun/lib/serializable";
+import type { ApiClient, Client, ClientParams, EmbeddedClientParams, RemoteClientParams } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
+const EMBEDDED_BASE_URL = "aiki://embedded/api";
+
 /**
- * Creates an Aiki client for starting and managing workflows.
+ * Creates an Aiki client.
  *
- * The client connects to the Aiki server via HTTP.
- * It provides methods to start workflows and monitor their execution.
+ * Two transports are supported:
+ * - Remote: connects to the Aiki server over HTTP.
+ * - Embedded: invokes the server's handler directly in-process — no network hop.
  *
- * @template AppContext - Type of application context passed to workflows (default: null)
- * @param params - Client configuration parameters
- * @param params.url - HTTP URL of the Aiki server (e.g., "http://localhost:9850")
- * @param params.apiKey - API key for authentication
- * @param params.appContext - Optional function to create context for each workflow run
- * @param params.logger - Optional custom logger (defaults to ConsoleLogger)
- * @returns Promise resolving to a configured Client instance
+ * Switching transports is a config-only change; workers and workflows are unaffected.
  *
  * @example
  * ```typescript
+ * // Remote
  * const aikiClient = client({
  *   url: "http://localhost:9850",
  *   apiKey: "yourApiKey",
- *   appContext: (run) => ({
- *     traceId: generateTraceId(),
- *     userId: extractUserId(run),
- *   }),
  * });
  *
- * // Start a workflow
- * const handle = await myWorkflow.start(aikiClient, { email: "user@example.com" });
+ * // Embedded — server and client in the same process
+ * const aiki = server({ db: { connectionString: "postgres://..." } });
+ * const aikiClient = client({ handler: aiki.handler });
  *
- * // Wait for completion
- * const result = await handle.wait(
- *   { type: "status", status: "completed" },
- *   { maxDurationMs: 60_000 }
- * );
+ * const handle = await myWorkflow.start(aikiClient, { email: "user@example.com" });
+ * const result = await handle.wait({ timeout: { seconds: 60 } });
  * ```
  */
-export function client<AppContext = null>(params: ClientParams<AppContext>): Client<AppContext> {
-	return new ClientImpl(params);
-}
+export function client<Context = null, Encoded = never>(
+	params: RemoteClientParams<Context, Encoded> & Serializable<Encoded, "encoded">
+): Client<Context>;
+export function client<Context = null, Encoded = never>(
+	params: EmbeddedClientParams<Context, Encoded> & Serializable<Encoded, "encoded">
+): Client<Context>;
+export function client<Context = null>(params: ClientParams<Context>): Client<Context> {
+	const logger = params.logger ?? createConsoleLogger();
+	const hasher = params.hasher?.({ logger });
+	const codec = params.codec?.({ logger });
 
-class ClientImpl<AppContext> implements Client<AppContext> {
-	public readonly api: ApiClient;
-	public readonly [INTERNAL]: Client<AppContext>[typeof INTERNAL];
-	public readonly logger: Logger;
+	const rpcLink = isEmbeddedParams(params)
+		? new RPCLink({
+				url: EMBEDDED_BASE_URL,
+				fetch: (request) => params.handler(request),
+			})
+		: new RPCLink({
+				url: `${params.url}/api`,
+				headers: () => (params.apiKey ? { Authorization: `Bearer ${params.apiKey}` } : {}),
+			});
 
-	constructor(private readonly params: ClientParams<AppContext>) {
-		this.logger = params.logger ?? new ConsoleLogger();
+	// Type safety: The server package has compile-time tests (see server/contract/workflow-run/procedure.ts)
+	// that ensures the contract matches WorkflowRunApi. If the contract changes, server won't compile.
+	const api = createORPCClient(rpcLink) as unknown as ApiClient;
 
-		const { apiKey } = params;
-
-		const rpcLink = new RPCLink({
-			url: `${params.url}/api`,
-			headers: () => (apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-		});
-		// Type safety: The server package has compile-time tests (see server/contract/workflow-run/procedure.ts)
-		// that verify the contract matches WorkflowRunApi. If the contract changes, server won't compile.
-		this.api = createORPCClient(rpcLink) as unknown as ApiClient;
-
-		this.logger.info("Aiki client initialized", {
+	if (isEmbeddedParams(params)) {
+		logger.info("Aiki client initialized", { "aiki.transport": "embedded" });
+	} else {
+		logger.info("Aiki client initialized", {
+			"aiki.transport": "remote",
 			"aiki.url": params.url,
 		});
-
-		this[INTERNAL] = {
-			appContext: this.params.appContext,
-		};
 	}
+
+	return {
+		api,
+		logger,
+		[INTERNAL]: {
+			context: params.context,
+			hasher,
+			codec,
+		},
+	};
+}
+
+function isEmbeddedParams<Context>(params: ClientParams<Context>): params is EmbeddedClientParams<Context> {
+	return "handler" in params;
 }

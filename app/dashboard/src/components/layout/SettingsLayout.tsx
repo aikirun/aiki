@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../auth/AuthProvider";
+import { eyebrow } from "../common/ui";
 
 export function SettingsLayout() {
 	const { activeOrganization, activeNamespace } = useAuth();
@@ -23,30 +24,24 @@ export function SettingsLayout() {
 	}, [isNamespaceAdmin, location.pathname, navigate]);
 
 	return (
-		<div style={{ maxWidth: 640, padding: "32px 0" }}>
+		<div style={{ maxWidth: 720, padding: "6px 0 0" }}>
 			{/* Page header */}
-			<div>
+			<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+				<span style={eyebrow()}>
+					{activeOrganization?.name} / {activeNamespace?.name}
+				</span>
 				<h1
 					style={{
-						fontSize: 18,
+						margin: 0,
+						fontSize: 30,
 						fontWeight: 800,
 						color: "var(--t0)",
-						letterSpacing: "-0.03em",
-						lineHeight: 1.2,
+						letterSpacing: "-0.038em",
+						lineHeight: 1.05,
 					}}
 				>
 					Settings
 				</h1>
-				<p
-					style={{
-						fontSize: 11,
-						fontFamily: "IBM Plex Mono, ui-monospace, monospace",
-						color: "var(--t3)",
-						marginTop: 4,
-					}}
-				>
-					{activeOrganization?.name} / {activeNamespace?.name}
-				</p>
 			</div>
 
 			{/* Tab bar */}
@@ -80,15 +75,16 @@ function TabLink({ to, label }: { to: string; label: string }) {
 			onMouseLeave={() => setHovered(false)}
 			style={({ isActive }) => ({
 				padding: "10px 16px",
-				fontSize: 13,
-				fontWeight: 600,
-				color: isActive ? "var(--t0)" : "var(--t2)",
+				fontFamily: "var(--mono)",
+				fontSize: 11.5,
+				fontWeight: 500,
+				letterSpacing: "0.02em",
+				color: isActive ? "var(--accent-ink)" : hovered ? "var(--t1)" : "var(--t3)",
 				textDecoration: "none",
-				borderBottom: isActive ? "2px solid var(--t0)" : "2px solid transparent",
+				borderBottom: isActive ? "2px solid var(--accent)" : "2px solid transparent",
 				marginBottom: -1,
-				background: hovered && !isActive ? "var(--s1)" : "transparent",
-				borderRadius: "6px 6px 0 0",
-				transition: "color 120ms, background 120ms",
+				background: "transparent",
+				transition: "color .16s ease, border-color .16s ease",
 			})}
 		>
 			{label}
