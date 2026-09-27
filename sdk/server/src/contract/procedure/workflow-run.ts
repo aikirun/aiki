@@ -340,13 +340,11 @@ const hasTerminatedV1: ContractProcedure<WorkflowRunHasTerminatedRequestV1, Work
 	.input(
 		type({
 			id: "string > 0",
-			afterStateTransitionId: "string > 0",
 		})
 	)
 	.output(
 		type({
 			terminated: "boolean",
-			latestStateTransitionId: "string > 0",
 		})
 	);
 

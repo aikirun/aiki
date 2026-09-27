@@ -245,17 +245,12 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		const intervalMs = options?.interval ? toMilliseconds(options.interval) : 1_000;
 		const timeoutAt = options?.timeout ? Date.now() + toMilliseconds(options.timeout) : undefined;
 
-		let afterStateTransitionId = this._run.stateTransitionId;
 		let finalPoll = false;
 
 		while (!signal?.aborted) {
 			let terminated: boolean;
 			try {
-				const response = await this.api.workflowRun.hasTerminatedV1({
-					id: this._run.id,
-					afterStateTransitionId,
-				});
-				afterStateTransitionId = response.latestStateTransitionId;
+				const response = await this.api.workflowRun.hasTerminatedV1({ id: this._run.id });
 				terminated = response.terminated;
 			} catch (err) {
 				this.logger.warn("Failed while checking if workflow has terminated", { err });

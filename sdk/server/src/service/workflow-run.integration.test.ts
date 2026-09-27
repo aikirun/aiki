@@ -1,5 +1,6 @@
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
+import { NotFoundError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
@@ -7,6 +8,7 @@ import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/wo
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
+import { ulid } from "ulidx";
 
 import { createTaskStateMachine } from "./state-machine/task";
 import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./state-machine/workflow-run";
@@ -23,7 +25,7 @@ import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
 import { seedClaimedRun } from "../testing/seed/run";
-import { seedRunningTask } from "../testing/seed/task";
+import { seedCompletedTask, seedRunningTask } from "../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
@@ -186,6 +188,69 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 			expect(run.eventWaits).toEqual({
 				orderShipped: [expect.objectContaining({ status: "received", data: encodedData, clientCodecApplied: true })],
 			});
+		}));
+});
+
+describe("WorkflowRunService hasTerminated", () => {
+	test("throws not found for an unknown run or a run in another namespace", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { service } = createService(repos);
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const otherNamespaceContext = namespaceRequestContextFactory.build();
+
+			expect(service.hasTerminated(context, ulid())).rejects.toThrow(NotFoundError);
+			expect(service.hasTerminated(otherNamespaceContext, runId)).rejects.toThrow(NotFoundError);
+		}));
+
+	test("a running run has not terminated", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { service } = createService(repos);
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			expect(await service.hasTerminated(context, runId)).toEqual({ terminated: false });
+		}));
+
+	Object.entries({
+		completed: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: seed.runId,
+				state: { status: "completed", output: asOpaquePayload({ receiptId: "rcp-3" }) },
+				expectedRevision: seed.revisionWhenClaimed,
+			}),
+		failed: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: seed.runId,
+				state: { status: "failed", cause: "self", error: { name: "Error", message: "inventory service unavailable" } },
+				expectedRevision: seed.revisionWhenClaimed,
+			}),
+		cancelled: (context, stateMachine, seed) =>
+			stateMachine.transitionState(context, { type: "pessimistic", id: seed.runId, state: { status: "cancelled" } }),
+	} satisfies Record<
+		TerminalWorkflowRunStatus,
+		(
+			context: NamespaceRequestContext,
+			stateMachine: WorkflowRunStateMachine,
+			seed: { runId: string; revisionWhenClaimed: number }
+		) => Promise<WorkflowRunTransitionStateResponseV1>
+	>).forEach(([status, terminateRun]) => {
+		test(`a ${status} run has terminated`, () =>
+			withHarness(async ({ context, repos, publisher }) => {
+				const { service, stateMachine } = createService(repos);
+				const seed = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+				await terminateRun(context, stateMachine, seed);
+
+				expect(await service.hasTerminated(context, seed.runId)).toEqual({ terminated: true });
+			}));
+	});
+
+	test("a task reaching a terminal status does not say its run is terminated", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { service } = createService(repos);
+			const { runId } = await seedCompletedTask({ namespaceRequestContext: context, repos, publisher });
+
+			expect(await service.hasTerminated(context, runId)).toEqual({ terminated: false });
 		}));
 });
 
