@@ -1,35 +1,35 @@
 import { noopLogger } from "@aikirun/lib/logger";
 
-import { codec, InvalidCodecPayloadFormatError } from "./codec";
-import { DuplicateRoutedCodecNameError, switchCodecs, UnknownCodecNameInPayloadError } from "./switch-codec";
+import { codec, InvalidEncodedValueError } from "./codec";
+import { DuplicateCodecNameError, switchCodecs, UnknownCodecNameError } from "./switch-codec";
 import { describe, expect, test } from "bun:test";
 
 describe("switchCodecs", () => {
 	const current = codec({
 		name: "v2",
 		encode: (payload) => ({ v2: payload }),
-		decode: (body) => {
-			if (typeof body !== "object" || body === null || !("v2" in body)) {
-				throw new Error("unexpected v2 body");
+		decode: (encoded) => {
+			if (typeof encoded !== "object" || encoded === null || !("v2" in encoded)) {
+				throw new Error("unexpected v2 encoded value");
 			}
-			return body.v2;
+			return encoded.v2;
 		},
 	});
 	const deprecated = codec({
 		name: "v1",
 		encode: (payload) => ({ v1: payload }),
-		decode: (body) => {
-			if (typeof body !== "object" || body === null || !("v1" in body)) {
-				throw new Error("unexpected v1 body");
+		decode: (encoded) => {
+			if (typeof encoded !== "object" || encoded === null || !("v1" in encoded)) {
+				throw new Error("unexpected v1 encoded value");
 			}
-			return body.v1;
+			return encoded.v1;
 		},
 	});
-	const routed = switchCodecs({ current, deprecated: [deprecated] })({ logger: noopLogger });
+	const switched = switchCodecs({ current, deprecated: [deprecated] })({ logger: noopLogger });
 
 	test("encode uses the current member", async () => {
 		const payload = { name: "alice" };
-		expect(await routed.encode(payload)).toEqual({
+		expect(await switched.encode(payload)).toEqual({
 			codecName: "v2",
 			body: { v2: payload },
 		});
@@ -38,13 +38,13 @@ describe("switchCodecs", () => {
 	test("decode runs the member that wrote the value", async () => {
 		const payload = { name: "alice" };
 		expect(
-			await routed.decode({
+			await switched.decode({
 				codecName: "v2",
 				body: { v2: payload },
 			})
 		).toEqual(payload);
 		expect(
-			await routed.decode({
+			await switched.decode({
 				codecName: "v1",
 				body: { v1: payload },
 			})
@@ -53,36 +53,36 @@ describe("switchCodecs", () => {
 
 	test("decode rejects a codecName that matches no member", async () => {
 		expect(
-			routed.decode({
+			switched.decode({
 				codecName: "v0",
 				body: { v0: { name: "alice" } },
 			})
 		).rejects.toMatchObject({
-			name: "UnknownCodecNameInPayloadError(v0)",
+			name: "UnknownCodecNameError",
 			codecName: "v0",
 			knownCodecNames: ["v2", "v1"],
 			message: 'No codec named "v0"; known: "v2", "v1"',
 		});
 		expect(
-			routed.decode({
+			switched.decode({
 				codecName: "v0",
 				body: { v0: { name: "alice" } },
 			})
-		).rejects.toBeInstanceOf(UnknownCodecNameInPayloadError);
+		).rejects.toBeInstanceOf(UnknownCodecNameError);
 	});
 
-	test("decode rejects a payload without the envelope", async () => {
-		expect(routed.decode({ name: "alice" })).rejects.toMatchObject({
-			name: "InvalidCodecPayloadFormatError(v2)",
+	test("decode rejects a value that was not encoded", async () => {
+		expect(switched.decode({ name: "alice" })).rejects.toMatchObject({
+			name: "InvalidEncodedValueError",
 			codecName: "v2",
 		});
-		expect(routed.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidCodecPayloadFormatError);
+		expect(switched.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidEncodedValueError);
 	});
 
 	test("rejects duplicate member names at construction", () => {
-		expect(() => switchCodecs({ current, deprecated: [current] })).toThrow(DuplicateRoutedCodecNameError);
+		expect(() => switchCodecs({ current, deprecated: [current] })).toThrow(DuplicateCodecNameError);
 		expect(() => switchCodecs({ current, deprecated: [current] })).toThrow(
-			'Codecs for routing must have unique names; "v2" appears more than once'
+			'Codec names must be unique; "v2" appears more than once'
 		);
 	});
 

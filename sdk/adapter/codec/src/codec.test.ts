@@ -1,17 +1,17 @@
 import { noopLogger } from "@aikirun/lib/logger";
 
-import { CodecNameMismatchError, codec, InvalidCodecPayloadFormatError } from "./codec";
+import { CodecNameMismatchError, codec, InvalidEncodedValueError } from "./codec";
 import { describe, expect, test } from "bun:test";
 
 describe("codec", () => {
 	const created = codec({
 		name: "test-codec",
 		encode: (payload) => ({ wrapped: payload }),
-		decode: (body) => {
-			if (typeof body !== "object" || body === null || !("wrapped" in body)) {
-				throw new Error("unexpected body");
+		decode: (encoded) => {
+			if (typeof encoded !== "object" || encoded === null || !("wrapped" in encoded)) {
+				throw new Error("unexpected encoded value");
 			}
-			return body.wrapped;
+			return encoded.wrapped;
 		},
 	});
 	const instance = created({ logger: noopLogger });
@@ -24,7 +24,7 @@ describe("codec", () => {
 		});
 	});
 
-	test("decode unwraps a matching envelope", async () => {
+	test("decode recovers the payload from a value it encoded", async () => {
 		const payload = { name: "alice" };
 		expect(
 			await instance.decode({
@@ -34,13 +34,13 @@ describe("codec", () => {
 		).toEqual(payload);
 	});
 
-	test("decode rejects a payload without the envelope", async () => {
+	test("decode rejects a value that was not encoded", async () => {
 		expect(instance.decode({ name: "alice" })).rejects.toMatchObject({
-			name: "InvalidCodecPayloadFormatError(test-codec)",
+			name: "InvalidEncodedValueError",
 			codecName: "test-codec",
-			message: 'Codec "test-codec" payload is missing the { codecName, body } envelope',
+			message: 'Codec "test-codec" received a value that was not produced by encode',
 		});
-		expect(instance.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidCodecPayloadFormatError);
+		expect(instance.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidEncodedValueError);
 	});
 
 	test("decode rejects a mismatched codec name", async () => {
@@ -50,7 +50,7 @@ describe("codec", () => {
 				body: { wrapped: { name: "alice" } },
 			})
 		).rejects.toMatchObject({
-			name: "CodecNameMismatchError(test-codec)",
+			name: "CodecNameMismatchError",
 			codecName: "test-codec",
 			payloadName: "other-codec",
 			message: 'Codec name mismatch: expected "test-codec", got "other-codec"',
@@ -67,7 +67,7 @@ describe("codec", () => {
 		const asyncCodec = codec({
 			name: "async-codec",
 			encode: async (payload) => `enc:${JSON.stringify(payload)}`,
-			decode: async (body) => JSON.parse(String(body).slice("enc:".length)),
+			decode: async (encoded) => JSON.parse(String(encoded).slice("enc:".length)),
 		})({ logger: noopLogger });
 
 		const payload = { name: "bob" };

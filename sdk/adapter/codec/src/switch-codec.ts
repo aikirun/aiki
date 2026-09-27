@@ -1,30 +1,30 @@
 import type { Codec, CodecContext } from "@aikirun/types/infra/codec";
 
-import { InvalidCodecPayloadFormatError, isEncodedPayload, type NamedCreateCodec } from "./codec";
+import { InvalidEncodedValueError, isEncodedValue, type NamedCreateCodec } from "./codec";
 
-export class UnknownCodecNameInPayloadError extends Error {
+export class UnknownCodecNameError extends Error {
 	public readonly codecName: string;
 	public readonly knownCodecNames: string[];
 
 	constructor(codecName: string, knownCodecNames: string[]) {
 		super(`No codec named "${codecName}"; known: ${knownCodecNames.map((name) => `"${name}"`).join(", ")}`);
-		this.name = `UnknownCodecNameInPayloadError(${codecName})`;
+		this.name = "UnknownCodecNameError";
 		this.codecName = codecName;
 		this.knownCodecNames = knownCodecNames;
 	}
 }
 
-export class DuplicateRoutedCodecNameError extends Error {
+export class DuplicateCodecNameError extends Error {
 	public readonly codecName: string;
 
 	constructor(codecName: string) {
-		super(`Codecs for routing must have unique names; "${codecName}" appears more than once`);
-		this.name = `DuplicateRoutedCodecNameError(${codecName})`;
+		super(`Codec names must be unique; "${codecName}" appears more than once`);
+		this.name = "DuplicateCodecNameError";
 		this.codecName = codecName;
 	}
 }
 
-export interface SwitchCodecsOptions {
+export interface SwitchCodecsParams {
 	current: NamedCreateCodec;
 	deprecated: NamedCreateCodec[];
 }
@@ -32,16 +32,16 @@ export interface SwitchCodecsOptions {
 /**
  * Encodes with the current codec. On decode, reads the stored `codecName`(s) and runs only the
  * member that wrote that value.
- * Throws `DuplicateRoutedCodecNameError` if any codecs share a name.
- * Throws `UnknownCodecNameInPayloadError` on decode when the payload's `codecName` matches no
+ * Throws `DuplicateCodecNameError` if any codecs share a name.
+ * Throws `UnknownCodecNameError` on decode when the payload's `codecName` matches no
  * member.
  */
-export function switchCodecs({ current, deprecated }: SwitchCodecsOptions): NamedCreateCodec {
+export function switchCodecs({ current, deprecated }: SwitchCodecsParams): NamedCreateCodec {
 	const members = [current, ...deprecated];
 	const seenNames = new Set<string>();
 	for (const member of members) {
 		if (seenNames.has(member.codecName)) {
-			throw new DuplicateRoutedCodecNameError(member.codecName);
+			throw new DuplicateCodecNameError(member.codecName);
 		}
 		seenNames.add(member.codecName);
 	}
@@ -57,17 +57,17 @@ export function switchCodecs({ current, deprecated }: SwitchCodecsOptions): Name
 
 			return {
 				encode: (payload) => currentInstance.encode(payload),
-				decode: async (payload) => {
-					if (!isEncodedPayload(payload)) {
-						throw new InvalidCodecPayloadFormatError(current.codecName);
+				decode: async (encoded) => {
+					if (!isEncodedValue(encoded)) {
+						throw new InvalidEncodedValueError(current.codecName);
 					}
 
-					const instance = instancesByName.get(payload.codecName);
+					const instance = instancesByName.get(encoded.codecName);
 					if (instance === undefined) {
-						throw new UnknownCodecNameInPayloadError(payload.codecName, knownCodecNames);
+						throw new UnknownCodecNameError(encoded.codecName, knownCodecNames);
 					}
 
-					return instance.decode(payload);
+					return instance.decode(encoded);
 				},
 			};
 		},
