@@ -61,4 +61,70 @@ describe("event wait repository", () => {
 				expect.objectContaining({ id: "01-declares-false", status: "timeout", clientCodecApplied: false }),
 			]);
 		}));
+
+	test("upsert records one wait per reference and keeps the first", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			await repos.eventWait.upsert({
+				id: "01-first-send",
+				workflowRunId: runId,
+				name: "orderShipped",
+				status: "received",
+				referenceId: "ref-1",
+				data: asOpaquePayload({ trackingId: "TRK-1" }),
+				clientCodecApplied: false,
+				signalSequence: 1,
+			});
+
+			await repos.eventWait.upsert({
+				id: "02-second-send",
+				workflowRunId: runId,
+				name: "orderShipped",
+				status: "received",
+				referenceId: "ref-1",
+				data: asOpaquePayload({ trackingId: "TRK-2" }),
+				clientCodecApplied: false,
+				signalSequence: 2,
+			});
+
+			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
+				expect.objectContaining({
+					id: "01-first-send",
+					referenceId: "ref-1",
+					data: { trackingId: "TRK-1" },
+					signalSequence: 1,
+				}),
+			]);
+		}));
+
+	test("upsert records separate waits for separate references", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+
+			await repos.eventWait.upsert({
+				id: "01-first-reference",
+				workflowRunId: runId,
+				name: "orderShipped",
+				status: "received",
+				referenceId: "ref-1",
+				data: asOpaquePayload({ trackingId: "TRK-1" }),
+				clientCodecApplied: false,
+				signalSequence: 1,
+			});
+			await repos.eventWait.upsert({
+				id: "02-second-reference",
+				workflowRunId: runId,
+				name: "orderShipped",
+				status: "received",
+				referenceId: "ref-2",
+				data: asOpaquePayload({ trackingId: "TRK-2" }),
+				clientCodecApplied: false,
+				signalSequence: 2,
+			});
+
+			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
+				expect.objectContaining({ id: "01-first-reference", referenceId: "ref-1", signalSequence: 1 }),
+				expect.objectContaining({ id: "02-second-reference", referenceId: "ref-2", signalSequence: 2 }),
+			]);
+		}));
 });

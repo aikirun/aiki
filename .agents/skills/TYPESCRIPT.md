@@ -30,6 +30,7 @@ This document outlines the TypeScript coding style and conventions for the proje
 - Classes: noun phrases. Methods/functions: verb phrases.
 - No abbreviated variable names (`wf`, `ctx`, `cfg`) — write `workflow`, `context`, `config`.
 - Timestamps are epoch milliseconds (`TimestampMs`) everywhere in code; never `Date` objects in domain types.
+- A local's name is its role and its noun (`pooledChildRun`, `referencedSchedule`), never the role alone (`pooled`, `first`, `own`) and never how the value was produced (`…Seed`). The reader meets the name far from the line that assigned it.
 
 ## 3. Interfaces and Types
 

@@ -481,7 +481,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			stateMachine: WorkflowRunStateMachine,
 			seed: { runId: string; revisionWhenClaimed: number }
 		) => Promise<WorkflowRunTransitionStateResponseV1>
-	>).forEach(([status, reachTerminalStatus]) => {
+	>).forEach(([status, terminateRun]) => {
 		test(`does not cancel a ${status} run`, () =>
 			withHarness(async ({ context, repos, publisher }) => {
 				const terminalRunSeed = await seedClaimedRun({
@@ -490,7 +490,7 @@ describe("WorkflowRunService cancelByIds", () => {
 					publisher,
 				});
 				const { service, stateMachine } = createService(repos);
-				const terminal = await reachTerminalStatus(context, stateMachine, terminalRunSeed);
+				const terminal = await terminateRun(context, stateMachine, terminalRunSeed);
 
 				const { runId: cancellableRunId } = await seedClaimedRun({
 					namespaceRequestContext: context,

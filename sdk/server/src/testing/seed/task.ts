@@ -4,6 +4,7 @@ import { asOpaquePayload } from "@aikirun/testing/payload";
 
 import { type SeedRunDeps, type SeedRunOverrides, seedClaimedRun } from "./run";
 import { createChildRunCanceller } from "../../service/cancel-child-runs";
+import { discardStaleTasks } from "../../service/discard-stale-tasks";
 import { createTaskStateMachine } from "../../service/state-machine/task";
 import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
 import { withFakeClock } from "../clock";
@@ -15,22 +16,53 @@ const seededTask = {
 	output: { reservationId: "rsv-1" },
 } as const;
 
+/** Creates a running task on a run that is already claimed. */
+export async function seedRunningTaskOnRun(
+	deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">,
+	run: { runId: string; revisionWhenClaimed: number },
+	params: { taskName: string; input: unknown }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+
+	const taskStateMachine = createTaskStateMachine({ repos });
+	const taskInfo = await taskStateMachine.transitionState(namespaceRequestContext, {
+		type: "create",
+		workflowRunId: run.runId,
+		expectedWorkflowRunRevision: run.revisionWhenClaimed,
+		taskName: params.taskName,
+		input: asOpaquePayload(params.input),
+		inputHash: await hashInput(params.input),
+	});
+
+	return { taskInfo, taskInput: params.input };
+}
+
 export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePublisher }, overrides?: SeedRunOverrides) {
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
 
-	const taskStateMachine = createTaskStateMachine({ repos });
-	const taskInfo = await taskStateMachine.transitionState(namespaceRequestContext, {
-		type: "create",
-		workflowRunId: seeded.runId,
-		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+	const task = await seedRunningTaskOnRun({ repos, namespaceRequestContext }, seeded, {
 		taskName: seededTask.name,
-		input: asOpaquePayload(seededTask.input),
-		inputHash: await hashInput(seededTask.input),
+		input: seededTask.input,
 	});
 
-	return { ...seeded, taskInfo, taskInput: seededTask.input };
+	return { ...seeded, ...task };
+}
+
+/** A run whose only task has been discarded, the way cancelling the run discards its tasks. */
+export async function seedDiscardedTask(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	overrides?: SeedRunOverrides
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedRunningTask({ ...deps, namespaceRequestContext }, overrides);
+
+	await repos.transaction((txRepos) => discardStaleTasks(seeded.runId, ["running"], txRepos));
+
+	return seeded;
 }
 
 /** An `awaiting_retry` task on a run that has not parked yet — the state between a task park and the run park. */
@@ -78,19 +110,14 @@ export async function seedSiblingAwaitingRetryTasks(
 		{ nextAttemptAt: params.firstNextAttemptAt }
 	);
 
-	const siblingInput = { invoiceId: "inv-9" };
-	const taskStateMachine = createTaskStateMachine({ repos });
-	const createdSibling = await taskStateMachine.transitionState(namespaceRequestContext, {
-		type: "create",
-		workflowRunId: seeded.runId,
-		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+	const createdSibling = await seedRunningTaskOnRun({ repos, namespaceRequestContext }, seeded, {
 		taskName: "charge-payment",
-		input: asOpaquePayload(siblingInput),
-		inputHash: await hashInput(siblingInput),
+		input: { invoiceId: "inv-9" },
 	});
+	const taskStateMachine = createTaskStateMachine({ repos });
 	const siblingTaskInfo = await withFakeClock(1, () =>
 		taskStateMachine.transitionState(namespaceRequestContext, {
-			id: createdSibling.id,
+			id: createdSibling.taskInfo.id,
 			workflowRunId: seeded.runId,
 			expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
 			attempts: 1,

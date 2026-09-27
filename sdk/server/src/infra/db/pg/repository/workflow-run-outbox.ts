@@ -161,11 +161,11 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 			);
 	},
 
-	async listPublishable(
+	async listDueForRepublish(
 		_context: DaemonContext,
-		limit: number,
-		cursor?: KeysetStreamCursor
+		params: { limit: number; cursor?: KeysetStreamCursor }
 	): Promise<WorkflowRunOutboxRowPublished[]> {
+		const { limit, cursor } = params;
 		// PRIORITY_LEVELS - 1 is the least priority and produces a rank greater than or equal to any rank due on or before now.
 		const maxNextPublishAttemptRank = computeRank({ dueAt: Date.now(), priority: PRIORITY_LEVELS - 1 });
 

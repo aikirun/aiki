@@ -15,6 +15,8 @@ Before writing any test, study the exemplars for its tier and match their idioms
   from a typed case table.
 - `sdk/server/src/infra/db/workflow-run-outbox.integration.test.ts` — provider-contract suite,
   two-connection concurrency choreography.
+- `sdk/server/src/infra/db/workflow-run.integration.test.ts` — one describe per repository method,
+  a status-keyed seed table driving the guard loops, a test-side column read for reset assertions.
 - `testing/src/infra/timer.ts` — infra contract suite, wake and absence checks;
   runner-injected so implementers can run it too, with each adapter binding it in its own
   package (`sdk/adapter/*/src/timer/`).
@@ -37,7 +39,12 @@ Before writing any test, study the exemplars for its tier and match their idioms
     never 0: bun's `setSystemTime(new Date(0))` resets to the real clock instead of freezing.
 - Ulids embed their mint time, so rows minted under a clock frozen in the past sort before
   rows minted earlier in real time. A read ordered by id (`listByRunId`) returns them in that
-  order — author expectations in id order, not in the order the test took its steps.
+  order — author expectations in id order, not in the order the test took its steps. Two rows
+  minted in the same millisecond order at random, so a read ordered by id promises nothing about
+  rows one seed mints in a burst. Don't force that order with a seed that freezes the clock a
+  step apart (`seedClaimedRunWithSpacedTransitions` existed for that and was removed):
+  assert the set and the total, and treat the missing order as a missing sequence column on the
+  row, like a run's revision or a wait's signal sequence.
 - Use these tools only where the test's semantics need them. The fake clock earns its place
   where state must look aged, where an expectation pins an exact written timestamp, or where
   a premise needs pinning — not where a status check suffices. Derive each piece of harness
@@ -110,6 +117,19 @@ Before writing any test, study the exemplars for its tier and match their idioms
   running a longer seed and transitioning back out of it hides which stage the behavior actually
   depends on. When no seed stops where the test needs it to, add one (`seedScheduledRun` is
   create-only, with the promoter left out) rather than contorting an existing one.
+- A seed returns what it made and what a test will assert against it: the ids, the revision and
+  attempts it left the row at, the input hash it authored. A test that has to read those back
+  has found a seed that stops short.
+- Seeds compose. `seedRunningTask` is `seedClaimedRun` followed by `seedRunningTaskOnRun`; a test
+  that needs one more task on an existing run calls the second alone. Don't give one seed an
+  override that makes it skip half of itself.
+- A seed may drive a daemon when that is how production reaches the state (the promoter, the
+  publisher, the recurring-runs daemon). Name it for the state it produces
+  (`seedRunFromSchedule`), not for the daemon it runs, and return the row the daemon created.
+- Seed through a production writer even when the repository under test has its own. A bare
+  `bulkTransitionToDiscarded` points the task at a transition nothing wrote, and a list that
+  inner-joins that transition drops the task whether or not its status filter exists, so the
+  test passes with the filter deleted.
 
 ## Assertions
 
@@ -137,7 +157,10 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Review step: grep every new or edited test file for `[0]`. Each hit is either inside an
   `expect` (rewrite as a whole-array matcher compare with an independently-sourced expected
   value) or a capture (precede with `toHaveLength`). Run it over every file a subagent
-  delivered, not just the largest one.
+  delivered, not just the largest one. After a structural edit, `grep -n '^describe('` shows
+  what moved (a cut by text markers once nested a whole describe inside its neighbour and every
+  test still passed); after a rename, read the test titles, because a regex rename that does
+  not exclude string literals rewrites them too ("matches only an unreferencedSchedule schedule").
 - Timestamps in expectations are exact values, never `expect.any(Number)`. Presence-only
   survives a dropped duration or a seconds/ms mix-up. Capture an instant, freeze the clock
   around the one mutating call, and assert the arithmetic
@@ -152,6 +175,9 @@ Before writing any test, study the exemplars for its tier and match their idioms
   the point, freeze the instant that minted the row and assert the authored value — the
   whole-array form then needs no capture at all.
 - An absence assertion must be a read that would have shown the row if it existed.
+- A batch read (`getByIds`) gets the same coverage as its single-row sibling (`getById`),
+  including the row normalisation they share. Sharing an implementation is not sharing a test:
+  the batch variant can stop calling the normaliser and only its own test would notice.
 - When a test claims "X prevents Y", first prove Y was actually going to happen: assert the
   seeded state is one Y would hit (the claim is old enough to be recovered), then do X, then
   assert Y didn't happen. Without that first assertion the test can pass for a reason other
@@ -166,6 +192,11 @@ Before writing any test, study the exemplars for its tier and match their idioms
   test by where you happen to be working. A loop or wiring test stops at the seam where it
   hands work off — proving a popped timer reached the run lookup is the loop's claim; what
   processing then writes belongs to the processing suite, driven directly at its own seam.
+- A repository suite has one `describe` per method, named for the method. A facet with several
+  tests (a guard table) nests inside it; a single test sits directly in it. Don't group by theme
+  (`state reads`, `compare-and-swap guards`, `claimPending — pool filter`): the reader looks for
+  a method. A helper used by one describe is declared inside it; module level is for helpers
+  two or more describes share.
 - Observe the code under test through a dependency it calls on purpose — a repos lookup, a
   queue pop — never through a side effect like the names bound via `logger.child`. A
   logger-based observation only holds while the logging sits at a particular line inside the
@@ -200,12 +231,12 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Mutation-test your assertions: if the behavior under test were deleted, would this test fail?
   Baselines captured before an intermediate step, or comparisons that hold vacuously (0 === 0),
   are the common failure.
-- When the claim is "X leaves Y untouched", mint Y in a state X cannot write: a bystander
-  sleep finalized `completed` (a `durationMs: 0` sleep is immediately due for the
-  elapsed-runs daemon) against an X that writes `cancelled`. A same-status bystander leans on
-  incidental values; a distinguishable status makes any violation a visible flip. Assert the
-  bystander's outcome columns with their null complements (`completedAt` set,
-  `cancelledAt: null`).
+- When the claim is "X leaves the other rows untouched", each other row must be able to show a
+  leaked write. Give it a status X cannot write (a sleep finalized `completed` against a bulk
+  cancel), and give a same-status row an authored column value the write would move
+  (`completedAt: 2_000_000` against a completion at `3_000_000`). Cover every status the guard
+  excludes, not one of them, and assert each row's outcome columns with their null complements
+  (`completedAt` set, `cancelledAt: null`).
 - When a behavior applies only to one status (a guard like `status = 'claimed'`), test every
   excluded status, not one representative. Build the case table as an object keyed by the
   excluded statuses and pin it with
@@ -246,12 +277,48 @@ Before writing any test, study the exemplars for its tier and match their idioms
   TYPESCRIPT.md §5: repository tests don't explain themselves in daemon vocabulary.
 - When a bulk method's SET clause writes a small fixed set of columns, assert exactly those
   columns against authored values rather than capturing the row before the write. The write
-  surface is the assertion surface, and the premise stays visible in the test.
+  surface is the assertion surface, and the premise stays visible in the test. Resets are part
+  of that surface: `bulkReleaseToQueued` nulls four due-time columns, and a test that checks
+  only the status has not tested the method. When the repository exposes no read for a column,
+  add a test-side read under `sdk/server/src/testing/infra/db/` that dispatches on the provider
+  like `resetDatabase` does (`readWorkflowRunDueTimes`), seed a row that has the column set, and
+  assert the exact column set before and after (`{ ...NO_DUE_TIMES, wakeupAt }`, then
+  `NO_DUE_TIMES`).
 - A fixture name is a claim, and it has to hold at every use site. `NO_CLAIM_GOES_STALE_MS`
   stopped being true the moment a test made a claim stale under it; the honest name was
   `ONE_HOUR_MS`.
 - Two tests that look alike must each kill a distinct mutant, and you should be able to say
   which one. If you can't name it, the second test is noise.
+
+## Naming
+
+- A local says what it is: the role and the noun. `pooledChildRun`, `referencedSchedule`,
+  `staleRevisionRun`, `runInOtherNamespace`. Never the role alone (`pooled`, `scheduled`,
+  `first`, `own`, `asChild`) and never how the value was made (`matchedSeed`, `SeedDeps`): the
+  reader meets the name far from the line that assigned it.
+- Use the words the interface under test uses. The outbox marks, claims, publishes and backs
+  off; a schedule has occurrences; a run has revisions. A word the interface never uses
+  (`settle`, `reach`, `move`, `bystander`) is a word the reader has to decode, and a helper named
+  for a mechanism its callers don't see (`backOffRowAs`) fails the caller-side rule in
+  TYPESCRIPT.md §2. A domain word can still read badly out of its home: `seedRunFromSchedule`
+  beat `seedScheduleOccurrenceRun`.
+- Match the neighbours before naming a helper: `orderById`, `getScheduleRow`,
+  `getRunLatestTransitionId`, `seedRunByStatus`. Read two sibling suites in the directory first;
+  a second spelling of the same helper (`byId`, `latestRunTransitionId`) is entropy.
+- A status-keyed table of seeding functions is `seed<Thing>ByStatus`, every cell creates the
+  thing (`seedOutboxRowByStatus.pending` inserts a row), and the loop variable is the singular
+  verb (`seedRun`, `terminateRun`). A cell that does nothing means the table is named for the
+  wrong action.
+- An id that must not exist is minted where it is used: `const absentWorkflowId = ulid()`. Its
+  absence follows from the per-test reset, which the reader can see; a module constant
+  (`ABSENT_WORKFLOW_ID`) or a magic string (`"run-missing"`) asks them to trust a convention.
+- A sentinel many tests may need (`END_OF_TIME`) lives once, next to the tool it belongs with
+  (`sdk/server/src/testing/clock.ts`), with its claim in the name and the reason for its value
+  in a comment. Copies per file drift.
+- Test titles are one honest sentence in the interface's vocabulary. No method prefix inside the
+  method's describe; no claim the body doesn't check ("then id" with no tied rows); say what
+  the write does, not what a caller does with it (`returnToPending` makes the row due at once
+  and keeps the publish times its backoff is anchored on).
 
 ## Concurrency
 
