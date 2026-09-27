@@ -11,6 +11,7 @@ import type { Repositories } from "../infra/db/types";
 import type { DaemonContext, NamespaceRequestContext } from "../middleware/context";
 
 interface HarnessDeps<Context> {
+	db: Database;
 	repos: Repositories;
 	publisher: FakePublisher;
 	context: Context;
@@ -22,7 +23,7 @@ export type ServiceHarnessDeps = HarnessDeps<NamespaceRequestContext>;
 /**
  * Stands up one pooled connection against the database, resets every table before each test,
  * and closes the connection afterwards.
- * The returned function runs a test body with fresh per-test deps: the shared `repos`, a
+ * The returned function runs a test body with fresh per-test deps: the shared `db` and `repos`, a
  * `fakePublisher` (verified on teardown), and the context built for the suite's seam.
  *
  * It is provider-blind — it works against whatever `DATABASE_PROVIDER` points to, going through
@@ -51,11 +52,11 @@ function createHarness<Context>(buildContext: () => Context) {
 	});
 
 	return async (fn: (deps: HarnessDeps<Context>) => Promise<void>) => {
-		if (!repos) {
+		if (!db || !repos) {
 			throw new Error("Harness deps are only available inside a test — call the returned function in a test body.");
 		}
 		const publisher = fakePublisher();
-		await fn({ context: buildContext(), repos, publisher });
+		await fn({ context: buildContext(), db, repos, publisher });
 		publisher.verify();
 	};
 }

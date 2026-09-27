@@ -66,7 +66,7 @@ export async function recoverOverdueOutboxEntries(
 	}
 
 	for await (const publishableEntries of streamChunks(
-		(cursor) => repos.workflowRunOutbox.listPublishable(context, pageSize, cursor),
+		(cursor) => repos.workflowRunOutbox.listDueForRepublish(context, { limit: pageSize, cursor }),
 		{
 			advanceCursor: advancePublishedCursor,
 			until: (page) => page.length < pageSize,

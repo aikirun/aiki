@@ -55,18 +55,19 @@ export async function seedScheduledRun(
 	const services = createServices(repos);
 
 	const input = { orderId: "order-7" };
+	const inputHash = await hashInput(input);
 	const runId = await services.workflowRun.createWorkflowRun(namespaceRequestContext, {
 		name: seededWorkflow.name,
 		versionId: seededWorkflow.versionId,
 		input: asOpaquePayload(input),
-		inputHash: { value: await hashInput(input) },
+		inputHash: { value: inputHash },
 		clientHasherApplied: false,
 		clientCodecApplied: false,
 		options: overrides?.options,
 		parent: overrides?.parent,
 	});
 
-	return { runId, revisionWhenScheduled: 0, attemptsWhenScheduled: 1 };
+	return { runId, inputHash, revisionWhenScheduled: 0, attemptsWhenScheduled: 1 };
 }
 
 export async function seedPooledQueuedRun(deps: SeedRunDeps) {
@@ -79,7 +80,7 @@ export async function seedQueuedRun(deps: SeedRunDeps, overrides?: SeedRunOverri
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 
-	const { runId } = await seedScheduledRun({ repos, namespaceRequestContext }, overrides);
+	const { runId, inputHash } = await seedScheduledRun({ repos, namespaceRequestContext }, overrides);
 
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 
@@ -104,6 +105,9 @@ export async function seedQueuedRun(deps: SeedRunDeps, overrides?: SeedRunOverri
 
 	return {
 		runId,
+		inputHash,
+		revisionWhenQueued: 1,
+		attemptsWhenQueued: 1,
 		outboxRowId: outboxRow.id,
 		workflowSource: seededWorkflow.source,
 		workflowName: seededWorkflow.name,
@@ -251,8 +255,111 @@ export async function seedStalledRun(deps: SeedRunDeps, overrides?: SeedRunOverr
 
 	return {
 		runId: seeded.runId,
+		revisionWhenStalled: seeded.revisionWhenQueued + 1,
 		workflowSource: seeded.workflowSource,
 		workflowName: seeded.workflowName,
 		workflowVersionId: seeded.workflowVersionId,
 	};
+}
+
+export async function seedPausedRun(deps: SeedRunDeps & { publisher: FakePublisher }, overrides?: SeedRunOverrides) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
+
+	const services = createServices(repos);
+	const paused = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+		type: "pessimistic",
+		id: seeded.runId,
+		state: { status: "paused" },
+	});
+
+	return { ...seeded, revisionWhenPaused: paused.revision };
+}
+
+/** A run parked as `awaiting_retry` on its own error, due at the authored instant. */
+export async function seedAwaitingRetryRun(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params: { nextAttemptAt: number },
+	overrides?: SeedRunOverrides
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
+
+	const services = createServices(repos);
+	// The transition takes a relative delay, so a frozen clock turns the authored absolute
+	// due time into that delay. Frozen at 1, not 0: bun's setSystemTime treats the zero
+	// timestamp as a reset to the real clock.
+	const parked = await withFakeClock(1, () =>
+		services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+			type: "optimistic",
+			id: seeded.runId,
+			state: {
+				status: "awaiting_retry",
+				cause: "self",
+				error: { name: "Error", message: "inventory service unavailable" },
+				nextAttemptInMs: params.nextAttemptAt - 1,
+			},
+			expectedRevision: seeded.revisionWhenClaimed,
+		})
+	);
+
+	return { ...seeded, nextAttemptAt: params.nextAttemptAt, revisionWhenParked: parked.revision };
+}
+
+/** A running parent parked on one of its running children. */
+export async function seedAwaitingChildRun(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params?: { timeoutInMs?: number }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const parent = await seedClaimedRun({ ...deps, namespaceRequestContext });
+	const child = await seedClaimedRun(
+		{ ...deps, namespaceRequestContext },
+		{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+	);
+
+	const services = createServices(repos);
+	const parked = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+		type: "optimistic",
+		id: parent.runId,
+		state: { status: "awaiting_child_workflow", childWorkflowRunId: child.runId, timeoutInMs: params?.timeoutInMs },
+		expectedRevision: parent.revisionWhenClaimed,
+		expectedSignalSequence: 0,
+	});
+
+	return { ...parent, child, revisionWhenParked: parked.revision };
+}
+
+export async function seedCancelledRun(deps: SeedRunDeps & { publisher: FakePublisher }, overrides?: SeedRunOverrides) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
+
+	const services = createServices(repos);
+	const cancelled = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+		type: "pessimistic",
+		id: seeded.runId,
+		state: { status: "cancelled" },
+	});
+
+	return { ...seeded, revisionWhenCancelled: cancelled.revision };
+}
+
+export async function seedFailedRun(deps: SeedRunDeps & { publisher: FakePublisher }, overrides?: SeedRunOverrides) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
+
+	const services = createServices(repos);
+	const failed = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+		type: "optimistic",
+		id: seeded.runId,
+		state: { status: "failed", cause: "self", error: { name: "Error", message: "inventory service unavailable" } },
+		expectedRevision: seeded.revisionWhenClaimed,
+	});
+
+	return { ...seeded, revisionWhenFailed: failed.revision };
 }

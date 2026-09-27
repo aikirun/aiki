@@ -25,8 +25,6 @@ const reconcileLedgerWorkflow = {
 	source: "user" as const,
 };
 
-const ABSENT_WORKFLOW_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
-
 const ONE_HOUR = 60 * 60 * 1_000;
 
 /** Reads a row back for the value only the database assigns: its id. */
@@ -162,10 +160,11 @@ describe("workflow repository", () => {
 			await createWorkflows(repos, { namespaceId: context.namespaceId, ...sendInvoicesWorkflow });
 			const row = await getWorkflowRow(repos, context.namespaceId, sendInvoicesWorkflow);
 			const otherNamespaceId = namespaceRequestContextFactory.build().namespaceId;
+			const absentWorkflowId = ulid();
 
 			expect(await repos.workflow.getById(context.namespaceId, row.id)).toEqual(row);
 			expect(await repos.workflow.getById(otherNamespaceId, row.id)).toBeNull();
-			expect(await repos.workflow.getById(context.namespaceId, ABSENT_WORKFLOW_ID)).toBeNull();
+			expect(await repos.workflow.getById(context.namespaceId, absentWorkflowId)).toBeNull();
 		}));
 
 	test("getByIds returns rows from any namespace and ignores unknown ids", () =>
@@ -178,10 +177,11 @@ describe("workflow repository", () => {
 			const ownNamespaceRow = await getWorkflowRow(repos, context.namespaceId, sendInvoicesWorkflow);
 			const otherNamespaceRow = await getWorkflowRow(repos, otherNamespaceId, sendInvoicesWorkflow);
 
+			const absentWorkflowId = ulid();
 			const rows = await repos.workflow.getByIds(daemonContextFactory.build(), [
 				ownNamespaceRow.id,
 				otherNamespaceRow.id,
-				ABSENT_WORKFLOW_ID,
+				absentWorkflowId,
 			]);
 
 			expect([...rows].sort(orderByIdentity)).toEqual([ownNamespaceRow, otherNamespaceRow].sort(orderByIdentity));
@@ -234,6 +234,41 @@ describe("workflow repository", () => {
 			const rows = await repos.workflow.listByNameAndVersion(namespaceId, { name: "send-invoices", source: "system" });
 
 			expect(rows).toEqual([expect.objectContaining({ namespaceId, ...systemSendInvoices })]);
+		}));
+
+	test("listByNameAndVersionPairs matches only the requested source", () =>
+		withHarness(async ({ context, repos }) => {
+			const namespaceId = context.namespaceId;
+			const systemSendInvoices = { ...sendInvoicesWorkflow, source: "system" as const };
+			await createWorkflows(repos, [
+				{ namespaceId, ...sendInvoicesWorkflow },
+				{ namespaceId, ...systemSendInvoices },
+			]);
+
+			const rows = await repos.workflow.listByNameAndVersionPairs(namespaceId, [
+				{ name: "send-invoices", versionId: "1.0.0", source: "system" },
+			]);
+
+			expect(rows).toEqual([expect.objectContaining({ namespaceId, ...systemSendInvoices })]);
+		}));
+
+	test("getByNameAndVersion finds the exact source, name and version, and returns null otherwise", () =>
+		withHarness(async ({ context, repos }) => {
+			const namespaceId = context.namespaceId;
+			const systemSendInvoices = { ...sendInvoicesWorkflow, source: "system" as const };
+			await createWorkflows(repos, [
+				{ namespaceId, ...sendInvoicesWorkflow },
+				{ namespaceId, ...systemSendInvoices },
+			]);
+			const otherNamespaceId = namespaceRequestContextFactory.build().namespaceId;
+
+			expect(await repos.workflow.getByNameAndVersion(namespaceId, sendInvoicesWorkflow)).toEqual(
+				expect.objectContaining({ namespaceId, ...sendInvoicesWorkflow })
+			);
+			expect(
+				await repos.workflow.getByNameAndVersion(namespaceId, { ...sendInvoicesWorkflow, versionId: "9.9.9" })
+			).toBeNull();
+			expect(await repos.workflow.getByNameAndVersion(otherNamespaceId, sendInvoicesWorkflow)).toBeNull();
 		}));
 });
 

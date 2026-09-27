@@ -242,7 +242,7 @@ describe("recoverOverdueOutboxEntries", () => {
 					})
 				);
 
-				const publishableRows = await repos.workflowRunOutbox.listPublishable(context, 100);
+				const publishableRows = await repos.workflowRunOutbox.listDueForRepublish(context, { limit: 100 });
 				expect(publishableRows).toHaveLength(1);
 				const originalFirstPublishedAt = publishableRows[0]?.firstPublishedAt;
 				const originalRank = publishableRows[0]?.rank;
@@ -326,7 +326,7 @@ describe("recoverOverdueOutboxEntries", () => {
 						}),
 					})
 				);
-				expect(await repos.workflowRunOutbox.listPublishable(context, 100)).toHaveLength(0);
+				expect(await repos.workflowRunOutbox.listDueForRepublish(context, { limit: 100 })).toHaveLength(0);
 			}));
 
 		test("does not stall a claimed row regardless of age", () =>
