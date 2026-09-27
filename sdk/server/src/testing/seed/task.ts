@@ -60,7 +60,9 @@ export async function seedDiscardedTask(
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedRunningTask({ ...deps, namespaceRequestContext }, overrides);
 
-	await repos.transaction((txRepos) => discardStaleTasks(seeded.runId, ["running"], txRepos));
+	await repos.transaction((txRepos) =>
+		discardStaleTasks([{ id: seeded.runId, revision: seeded.revisionWhenClaimed }], ["running"], txRepos)
+	);
 
 	return seeded;
 }

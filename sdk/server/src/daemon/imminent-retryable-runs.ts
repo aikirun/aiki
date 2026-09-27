@@ -109,6 +109,7 @@ async function processChunk(
 			workflowRunId: run.id,
 			type: "workflow_run",
 			attempt: run.attempts + 1,
+			revision: run.revision + 1,
 			state,
 		});
 		workflowRunUpdates.push({
@@ -161,7 +162,7 @@ async function transitionToQueuedInTx(
 	txRepos: TxRepositories
 ): Promise<WorkflowRunOutboxRowInsertPending[]> {
 	const { workflowRunUpdates, stateTransitionEntries, outboxEntries } = entries;
-	const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
+	const transitionedRuns = await txRepos.workflowRun.bulkTransitionToQueued(
 		context,
 		"awaiting_retry",
 		workflowRunUpdates,
@@ -169,16 +170,16 @@ async function transitionToQueuedInTx(
 			incrementAttempts: true,
 		}
 	);
-	if (!isNonEmptyArray(transitionedRunIds)) {
+	if (!isNonEmptyArray(transitionedRuns)) {
 		return [];
 	}
 
-	await discardStaleTasks(transitionedRunIds, ["running", "awaiting_retry", "failed"], txRepos);
+	await discardStaleTasks(transitionedRuns, ["running", "awaiting_retry", "failed"], txRepos);
 
 	let stateTransitionEntriesToInsert = stateTransitionEntries;
 	let outboxEntriesToInsert = outboxEntries;
-	if (transitionedRunIds.length !== stateTransitionEntries.length) {
-		const transitionedRunIdsSet = new Set(transitionedRunIds);
+	if (transitionedRuns.length !== stateTransitionEntries.length) {
+		const transitionedRunIdsSet = new Set(transitionedRuns.map((run) => run.id));
 		stateTransitionEntriesToInsert = stateTransitionEntries.filter((entry) =>
 			transitionedRunIdsSet.has(entry.workflowRunId)
 		);

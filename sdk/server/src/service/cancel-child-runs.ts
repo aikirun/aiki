@@ -112,6 +112,7 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 				workflowRunId: childrenCancellationRunId,
 				type: "workflow_run",
 				attempt: 1,
+				revision: 0,
 				state: {
 					status: "scheduled",
 					scheduledAt: now,

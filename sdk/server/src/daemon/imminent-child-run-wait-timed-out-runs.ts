@@ -141,6 +141,7 @@ async function processChunk(
 			workflowRunId: run.id,
 			type: "workflow_run",
 			attempt: run.attempts,
+			revision: run.revision + 1,
 			state: toState,
 		});
 		workflowRunUpdates.push({
@@ -197,11 +198,12 @@ async function transitionToQueuedInTx(
 	txRepos: TxRepositories
 ): Promise<WorkflowRunOutboxRowInsertPending[]> {
 	const { workflowRunUpdates, childRunWaitEntries, stateTransitionEntries, outboxEntries } = entries;
-	const transitionedRunIds = await txRepos.workflowRun.bulkTransitionToQueued(
+	const transitionedRuns = await txRepos.workflowRun.bulkTransitionToQueued(
 		context,
 		"awaiting_child_workflow",
 		workflowRunUpdates
 	);
+	const transitionedRunIds = transitionedRuns.map((run) => run.id);
 	if (!isNonEmptyArray(transitionedRunIds)) {
 		return [];
 	}
