@@ -1,21 +1,21 @@
 import type { Codec, CreateCodec } from "@aikirun/types/infra/codec";
 
-export type CodecOptions = {
+export type CodecParams = {
 	name: string;
 	encode: (payload: unknown) => unknown | Promise<unknown>;
-	decode: (namedEncodedPayload: unknown) => unknown | Promise<unknown>;
+	decode: (encoded: unknown) => unknown | Promise<unknown>;
 };
 
 export type NamedCreateCodec = CreateCodec & {
 	readonly codecName: string;
 };
 
-export class InvalidCodecPayloadFormatError extends Error {
+export class InvalidEncodedValueError extends Error {
 	public readonly codecName: string;
 
 	constructor(codecName: string) {
-		super(`Codec "${codecName}" payload is missing the { codecName, body } envelope`);
-		this.name = `InvalidCodecPayloadFormatError(${codecName})`;
+		super(`Codec "${codecName}" received a value that was not produced by encode`);
+		this.name = "InvalidEncodedValueError";
 		this.codecName = codecName;
 	}
 }
@@ -26,28 +26,28 @@ export class CodecNameMismatchError extends Error {
 
 	constructor(codecName: string, payloadName: string) {
 		super(`Codec name mismatch: expected "${codecName}", got "${payloadName}"`);
-		this.name = `CodecNameMismatchError(${codecName})`;
+		this.name = "CodecNameMismatchError";
 		this.codecName = codecName;
 		this.payloadName = payloadName;
 	}
 }
 
-export type NamedEncodedPayload = {
+export type EncodedValue = {
 	codecName: string;
 	body: unknown;
 };
 
-export function isEncodedPayload(payload: unknown): payload is NamedEncodedPayload {
+export function isEncodedValue(payload: unknown): payload is EncodedValue {
 	return (
 		typeof payload === "object" &&
 		payload !== null &&
 		"codecName" in payload &&
 		"body" in payload &&
-		typeof (payload as NamedEncodedPayload).codecName === "string"
+		typeof (payload as EncodedValue).codecName === "string"
 	);
 }
 
-export function codec({ name, encode, decode }: CodecOptions): NamedCreateCodec {
+export function codec({ name, encode, decode }: CodecParams): NamedCreateCodec {
 	const create: NamedCreateCodec = Object.assign(
 		(): Codec => ({
 			encode: async (payload) => {
@@ -57,16 +57,16 @@ export function codec({ name, encode, decode }: CodecOptions): NamedCreateCodec 
 					body: body instanceof Promise ? await body : body,
 				};
 			},
-			decode: async (payload) => {
-				if (!isEncodedPayload(payload)) {
-					throw new InvalidCodecPayloadFormatError(name);
+			decode: async (encoded) => {
+				if (!isEncodedValue(encoded)) {
+					throw new InvalidEncodedValueError(name);
 				}
 
-				if (payload.codecName !== name) {
-					throw new CodecNameMismatchError(name, payload.codecName);
+				if (encoded.codecName !== name) {
+					throw new CodecNameMismatchError(name, encoded.codecName);
 				}
 
-				const decoded = decode(payload.body);
+				const decoded = decode(encoded.body);
 
 				return decoded instanceof Promise ? await decoded : decoded;
 			},

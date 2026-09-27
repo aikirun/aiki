@@ -11,12 +11,12 @@ export interface BoundCodec {
 
 export const noopCodec: BoundCodec = {
 	encode: async (payload) => payload as OpaquePayload,
-	decode: async (payload) => payload,
+	decode: async (encoded) => encoded,
 };
 
 export const toBoundCodec = (codec: Codec): BoundCodec => ({
 	encode: async (payload) => (await codec.encode(payload)) as OpaquePayload,
-	decode: (payload) => codec.decode(payload),
+	decode: (encoded) => codec.decode(encoded),
 });
 
 /**

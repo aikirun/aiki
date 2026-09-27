@@ -19,7 +19,7 @@ import { codec } from "@aikirun/codec";
 const myCodec = codec({
 	name: "aes-256-gcm",
 	encode: (payload) => encryptWithKey(payload),
-	decode: (body) => decryptWithKey(body),
+	decode: (encoded) => decryptWithKey(encoded),
 });
 
 const aiki = client({

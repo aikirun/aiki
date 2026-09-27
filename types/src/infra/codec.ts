@@ -6,7 +6,7 @@ export interface CodecContext {
 
 export type Codec = {
 	encode(payload: unknown): Promise<unknown>;
-	decode(payload: unknown): Promise<unknown>;
+	decode(encoded: unknown): Promise<unknown>;
 };
 
 export type CreateCodec = (context: CodecContext) => Codec;

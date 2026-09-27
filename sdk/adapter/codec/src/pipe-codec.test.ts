@@ -8,31 +8,31 @@ describe("pipeCodecs", () => {
 	const inner = codec({
 		name: "inner",
 		encode: (payload) => ({ inner: payload }),
-		decode: (body) => {
-			if (typeof body !== "object" || body === null || !("inner" in body)) {
-				throw new Error("unexpected inner body");
+		decode: (encoded) => {
+			if (typeof encoded !== "object" || encoded === null || !("inner" in encoded)) {
+				throw new Error("unexpected inner encoded value");
 			}
-			return body.inner;
+			return encoded.inner;
 		},
 	});
 	const middle = codec({
 		name: "middle",
 		encode: (payload) => ({ middle: payload }),
-		decode: (body) => {
-			if (typeof body !== "object" || body === null || !("middle" in body)) {
-				throw new Error("unexpected middle body");
+		decode: (encoded) => {
+			if (typeof encoded !== "object" || encoded === null || !("middle" in encoded)) {
+				throw new Error("unexpected middle encoded value");
 			}
-			return body.middle;
+			return encoded.middle;
 		},
 	});
 	const outer = codec({
 		name: "outer",
 		encode: (payload) => ({ outer: payload }),
-		decode: (body) => {
-			if (typeof body !== "object" || body === null || !("outer" in body)) {
-				throw new Error("unexpected outer body");
+		decode: (encoded) => {
+			if (typeof encoded !== "object" || encoded === null || !("outer" in encoded)) {
+				throw new Error("unexpected outer encoded value");
 			}
-			return body.outer;
+			return encoded.outer;
 		},
 	});
 	const piped = pipeCodecs(inner, middle, outer)({ logger: noopLogger });

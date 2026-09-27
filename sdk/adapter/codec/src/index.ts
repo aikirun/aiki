@@ -1,14 +1,14 @@
 export {
 	CodecNameMismatchError,
-	type CodecOptions,
+	type CodecParams,
 	codec,
-	InvalidCodecPayloadFormatError,
+	InvalidEncodedValueError,
 	type NamedCreateCodec,
 } from "./codec";
 export { pipeCodecs } from "./pipe-codec";
 export {
-	DuplicateRoutedCodecNameError,
-	type SwitchCodecsOptions,
+	DuplicateCodecNameError,
+	type SwitchCodecsParams,
 	switchCodecs,
-	UnknownCodecNameInPayloadError,
+	UnknownCodecNameError,
 } from "./switch-codec";
