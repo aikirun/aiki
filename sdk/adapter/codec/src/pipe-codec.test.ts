@@ -1,39 +1,24 @@
 import { noopLogger } from "@aikirun/lib/logger";
 
-import { codec } from "./codec";
+import { codec, type EncodedValue, type NamedCreateCodec } from "./codec";
 import { pipeCodecs } from "./pipe-codec";
-import { describe, expect, test } from "bun:test";
+import { describe, expect, expectTypeOf, test } from "bun:test";
 
 describe("pipeCodecs", () => {
 	const inner = codec({
 		name: "inner",
-		encode: (payload) => ({ inner: payload }),
-		decode: (encoded) => {
-			if (typeof encoded !== "object" || encoded === null || !("inner" in encoded)) {
-				throw new Error("unexpected inner encoded value");
-			}
-			return encoded.inner;
-		},
+		encode: (payload) => ({ inner: JSON.stringify(payload) }),
+		decode: (encoded) => JSON.parse(encoded.inner),
 	});
 	const middle = codec({
 		name: "middle",
-		encode: (payload) => ({ middle: payload }),
-		decode: (encoded) => {
-			if (typeof encoded !== "object" || encoded === null || !("middle" in encoded)) {
-				throw new Error("unexpected middle encoded value");
-			}
-			return encoded.middle;
-		},
+		encode: (payload) => ({ middle: JSON.stringify(payload) }),
+		decode: (encoded) => JSON.parse(encoded.middle),
 	});
 	const outer = codec({
 		name: "outer",
-		encode: (payload) => ({ outer: payload }),
-		decode: (encoded) => {
-			if (typeof encoded !== "object" || encoded === null || !("outer" in encoded)) {
-				throw new Error("unexpected outer encoded value");
-			}
-			return encoded.outer;
-		},
+		encode: (payload) => ({ outer: JSON.stringify(payload) }),
+		decode: (encoded) => JSON.parse(encoded.outer),
 	});
 	const piped = pipeCodecs(inner, middle, outer)({ logger: noopLogger });
 
@@ -42,15 +27,15 @@ describe("pipeCodecs", () => {
 		expect(await piped.encode(payload)).toEqual({
 			codecName: "outer",
 			body: {
-				outer: {
+				outer: JSON.stringify({
 					codecName: "middle",
 					body: {
-						middle: {
+						middle: JSON.stringify({
 							codecName: "inner",
-							body: { inner: payload },
-						},
+							body: { inner: JSON.stringify(payload) },
+						}),
 					},
-				},
+				}),
 			},
 		});
 	});
@@ -64,5 +49,10 @@ describe("pipeCodecs", () => {
 	test("exposes the outermost codec name", () => {
 		expect(pipeCodecs(inner, middle, outer).codecName).toBe("outer");
 		expect(pipeCodecs(inner).codecName).toBe("inner");
+	});
+
+	test("reports the outermost member's output type", () => {
+		expectTypeOf(pipeCodecs(inner, middle, outer)).toEqualTypeOf<NamedCreateCodec<EncodedValue<{ outer: string }>>>();
+		expectTypeOf(pipeCodecs(inner)).toEqualTypeOf<NamedCreateCodec<EncodedValue<{ inner: string }>>>();
 	});
 });

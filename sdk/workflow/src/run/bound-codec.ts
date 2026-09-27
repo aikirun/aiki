@@ -14,7 +14,7 @@ export const noopCodec: BoundCodec = {
 	decode: async (encoded) => encoded,
 };
 
-export const toBoundCodec = (codec: Codec): BoundCodec => ({
+export const toBoundCodec = (codec: Codec<unknown>): BoundCodec => ({
 	encode: async (payload) => (await codec.encode(payload)) as OpaquePayload,
 	decode: (encoded) => codec.decode(encoded),
 });

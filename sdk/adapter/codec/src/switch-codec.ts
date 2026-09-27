@@ -24,8 +24,8 @@ export class DuplicateCodecNameError extends Error {
 	}
 }
 
-export interface SwitchCodecsParams {
-	current: NamedCreateCodec;
+export interface SwitchCodecsParams<Encoded> {
+	current: NamedCreateCodec<Encoded>;
 	deprecated: NamedCreateCodec[];
 }
 
@@ -36,7 +36,7 @@ export interface SwitchCodecsParams {
  * Throws `UnknownCodecNameError` on decode when the payload's `codecName` matches no
  * member.
  */
-export function switchCodecs({ current, deprecated }: SwitchCodecsParams): NamedCreateCodec {
+export function switchCodecs<Encoded>({ current, deprecated }: SwitchCodecsParams<Encoded>): NamedCreateCodec<Encoded> {
 	const members = [current, ...deprecated];
 	const seenNames = new Set<string>();
 	for (const member of members) {
@@ -48,9 +48,9 @@ export function switchCodecs({ current, deprecated }: SwitchCodecsParams): Named
 	const knownCodecNames = members.map((member) => member.codecName);
 
 	return Object.assign(
-		(context: CodecContext): Codec => {
+		(context: CodecContext): Codec<Encoded> => {
 			const currentInstance = current(context);
-			const instancesByName = new Map<string, Codec>([
+			const instancesByName = new Map<string, Codec<unknown>>([
 				[current.codecName, currentInstance],
 				...deprecated.map((member) => [member.codecName, member(context)] as const),
 			]);

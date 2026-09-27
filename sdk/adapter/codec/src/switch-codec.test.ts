@@ -1,29 +1,19 @@
 import { noopLogger } from "@aikirun/lib/logger";
 
-import { codec, InvalidEncodedValueError } from "./codec";
+import { codec, type EncodedValue, InvalidEncodedValueError, type NamedCreateCodec } from "./codec";
 import { DuplicateCodecNameError, switchCodecs, UnknownCodecNameError } from "./switch-codec";
-import { describe, expect, test } from "bun:test";
+import { describe, expect, expectTypeOf, test } from "bun:test";
 
 describe("switchCodecs", () => {
 	const current = codec({
 		name: "v2",
-		encode: (payload) => ({ v2: payload }),
-		decode: (encoded) => {
-			if (typeof encoded !== "object" || encoded === null || !("v2" in encoded)) {
-				throw new Error("unexpected v2 encoded value");
-			}
-			return encoded.v2;
-		},
+		encode: (payload) => ({ v2: JSON.stringify(payload) }),
+		decode: (encoded) => JSON.parse(encoded.v2),
 	});
 	const deprecated = codec({
 		name: "v1",
-		encode: (payload) => ({ v1: payload }),
-		decode: (encoded) => {
-			if (typeof encoded !== "object" || encoded === null || !("v1" in encoded)) {
-				throw new Error("unexpected v1 encoded value");
-			}
-			return encoded.v1;
-		},
+		encode: (payload) => ({ v1: JSON.stringify(payload) }),
+		decode: (encoded) => JSON.parse(encoded.v1),
 	});
 	const switched = switchCodecs({ current, deprecated: [deprecated] })({ logger: noopLogger });
 
@@ -31,7 +21,7 @@ describe("switchCodecs", () => {
 		const payload = { name: "alice" };
 		expect(await switched.encode(payload)).toEqual({
 			codecName: "v2",
-			body: { v2: payload },
+			body: { v2: JSON.stringify(payload) },
 		});
 	});
 
@@ -40,13 +30,13 @@ describe("switchCodecs", () => {
 		expect(
 			await switched.decode({
 				codecName: "v2",
-				body: { v2: payload },
+				body: { v2: JSON.stringify(payload) },
 			})
 		).toEqual(payload);
 		expect(
 			await switched.decode({
 				codecName: "v1",
-				body: { v1: payload },
+				body: { v1: JSON.stringify(payload) },
 			})
 		).toEqual(payload);
 	});
@@ -88,5 +78,11 @@ describe("switchCodecs", () => {
 
 	test("exposes the current codec name", () => {
 		expect(switchCodecs({ current, deprecated: [deprecated] }).codecName).toBe("v2");
+	});
+
+	test("reports the current member's output type", () => {
+		expectTypeOf(switchCodecs({ current, deprecated: [deprecated] })).toEqualTypeOf<
+			NamedCreateCodec<EncodedValue<{ v2: string }>>
+		>();
 	});
 });
