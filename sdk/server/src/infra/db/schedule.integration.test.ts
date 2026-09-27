@@ -181,6 +181,34 @@ describe("schedule repository update", () => {
 			expect(updated).toEqual(await getScheduleRow(repos, context.namespaceId, schedule.id));
 		}));
 
+	test("bumps the revision when the update records a state transition", () =>
+		withHarness(async ({ context, repos }) => {
+			const { schedule } = await seedActiveSchedule({ namespaceRequestContext: context, repos });
+			const rowBefore = await getScheduleRow(repos, context.namespaceId, schedule.id);
+
+			const updated = await repos.schedule.update(
+				context.namespaceId,
+				{ id: schedule.id },
+				{ status: "paused", latestStateTransitionId: ulid() }
+			);
+
+			expect(updated).toEqual(expect.objectContaining({ revision: rowBefore.revision + 1 }));
+		}));
+
+	test("keeps the revision when the update records no state transition", () =>
+		withHarness(async ({ context, repos }) => {
+			const { schedule } = await seedActiveSchedule({ namespaceRequestContext: context, repos });
+			const rowBefore = await getScheduleRow(repos, context.namespaceId, schedule.id);
+
+			const updated = await repos.schedule.update(
+				context.namespaceId,
+				{ id: schedule.id },
+				{ referenceId: "monthly-close" }
+			);
+
+			expect(updated).toEqual(expect.objectContaining({ referenceId: "monthly-close", revision: rowBefore.revision }));
+		}));
+
 	test("a null reference id in the filter matches only an unreferenced schedule", () =>
 		withHarness(async ({ context, repos }) => {
 			const deps = { namespaceRequestContext: context, repos };

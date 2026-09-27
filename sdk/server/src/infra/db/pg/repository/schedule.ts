@@ -62,7 +62,11 @@ export const createScheduleRepository = (db: PgDb) => ({
 
 		const result = await db
 			.update(schedule)
-			.set(updates)
+			.set(
+				updates.latestStateTransitionId === undefined
+					? updates
+					: { ...updates, revision: sql`${schedule.revision} + 1` }
+			)
 			.where(and(...conditions))
 			.returning();
 		return result[0] ?? null;
