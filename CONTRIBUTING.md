@@ -140,6 +140,20 @@ handled for you on commit. A pre-push hook type-checks your changes with
 it first regenerates the docs types. Commits stay fast so you can freely save
 work in progress.
 
+## Opening a PR
+
+- **Branch from an up-to-date `main`,** and name the branch after the change in
+  short kebab-case: `schedule-revision`, `workflow-queue-collision`.
+- **Keep each PR to one change.** A fix and an unrelated refactor are two PRs.
+  A large change can land as a series, each PR building on the last.
+- **Write commit messages as a short imperative sentence,** with no type
+  prefix: `Order state transitions by revision`.
+- **Fill in the PR template.** It asks what changed and why, which issue it
+  closes, how you tested it, and for the checks above.
+
+CI runs those checks too, along with the integration tests, an image smoke
+test, and a check that committed migrations match the schema.
+
 ## Contributor License Agreement
 
 Your first pull request needs a one-time agreement to the
@@ -154,10 +168,3 @@ remain free to use your own contributions anywhere else.
 If your employer owns the code you write — which is what many employment
 contracts say, including for work done on your own time — your personal signature is not enough. Point them at the [Corporate CLA](.github/CCLA.md) and email
 oluwafemi.shobande@aiki.run.
-
-## TODO — planned additions to this guide
-
-- **PR creation guidance.** Add a [`.github/PULL_REQUEST_TEMPLATE.md`](.github)
-  (summary, linked issue, test plan, and a check/lint/test checklist) plus a
-  short "Opening a PR" section here covering branch naming, keeping PRs focused,
-  and the commit-message convention.
