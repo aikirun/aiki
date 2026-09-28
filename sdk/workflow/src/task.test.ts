@@ -627,6 +627,112 @@ describe("task", () => {
 				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
 			}));
 
+		test("does not re-run the handler when completing the task fails", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				// The max inline wait admits the retry delay, so a failed completion counted as a failed
+				// attempt would run the handler again in process.
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: Number.MAX_SAFE_INTEGER });
+
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
+				let handlerCalls = 0;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						handlerCalls++;
+						return "charged";
+					},
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash,
+							taskName: chargeCard.name,
+							options: { retry },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.rejectsOnce(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: { status: "completed", output: asOpaquePayload("charged") },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						new Error("server unavailable")
+					);
+
+				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
+				expect(handlerCalls).toBe(1);
+			}));
+
+		test("does not re-run the handler when persisting awaiting_retry fails", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: 0 });
+
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 1_000 } as const;
+				let handlerCalls = 0;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						handlerCalls++;
+						throw new Error("down");
+					},
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash,
+							taskName: chargeCard.name,
+							options: { retry },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.rejectsOnce(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "awaiting_retry",
+								error: expect.objectContaining({ message: "down" }),
+								nextAttemptInMs: 1_000,
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						new Error("server unavailable")
+					);
+
+				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
+				expect(handlerCalls).toBe(1);
+			}));
+
 		test("replays a completed task from history without touching the client", () =>
 			withFakeClient(async (client) => {
 				let handlerCalls = 0;

@@ -335,12 +335,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	): Promise<{ output: Output; lastAttempt: number }> {
 		let attempts = currentAttempt;
 
-		// TODO: Add test cases for this:
-		// Infra changes like transitioning of task state should not consume retry budget.
-		// Even if task crashes while trying to transition state, it will be picked up
-		// by another worker, who will either fail the task if retry budget is
-		// exhausted or retry the task
-
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(input);
