@@ -3,6 +3,9 @@
 	"version": "0.42.0",
 	"description": "Aiki server library \u2014 durable execution orchestrator.",
 	"type": "module",
+	"engines": {
+		"node": ">=22"
+	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {

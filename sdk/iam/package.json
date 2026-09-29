@@ -3,6 +3,9 @@
 	"version": "0.42.0",
 	"description": "Aiki IAM library \u2014 pluggable identity & access management",
 	"type": "module",
+	"engines": {
+		"node": ">=22"
+	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
