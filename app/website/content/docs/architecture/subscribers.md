@@ -41,7 +41,7 @@ import { inMemoryQueue } from "@aikirun/memory";
 const queue = inMemoryQueue();
 
 const aikiServer = server({
-  db: database({ provider: "pg", url: databaseUrl }),
+  db: database({ provider: "sqlite", path: "./aiki.db" }),
   runtime: { publisher: queue.publisher },
 });
 

@@ -70,17 +70,11 @@
     #topo-head { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   /* The push column is veiled until the server-side push path ships; the endpoint package alone
-     does not deliver work. The zero-infrastructure cell wears the same veil until the SQLite
-     provider ships. */
+     does not deliver work. */
   .topo-soon { position: relative; }
   .topo-soon:hover { border-color: rgba(23,23,26,0.075); box-shadow: 0 1px 2px rgba(23,23,26,0.04); }
   .topo-soon-veil { position: absolute; inset: 0; border-radius: 14px; background: rgba(23,23,26,0.055); pointer-events: none; }
   .topo-soon-tag { position: relative; z-index: 1; align-self: flex-start; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #5d3a83; background: #ffffff; border: 1px solid rgba(118,75,162,0.3); border-radius: 999px; padding: 5px 11px; margin-bottom: 9px; }
-  /* The infra cells are square inside a clipped grid and carry their own hover tint, and the
-     column gap already spaces the tag off the heading. */
-  #grid-infra .topo-soon-veil { border-radius: 0; }
-  #grid-infra .topo-soon:hover { background: #ffffff; }
-  #grid-infra .topo-soon-tag { margin-bottom: 0; }
 </style>
 </head>
 <body>
@@ -136,6 +130,7 @@
 <span style="color:#b78ce0">import</span> { activateTrial, downgradeToFree } <span style="color:#b78ce0">from</span> <span style="color:#d9b48a">"./tasks"</span>;
 
 <span style="color:#b78ce0">export const</span> <span style="color:#8ab4e8">trialV1</span> = workflow({ name: <span style="color:#d9b48a">"trial"</span> }).<span style="color:#8ab4e8">v</span>(<span style="color:#d9b48a">"1"</span>, {
+  events: { <span style="color:#8ab4e8">paymentReceived</span>: event() },
   <span style="color:#b78ce0">async</span> handler(run, input: { <span style="color:#8ab4e8">userId</span>: <span style="color:#b78ce0">string</span> }) {
     <span style="color:#8b8794">// start a task
 </span>    <span style="color:#b78ce0">await</span> <span style="color:#8ab4e8">activateTrial</span>.start(run, input.<span style="color:#8ab4e8">userId</span>);
@@ -148,7 +143,6 @@
       <span style="color:#b78ce0">await</span> <span style="color:#8ab4e8">downgradeToFree</span>.start(run, input.<span style="color:#8ab4e8">userId</span>);
     }
   },
-  events: { <span style="color:#8ab4e8">paymentReceived</span>: event() },
 });</pre>
 
 <pre class="pane" data-pane="1" style="margin: 0; padding: 24px 22px 28px; overflow-x: auto; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.95; color: #d7d6de; min-height: 470px;"><span style="color:#b78ce0">import</span> { task } <span style="color:#b78ce0">from</span> <span style="color:#d9b48a">"@aikirun/workflow"</span>;
@@ -172,7 +166,7 @@
 <span style="color:#b78ce0">import</span> { worker } <span style="color:#b78ce0">from</span> <span style="color:#d9b48a">"@aikirun/worker"</span>;
 <span style="color:#b78ce0">import</span> { trialV1 } <span style="color:#b78ce0">from</span> <span style="color:#d9b48a">"./workflow"</span>;
 
-<span style="color:#b78ce0">const</span> <span style="color:#8ab4e8">db</span> = database({ provider: <span style="color:#d9b48a">"pg"</span>, url: process.env.<span style="color:#8ab4e8">DATABASE_URL</span> });
+<span style="color:#b78ce0">const</span> <span style="color:#8ab4e8">db</span> = database({ provider: <span style="color:#d9b48a">"sqlite"</span>, path: <span style="color:#d9b48a">"./aiki.db"</span> });
 
 <span style="color:#8b8794">// the server is a library — it runs inside this process
 </span><span style="color:#b78ce0">const</span> <span style="color:#8ab4e8">aikiServer</span> = server({ <span style="color:#8ab4e8">db</span> });
@@ -393,11 +387,9 @@
       <p style="margin: 4px 0 0; font-size: 16px; line-height: 1.6; color: #5c5c64; max-width: 60ch; text-wrap: pretty;">What you run depends on what you need — nothing more.</p>
     </div>
     <div id="grid-infra" style="display: grid; gap: 1px; background: rgba(23,23,26,0.1); border: 1px solid rgba(23,23,26,0.1); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(23,23,26,0.04);">
-      <div class="cell topo-soon" style="background: #ffffff; padding: 28px 26px 32px; display: flex; flex-direction: column; gap: 10px; transition: background .16s ease;">
-        <span class="topo-soon-tag">Coming soon</span>
+      <div class="cell" style="background: #ffffff; padding: 28px 26px 32px; display: flex; flex-direction: column; gap: 10px; transition: background .16s ease;">
         <h3 style="margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.018em;">Zero infrastructure</h3>
         <p style="margin: 0; font-size: 14.5px; line-height: 1.62; color: #5c5c64; text-wrap: pretty;">One process, a SQLite file. Durable workflows with no external services.</p>
-        <div class="topo-soon-veil"></div>
       </div>
       <div class="cell" style="background: #ffffff; padding: 28px 26px 32px; display: flex; flex-direction: column; gap: 10px; transition: background .16s ease;">
         <h3 style="margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.018em;">Shared state</h3>

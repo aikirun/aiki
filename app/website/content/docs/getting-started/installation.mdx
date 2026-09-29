@@ -6,61 +6,121 @@ description: Add the SDK to your project, or host the standalone server and dash
 How you install Aiki depends on what you're doing:
 
 - **Building workflows** — add the SDK to your TypeScript project and run the server embedded in your app, or point your app at a hosted Aiki server. Follow [Add Aiki to your project](#add-aiki-to-your-project).
-- **Hosting Aiki** — run the standalone server and web dashboard as infrastructure, with no SDK install. You need a PostgreSQL database. Run it from the prebuilt `aiki` binary, the ready-made Docker stack, or from source with Bun. Follow [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard).
+- **Hosting Aiki** — run the standalone server and web dashboard as infrastructure, with no SDK install. You need a database: a SQLite file, or a PostgreSQL server. Run the server from the prebuilt `aiki` binary, or run both from the published Docker images or from source with Bun. Follow [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard).
 
 ## Add Aiki to your project
 
-You need Node.js 18+ or Bun 1.0+, and a PostgreSQL 14+ database (SQLite and MySQL coming soon). Aiki ships as ESM only, so your project must be ESM.
+You need Node.js 22+ or Bun 1.0+, and a database. Aiki ships as ESM only, so your project must be ESM.
+
+Aiki stores its state in one of two databases. You pick one with `DATABASE_PROVIDER`:
+
+| Database | `DATABASE_PROVIDER` | Where it lives | Also set |
+|---|---|---|---|
+| SQLite | `sqlite` | a single file on the Aiki server's disk | `DATABASE_PATH` |
+| PostgreSQL 14+ | `pg` | a Postgres server you run | `DATABASE_URL` |
+
+SQLite needs nothing installed, so it's the quickest way to start. A SQLite file serves one server process. Two processes on the same file, such as two servers or two apps that each embed one, can stall each other. To run several server instances, use Postgres.
 
 ### Install the SDK packages
+
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
+
+```package-install
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @libsql/client
+```
+
+`@libsql/client` is the driver for SQLite.
+
+</Tab>
+<Tab value="Postgres">
 
 ```package-install
 @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server postgres
 ```
 
-`postgres` is the driver for the `pg` provider. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
+`postgres` is the driver for Postgres.
+
+</Tab>
+</Tabs>
+
+`@aikirun/server` declares the drivers as optional peer dependencies, so your package manager does not install them on its own.
 
 ### Apply the schema migration
 
 If you will [run the standalone server](#run-the-standalone-server-and-dashboard), skip this step — that section covers migration for each way of running it.
 
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
+
 ```bash
-DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
   npx aiki-server migrate apply
 ```
+
+The file is created if it doesn't exist.
+
+</Tab>
+<Tab value="Postgres">
+
+```bash
+DATABASE_PROVIDER=pg DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+  npx aiki-server migrate apply
+```
+
+</Tab>
+</Tabs>
 
 Re-run this command when upgrading Aiki to apply new migrations.
 
 ### Run the server
 
-Mount aiki server handler in any HTTP framework — in the same process as your app, or in a process dedicated to Aiki. The [Quick Start](./quick-start.mdx) walks through this end-to-end, including worker and client.
+Serve the Aiki server's handler with any HTTP framework, in the same process as your app or in a process dedicated to Aiki. The [Quick Start](./quick-start.mdx) walks through this end to end, including the worker and client.
 
-An embedded server should also be given a timer priority queue. Without one it finds due work by scanning the database on an interval, so a short sleep or retry waits for the next scan:
+An embedded server should also be given a timer priority queue. Without one, a run can wait several seconds before it moves on: after it starts, after an event arrives, or when a sleep or retry comes due.
 
 ```package-install
 @aikirun/memory
 ```
 
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
+
 ```typescript
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 
 const aikiServer = server({
-  db: database({ provider: "pg", url: databaseUrl }),
+  db: database({ provider: "sqlite", path: "./aiki.db" }),
   timerPriorityQueue: inMemoryTimerPriorityQueue(),
 });
 ```
+
+</Tab>
+<Tab value="Postgres">
+
+```typescript
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+
+const aikiServer = server({
+  db: database({ provider: "pg", url: "postgresql://user:password@your-db-host:5432/aiki" }),
+  timerPriorityQueue: inMemoryTimerPriorityQueue(),
+});
+```
+
+</Tab>
+</Tabs>
 
 The in-process queue serves one server instance. Across several instances use `@aikirun/redis`, which hands each timer to exactly one of them — see [Server](../architecture/server.md).
 
 Workflow code is identical against an embedded or standalone server, so you can also skip embedding entirely and point your client at a server hosted per [Run the standalone server and dashboard](#run-the-standalone-server-and-dashboard).
 
-Want the web dashboard against your embedded server? Serve it separately — see [Run the dashboard on its own](#run-the-dashboard-on-its-own).
+Want the web dashboard for your embedded server? Serve the server's handler over HTTP, as the [Quick Start](./quick-start.mdx) does, then point the dashboard at it. See [Run the dashboard on its own](#run-the-dashboard-on-its-own).
 
 ## Run the standalone server and dashboard
 
 Hosting Aiki as infrastructure means running two components:
 
-- **Server** — the Aiki server. Needs `DATABASE_URL`.
+- **Server** — the Aiki server. Needs `DATABASE_PROVIDER`, plus `DATABASE_PATH` for SQLite or `DATABASE_URL` for Postgres.
 - **Dashboard** — the web UI, a single-page app that talks to the server.
 
 However you run the server, applications connect the same way:
@@ -69,11 +129,11 @@ However you run the server, applications connect the same way:
 const aikiClient = client({ url: "http://localhost:9850" });
 ```
 
-Before the server starts, apply the schema. This one-off **migration step** applies the server package's migrations, plus the iam package's when the server runs with auth (`AIKI_SERVER_AUTH_SECRET`). It needs `DATABASE_URL`, and is safe to repeat: run it on a fresh database or when an aiki upgrade ships new migrations. Already-applied migrations are skipped.
+Before the server starts, apply the schema. This one-off **migration step** applies the server package's migrations, plus the iam package's when the server runs with auth (`AIKI_SERVER_AUTH_SECRET`). It needs the same database settings as the server, and is safe to repeat: run it on a fresh database or when an aiki upgrade ships new migrations. Already-applied migrations are skipped.
 
-There are three ways to run this stack:
+There are three ways to run them:
 
-- **The `aiki` binary** — one downloaded executable with its own runtime, no Node, Bun, or Docker to install.
+- **The `aiki` binary** — runs the server from one downloaded executable with its own runtime, no Node, Bun, or Docker to install. The dashboard is served separately.
 - **Docker** — run the published images, brought up together by Compose or on their own. Best if you already run containers.
 - **From source** — clone at a release tag and run with Bun. Best for contributors.
 
@@ -90,9 +150,26 @@ chmod +x aiki
 
 If macOS then refuses to run it, see [Troubleshooting](#troubleshooting).
 
-```bash
-export DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
 
+```bash
+export DATABASE_PROVIDER=sqlite
+export DATABASE_PATH=./aiki.db
+```
+
+</Tab>
+<Tab value="Postgres">
+
+```bash
+export DATABASE_PROVIDER=pg
+export DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
+```
+
+</Tab>
+</Tabs>
+
+```bash
 aiki migrate apply     # migrates the server package; use --package server,iam to include iam
 aiki server start      # serves on :9850
 ```
@@ -103,7 +180,7 @@ The dashboard ships separately — serve it as a static site (see [Run the dashb
 
 ### With Docker
 
-The published images cover the stack: `ghcr.io/aikirun/cli` — the same `aiki` binary — runs the migration, `ghcr.io/aikirun/server` runs the server, and `ghcr.io/aikirun/dashboard` serves the web UI. Compose wires them together; you can also run them yourself.
+There are three published images: `ghcr.io/aikirun/cli` — the same `aiki` binary — runs the migration, `ghcr.io/aikirun/server` runs the server, and `ghcr.io/aikirun/dashboard` serves the web UI. Compose wires them together; you can also run them yourself.
 
 #### With Docker Compose
 
@@ -114,13 +191,31 @@ mkdir aiki && cd aiki
 curl -fsSL https://github.com/aikirun/aiki/releases/latest/download/docker-compose.yml -o docker-compose.yml
 ```
 
-Create a `.env` next to it with your database URL:
+Create a `.env` next to it that picks the database:
+
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
 
 ```bash
+DATABASE_PROVIDER=sqlite
+```
+
+The database file lives on a Docker volume, `aiki-data`, so it survives restarts and upgrades.
+
+</Tab>
+<Tab value="Postgres">
+
+```bash
+DATABASE_PROVIDER=pg
 DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
 ```
 
-Running Postgres on the same machine as the stack? See [Troubleshooting](#troubleshooting).
+Running Postgres on the same machine as Docker? See [Troubleshooting](#troubleshooting).
+
+</Tab>
+</Tabs>
+
+Compose also reads these variables from your shell or from `--env-file`. Every `docker compose` command needs `DATABASE_PROVIDER`, including `down` and `logs`, and stops with a message saying so when it's missing. A `.env` next to the compose file keeps it set for all of them.
 
 ```bash
 docker compose up -d
@@ -133,18 +228,42 @@ The migration step applies the packages listed in `AIKI_MIGRATE_PACKAGES` — by
 
 #### Without Docker Compose
 
-Run the images yourself when you orchestrate containers with your own tooling. Migrate first, then start the server and dashboard against it:
+Run the images yourself when you orchestrate containers with your own tooling. Migrate first, then start the server against the same database:
+
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
+
+The file sits on a volume that both containers mount, so it outlives them:
 
 ```bash
 # migration
-docker run --rm -e DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+docker run --rm -v aiki-data:/data -e DATABASE_PROVIDER=sqlite -e DATABASE_PATH=/data/aiki.db \
   ghcr.io/aikirun/cli:<version> migrate apply --package server
 
 # server
-docker run -p 9850:9850 -e DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+docker run -p 9850:9850 -v aiki-data:/data -e DATABASE_PROVIDER=sqlite -e DATABASE_PATH=/data/aiki.db \
   ghcr.io/aikirun/server:<version>
+```
 
-# dashboard, proxying browser calls to the server
+</Tab>
+<Tab value="Postgres">
+
+```bash
+# migration
+docker run --rm -e DATABASE_PROVIDER=pg -e DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+  ghcr.io/aikirun/cli:<version> migrate apply --package server
+
+# server
+docker run -p 9850:9850 -e DATABASE_PROVIDER=pg -e DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+  ghcr.io/aikirun/server:<version>
+```
+
+</Tab>
+</Tabs>
+
+Then start the dashboard, which proxies browser calls to the server:
+
+```bash
 docker run -p 9851:9851 -e AIKI_SERVER_UPSTREAM_URL=http://your-server:9850 \
   ghcr.io/aikirun/dashboard:<version>
 ```
@@ -153,14 +272,14 @@ Add `--package server,iam` to the migration when the server runs with auth. The 
 
 ### From source
 
-The same stack runs without Docker (this path needs Bun). Clone at a release tag so you run released code — pick one from the [releases](https://github.com/aikirun/aiki/releases):
+The server and dashboard also run without Docker (this path needs Bun). Clone at a release tag so you run released code — pick one from the [releases](https://github.com/aikirun/aiki/releases):
 
 ```bash
 git clone --branch <version> https://github.com/aikirun/aiki.git
 cd aiki
 bun install
 cp app/server/.env.example app/server/.env
-# Edit app/server/.env with your DATABASE_URL
+# Edit app/server/.env with your database settings
 
 bun run --cwd app/server db:migrate:apply:server   # the migration step
 bun run server                                     # Terminal 1
@@ -171,7 +290,7 @@ Run `bun run --cwd app/server db:migrate:apply:iam` too when the server will run
 
 ## Run the dashboard on its own
 
-Serve the dashboard by itself when the server is embedded in your app (the [SDK path above](#add-aiki-to-your-project)) or hosted somewhere the bundled stack does not reach. It is a single-page app that calls the server from the browser. Serve it as a static site; to run it as a container instead, use the dashboard image under [With Docker](#with-docker).
+Serve the dashboard by itself when the server is embedded in your app (the [SDK path above](#add-aiki-to-your-project)) or when you host the server another way. It is a single-page app that calls the server from the browser. Serve it as a static site; to run it as a container instead, use the dashboard image under [With Docker](#with-docker).
 
 The server's URL is baked into the bundle at build time, so the dashboard is built per deployment (the build needs Bun) — from the release tag matching your installed `@aikirun/*` version:
 
@@ -193,10 +312,11 @@ These apply to the standalone server and the dashboard. If you embed the server 
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_PROVIDER` | No | `pg` | Database provider; `pg` is supported today, `sqlite` and `mysql` coming soon |
-| `DATABASE_URL` | Yes | — | Postgres connection string |
-| `DATABASE_MAX_CONNECTIONS` | No | driver default | Connection pool size |
-| `DATABASE_CA_CERT` | No | — | PEM contents of a CA certificate used to verify the database's TLS certificate. Needed to verify against a private CA (e.g. DigitalOcean, RDS) |
+| `DATABASE_PROVIDER` | Yes | — | `sqlite` for SQLite or `pg` for Postgres |
+| `DATABASE_PATH` | For SQLite | — | Path to the SQLite file; created if it doesn't exist |
+| `DATABASE_URL` | For Postgres | — | Postgres connection string |
+| `DATABASE_MAX_CONNECTIONS` | No | driver default | Postgres connection pool size |
+| `DATABASE_CA_CERT` | No | — | PEM contents of a CA certificate used to verify Postgres's TLS certificate. Needed to verify against a private CA (e.g. DigitalOcean, RDS) |
 | `AIKI_SERVER_HOST` | No | `0.0.0.0` | Bind address |
 | `AIKI_SERVER_PORT` | No | `9850` | Server port |
 | `AIKI_SERVER_BASE_URL` | If IAM is on | — | Public URL of the server; required only when `AIKI_SERVER_AUTH_SECRET` is also set |

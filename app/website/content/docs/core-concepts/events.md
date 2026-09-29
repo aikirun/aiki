@@ -17,13 +17,13 @@ Define events in the workflow version using the `event()` function:
 import { event } from "@aikirun/workflow";
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(run, input) {
-		const response = await run.events.paymentReceived.wait();
-		// Process payment...
-	},
 	events: {
 		paymentReceived: event<{ transactionId: string; amount: number }>(),
 		cancelled: event(),  // Event with no data
+	},
+	async handler(run, input) {
+		const response = await run.events.paymentReceived.wait();
+		// Process payment...
 	},
 });
 ```
@@ -38,10 +38,6 @@ For runtime validation, provide a schema:
 import { z } from "zod";
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
-	async handler(run, input) {
-		// Data is validated by the sender, before it is sent
-		const { data } = await run.events.paymentReceived.wait();
-	},
 	events: {
 		paymentReceived: event<{ transactionId: string; amount: number }>({
 			schema: z.object({
@@ -49,6 +45,10 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 				amount: z.number().positive(),
 			}),
 		}),
+	},
+	async handler(run, input) {
+		// Data is validated by the sender, before it is sent
+		const { data } = await run.events.paymentReceived.wait();
 	},
 });
 ```
@@ -118,6 +118,10 @@ Use `Promise.all` to wait for multiple events. The workflow proceeds only when a
 
 ```typescript
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	events: {
+		paymentReceived: event<{ transactionId: string }>(),
+		shippingConfirmed: event<{ trackingNumber: string }>(),
+	},
 	async handler(run, input) {
 		// Wait for both payment AND shipping confirmation
 		const [payment, shipping] = await Promise.all([
@@ -130,10 +134,6 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 			transactionId: payment.data.transactionId,
 			trackingNumber: shipping.data.trackingNumber,
 		});
-	},
-	events: {
-		paymentReceived: event<{ transactionId: string }>(),
-		shippingConfirmed: event<{ trackingNumber: string }>(),
 	},
 });
 ```
@@ -148,6 +148,9 @@ type OrderUpdate =
 	| { type: "rejected"; by: string; reason: string };
 
 const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	events: {
+		orderUpdate: event<OrderUpdate>(),
+	},
 	async handler(run, input) {
 		const { data } = await run.events.orderUpdate.wait();
 
@@ -156,9 +159,6 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 		} else {
 			await handleRejection.start(run, { reason: data.reason });
 		}
-	},
-	events: {
-		orderUpdate: event<OrderUpdate>(),
 	},
 });
 ```

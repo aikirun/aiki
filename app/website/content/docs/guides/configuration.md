@@ -26,7 +26,7 @@ The server's runtime settings sit under `runtime`:
 import { database, server } from "@aikirun/server";
 
 const aikiServer = server({
-	db: database({ provider: "pg", url: databaseUrl }),
+	db: database({ provider: "sqlite", path: "./aiki.db" }),
 	runtime: {
 		config: { gracefulShutdownTimeoutMs: 10_000 },
 	},

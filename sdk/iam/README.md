@@ -14,7 +14,7 @@ npm install @aikirun/iam
 import { iam } from "@aikirun/iam";
 import { database, server } from "@aikirun/server";
 
-const db = database({ provider: "pg", url: databaseUrl });
+const db = database({ provider: "sqlite", path: "./aiki.db" });
 
 const aikiServer = server({
 	db,

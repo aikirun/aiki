@@ -16,8 +16,9 @@ environment running. For cutting releases, see [`.github/RELEASING.md`](.github/
   protocol, which only Bun/pnpm/Yarn understand — `npm install` here fails with
   `EUNSUPPORTEDPROTOCOL`).
 - **Git**
-- **PostgreSQL** — needed to run the server or examples end-to-end, and to run
-  the integration tests (`bun run test:integration`).
+- **A database** — needed to run the server or examples end-to-end, and to run
+  the integration tests (`bun run test:integration`). Use SQLite, which needs
+  nothing installed, or PostgreSQL.
   The unit tests (`bun run test:unit`) need no database.
 
 ## Set up
@@ -37,7 +38,7 @@ Run these from the repo root:
 | Command                    | What it does                                                           |
 | -------------------------- | ---------------------------------------------------------------------- |
 | `bun run test:unit`        | Run the unit test suite (no database needed)                           |
-| `bun run test:integration` | Run the integration tests (needs a Postgres test database — see below) |
+| `bun run test:integration` | Run the integration tests (needs a test database — see below)          |
 | `bun run check`            | Type-check every package with `tsc`                                    |
 | `bun run lint`             | Lint & format check with Biome                                         |
 | `bun run lint:fix`         | Auto-fix lint/format issues                                            |
@@ -45,22 +46,16 @@ Run these from the repo root:
 
 ## Run the server + dashboard locally
 
-1. Start a Postgres matching the default connection string:
-
-    ```bash
-    docker run --name aiki-pg -p 5432:5432 \
-      -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=aiki \
-      -d postgres:16
-    ```
-
-2. Create the server env file and apply migrations:
+1. Create the server env file and apply migrations. The example settings use
+   SQLite, so the database is a file, `app/server/aiki.db`, and there is nothing
+   else to start:
 
     ```bash
     cp app/server/.env.example app/server/.env
     bun run --cwd app/server db:migrate:apply
     ```
 
-3. Run the pieces (each in its own terminal):
+2. Run the pieces (each in its own terminal):
 
     ```bash
     bun run server      # API server on http://localhost:9850
@@ -68,22 +63,45 @@ Run these from the repo root:
     bun run website     # docs site
     ```
 
+To run on Postgres instead:
+
+1. Start a Postgres container. Its user, password and database are the ones in
+   the Postgres lines of `app/server/.env`:
+
+    ```bash
+    docker run --name aiki-pg -p 5432:5432 \
+      -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=aiki \
+      -d postgres:16
+    ```
+
+2. In `app/server/.env`, comment out the two SQLite lines and uncomment the
+   Postgres ones.
+
+3. Apply the migrations:
+
+    ```bash
+    bun run --cwd app/server db:migrate:apply
+    ```
+
 ## Run an example
 
 The examples run everything in one process (server + workers), so they only need
-a database.
+a database. Their example settings use SQLite too; apply the migrations to that
+file first:
 
 ```bash
-cp examples/.env.example examples/.env          # defaults to embedded mode
-bun run examples/src/scenarios/echo.ts          # or any other scenario
+cp examples/.env.example examples/.env                            # defaults to embedded mode
+bun sdk/server/src/bin.ts migrate apply --env-file examples/.env  # creates aiki.db in the repo root
+bun run examples/src/scenarios/echo.ts                            # or any other scenario
 ```
 
 ## Changing the database schema
 
-Schemas are defined in TypeScript with Drizzle, one per service:
+Schemas are defined in TypeScript with Drizzle, one per service and database. A
+schema change is made to both databases' schemas:
 
-- Server: [`sdk/server/src/infra/db/pg/schema.ts`](sdk/server/src/infra/db/pg/schema.ts)
-- IAM: [`sdk/iam/src/infra/db/pg/schema.ts`](sdk/iam/src/infra/db/pg/schema.ts)
+- Server: [`sdk/server/src/infra/db/sqlite/schema.ts`](sdk/server/src/infra/db/sqlite/schema.ts) and [`sdk/server/src/infra/db/pg/schema.ts`](sdk/server/src/infra/db/pg/schema.ts)
+- IAM: [`sdk/iam/src/infra/db/sqlite/schema.ts`](sdk/iam/src/infra/db/sqlite/schema.ts) and [`sdk/iam/src/infra/db/pg/schema.ts`](sdk/iam/src/infra/db/pg/schema.ts)
 
 After editing a schema, generate a migration:
 
@@ -92,8 +110,8 @@ bun run db:migrate:generate                    # both services
 bun run --cwd sdk/server db:migrate:generate   # or a single service
 ```
 
-This diffs the schema against the stored snapshot and writes a new numbered
-`.sql` file into that service's `src/infra/db/pg/migration/`, updating the
+This diffs each schema against its stored snapshot and writes a new numbered
+`.sql` file into that service's `src/infra/db/<database>/migration/`, updating the
 `meta/` snapshot. No database is needed — it's a pure schema diff. Commit the
 generated `.sql` and `meta/` files together with the schema change.
 
@@ -110,23 +128,29 @@ dashboard locally** step above (`bun run --cwd app/server db:migrate:apply`).
 ## Integration tests
 
 Unit tests (`bun run test:unit`) need no backing services. Integration tests
-(`bun run test:integration`) need two: a Postgres they truncate every table in
-between tests — so it must be a **dedicated** test database, never a real one —
-and a Redis for the redis adapter's tests.
+(`bun run test:integration`) need two: a database they empty before every test
+— so it must be a **dedicated** test database, never a real one — and a Redis for
+the redis adapter's tests.
+
+The example settings use SQLite, so the test database is a file that the migrate
+step creates:
 
 ```bash
-docker exec aiki-pg createdb -U user aiki_test    # test database in the Postgres started above
 docker run --name aiki-redis -p 6379:6379 -d redis:7
-cp .env.test.example .env.test    # defaults match the two containers above
+cp .env.test.example .env.test    # a SQLite test file, plus the Redis container above
 bun run test:db:migrate:apply     # apply the server + iam migrations to the test database
 bun run test:integration
 ```
 
-`DATABASE_URL` and `REDIS_URL` in `.env.test` point the suite elsewhere.
+To run the suite on Postgres, switch `.env.test` to its Postgres lines and create
+the test database, for example in the Postgres from **Run the server + dashboard
+locally**: `docker exec aiki-pg createdb -U user aiki_test`. `DATABASE_URL` and
+`REDIS_URL` in `.env.test` point the suite elsewhere.
 
-CI runs all of this automatically against throwaway Postgres and Redis services,
-so opening a PR does not require local services — but run the tests locally when
-your change touches the database layer or a timer-queue adapter.
+CI runs all of this automatically against throwaway Redis and Postgres services,
+and runs the suite on SQLite too, so opening a PR does not require local services
+— but run the tests locally when your change touches the database layer or a
+timer-queue adapter.
 
 ## Before you open a PR
 

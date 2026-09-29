@@ -52,6 +52,7 @@ const taskWithInput = task({
 
 // Safe: same tasks consumed in different order
 export const camReorderV1 = workflow({ name: "cam-reorder" }).v("1.0.0", {
+	events: { proceed: event() },
 	async handler(run) {
 		if (flags.reorder) {
 			await taskB.start(run);
@@ -63,11 +64,11 @@ export const camReorderV1 = workflow({ name: "cam-reorder" }).v("1.0.0", {
 		await run.events.proceed.wait();
 		return { ok: true };
 	},
-	events: { proceed: event() },
 });
 
 // Safe: fewer entries consumed, nothing new executed
 export const camRemovalV1 = workflow({ name: "cam-removal" }).v("1.0.0", {
+	events: { proceed: event() },
 	async handler(run) {
 		if (!flags.removal) {
 			await taskA.start(run);
@@ -76,11 +77,11 @@ export const camRemovalV1 = workflow({ name: "cam-removal" }).v("1.0.0", {
 		await run.events.proceed.wait();
 		return { ok: true };
 	},
-	events: { proceed: event() },
 });
 
 // Safe: new task after all previous entries consumed
 export const camAppendV1 = workflow({ name: "cam-append" }).v("1.0.0", {
+	events: { proceed: event() },
 	async handler(run) {
 		await taskA.start(run);
 		await run.events.proceed.wait();
@@ -89,11 +90,11 @@ export const camAppendV1 = workflow({ name: "cam-append" }).v("1.0.0", {
 		}
 		return { ok: true };
 	},
-	events: { proceed: event() },
 });
 
 // Unsafe: new task before unconsumed entries → NDE
 export const camInsertV1 = workflow({ name: "cam-insert" }).v("1.0.0", {
+	events: { proceed: event() },
 	async handler(run) {
 		await taskA.start(run);
 		if (flags.insert) {
@@ -103,21 +104,21 @@ export const camInsertV1 = workflow({ name: "cam-insert" }).v("1.0.0", {
 		await run.events.proceed.wait();
 		return { ok: true };
 	},
-	events: { proceed: event() },
 });
 
 // Unsafe: different input → different address, old entry unconsumed → NDE
 export const camInputChangeV1 = workflow({ name: "cam-input-change" }).v("1.0.0", {
+	events: { proceed: event() },
 	async handler(run) {
 		await taskWithInput.start(run, { id: flags.inputChange ? "changed" : "original" });
 		await run.events.proceed.wait();
 		return { ok: true };
 	},
-	events: { proceed: event() },
 });
 
 // Unsafe: entirely different branch, old entries unconsumed → NDE
 export const camControlFlowV1 = workflow({ name: "cam-control-flow" }).v("1.0.0", {
+	events: { proceed: event() },
 	async handler(run) {
 		if (flags.controlFlow) {
 			await taskC.start(run);
@@ -129,5 +130,4 @@ export const camControlFlowV1 = workflow({ name: "cam-control-flow" }).v("1.0.0"
 		await run.events.proceed.wait();
 		return { ok: true };
 	},
-	events: { proceed: event() },
 });

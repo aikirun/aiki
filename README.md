@@ -38,6 +38,9 @@ const downgradeToFree = task({
 });
 
 export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
+  events: {
+    paymentReceived: event(),
+  },
   async handler(run, input: { userId: string }) {
     await activateTrial.start(run, input.userId);
 
@@ -47,30 +50,32 @@ export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
       await downgradeToFree.start(run, input.userId);
     }
   },
-  events: {
-    paymentReceived: event(),
-  },
 });
 ```
 
 Behind this code, the workflow is persisted at every step: it survives crashes and waits out the 14 days without holding any system resources.
 
-## Quick Start
+## Try it
 
 The Aiki server is a library: `server({ db })` returns a fetch API HTTP handler `(Request) => Promise<Response>` and a background runtime. Mount the handler in any HTTP server — in the same process as your app, or in a process dedicated to Aiki. The example below runs everything in one process.
 
 Install the SDK packages:
 
 ```bash
-npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server postgres
+npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory @libsql/client
 ```
 
-`postgres` is the driver for the `pg` provider. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
+`@libsql/client` is the driver for SQLite, so there is nothing else to install. To use Postgres instead, install `postgres` in its place. `@aikirun/server` declares both drivers as optional peer dependencies, so your package manager does not install either on its own.
 
-Apply Aiki's schema migration to your Postgres database:
+Apply Aiki's schema migration to your database:
 
 ```bash
-DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+# SQLite: creates the file if it doesn't exist
+DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
+  npx aiki-server migrate apply
+
+# Postgres
+DATABASE_PROVIDER=pg DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
   npx aiki-server migrate apply
 ```
 
@@ -79,14 +84,16 @@ Save the trial workflow above to `workflow.ts` (exported as `trialV1`), then boo
 ```typescript
 // app.ts
 import { client } from "@aikirun/client";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { database, server } from "@aikirun/server";
 import { worker } from "@aikirun/worker";
 import { trialV1 } from "./workflow";
 
-const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@your-db-host:5432/aiki";
-
 // Server and worker, both running in this process
-const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+const aikiServer = server({
+  db: database({ provider: "sqlite", path: "./aiki.db" }),
+  timerPriorityQueue: inMemoryTimerPriorityQueue(),
+});
 const runtimeHandle = aikiServer.runtime.start();
 
 const aikiClient = client({ handler: aikiServer.handler });
@@ -103,6 +110,8 @@ await workerHandle.stop();
 await runtimeHandle.stop();
 ```
 
+Using Postgres? Pass its connection string instead: `database({ provider: "pg", url: "postgresql://user:password@your-db-host:5432/aiki" })`.
+
 Run it:
 
 ```bash
@@ -113,6 +122,8 @@ The trial activates, the payment event ends the 14-day wait early, and the run c
 
 Above, the client invokes `aikiServer.handler` directly — no network hop. If the server runs in a different process, point the client at it with `client({ url: "https://..." })`. Workflow code is unchanged.
 
+To see a run survive a crash, and to watch it in the dashboard, follow the [Quick Start](https://aiki.run/docs/getting-started/quick-start).
+
 ### Bundled standalone server + dashboard
 
 Prefer to run the server in its own process with a web dashboard? Download the standalone compose file from the latest release — it pulls prebuilt images, so there is nothing to clone or build:
@@ -121,13 +132,13 @@ Prefer to run the server in its own process with a web dashboard? Download the s
 mkdir aiki && cd aiki
 curl -fsSL https://github.com/aikirun/aiki/releases/latest/download/docker-compose.yml -o docker-compose.yml
 
-# Create a .env with your DATABASE_URL, then:
+# Create a .env containing DATABASE_PROVIDER=sqlite (or pg plus DATABASE_URL), then:
 docker compose up -d
 
 # Server: http://localhost:9850 — Dashboard: http://localhost:9851
 ```
 
-That is the container path. You can also run the stack from the standalone `aiki` binary — one downloaded executable with its own runtime, no Node, Bun, or Docker — or from source with Bun. See the [Installation Guide](https://aiki.run/docs/getting-started/installation) for all three, plus env vars and configuration.
+That is the container path. You can also run the server from the `aiki` binary — one downloaded executable with its own runtime, no Node, Bun, or Docker — or run the server and dashboard from source with Bun. See the [Installation Guide](https://aiki.run/docs/getting-started/installation) for all three, plus env vars and configuration.
 
 <br>
 <p align="center">
@@ -188,9 +199,9 @@ You choose where each component runs: everything in one process, or a central se
 
 ## Requirements
 
-- **Runtime**: Node.js 18+ or Bun 1.0+
+- **Runtime**: Node.js 22+ or Bun 1.0+
 - **Modules**: ESM only (`import`/`export`); CommonJS is not supported
-- **Database**: PostgreSQL 14+ (SQLite and MySQL coming soon)
+- **Database**: SQLite or PostgreSQL 14+ (MySQL coming soon)
 
 See the [Installation Guide](https://aiki.run/docs/getting-started/installation) for detailed setup instructions including environment variable configuration.
 
