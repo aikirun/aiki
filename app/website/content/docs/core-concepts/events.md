@@ -86,7 +86,41 @@ Once a wait times out, that is its answer for good. The timeout is recorded like
 
 ## Sending Events
 
-Send events to a workflow using the handle:
+To send an event from code that didn't start the run, such as a webhook handler, a queue consumer or another service, send it through the workflow with the run's id:
+
+```typescript
+// In the payment webhook, with the run id you saved when the order was placed
+await orderWorkflowV1.events.paymentReceived.send(client, runId, {
+	transactionId: "txn_abc123",
+	amount: 99.99,
+});
+```
+
+If you start the run with a [reference ID](../guides/reference-ids.md), such as your own order id, you don't need to save the run id at all:
+
+```typescript
+// When the order is placed
+await orderWorkflowV1.with("reference.id", "order-123").start(client, { orderId: "123" });
+
+// Later, in the payment webhook
+await orderWorkflowV1.events.paymentReceived.sendByReferenceId(client, "order-123", {
+	transactionId: "txn_abc123",
+	amount: 99.99,
+});
+```
+
+Both accept a list of ids, to send the same event to several runs, and report which runs received it:
+
+```typescript
+const { sentIds, failedIds } = await orderWorkflowV1.events.paymentReceived.send(client, [firstRunId, secondRunId], {
+	transactionId: "txn_abc123",
+	amount: 99.99,
+});
+```
+
+A run that can't take the event, such as one that doesn't exist, is listed in `failedIds`, and the others still receive it. With `sendByReferenceId`, a reference ID that matches no run fails the whole call, and no run receives the event.
+
+When the code that started the run sends the event itself, the handle is shorter:
 
 ```typescript
 const handle = await orderWorkflowV1.start(client, { orderId: "123" });
@@ -99,18 +133,6 @@ await handle.events.paymentReceived.send({
 ```
 
 The send does not need the workflow to be waiting, or even to have started executing. It needs the run to be alive: once a run has completed, failed, or been cancelled, its mailbox is closed and sending to it fails.
-
-### With Reference ID
-
-Prevent duplicate event delivery using a reference ID:
-
-```typescript
-await handle.events.paymentReceived
-	.with("reference.id", "payment-txn_abc123")
-	.send({ transactionId: "txn_abc123", amount: 99.99 });
-```
-
-See the [Reference IDs Guide](../guides/reference-ids.md) for details.
 
 ## Waiting for Multiple Events (AND)
 
@@ -194,6 +216,14 @@ await handle.events.paymentReceived
 ```
 
 This is useful when event sources may retry (webhooks, message queues). See the [Reference IDs Guide](../guides/reference-ids.md) for more patterns.
+
+This reference ID belongs to the event: it tells Aiki that two sends are the same event. It is separate from the run's reference ID, which `sendByReferenceId` uses to find the run. A webhook can use both:
+
+```typescript
+await orderWorkflowV1.events.paymentReceived
+	.with("reference.id", "payment-txn_abc123") // the event: ignore a retried webhook
+	.sendByReferenceId(client, "order-123", { transactionId: "txn_abc123", amount: 99.99 }); // the run: this order
+```
 
 ## Mailbox Order
 

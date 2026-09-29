@@ -29,12 +29,24 @@ This is the right shape when the server isn't reachable by anyone you don't trus
 
 IAM owns its own tables (users, sessions, organizations, namespaces, members, API keys), migrated separately from the server's:
 
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
+
 ```bash
 DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
   npx aiki-iam migrate apply
 ```
 
-On Postgres, set `DATABASE_PROVIDER=pg` and `DATABASE_URL` instead.
+</Tab>
+<Tab value="Postgres">
+
+```bash
+DATABASE_PROVIDER=pg DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+  npx aiki-iam migrate apply
+```
+
+</Tab>
+</Tabs>
 
 Use the same database as the server or a different one — the two schemas have no foreign keys between them.
 

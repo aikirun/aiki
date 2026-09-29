@@ -468,6 +468,9 @@ const fulfillOrder = task({ /* ... */ });
 import { event, workflow } from "@aikirun/workflow";
 
 const processOrderV1 = workflow({ name: "process-order" }).v('1.0.0', {
+  events: {
+    paymentReceived: event<{ amount: number }>(),
+  },
   async handler(run, orderId: string) {
     await createOrder.start(run, orderId);
     await reserveInventory.start(run, orderId);
@@ -478,9 +481,6 @@ const processOrderV1 = workflow({ name: "process-order" }).v('1.0.0', {
     } else {
       await fulfillOrder.start(run, orderId);
     }
-  },
-  events: { 
-    paymentReceived: event<{ amount: number }>() 
   },
 });
 ```

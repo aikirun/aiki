@@ -27,9 +27,18 @@ const handle = await orderWorkflowV1
   .with("reference.id", "order-123")
   .start(client, { orderId: "order-123", items: [...] });
 
-// You can now look up this workflow using "order-123"
 // If you try to start another workflow with the same reference ID,
 // Aiki will throw an error by default (configurable via conflictPolicy)
+```
+
+Anywhere else in your system, the reference ID finds the run, so you don't need to save Aiki's run ID:
+
+```typescript
+// Get a handle to the run
+const handle = await orderWorkflowV1.getHandleByReferenceId(client, "order-123");
+
+// Or send it an event directly
+await orderWorkflowV1.events.paymentReceived.sendByReferenceId(client, "order-123", { amount: 99.99 });
 ```
 
 ### Conflict Handling
@@ -48,12 +57,12 @@ const handle = await orderWorkflowV1
   .start(client, { orderId: "order-123", items: [...] });
 
 // With "return_existing", duplicate calls return the same workflow run
-// handle.id will be the same as the original run
+// handle.run.id will be the same as the original run
 ```
 
 ## Event Reference IDs
 
-When sending events to a workflow, you can provide a reference ID to prevent duplicate event delivery:
+When sending events to a workflow, you can provide a reference ID to prevent duplicate event delivery. This is the event's own reference ID, separate from the run's reference ID above:
 
 ```typescript
 // Send an event with a reference ID
