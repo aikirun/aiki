@@ -6,5 +6,6 @@ export default defineConfig({
 	dts: true,
 	clean: true,
 	outDir: "dist",
+	removeNodeProtocol: false,
 	noExternal: ["@aikirun/lib", "@aikirun/http"],
 });

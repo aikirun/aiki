@@ -61,3 +61,4 @@ jobs:
         run: |
           docker run --rm -e DATABASE_PROVIDER=pg aikirun/cli:smoke migrate list --package server
           docker run --rm -e DATABASE_PROVIDER=pg aikirun/cli:smoke migrate list --package iam
+          docker run --rm -e DATABASE_PROVIDER=sqlite -e DATABASE_PATH=/tmp/smoke.db aikirun/cli:smoke migrate apply --package server,iam

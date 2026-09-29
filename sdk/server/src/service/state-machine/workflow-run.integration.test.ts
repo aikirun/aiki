@@ -18,6 +18,7 @@ import { computeRank } from "../../lib/rank";
 import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness, withRepos } from "../../testing/harness";
+import { allowsConcurrentWriteTransactions } from "../../testing/infra/db/transaction";
 import { claimRun, seedClaimedRun, seedCompletedRun, seedScheduledRun, seedStalledRun } from "../../testing/seed/run";
 import { seedAwaitingRetryTask, seedRunningTask, seedSiblingAwaitingRetryTasks } from "../../testing/seed/task";
 import { createChildRunCanceller } from "../cancel-child-runs";
@@ -706,83 +707,86 @@ describe("WorkflowRunStateMachine redelivery", () => {
 });
 
 describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
-	test("an event committing between the park's read and its guarded write reschedules instead of parking", () =>
-		withHarness(async ({ context, repos, publisher }) =>
-			withRepos(async (secondaryRepos) => {
-				const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
-					namespaceRequestContext: context,
-					repos,
-					publisher,
-				});
+	test.skipIf(!allowsConcurrentWriteTransactions())(
+		"an event committing between the park's read and its guarded write reschedules instead of parking",
+		() =>
+			withHarness(async ({ context, repos, publisher }) =>
+				withRepos(async (secondaryRepos) => {
+					const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+						namespaceRequestContext: context,
+						repos,
+						publisher,
+					});
 
-				const parkReachedGuardedWrite = createBinaryLatch();
-				const eventCommitted = createBinaryLatch();
+					const parkReachedGuardedWrite = createBinaryLatch();
+					const eventCommitted = createBinaryLatch();
 
-				const stateMachine = createStateMachine(repos);
-				const parkedAt = Date.now();
-				const result = await withFakeClock(parkedAt, async () => {
-					// The park pauses at its guarded write, after its read and revision precheck
-					// have passed — the window the send lands in.
-					const parkPromise = repos.transaction(async (txRepos) => {
-						const pausingTxRepos: TxRepositories = {
-							...txRepos,
-							workflowRun: {
-								...txRepos.workflowRun,
-								update: async (params) => {
-									parkReachedGuardedWrite.signal();
-									await eventCommitted.wait();
-									return txRepos.workflowRun.update(params);
+					const stateMachine = createStateMachine(repos);
+					const parkedAt = Date.now();
+					const result = await withFakeClock(parkedAt, async () => {
+						// The park pauses at its guarded write, after its read and revision precheck
+						// have passed — the window the send lands in.
+						const parkPromise = repos.transaction(async (txRepos) => {
+							const pausingTxRepos: TxRepositories = {
+								...txRepos,
+								workflowRun: {
+									...txRepos.workflowRun,
+									update: async (params) => {
+										parkReachedGuardedWrite.signal();
+										await eventCommitted.wait();
+										return txRepos.workflowRun.update(params);
+									},
 								},
-							},
-						};
+							};
 
-						return stateMachine.transitionState(
-							context,
-							{
-								type: "optimistic",
-								id: runId,
-								state: { status: "awaiting_event", eventName: "paymentReceived" },
-								expectedRevision: revisionWhenClaimed,
-								expectedSignalSequence: 0,
-							},
-							pausingTxRepos
-						);
+							return stateMachine.transitionState(
+								context,
+								{
+									type: "optimistic",
+									id: runId,
+									state: { status: "awaiting_event", eventName: "paymentReceived" },
+									expectedRevision: revisionWhenClaimed,
+									expectedSignalSequence: 0,
+								},
+								pausingTxRepos
+							);
+						});
+						await parkReachedGuardedWrite.wait();
+
+						await createEventService({
+							repos: secondaryRepos,
+							workflowRunStateMachine: createStateMachine(secondaryRepos),
+						}).sendEventToWorkflowRun(context, {
+							runId: runId as WorkflowRunId,
+							eventName: "paymentReceived",
+							data: asOpaquePayload({ amount: 25 }),
+							clientCodecApplied: false,
+							reference: undefined,
+						});
+						eventCommitted.signal();
+
+						return parkPromise;
 					});
-					await parkReachedGuardedWrite.wait();
 
-					await createEventService({
-						repos: secondaryRepos,
-						workflowRunStateMachine: createStateMachine(secondaryRepos),
-					}).sendEventToWorkflowRun(context, {
-						runId: runId as WorkflowRunId,
-						eventName: "paymentReceived",
-						data: asOpaquePayload({ amount: 25 }),
-						clientCodecApplied: false,
-						reference: undefined,
-					});
-					eventCommitted.signal();
-
-					return parkPromise;
-				});
-
-				expect(result).toEqual({
-					revision: revisionWhenClaimed + 1,
-					state: { status: "scheduled", reason: "event", scheduledAt: parkedAt },
-					attempts: attemptsWhenClaimed,
-				});
-
-				const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
-				expect(run).toEqual(
-					expect.objectContaining({
-						run: expect.objectContaining({ id: runId, status: "scheduled", revision: result.revision }),
+					expect(result).toEqual({
+						revision: revisionWhenClaimed + 1,
 						state: { status: "scheduled", reason: "event", scheduledAt: parkedAt },
-					})
-				);
-				expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
-					expect.objectContaining({ workflowRunId: runId, name: "paymentReceived", status: "received" }),
-				]);
-			})
-		));
+						attempts: attemptsWhenClaimed,
+					});
+
+					const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+					expect(run).toEqual(
+						expect.objectContaining({
+							run: expect.objectContaining({ id: runId, status: "scheduled", revision: result.revision }),
+							state: { status: "scheduled", reason: "event", scheduledAt: parkedAt },
+						})
+					);
+					expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
+						expect.objectContaining({ workflowRunId: runId, name: "paymentReceived", status: "received" }),
+					]);
+				})
+			)
+	);
 
 	test("a park with the run's current signal sequence parks it", () =>
 		withHarness(async ({ context, repos, publisher }) => {

@@ -10,10 +10,13 @@ export async function resetDatabase(db: Database): Promise<void> {
 			await truncatePgTables(db);
 			return;
 		}
+		case "sqlite": {
+			const { deleteSqliteRows } = await import("./sqlite/reset");
+			await deleteSqliteRows(db);
+			return;
+		}
 		// case "mysql":
 		// 	throw new Error("MySQL support not yet implemented");
-		// case "sqlite":
-		// 	throw new Error("SQLite support not yet implemented");
 		default:
 			db.provider satisfies never;
 	}

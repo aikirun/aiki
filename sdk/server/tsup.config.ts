@@ -10,6 +10,7 @@ export default defineConfig({
 	dts: { entry: "src/index.ts" },
 	clean: true,
 	outDir: "dist",
+	removeNodeProtocol: false,
 	noExternal: ["@aikirun/lib"],
 	async onSuccess() {
 		for (const provider of DATABASE_PROVIDERS) {

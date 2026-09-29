@@ -197,10 +197,7 @@ export const createScheduleRepository = (db: PgDb) => ({
 	async listDueSchedules(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: KeysetStreamCursor) {
 		return db
 			.select({
-				schedule: {
-					...getTableColumns(schedule),
-					nextRunAt: sql<Date>`${schedule.nextRunAt}`.mapWith(schedule.nextRunAt),
-				},
+				schedule: getTableColumns(schedule),
 				workflow: {
 					workflowSource: workflow.source,
 					workflowName: workflow.name,

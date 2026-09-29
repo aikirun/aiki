@@ -1,0 +1,140 @@
+import type { NonEmptyArray } from "@aikirun/lib/collection/array";
+import { ConflictError } from "@aikirun/lib/error";
+import { and, eq, sql } from "drizzle-orm";
+
+import type { NamespaceMemberInfo } from "../../../../contract/schema/namespace";
+import type {
+	NamespaceMemberRow,
+	NamespaceMemberRowInsert,
+	NamespaceRepository,
+	NamespaceRow,
+	NamespaceRowInsert,
+	NamespaceRowWithRole,
+} from "../../types/namespace";
+import type { SqliteDb } from "../provider";
+import { namespace, namespaceMember, user } from "../schema";
+
+export const createNamespaceRepository = (db: SqliteDb): NamespaceRepository => ({
+	async create(namespaceParams: NamespaceRowInsert): Promise<NamespaceRow> {
+		const [createdNamespace] = await db
+			.insert(namespace)
+			.values(namespaceParams)
+			.onConflictDoUpdate({
+				target: [namespace.organizationId, namespace.name],
+				set: { status: "active" },
+				where: eq(namespace.status, "deleted"),
+			})
+			.returning();
+		if (!createdNamespace) {
+			throw new ConflictError(`Namespace with name "${namespaceParams.name}" already exists`);
+		}
+
+		return createdNamespace;
+	},
+
+	async createMember(member: NamespaceMemberRowInsert): Promise<void> {
+		await db
+			.insert(namespaceMember)
+			.values(member)
+			.onConflictDoUpdate({
+				target: [namespaceMember.namespaceId, namespaceMember.userId],
+				set: { role: member.role },
+			});
+	},
+
+	async getMember(namespaceId: string, userId: string): Promise<NamespaceMemberRow | null> {
+		const [row] = await db
+			.select()
+			.from(namespaceMember)
+			.where(and(eq(namespaceMember.namespaceId, namespaceId), eq(namespaceMember.userId, userId)))
+			.limit(1);
+		return row ?? null;
+	},
+
+	async exists(filter: { organizationId: string; namespaceId: string }): Promise<boolean> {
+		const [row] = await db
+			.select({ id: namespace.id })
+			.from(namespace)
+			.where(and(eq(namespace.organizationId, filter.organizationId), eq(namespace.id, filter.namespaceId)))
+			.limit(1);
+		return row?.id !== undefined;
+	},
+
+	async listByUser(organizationId: string, userId: string): Promise<NamespaceRowWithRole[]> {
+		const rows = await db
+			.select({
+				id: namespace.id,
+				name: namespace.name,
+				organizationId: namespace.organizationId,
+				status: namespace.status,
+				createdAt: namespace.createdAt,
+				updatedAt: namespace.updatedAt,
+				role: namespaceMember.role,
+			})
+			.from(namespace)
+			.innerJoin(namespaceMember, eq(namespace.id, namespaceMember.namespaceId))
+			.where(
+				and(
+					eq(namespace.organizationId, organizationId),
+					eq(namespaceMember.userId, userId),
+					eq(namespace.status, "active")
+				)
+			);
+		return rows;
+	},
+
+	async listByOrganization(organizationId: string): Promise<NamespaceRow[]> {
+		return db
+			.select()
+			.from(namespace)
+			.where(and(eq(namespace.organizationId, organizationId), eq(namespace.status, "active")));
+	},
+
+	async softDelete(namespaceId: string): Promise<void> {
+		await db.update(namespace).set({ status: "deleted" }).where(eq(namespace.id, namespaceId));
+	},
+
+	async upsertMembers(members: NonEmptyArray<NamespaceMemberRowInsert>): Promise<void> {
+		await db
+			.insert(namespaceMember)
+			.values(members)
+			.onConflictDoUpdate({
+				target: [namespaceMember.namespaceId, namespaceMember.userId],
+				set: { role: sql`excluded.role` },
+			});
+	},
+
+	async removeMember(namespaceId: string, userId: string): Promise<void> {
+		await db
+			.delete(namespaceMember)
+			.where(and(eq(namespaceMember.namespaceId, namespaceId), eq(namespaceMember.userId, userId)));
+	},
+
+	async listMembers(namespaceId: string): Promise<NamespaceMemberInfo[]> {
+		const rows = await db
+			.select({
+				userId: namespaceMember.userId,
+				name: user.name,
+				email: user.email,
+				role: namespaceMember.role,
+			})
+			.from(namespaceMember)
+			.innerJoin(user, eq(namespaceMember.userId, user.id))
+			.where(eq(namespaceMember.namespaceId, namespaceId));
+		return rows.map((row) => ({
+			userId: row.userId,
+			name: row.name ?? undefined,
+			email: row.email,
+			role: row.role,
+		}));
+	},
+
+	// Needs no row lock: a transaction holds the database's write lock from its start.
+	async countActiveByOrganizationForUpdate(organizationId: string): Promise<number> {
+		const rows = await db
+			.select({ id: namespace.id })
+			.from(namespace)
+			.where(and(eq(namespace.organizationId, organizationId), eq(namespace.status, "active")));
+		return rows.length;
+	},
+});

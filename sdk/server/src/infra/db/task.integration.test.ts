@@ -212,8 +212,8 @@ describe("task repository listByWorkflowRunIdWithState", () => {
 			});
 			await seedRunningTask(deps);
 
-			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
-				expect.objectContaining({
+			const expectedTasks = [
+				{
 					id: taskInfo.id,
 					name: taskInfo.name,
 					attempts: 1,
@@ -222,8 +222,8 @@ describe("task repository listByWorkflowRunIdWithState", () => {
 						error: { name: "Error", message: "inventory service unavailable" },
 						nextAttemptAt: 4_000_000,
 					},
-				}),
-				expect.objectContaining({
+				},
+				{
 					id: siblingTaskInfo.id,
 					name: siblingTaskInfo.name,
 					attempts: 1,
@@ -232,8 +232,12 @@ describe("task repository listByWorkflowRunIdWithState", () => {
 						error: { name: "Error", message: "payment gateway unavailable" },
 						nextAttemptAt: 3_000_000,
 					},
-				}),
-			]);
+				},
+			].sort((a, b) => (a.id < b.id ? -1 : 1));
+
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual(
+				expectedTasks.map((expectedTask) => expect.objectContaining(expectedTask))
+			);
 		}));
 
 	test("leaves out a discarded task", () =>

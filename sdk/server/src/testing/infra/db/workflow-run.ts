@@ -14,6 +14,12 @@ export async function readWorkflowRunDueTimes(db: Database, runId: string): Prom
 			const { readPgWorkflowRunDueTimes } = await import("./pg/workflow-run");
 			return readPgWorkflowRunDueTimes(db, runId);
 		}
+		case "sqlite": {
+			const { readSqliteWorkflowRunDueTimes } = await import("./sqlite/workflow-run");
+			return readSqliteWorkflowRunDueTimes(db, runId);
+		}
+		// case "mysql":
+		// 	throw new Error("MySQL support not yet implemented");
 		default:
 			return db.provider satisfies never;
 	}

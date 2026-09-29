@@ -12,6 +12,7 @@ export default defineConfig({
 		"db/index": "src/db/index.ts",
 		"db/migrate/index": "src/db/migrate/index.ts",
 		"db/migrate/cli": "src/db/migrate/cli.ts",
+		"db/sqlite/index": "src/db/sqlite/index.ts",
 		"duration/index": "src/duration/index.ts",
 		"error/index": "src/error/index.ts",
 		"id/index": "src/id/index.ts",
@@ -27,5 +28,6 @@ export default defineConfig({
 	dts: true,
 	clean: true,
 	outDir: "dist",
-	external: ["arktype", "cac", "dotenv", "drizzle-orm", "postgres"],
+	removeNodeProtocol: false,
+	external: ["@libsql/client", "arktype", "cac", "dotenv", "drizzle-orm", "postgres"],
 });

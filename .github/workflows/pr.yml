@@ -44,6 +44,10 @@ jobs:
       - name: Build
         run: bun run build
 
+      - uses: ./.github/actions/smoke-test-binary-on-sqlite
+        with:
+          binary: cli/dist/aiki
+
   integration-test:
     uses: ./.github/workflows/integration-test.yml
 

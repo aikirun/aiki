@@ -100,12 +100,16 @@ jobs:
             rm -rf "$workdir" "$dir/$tarball"
           done
 
+      # Each binary embeds the libsql addon of its own platform, so every target's addon must be installed.
+      - name: Install the libsql addons of every target
+        run: bun install --frozen-lockfile --os=darwin --os=linux --cpu=x64 --cpu=arm64
+
       - name: Compile the aiki binaries
         working-directory: cli
         run: |
           bun scripts/generate-embedded-data.ts
           for target in bun-linux-x64 bun-linux-arm64 bun-darwin-arm64; do
-            bun build src/index.ts --compile --target="$target" --outfile "dist/aiki-${target#bun-}"
+            bun ../scripts/compile.ts src/index.ts --target "$target" --outfile "dist/aiki-${target#bun-}"
           done
 
       - name: Smoke-test the linux-x64 binary
@@ -114,6 +118,10 @@ jobs:
         run: |
           chmod +x cli/dist/aiki-linux-x64
           cli/dist/aiki-linux-x64 migrate list --package server,iam
+
+      - uses: ./.github/actions/smoke-test-binary-on-sqlite
+        with:
+          binary: cli/dist/aiki-linux-x64
 
       - name: Upload the aiki binaries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

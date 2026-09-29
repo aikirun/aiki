@@ -1,7 +1,7 @@
 import type { WorkflowRunState } from "@aikirun/types/workflow";
 import { eq, getTableColumns } from "drizzle-orm";
 
-import { toWorkflowRunState } from "./state-transition";
+import { toWorkflowRunState } from "../../state-transition-row";
 import type { PgDb } from "../provider";
 import { childWorkflowRunWait, stateTransition } from "../schema";
 
