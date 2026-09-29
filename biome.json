@@ -106,6 +106,34 @@
 			}
 		},
 		{
+			"includes": ["lib/src/**", "sdk/**/src/**", "types/src/**", "!**/*.test.ts", "!**/testing/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedGlobals": {
+							"level": "error",
+							"options": {
+								"deniedGlobals": {
+									"Bun": "Published SDK code must run on Node. Use a Node or web API instead of Bun."
+								}
+							}
+						},
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": ["bun", "bun:*"],
+										"message": "Published SDK code must run on Node. Use a Node or web API instead of a Bun module."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
 			"includes": ["scripts/**", "lib/**", "cli/**", "app/website/scripts/**"],
 			"linter": {
 				"rules": {
