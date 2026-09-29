@@ -1,25 +1,54 @@
 ---
 title: Quick Start
-description: Run a workflow that waits two weeks for a payment and resumes where it left off, all in one process.
+description: Start a workflow that waits for a payment, crash your app while it waits, and see the run finish.
 ---
 
-This example starts a 14-day free trial, then suspends the workflow waiting for a payment event — holding no worker, no thread, no database connection — for up to two weeks. When the payment arrives (or the server restarts mid-wait), the run resumes exactly where it left off. You'll run the server, worker, and workflow in one process and watch it finish in seconds.
+This example is a workflow for a subscription app: when a user signs up, it gives them a 14-day free trial, then waits for their payment. While the workflow waits, it holds no worker, no thread and no database connection. You'll crash your app in the middle of the wait, start it again, then send the payment, and the run continues from where it stopped.
+
+The Aiki server runs inside your app, so there is no separate Aiki server to run.
 
 ## Prerequisites
 
-You need Node.js 18+ (or Bun 1.0+) and a PostgreSQL database. Install the SDK and apply the db migrations — the two commands below, covered in full in [Installation](./installation.md).
+You need Node.js 22+ or Bun 1.0+, and a database: SQLite, which needs nothing installed, or a PostgreSQL server.
 
-```package-install
-@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server postgres
-```
-
-`postgres` is the driver for the `pg` provider. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
+Create a project:
 
 <Tabs groupId="runtime" persist items={["Node", "Bun"]}>
 <Tab value="Node">
 
 ```bash
-DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+mkdir aiki-quickstart && cd aiki-quickstart
+npm init -y
+npm pkg set type=module
+```
+
+</Tab>
+<Tab value="Bun">
+
+```bash
+mkdir aiki-quickstart && cd aiki-quickstart
+bun init -y
+```
+
+</Tab>
+</Tabs>
+
+Install the SDK and apply the database migrations. [Installation](./installation.mdx) covers both in full.
+
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
+
+```package-install
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory @libsql/client srvx
+```
+
+`@libsql/client` is the driver for SQLite, and `srvx` serves the Aiki server over HTTP.
+
+<Tabs groupId="runtime" persist items={["Node", "Bun"]}>
+<Tab value="Node">
+
+```bash
+DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
   npx aiki-server migrate apply
 ```
 
@@ -27,18 +56,47 @@ DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
 <Tab value="Bun">
 
 ```bash
-DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
   bunx aiki-server migrate apply
 ```
 
 </Tab>
 </Tabs>
 
-Build the app in three pieces. They live in one file, `app.ts` — the complete listing is at the end.
+</Tab>
+<Tab value="Postgres">
+
+```package-install
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory postgres srvx
+```
+
+`postgres` is the driver for Postgres, and `srvx` serves the Aiki server over HTTP.
+
+<Tabs groupId="runtime" persist items={["Node", "Bun"]}>
+<Tab value="Node">
+
+```bash
+DATABASE_PROVIDER=pg DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+  npx aiki-server migrate apply
+```
+
+</Tab>
+<Tab value="Bun">
+
+```bash
+DATABASE_PROVIDER=pg DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+  bunx aiki-server migrate apply
+```
+
+</Tab>
+</Tabs>
+
+</Tab>
+</Tabs>
 
 ## 1. The workflow
 
-This is the part you write for your business: two tasks and a workflow that ties them together.
+This is the part you write for your business: two tasks and a workflow that ties them together. Save it as `workflow.ts`:
 
 ```typescript
 import { event, task, workflow } from "@aikirun/workflow";
@@ -57,7 +115,10 @@ const downgradeToFree = task({
   },
 });
 
-const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
+export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
+  events: {
+    paymentReceived: event(),
+  },
   async handler(run, input: { userId: string }) {
     await activateTrial.start(run, input.userId);
 
@@ -67,58 +128,70 @@ const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
       await downgradeToFree.start(run, input.userId);
     }
   },
-  events: {
-    paymentReceived: event(),
-  },
 });
 ```
 
-`activateTrial` runs, then `paymentReceived.wait()` suspends the run — nothing is held while it waits. A payment resumes it; if 14 days pass first, the user is downgraded instead.
+`activateTrial` runs, then `paymentReceived.wait()` pauses the run until the payment arrives. If 14 days pass first, the user is downgraded instead.
 
-## 2. Wire it up
+## 2. The app
 
-Infrastructure you write once: a server, a worker, and a client connecting them. Here they share this process.
+Your app runs the Aiki server and a worker. Save it as `app.ts`:
+
+<Tabs groupId="database" persist items={["SQLite", "Postgres"]}>
+<Tab value="SQLite">
 
 ```typescript
 import { client } from "@aikirun/client";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { database, server } from "@aikirun/server";
 import { worker } from "@aikirun/worker";
+import { serve } from "srvx";
+import { trialV1 } from "./workflow";
 
-const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@your-db-host:5432/aiki";
-
-const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
-const runtimeHandle = aikiServer.runtime.start();
+const aikiServer = server({
+  db: database({ provider: "sqlite", path: "./aiki.db" }),
+  timerPriorityQueue: inMemoryTimerPriorityQueue(),
+});
+aikiServer.runtime.start();
+serve({ port: 9850, fetch: aikiServer.handler });
 
 const aikiClient = client({ handler: aikiServer.handler });
-const workerHandle = worker({ workflows: [trialV1] }).start(aikiClient);
+worker({ workflows: [trialV1] }).start(aikiClient);
 ```
 
-`runtime.start()` runs the server's background loops. The worker claims ready runs and executes them. The client is the in-process connection between your code and the server.
-
-## 3. Run it
-
-Start the workflow, then simulate the payment so the run completes without the full 14-day wait.
+</Tab>
+<Tab value="Postgres">
 
 ```typescript
-const handle = await trialV1.start(aikiClient, { userId: "user-123" });
+import { client } from "@aikirun/client";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { database, server } from "@aikirun/server";
+import { worker } from "@aikirun/worker";
+import { serve } from "srvx";
+import { trialV1 } from "./workflow";
 
-await handle.events.paymentReceived.send();
-await handle.wait();
+const aikiServer = server({
+  db: database({ provider: "pg", url: "postgresql://user:password@your-db-host:5432/aiki" }),
+  timerPriorityQueue: inMemoryTimerPriorityQueue(),
+});
+aikiServer.runtime.start();
+serve({ port: 9850, fetch: aikiServer.handler });
 
-console.log("Run completed");
-
-await workerHandle.stop();
-await runtimeHandle.stop();
+const aikiClient = client({ handler: aikiServer.handler });
+worker({ workflows: [trialV1] }).start(aikiClient);
 ```
 
-> **Tip:** by default `wait` never gives up. Pass `{ timeout: { seconds: 60 } }` to bound it.
+</Tab>
+</Tabs>
 
-## Run
+- `runtime.start()` runs the server's background loops, and the timer priority queue lets them wake a run the moment it's ready.
+- `serve(...)` puts the server on http://localhost:9850, so your scripts and the dashboard can reach it.
+- The worker executes your workflows. Its client calls the server inside the same process.
+
+Start the app and leave it running:
 
 <Tabs groupId="runtime" persist items={["Node", "Bun"]}>
 <Tab value="Node">
-
-`app.ts` uses top-level `await`, so the project needs `"type": "module"` in `package.json`.
 
 ```bash
 npx tsx app.ts
@@ -128,98 +201,120 @@ npx tsx app.ts
 <Tab value="Bun">
 
 ```bash
-bun run app.ts
+bun app.ts
 ```
 
 </Tab>
 </Tabs>
 
-You'll see:
+## 3. Open the dashboard (optional)
 
+The dashboard is a web page that shows your runs. It reads them from the server your app serves on port 9850. With [Docker](https://docs.docker.com/get-docker/), start it in a new terminal:
+
+```bash
+docker run --rm -p 9851:9851 \
+  --add-host=host.docker.internal:host-gateway \
+  -e AIKI_SERVER_UPSTREAM_URL=http://host.docker.internal:9850 \
+  ghcr.io/aikirun/dashboard:latest
 ```
-Activated 14-day trial for user-123
-Run completed
-```
 
-Aiki logs its own lifecycle around these lines — the task and workflow starting and completing. The payment event ended the 14-day wait early, so `downgradeToFree` never ran.
+The dashboard runs inside a container, where `localhost` means the container itself. `host.docker.internal` is how it reaches your app.
 
-## The complete `app.ts`
+Open http://localhost:9851. The list of runs is empty for now. Reload the page after each of the next steps to follow the run.
 
-<Accordions>
-<Accordion title="Show the full listing — all three pieces in one file">
+## 4. Start a trial
+
+Other code reaches the server over HTTP. Save this as `start.ts`:
 
 ```typescript
 import { client } from "@aikirun/client";
-import { database, server } from "@aikirun/server";
-import { worker } from "@aikirun/worker";
-import { event, task, workflow } from "@aikirun/workflow";
+import { trialV1 } from "./workflow";
 
-const activateTrial = task({
-  name: "activate-trial",
-  async handler(userId: string) {
-    console.log(`Activated 14-day trial for ${userId}`);
-  },
-});
-
-const downgradeToFree = task({
-  name: "downgrade-to-free",
-  async handler(userId: string) {
-    console.log(`Downgraded ${userId} to the free plan`);
-  },
-});
-
-const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
-  async handler(run, input: { userId: string }) {
-    await activateTrial.start(run, input.userId);
-
-    // Wait until payment is received or the 14-day trial expires
-    const result = await run.events.paymentReceived.wait({ timeout: { days: 14 } });
-    if (result.timeout) {
-      await downgradeToFree.start(run, input.userId);
-    }
-  },
-  events: {
-    paymentReceived: event(),
-  },
-});
-
-const databaseUrl = process.env.DATABASE_URL ?? "postgresql://user:password@your-db-host:5432/aiki";
-
-// Server and worker, both running in this process
-const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
-const runtimeHandle = aikiServer.runtime.start();
-
-const aikiClient = client({ handler: aikiServer.handler });
-const workerHandle = worker({ workflows: [trialV1] }).start(aikiClient);
-
-// Start the workflow
+const aikiClient = client({ url: "http://localhost:9850" });
 const handle = await trialV1.start(aikiClient, { userId: "user-123" });
-
-// Simulate the payment arriving
-await handle.events.paymentReceived.send();
-await handle.wait();
-
-console.log("Run completed");
-
-await workerHandle.stop();
-await runtimeHandle.stop();
+console.log(`Started run ${handle.run.id}`);
 ```
 
-</Accordion>
-</Accordions>
+Run it in another terminal:
+
+<Tabs groupId="runtime" persist items={["Node", "Bun"]}>
+<Tab value="Node">
+
+```bash
+npx tsx start.ts
+```
+
+</Tab>
+<Tab value="Bun">
+
+```bash
+bun start.ts
+```
+
+</Tab>
+</Tabs>
+
+It prints the run's id; keep it for step 6. In the app's terminal you'll see:
+
+```
+Activated 14-day trial for user-123
+```
+
+The run is now waiting for the payment. In the dashboard, it shows as Awaiting Event.
+
+## 5. Crash the app
+
+Stop the app with Ctrl+C, or kill it outright, then start it again.
+
+`Activated 14-day trial` doesn't print again: the trial isn't activated a second time. The run is still waiting for the payment, and the dashboard still shows it as Awaiting Event. The run lives in your database, not in your app's memory, so a crash or a restart doesn't lose it or start it over.
+
+## 6. Send the payment
+
+Save this as `pay.ts`:
+
+```typescript
+import { client } from "@aikirun/client";
+import { trialV1 } from "./workflow";
+
+const runId = process.argv[2];
+if (!runId) {
+  throw new Error("Pass the run id as the first argument");
+}
+
+const aikiClient = client({ url: "http://localhost:9850" });
+await trialV1.events.paymentReceived.send(aikiClient, runId);
+console.log(`Sent the payment to run ${runId}`);
+```
+
+Run it with the id from step 4:
+
+<Tabs groupId="runtime" persist items={["Node", "Bun"]}>
+<Tab value="Node">
+
+```bash
+npx tsx pay.ts <run id>
+```
+
+</Tab>
+<Tab value="Bun">
+
+```bash
+bun pay.ts <run id>
+```
+
+</Tab>
+</Tabs>
+
+The payment ends the wait, and the run completes. The workflow continues from the line after the wait, as if the app had never gone down. The payment came before the 14 days were up, so `downgradeToFree` never runs. In the dashboard, the run now shows as Completed.
 
 ## What you just used
 
-- **[Task](../core-concepts/tasks.md)** — `activateTrial` / `downgradeToFree`: a unit of work whose result is persisted, so a restart never redoes it.
-- **[Workflow](../core-concepts/workflows.md)** — `trialV1`: orchestrates tasks and events, tracked at every step.
-- **[Event](../core-concepts/events.md)** — `paymentReceived`: `wait()` suspends with nothing held; `send()` or the 14-day timeout resumes it.
-- **[Server](../architecture/server.md)** — `server({ db })` + `runtime.start()`: the orchestrator and its background loops.
-- **[Client](../core-concepts/client.mdx)** — `client({ handler })`: the in-process connection; workers and your app both attach.
-- **[Worker](../core-concepts/workers.md)** — `worker({...}).start(client)`: claims ready runs and executes them.
-
-Everything here runs in one process. The same workflow code runs against a separately deployed server — swap `client({ handler: aikiServer.handler })` for `client({ url: "..." })`.
-
-Beyond this demo, give the server a timer priority queue so sleeps and timeouts fire exactly when they come due rather than at the next database scan — see [Installation](./installation.md).
+- **[Task](../core-concepts/tasks.md)** — `activateTrial` / `downgradeToFree`: a unit of work whose result is saved, so a restart never redoes it.
+- **[Workflow](../core-concepts/workflows.md)** — `trialV1`: runs tasks in order and waits for events, and every step is saved.
+- **[Event](../core-concepts/events.md)** — `paymentReceived`: `wait()` pauses the run with nothing held; `send()` or the 14-day timeout resumes it.
+- **[Server](../architecture/server.md)** — `server({ db, timerPriorityQueue })` + `runtime.start()`: keeps track of every run and wakes it when it's ready.
+- **[Client](../core-concepts/client.mdx)** — `client({ handler })` in the app, `client({ url })` in the scripts: the connection to the server.
+- **[Worker](../core-concepts/workers.md)** — `worker({...}).start(client)`: executes your workflows.
 
 ## Next Steps
 

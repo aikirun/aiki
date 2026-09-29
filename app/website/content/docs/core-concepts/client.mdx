@@ -28,7 +28,7 @@ const aikiClient = client({
 Invokes an in-process server's handler directly — no network hop:
 
 ```typescript
-const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+const aikiServer = server({ db: database({ provider: "sqlite", path: "./aiki.db" }) });
 
 const aikiClient = client({ handler: aikiServer.handler });
 ```

@@ -21,6 +21,9 @@ const finalize = task({
 });
 
 export const longRunningPipelineV1 = workflow({ name: "long-running-pipeline" }).v("1.0.0", {
+	events: {
+		approve: event<{ approver: string }>(),
+	},
 	async handler(run) {
 		await prepare.start(run);
 
@@ -35,8 +38,5 @@ export const longRunningPipelineV1 = workflow({ name: "long-running-pipeline" })
 		}
 
 		return finalize.start(run, { approver: approval.data.approver });
-	},
-	events: {
-		approve: event<{ approver: string }>(),
 	},
 });

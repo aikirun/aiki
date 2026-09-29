@@ -1,6 +1,9 @@
 import { event, workflow } from "@aikirun/workflow";
 
 export const echoV1 = workflow({ name: "echo" }).v("1.0.0", {
+	events: {
+		ping: event<{ message: string }>(),
+	},
 	async handler(run) {
 		while (true) {
 			const response = await run.events.ping.wait({ timeout: { seconds: 10 } });
@@ -10,8 +13,5 @@ export const echoV1 = workflow({ name: "echo" }).v("1.0.0", {
 			}
 			run.logger.info(response.data.message);
 		}
-	},
-	events: {
-		ping: event<{ message: string }>(),
 	},
 });

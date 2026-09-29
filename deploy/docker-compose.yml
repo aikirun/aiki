@@ -1,13 +1,17 @@
-# Standalone Aiki stack — pulls the published images at a pinned version. 
-# Put a .env with your DATABASE_URL next to this file, then: docker compose up -d
+# Standalone Aiki stack — pulls the published images at a pinned version.
+# Put a .env next to this file with DATABASE_PROVIDER=sqlite (or DATABASE_PROVIDER=pg and
+# DATABASE_URL), then: docker compose up -d
 services:
   migrate:
     image: ghcr.io/aikirun/cli:0.42.0
     container_name: aiki-migrate
     environment:
-      DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
+      DATABASE_PROVIDER: ${DATABASE_PROVIDER:?Set DATABASE_PROVIDER - sqlite, or pg with DATABASE_URL}
+      DATABASE_PATH: ${DATABASE_PATH:-/data/aiki.db}
+      DATABASE_URL: ${DATABASE_URL:-}
       DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
+    volumes:
+      - aiki-data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: ["migrate", "apply", "--package", "${AIKI_MIGRATE_PACKAGES:-server${AIKI_SERVER_AUTH_SECRET:+,iam}}"]
@@ -26,13 +30,16 @@ services:
       AIKI_SERVER_BASE_URL: ${AIKI_SERVER_BASE_URL:-http://localhost:9850}
       AIKI_SERVER_AUTH_SECRET: ${AIKI_SERVER_AUTH_SECRET:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
-      DATABASE_PROVIDER: ${DATABASE_PROVIDER:-pg}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/aiki}
+      DATABASE_PROVIDER: ${DATABASE_PROVIDER:?Set DATABASE_PROVIDER - sqlite, or pg with DATABASE_URL}
+      DATABASE_PATH: ${DATABASE_PATH:-/data/aiki.db}
+      DATABASE_URL: ${DATABASE_URL:-}
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-}
       DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
       REDIS_URL: ${REDIS_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PRETTY_LOGS: ${PRETTY_LOGS:-true}
+    volumes:
+      - aiki-data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -47,3 +54,6 @@ services:
     depends_on:
       - server
     restart: unless-stopped
+
+volumes:
+  aiki-data:

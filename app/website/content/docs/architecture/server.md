@@ -8,7 +8,7 @@ The Aiki server coordinates workflow execution — and it's a library. `server({
 - **`handler`** — a fetch-style HTTP handler `(Request) => Promise<Response>` serving the RPC API that clients call. Mount it in any HTTP framework.
 - **`runtime`** — background daemons that drive workflow state transitions. Start it with `runtime.start()`.
 
-The bundled standalone server (`app/server`) is a thin composition of this same library — see [Installation](../getting-started/installation.md).
+The bundled standalone server (`app/server`) is a thin composition of this same library — see [Installation](../getting-started/installation.mdx).
 
 ## Request Handling
 
@@ -62,14 +62,14 @@ import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { database, server } from "@aikirun/server";
 
 const aikiServer = server({
-  db: database({ provider: "pg", url: databaseUrl }),
+  db: database({ provider: "sqlite", path: "./aiki.db" }),
   timerPriorityQueue: inMemoryTimerPriorityQueue(),
 });
 
 const runtimeHandle = aikiServer.runtime.start();
 ```
 
-Optional pieces plug in the same way — `cache`, `iam` (multi-tenancy and auth), and the Redis-backed adapters:
+Optional pieces plug in the same way — `cache`, `iam` (multi-tenancy and auth), and the Redis-backed adapters. This example is for several server instances sharing one Postgres database:
 
 ```typescript
 import { redisPublisher, redisTimerPriorityQueue } from "@aikirun/redis";
@@ -86,7 +86,7 @@ const aikiServer = server({
 });
 ```
 
-For the bundled standalone server's environment variables, see the [Installation Guide](../getting-started/installation.md).
+For the bundled standalone server's environment variables, see the [Installation Guide](../getting-started/installation.mdx).
 
 ## Next Steps
 

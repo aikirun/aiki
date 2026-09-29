@@ -30,9 +30,11 @@ This is the right shape when the server isn't reachable by anyone you don't trus
 IAM owns its own tables (users, sessions, organizations, namespaces, members, API keys), migrated separately from the server's:
 
 ```bash
-DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki \
+DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
   npx aiki-iam migrate apply
 ```
+
+On Postgres, set `DATABASE_PROVIDER=pg` and `DATABASE_URL` instead.
 
 Use the same database as the server or a different one — the two schemas have no foreign keys between them.
 
@@ -42,7 +44,7 @@ Use the same database as the server or a different one — the two schemas have 
 import { iam } from "@aikirun/iam";
 import { database, server } from "@aikirun/server";
 
-const db = database({ provider: "pg", url: databaseUrl });
+const db = database({ provider: "sqlite", path: "./aiki.db" });
 
 const aikiServer = server({
 	db,
@@ -76,7 +78,7 @@ const aikiClient = client({
 
 ### Bundled standalone server
 
-The bundled `app/server` composes IAM for you when `AIKI_SERVER_AUTH_SECRET` and `AIKI_SERVER_BASE_URL` are both set — see the [Installation Guide](../getting-started/installation.md#environment-variable-reference).
+The bundled `app/server` composes IAM for you when `AIKI_SERVER_AUTH_SECRET` and `AIKI_SERVER_BASE_URL` are both set — see the [Installation Guide](../getting-started/installation.mdx#environment-variable-reference).
 
 ## Runs created before IAM
 
@@ -110,5 +112,5 @@ Whatever IDs your authorizer returns are the tenant IDs the server tags workflow
 
 ## Next Steps
 
-- **[Installation](../getting-started/installation.md)** - Environment variables for the bundled server
+- **[Installation](../getting-started/installation.mdx)** - Environment variables for the bundled server
 - **[Client](../core-concepts/client.mdx)** - Client configuration, including `apiKey`

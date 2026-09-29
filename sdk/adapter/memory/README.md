@@ -17,7 +17,7 @@ import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { database, server } from "@aikirun/server";
 
 const aikiServer = server({
-	db: database({ provider: "pg", url: databaseUrl }),
+	db: database({ provider: "sqlite", path: "./aiki.db" }),
 	timerPriorityQueue: inMemoryTimerPriorityQueue(),
 });
 ```
@@ -33,7 +33,7 @@ import { orderWorkflowV1 } from "./workflows.ts";
 const queue = inMemoryQueue();
 
 const aikiServer = server({
-	db: database({ provider: "pg", url: databaseUrl }),
+	db: database({ provider: "sqlite", path: "./aiki.db" }),
 	runtime: { publisher: queue.publisher },
 });
 

@@ -1,11 +1,11 @@
 # Database and Migrations
 
-- Postgres is required for running server/examples end-to-end.
+- Running server/examples end-to-end needs a database: SQLite (the default in the example `.env` files; nothing to install) or Postgres.
 - Unit tests (`bun run test:unit`) are hermetic and do not require a database.
 - Integration tests (`bun run test:integration`) require a database. Credentials should be in `.env.test` at the repo root (see [`.env.test.example`](https://github.com/aikirun/aiki/blob/main/.env.test.example)).
-- Schema sources:
-    - `sdk/server/src/infra/db/pg/schema.ts`
-    - `sdk/iam/src/infra/db/pg/schema.ts`
+- Schema sources, one per service and database — a schema change goes into both databases' schemas:
+    - `sdk/server/src/infra/db/sqlite/schema.ts` and `sdk/server/src/infra/db/pg/schema.ts`
+    - `sdk/iam/src/infra/db/sqlite/schema.ts` and `sdk/iam/src/infra/db/pg/schema.ts`
 - Repository get-by-key methods return `T | null`, never `T | undefined` — coalesce drizzle's row access (`rows[0] ?? null`).
 
 Generate migrations:

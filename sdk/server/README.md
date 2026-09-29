@@ -5,10 +5,11 @@ The Aiki server as a library — orchestrates workflow runs and persists state i
 ## Installation
 
 ```bash
-npm install @aikirun/server postgres
+npm install @aikirun/server @libsql/client   # SQLite
+npm install @aikirun/server postgres         # Postgres
 ```
 
-`postgres` is the driver for the `pg` provider. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
+Install the driver for your database: `@libsql/client` for SQLite, `postgres` for Postgres. `@aikirun/server` declares both as optional peer dependencies, so your package manager does not install either on its own.
 
 ## Quick Start
 
@@ -16,7 +17,8 @@ npm install @aikirun/server postgres
 import { client } from "@aikirun/client";
 import { database, server } from "@aikirun/server";
 
-const aikiServer = server({ db: database({ provider: "pg", url: databaseUrl }) });
+const aikiServer = server({ db: database({ provider: "sqlite", path: "./aiki.db" }) });
+// or Postgres: database({ provider: "pg", url: databaseUrl })
 const runtimeHandle = aikiServer.runtime.start();
 
 // In-process client — or serve aikiServer.handler over HTTP
