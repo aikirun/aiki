@@ -99,6 +99,7 @@ describe("task", () => {
 								options: {},
 								workflowRunId: runRecord.id,
 								expectedWorkflowRunRevision: runRecord.revision,
+								sequence: 1,
 							},
 							{ taskInfo: runningTaskInfo }
 						)
@@ -109,6 +110,7 @@ describe("task", () => {
 								state: completedTaskInfo.state,
 								workflowRunId: runRecord.id,
 								expectedWorkflowRunRevision: runRecord.revision,
+								sequence: 2,
 							},
 							{ taskInfo: completedTaskInfo }
 						);
@@ -162,6 +164,7 @@ describe("task", () => {
 							options: {},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
@@ -172,6 +175,7 @@ describe("task", () => {
 							state: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{ taskInfo: completedTaskInfo }
 					);
@@ -220,6 +224,7 @@ describe("task", () => {
 							options: { retry },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
@@ -230,6 +235,7 @@ describe("task", () => {
 							state: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{ taskInfo: completedTaskInfo }
 					);
@@ -266,6 +272,7 @@ describe("task", () => {
 							options: { retry },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
@@ -280,6 +287,7 @@ describe("task", () => {
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{ taskInfo: runningTaskInfo }
 					);
@@ -326,6 +334,7 @@ describe("task", () => {
 							attempts: 2,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: retriedTaskInfo }
 					)
@@ -336,6 +345,7 @@ describe("task", () => {
 							state: { status: "completed", output: asOpaquePayload("charged") },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{
 							taskInfo: completedTaskInfoFactory.build({
@@ -425,6 +435,7 @@ describe("task", () => {
 							attempts: 2,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: retriedTaskInfo }
 					)
@@ -435,6 +446,7 @@ describe("task", () => {
 							state: { status: "completed", output: asOpaquePayload("charged") },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{
 							taskInfo: completedTaskInfoFactory.build({
@@ -504,6 +516,7 @@ describe("task", () => {
 							options: {},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
@@ -517,6 +530,7 @@ describe("task", () => {
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{ taskInfo: runningTaskInfo }
 					);
@@ -764,6 +778,7 @@ describe("task", () => {
 							options: { retry },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
@@ -774,6 +789,7 @@ describe("task", () => {
 							state: completedTaskInfo.state,
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{ taskInfo: completedTaskInfo }
 					);
@@ -846,6 +862,7 @@ describe("task output on the first run", () => {
 						options: {},
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
 					},
 					{ taskInfo: runningTaskInfo }
 				)
@@ -856,6 +873,7 @@ describe("task output on the first run", () => {
 						state: completedTaskInfo.state,
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 2,
 					},
 					{ taskInfo: completedTaskInfo }
 				);
@@ -880,6 +898,7 @@ describe("task output on the first run", () => {
 						options: {},
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
 					},
 					{ taskInfo: runningTaskInfo }
 				)
@@ -890,6 +909,7 @@ describe("task output on the first run", () => {
 						state: { status: "completed", output: undefined },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 2,
 					},
 					{ taskInfo: { ...runningTaskInfo, state: { status: "completed" } } }
 				);

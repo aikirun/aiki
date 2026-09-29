@@ -624,6 +624,7 @@ describe("WorkflowRunService cancelByIds", () => {
 				type: "create",
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: 1,
 				taskName: "charge-card",
 				input: asOpaquePayload(taskInput),
 				inputHash: await hashInput(taskInput),
@@ -716,7 +717,7 @@ describe("WorkflowRunService cancelByIds", () => {
 describe("WorkflowRunService listWorkflowRunTransitions", () => {
 	test("lists a task's transitions with their stored states", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
@@ -727,6 +728,7 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 				type: "retry",
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: latestTaskSequence + 1,
 				id: taskInfo.id,
 				attempts: 2,
 			});
@@ -737,10 +739,7 @@ describe("WorkflowRunService listWorkflowRunTransitions", () => {
 				sort: { order: "asc" },
 			});
 			const taskTransitions = transitions.filter((transition) => transition.type === "task");
-			// Both transitions carry the run's revision, and the listing breaks that tie by id, which
-			// rows minted in the same millisecond do not keep in order. So the set is asserted, not the order.
-			// TODO: order will be asserted when tasks have deterministic ordering
-			expect([...taskTransitions].sort((a, b) => a.attempt - b.attempt)).toEqual([
+			expect(taskTransitions).toEqual([
 				{
 					id: expect.any(String),
 					createdAt: expect.any(Number),

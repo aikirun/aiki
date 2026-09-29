@@ -37,6 +37,7 @@ describe("TaskStateMachine transitionState", () => {
 				taskStateMachine.transitionState(context, {
 					workflowRunId: attackerRunSeed.runId,
 					expectedWorkflowRunRevision: attackerRunSeed.revisionWhenClaimed,
+					sequence: 1,
 					id: victimTaskSeed.taskInfo.id,
 					attempts: 2,
 					state: { status: "completed", output: asOpaquePayload("hijacked") },

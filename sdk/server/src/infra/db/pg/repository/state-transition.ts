@@ -2,7 +2,7 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { ScheduleState } from "@aikirun/types/schedule";
 import type { WorkflowRunState } from "@aikirun/types/workflow/run";
 import type { TaskState } from "@aikirun/types/workflow/task";
-import { count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, max, sql } from "drizzle-orm";
 
 import {
 	toRunOwnedStateTransitionRow,
@@ -14,13 +14,14 @@ import { stateTransition } from "../schema";
 
 export type StateTransitionRowSelect = typeof stateTransition.$inferSelect;
 type _StateTransitionRowInsert = typeof stateTransition.$inferInsert;
-type EntityColumn = "type" | "workflowRunId" | "attempt" | "taskId" | "scheduleId" | "state";
+type EntityColumn = "type" | "workflowRunId" | "attempt" | "taskId" | "taskSequence" | "scheduleId" | "state";
 
 export type WorkflowRunStateTransitionRow = Omit<StateTransitionRowSelect, EntityColumn> & {
 	type: "workflow_run";
 	workflowRunId: string;
 	attempt: number;
 	taskId: null;
+	taskSequence: null;
 	scheduleId: null;
 	state: WorkflowRunState;
 };
@@ -29,6 +30,7 @@ export type TaskStateTransitionRow = Omit<StateTransitionRowSelect, EntityColumn
 	workflowRunId: string;
 	attempt: number;
 	taskId: string;
+	taskSequence: number;
 	scheduleId: null;
 	state: TaskState;
 };
@@ -37,6 +39,7 @@ export type ScheduleStateTransitionRow = Omit<StateTransitionRowSelect, EntityCo
 	workflowRunId: null;
 	attempt: null;
 	taskId: null;
+	taskSequence: null;
 	scheduleId: string;
 	state: ScheduleState;
 };
@@ -53,6 +56,7 @@ export type TaskStateTransitionRowInsert = Omit<_StateTransitionRowInsert, Entit
 	workflowRunId: string;
 	attempt: number;
 	taskId: string;
+	taskSequence: number;
 	state: TaskState;
 };
 export type ScheduleStateTransitionRowInsert = Omit<_StateTransitionRowInsert, EntityColumn> & {
@@ -85,6 +89,20 @@ export const createStateTransitionRepository = (db: PgDb) => ({
 		return rows.map(toStateTransitionRow);
 	},
 
+	async getLatestTaskSequence(runId: string, revision: number): Promise<number | null> {
+		const result = await db
+			.select({ taskSequence: max(stateTransition.taskSequence) })
+			.from(stateTransition)
+			.where(
+				and(
+					eq(stateTransition.workflowRunId, runId),
+					eq(stateTransition.revision, revision),
+					eq(stateTransition.type, "task")
+				)
+			);
+		return result[0]?.taskSequence ?? null;
+	},
+
 	async listByRunId(
 		runId: string,
 		limit = 50,
@@ -99,10 +117,12 @@ export const createStateTransitionRepository = (db: PgDb) => ({
 				.from(stateTransition)
 				.where(eq(stateTransition.workflowRunId, runId))
 				// The type enum declares workflow_run before task, so within one revision the run's
-				// transition sorts before the task transitions stamped with the revision it produced.
+				// transition sorts before the task transitions stamped with the revision it produced,
+				// and those sort in the order the worker executing the run numbered them.
 				.orderBy(
 					sql`${stateTransition.revision} ${sortOrder}`,
 					sql`${stateTransition.type} ${sortOrder}`,
+					sql`${stateTransition.taskSequence} ${sortOrder}`,
 					sql`${stateTransition.id} ${sortOrder}`
 				)
 				.limit(limit)

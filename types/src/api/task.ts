@@ -25,6 +25,11 @@ export interface TaskGetByIdResponseV1 {
 export interface TransitionTaskStateBase {
 	workflowRunId: string;
 	expectedWorkflowRunRevision: number;
+	/**
+	 * Orders the task transitions a worker makes while it executes a run: each request carries a
+	 * number larger than every task transition request the worker sent before it in that execution.
+	 */
+	sequence: number;
 }
 
 export interface TransitionTaskStateToRunningCreate extends TransitionTaskStateBase {

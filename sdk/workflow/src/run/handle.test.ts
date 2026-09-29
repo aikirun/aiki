@@ -115,20 +115,23 @@ describe("workflowRunHandle", () => {
 	});
 
 	describe("transitionTaskState", () => {
-		test("injects the run id and revision and returns the task info", () =>
+		test("injects the run id, revision and sequence, and returns the task info", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
 				const handle = workflowRunHandle(client, record);
 
 				const taskInfo = runningTaskInfoFactory.build();
-				const request: Omit<TransitionTaskStateToRunningCreate, "workflowRunId" | "expectedWorkflowRunRevision"> = {
+				const request: Omit<
+					TransitionTaskStateToRunningCreate,
+					"workflowRunId" | "expectedWorkflowRunRevision" | "sequence"
+				> = {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
 				};
 				client.api.task.transitionStateV1.once(
-					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
+					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5, sequence: 1 },
 					{ taskInfo }
 				);
 
@@ -137,19 +140,57 @@ describe("workflowRunHandle", () => {
 				expect(result).toEqual(taskInfo);
 			}));
 
+		test("numbers task transition requests in the order they are sent, including requests sent together", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
+				const handle = workflowRunHandle(client, record);
+
+				const reserveSeat = { type: "create", taskName: "reserve-seat", options: {}, inputHash: "seat-hash" } as const;
+				const chargeCard = { type: "create", taskName: "charge-card", options: {}, inputHash: "card-hash" } as const;
+				const sendReceipt = {
+					type: "create",
+					taskName: "send-receipt",
+					options: {},
+					inputHash: "receipt-hash",
+				} as const;
+
+				client.api.task.transitionStateV1
+					.once(
+						{ ...reserveSeat, workflowRunId: record.id, expectedWorkflowRunRevision: 5, sequence: 1 },
+						{ taskInfo: runningTaskInfoFactory.build() }
+					)
+					.once(
+						{ ...chargeCard, workflowRunId: record.id, expectedWorkflowRunRevision: 5, sequence: 2 },
+						{ taskInfo: runningTaskInfoFactory.build() }
+					)
+					.once(
+						{ ...sendReceipt, workflowRunId: record.id, expectedWorkflowRunRevision: 5, sequence: 3 },
+						{ taskInfo: runningTaskInfoFactory.build() }
+					);
+
+				await Promise.all([
+					handle[INTERNAL].transitionTaskState(reserveSeat),
+					handle[INTERNAL].transitionTaskState(chargeCard),
+				]);
+				await handle[INTERNAL].transitionTaskState(sendReceipt);
+			}));
+
 		test("maps a revision conflict to WorkflowRunRevisionConflictError", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
 				const handle = workflowRunHandle(client, record);
 
-				const request: Omit<TransitionTaskStateToRunningCreate, "workflowRunId" | "expectedWorkflowRunRevision"> = {
+				const request: Omit<
+					TransitionTaskStateToRunningCreate,
+					"workflowRunId" | "expectedWorkflowRunRevision" | "sequence"
+				> = {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
-					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
+					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5, sequence: 1 },
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);
 
@@ -161,14 +202,17 @@ describe("workflowRunHandle", () => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
 				const handle = workflowRunHandle(client, record);
 				const nonConflictError = { code: "SOME_OTHER_ERROR" };
-				const request: Omit<TransitionTaskStateToRunningCreate, "workflowRunId" | "expectedWorkflowRunRevision"> = {
+				const request: Omit<
+					TransitionTaskStateToRunningCreate,
+					"workflowRunId" | "expectedWorkflowRunRevision" | "sequence"
+				> = {
 					type: "create",
 					taskName: "reserve-seat",
 					options: {},
 					inputHash: "hash",
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
-					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5 },
+					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5, sequence: 1 },
 					nonConflictError
 				);
 

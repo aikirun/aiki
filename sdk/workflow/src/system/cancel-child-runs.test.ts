@@ -106,6 +106,7 @@ describe("createCancelChildRunsV1", () => {
 						options: {},
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
 					},
 					{ taskInfo: runningListNonTerminalChildrenTask }
 				)
@@ -116,6 +117,7 @@ describe("createCancelChildRunsV1", () => {
 						state: { status: "completed", output: asOpaquePayload(nonTerminalChildRunIds) },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 2,
 					},
 					{ taskInfo: completedListNonTerminalChildrenTask }
 				)
@@ -128,6 +130,7 @@ describe("createCancelChildRunsV1", () => {
 						options: {},
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 3,
 					},
 					{ taskInfo: runningCancelRunsTask }
 				)
@@ -138,6 +141,7 @@ describe("createCancelChildRunsV1", () => {
 						state: { status: "completed", output: asOpaquePayload(nonTerminalChildRunIds) },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 4,
 					},
 					{ taskInfo: completedCancelRunsTask }
 				);
@@ -206,6 +210,7 @@ describe("createCancelChildRunsV1", () => {
 						options: {},
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
 					},
 					{ taskInfo: runningListNonTerminalChildrenTask }
 				)
@@ -216,6 +221,7 @@ describe("createCancelChildRunsV1", () => {
 						state: { status: "completed", output: asOpaquePayload([]) },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 2,
 					},
 					{ taskInfo: completedListNonTerminalChildrenTask }
 				);

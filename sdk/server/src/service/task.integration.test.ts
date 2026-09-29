@@ -9,7 +9,7 @@ import { createTaskService } from "../service/task";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../testing/harness";
 import { completeRun, seedClaimedRun } from "../testing/seed/run";
-import { seedCompletedTask, seedRunningTask } from "../testing/seed/task";
+import { seedCompletedTask, seedRunningTask, seedRunningTaskOnRun } from "../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
@@ -37,7 +37,7 @@ describe("TaskService getTaskById", () => {
 
 	test("returns the task's latest state", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
@@ -48,6 +48,7 @@ describe("TaskService getTaskById", () => {
 				type: "retry",
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: latestTaskSequence + 1,
 				id: taskInfo.id,
 				attempts: 2,
 			});
@@ -95,6 +96,33 @@ describe("TaskService setTaskState", () => {
 					attempts: 2,
 					state: { status: "completed", output: asOpaquePayload(output) },
 				}),
+			]);
+		}));
+
+	test("puts the result after the task transitions already at the run's revision", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const seeded = await seedRunningTask({ namespaceRequestContext: context, repos, publisher });
+			const { taskInfo: siblingTaskInfo } = await seedRunningTaskOnRun(
+				{ repos, namespaceRequestContext: context },
+				seeded,
+				{
+					taskName: "charge-payment",
+					input: { invoiceId: "inv-9" },
+				}
+			);
+
+			const taskService = createTaskService({ repos });
+			await taskService.setTaskState(context, {
+				id: seeded.taskInfo.id,
+				workflowRunId: seeded.runId,
+				state: { status: "completed", output: asOpaquePayload({ reservationId: "rsv-1" }) },
+			});
+
+			const { rows } = await repos.stateTransition.listByRunId(seeded.runId, 50, 0, { order: "asc" });
+			expect(rows.filter((row) => row.type === "task")).toEqual([
+				expect.objectContaining({ taskId: seeded.taskInfo.id, taskSequence: 1, state: { status: "running" } }),
+				expect.objectContaining({ taskId: siblingTaskInfo.id, taskSequence: 2, state: { status: "running" } }),
+				expect.objectContaining({ taskId: seeded.taskInfo.id, taskSequence: 3, status: "completed" }),
 			]);
 		}));
 
@@ -204,7 +232,7 @@ describe("TaskService setTaskState", () => {
 
 	test("does not resolve a task that is waiting for its retry", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
@@ -215,6 +243,7 @@ describe("TaskService setTaskState", () => {
 				id: taskInfo.id,
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: latestTaskSequence + 1,
 				attempts: 1,
 				state: {
 					status: "awaiting_retry",
