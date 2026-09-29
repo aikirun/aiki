@@ -32,6 +32,7 @@ COPY sdk/adapter/redis/ ./sdk/adapter/redis/
 COPY sdk/iam/ ./sdk/iam/
 COPY sdk/server/ ./sdk/server/
 COPY app/server/ ./app/server/
+COPY scripts/compile.ts ./scripts/
 COPY tsconfig.json ./
 
 RUN bunx tsc --noEmit

@@ -1,255 +1,244 @@
-import type { NonEmptyArray } from "@aikirun/lib/array";
-import { isNonEmptyArray } from "@aikirun/lib/array";
-import type { WorkflowRunId } from "@aikirun/types/workflow/run";
-import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { asNonEmptyArray, isNonEmptyArray } from "@aikirun/lib/collection/array";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
-import { rankStreamCursorFilter } from "./lib/rank-stream";
-import { timerStreamCursorFilter } from "./lib/timer-stream";
-import type { RankStreamCursor } from "../../../../lib/rank-stream";
-import type { TimerStreamCursor } from "../../../../lib/timer-stream";
-import type { DaemonContext } from "../../../../middleware/context";
+import { keysetStreamCursorFilter } from "./lib/keyset-stream";
+import { valuesTable } from "./lib/values-table";
+import { computeRank, PRIORITY_LEVELS } from "../../../../lib/rank";
+import type {
+	WorkflowRunOutboxRepository,
+	WorkflowRunOutboxRowClaimed,
+	WorkflowRunOutboxRowPending,
+	WorkflowRunOutboxRowPublished,
+} from "../../types/workflow-run-outbox";
 import type { SqliteDb } from "../provider";
 import { workflowRunOutbox } from "../schema";
 
-export type WorkflowRunOutboxRow = typeof workflowRunOutbox.$inferSelect;
-export type WorkflowRunOutboxRowInsert = typeof workflowRunOutbox.$inferInsert;
-export type WorkflowRunOutboxRowPublished = WorkflowRunOutboxRow & { status: "published"; publishedAt: Date };
-export type WorkflowRunOutboxRowClaimed = WorkflowRunOutboxRow & { status: "claimed"; claimedAt: Date };
+export const createWorkflowRunOutboxRepository = (db: SqliteDb): WorkflowRunOutboxRepository => ({
+	async createBatch(rows) {
+		await db.insert(workflowRunOutbox).values(rows);
+	},
 
-interface ClaimFilter {
-	workflows: NonEmptyArray<{ name: string; versionId: string }>;
-	shards?: string[];
-}
+	async deleteByWorkflowRunIds(workflowRunIds) {
+		await db.delete(workflowRunOutbox).where(inArray(workflowRunOutbox.workflowRunId, workflowRunIds));
+	},
 
-function buildClaimFilterPredicate(filters: ClaimFilter) {
-	const workflowsPredicate = or(
-		...filters.workflows.map((workflow) =>
-			and(
-				eq(workflowRunOutbox.workflowName, workflow.name),
-				eq(workflowRunOutbox.workflowVersionId, workflow.versionId)
+	async listPending(_context, limit) {
+		const rows = await db
+			.select()
+			.from(workflowRunOutbox)
+			.where(eq(workflowRunOutbox.status, "pending"))
+			.orderBy(workflowRunOutbox.nextPublishAttemptRank, workflowRunOutbox.id)
+			.limit(limit);
+
+		return rows as WorkflowRunOutboxRowPending[];
+	},
+
+	async leaseDuePending(_context, params) {
+		const { leaseDurationMs, limit } = params;
+		const now = Date.now();
+		// PRIORITY_LEVELS - 1 is the least priority and produces a rank greater than or equal to any rank due on or before now.
+		const maxNextPublishAttemptRank = computeRank({ dueAt: now, priority: PRIORITY_LEVELS - 1 });
+
+		const leaseRankBase = (now + leaseDurationMs) * PRIORITY_LEVELS;
+
+		const duePendingRows = db
+			.select({ id: workflowRunOutbox.id })
+			.from(workflowRunOutbox)
+			.where(
+				and(
+					eq(workflowRunOutbox.status, "pending"),
+					lte(workflowRunOutbox.nextPublishAttemptRank, maxNextPublishAttemptRank)
+				)
 			)
-		)
-	);
-	const shardsPredicate = isNonEmptyArray(filters.shards)
-		? inArray(workflowRunOutbox.shard, filters.shards)
-		: isNull(workflowRunOutbox.shard);
+			.orderBy(workflowRunOutbox.nextPublishAttemptRank, workflowRunOutbox.id)
+			.limit(limit);
 
-	return and(workflowsPredicate, shardsPredicate);
-}
-
-export function createWorkflowRunOutboxRepository(db: SqliteDb) {
-	return {
-		async createBatch(rows: NonEmptyArray<WorkflowRunOutboxRowInsert>): Promise<void> {
-			await db.insert(workflowRunOutbox).values(rows);
-		},
-
-		async deleteByWorkflowRunIds(_context: DaemonContext, workflowRunIds: NonEmptyArray<string>): Promise<void> {
-			await db.delete(workflowRunOutbox).where(inArray(workflowRunOutbox.workflowRunId, workflowRunIds));
-		},
-
-		async listPending(
-			_context: DaemonContext,
-			limit: number,
-			cursor?: RankStreamCursor
-		): Promise<WorkflowRunOutboxRow[]> {
-			return db
-				.select()
-				.from(workflowRunOutbox)
-				.where(
-					and(
-						eq(workflowRunOutbox.status, "pending"),
-						rankStreamCursorFilter(workflowRunOutbox.rank, workflowRunOutbox.id, cursor)
-					)
+		const rows = await db
+			.update(workflowRunOutbox)
+			.set({
+				// Each row preserves its priority digit, only the dueAt portion of the rank shifts.
+				nextPublishAttemptRank: sql`${leaseRankBase} + (${workflowRunOutbox.rank} - floor(${workflowRunOutbox.rank} / ${PRIORITY_LEVELS}) * ${PRIORITY_LEVELS})`,
+			})
+			.where(
+				and(
+					eq(workflowRunOutbox.status, "pending"),
+					lte(workflowRunOutbox.nextPublishAttemptRank, maxNextPublishAttemptRank),
+					inArray(workflowRunOutbox.id, duePendingRows)
 				)
-				.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
-				.limit(limit);
-		},
+			)
+			.returning();
 
-		async markPublished(ids: NonEmptyArray<string>): Promise<void> {
-			await db
-				.update(workflowRunOutbox)
-				.set({ status: "published", publishedAt: new Date() })
-				.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, ids)));
-		},
+		return rows as WorkflowRunOutboxRowPending[];
+	},
 
-		async markRepublished(ids: NonEmptyArray<string>): Promise<void> {
-			await db
-				.update(workflowRunOutbox)
-				.set({ publishedAt: new Date() })
-				.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, ids)));
-		},
+	async markPublished(entries) {
+		const now = Date.now() as TimestampMs;
+		const valueRows = asNonEmptyArray(entries.map((entry) => sql`(${entry.id}, ${entry.nextPublishAttemptRank})`));
 
-		async releaseStaleClaim(ids: NonEmptyArray<string>): Promise<void> {
-			await db
-				.update(workflowRunOutbox)
-				.set({ status: "published", claimedAt: null, publishedAt: new Date() })
-				.where(and(eq(workflowRunOutbox.status, "claimed"), inArray(workflowRunOutbox.id, ids)));
-		},
+		await db
+			.update(workflowRunOutbox)
+			.set({
+				status: "published",
+				firstPublishedAt: sql`COALESCE(${workflowRunOutbox.firstPublishedAt}, ${now})`,
+				lastPublishedAt: now,
+				nextPublishAttemptRank: sql`v.next_publish_attempt_rank`,
+			})
+			.from(valuesTable("v", ["id", "next_publish_attempt_rank"], valueRows))
+			.where(and(eq(workflowRunOutbox.status, "pending"), sql`${workflowRunOutbox.id} = v.id`));
+	},
 
-		async markClaimed(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
-			await db
-				.update(workflowRunOutbox)
-				.set({ status: "claimed", claimedAt: new Date() })
-				.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
-		},
+	async setNextPublishAttemptRank(entries) {
+		const valueRows = asNonEmptyArray(entries.map((entry) => sql`(${entry.id}, ${entry.nextPublishAttemptRank})`));
 
-		async reclaim(namespaceId: string, workflowRunId: WorkflowRunId): Promise<void> {
-			await db
-				.update(workflowRunOutbox)
-				.set({ claimedAt: new Date() })
-				.where(
-					and(
-						eq(workflowRunOutbox.namespaceId, namespaceId),
-						eq(workflowRunOutbox.workflowRunId, workflowRunId),
-						eq(workflowRunOutbox.status, "claimed")
-					)
-				);
-		},
+		await db
+			.update(workflowRunOutbox)
+			.set({ nextPublishAttemptRank: sql`v.next_publish_attempt_rank` })
+			.from(valuesTable("v", ["id", "next_publish_attempt_rank"], valueRows))
+			.where(and(eq(workflowRunOutbox.status, "pending"), sql`${workflowRunOutbox.id} = v.id`));
+	},
 
-		async listStalePublished(
-			_context: DaemonContext,
-			claimMinIdleTimeMs: number,
-			limit: number,
-			cursor?: TimerStreamCursor
-		): Promise<WorkflowRunOutboxRowPublished[]> {
-			const now = Date.now();
-			const staleThreshold = new Date(now - claimMinIdleTimeMs);
+	// firstPublishedAt and lastPublishedAt are not cleared so that backoff anchors survive recovery churn.
+	// nextPublishAttemptRank resets to rank so the returned row is immediately due.
+	async returnToPending(ids, fromStatus) {
+		await db
+			.update(workflowRunOutbox)
+			.set({ status: "pending", claimedAt: null, nextPublishAttemptRank: workflowRunOutbox.rank })
+			.where(and(inArray(workflowRunOutbox.id, ids), eq(workflowRunOutbox.status, fromStatus)));
+	},
 
-			const rows = await db
-				.select()
-				.from(workflowRunOutbox)
-				.where(
-					and(
-						eq(workflowRunOutbox.status, "published"),
-						lt(workflowRunOutbox.publishedAt, staleThreshold),
-						timerStreamCursorFilter(workflowRunOutbox.publishedAt, workflowRunOutbox.id, cursor)
-					)
+	async markClaimed(namespaceId, workflowRunId) {
+		await db
+			.update(workflowRunOutbox)
+			.set({ status: "claimed", claimedAt: Date.now() as TimestampMs })
+			.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
+	},
+
+	async refreshClaim(namespaceId, workflowRunId) {
+		await db
+			.update(workflowRunOutbox)
+			.set({ claimedAt: Date.now() as TimestampMs })
+			.where(
+				and(
+					eq(workflowRunOutbox.namespaceId, namespaceId),
+					eq(workflowRunOutbox.workflowRunId, workflowRunId),
+					eq(workflowRunOutbox.status, "claimed")
 				)
-				.orderBy(workflowRunOutbox.publishedAt, workflowRunOutbox.id)
-				.limit(limit);
+			);
+	},
 
-			return rows as WorkflowRunOutboxRowPublished[];
-		},
+	async listDueForRepublish(_context, params) {
+		const { limit, cursor } = params;
+		// PRIORITY_LEVELS - 1 is the least priority and produces a rank greater than or equal to any rank due on or before now.
+		const maxNextPublishAttemptRank = computeRank({ dueAt: Date.now(), priority: PRIORITY_LEVELS - 1 });
 
-		async listStaleClaimed(
-			_context: DaemonContext,
-			claimMinIdleTimeMs: number,
-			limit: number,
-			cursor?: TimerStreamCursor
-		): Promise<WorkflowRunOutboxRowClaimed[]> {
-			const now = Date.now();
-			const staleThreshold = new Date(now - claimMinIdleTimeMs);
-
-			const rows = await db
-				.select()
-				.from(workflowRunOutbox)
-				.where(
-					and(
-						eq(workflowRunOutbox.status, "claimed"),
-						lt(workflowRunOutbox.claimedAt, staleThreshold),
-						timerStreamCursorFilter(workflowRunOutbox.claimedAt, workflowRunOutbox.id, cursor)
-					)
+		const rows = await db
+			.select()
+			.from(workflowRunOutbox)
+			.where(
+				and(
+					eq(workflowRunOutbox.status, "published"),
+					lte(workflowRunOutbox.nextPublishAttemptRank, maxNextPublishAttemptRank),
+					keysetStreamCursorFilter(workflowRunOutbox.nextPublishAttemptRank, workflowRunOutbox.id, cursor)
 				)
-				.orderBy(workflowRunOutbox.claimedAt, workflowRunOutbox.id)
-				.limit(limit);
+			)
+			.orderBy(workflowRunOutbox.nextPublishAttemptRank, workflowRunOutbox.id)
+			.limit(limit);
 
-			return rows as WorkflowRunOutboxRowClaimed[];
-		},
+		return rows as WorkflowRunOutboxRowPublished[];
+	},
 
-		async deleteByWorkflowRunId(namespaceId: string, workflowRunId: string): Promise<void> {
-			await db
-				.delete(workflowRunOutbox)
-				.where(and(eq(workflowRunOutbox.namespaceId, namespaceId), eq(workflowRunOutbox.workflowRunId, workflowRunId)));
-		},
-
-		async stealStaleClaimed(namespaceId: string, filters: ClaimFilter, claimMinIdleTimeMs: number, limit: number) {
-			const now = Date.now();
-			const staleThreshold = new Date(now - claimMinIdleTimeMs);
-
-			const staleEntries = await db
-				.select({ id: workflowRunOutbox.id })
-				.from(workflowRunOutbox)
-				.where(
-					and(
-						eq(workflowRunOutbox.namespaceId, namespaceId),
-						eq(workflowRunOutbox.status, "claimed"),
-						lt(workflowRunOutbox.claimedAt, staleThreshold),
-						buildClaimFilterPredicate(filters)
-					)
+	async listStaleClaimed(_context, params) {
+		const { claimIdleTimeoutMs, limit, cursor } = params;
+		const rows = await db
+			.select()
+			.from(workflowRunOutbox)
+			.where(
+				and(
+					eq(workflowRunOutbox.status, "claimed"),
+					lt(workflowRunOutbox.claimedAt, (Date.now() - claimIdleTimeoutMs) as TimestampMs),
+					keysetStreamCursorFilter(workflowRunOutbox.claimedAt, workflowRunOutbox.id, cursor)
 				)
-				.orderBy(workflowRunOutbox.claimedAt, workflowRunOutbox.rank, workflowRunOutbox.id)
-				.limit(limit);
+			)
+			.orderBy(workflowRunOutbox.claimedAt, workflowRunOutbox.id)
+			.limit(limit);
 
-			const staleEntryIds = staleEntries.map(({ id }) => id);
-			if (!isNonEmptyArray(staleEntryIds)) {
-				return [];
-			}
+		return rows as WorkflowRunOutboxRowClaimed[];
+	},
 
-			return db
-				.update(workflowRunOutbox)
-				.set({ claimedAt: new Date(now) })
-				.where(
-					and(
-						eq(workflowRunOutbox.status, "claimed"),
-						inArray(workflowRunOutbox.id, staleEntryIds),
-						lt(workflowRunOutbox.claimedAt, staleThreshold)
-					)
+	async listUndeliverable(_context, params) {
+		const { maxId, limit, cursorId } = params;
+		const conditions = [inArray(workflowRunOutbox.status, ["pending", "published"]), lte(workflowRunOutbox.id, maxId)];
+		if (cursorId !== undefined) {
+			conditions.push(sql`${workflowRunOutbox.id} > ${cursorId}`);
+		}
+
+		return db
+			.select({
+				id: workflowRunOutbox.id,
+				workflowRunId: workflowRunOutbox.workflowRunId,
+			})
+			.from(workflowRunOutbox)
+			.where(and(...conditions))
+			.orderBy(workflowRunOutbox.id)
+			.limit(limit);
+	},
+
+	async getByWorkflowRunId(params) {
+		const result = await db
+			.select()
+			.from(workflowRunOutbox)
+			.where(
+				and(
+					eq(workflowRunOutbox.namespaceId, params.namespaceId),
+					eq(workflowRunOutbox.workflowRunId, params.workflowRunId)
 				)
-				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
-		},
+			)
+			.limit(1);
 
-		async claimPublished(namespaceId: string, filters: ClaimFilter, limit: number) {
-			const entries = await db
-				.select({ id: workflowRunOutbox.id })
-				.from(workflowRunOutbox)
-				.where(
-					and(
-						eq(workflowRunOutbox.namespaceId, namespaceId),
-						eq(workflowRunOutbox.status, "published"),
-						buildClaimFilterPredicate(filters)
-					)
+		return result[0] ?? null;
+	},
+
+	async deleteByWorkflowRunId(params) {
+		await db
+			.delete(workflowRunOutbox)
+			.where(
+				and(
+					eq(workflowRunOutbox.namespaceId, params.namespaceId),
+					eq(workflowRunOutbox.workflowRunId, params.workflowRunId)
 				)
-				.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
-				.limit(limit);
+			);
+	},
 
-			const entryIds = entries.map(({ id }) => id);
-			if (!isNonEmptyArray(entryIds)) {
-				return [];
-			}
-
-			return db
-				.update(workflowRunOutbox)
-				.set({ status: "claimed", claimedAt: new Date() })
-				.where(and(eq(workflowRunOutbox.status, "published"), inArray(workflowRunOutbox.id, entryIds)))
-				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
-		},
-
-		async claimPending(namespaceId: string, filters: ClaimFilter, limit: number) {
-			const pendingEntries = await db
-				.select({ id: workflowRunOutbox.id })
-				.from(workflowRunOutbox)
-				.where(
-					and(
-						eq(workflowRunOutbox.namespaceId, namespaceId),
-						eq(workflowRunOutbox.status, "pending"),
-						buildClaimFilterPredicate(filters)
-					)
+	async claimPending(namespaceId, filters, limit) {
+		const claimableEntryIds = db
+			.select({ id: workflowRunOutbox.id })
+			.from(workflowRunOutbox)
+			.where(
+				and(
+					eq(workflowRunOutbox.namespaceId, namespaceId),
+					eq(workflowRunOutbox.status, "pending"),
+					or(
+						...filters.workflows.map((workflow) =>
+							and(
+								eq(workflowRunOutbox.workflowSource, workflow.source),
+								eq(workflowRunOutbox.workflowName, workflow.name),
+								eq(workflowRunOutbox.workflowVersionId, workflow.versionId)
+							)
+						)
+					),
+					isNonEmptyArray(filters.pools)
+						? inArray(workflowRunOutbox.pool, filters.pools)
+						: isNull(workflowRunOutbox.pool)
 				)
-				.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
-				.limit(limit);
+			)
+			.orderBy(workflowRunOutbox.rank, workflowRunOutbox.id)
+			.limit(limit);
 
-			const pendingEntryIds = pendingEntries.map(({ id }) => id);
-			if (!isNonEmptyArray(pendingEntryIds)) {
-				return [];
-			}
-
-			return db
-				.update(workflowRunOutbox)
-				.set({ status: "claimed", claimedAt: new Date() })
-				.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, pendingEntryIds)))
-				.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
-		},
-	};
-}
-
-export type WorkflowRunOutboxRepository = ReturnType<typeof createWorkflowRunOutboxRepository>;
+		return db
+			.update(workflowRunOutbox)
+			.set({ status: "claimed", claimedAt: Date.now() as TimestampMs })
+			.where(and(eq(workflowRunOutbox.status, "pending"), inArray(workflowRunOutbox.id, claimableEntryIds)))
+			.returning({ workflowRunId: workflowRunOutbox.workflowRunId });
+	},
+});

@@ -14,10 +14,10 @@ import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run"
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
-import { toWorkflowRunState } from "./state-transition";
 import type { WorkflowRow } from "./workflow";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
+import { toWorkflowRunState } from "../../state-transition-row";
 import type { PgDb } from "../provider";
 import { stateTransition, workflow, workflowRun } from "../schema";
 

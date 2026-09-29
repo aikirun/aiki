@@ -1,11 +1,11 @@
 {
 	"version": "6",
 	"dialect": "sqlite",
-	"id": "6e261913-e38c-480f-8377-1858470a1451",
+	"id": "afd42f4d-c4f5-425b-ba54-ae8b72f3e0bb",
 	"prevId": "00000000-0000-0000-0000-000000000000",
 	"tables": {
-		"child_workflow_run_wait_queue": {
-			"name": "child_workflow_run_wait_queue",
+		"child_workflow_run_wait": {
+			"name": "child_workflow_run_wait",
 			"columns": {
 				"id": {
 					"name": "id",
@@ -32,7 +32,7 @@
 					"name": "child_workflow_run_status",
 					"type": "text",
 					"primaryKey": false,
-					"notNull": true,
+					"notNull": false,
 					"autoincrement": false
 				},
 				"status": {
@@ -44,14 +44,14 @@
 				},
 				"completed_at": {
 					"name": "completed_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"timed_out_at": {
 					"name": "timed_out_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
@@ -63,44 +63,51 @@
 					"notNull": false,
 					"autoincrement": false
 				},
+				"signal_sequence": {
+					"name": "signal_sequence",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
-				"idx_child_workflow_run_wait_queue_parent_id": {
-					"name": "idx_child_workflow_run_wait_queue_parent_id",
+				"idx_child_workflow_run_wait_parent_id": {
+					"name": "idx_child_workflow_run_wait_parent_id",
 					"columns": ["parent_workflow_run_id", "id"],
 					"isUnique": false
 				}
 			},
 			"foreignKeys": {
-				"fk_child_workflow_run_wait_queue_parent": {
-					"name": "fk_child_workflow_run_wait_queue_parent",
-					"tableFrom": "child_workflow_run_wait_queue",
+				"fk_child_workflow_run_wait_parent": {
+					"name": "fk_child_workflow_run_wait_parent",
+					"tableFrom": "child_workflow_run_wait",
 					"tableTo": "workflow_run",
 					"columnsFrom": ["parent_workflow_run_id"],
 					"columnsTo": ["id"],
 					"onDelete": "no action",
 					"onUpdate": "no action"
 				},
-				"fk_child_workflow_run_wait_queue_child": {
-					"name": "fk_child_workflow_run_wait_queue_child",
-					"tableFrom": "child_workflow_run_wait_queue",
+				"fk_child_workflow_run_wait_child": {
+					"name": "fk_child_workflow_run_wait_child",
+					"tableFrom": "child_workflow_run_wait",
 					"tableTo": "workflow_run",
 					"columnsFrom": ["child_workflow_run_id"],
 					"columnsTo": ["id"],
 					"onDelete": "no action",
 					"onUpdate": "no action"
 				},
-				"fk_child_workflow_run_wait_queue_state_transition": {
-					"name": "fk_child_workflow_run_wait_queue_state_transition",
-					"tableFrom": "child_workflow_run_wait_queue",
+				"fk_child_workflow_run_wait_state_transition": {
+					"name": "fk_child_workflow_run_wait_state_transition",
+					"tableFrom": "child_workflow_run_wait",
 					"tableTo": "state_transition",
 					"columnsFrom": ["child_workflow_run_state_transition_id"],
 					"columnsTo": ["id"],
@@ -111,18 +118,26 @@
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {
+				"chk_child_workflow_run_wait_status": {
+					"name": "chk_child_workflow_run_wait_status",
+					"value": "\"child_workflow_run_wait\".\"status\" IN ('completed', 'timeout')"
+				},
+				"chk_child_workflow_run_wait_child_workflow_run_status": {
+					"name": "chk_child_workflow_run_wait_child_workflow_run_status",
+					"value": "\"child_workflow_run_wait\".\"child_workflow_run_status\" IS NULL OR \"child_workflow_run_wait\".\"child_workflow_run_status\" IN ('cancelled', 'completed', 'failed')"
+				},
 				"chk_child_workflow_run_wait_completed_invariants": {
 					"name": "chk_child_workflow_run_wait_completed_invariants",
-					"value": "\"child_workflow_run_wait_queue\".\"status\" != 'completed' OR (\"child_workflow_run_wait_queue\".\"completed_at\" IS NOT NULL AND \"child_workflow_run_wait_queue\".\"child_workflow_run_state_transition_id\" IS NOT NULL)"
+					"value": "\"child_workflow_run_wait\".\"status\" != 'completed' OR (\"child_workflow_run_wait\".\"completed_at\" IS NOT NULL AND \"child_workflow_run_wait\".\"child_workflow_run_state_transition_id\" IS NOT NULL AND \"child_workflow_run_wait\".\"child_workflow_run_status\" IS NOT NULL AND \"child_workflow_run_wait\".\"signal_sequence\" IS NOT NULL)"
 				},
-				"chk_child_workflow_run_wait_timeout_requires_timed_out_at": {
-					"name": "chk_child_workflow_run_wait_timeout_requires_timed_out_at",
-					"value": "\"child_workflow_run_wait_queue\".\"status\" != 'timeout' OR \"child_workflow_run_wait_queue\".\"timed_out_at\" IS NOT NULL"
+				"chk_child_workflow_run_wait_timeout_invariants": {
+					"name": "chk_child_workflow_run_wait_timeout_invariants",
+					"value": "\"child_workflow_run_wait\".\"status\" != 'timeout' OR (\"child_workflow_run_wait\".\"timed_out_at\" IS NOT NULL AND \"child_workflow_run_wait\".\"child_workflow_run_status\" IS NULL AND \"child_workflow_run_wait\".\"child_workflow_run_state_transition_id\" IS NULL AND \"child_workflow_run_wait\".\"signal_sequence\" IS NULL)"
 				}
 			}
 		},
-		"event_wait_queue": {
-			"name": "event_wait_queue",
+		"event_wait": {
+			"name": "event_wait",
 			"columns": {
 				"id": {
 					"name": "id",
@@ -159,6 +174,13 @@
 					"notNull": false,
 					"autoincrement": false
 				},
+				"signal_sequence": {
+					"name": "signal_sequence",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
 				"data": {
 					"name": "data",
 					"type": "text",
@@ -166,38 +188,45 @@
 					"notNull": false,
 					"autoincrement": false
 				},
+				"client_codec_applied": {
+					"name": "client_codec_applied",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
 				"timed_out_at": {
 					"name": "timed_out_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
-				"uqidx_event_wait_queue_workflow_run_name_reference": {
-					"name": "uqidx_event_wait_queue_workflow_run_name_reference",
+				"uqidx_event_wait_workflow_run_name_reference": {
+					"name": "uqidx_event_wait_workflow_run_name_reference",
 					"columns": ["workflow_run_id", "name", "reference_id"],
 					"isUnique": true
 				},
-				"idx_event_wait_queue_workflow_run_id": {
-					"name": "idx_event_wait_queue_workflow_run_id",
-					"columns": ["workflow_run_id", "id"],
+				"idx_event_wait_workflow_run_signal_sequence_id": {
+					"name": "idx_event_wait_workflow_run_signal_sequence_id",
+					"columns": ["workflow_run_id", "signal_sequence", "id"],
 					"isUnique": false
 				}
 			},
 			"foreignKeys": {
-				"fk_event_wait_queue_workflow_run": {
-					"name": "fk_event_wait_queue_workflow_run",
-					"tableFrom": "event_wait_queue",
+				"fk_event_wait_workflow_run": {
+					"name": "fk_event_wait_workflow_run",
+					"tableFrom": "event_wait",
 					"tableTo": "workflow_run",
 					"columnsFrom": ["workflow_run_id"],
 					"columnsTo": ["id"],
@@ -208,9 +237,17 @@
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {
-				"chk_event_wait_queue_timeout_requires_timed_out_at": {
-					"name": "chk_event_wait_queue_timeout_requires_timed_out_at",
-					"value": "\"event_wait_queue\".\"status\" != 'timeout' OR \"event_wait_queue\".\"timed_out_at\" IS NOT NULL"
+				"chk_event_wait_status": {
+					"name": "chk_event_wait_status",
+					"value": "\"event_wait\".\"status\" IN ('received', 'timeout')"
+				},
+				"chk_event_wait_timeout_requires_timed_out_at": {
+					"name": "chk_event_wait_timeout_requires_timed_out_at",
+					"value": "\"event_wait\".\"status\" != 'timeout' OR \"event_wait\".\"timed_out_at\" IS NOT NULL"
+				},
+				"chk_event_wait_timeout_not_codec_applied": {
+					"name": "chk_event_wait_timeout_not_codec_applied",
+					"value": "\"event_wait\".\"status\" != 'timeout' OR \"event_wait\".\"client_codec_applied\" = false"
 				}
 			}
 		},
@@ -245,6 +282,28 @@
 					"notNull": true,
 					"autoincrement": false
 				},
+				"client_hasher_applied": {
+					"name": "client_hasher_applied",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"client_codec_applied": {
+					"name": "client_codec_applied",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"revision": {
+					"name": "revision",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
 				"type": {
 					"name": "type",
 					"type": "text",
@@ -254,6 +313,13 @@
 				},
 				"cron_expression": {
 					"name": "cron_expression",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"cron_timezone": {
+					"name": "cron_timezone",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": false,
@@ -301,8 +367,8 @@
 					"notNull": false,
 					"autoincrement": false
 				},
-				"conflict_policy": {
-					"name": "conflict_policy",
+				"workflow_run_options": {
+					"name": "workflow_run_options",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": false,
@@ -310,33 +376,40 @@
 				},
 				"last_occurrence": {
 					"name": "last_occurrence",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"next_run_at": {
 					"name": "next_run_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"latest_state_transition_id": {
+					"name": "latest_state_transition_id",
 					"type": "text",
 					"primaryKey": false,
-					"notNull": false,
+					"notNull": true,
 					"autoincrement": false
 				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				},
 				"updated_at": {
 					"name": "updated_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
@@ -355,10 +428,11 @@
 					"columns": ["namespace_id", "workflow_id"],
 					"isUnique": false
 				},
-				"idx_schedule_status_next_run_at_id": {
-					"name": "idx_schedule_status_next_run_at_id",
-					"columns": ["status", "next_run_at", "id"],
-					"isUnique": false
+				"idx_schedule_due_active": {
+					"name": "idx_schedule_due_active",
+					"columns": ["next_run_at", "id"],
+					"isUnique": false,
+					"where": "\"schedule\".\"status\" = 'active'"
 				}
 			},
 			"foreignKeys": {
@@ -374,10 +448,27 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_schedule_status": {
+					"name": "chk_schedule_status",
+					"value": "\"schedule\".\"status\" IN ('active', 'paused', 'inactive')"
+				},
+				"chk_schedule_type": {
+					"name": "chk_schedule_type",
+					"value": "\"schedule\".\"type\" IN ('cron', 'interval')"
+				},
+				"chk_schedule_overlap_policy": {
+					"name": "chk_schedule_overlap_policy",
+					"value": "\"schedule\".\"overlap_policy\" IS NULL OR \"schedule\".\"overlap_policy\" IN ('allow', 'skip', 'cancel_previous')"
+				},
+				"chk_schedule_spec_matches_type": {
+					"name": "chk_schedule_spec_matches_type",
+					"value": "(\"schedule\".\"type\" = 'cron' AND \"schedule\".\"cron_expression\" IS NOT NULL AND \"schedule\".\"interval_ms\" IS NULL) OR (\"schedule\".\"type\" = 'interval' AND \"schedule\".\"interval_ms\" > 0 AND \"schedule\".\"cron_expression\" IS NULL AND \"schedule\".\"cron_timezone\" IS NULL)"
+				}
+			}
 		},
-		"sleep_queue": {
-			"name": "sleep_queue",
+		"sleep": {
+			"name": "sleep",
 			"columns": {
 				"id": {
 					"name": "id",
@@ -407,53 +498,53 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"awake_at": {
-					"name": "awake_at",
-					"type": "text",
+				"wakeup_at": {
+					"name": "wakeup_at",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false
 				},
 				"completed_at": {
 					"name": "completed_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"cancelled_at": {
 					"name": "cancelled_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
-				"uqidx_sleep_queue_one_active_per_run": {
-					"name": "uqidx_sleep_queue_one_active_per_run",
+				"uqidx_sleep_one_active_per_run": {
+					"name": "uqidx_sleep_one_active_per_run",
 					"columns": ["workflow_run_id"],
 					"isUnique": true,
-					"where": "\"sleep_queue\".\"status\" = 'sleeping'"
+					"where": "\"sleep\".\"status\" = 'sleeping'"
 				},
-				"idx_sleep_queue_workflow_run_id": {
-					"name": "idx_sleep_queue_workflow_run_id",
+				"idx_sleep_workflow_run_id": {
+					"name": "idx_sleep_workflow_run_id",
 					"columns": ["workflow_run_id", "id"],
 					"isUnique": false
 				}
 			},
 			"foreignKeys": {
-				"fk_sleep_queue_workflow_run": {
-					"name": "fk_sleep_queue_workflow_run",
-					"tableFrom": "sleep_queue",
+				"fk_sleep_workflow_run": {
+					"name": "fk_sleep_workflow_run",
+					"tableFrom": "sleep",
 					"tableTo": "workflow_run",
 					"columnsFrom": ["workflow_run_id"],
 					"columnsTo": ["id"],
@@ -464,13 +555,17 @@
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {
-				"chk_sleep_queue_completed_requires_completed_at": {
-					"name": "chk_sleep_queue_completed_requires_completed_at",
-					"value": "\"sleep_queue\".\"status\" != 'completed' OR \"sleep_queue\".\"completed_at\" IS NOT NULL"
+				"chk_sleep_status": {
+					"name": "chk_sleep_status",
+					"value": "\"sleep\".\"status\" IN ('sleeping', 'completed', 'cancelled')"
 				},
-				"chk_sleep_queue_cancelled_requires_cancelled_at": {
-					"name": "chk_sleep_queue_cancelled_requires_cancelled_at",
-					"value": "\"sleep_queue\".\"status\" != 'cancelled' OR \"sleep_queue\".\"cancelled_at\" IS NOT NULL"
+				"chk_sleep_completed_requires_completed_at": {
+					"name": "chk_sleep_completed_requires_completed_at",
+					"value": "\"sleep\".\"status\" != 'completed' OR \"sleep\".\"completed_at\" IS NOT NULL"
+				},
+				"chk_sleep_cancelled_requires_cancelled_at": {
+					"name": "chk_sleep_cancelled_requires_cancelled_at",
+					"value": "\"sleep\".\"status\" != 'cancelled' OR \"sleep\".\"cancelled_at\" IS NOT NULL"
 				}
 			}
 		},
@@ -488,7 +583,7 @@
 					"name": "workflow_run_id",
 					"type": "text",
 					"primaryKey": false,
-					"notNull": true,
+					"notNull": false,
 					"autoincrement": false
 				},
 				"type": {
@@ -505,15 +600,33 @@
 					"notNull": false,
 					"autoincrement": false
 				},
+				"schedule_id": {
+					"name": "schedule_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
 				"status": {
 					"name": "status",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true,
-					"autoincrement": false
+					"autoincrement": false,
+					"generated": {
+						"as": "(json_extract(\"state\", '$.status'))",
+						"type": "stored"
+					}
 				},
 				"attempt": {
 					"name": "attempt",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"revision": {
+					"name": "revision",
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
@@ -528,18 +641,30 @@
 				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
 				"idx_state_transition_workflow_run_id": {
 					"name": "idx_state_transition_workflow_run_id",
-					"columns": ["workflow_run_id", "id"],
-					"isUnique": false
+					"columns": [
+						"workflow_run_id",
+						"revision",
+						"(CASE \"type\" WHEN 'workflow_run' THEN 0 WHEN 'task' THEN 1 WHEN 'schedule' THEN 2 END)",
+						"id"
+					],
+					"isUnique": false,
+					"where": "\"state_transition\".\"workflow_run_id\" IS NOT NULL"
+				},
+				"idx_state_transition_schedule_id": {
+					"name": "idx_state_transition_schedule_id",
+					"columns": ["schedule_id", "revision", "id"],
+					"isUnique": false,
+					"where": "\"state_transition\".\"schedule_id\" IS NOT NULL"
 				}
 			},
 			"foreignKeys": {
@@ -560,18 +685,31 @@
 					"columnsTo": ["id"],
 					"onDelete": "no action",
 					"onUpdate": "no action"
+				},
+				"fk_state_transition_schedule": {
+					"name": "fk_state_transition_schedule",
+					"tableFrom": "state_transition",
+					"tableTo": "schedule",
+					"columnsFrom": ["schedule_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
 				}
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {
-				"chk_task_state_transition_requires_task_id": {
-					"name": "chk_task_state_transition_requires_task_id",
-					"value": "(\"state_transition\".\"type\" = 'task' AND \"state_transition\".\"task_id\" IS NOT NULL) OR (\"state_transition\".\"type\" = 'workflow_run' AND \"state_transition\".\"task_id\" IS NULL)"
+				"chk_state_transition_type": {
+					"name": "chk_state_transition_type",
+					"value": "\"state_transition\".\"type\" IN ('workflow_run', 'task', 'schedule')"
+				},
+				"chk_state_transition_columns_match_type": {
+					"name": "chk_state_transition_columns_match_type",
+					"value": "(\"state_transition\".\"type\" = 'workflow_run' AND \"state_transition\".\"workflow_run_id\" IS NOT NULL AND \"state_transition\".\"attempt\" IS NOT NULL AND \"state_transition\".\"task_id\" IS NULL AND \"state_transition\".\"schedule_id\" IS NULL) OR (\"state_transition\".\"type\" = 'task' AND \"state_transition\".\"workflow_run_id\" IS NOT NULL AND \"state_transition\".\"attempt\" IS NOT NULL AND \"state_transition\".\"task_id\" IS NOT NULL AND \"state_transition\".\"schedule_id\" IS NULL) OR (\"state_transition\".\"type\" = 'schedule' AND \"state_transition\".\"schedule_id\" IS NOT NULL AND \"state_transition\".\"workflow_run_id\" IS NULL AND \"state_transition\".\"attempt\" IS NULL AND \"state_transition\".\"task_id\" IS NULL)"
 				},
 				"chk_state_transition_status_matches_type": {
 					"name": "chk_state_transition_status_matches_type",
-					"value": "(type = 'workflow_run' AND status IN ('scheduled', 'queued', 'running', 'paused', 'sleeping', 'awaiting_event', 'awaiting_retry', 'awaiting_child_workflow', 'cancelled', 'completed', 'failed')) OR (type = 'task' AND status IN ('running', 'awaiting_retry', 'completed', 'failed', 'discarded'))"
+					"value": "(\"state_transition\".\"type\" = 'workflow_run' AND \"state_transition\".\"status\" IN ('scheduled', 'queued', 'running', 'paused', 'sleeping', 'awaiting_event', 'awaiting_retry', 'awaiting_task_retry', 'awaiting_child_workflow', 'stalled', 'cancelled', 'completed', 'failed')) OR (\"state_transition\".\"type\" = 'task' AND \"state_transition\".\"status\" IN ('running', 'awaiting_retry', 'completed', 'failed', 'discarded')) OR (\"state_transition\".\"type\" = 'schedule' AND \"state_transition\".\"status\" IN ('active', 'paused', 'inactive'))"
 				}
 			}
 		},
@@ -643,26 +781,26 @@
 				},
 				"next_attempt_at": {
 					"name": "next_attempt_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				},
 				"updated_at": {
 					"name": "updated_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
@@ -674,11 +812,6 @@
 				"idx_task_workflow_run_status": {
 					"name": "idx_task_workflow_run_status",
 					"columns": ["workflow_run_id", "status"],
-					"isUnique": false
-				},
-				"idx_task_status_next_attempt_at_workflow_run": {
-					"name": "idx_task_status_next_attempt_at_workflow_run",
-					"columns": ["status", "next_attempt_at", "workflow_run_id"],
 					"isUnique": false
 				}
 			},
@@ -695,7 +828,12 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_task_status": {
+					"name": "chk_task_status",
+					"value": "\"task\".\"status\" IN ('running', 'awaiting_retry', 'completed', 'failed', 'discarded')"
+				}
+			}
 		},
 		"workflow": {
 			"name": "workflow",
@@ -719,8 +857,7 @@
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true,
-					"autoincrement": false,
-					"default": "'user'"
+					"autoincrement": false
 				},
 				"name": {
 					"name": "name",
@@ -738,11 +875,11 @@
 				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
@@ -755,7 +892,12 @@
 			"foreignKeys": {},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_workflow_source": {
+					"name": "chk_workflow_source",
+					"value": "\"workflow\".\"source\" IN ('user', 'system')"
+				}
+			}
 		},
 		"workflow_run": {
 			"name": "workflow_run",
@@ -802,8 +944,30 @@
 					"notNull": true,
 					"autoincrement": false
 				},
+				"client_hasher_applied": {
+					"name": "client_hasher_applied",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"client_codec_applied": {
+					"name": "client_codec_applied",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
 				"revision": {
 					"name": "revision",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
+				"signal_sequence": {
+					"name": "signal_sequence",
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
@@ -846,13 +1010,6 @@
 					"notNull": false,
 					"autoincrement": false
 				},
-				"conflict_policy": {
-					"name": "conflict_policy",
-					"type": "text",
-					"primaryKey": false,
-					"notNull": false,
-					"autoincrement": false
-				},
 				"latest_state_transition_id": {
 					"name": "latest_state_transition_id",
 					"type": "text",
@@ -862,54 +1019,55 @@
 				},
 				"scheduled_at": {
 					"name": "scheduled_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
-				"awake_at": {
-					"name": "awake_at",
-					"type": "text",
+				"wakeup_at": {
+					"name": "wakeup_at",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"timeout_at": {
 					"name": "timeout_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"next_attempt_at": {
 					"name": "next_attempt_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				},
 				"updated_at": {
 					"name": "updated_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
 				"uqidx_workflow_run_workflow_reference": {
 					"name": "uqidx_workflow_run_workflow_reference",
 					"columns": ["workflow_id", "reference_id"],
-					"isUnique": true
+					"isUnique": true,
+					"where": "\"workflow_run\".\"reference_id\" IS NOT NULL"
 				},
 				"idx_workflow_run_namespace_id": {
 					"name": "idx_workflow_run_namespace_id",
@@ -931,35 +1089,53 @@
 					"columns": ["workflow_id", "status", "id"],
 					"isUnique": false
 				},
-				"idx_workflow_run_schedule": {
-					"name": "idx_workflow_run_schedule",
-					"columns": ["schedule_id"],
-					"isUnique": false
+				"idx_workflow_run_schedule_namespace": {
+					"name": "idx_workflow_run_schedule_namespace",
+					"columns": ["schedule_id", "namespace_id"],
+					"isUnique": false,
+					"where": "\"workflow_run\".\"schedule_id\" IS NOT NULL"
 				},
 				"idx_workflow_run_parent_workflow_run_status": {
 					"name": "idx_workflow_run_parent_workflow_run_status",
 					"columns": ["parent_workflow_run_id", "status"],
-					"isUnique": false
+					"isUnique": false,
+					"where": "\"workflow_run\".\"parent_workflow_run_id\" IS NOT NULL"
 				},
-				"idx_workflow_run_status_scheduled_at_id": {
-					"name": "idx_workflow_run_status_scheduled_at_id",
-					"columns": ["status", "scheduled_at", "id"],
-					"isUnique": false
+				"idx_workflow_run_due_scheduled": {
+					"name": "idx_workflow_run_due_scheduled",
+					"columns": ["scheduled_at", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run\".\"status\" = 'scheduled'"
 				},
-				"idx_workflow_run_status_awake_at_id": {
-					"name": "idx_workflow_run_status_awake_at_id",
-					"columns": ["status", "awake_at", "id"],
-					"isUnique": false
+				"idx_workflow_run_due_sleeping": {
+					"name": "idx_workflow_run_due_sleeping",
+					"columns": ["wakeup_at", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run\".\"status\" = 'sleeping'"
 				},
-				"idx_workflow_run_status_timeout_at_id": {
-					"name": "idx_workflow_run_status_timeout_at_id",
-					"columns": ["status", "timeout_at", "id"],
-					"isUnique": false
+				"idx_workflow_run_due_awaiting_event": {
+					"name": "idx_workflow_run_due_awaiting_event",
+					"columns": ["timeout_at", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run\".\"status\" = 'awaiting_event'"
 				},
-				"idx_workflow_run_status_next_attempt_at_id": {
-					"name": "idx_workflow_run_status_next_attempt_at_id",
-					"columns": ["status", "next_attempt_at", "id"],
-					"isUnique": false
+				"idx_workflow_run_due_awaiting_child_workflow": {
+					"name": "idx_workflow_run_due_awaiting_child_workflow",
+					"columns": ["timeout_at", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run\".\"status\" = 'awaiting_child_workflow'"
+				},
+				"idx_workflow_run_due_awaiting_retry": {
+					"name": "idx_workflow_run_due_awaiting_retry",
+					"columns": ["next_attempt_at", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run\".\"status\" = 'awaiting_retry'"
+				},
+				"idx_workflow_run_due_awaiting_task_retry": {
+					"name": "idx_workflow_run_due_awaiting_task_retry",
+					"columns": ["next_attempt_at", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run\".\"status\" = 'awaiting_task_retry'"
 				}
 			},
 			"foreignKeys": {
@@ -993,7 +1169,12 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_workflow_run_status": {
+					"name": "chk_workflow_run_status",
+					"value": "\"workflow_run\".\"status\" IN ('scheduled', 'queued', 'running', 'paused', 'sleeping', 'awaiting_event', 'awaiting_retry', 'awaiting_task_retry', 'awaiting_child_workflow', 'stalled', 'cancelled', 'completed', 'failed')"
+				}
+			}
 		},
 		"workflow_run_outbox": {
 			"name": "workflow_run_outbox",
@@ -1019,6 +1200,13 @@
 					"notNull": true,
 					"autoincrement": false
 				},
+				"workflow_source": {
+					"name": "workflow_source",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
 				"workflow_name": {
 					"name": "workflow_name",
 					"type": "text",
@@ -1033,8 +1221,8 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"shard": {
-					"name": "shard",
+				"pool": {
+					"name": "pool",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": false,
@@ -1054,35 +1242,57 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"published_at": {
-					"name": "published_at",
-					"type": "text",
+				"claimed_at": {
+					"name": "claimed_at",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
 				},
-				"claimed_at": {
-					"name": "claimed_at",
-					"type": "text",
+				"first_published_at": {
+					"name": "first_published_at",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
+				},
+				"last_published_at": {
+					"name": "last_published_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"next_publish_attempt_rank": {
+					"name": "next_publish_attempt_rank",
+					"type": "real",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"dispatch_attempts": {
+					"name": "dispatch_attempts",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
 				},
 				"created_at": {
 					"name": "created_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				},
 				"updated_at": {
 					"name": "updated_at",
-					"type": "text",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false,
-					"default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+					"default": "(cast(unixepoch('subsec') * 1000 as integer))"
 				}
 			},
 			"indexes": {
@@ -1091,48 +1301,52 @@
 					"columns": ["workflow_run_id"],
 					"isUnique": true
 				},
-				"idx_workflow_run_outbox_status_workflow_rank_id": {
-					"name": "idx_workflow_run_outbox_status_workflow_rank_id",
-					"columns": ["namespace_id", "status", "workflow_name", "workflow_version_id", "shard", "rank", "id"],
-					"isUnique": false
+				"idx_workflow_run_outbox_claim_pending": {
+					"name": "idx_workflow_run_outbox_claim_pending",
+					"columns": ["namespace_id", "workflow_source", "workflow_name", "workflow_version_id", "pool", "rank", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run_outbox\".\"status\" = 'pending'"
 				},
-				"idx_workflow_run_outbox_status_workflow_claimed_rank_id": {
-					"name": "idx_workflow_run_outbox_status_workflow_claimed_rank_id",
-					"columns": [
-						"namespace_id",
-						"status",
-						"workflow_name",
-						"workflow_version_id",
-						"shard",
-						"claimed_at",
-						"rank",
-						"id"
-					],
-					"isUnique": false
+				"idx_workflow_run_outbox_list_pending": {
+					"name": "idx_workflow_run_outbox_list_pending",
+					"columns": ["next_publish_attempt_rank", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run_outbox\".\"status\" = 'pending'"
 				},
-				"idx_workflow_run_outbox_status_rank_id": {
-					"name": "idx_workflow_run_outbox_status_rank_id",
-					"columns": ["status", "rank", "id"],
-					"isUnique": false
+				"idx_workflow_run_outbox_list_published": {
+					"name": "idx_workflow_run_outbox_list_published",
+					"columns": ["next_publish_attempt_rank", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run_outbox\".\"status\" = 'published'"
 				},
-				"idx_workflow_run_outbox_status_published_id": {
-					"name": "idx_workflow_run_outbox_status_published_id",
-					"columns": ["status", "published_at", "id"],
-					"isUnique": false
+				"idx_workflow_run_outbox_list_claimed": {
+					"name": "idx_workflow_run_outbox_list_claimed",
+					"columns": ["claimed_at", "id"],
+					"isUnique": false,
+					"where": "\"workflow_run_outbox\".\"status\" = 'claimed'"
 				},
-				"idx_workflow_run_outbox_status_claimed_id": {
-					"name": "idx_workflow_run_outbox_status_claimed_id",
-					"columns": ["status", "claimed_at", "id"],
-					"isUnique": false
+				"idx_workflow_run_outbox_stall_undeliverable": {
+					"name": "idx_workflow_run_outbox_stall_undeliverable",
+					"columns": ["id"],
+					"isUnique": false,
+					"where": "\"workflow_run_outbox\".\"status\" IN ('pending', 'published')"
 				}
 			},
 			"foreignKeys": {},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {
-				"chk_workflow_run_outbox_published_requires_published_at": {
-					"name": "chk_workflow_run_outbox_published_requires_published_at",
-					"value": "\"workflow_run_outbox\".\"status\" != 'published' OR \"workflow_run_outbox\".\"published_at\" IS NOT NULL"
+				"chk_workflow_run_outbox_workflow_source": {
+					"name": "chk_workflow_run_outbox_workflow_source",
+					"value": "\"workflow_run_outbox\".\"workflow_source\" IN ('user', 'system')"
+				},
+				"chk_workflow_run_outbox_status": {
+					"name": "chk_workflow_run_outbox_status",
+					"value": "\"workflow_run_outbox\".\"status\" IN ('pending', 'published', 'claimed')"
+				},
+				"chk_workflow_run_outbox_published_requires_first_published_at": {
+					"name": "chk_workflow_run_outbox_published_requires_first_published_at",
+					"value": "\"workflow_run_outbox\".\"status\" != 'published' OR \"workflow_run_outbox\".\"first_published_at\" IS NOT NULL"
 				},
 				"chk_workflow_run_outbox_claimed_requires_claimed_at": {
 					"name": "chk_workflow_run_outbox_claimed_requires_claimed_at",
@@ -1149,6 +1363,14 @@
 		"columns": {}
 	},
 	"internal": {
-		"indexes": {}
+		"indexes": {
+			"idx_state_transition_workflow_run_id": {
+				"columns": {
+					"(CASE \"type\" WHEN 'workflow_run' THEN 0 WHEN 'task' THEN 1 WHEN 'schedule' THEN 2 END)": {
+						"isExpression": true
+					}
+				}
+			}
+		}
 	}
 }

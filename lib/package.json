@@ -45,6 +45,10 @@
 			"types": "./dist/db/migrate/cli.d.ts",
 			"import": "./dist/db/migrate/cli.js"
 		},
+		"./db/sqlite": {
+			"types": "./dist/db/sqlite/index.d.ts",
+			"import": "./dist/db/sqlite/index.js"
+		},
 		"./duration": {
 			"types": "./dist/duration/index.d.ts",
 			"import": "./dist/duration/index.js"
@@ -93,6 +97,7 @@
 		"build": "tsup"
 	},
 	"devDependencies": {
+		"@libsql/client": "^0.18.0",
 		"arktype": "^2.1.29",
 		"cac": "^6.7.14",
 		"dotenv": "^16.4.5",

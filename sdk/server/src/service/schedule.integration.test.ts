@@ -997,7 +997,7 @@ async function runConcurrentScheduleOperations<T>(
 ): Promise<T> {
 	const primaryWritten = createBinaryLatch();
 	const commitPrimary = createBinaryLatch();
-	const secondaryReadStarted = createBinaryLatch();
+	const secondaryTransactionRequested = createBinaryLatch();
 	const primaryService = createScheduleService({
 		repos: {
 			...primaryRepos,
@@ -1013,29 +1013,17 @@ async function runConcurrentScheduleOperations<T>(
 	const secondaryService = createScheduleService({
 		repos: {
 			...secondaryRepos,
-			transaction: (fn) =>
-				secondaryRepos.transaction((txRepos) =>
-					fn({
-						...txRepos,
-						schedule: {
-							...txRepos.schedule,
-							get: (namespaceId, filter, options) => {
-								const result = txRepos.schedule.get(namespaceId, filter, options);
-								if (filter.id || filter.definitionHashes) {
-									secondaryReadStarted.signal();
-								}
-								return result;
-							},
-						},
-					})
-				),
+			transaction: (fn) => {
+				secondaryTransactionRequested.signal();
+				return secondaryRepos.transaction(fn);
+			},
 		},
 	});
 
 	const primaryPromise = primaryOperation(primaryService);
 	await primaryWritten.wait();
 	const secondaryPromise = secondaryOperation(secondaryService);
-	await secondaryReadStarted.wait();
+	await secondaryTransactionRequested.wait();
 	commitPrimary.signal();
 	await primaryPromise;
 	return secondaryPromise;

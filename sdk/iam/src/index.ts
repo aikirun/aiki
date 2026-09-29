@@ -1,6 +1,7 @@
 export type {
-	DatabaseConfig /*, MysqlDatabaseConfig*/,
-	PgDatabaseConfig /*, SqliteDatabaseConfig*/,
+	DatabaseConfig,
+	PgDatabaseConfig,
+	SqliteDatabaseConfig /*, MysqlDatabaseConfig*/,
 } from "@aikirun/lib/db";
 
 export type {

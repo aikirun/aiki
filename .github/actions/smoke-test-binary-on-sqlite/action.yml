@@ -1,0 +1,22 @@
+name: Smoke-test an aiki binary on sqlite
+description: Apply every package's migrations to a fresh sqlite file with a compiled aiki binary
+
+inputs:
+  binary:
+    description: Path to the compiled aiki binary
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Run away from node_modules: next to it, a binary missing its embedded libsql addon would load
+    # the addon from disk and pass.
+    - shell: bash
+      env:
+        BINARY: ${{ inputs.binary }}
+        DATABASE_PROVIDER: sqlite
+      run: |
+        cp "$BINARY" "$RUNNER_TEMP/aiki"
+        chmod +x "$RUNNER_TEMP/aiki"
+        cd "$RUNNER_TEMP"
+        DATABASE_PATH="$RUNNER_TEMP/smoke.db" ./aiki migrate apply --package server,iam

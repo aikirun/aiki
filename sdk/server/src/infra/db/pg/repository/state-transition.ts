@@ -4,14 +4,19 @@ import type { WorkflowRunState } from "@aikirun/types/workflow/run";
 import type { TaskState } from "@aikirun/types/workflow/task";
 import { count, eq, inArray, sql } from "drizzle-orm";
 
+import {
+	toRunOwnedStateTransitionRow,
+	toScheduleStateTransitionRow,
+	toStateTransitionRow,
+} from "../../state-transition-row";
 import type { PgDb } from "../provider";
 import { stateTransition } from "../schema";
 
-type _StateTransitionRow = typeof stateTransition.$inferSelect;
+export type StateTransitionRowSelect = typeof stateTransition.$inferSelect;
 type _StateTransitionRowInsert = typeof stateTransition.$inferInsert;
 type EntityColumn = "type" | "workflowRunId" | "attempt" | "taskId" | "scheduleId" | "state";
 
-export type WorkflowRunStateTransitionRow = Omit<_StateTransitionRow, EntityColumn> & {
+export type WorkflowRunStateTransitionRow = Omit<StateTransitionRowSelect, EntityColumn> & {
 	type: "workflow_run";
 	workflowRunId: string;
 	attempt: number;
@@ -19,7 +24,7 @@ export type WorkflowRunStateTransitionRow = Omit<_StateTransitionRow, EntityColu
 	scheduleId: null;
 	state: WorkflowRunState;
 };
-export type TaskStateTransitionRow = Omit<_StateTransitionRow, EntityColumn> & {
+export type TaskStateTransitionRow = Omit<StateTransitionRowSelect, EntityColumn> & {
 	type: "task";
 	workflowRunId: string;
 	attempt: number;
@@ -27,7 +32,7 @@ export type TaskStateTransitionRow = Omit<_StateTransitionRow, EntityColumn> & {
 	scheduleId: null;
 	state: TaskState;
 };
-export type ScheduleStateTransitionRow = Omit<_StateTransitionRow, EntityColumn> & {
+export type ScheduleStateTransitionRow = Omit<StateTransitionRowSelect, EntityColumn> & {
 	type: "schedule";
 	workflowRunId: null;
 	attempt: null;
@@ -132,103 +137,3 @@ export const createStateTransitionRepository = (db: PgDb) => ({
 });
 
 export type StateTransitionRepository = ReturnType<typeof createStateTransitionRepository>;
-
-/**
- * JSONB cannot represent `undefined` — keys with `undefined` values are dropped on insert.
- * These functions restore missing keys when reading JSONB data back from the database,
- * ensuring the returned objects conform to their domain types.
- */
-
-export function toWorkflowRunState(raw: unknown): WorkflowRunState {
-	const state = raw as Record<string, unknown>;
-	if (state.status === "completed" && !("output" in state)) {
-		state.output = undefined;
-	}
-	return state as unknown as WorkflowRunState;
-}
-
-export function toTaskState(raw: unknown): TaskState {
-	const state = raw as Record<string, unknown>;
-	if (state.status === "completed" && !("output" in state)) {
-		state.output = undefined;
-	}
-	return state as unknown as TaskState;
-}
-
-function toStateTransitionRow(row: _StateTransitionRow): StateTransitionRow {
-	const { id, status, revision, createdAt } = row;
-	switch (row.type) {
-		case "workflow_run": {
-			if (row.workflowRunId === null || row.attempt === null || row.taskId !== null || row.scheduleId !== null) {
-				throw new Error(`State transition ${id} has columns that do not match type 'workflow_run'`);
-			}
-			return {
-				id,
-				status,
-				revision,
-				createdAt,
-				type: "workflow_run",
-				workflowRunId: row.workflowRunId,
-				attempt: row.attempt,
-				taskId: null,
-				scheduleId: null,
-				state: toWorkflowRunState(row.state),
-			};
-		}
-		case "task": {
-			if (row.workflowRunId === null || row.attempt === null || row.taskId === null || row.scheduleId !== null) {
-				throw new Error(`State transition ${id} has columns that do not match type 'task'`);
-			}
-			return {
-				id,
-				status,
-				revision,
-				createdAt,
-				type: "task",
-				workflowRunId: row.workflowRunId,
-				attempt: row.attempt,
-				taskId: row.taskId,
-				scheduleId: null,
-				state: toTaskState(row.state),
-			};
-		}
-		case "schedule": {
-			if (row.scheduleId === null || row.workflowRunId !== null || row.attempt !== null || row.taskId !== null) {
-				throw new Error(`State transition ${id} has columns that do not match type 'schedule'`);
-			}
-			return {
-				id,
-				status,
-				revision,
-				createdAt,
-				type: "schedule",
-				workflowRunId: null,
-				attempt: null,
-				taskId: null,
-				scheduleId: row.scheduleId,
-				state: row.state as ScheduleState,
-			};
-		}
-		default: {
-			return row.type satisfies never;
-		}
-	}
-}
-
-function toRunOwnedStateTransitionRow(
-	row: _StateTransitionRow
-): WorkflowRunStateTransitionRow | TaskStateTransitionRow {
-	const narrowed = toStateTransitionRow(row);
-	if (narrowed.type !== "workflow_run" && narrowed.type !== "task") {
-		throw new Error(`State transition ${row.id} doesn't belong to a run`);
-	}
-	return narrowed;
-}
-
-function toScheduleStateTransitionRow(row: _StateTransitionRow): ScheduleStateTransitionRow {
-	const narrowed = toStateTransitionRow(row);
-	if (narrowed.type !== "schedule") {
-		throw new Error(`State transition ${row.id} doesn't belong to a schedule`);
-	}
-	return narrowed;
-}

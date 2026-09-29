@@ -1,7 +1,7 @@
 {
 	"name": "@aikirun/iam",
 	"version": "0.42.0",
-	"description": "Aiki IAM library — pluggable identity & access management",
+	"description": "Aiki IAM library \u2014 pluggable identity & access management",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -35,15 +35,20 @@
 		"ulidx": "^2.4.1"
 	},
 	"peerDependencies": {
+		"@libsql/client": "^0.18.0",
 		"postgres": "^3.4.8"
 	},
 	"peerDependenciesMeta": {
+		"@libsql/client": {
+			"optional": true
+		},
 		"postgres": {
 			"optional": true
 		}
 	},
 	"devDependencies": {
 		"@aikirun/lib": "workspace:*",
+		"@libsql/client": "^0.18.0",
 		"drizzle-kit": "^0.31.8",
 		"postgres": "^3.4.8"
 	},

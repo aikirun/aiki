@@ -32,6 +32,7 @@ COPY sdk/iam/ ./sdk/iam/
 COPY sdk/server/ ./sdk/server/
 COPY app/server/ ./app/server/
 COPY cli/ ./cli/
+COPY scripts/compile.ts ./scripts/
 COPY tsconfig.json ./
 
 ARG TARGETARCH
@@ -39,7 +40,7 @@ RUN cd cli \
 	&& bun scripts/generate-embedded-data.ts \
 	&& target="bun-linux-x64-musl" \
 	&& if [ "$TARGETARCH" = "arm64" ]; then target="bun-linux-arm64-musl"; fi \
-	&& bun build src/index.ts --compile --target="$target" --outfile dist/aiki
+	&& bun ../scripts/compile.ts src/index.ts --target "$target" --outfile dist/aiki
 
 FROM alpine:3
 

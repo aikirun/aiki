@@ -31,7 +31,8 @@ CREATE TABLE `api_key` (
 	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	FOREIGN KEY (`namespace_id`) REFERENCES `namespace`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`created_by_user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`created_by_user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "chk_api_key_status" CHECK("api_key"."status" IN ('active', 'revoked', 'expired'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uq_api_key_key_hash` ON `api_key` (`key_hash`);--> statement-breakpoint
@@ -44,7 +45,8 @@ CREATE TABLE `namespace` (
 	`status` text DEFAULT 'active' NOT NULL,
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "chk_namespace_status" CHECK("namespace"."status" IN ('active', 'suspended', 'deleted'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uqidx_namespace_org_name` ON `namespace` (`organization_id`,`name`);--> statement-breakpoint
@@ -56,7 +58,8 @@ CREATE TABLE `namespace_member` (
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	FOREIGN KEY (`namespace_id`) REFERENCES `namespace`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "chk_namespace_member_role" CHECK("namespace_member"."role" IN ('admin', 'member', 'viewer'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uqidx_namespace_member_namespace_user` ON `namespace_member` (`namespace_id`,`user_id`);--> statement-breakpoint
@@ -70,7 +73,9 @@ CREATE TABLE `organization` (
 	`type` text NOT NULL,
 	`status` text DEFAULT 'active' NOT NULL,
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
-	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL
+	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
+	CONSTRAINT "chk_organization_type" CHECK("organization"."type" IN ('personal', 'team')),
+	CONSTRAINT "chk_organization_status" CHECK("organization"."status" IN ('active', 'suspended', 'deleted'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uq_organization_slug` ON `organization` (`slug`);--> statement-breakpoint
@@ -86,7 +91,9 @@ CREATE TABLE `organization_invitation` (
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	FOREIGN KEY (`inviter_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "chk_org_invitation_role" CHECK("organization_invitation"."role" IN ('owner', 'admin', 'member')),
+	CONSTRAINT "chk_org_invitation_status" CHECK("organization_invitation"."status" IN ('pending', 'accepted', 'rejected', 'expired', 'canceled'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uqidx_org_invitation_pending_email_org_namespace` ON `organization_invitation` (`email`,`organization_id`,`namespace_id`) WHERE "organization_invitation"."status" = 'pending';--> statement-breakpoint
@@ -98,7 +105,8 @@ CREATE TABLE `organization_member` (
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`organization_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "chk_org_member_role" CHECK("organization_member"."role" IN ('owner', 'admin', 'member'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uqidx_org_member_org_user` ON `organization_member` (`organization_id`,`user_id`);--> statement-breakpoint
@@ -127,7 +135,8 @@ CREATE TABLE `user` (
 	`image` text,
 	`status` text DEFAULT 'active' NOT NULL,
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
-	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL
+	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
+	CONSTRAINT "chk_user_status" CHECK("user"."status" IN ('active', 'suspended', 'deleted'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uq_user_email` ON `user` (`email`);--> statement-breakpoint

@@ -1,4 +1,4 @@
-import type { DatabaseConfig, PgDatabaseConfig } from "../../config";
+import type { DatabaseConfig, PgDatabaseConfig, SqliteDatabaseConfig } from "../../config";
 import type { MigrationMeta, MigrationSource } from "../source";
 
 interface MigrateApplyParams {
@@ -14,11 +14,13 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 		case "pg":
 			await applyPg(dbConfig, params.source.read(), params.migrationsTable);
 			return;
-		// case "sqlite":
+		case "sqlite":
+			await applySqlite(dbConfig, params.source.read(), params.migrationsTable);
+			return;
 		// case "mysql":
 		// 	throw new Error(`DATABASE_PROVIDER=${dbConfig.provider} is not yet supported.`);
 		default:
-			dbConfig.provider satisfies never;
+			dbConfig satisfies never;
 	}
 }
 
@@ -66,6 +68,52 @@ async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], mi
 		}
 	} finally {
 		await client.end();
+	}
+}
+
+async function applySqlite(
+	config: SqliteDatabaseConfig,
+	migrations: MigrationMeta[],
+	migrationsTable: string
+): Promise<void> {
+	const { openSqliteClient } = await import("../../sqlite");
+	const client = await openSqliteClient(config);
+	const quotedMigrationsTable = `"${migrationsTable}"`;
+
+	try {
+		await client.execute(`
+			CREATE TABLE IF NOT EXISTS ${quotedMigrationsTable} (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				hash text NOT NULL,
+				created_at integer
+			)
+		`);
+
+		const applied = await client.execute(`SELECT hash FROM ${quotedMigrationsTable}`);
+		const appliedHashes = new Set(applied.rows.map((row) => String(row.hash)));
+
+		for (const migration of migrations) {
+			if (appliedHashes.has(migration.hash)) {
+				continue;
+			}
+
+			console.log(`applying migration ${migration.hash.slice(0, 12)}`);
+
+			// Not a plain transaction: drizzle-kit changes a SQLite table by rebuilding it (create a
+			// copy, move the rows, drop the original). While foreign keys are enforced, dropping the
+			// original fails if rows in other tables still point at it. SQLite ignores switching
+			// them off inside a transaction, so migrate() switches them off first, then runs the
+			// statements in one.
+			await client.migrate([
+				...migration.sql,
+				{
+					sql: `INSERT INTO ${quotedMigrationsTable} (hash, created_at) VALUES (?, ?)`,
+					args: [migration.hash, migration.folderMillis],
+				},
+			]);
+		}
+	} finally {
+		client.close();
 	}
 }
 

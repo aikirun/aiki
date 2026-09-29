@@ -4,6 +4,7 @@ export type {
 	StateTransitionRepository,
 	StateTransitionRow,
 	StateTransitionRowInsert,
+	StateTransitionRowSelect,
 	TaskStateTransitionRow,
 	TaskStateTransitionRowInsert,
 	WorkflowRunStateTransitionRow,

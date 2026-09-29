@@ -3,6 +3,7 @@ import type { CreateDatabase, Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
 import type { PgClient } from "./pg/provider";
+import type { SqliteClient } from "./sqlite/client";
 
 export function database(config: DatabaseConfig): CreateDatabase {
 	let createDbPromise: Promise<Database> | undefined;
@@ -20,12 +21,14 @@ export function database(config: DatabaseConfig): CreateDatabase {
 					});
 					return { provider: "pg", [INTERNAL]: { client } };
 				}
-				// case "sqlite":
-				// 	throw new Error("SQLite support not yet implemented");
+				case "sqlite": {
+					const { createSqliteClient } = await import("./sqlite/client");
+					return { provider: "sqlite", [INTERNAL]: { client: createSqliteClient(config) } };
+				}
 				// case "mysql":
 				// 	throw new Error("MySQL support not yet implemented");
 				default:
-					return config.provider satisfies never;
+					return config satisfies never;
 			}
 		})();
 		return createDbPromise;
@@ -43,8 +46,11 @@ export function database(config: DatabaseConfig): CreateDatabase {
 					await client.end();
 					return;
 				}
-				// case "sqlite":
-				// 	throw new Error("SQLite support not yet implemented");
+				case "sqlite": {
+					const client = db[INTERNAL].client as SqliteClient;
+					client.close();
+					return;
+				}
 				// case "mysql":
 				// 	throw new Error("MySQL support not yet implemented");
 				default:

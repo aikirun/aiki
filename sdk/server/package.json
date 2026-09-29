@@ -1,7 +1,7 @@
 {
 	"name": "@aikirun/server",
 	"version": "0.42.0",
-	"description": "Aiki server library — durable execution orchestrator.",
+	"description": "Aiki server library \u2014 durable execution orchestrator.",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -35,9 +35,13 @@
 		"ulidx": "^2.4.1"
 	},
 	"peerDependencies": {
+		"@libsql/client": "^0.18.0",
 		"postgres": "^3.4.8"
 	},
 	"peerDependenciesMeta": {
+		"@libsql/client": {
+			"optional": true
+		},
 		"postgres": {
 			"optional": true
 		}
@@ -46,6 +50,7 @@
 		"@aikirun/lib": "workspace:*",
 		"@aikirun/memory": "workspace:*",
 		"@aikirun/testing": "workspace:*",
+		"@libsql/client": "^0.18.0",
 		"drizzle-kit": "^0.31.8",
 		"fishery": "^2.4.0",
 		"postgres": "^3.4.8"

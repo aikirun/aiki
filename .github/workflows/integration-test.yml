@@ -6,8 +6,12 @@ on:
 
 jobs:
   integration-test:
-    name: Integration Test
+    name: Integration Test (${{ matrix.database-provider }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database-provider: [pg, sqlite]
     timeout-minutes: 10
     services:
       postgres:
@@ -33,8 +37,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_PROVIDER: pg
+      DATABASE_PROVIDER: ${{ matrix.database-provider }}
       DATABASE_URL: postgresql://user:password@localhost:5432/aiki_test
+      DATABASE_PATH: aiki_test.db
       REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

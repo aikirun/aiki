@@ -1,7 +1,7 @@
 {
 	"version": "6",
 	"dialect": "sqlite",
-	"id": "0902b260-13a8-48a7-8369-6935653684b9",
+	"id": "70b11722-c5cb-4248-b237-f95278672ee5",
 	"prevId": "00000000-0000-0000-0000-000000000000",
 	"tables": {
 		"account": {
@@ -262,7 +262,12 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_api_key_status": {
+					"name": "chk_api_key_status",
+					"value": "\"api_key\".\"status\" IN ('active', 'revoked', 'expired')"
+				}
+			}
 		},
 		"namespace": {
 			"name": "namespace",
@@ -333,7 +338,12 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_namespace_status": {
+					"name": "chk_namespace_status",
+					"value": "\"namespace\".\"status\" IN ('active', 'suspended', 'deleted')"
+				}
+			}
 		},
 		"namespace_member": {
 			"name": "namespace_member",
@@ -418,7 +428,12 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_namespace_member_role": {
+					"name": "chk_namespace_member_role",
+					"value": "\"namespace_member\".\"role\" IN ('admin', 'member', 'viewer')"
+				}
+			}
 		},
 		"organization": {
 			"name": "organization",
@@ -500,7 +515,16 @@
 			"foreignKeys": {},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_organization_type": {
+					"name": "chk_organization_type",
+					"value": "\"organization\".\"type\" IN ('personal', 'team')"
+				},
+				"chk_organization_status": {
+					"name": "chk_organization_status",
+					"value": "\"organization\".\"status\" IN ('active', 'suspended', 'deleted')"
+				}
+			}
 		},
 		"organization_invitation": {
 			"name": "organization_invitation",
@@ -608,7 +632,16 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_org_invitation_role": {
+					"name": "chk_org_invitation_role",
+					"value": "\"organization_invitation\".\"role\" IN ('owner', 'admin', 'member')"
+				},
+				"chk_org_invitation_status": {
+					"name": "chk_org_invitation_status",
+					"value": "\"organization_invitation\".\"status\" IN ('pending', 'accepted', 'rejected', 'expired', 'canceled')"
+				}
+			}
 		},
 		"organization_member": {
 			"name": "organization_member",
@@ -692,7 +725,12 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_org_member_role": {
+					"name": "chk_org_member_role",
+					"value": "\"organization_member\".\"role\" IN ('owner', 'admin', 'member')"
+				}
+			}
 		},
 		"session": {
 			"name": "session",
@@ -871,7 +909,12 @@
 			"foreignKeys": {},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
-			"checkConstraints": {}
+			"checkConstraints": {
+				"chk_user_status": {
+					"name": "chk_user_status",
+					"value": "\"user\".\"status\" IN ('active', 'suspended', 'deleted')"
+				}
+			}
 		},
 		"verification": {
 			"name": "verification",

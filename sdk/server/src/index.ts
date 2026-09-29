@@ -1,8 +1,9 @@
 export type { ConfigProvider, ConfigProviderContext, CreateConfigProvider } from "@aikirun/lib/config";
 export { asConfigProvider } from "@aikirun/lib/config";
 export type {
-	DatabaseConfig /*, MysqlDatabaseConfig*/,
-	PgDatabaseConfig /*, SqliteDatabaseConfig*/,
+	DatabaseConfig,
+	PgDatabaseConfig,
+	SqliteDatabaseConfig /*, MysqlDatabaseConfig*/,
 } from "@aikirun/lib/db";
 export type { Logger } from "@aikirun/lib/logger";
 

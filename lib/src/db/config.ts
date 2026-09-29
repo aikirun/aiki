@@ -12,6 +12,11 @@ const pgDatabaseConfigSchema = type({
 	"caCert?": "string > 0",
 });
 
+const sqliteDatabaseConfigSchema = type({
+	provider: "'sqlite'",
+	path: "string > 0",
+});
+
 // const mysqlDatabaseConfigSchema = type({
 // 	provider: "'mysql'",
 // 	url: "string > 0",
@@ -19,22 +24,30 @@ const pgDatabaseConfigSchema = type({
 // 	"caCert?": "string > 0",
 // });
 
-// const sqliteDatabaseConfigSchema = type({
-// 	provider: "'sqlite'",
-// 	path: "string > 0 = ':memory:'",
-// });
-
-const databaseConfigSchema = pgDatabaseConfigSchema /*.or(mysqlDatabaseConfigSchema).or(sqliteDatabaseConfigSchema)*/;
+const databaseConfigSchema = pgDatabaseConfigSchema.or(sqliteDatabaseConfigSchema) /*.or(mysqlDatabaseConfigSchema)*/;
 
 export type PgDatabaseConfig = typeof pgDatabaseConfigSchema.infer;
+export type SqliteDatabaseConfig = typeof sqliteDatabaseConfigSchema.infer;
 // export type MysqlDatabaseConfig = typeof mysqlDatabaseConfigSchema.infer;
-// export type SqliteDatabaseConfig = typeof sqliteDatabaseConfigSchema.infer;
 export type DatabaseConfig = typeof databaseConfigSchema.infer;
 
 type _DbOptionsSatisfiesDbProviders = ExpectTrue<Equal<DatabaseConfig["provider"], DatabaseProvider>>;
 
+const DATABASE_CONFIG_ENV_VARS: Record<string, string> = {
+	url: "DATABASE_URL",
+	maxConnections: "DATABASE_MAX_CONNECTIONS",
+	caCert: "DATABASE_CA_CERT",
+	path: "DATABASE_PATH",
+} satisfies Record<
+	Exclude<keyof PgDatabaseConfig | keyof SqliteDatabaseConfig /*| keyof MysqlDatabaseConfig*/, "provider">,
+	string
+>;
+
 export function loadDatabaseProvider(): DatabaseProvider {
-	const provider = process.env.DATABASE_PROVIDER ?? "pg";
+	const provider = process.env.DATABASE_PROVIDER;
+	if (!provider) {
+		throw new Error(`DATABASE_PROVIDER is required. Set it to one of: ${DATABASE_PROVIDERS.join(", ")}`);
+	}
 	if (!isDatabaseProvider(provider)) {
 		throw new Error(`Unsupported DATABASE_PROVIDER: ${provider}. Must be one of: ${DATABASE_PROVIDERS.join(", ")}`);
 	}
@@ -47,8 +60,8 @@ export function loadDatabaseConfig(): DatabaseConfig {
 
 	const raw = (() => {
 		switch (provider) {
-			// case "sqlite":
-			// 	return { provider, path: process.env.DATABASE_PATH };
+			case "sqlite":
+				return { provider, path: process.env.DATABASE_PATH || undefined };
 			case "pg":
 				// case "mysql":
 				return {
@@ -64,7 +77,12 @@ export function loadDatabaseConfig(): DatabaseConfig {
 
 	const result = databaseConfigSchema(omitUndefined(raw));
 	if (result instanceof type.errors) {
-		throw new Error(`Invalid database config: ${result.summary}`);
+		const problems = result.map((error) => {
+			const key = error.path[0];
+			const envVar = typeof key === "string" ? DATABASE_CONFIG_ENV_VARS[key] : undefined;
+			return envVar ? `${envVar} ${error.problem}` : error.message;
+		});
+		throw new Error(`Invalid database config: ${problems.join("; ")}`);
 	}
 
 	return result;

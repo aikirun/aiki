@@ -1,4 +1,4 @@
-import { loadDatabaseConfig } from "@aikirun/lib/db";
+import { loadDatabaseConfig, loadDatabaseProvider, type PgDatabaseConfig } from "@aikirun/lib/db";
 import { is } from "drizzle-orm";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import postgres from "postgres";
@@ -15,11 +15,13 @@ const tableNamesWithUpdatedAt = (Object.values(schema) as unknown[])
 	.map((table) => table.name)
 	.sort();
 
-test("every table declaring updated_at carries the trigger that maintains it", async () => {
-	const client = postgres(loadDatabaseConfig().url, { max: 1 });
-	try {
-		// tgtype is a bitmask: 2 marks a BEFORE trigger, 16 marks one that fires on UPDATE.
-		const rows = await client<{ tableName: string }[]>`
+test.skipIf(loadDatabaseProvider() !== "pg")(
+	"every table declaring updated_at carries the trigger that maintains it",
+	async () => {
+		const client = postgres(loadPgDatabaseConfig().url, { max: 1 });
+		try {
+			// tgtype is a bitmask: 2 marks a BEFORE trigger, 16 marks one that fires on UPDATE.
+			const rows = await client<{ tableName: string }[]>`
 			SELECT triggered_table.relname AS "tableName"
 			FROM pg_trigger AS updated_at_trigger
 			JOIN pg_class AS triggered_table ON triggered_table.oid = updated_at_trigger.tgrelid
@@ -31,8 +33,17 @@ test("every table declaring updated_at carries the trigger that maintains it", a
 			ORDER BY triggered_table.relname
 		`;
 
-		expect(rows.map((row) => row.tableName)).toEqual(tableNamesWithUpdatedAt);
-	} finally {
-		await client.end();
+			expect(rows.map((row) => row.tableName)).toEqual(tableNamesWithUpdatedAt);
+		} finally {
+			await client.end();
+		}
 	}
-});
+);
+
+function loadPgDatabaseConfig(): PgDatabaseConfig {
+	const dbConfig = loadDatabaseConfig();
+	if (dbConfig.provider !== "pg") {
+		throw new Error(`expected DATABASE_PROVIDER=pg, got ${dbConfig.provider}`);
+	}
+	return dbConfig;
+}

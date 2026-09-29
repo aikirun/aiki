@@ -4,7 +4,7 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { DiscardableTaskStatus, TaskStatus } from "@aikirun/types/workflow/task";
 import { and, count, eq, inArray, min, ne, sql } from "drizzle-orm";
 
-import { toTaskState } from "./state-transition";
+import { toTaskState } from "../../state-transition-row";
 import type { PgDb } from "../provider";
 import { stateTransition, task, workflowRun } from "../schema";
 

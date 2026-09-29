@@ -6,7 +6,7 @@ import { DATABASE_PROVIDERS, type DatabaseProvider } from "../../provider";
 
 const providerDialects: Record<DatabaseProvider, string> = {
 	pg: "postgresql",
-	// sqlite: "sqlite",
+	sqlite: "sqlite",
 	// mysql: "mysql",
 };
 
