@@ -78,6 +78,13 @@ async function setTaskStateInTx(
 			? { status: "completed", output: request.state.output }
 			: { status: request.state.status satisfies "failed", error: request.state.error };
 
+	// Only the worker assigns task sequences, so a result set from outside it takes the next one after
+	// every task transition already at this revision.
+	// A worker still executing the run can't write this task again at this revision: its write is guarded
+	// by the status and attempts it last saw, and this result changes both. It can write another task's
+	// transition here with a lower task sequence; it sent that without knowing about this result, so
+	// neither happened first, and either order is right.
+	const latestTaskSequence = await txRepos.stateTransition.getLatestTaskSequence(runId, run.revision);
 	const transitionId = ulid();
 	await txRepos.stateTransition.append({
 		id: transitionId,
@@ -86,6 +93,7 @@ async function setTaskStateInTx(
 		taskId: existingTaskRow.id,
 		attempt: attempts,
 		revision: run.revision,
+		taskSequence: (latestTaskSequence ?? 0) + 1,
 		state: state,
 	});
 	const updatedTask = await txRepos.task.update(

@@ -136,7 +136,10 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 		codec: BoundCodec;
 		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
 		transitionTaskState: (
-			request: DistributiveOmit<TaskTransitionStateRequestV1, "workflowRunId" | "expectedWorkflowRunRevision">
+			request: DistributiveOmit<
+				TaskTransitionStateRequestV1,
+				"workflowRunId" | "expectedWorkflowRunRevision" | "sequence"
+			>
 		) => Promise<TaskInfo>;
 		assertExecutionAllowed: () => void;
 	};
@@ -188,6 +191,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 	implements WorkflowRunHandle<Output, Context, TEvents>
 {
 	private readonly api: ApiClient;
+	private taskTransitionSequence = 0;
 	public readonly events: EventSenders<TEvents>;
 	public readonly [INTERNAL]: WorkflowRunHandle<Output, Context, TEvents>[typeof INTERNAL];
 
@@ -363,13 +367,17 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 	}
 
 	private async transitionTaskState(
-		request: DistributiveOmit<TaskTransitionStateRequestV1, "workflowRunId" | "expectedWorkflowRunRevision">
+		request: DistributiveOmit<
+			TaskTransitionStateRequestV1,
+			"workflowRunId" | "expectedWorkflowRunRevision" | "sequence"
+		>
 	): Promise<TaskInfo> {
 		try {
 			const { taskInfo } = await this.api.task.transitionStateV1({
 				...request,
 				workflowRunId: this.run.id,
 				expectedWorkflowRunRevision: this.run.revision,
+				sequence: ++this.taskTransitionSequence,
 			});
 			return taskInfo;
 		} catch (err) {

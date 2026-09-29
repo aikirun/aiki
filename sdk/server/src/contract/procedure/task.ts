@@ -44,6 +44,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 			"input?": opaquePayloadSchema,
 			inputHash: "string > 0",
 			expectedWorkflowRunRevision: "number.integer >= 0",
+			sequence: "number.integer > 0",
 		})
 			.or({
 				type: "'retry'",
@@ -51,6 +52,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 				workflowRunId: "string > 0",
 				attempts: "number.integer > 0",
 				expectedWorkflowRunRevision: "number.integer >= 0",
+				sequence: "number.integer > 0",
 			})
 			.or({
 				id: "string > 0",
@@ -58,6 +60,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 				attempts: "number.integer > 0",
 				state: taskStateCompletedSchema.omit("output").and({ "output?": opaquePayloadSchema }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
+				sequence: "number.integer > 0",
 			})
 			.or({
 				id: "string > 0",
@@ -65,6 +68,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 				attempts: "number.integer > 0",
 				state: taskStateFailedSchema,
 				expectedWorkflowRunRevision: "number.integer >= 0",
+				sequence: "number.integer > 0",
 			})
 			.or({
 				id: "string > 0",
@@ -72,6 +76,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 				attempts: "number.integer > 0",
 				state: taskStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" }),
 				expectedWorkflowRunRevision: "number.integer >= 0",
+				sequence: "number.integer > 0",
 			})
 	)
 	.output(

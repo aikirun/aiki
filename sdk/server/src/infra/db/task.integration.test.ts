@@ -102,7 +102,7 @@ describe("task repository update", () => {
 
 	test("leaves the task untouched when the expected attempts do not match", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
@@ -116,6 +116,7 @@ describe("task repository update", () => {
 				id: taskInfo.id,
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: latestTaskSequence + 1,
 				attempts: 2,
 			});
 			const rowBefore = await repos.task.getById({ id: taskInfo.id, workflowRunId: runId });
@@ -133,7 +134,7 @@ describe("task repository update", () => {
 describe("task repository bulkTransitionToDiscarded", () => {
 	test("skips a task whose attempts moved past the expected value", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
@@ -145,6 +146,7 @@ describe("task repository bulkTransitionToDiscarded", () => {
 				id: taskInfo.id,
 				workflowRunId: runId,
 				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: latestTaskSequence + 1,
 				attempts: 2,
 			});
 			const rowBefore = await repos.task.getById({ id: taskInfo.id, workflowRunId: runId });

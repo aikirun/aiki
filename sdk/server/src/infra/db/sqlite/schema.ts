@@ -260,6 +260,7 @@ export const stateTransition = sqliteTable(
 			.generatedAlwaysAs((): SQL => sql`json_extract(${stateTransition.state}, '$.status')`, { mode: "stored" }),
 		attempt: integer("attempt"),
 		revision: integer("revision").notNull(),
+		taskSequence: integer("task_sequence"),
 		state: text("state", { mode: "json" }).notNull(),
 		createdAt: timestampMs("created_at").notNull().default(NOW_MS),
 	},
@@ -280,7 +281,7 @@ export const stateTransition = sqliteTable(
 			foreignColumns: [schedule.id],
 		}),
 		index("idx_state_transition_workflow_run_id")
-			.on(table.workflowRunId, table.revision, stateTransitionTypeOrder(table.type), table.id)
+			.on(table.workflowRunId, table.revision, stateTransitionTypeOrder(table.type), table.taskSequence, table.id)
 			.where(sql`${table.workflowRunId} IS NOT NULL`),
 		index("idx_state_transition_schedule_id")
 			.on(table.scheduleId, table.revision, table.id)
@@ -288,7 +289,7 @@ export const stateTransition = sqliteTable(
 		check("chk_state_transition_type", isOneOf(table.type, STATE_TRANSITION_TYPES)),
 		check(
 			"chk_state_transition_columns_match_type",
-			sql`(${table.type} = 'workflow_run' AND ${table.workflowRunId} IS NOT NULL AND ${table.attempt} IS NOT NULL AND ${table.taskId} IS NULL AND ${table.scheduleId} IS NULL) OR (${table.type} = 'task' AND ${table.workflowRunId} IS NOT NULL AND ${table.attempt} IS NOT NULL AND ${table.taskId} IS NOT NULL AND ${table.scheduleId} IS NULL) OR (${table.type} = 'schedule' AND ${table.scheduleId} IS NOT NULL AND ${table.workflowRunId} IS NULL AND ${table.attempt} IS NULL AND ${table.taskId} IS NULL)`
+			sql`(${table.type} = 'workflow_run' AND ${table.workflowRunId} IS NOT NULL AND ${table.attempt} IS NOT NULL AND ${table.taskId} IS NULL AND ${table.scheduleId} IS NULL AND ${table.taskSequence} IS NULL) OR (${table.type} = 'task' AND ${table.workflowRunId} IS NOT NULL AND ${table.attempt} IS NOT NULL AND ${table.taskId} IS NOT NULL AND ${table.scheduleId} IS NULL AND ${table.taskSequence} IS NOT NULL AND ${table.taskSequence} >= 0) OR (${table.type} = 'schedule' AND ${table.scheduleId} IS NOT NULL AND ${table.workflowRunId} IS NULL AND ${table.attempt} IS NULL AND ${table.taskId} IS NULL AND ${table.taskSequence} IS NULL)`
 		),
 		check(
 			"chk_state_transition_status_matches_type",

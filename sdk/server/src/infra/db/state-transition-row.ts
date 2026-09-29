@@ -36,7 +36,13 @@ export function toStateTransitionRow(row: StateTransitionRowSelect): StateTransi
 	const { id, status, revision, createdAt } = row;
 	switch (row.type) {
 		case "workflow_run": {
-			if (row.workflowRunId === null || row.attempt === null || row.taskId !== null || row.scheduleId !== null) {
+			if (
+				row.workflowRunId === null ||
+				row.attempt === null ||
+				row.taskId !== null ||
+				row.taskSequence !== null ||
+				row.scheduleId !== null
+			) {
 				throw new Error(`State transition ${id} has columns that do not match type 'workflow_run'`);
 			}
 			return {
@@ -48,12 +54,19 @@ export function toStateTransitionRow(row: StateTransitionRowSelect): StateTransi
 				workflowRunId: row.workflowRunId,
 				attempt: row.attempt,
 				taskId: null,
+				taskSequence: null,
 				scheduleId: null,
 				state: toWorkflowRunState(row.state),
 			};
 		}
 		case "task": {
-			if (row.workflowRunId === null || row.attempt === null || row.taskId === null || row.scheduleId !== null) {
+			if (
+				row.workflowRunId === null ||
+				row.attempt === null ||
+				row.taskId === null ||
+				row.taskSequence === null ||
+				row.scheduleId !== null
+			) {
 				throw new Error(`State transition ${id} has columns that do not match type 'task'`);
 			}
 			return {
@@ -65,12 +78,19 @@ export function toStateTransitionRow(row: StateTransitionRowSelect): StateTransi
 				workflowRunId: row.workflowRunId,
 				attempt: row.attempt,
 				taskId: row.taskId,
+				taskSequence: row.taskSequence,
 				scheduleId: null,
 				state: toTaskState(row.state),
 			};
 		}
 		case "schedule": {
-			if (row.scheduleId === null || row.workflowRunId !== null || row.attempt !== null || row.taskId !== null) {
+			if (
+				row.scheduleId === null ||
+				row.workflowRunId !== null ||
+				row.attempt !== null ||
+				row.taskId !== null ||
+				row.taskSequence !== null
+			) {
 				throw new Error(`State transition ${id} has columns that do not match type 'schedule'`);
 			}
 			return {
@@ -82,6 +102,7 @@ export function toStateTransitionRow(row: StateTransitionRowSelect): StateTransi
 				workflowRunId: null,
 				attempt: null,
 				taskId: null,
+				taskSequence: null,
 				scheduleId: row.scheduleId,
 				state: row.state as ScheduleState,
 			};

@@ -411,6 +411,7 @@ describe("workflow version execution", () => {
 							options: {},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
@@ -424,6 +425,7 @@ describe("workflow version execution", () => {
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{ taskInfo: runningTaskInfo }
 					);
@@ -485,6 +487,7 @@ describe("workflow version execution", () => {
 							options: {},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
 						},
 						{ taskInfo: runningTaskInfo }
 					)
@@ -498,6 +501,7 @@ describe("workflow version execution", () => {
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
 						},
 						{ taskInfo: runningTaskInfo }
 					);

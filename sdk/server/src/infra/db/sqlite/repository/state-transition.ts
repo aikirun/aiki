@@ -1,4 +1,4 @@
-import { asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, max } from "drizzle-orm";
 
 import {
 	toRunOwnedStateTransitionRow,
@@ -29,6 +29,20 @@ export const createStateTransitionRepository = (db: SqliteDb): StateTransitionRe
 		return rows.map(toStateTransitionRow);
 	},
 
+	async getLatestTaskSequence(runId, revision) {
+		const result = await db
+			.select({ taskSequence: max(stateTransition.taskSequence) })
+			.from(stateTransition)
+			.where(
+				and(
+					eq(stateTransition.workflowRunId, runId),
+					eq(stateTransition.revision, revision),
+					eq(stateTransition.type, "task")
+				)
+			);
+		return result[0]?.taskSequence ?? null;
+	},
+
 	async listByRunId(runId, limit = 50, offset = 0, sort) {
 		const direction = sort?.order === "asc" ? asc : desc;
 
@@ -40,6 +54,7 @@ export const createStateTransitionRepository = (db: SqliteDb): StateTransitionRe
 				.orderBy(
 					direction(stateTransition.revision),
 					direction(stateTransitionTypeOrder(stateTransition.type)),
+					direction(stateTransition.taskSequence),
 					direction(stateTransition.id)
 				)
 				.limit(limit)

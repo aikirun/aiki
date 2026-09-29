@@ -9,7 +9,12 @@ import { createWorkflowRunStateMachine } from "../../service/state-machine/workf
 import { createServiceHarness } from "../../testing/harness";
 import { seedClaimedRun, seedCompletedRun, seedScheduledRun } from "../../testing/seed/run";
 import { seedActiveSchedule } from "../../testing/seed/schedule";
-import { seedCompletedTask, seedRunningTask } from "../../testing/seed/task";
+import {
+	seedAwaitingTaskRetryRun,
+	seedCompletedTask,
+	seedRunningTask,
+	seedSiblingAwaitingRetryTasks,
+} from "../../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
@@ -214,6 +219,30 @@ describe("state transition repository getByIds", () => {
 		}));
 });
 
+describe("state transition repository getLatestTaskSequence", () => {
+	test("returns the highest task sequence among the revision's tasks", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedSiblingAwaitingRetryTasks(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ firstNextAttemptAt: 3_000_000, siblingNextAttemptAt: 4_000_000 }
+			);
+
+			// The seed's worker sent the first task's creation and retry wait as 1 and 2, then its
+			// sibling's as 3 and 4.
+			expect(await repos.stateTransition.getLatestTaskSequence(runId, revisionWhenClaimed)).toBe(4);
+		}));
+
+	test("returns null at a revision no task transition was written at, even when an earlier revision has some", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenParked } = await seedAwaitingTaskRetryRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ nextAttemptAt: 3_000_000 }
+			);
+
+			expect(await repos.stateTransition.getLatestTaskSequence(runId, revisionWhenParked)).toBeNull();
+		}));
+});
+
 describe("state transition repository listByRunId", () => {
 	test("lists the run's own and its tasks' transitions newest first with the total", () =>
 		withHarness(async ({ context, repos, publisher }) => {
@@ -255,14 +284,15 @@ describe("state transition repository listByRunId", () => {
 			});
 		}));
 
-	test("lists a task transition after the run transition at its revision even when its id is older", () =>
+	test("lists a revision's task transitions after its run transition, in sequence order whatever their ids", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
 			});
 			const runningTransitionId = await getRunLatestTransitionId(repos, context.namespaceId, runId);
+			const createdTaskTransitionId = await getTaskLatestTransitionId(repos, { id: taskInfo.id, workflowRunId: runId });
 			const olderTaskTransitionId = ulid(Date.now() - ONE_MINUTE);
 			await repos.stateTransition.append({
 				id: olderTaskTransitionId,
@@ -271,12 +301,17 @@ describe("state transition repository listByRunId", () => {
 				taskId: taskInfo.id,
 				attempt: 1,
 				revision: revisionWhenClaimed,
-				state: { status: "running" },
+				taskSequence: latestTaskSequence + 1,
+				state: { status: "completed" },
 			});
 
 			const { rows } = await repos.stateTransition.listByRunId(runId, 50, 0, { order: "asc" });
 
-			expect(rows.map((row) => row.id).slice(2, 4)).toEqual([runningTransitionId, olderTaskTransitionId]);
+			expect(rows.map((row) => row.id).slice(2)).toEqual([
+				runningTransitionId,
+				createdTaskTransitionId,
+				olderTaskTransitionId,
+			]);
 		}));
 
 	test("lists a discarded task right after the run transition that discarded it", () =>

@@ -61,6 +61,10 @@ export async function discardStaleTasks(
 			taskId: discardedTaskId,
 			attempt: taskUpdate.filter.attempts,
 			revision: taskUpdate.revision,
+			// Every caller discards in the transaction whose run transition opens this revision, and no
+			// worker writes task transitions at that revision, so 0 sorts the discards right after the run
+			// transition. At a revision a worker executes, 0 would put them before its transitions.
+			taskSequence: 0,
 			state: { status: "discarded" } satisfies TaskStateDiscarded,
 		});
 	}
