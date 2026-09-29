@@ -98,10 +98,10 @@
 	},
 	"devDependencies": {
 		"@libsql/client": "^0.18.0",
-		"arktype": "^2.1.29",
-		"cac": "^6.7.14",
-		"dotenv": "^16.4.5",
-		"drizzle-orm": "^0.45.1",
+		"arktype": "^2.2.5",
+		"cac": "^7.0.0",
+		"dotenv": "^18.0.4",
+		"drizzle-orm": "^0.45.3",
 		"postgres": "^3.4.8"
 	},
 	"license": "Apache-2.0"
