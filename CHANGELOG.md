@@ -2,6 +2,125 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.43.0
+
+Aiki now runs on SQLite as well as Postgres, and SQLite is the default in the docs: the database is one file, with no server to run. A new package, `@aikirun/codec`, builds codecs that record their name, run in sequence, and switch from an old codec to a new one. The server and IAM log which migrations a database is missing when they first connect, and errors print what caused them. A run's history is ordered by revision instead of by id, so servers whose clocks disagree no longer list it out of order, and `handle.wait()` no longer misses a finished run for the same reason. Redis and in-memory queues are isolated by namespace. The server listens on `127.0.0.1` by default. Four database migrations (`0041` through `0044`) ship with this release, and the server, workers and clients must be upgraded together.
+
+### Breaking Changes
+
+- **`DATABASE_PROVIDER` is required.** It used to default to `pg`. This applies to the `aiki` binary, the Docker images, the app server and the `migrate` commands. With `sqlite`, `DATABASE_PATH` is required too.
+
+  ```bash
+  # Before: pg was implied
+  DATABASE_URL=postgresql://user:password@host:5432/aiki
+
+  # After
+  DATABASE_PROVIDER=pg
+  DATABASE_URL=postgresql://user:password@host:5432/aiki
+  ```
+
+- **The compose files have no default for `DATABASE_PROVIDER` or `DATABASE_URL`.** `docker compose up` fails until `.env` sets `DATABASE_PROVIDER`. With SQLite, the data lives in the `aiki-data` volume at `/data/aiki.db`.
+
+- **The server listens on `127.0.0.1` by default.** It used to listen on `0.0.0.0`. A server started from the binary or from source without `AIKI_SERVER_HOST` no longer accepts connections from other machines. To serve them, set `AIKI_SERVER_HOST=0.0.0.0` and turn on authentication with `AIKI_SERVER_AUTH_SECRET`. The Docker images and compose files still listen on `0.0.0.0`.
+
+- **Redis queue keys have a new format.** Update any Redis ACL rules or tooling that match key names; a per-namespace ACL can match `~aiki:{<namespace-id>}:*`. The old `aiki:workflow:*` keys are no longer read and can be deleted.
+
+  ```
+  before  aiki:workflow:user:billing:1.0.0
+  after   aiki:{<namespace-id>}:workflow:user:billing:1.0.0
+  ```
+
+- **A codec declares its output type, and that output must survive JSON.** `Codec` and `CreateCodec` in `@aikirun/types` now take the type `encode` returns. `client()` rejects a codec at compile time if `encode` returns binary data, a `Date`, `any` or `unknown`. Codecs built with `codec()` from `@aikirun/codec` get the type inferred.
+
+  ```typescript
+  // Before
+  const encryptCodec: CreateCodec = () => ({
+    encode: async (payload) => encrypt(JSON.stringify(payload)),
+    decode: async (encoded) => JSON.parse(decrypt(encoded as string)),
+  });
+
+  // After
+  const encryptCodec: CreateCodec<string> = () => ({
+    encode: async (payload) => encrypt(JSON.stringify(payload)),
+    decode: async (encoded) => JSON.parse(decrypt(encoded as string)),
+  });
+  ```
+
+- **The published packages require Node.js 22+.** Each declares `engines.node >=22`; with npm's `engine-strict` setting on, installs on older Node versions fail.
+
+- **Four migrations ship with this release, and 0.42 and 0.43 don't work against each other.** `0041` adds `schedule.revision`. `0042` adds `state_transition.revision` and `0043` adds `state_transition.task_sequence`; both fill in every existing row, so they take longer on a large database. `0044` adds `workflow.name_lowercase`. The migrations table also changes format, and `migrate apply` from 0.42 fails on it afterwards. Upgrade the server, workers and clients together:
+
+  1. Back up the database. Once it's migrated, the only way back to 0.42 is restoring the backup.
+  2. Stop the servers and workers.
+  3. Run `migrate apply` from 0.43.
+  4. Start the servers, then the workers, all on 0.43.
+
+### New Features
+
+- **SQLite database provider.** Aiki can now store everything in one file, with no database server to run. It works for the server and IAM, embedded in your app, in the `aiki` binary, in both Docker images, and in `aiki-server` / `aiki-iam migrate`. Install the driver, `@libsql/client`, next to `@aikirun/server`; like `postgres`, it is an optional peer dependency. From the environment, set `DATABASE_PROVIDER=sqlite` and `DATABASE_PATH=./aiki.db`.
+
+  ```typescript
+  import { database, server } from "@aikirun/server";
+
+  const aikiServer = server({ db: database({ provider: "sqlite", path: "./aiki.db" }) });
+  ```
+
+- **`@aikirun/codec` builds codecs.** `codec({ name, encode, decode })` stores each encoded value with the name of the codec that wrote it. `pipeCodecs(compress, encrypt, offload)` encodes through the codecs in order and decodes in reverse. `switchCodecs({ current, deprecated })` encodes with `current` and decodes each stored value with whichever codec wrote it, so you can move to a new codec and still read old values. Each returns a codec that `client()` takes as is, so they work alone or nested inside each other.
+
+  ```typescript
+  import { codec, pipeCodecs, switchCodecs } from "@aikirun/codec";
+
+  const url = "http://localhost:9850";
+  const gzip = codec({ name: "gzip", encode: gzipToBase64, decode: gunzipFromBase64 });
+  const aesV1 = codec({ name: "aes-v1", encode: encryptV1, decode: decryptV1 });
+  const aesV2 = codec({ name: "aes-v2", encode: encryptV2, decode: decryptV2 });
+
+  // Compress, then encrypt
+  client({ url, codec: pipeCodecs(gzip, aesV2) });
+
+  // Encrypt with aes-v2; values that aes-v1 wrote still decode
+  client({ url, codec: switchCodecs({ current: aesV2, deprecated: [aesV1] }) });
+
+  // Compress, then encrypt with aes-v2; values that pipeCodecs(gzip, aesV1) wrote still decode
+  client({ url, codec: pipeCodecs(gzip, switchCodecs({ current: aesV2, deprecated: [aesV1] })) });
+  ```
+
+- **Missing migrations show up in the logs.** The first time the server and IAM connect to the database, they check which of their migrations it has applied. If none are, they log an error; if some are missing, a warning naming them. Both link to the docs on applying migrations. The check runs in the background and doesn't delay startup.
+
+- **A client can ask which namespace its API key belongs to.** `client.api.identity.getV1({})` returns the organization and namespace.
+
+### Web UI
+
+- **The run timeline shows dates.** A day separator marks where the timeline crosses midnight, an attempt's time range shows dates when it spans days, and hovering over any time shows the full date and time. Event wait times show the date when it isn't today.
+- **The API Keys snippet shows the server's address.** It uses the address the dashboard reaches the server at, instead of `http://localhost:9850`.
+
+### Improvements
+
+- **The workflow name search ignores case.** `send` finds `Send-Invoices`, and the search reads an index instead of checking every row. Accented letters still only match themselves: `ecr` doesn't find `Écrire-facture`.
+
+- **Errors print what caused them.** The console logger, the `migrate` commands and the `aiki` binary print one line for each error an error wraps, so a failed query shows the database's reason:
+
+  ```
+  err: Error: Failed query: select "id", ... from "workflow_run" where ...
+    Caused by: PostgresError [42P01]: relation "workflow_run" does not exist
+  ```
+
+- **`migrate apply` refuses a changed migration.** It stops before applying anything when the SQL of a migration it already applied has changed since.
+
+- **A custom subscriber receives the worker's `api` client.** It's on the subscriber's context, next to `workerId` and `workflows`.
+
+### Bug Fixes
+
+- **`handle.wait()` no longer misses a finished run.** When two servers' clocks disagreed, it could keep polling after the run had finished, until its timeout or forever without one. The server now answers from the run's current status.
+- **A run's history lists in the order it happened.** Transitions were ordered by id, and an id carries the clock of the server that wrote it. When servers' clocks disagreed, or two transitions fell in the same millisecond, the dashboard timeline and the state transitions API could list them out of order. A run's history is now ordered by the run's revision, and the task changes within a revision by the order the worker sent them. A schedule's history is ordered by the schedule's revision. Existing history keeps its current order.
+- **Namespaces sharing a Redis no longer share queues.** Their runs went into the same queue, so a worker could pick up another namespace's run, fail to load it, and drop it. Redis and in-memory queue names now include the namespace.
+- **A `:` in a workflow name, version or pool no longer merges two queues.** `billing:v2` at `1.0.0` and `billing` at `v2:1.0.0` both became `billing:v2:1.0.0`. Queue name parts are now escaped.
+- **`migrate apply` applies each migration once.** It recorded migrations by the hash of their SQL, so it skipped a migration whose SQL matched an earlier one, and two migrators running at once could both apply the same migration. It now records them by tag.
+
+### Documentation
+
+- The quick start is rewritten around SQLite: you start the app, crash it mid-wait, and watch the run continue. The installation and IAM guides show SQLite and Postgres side by side. The events doc explains the mailbox and how to send an event from code that didn't start the run, with `send(client, runId, …)` or `sendByReferenceId(…)`. The tasks doc covers task states and when tasks are retried or discarded, the subscribers doc covers the in-memory subscriber, and the docs now require Node.js 22+.
+
 ## 0.42.0
 
 `@aikirun/memory` is now published: a server and worker sharing one process get timer dispatch and work delivery without an external service. An event wait reports when it resolved. Two Redis connection hangs are fixed, and a missing `postgres` driver now names itself instead of failing inside a drizzle internal.
