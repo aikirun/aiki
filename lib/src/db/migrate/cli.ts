@@ -5,6 +5,7 @@ import { config as loadEnv } from "dotenv";
 import { migrateApply } from "./commands/apply";
 import { migrateList } from "./commands/list";
 import type { MigrationSource } from "./source";
+import { describeErrorCauses } from "../../error/cause";
 import { loadDatabaseConfig, loadDatabaseProvider } from "../config";
 import type { DatabaseProvider } from "../provider";
 
@@ -96,7 +97,11 @@ export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 			cli.outputHelp();
 		}
 	} catch (err) {
-		console.error(err instanceof Error ? err.message : String(err));
+		console.error(
+			err instanceof Error
+				? [err.message, ...describeErrorCauses(err).map((cause) => `  Caused by: ${cause}`)].join("\n")
+				: String(err)
+		);
 		process.exit(1);
 	}
 }

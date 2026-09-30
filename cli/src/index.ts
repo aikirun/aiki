@@ -3,6 +3,7 @@ import { loadAppServerConfig, startAppServer } from "@aikirun/app-server";
 import { loadDatabaseConfig, loadDatabaseProvider } from "@aikirun/lib/db";
 import { migrateApply, migrateList, migrationSource } from "@aikirun/lib/db/migrate";
 import { isMigrateSubcommand, MIGRATE_SUBCOMMAND_HELP, MIGRATE_SUBCOMMANDS } from "@aikirun/lib/db/migrate/cli";
+import { describeErrorCauses } from "@aikirun/lib/error";
 import { cac } from "cac";
 import { config as loadEnv } from "dotenv";
 
@@ -160,6 +161,10 @@ try {
 		cli.outputHelp();
 	}
 } catch (err) {
-	console.error(err instanceof Error ? err.message : String(err));
+	console.error(
+		err instanceof Error
+			? [err.message, ...describeErrorCauses(err).map((cause) => `  Caused by: ${cause}`)].join("\n")
+			: String(err)
+	);
 	process.exit(1);
 }

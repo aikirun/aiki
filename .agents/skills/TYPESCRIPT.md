@@ -22,6 +22,7 @@ This document outlines the TypeScript coding style and conventions for the proje
 - Do not rename default imports with `as`.
 - Use `import Bar = Foo.Bar` namespace aliases with caution — if `Foo.Bar` is renamed, the alias won't auto-update.
 - Error handling: prefer guard clauses and explicit error types; avoid complex/nested ternaries. Simple ternaries for assignments are acceptable if readable. Guard clauses first, happy path last.
+- A file either holds code or re-exports other files (a barrel), never both. When an `index.ts` that holds code needs to re-export a new file, first move its code into a named file of its own.
 
 ## 2. Naming Conventions
 
