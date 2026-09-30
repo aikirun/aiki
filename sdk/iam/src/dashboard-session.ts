@@ -19,6 +19,7 @@ import type { OrganizationSessionRequestContext } from "./context";
 import type { OrganizationRole } from "./infra/db/constants/organization";
 import { createRepos } from "./infra/db/repo";
 import type { OrganizationRepository } from "./infra/db/types/organization";
+import { reportPendingMigrations } from "./pending-migrations";
 import { createOrganizationAuthedRouter } from "./router/index";
 import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 import { createNamespaceService } from "./service/namespace";
@@ -37,11 +38,14 @@ export interface DashboardSessionIamParams {
 	trustedOrigins: string[];
 }
 
-function authService(params: DashboardSessionIamParams) {
+function authService(params: DashboardSessionIamParams, { logger }: IamContext) {
 	let authServicePromise: Promise<AuthService> | undefined;
 	return (): Promise<AuthService> => {
 		authServicePromise ??= (async () => {
 			const [{ createAuthService }, db] = await Promise.all([import("./auth"), params.db()]);
+
+			reportPendingMigrations(db, logger);
+
 			return createAuthService({
 				db,
 				baseURL: params.baseURL,
@@ -102,7 +106,7 @@ function createAuthenticator(getAuthService: GetAuthService): DashboardAuthentic
 }
 
 function authenticator(params: DashboardSessionIamParams): CreateDashboardAuthenticator {
-	return (_context) => createAuthenticator(authService(params));
+	return (context) => createAuthenticator(authService(params, context));
 }
 
 function createOrganizationHandler(
@@ -120,6 +124,9 @@ function createOrganizationHandler(
 		return (async () => {
 			createHandlerPromise ??= (async () => {
 				const db = await params.db();
+
+				reportPendingMigrations(db, logger);
+
 				const repos = await createRepos(db);
 				const authService = await getAuthService();
 				const apiKeyCache = params.cache?.<ApiKeyAuthorizationInfo>({
@@ -179,12 +186,12 @@ function createOrganizationHandler(
 }
 
 function organization(params: DashboardSessionIamParams): CreateOrganizationDashboardHandler {
-	return (context) => createOrganizationHandler(params, context, authService(params));
+	return (context) => createOrganizationHandler(params, context, authService(params, context));
 }
 
 function dashboardSessionIamFn(params: DashboardSessionIamParams): CreateDashboardIam {
 	return (context): DashboardIam => {
-		const getAuthService = authService(params);
+		const getAuthService = authService(params, context);
 		return {
 			authenticator: createAuthenticator(getAuthService),
 			organization: createOrganizationHandler(params, context, getAuthService),

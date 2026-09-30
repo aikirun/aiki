@@ -60,6 +60,10 @@ export function server(params: ServerParams): Server {
 			return (async () => {
 				createHandlerPromise ??= (async () => {
 					const db = await params.db();
+
+					const { reportPendingMigrations } = await import("./pending-migrations");
+					reportPendingMigrations(db, logger);
+
 					const { createHandler } = await import("./handler");
 					return createHandler({
 						db,
@@ -99,6 +103,10 @@ function createRuntimeHandle(params: {
 	const startRuntimePromise = (async () => {
 		try {
 			const db = await params.db();
+
+			const { reportPendingMigrations } = await import("./pending-migrations");
+			reportPendingMigrations(db, logger);
+
 			const { startRuntime } = await import("./runtime");
 			return await startRuntime({
 				db,

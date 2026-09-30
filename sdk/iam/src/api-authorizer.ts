@@ -7,6 +7,7 @@ import type { OrganizationId } from "@aikirun/types/organization";
 
 import type { AuthService } from "./auth";
 import { createRepos } from "./infra/db/repo";
+import { reportPendingMigrations } from "./pending-migrations";
 import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 
 export interface ApiAuthorizerParams {
@@ -50,6 +51,9 @@ function createApiKeyAuthorizer(params: ApiAuthorizerKeyParams, { logger }: IamC
 		return (async () => {
 			createAuthorizerPromise ??= (async () => {
 				const db = await params.db();
+
+				reportPendingMigrations(db, logger);
+
 				const repos = await createRepos(db);
 				const apiKeyService = createApiKeyService({
 					repos,
@@ -86,7 +90,7 @@ function key(params: ApiAuthorizerKeyParams): CreateApiAuthorizer {
 	return (context) => createApiKeyAuthorizer(params, context);
 }
 
-function createSessionAuthorizer(params: ApiAuthorizerSessionParams): ApiAuthorizer {
+function createSessionAuthorizer(params: ApiAuthorizerSessionParams, { logger }: IamContext): ApiAuthorizer {
 	let authorizer: ApiAuthorizer | undefined;
 	let createAuthorizerPromise: Promise<ApiAuthorizer> | undefined;
 
@@ -97,6 +101,9 @@ function createSessionAuthorizer(params: ApiAuthorizerSessionParams): ApiAuthori
 		return (async () => {
 			createAuthorizerPromise ??= (async () => {
 				const [{ createAuthService }, db] = await Promise.all([import("./auth"), params.db()]);
+
+				reportPendingMigrations(db, logger);
+
 				const authService: AuthService = await createAuthService({
 					db,
 					baseURL: params.baseURL,
@@ -134,18 +141,21 @@ function createSessionAuthorizer(params: ApiAuthorizerSessionParams): ApiAuthori
 }
 
 function session(params: ApiAuthorizerSessionParams): CreateApiAuthorizer {
-	return (_context) => createSessionAuthorizer(params);
+	return (context) => createSessionAuthorizer(params, context);
 }
 
 function apiAuthorizerFn(params: ApiAuthorizerParams): CreateApiAuthorizer {
 	return (context): ApiAuthorizer => {
 		const apiKeyAuthorizer = createApiKeyAuthorizer({ db: params.db, cache: params.cache }, context);
-		const sessionAuthorizer = createSessionAuthorizer({
-			db: params.db,
-			secret: params.secret,
-			baseURL: params.baseURL,
-			trustedOrigins: params.trustedOrigins,
-		});
+		const sessionAuthorizer = createSessionAuthorizer(
+			{
+				db: params.db,
+				secret: params.secret,
+				baseURL: params.baseURL,
+				trustedOrigins: params.trustedOrigins,
+			},
+			context
+		);
 
 		return async (request) => {
 			const hasBearer = request.headers.get("authorization")?.startsWith(BEARER_PREFIX);
