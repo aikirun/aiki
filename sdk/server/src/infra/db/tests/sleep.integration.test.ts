@@ -2,8 +2,8 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
 import { describe, expect, test } from "bun:test";
-import { createServiceHarness } from "../../testing/harness";
-import { seedClaimedRun, seedSleepingRun } from "../../testing/seed/run";
+import { createServiceHarness } from "../../../testing/harness";
+import { seedClaimedRun, seedSleepingRun } from "../../../testing/seed/run";
 
 const withHarness = createServiceHarness();
 

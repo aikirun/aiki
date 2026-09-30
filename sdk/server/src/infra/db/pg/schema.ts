@@ -58,6 +58,7 @@ export const workflow = pgTable(
 		namespaceId: text("namespace_id").notNull(),
 		source: workflowSourceEnum("source").notNull(),
 		name: text("name").notNull(),
+		nameLowercase: text("name_lowercase").notNull(),
 		versionId: text("version_id").notNull(),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 	},
@@ -67,6 +68,13 @@ export const workflow = pgTable(
 			table.source,
 			table.name,
 			table.versionId
+		),
+		// The "C" collation sorts in code point order, so the names sharing a prefix are one range of the index.
+		index("idx_workflow_namespace_source_name_lowercase").on(
+			table.namespaceId,
+			table.source,
+			sql`${table.nameLowercase} COLLATE "C"`,
+			table.name
 		),
 	]
 );

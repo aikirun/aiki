@@ -1,6 +1,6 @@
-import type { TxRepositories } from "./types";
 import { describe, expect, test } from "bun:test";
-import { withRepos } from "../../testing/harness";
+import { withRepos } from "../../../testing/harness";
+import type { TxRepositories } from "../types";
 
 describe("transaction onCommit", () => {
 	test("runs effects after the transaction body, before the transaction call resolves", () =>

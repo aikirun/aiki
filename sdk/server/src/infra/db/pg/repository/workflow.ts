@@ -2,14 +2,15 @@ import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { WorkflowListRequestV1, WorkflowListVersionsRequestV1 } from "@aikirun/types/api/workflow";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
-import { and, count, desc, eq, inArray, like, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
 
 import type { DaemonContext } from "../../../../middleware/context";
+import { prefixRangeEnd } from "../../lib/prefix-range";
 import type { PgDb } from "../provider";
 import { workflow } from "../schema";
 
 export type WorkflowRow = typeof workflow.$inferSelect;
-export type WorkflowRowInsert = typeof workflow.$inferInsert;
+export type WorkflowRowInsert = Omit<typeof workflow.$inferInsert, "nameLowercase">;
 export type WorkflowIdentity = Pick<WorkflowRow, "namespaceId" | "source" | "name" | "versionId">;
 
 export const createWorkflowRepository = (db: PgDb) => ({
@@ -71,7 +72,12 @@ export const createWorkflowRepository = (db: PgDb) => ({
 	async createIfMissing(entries: WorkflowRowInsert | NonEmptyArray<WorkflowRowInsert>): Promise<void> {
 		await db
 			.insert(workflow)
-			.values(Array.isArray(entries) ? entries : [entries])
+			.values(
+				(Array.isArray(entries) ? entries : [entries]).map((entry) => ({
+					...entry,
+					nameLowercase: entry.name.toLowerCase(),
+				}))
+			)
 			.onConflictDoNothing({ target: [workflow.namespaceId, workflow.source, workflow.name, workflow.versionId] });
 	},
 
@@ -127,10 +133,7 @@ export const createWorkflowRepository = (db: PgDb) => ({
 	): Promise<{ items: Array<{ name: string }>; total: number }> {
 		const { source, limit = 50, offset = 0, namePrefix } = request;
 
-		const namePrefixCondition =
-			namePrefix !== undefined
-				? like(workflow.name, `${namePrefix.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_")}%`)
-				: undefined;
+		const namePrefixCondition = namePrefix !== undefined ? namePrefixMatch(namePrefix) : undefined;
 		const whereClause = and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), namePrefixCondition);
 
 		const items = await db
@@ -184,3 +187,17 @@ export const createWorkflowRepository = (db: PgDb) => ({
 });
 
 export type WorkflowRepository = ReturnType<typeof createWorkflowRepository>;
+
+// Every name starting with the prefix sorts between the prefix and prefixRangeEnd(prefix), so the
+// match is one range read of idx_workflow_namespace_source_name_lowercase. LIKE reads that range only
+// when Postgres plans the query knowing the prefix, which a prepared statement does not guarantee.
+// The range holds only in code point order, hence the "C" collation on the index and on these comparisons.
+function namePrefixMatch(namePrefix: string): SQL {
+	const namePrefixLowercase = namePrefix.toLowerCase();
+	const rangeStart = sql`${workflow.nameLowercase} COLLATE "C" >= ${namePrefixLowercase}`;
+	const rangeEnd = prefixRangeEnd(namePrefixLowercase);
+	if (rangeEnd === undefined) {
+		return rangeStart;
+	}
+	return sql`${rangeStart} AND ${workflow.nameLowercase} COLLATE "C" < ${rangeEnd}`;
+}

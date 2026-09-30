@@ -17,7 +17,7 @@ import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import type { WorkflowRow } from "./workflow";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
-import { toWorkflowRunState } from "../../state-transition-row";
+import { toWorkflowRunState } from "../../lib/state-transition-row";
 import type { PgDb } from "../provider";
 import { stateTransition, workflow, workflowRun } from "../schema";
 

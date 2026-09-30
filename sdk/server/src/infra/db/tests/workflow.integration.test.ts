@@ -3,12 +3,12 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
 import { ulid } from "ulidx";
 
-import type { Repositories } from "./types";
-import type { WorkflowIdentity } from "./types/workflow";
 import { describe, expect, test } from "bun:test";
-import { withFakeClock } from "../../testing/clock";
-import { daemonContextFactory, namespaceRequestContextFactory } from "../../testing/data-factory/middleware/context";
-import { createServiceHarness } from "../../testing/harness";
+import { withFakeClock } from "../../../testing/clock";
+import { daemonContextFactory, namespaceRequestContextFactory } from "../../../testing/data-factory/middleware/context";
+import { createServiceHarness } from "../../../testing/harness";
+import type { Repositories } from "../types";
+import type { WorkflowIdentity } from "../types/workflow";
 
 const withHarness = createServiceHarness();
 
@@ -311,6 +311,64 @@ describe("workflow repository listNames", () => {
 			]);
 
 			expect(await repos.workflow.listNames(namespaceId, { source: "user" })).toEqual({
+				items: [{ name: "send-invoices" }],
+				total: 1,
+			});
+		}));
+
+	test("a name prefix matches whatever the case", () =>
+		withHarness(async ({ context, repos }) => {
+			const namespaceId = context.namespaceId;
+			await createWorkflows(repos, [
+				{ namespaceId, ...sendInvoicesWorkflow, name: "Send-Invoices" as WorkflowName },
+				{ namespaceId, ...sendInvoicesWorkflow, name: "send-reminders" as WorkflowName },
+				{ namespaceId, ...reconcileLedgerWorkflow },
+			]);
+
+			expect(await repos.workflow.listNames(namespaceId, { source: "user", namePrefix: "SEND-" })).toEqual({
+				items: [{ name: "Send-Invoices" }, { name: "send-reminders" }],
+				total: 2,
+			});
+		}));
+
+	test("a name prefix matches letters beyond A to Z whatever the case", () =>
+		withHarness(async ({ context, repos }) => {
+			const namespaceId = context.namespaceId;
+			await createWorkflows(repos, [
+				{ namespaceId, ...sendInvoicesWorkflow, name: "Écrire-facture" as WorkflowName },
+				{ namespaceId, ...reconcileLedgerWorkflow },
+			]);
+
+			expect(await repos.workflow.listNames(namespaceId, { source: "user", namePrefix: "écr" })).toEqual({
+				items: [{ name: "Écrire-facture" }],
+				total: 1,
+			});
+		}));
+
+	test("a name prefix with an unaccented letter does not match the accented letter", () =>
+		withHarness(async ({ context, repos }) => {
+			const namespaceId = context.namespaceId;
+			await createWorkflows(repos, [
+				{ namespaceId, ...sendInvoicesWorkflow, name: "Écrire-facture" as WorkflowName },
+				{ namespaceId, ...sendInvoicesWorkflow, name: "ecrire-rappel" as WorkflowName },
+			]);
+
+			expect(await repos.workflow.listNames(namespaceId, { source: "user", namePrefix: "ecr" })).toEqual({
+				items: [{ name: "ecrire-rappel" }],
+				total: 1,
+			});
+		}));
+
+	test("a name prefix excludes the first name past its range", () =>
+		withHarness(async ({ context, repos }) => {
+			const namespaceId = context.namespaceId;
+			// "sene" is where the range for "send" ends.
+			await createWorkflows(repos, [
+				{ namespaceId, ...sendInvoicesWorkflow },
+				{ namespaceId, ...sendInvoicesWorkflow, name: "sene" as WorkflowName },
+			]);
+
+			expect(await repos.workflow.listNames(namespaceId, { source: "user", namePrefix: "send" })).toEqual({
 				items: [{ name: "send-invoices" }],
 				total: 1,
 			});

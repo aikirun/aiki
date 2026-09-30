@@ -1,10 +1,10 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 
-import type { EventWaitRowInsert } from "./types/event-wait";
 import { describe, expect, test } from "bun:test";
-import { createServiceHarness } from "../../testing/harness";
-import { seedClaimedRun } from "../../testing/seed/run";
+import { createServiceHarness } from "../../../testing/harness";
+import { seedClaimedRun } from "../../../testing/seed/run";
+import type { EventWaitRowInsert } from "../types/event-wait";
 
 const withHarness = createServiceHarness();
 

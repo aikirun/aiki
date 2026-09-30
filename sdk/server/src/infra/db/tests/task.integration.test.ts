@@ -2,10 +2,10 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { ulid } from "ulidx";
 
 import { describe, expect, test } from "bun:test";
-import { createTaskStateMachine } from "../../service/state-machine/task";
-import { namespaceRequestContextFactory } from "../../testing/data-factory/middleware/context";
-import { createServiceHarness } from "../../testing/harness";
-import { seedClaimedRun } from "../../testing/seed/run";
+import { createTaskStateMachine } from "../../../service/state-machine/task";
+import { namespaceRequestContextFactory } from "../../../testing/data-factory/middleware/context";
+import { createServiceHarness } from "../../../testing/harness";
+import { seedClaimedRun } from "../../../testing/seed/run";
 import {
 	seedAwaitingRetryTask,
 	seedCompletedTask,
@@ -13,7 +13,7 @@ import {
 	seedRunningTask,
 	seedRunningTaskOnRun,
 	seedSiblingAwaitingRetryTasks,
-} from "../../testing/seed/task";
+} from "../../../testing/seed/task";
 
 const withHarness = createServiceHarness();
 

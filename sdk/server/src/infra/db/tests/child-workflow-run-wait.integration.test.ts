@@ -2,11 +2,11 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 
 import { describe, expect, test } from "bun:test";
-import { createChildRunCanceller } from "../../service/cancel-child-runs";
-import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
-import { withFakeClock } from "../../testing/clock";
-import { createServiceHarness, type ServiceHarnessDeps } from "../../testing/harness";
-import { seedClaimedRun } from "../../testing/seed/run";
+import { createChildRunCanceller } from "../../../service/cancel-child-runs";
+import { createWorkflowRunStateMachine } from "../../../service/state-machine/workflow-run";
+import { withFakeClock } from "../../../testing/clock";
+import { createServiceHarness, type ServiceHarnessDeps } from "../../../testing/harness";
+import { seedClaimedRun } from "../../../testing/seed/run";
 
 const withHarness = createServiceHarness();
 

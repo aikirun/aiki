@@ -1,7 +1,8 @@
 import { asNonEmptyArray } from "@aikirun/lib/collection/array";
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
 
 import { valuesTable } from "./lib/values-table";
+import { prefixRangeEnd } from "../../lib/prefix-range";
 import type { WorkflowRepository } from "../../types/workflow";
 import type { SqliteDb } from "../provider";
 import { workflow } from "../schema";
@@ -61,7 +62,12 @@ export const createWorkflowRepository = (db: SqliteDb): WorkflowRepository => ({
 	async createIfMissing(entries) {
 		await db
 			.insert(workflow)
-			.values(Array.isArray(entries) ? entries : [entries])
+			.values(
+				(Array.isArray(entries) ? entries : [entries]).map((entry) => ({
+					...entry,
+					nameLowercase: entry.name.toLowerCase(),
+				}))
+			)
 			.onConflictDoNothing({ target: [workflow.namespaceId, workflow.source, workflow.name, workflow.versionId] });
 	},
 
@@ -105,9 +111,7 @@ export const createWorkflowRepository = (db: SqliteDb): WorkflowRepository => ({
 	async listNames(namespaceId, request) {
 		const { source, limit = 50, offset = 0, namePrefix } = request;
 
-		// Not LIKE: SQLite's LIKE ignores ASCII case.
-		const namePrefixCondition =
-			namePrefix !== undefined ? sql`substr(${workflow.name}, 1, length(${namePrefix})) = ${namePrefix}` : undefined;
+		const namePrefixCondition = namePrefix !== undefined ? namePrefixMatch(namePrefix) : undefined;
 		const whereClause = and(eq(workflow.namespaceId, namespaceId), eq(workflow.source, source), namePrefixCondition);
 
 		const items = await db
@@ -156,3 +160,17 @@ export const createWorkflowRepository = (db: SqliteDb): WorkflowRepository => ({
 		};
 	},
 });
+
+// Every name starting with the prefix sorts between the prefix and prefixRangeEnd(prefix), so the
+// match is one range read of idx_workflow_namespace_source_name_lowercase. LIKE would not read it:
+// SQLite uses an index for LIKE only on a NOCASE column. The range holds in code point order, the
+// order SQLite compares text in by default.
+function namePrefixMatch(namePrefix: string): SQL {
+	const namePrefixLowercase = namePrefix.toLowerCase();
+	const rangeStart = sql`${workflow.nameLowercase} >= ${namePrefixLowercase}`;
+	const rangeEnd = prefixRangeEnd(namePrefixLowercase);
+	if (rangeEnd === undefined) {
+		return rangeStart;
+	}
+	return sql`${rangeStart} AND ${workflow.nameLowercase} < ${rangeEnd}`;
+}

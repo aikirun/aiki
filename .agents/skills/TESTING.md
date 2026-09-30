@@ -13,9 +13,9 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - `sdk/workflow/src/task.test.ts` — boundary-value config knobs, file-local helpers.
 - `sdk/server/src/service/workflow-run-state-machine.test.ts` — exhaustive legality matrix driven
   from a typed case table.
-- `sdk/server/src/infra/db/workflow-run-outbox.integration.test.ts` — provider-contract suite,
+- `sdk/server/src/infra/db/tests/workflow-run-outbox.integration.test.ts` — provider-contract suite,
   two-connection concurrency choreography.
-- `sdk/server/src/infra/db/workflow-run.integration.test.ts` — one describe per repository method,
+- `sdk/server/src/infra/db/tests/workflow-run.integration.test.ts` — one describe per repository method,
   a status-keyed seed table driving the guard loops, a test-side column read for reset assertions.
 - `testing/src/infra/timer.ts` — infra contract suite, wake and absence checks;
   runner-injected so implementers can run it too, with each adapter binding it in its own
@@ -209,7 +209,7 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - Pluggable infra is a provider contract — the database, the timer priority queue. Write the
   suite once, provider-neutral; an adapter never gets its own assertions. Where the suite
   runs follows who may implement the contract. The database is pluggable only by Aiki: its
-  suite stays internal at `sdk/server/src/infra/db/`, `DATABASE_PROVIDER` picks the
+  suite stays internal at `sdk/server/src/infra/db/tests/`, `DATABASE_PROVIDER` picks the
   implementation, and CI supplies the matrix — a new provider adds a matrix row. The timer
   priority queue is pluggable by users: the suite body is exported from
   `@aikirun/testing/infra/timer` with the test runner and queue provider injected, so
