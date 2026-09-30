@@ -3,6 +3,12 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { nestedMap } from "../../../collection/map";
 import type { DatabaseConfig, PgDatabaseConfig, SqliteDatabaseConfig } from "../../config";
+import {
+	type AppliedMigration,
+	type MigrationsDatabase,
+	readAppliedMigrations,
+	readMigrationsTableState,
+} from "../migrations-table";
 import type { MigrationMeta, MigrationSource } from "../source";
 
 interface MigrateApplyParams {
@@ -46,12 +52,12 @@ async function applySqlite(
 				created_at integer NOT NULL
 			)
 		`);
-		if (!(await sqliteMigrationsTableHasTagColumn(client, migrationsTable))) {
+		const migrationsDatabase: MigrationsDatabase = { provider: "sqlite", client };
+		if ((await readMigrationsTableState(migrationsDatabase, migrationsTable)) === "untagged") {
 			await addTagColumnToSqliteMigrationsTable(client, migrationsTable, migrations);
 		}
 
-		const appliedRows = await client.execute(`SELECT tag, hash FROM ${quotedMigrationsTable}`);
-		const appliedMigrations = appliedRows.rows.map((row) => ({ tag: String(row.tag), hash: String(row.hash) }));
+		const appliedMigrations = await readAppliedMigrations(migrationsDatabase, migrationsTable);
 		assertAppliedMigrationsUnchanged(appliedMigrations, migrations);
 		const appliedTags = new Set(appliedMigrations.map((appliedMigration) => appliedMigration.tag));
 
@@ -89,11 +95,6 @@ async function applySqlite(
 	} finally {
 		client.close();
 	}
-}
-
-async function sqliteMigrationsTableHasTagColumn(client: Client, migrationsTable: string): Promise<boolean> {
-	const columns = await client.execute(`PRAGMA table_info("${migrationsTable}")`);
-	return columns.rows.some((column) => column.name === "tag");
 }
 
 // SQLite cannot add a NOT NULL column to a table, so the table is rebuilt with one.
@@ -162,11 +163,12 @@ async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], mi
 				created_at bigint NOT NULL
 			)
 		`);
-		if (!(await pgMigrationsTableHasTagColumn(db, sql, migrationsTable))) {
+		const migrationsDatabase: MigrationsDatabase = { provider: "pg", client };
+		if ((await readMigrationsTableState(migrationsDatabase, migrationsTable)) === "untagged") {
 			await addTagColumnToPgMigrationsTable(db, sql, migrationsTable, migrations);
 		}
 
-		const appliedMigrations = await db.execute<{ tag: string; hash: string }>(sql`SELECT tag, hash FROM ${table}`);
+		const appliedMigrations = await readAppliedMigrations(migrationsDatabase, migrationsTable);
 		assertAppliedMigrationsUnchanged(appliedMigrations, migrations);
 		const appliedTags = new Set(appliedMigrations.map((appliedMigration) => appliedMigration.tag));
 
@@ -209,17 +211,6 @@ async function importPostgres() {
 	} catch {
 		throw new Error("the pg provider requires the postgres driver, install it with: npm install postgres");
 	}
-}
-
-async function pgMigrationsTableHasTagColumn(
-	db: PostgresJsDatabase,
-	sql: typeof import("drizzle-orm").sql,
-	migrationsTable: string
-): Promise<boolean> {
-	const columns = await db.execute<{ columnName: string }>(
-		sql`SELECT column_name AS "columnName" FROM information_schema.columns WHERE table_schema = 'drizzle' AND table_name = ${migrationsTable}`
-	);
-	return columns.some((column) => column.columnName === "tag");
 }
 
 async function addTagColumnToPgMigrationsTable(
@@ -308,10 +299,7 @@ function unmatchedLegacyRowError(
 	return changedMigrationError(tagsSharingLegacyRowCreationTime);
 }
 
-function assertAppliedMigrationsUnchanged(
-	appliedMigrations: { tag: string; hash: string }[],
-	migrations: MigrationMeta[]
-): void {
+function assertAppliedMigrationsUnchanged(appliedMigrations: AppliedMigration[], migrations: MigrationMeta[]): void {
 	const migrationsByTag = new Map(migrations.map((migration) => [migration.tag, migration]));
 	for (const appliedMigration of appliedMigrations) {
 		const migration = migrationsByTag.get(appliedMigration.tag);

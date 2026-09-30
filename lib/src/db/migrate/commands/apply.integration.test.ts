@@ -3,6 +3,12 @@ import { describe, expect, test } from "bun:test";
 import { sha256 } from "../../../crypto";
 import { loadDatabaseConfig } from "../../config";
 import { type Migrations, migrationSource } from "../source";
+import {
+	createLegacyMigrationsTable,
+	qualifiedMigrationsTable,
+	runSql,
+	withMigrationsFixture,
+} from "../testing/migrations-fixture";
 
 const dbConfig = loadDatabaseConfig();
 
@@ -30,7 +36,7 @@ describe("migrateApply", () => {
 	test("adds tags to a legacy migrations table, keeping one row per migration", () =>
 		withMigrationsFixture(async (fixture) => {
 			await runSql(fixture.createWidgetSql);
-			await runSql(legacyMigrationsTableSql(fixture.migrationsTable));
+			await createLegacyMigrationsTable(fixture.migrationsTable);
 			// Two rows for one migration, as two migrators that both applied it would leave behind.
 			await runSql(
 				`INSERT INTO ${qualifiedMigrationsTable(fixture.migrationsTable)} (hash, created_at) VALUES ('${sha256(fixture.createWidgetSql)}', 1700000000000), ('${sha256(fixture.createWidgetSql)}', 1700000000000)`
@@ -62,7 +68,7 @@ describe("migrateApply", () => {
 			};
 			await runSql(fixture.createWidgetSql);
 			await runSql(fixture.insertWidgetSql);
-			await runSql(legacyMigrationsTableSql(fixture.migrationsTable));
+			await createLegacyMigrationsTable(fixture.migrationsTable);
 			await runSql(
 				`INSERT INTO ${qualifiedMigrationsTable(fixture.migrationsTable)} (hash, created_at) VALUES ('${sha256(fixture.createWidgetSql)}', 1700000000000), ('${sha256(fixture.insertWidgetSql)}', 1700000000000)`
 			);
@@ -82,7 +88,7 @@ describe("migrateApply", () => {
 
 	test("refuses to add tags to a legacy migrations table when an applied migration has changed", () =>
 		withMigrationsFixture(async (fixture) => {
-			await runSql(legacyMigrationsTableSql(fixture.migrationsTable));
+			await createLegacyMigrationsTable(fixture.migrationsTable);
 			await runSql(
 				`INSERT INTO ${qualifiedMigrationsTable(fixture.migrationsTable)} (hash, created_at) VALUES ('${sha256("CREATE TABLE widget_before_edit (id text PRIMARY KEY)")}', 1700000000000)`
 			);
@@ -109,7 +115,7 @@ describe("migrateApply", () => {
 
 	test("refuses to add tags to a legacy migrations table with a migration this version does not ship", () =>
 		withMigrationsFixture(async (fixture) => {
-			await runSql(legacyMigrationsTableSql(fixture.migrationsTable));
+			await createLegacyMigrationsTable(fixture.migrationsTable);
 			await runSql(
 				`INSERT INTO ${qualifiedMigrationsTable(fixture.migrationsTable)} (hash, created_at) VALUES ('${sha256("CREATE TABLE gadget (id text PRIMARY KEY)")}', 1700000009000)`
 			);
@@ -204,49 +210,6 @@ describe("migrateApply", () => {
 		}));
 });
 
-interface MigrationsFixture {
-	widgetTable: string;
-	migrationsTable: string;
-	createWidgetSql: string;
-	insertWidgetSql: string;
-	migrations: Migrations;
-	firstMigrationOnly: Migrations;
-}
-
-// Each test gets a widget table and a migrations table of its own, so tests share nothing with each
-// other or with the migrated schema. Both tables are dropped once the test finishes.
-async function withMigrationsFixture(fn: (fixture: MigrationsFixture) => Promise<void>): Promise<void> {
-	const tableSuffix = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
-	const widgetTable = `migrate_apply_widget_${tableSuffix}`;
-	const migrationsTable = `migrate_apply_migrations_${tableSuffix}`;
-	const createWidgetSql = `CREATE TABLE ${widgetTable} (id text PRIMARY KEY)`;
-	const insertWidgetSql = `INSERT INTO ${widgetTable} (id) VALUES ('first-widget')`;
-	try {
-		await fn({
-			widgetTable,
-			migrationsTable,
-			createWidgetSql,
-			insertWidgetSql,
-			migrations: {
-				journal: {
-					entries: [
-						{ tag: "0000_create_widget", when: 1_700_000_000_000 },
-						{ tag: "0001_insert_widget", when: 1_700_000_001_000 },
-					],
-				},
-				files: { "0000_create_widget": createWidgetSql, "0001_insert_widget": insertWidgetSql },
-			},
-			firstMigrationOnly: {
-				journal: { entries: [{ tag: "0000_create_widget", when: 1_700_000_000_000 }] },
-				files: { "0000_create_widget": createWidgetSql },
-			},
-		});
-	} finally {
-		await runSql(`DROP TABLE IF EXISTS ${widgetTable}`);
-		await runSql(`DROP TABLE IF EXISTS ${qualifiedMigrationsTable(migrationsTable)}`);
-	}
-}
-
 async function readMigrationsTable(migrationsTable: string) {
 	const migrationRows = await runSql(
 		`SELECT tag, hash, created_at FROM ${qualifiedMigrationsTable(migrationsTable)} ORDER BY tag`
@@ -258,29 +221,6 @@ async function readMigrationsTable(migrationsTable: string) {
 	}));
 }
 
-function qualifiedMigrationsTable(migrationsTable: string): string {
-	switch (dbConfig.provider) {
-		case "sqlite":
-			return `"${migrationsTable}"`;
-		case "pg":
-			return `drizzle."${migrationsTable}"`;
-		default:
-			return dbConfig satisfies never;
-	}
-}
-
-// A migrations table in the legacy format, which has no tag column.
-function legacyMigrationsTableSql(migrationsTable: string): string {
-	switch (dbConfig.provider) {
-		case "sqlite":
-			return `CREATE TABLE "${migrationsTable}" (id INTEGER PRIMARY KEY AUTOINCREMENT, hash text NOT NULL, created_at integer)`;
-		case "pg":
-			return `CREATE TABLE drizzle."${migrationsTable}" (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at bigint)`;
-		default:
-			return dbConfig satisfies never;
-	}
-}
-
 // Postgres returns a bigint column as a string.
 function fromDatabaseBigint(value: number): number | string {
 	switch (dbConfig.provider) {
@@ -288,34 +228,6 @@ function fromDatabaseBigint(value: number): number | string {
 			return value;
 		case "pg":
 			return String(value);
-		default:
-			return dbConfig satisfies never;
-	}
-}
-
-async function runSql(statement: string): Promise<Record<string, unknown>[]> {
-	switch (dbConfig.provider) {
-		case "sqlite": {
-			const { openSqliteClient } = await import("../../sqlite");
-			const client = await openSqliteClient(dbConfig);
-			try {
-				const queryResult = await client.execute(statement);
-				return queryResult.rows.map((row) =>
-					Object.fromEntries(queryResult.columns.map((column) => [column, row[column]]))
-				);
-			} finally {
-				client.close();
-			}
-		}
-		case "pg": {
-			const { default: postgres } = await import("postgres");
-			const client = postgres(dbConfig.url, { max: 1, onnotice: () => {} });
-			try {
-				return [...(await client.unsafe(statement))];
-			} finally {
-				await client.end();
-			}
-		}
 		default:
 			return dbConfig satisfies never;
 	}
