@@ -46,6 +46,9 @@ FROM alpine:3
 
 RUN apk add --no-cache libstdc++
 
+# Inside a container, the loopback address is unreachable from outside it.
+ENV AIKI_SERVER_HOST=0.0.0.0
+
 COPY --from=builder /aiki/cli/dist/aiki /usr/local/bin/aiki
 
 ENTRYPOINT ["aiki"]

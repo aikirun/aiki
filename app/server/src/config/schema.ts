@@ -24,7 +24,7 @@ export const authConfigSchema = type({
 });
 
 export const configSchema = type({
-	host: "string > 0 = '0.0.0.0'",
+	host: "string > 0 = '127.0.0.1'",
 	port: "string.integer.parse | number.integer > 0 = 9850",
 	"baseURL?": "string > 0",
 	corsOrigins: uniqueCommaSeparatedToItems.default("http://localhost:9851"),
