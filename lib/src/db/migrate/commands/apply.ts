@@ -1,3 +1,7 @@
+import type { Client } from "@libsql/client";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+
+import { nestedMap } from "../../../collection/map";
 import type { DatabaseConfig, PgDatabaseConfig, SqliteDatabaseConfig } from "../../config";
 import type { MigrationMeta, MigrationSource } from "../source";
 
@@ -37,37 +41,103 @@ async function applySqlite(
 		await client.execute(`
 			CREATE TABLE IF NOT EXISTS ${quotedMigrationsTable} (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				tag text NOT NULL UNIQUE,
 				hash text NOT NULL,
-				created_at integer
+				created_at integer NOT NULL
 			)
 		`);
+		if (!(await sqliteMigrationsTableHasTagColumn(client, migrationsTable))) {
+			await addTagColumnToSqliteMigrationsTable(client, migrationsTable, migrations);
+		}
 
-		const applied = await client.execute(`SELECT hash FROM ${quotedMigrationsTable}`);
-		const appliedHashes = new Set(applied.rows.map((row) => String(row.hash)));
+		const appliedRows = await client.execute(`SELECT tag, hash FROM ${quotedMigrationsTable}`);
+		const appliedMigrations = appliedRows.rows.map((row) => ({ tag: String(row.tag), hash: String(row.hash) }));
+		assertAppliedMigrationsUnchanged(appliedMigrations, migrations);
+		const appliedTags = new Set(appliedMigrations.map((appliedMigration) => appliedMigration.tag));
 
 		for (const migration of migrations) {
-			if (appliedHashes.has(migration.hash)) {
+			if (appliedTags.has(migration.tag)) {
 				continue;
 			}
 
-			console.log(`applying migration ${migration.hash.slice(0, 12)}`);
+			console.log(`applying migration ${migration.tag}`);
 
 			// Not a plain transaction: drizzle-kit changes a SQLite table by rebuilding it (create a
 			// copy, move the rows, drop the original). While foreign keys are enforced, dropping the
 			// original fails if rows in other tables still point at it. SQLite ignores switching
 			// them off inside a transaction, so migrate() switches them off first, then runs the
 			// statements in one.
-			await client.migrate([
-				...migration.sql,
-				{
-					sql: `INSERT INTO ${quotedMigrationsTable} (hash, created_at) VALUES (?, ?)`,
-					args: [migration.hash, migration.folderMillis],
-				},
-			]);
+			// The migration's row goes first: when another migrator has applied it since the read
+			// above, the insert fails on the unique tag before any statement runs.
+			try {
+				await client.migrate([
+					{
+						sql: `INSERT INTO ${quotedMigrationsTable} (tag, hash, created_at) VALUES (?, ?, ?)`,
+						args: [migration.tag, migration.hash, migration.folderMillis],
+					},
+					...migration.sql,
+				]);
+			} catch (error) {
+				// The failed transaction left nothing behind, so a recorded tag means another migrator
+				// applied this migration.
+				if (await sqliteMigrationsTableHasTag(client, migrationsTable, migration.tag)) {
+					continue;
+				}
+				throw error;
+			}
 		}
 	} finally {
 		client.close();
 	}
+}
+
+async function sqliteMigrationsTableHasTagColumn(client: Client, migrationsTable: string): Promise<boolean> {
+	const columns = await client.execute(`PRAGMA table_info("${migrationsTable}")`);
+	return columns.rows.some((column) => column.name === "tag");
+}
+
+// SQLite cannot add a NOT NULL column to a table, so the table is rebuilt with one.
+async function addTagColumnToSqliteMigrationsTable(
+	client: Client,
+	migrationsTable: string,
+	migrations: MigrationMeta[]
+): Promise<void> {
+	const quotedMigrationsTable = `"${migrationsTable}"`;
+	const transaction = await client.transaction("write");
+	try {
+		const legacyRows = await transaction.execute(`SELECT hash, created_at FROM ${quotedMigrationsTable}`);
+		const appliedMigrations = matchLegacyRowsToMigrations(
+			legacyRows.rows.map((row) => ({ hash: String(row.hash), createdAtMs: Number(row.created_at) })),
+			migrations,
+			migrationsTable
+		);
+
+		const quotedRebuiltTable = `"${migrationsTable}_rebuilt"`;
+		await transaction.execute(`
+			CREATE TABLE ${quotedRebuiltTable} (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				tag text NOT NULL UNIQUE,
+				hash text NOT NULL,
+				created_at integer NOT NULL
+			)
+		`);
+		for (const migration of appliedMigrations) {
+			await transaction.execute({
+				sql: `INSERT INTO ${quotedRebuiltTable} (tag, hash, created_at) VALUES (?, ?, ?)`,
+				args: [migration.tag, migration.hash, migration.folderMillis],
+			});
+		}
+		await transaction.execute(`DROP TABLE ${quotedMigrationsTable}`);
+		await transaction.execute(`ALTER TABLE ${quotedRebuiltTable} RENAME TO ${quotedMigrationsTable}`);
+		await transaction.commit();
+	} finally {
+		transaction.close();
+	}
+}
+
+async function sqliteMigrationsTableHasTag(client: Client, migrationsTable: string, tag: string): Promise<boolean> {
+	const taggedRows = await client.execute({ sql: `SELECT 1 FROM "${migrationsTable}" WHERE tag = ?`, args: [tag] });
+	return taggedRows.rows.length > 0;
 }
 
 async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], migrationsTable: string): Promise<void> {
@@ -80,37 +150,52 @@ async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], mi
 		ssl: config.caCert ? { ca: config.caCert, rejectUnauthorized: true } : undefined,
 	});
 	const db = drizzle(client);
+	const table = sql`drizzle.${sql.identifier(migrationsTable)}`;
 
 	try {
 		await db.execute(sql`CREATE SCHEMA IF NOT EXISTS drizzle`);
 		await db.execute(sql`
-			CREATE TABLE IF NOT EXISTS drizzle.${sql.identifier(migrationsTable)} (
+			CREATE TABLE IF NOT EXISTS ${table} (
 				id SERIAL PRIMARY KEY,
+				tag text NOT NULL UNIQUE,
 				hash text NOT NULL,
-				created_at bigint
+				created_at bigint NOT NULL
 			)
 		`);
+		if (!(await pgMigrationsTableHasTagColumn(db, sql, migrationsTable))) {
+			await addTagColumnToPgMigrationsTable(db, sql, migrationsTable, migrations);
+		}
 
-		const applied = await db.execute<{ hash: string }>(
-			sql`SELECT hash FROM drizzle.${sql.identifier(migrationsTable)}`
-		);
-		const appliedHashes = new Set(applied.map((row) => row.hash));
+		const appliedMigrations = await db.execute<{ tag: string; hash: string }>(sql`SELECT tag, hash FROM ${table}`);
+		assertAppliedMigrationsUnchanged(appliedMigrations, migrations);
+		const appliedTags = new Set(appliedMigrations.map((appliedMigration) => appliedMigration.tag));
 
 		for (const migration of migrations) {
-			if (appliedHashes.has(migration.hash)) {
+			if (appliedTags.has(migration.tag)) {
 				continue;
 			}
 
-			console.log(`applying migration ${migration.hash.slice(0, 12)}`);
+			console.log(`applying migration ${migration.tag}`);
 
-			await db.transaction(async (tx) => {
-				for (const statement of migration.sql) {
-					await tx.execute(sql.raw(statement));
+			// The migration's row goes first: when another migrator has applied it since the read
+			// above, the insert fails on the unique tag before any statement runs.
+			try {
+				await db.transaction(async (tx) => {
+					await tx.execute(
+						sql`INSERT INTO ${table} (tag, hash, created_at) VALUES (${migration.tag}, ${migration.hash}, ${migration.folderMillis})`
+					);
+					for (const statement of migration.sql) {
+						await tx.execute(sql.raw(statement));
+					}
+				});
+			} catch (error) {
+				// The failed transaction left nothing behind, so a recorded tag means another migrator
+				// applied this migration.
+				if (await pgMigrationsTableHasTag(db, sql, migrationsTable, migration.tag)) {
+					continue;
 				}
-				await tx.execute(
-					sql`INSERT INTO drizzle.${sql.identifier(migrationsTable)} (hash, created_at) VALUES (${migration.hash}, ${migration.folderMillis})`
-				);
-			});
+				throw error;
+			}
 		}
 	} finally {
 		await client.end();
@@ -124,4 +209,120 @@ async function importPostgres() {
 	} catch {
 		throw new Error("the pg provider requires the postgres driver, install it with: npm install postgres");
 	}
+}
+
+async function pgMigrationsTableHasTagColumn(
+	db: PostgresJsDatabase,
+	sql: typeof import("drizzle-orm").sql,
+	migrationsTable: string
+): Promise<boolean> {
+	const columns = await db.execute<{ columnName: string }>(
+		sql`SELECT column_name AS "columnName" FROM information_schema.columns WHERE table_schema = 'drizzle' AND table_name = ${migrationsTable}`
+	);
+	return columns.some((column) => column.columnName === "tag");
+}
+
+async function addTagColumnToPgMigrationsTable(
+	db: PostgresJsDatabase,
+	sql: typeof import("drizzle-orm").sql,
+	migrationsTable: string,
+	migrations: MigrationMeta[]
+): Promise<void> {
+	const table = sql`drizzle.${sql.identifier(migrationsTable)}`;
+
+	await db.transaction(async (tx) => {
+		const legacyRows = await tx.execute<{ hash: string; createdAtMs: string }>(
+			sql`SELECT hash, created_at AS "createdAtMs" FROM ${table}`
+		);
+		const appliedMigrations = matchLegacyRowsToMigrations(
+			legacyRows.map((row) => ({ hash: row.hash, createdAtMs: Number(row.createdAtMs) })),
+			migrations,
+			migrationsTable
+		);
+
+		await tx.execute(sql`DELETE FROM ${table}`);
+		await tx.execute(sql`ALTER TABLE ${table} ADD COLUMN tag text NOT NULL UNIQUE`);
+		for (const migration of appliedMigrations) {
+			await tx.execute(
+				sql`INSERT INTO ${table} (tag, hash, created_at) VALUES (${migration.tag}, ${migration.hash}, ${migration.folderMillis})`
+			);
+		}
+		await tx.execute(sql`ALTER TABLE ${table} ALTER COLUMN created_at SET NOT NULL`);
+	});
+}
+
+async function pgMigrationsTableHasTag(
+	db: PostgresJsDatabase,
+	sql: typeof import("drizzle-orm").sql,
+	migrationsTable: string,
+	tag: string
+): Promise<boolean> {
+	const taggedRows = await db.execute(sql`SELECT 1 FROM drizzle.${sql.identifier(migrationsTable)} WHERE tag = ${tag}`);
+	return taggedRows.length > 0;
+}
+
+interface LegacyMigrationRow {
+	hash: string;
+	createdAtMs: number;
+}
+
+// A legacy migrations table has no tag column: each row holds only a migration's hash and the
+// creation time from its journal entry. A row is matched to the migration with the same pair, and
+// several rows for one migration count as one.
+function matchLegacyRowsToMigrations(
+	legacyRows: LegacyMigrationRow[],
+	migrations: MigrationMeta[],
+	migrationsTable: string
+): MigrationMeta[] {
+	const migrationsByCreationAndHash = nestedMap(migrations, "folderMillis", "hash");
+
+	const matchedMigrations = new Map<string, MigrationMeta>();
+	for (const legacyRow of legacyRows) {
+		const migrationsSharingLegacyRowCreationTime = migrationsByCreationAndHash.get(legacyRow.createdAtMs);
+		const migration = migrationsSharingLegacyRowCreationTime?.get(legacyRow.hash);
+		if (!migration) {
+			const tagsSharingLegacyRowCreationTime = Array.from(
+				migrationsSharingLegacyRowCreationTime?.values() ?? [],
+				({ tag }) => tag
+			);
+			throw unmatchedLegacyRowError(legacyRow, tagsSharingLegacyRowCreationTime, migrationsTable);
+		}
+		matchedMigrations.set(migration.tag, migration);
+	}
+	return Array.from(matchedMigrations.values());
+}
+
+// A legacy row's creation time was copied from its migration's journal entry, so the row can only
+// belong to a migration created at that time. When there are such migrations, one of them was
+// applied with SQL that has since changed.
+function unmatchedLegacyRowError(
+	legacyRow: LegacyMigrationRow,
+	tagsSharingLegacyRowCreationTime: string[],
+	migrationsTable: string
+): Error {
+	if (tagsSharingLegacyRowCreationTime.length === 0) {
+		return new Error(
+			`${migrationsTable} has a migration created at ${legacyRow.createdAtMs}, which this version does not ship`
+		);
+	}
+	return changedMigrationError(tagsSharingLegacyRowCreationTime);
+}
+
+function assertAppliedMigrationsUnchanged(
+	appliedMigrations: { tag: string; hash: string }[],
+	migrations: MigrationMeta[]
+): void {
+	const migrationsByTag = new Map(migrations.map((migration) => [migration.tag, migration]));
+	for (const appliedMigration of appliedMigrations) {
+		const migration = migrationsByTag.get(appliedMigration.tag);
+		if (migration && migration.hash !== appliedMigration.hash) {
+			throw changedMigrationError([migration.tag]);
+		}
+	}
+}
+
+function changedMigrationError(tags: string[]): Error {
+	return new Error(
+		`migration ${tags.join(" or ")} has changed since it was applied to this database; a migration must not change once applied`
+	);
 }
