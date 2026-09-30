@@ -44,6 +44,8 @@ FROM gcr.io/distroless/cc-debian12
 
 ARG AIKI_SERVER_PORT=9850
 ENV AIKI_SERVER_PORT=${AIKI_SERVER_PORT}
+# Inside a container, the loopback address is unreachable from outside it.
+ENV AIKI_SERVER_HOST=0.0.0.0
 
 WORKDIR /aiki/app
 COPY --from=builder /aiki/app/server/dist/aiki-app-server ./

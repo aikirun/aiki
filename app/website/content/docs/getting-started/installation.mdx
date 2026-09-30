@@ -171,10 +171,12 @@ export DATABASE_URL=postgresql://user:password@your-db-host:5432/aiki
 
 ```bash
 aiki migrate apply     # migrates the server package; use --package server,iam to include iam
-aiki server start      # serves on :9850
+aiki server start      # serves on 127.0.0.1:9850
 ```
 
 Both commands read configuration from the environment; pass `--env-file <path>` to load it from a file instead.
+
+The server accepts connections from this machine only. To serve other machines, set `AIKI_SERVER_HOST=0.0.0.0`, and turn on authentication with `AIKI_SERVER_AUTH_SECRET` and `AIKI_SERVER_BASE_URL`. Without it, anyone who can reach the server can start and read runs.
 
 The dashboard ships separately — serve it as a static site (see [Run the dashboard on its own](#run-the-dashboard-on-its-own)) or from a container (see [With Docker](#with-docker)). A dashboard on a different origin than the server needs its origin added to the server's `CORS_ORIGINS` (via `--env-file` or the environment).
 
@@ -317,14 +319,14 @@ These apply to the standalone server and the dashboard. If you embed the server 
 | `DATABASE_URL` | For Postgres | — | Postgres connection string |
 | `DATABASE_MAX_CONNECTIONS` | No | driver default | Postgres connection pool size |
 | `DATABASE_CA_CERT` | No | — | PEM contents of a CA certificate used to verify Postgres's TLS certificate. Needed to verify against a private CA (e.g. DigitalOcean, RDS) |
-| `AIKI_SERVER_HOST` | No | `0.0.0.0` | Bind address |
+| `AIKI_SERVER_HOST` | No | `127.0.0.1` | Address the server listens on. `127.0.0.1` accepts connections from this machine only; `0.0.0.0` accepts them from any machine that can reach it. The Docker images set `0.0.0.0` |
 | `AIKI_SERVER_PORT` | No | `9850` | Server port |
 | `AIKI_SERVER_BASE_URL` | If IAM is on | — | Public URL of the server; required only when `AIKI_SERVER_AUTH_SECRET` is also set |
 | `AIKI_SERVER_AUTH_SECRET` | If IAM is on | — | Authentication secret; setting this (with `AIKI_SERVER_BASE_URL`) activates the IAM package |
 | `CORS_ORIGINS` | If the dashboard is cross-origin | — | Comma-separated allowed origins, e.g. a static-host dashboard's; unneeded behind the dashboard image's proxy |
 | `REDIS_URL` | No | — | Redis connection string, e.g. `redis://localhost:6379`; enables Redis-backed work distribution and moves timer dispatch from the in-process queue to a shared Redis-backed one |
 | `LOG_LEVEL` | No | `info` | Log level |
-| `PRETTY_LOGS` | No | `true` | Pretty-print logs (set `false` for JSON output) |
+| `PRETTY_LOGS` | No | `false` | Pretty-print logs; `false` prints JSON |
 
 ### Dashboard
 
