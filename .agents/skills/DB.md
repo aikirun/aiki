@@ -32,7 +32,8 @@ When schema changes, commit generated migration SQL and `meta/` snapshot files t
 
 ## Gotchas
 
-- **Never hand-author or hand-edit `meta/` snapshot files.** Snapshots must come from the generator; a doctored snapshot misdescribes the schema and silently corrupts every future diff. Editing the *generated SQL* is fine (e.g., inserting a data backfill between statements).
+- **Never hand-author or hand-edit `meta/` snapshot files.** Snapshots must come from the generator; a doctored snapshot misdescribes the schema and silently corrupts every future diff. Editing the *generated SQL* is fine (e.g., inserting a data backfill between statements) until the migration is merged.
+- **Never edit a migration's SQL once it is merged.** A database records each applied migration by tag with the hash of its SQL, and `migrate apply` refuses to run while an applied migration's SQL differs from what was recorded. A fix goes in a new migration.
 - **Backfill before you drop.** When a migration replaces a column, order the statements: add new columns → backfill from the old column → drop the old column. Once the drop runs, the data is gone. If a new `CHECK` constraint depends on backfilled values, the backfill must cover every row the constraint binds, or the `ADD CONSTRAINT` fails on live data.
 - **`timestampMs` columns are `timestamp with time zone` in Postgres**, mapped to epoch milliseconds by a custom type whose `toDriver` serializes ISO strings. Drizzle operators (`lte`, `eq`, …) apply the mapping automatically, but raw `` sql`...` `` fragments do NOT — binding an epoch number (or casting `::bigint`) into a timestamptz column fails at runtime and typechecks fine. In raw fragments, bind `new Date(ms).toISOString()` with `::timestamptz`. Similarly, `` sql<Date>`${column}` `` strips the decoder — chain `.mapWith(column)`.
 - Apply migrations only when explicitly asked; the operator runs them (see AGENTS working rules).
