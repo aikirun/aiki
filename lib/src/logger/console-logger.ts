@@ -1,4 +1,5 @@
 import type { Logger, LogLevel } from "./types";
+import { describeErrorCauses } from "../error/cause";
 
 const colors = {
 	reset: "\x1b[0m",
@@ -46,7 +47,10 @@ export function createConsoleLogger(options: ConsoleLoggerOptions = {}): Logger 
 				.map(([key, value]) => {
 					// Error properties are non-enumerable, so JSON.stringify renders the error as "{}".
 					if (value instanceof Error) {
-						return `${colors.magenta}${key}:${colors.reset} ${value.stack ?? `${value.name}: ${value.message}`}`;
+						const causes = describeErrorCauses(value)
+							.map((cause) => `\n  ${colors.magenta}Caused by:${colors.reset} ${cause}`)
+							.join("");
+						return `${colors.magenta}${key}:${colors.reset} ${value.stack ?? `${value.name}: ${value.message}`}${causes}`;
 					}
 					const valueStr = typeof value === "object" ? JSON.stringify(value) : String(value);
 					return `${colors.magenta}${key}:${colors.reset} ${valueStr}`;

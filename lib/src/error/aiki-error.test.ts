@@ -1,4 +1,11 @@
-import { asAikiError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "./index";
+import {
+	asAikiError,
+	ConflictError,
+	ForbiddenError,
+	NotFoundError,
+	UnauthorizedError,
+	ValidationError,
+} from "./aiki-error";
 import { describe, expect, test } from "bun:test";
 
 describe("asAikiError", () => {
