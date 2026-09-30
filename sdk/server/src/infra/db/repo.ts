@@ -7,15 +7,15 @@ import type { Repositories } from "./types";
 
 export async function createRepos(db: Database): Promise<Repositories> {
 	switch (db.provider) {
-		case "pg": {
-			const { createPgRepos } = await import("./pg");
-			const client = db[INTERNAL].client as PgClient;
-			return createPgRepos(client);
-		}
 		case "sqlite": {
 			const { createSqliteRepos } = await import("./sqlite");
 			const client = db[INTERNAL].client as SqliteClient;
 			return createSqliteRepos(client);
+		}
+		case "pg": {
+			const { createPgRepos } = await import("./pg");
+			const client = db[INTERNAL].client as PgClient;
+			return createPgRepos(client);
 		}
 		// case "mysql":
 		// 	throw new Error("MySQL support not yet implemented");

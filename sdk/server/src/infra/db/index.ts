@@ -11,6 +11,10 @@ export function database(config: DatabaseConfig): CreateDatabase {
 	const createDbFn = () => {
 		createDbPromise ??= (async () => {
 			switch (config.provider) {
+				case "sqlite": {
+					const { createSqliteClient } = await import("./sqlite/client");
+					return { provider: "sqlite", [INTERNAL]: { client: createSqliteClient(config) } };
+				}
 				case "pg": {
 					const postgres = await importPostgres();
 					// Keys must be absent, not undefined: the driver merges options by key presence,
@@ -20,10 +24,6 @@ export function database(config: DatabaseConfig): CreateDatabase {
 						...(config.caCert !== undefined && { ssl: { ca: config.caCert, rejectUnauthorized: true } }),
 					});
 					return { provider: "pg", [INTERNAL]: { client } };
-				}
-				case "sqlite": {
-					const { createSqliteClient } = await import("./sqlite/client");
-					return { provider: "sqlite", [INTERNAL]: { client: createSqliteClient(config) } };
 				}
 				// case "mysql":
 				// 	throw new Error("MySQL support not yet implemented");
@@ -41,14 +41,14 @@ export function database(config: DatabaseConfig): CreateDatabase {
 			}
 			const db = await createDbPromise;
 			switch (db.provider) {
-				case "pg": {
-					const client = db[INTERNAL].client as PgClient;
-					await client.end();
-					return;
-				}
 				case "sqlite": {
 					const client = db[INTERNAL].client as SqliteClient;
 					client.close();
+					return;
+				}
+				case "pg": {
+					const client = db[INTERNAL].client as PgClient;
+					await client.end();
 					return;
 				}
 				// case "mysql":

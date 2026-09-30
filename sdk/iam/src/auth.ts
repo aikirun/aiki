@@ -22,24 +22,6 @@ type BetterAuthSchema = Record<
 
 async function createDrizzleAdapter(db: Database) {
 	switch (db.provider) {
-		case "pg": {
-			const schema = await import("./infra/db/pg/schema");
-			const betterAuthSchema = {
-				user: schema.user,
-				session: schema.session,
-				account: schema.account,
-				verification: schema.verification,
-				organization: schema.organization,
-				organization_member: schema.organizationMember,
-				organization_invitation: schema.organizationInvitation,
-				namespace: schema.namespace,
-				namespace_member: schema.namespaceMember,
-			} satisfies BetterAuthSchema;
-			const client = db[INTERNAL].client as PgClient;
-			const { drizzle } = await import("drizzle-orm/postgres-js");
-			const handle = drizzle(client, { schema: betterAuthSchema });
-			return drizzleAdapter(handle, { provider: db.provider, schema: betterAuthSchema });
-		}
 		case "sqlite": {
 			const schema = await import("./infra/db/sqlite/schema");
 			const betterAuthSchema = {
@@ -55,6 +37,24 @@ async function createDrizzleAdapter(db: Database) {
 			} satisfies BetterAuthSchema;
 			const client = db[INTERNAL].client as SqliteClient;
 			const { drizzle } = await import("drizzle-orm/libsql");
+			const handle = drizzle(client, { schema: betterAuthSchema });
+			return drizzleAdapter(handle, { provider: db.provider, schema: betterAuthSchema });
+		}
+		case "pg": {
+			const schema = await import("./infra/db/pg/schema");
+			const betterAuthSchema = {
+				user: schema.user,
+				session: schema.session,
+				account: schema.account,
+				verification: schema.verification,
+				organization: schema.organization,
+				organization_member: schema.organizationMember,
+				organization_invitation: schema.organizationInvitation,
+				namespace: schema.namespace,
+				namespace_member: schema.namespaceMember,
+			} satisfies BetterAuthSchema;
+			const client = db[INTERNAL].client as PgClient;
+			const { drizzle } = await import("drizzle-orm/postgres-js");
 			const handle = drizzle(client, { schema: betterAuthSchema });
 			return drizzleAdapter(handle, { provider: db.provider, schema: betterAuthSchema });
 		}

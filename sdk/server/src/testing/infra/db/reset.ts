@@ -5,14 +5,14 @@ import type { Database } from "@aikirun/types/infra/db";
  */
 export async function resetDatabase(db: Database): Promise<void> {
 	switch (db.provider) {
-		case "pg": {
-			const { truncatePgTables } = await import("./pg/reset");
-			await truncatePgTables(db);
-			return;
-		}
 		case "sqlite": {
 			const { deleteSqliteRows } = await import("./sqlite/reset");
 			await deleteSqliteRows(db);
+			return;
+		}
+		case "pg": {
+			const { truncatePgTables } = await import("./pg/reset");
+			await truncatePgTables(db);
 			return;
 		}
 		// case "mysql":

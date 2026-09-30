@@ -7,10 +7,10 @@ import { loadDatabaseProvider } from "@aikirun/lib/db";
 export function allowsConcurrentWriteTransactions(): boolean {
 	const provider = loadDatabaseProvider();
 	switch (provider) {
-		case "pg":
-			return true;
 		case "sqlite":
 			return false;
+		case "pg":
+			return true;
 		// case "mysql":
 		// 	return true;
 		default:
