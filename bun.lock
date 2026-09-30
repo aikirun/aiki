@@ -304,6 +304,7 @@
   },
   "overrides": {
     "better-auth": "1.6.11",
+    "mdast-util-to-markdown": "2.1.2",
   },
   "packages": {
     "@aikirun/app-dashboard": ["@aikirun/app-dashboard@workspace:app/dashboard"],
