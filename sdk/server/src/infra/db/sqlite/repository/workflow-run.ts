@@ -11,7 +11,7 @@ import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import { valuesTable } from "./lib/values-table";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
-import { toWorkflowRunState } from "../../state-transition-row";
+import { toWorkflowRunState } from "../../lib/state-transition-row";
 import type {
 	ChildRunWithWorkflow,
 	DueWorkflowRun,

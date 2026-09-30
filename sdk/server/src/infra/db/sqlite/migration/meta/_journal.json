@@ -15,6 +15,13 @@
 			"when": 1790689196970,
 			"tag": "0001_blue_firelord",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "6",
+			"when": 1790799507714,
+			"tag": "0002_pretty_namor",
+			"breakpoints": true
 		}
 	]
 }

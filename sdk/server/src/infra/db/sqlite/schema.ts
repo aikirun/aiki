@@ -52,6 +52,7 @@ export const workflow = sqliteTable(
 		namespaceId: text("namespace_id").notNull(),
 		source: text("source", { enum: WORKFLOW_SOURCES }).notNull(),
 		name: text("name").notNull(),
+		nameLowercase: text("name_lowercase").notNull(),
 		versionId: text("version_id").notNull(),
 		createdAt: timestampMs("created_at").notNull().default(NOW_MS),
 	},
@@ -61,6 +62,12 @@ export const workflow = sqliteTable(
 			table.source,
 			table.name,
 			table.versionId
+		),
+		index("idx_workflow_namespace_source_name_lowercase").on(
+			table.namespaceId,
+			table.source,
+			table.nameLowercase,
+			table.name
 		),
 		check("chk_workflow_source", isOneOf(table.source, WORKFLOW_SOURCES)),
 	]

@@ -8,7 +8,7 @@ import type {
 	StateTransitionRowSelect,
 	TaskStateTransitionRow,
 	WorkflowRunStateTransitionRow,
-} from "./types/state-transition";
+} from "../types/state-transition";
 
 /**
  * JSON cannot represent `undefined` — keys with `undefined` values are dropped on insert.

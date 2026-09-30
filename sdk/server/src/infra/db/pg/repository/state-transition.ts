@@ -8,7 +8,7 @@ import {
 	toRunOwnedStateTransitionRow,
 	toScheduleStateTransitionRow,
 	toStateTransitionRow,
-} from "../../state-transition-row";
+} from "../../lib/state-transition-row";
 import type { PgDb } from "../provider";
 import { stateTransition } from "../schema";
 

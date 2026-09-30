@@ -4,7 +4,7 @@ import {
 	toRunOwnedStateTransitionRow,
 	toScheduleStateTransitionRow,
 	toStateTransitionRow,
-} from "../../state-transition-row";
+} from "../../lib/state-transition-row";
 import type { StateTransitionRepository } from "../../types/state-transition";
 import type { SqliteDb } from "../provider";
 import { stateTransition, stateTransitionTypeOrder } from "../schema";

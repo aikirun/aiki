@@ -2,7 +2,7 @@ import { asNonEmptyArray } from "@aikirun/lib/collection/array";
 import { and, count, eq, inArray, min, ne, sql } from "drizzle-orm";
 
 import { valuesTable } from "./lib/values-table";
-import { toTaskState } from "../../state-transition-row";
+import { toTaskState } from "../../lib/state-transition-row";
 import type { TaskRepository } from "../../types/task";
 import type { SqliteDb } from "../provider";
 import { stateTransition, task, workflowRun } from "../schema";

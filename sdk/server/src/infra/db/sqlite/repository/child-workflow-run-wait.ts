@@ -1,6 +1,6 @@
 import { eq, getTableColumns } from "drizzle-orm";
 
-import { toWorkflowRunState } from "../../state-transition-row";
+import { toWorkflowRunState } from "../../lib/state-transition-row";
 import type {
 	ChildWorkflowRunWaitRepository,
 	ChildWorkflowRunWaitRowInsert,
