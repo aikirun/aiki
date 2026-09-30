@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { DataBlock } from "../components/common/DataBlock";
 import { RelativeTime } from "../components/common/RelativeTime";
 import { btnPrimary, eyebrow, primaryHover } from "../components/common/ui";
+import { AIKI_SERVER_URL } from "../config";
 import { API_KEY_STATUS_COLORS } from "../constants/status-colors";
 
 type PageState = { mode: "idle" } | { mode: "creating" } | { mode: "revealed"; key: string };
@@ -121,7 +122,7 @@ export function ApiKeys() {
 				text={`import { client } from "@aikirun/client";
 
 const aikiClient = client({
-  url: "https://api.aiki.run",
+  url: "${AIKI_SERVER_URL}",
   apiKey: "YOUR_API_KEY",
 });`}
 			/>
