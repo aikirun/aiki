@@ -2,6 +2,36 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.43.1
+
+IAM works on a fresh install again, cron schedules work on Node, and a jittered retry no longer fails a run or retries it forever. A schedule's first run is on time, and the server stops on `SIGTERM` when Postgres is unreachable. Projects that type-check their dependencies compile against `@aikirun/workflow` again, and the dashboard Docker image can be told which address to listen on.
+
+### Breaking Changes
+
+- **IAM has one new migration and uses better-auth 1.7.** `@aikirun/iam` declared `better-auth: ^1.4.14`, so a fresh install got better-auth 1.7. That version expects two columns the IAM schema did not have, and sign-up returned 500. IAM now declares `~1.7.7`, and the migration adds `namespace.member_count` and `namespace_member.membership_key`. Existing rows need no backfill. Apply it before starting this version:
+
+  ```bash
+  npx aiki-iam migrate apply
+  # or, with the aiki binary
+  aiki migrate apply --package server,iam
+  ```
+
+### Improvements
+
+- **A schedule's first run after it becomes active is on time.** On a server with a timer queue, activating or resuming a schedule adds a timer for its next run when that run is within 30 seconds. The run used to wait for the next scan, up to 10 seconds late.
+- **`close()` on the database takes a time limit.** `database(...).close({ timeoutMs })` waits that long for running queries, 5 seconds by default, then closes the Postgres connections anyway.
+- **Exponential and jittered retries accept a fractional `factor`.** Any value of 1 or more works, such as `1.5`. The server rejected everything but whole numbers, although the SDK's type allowed them.
+- **The dashboard Docker image reads its listen address from `AIKI_DASHBOARD_HOST`.** It defaults to `0.0.0.0`, as before. Run the container with `--network host` and `AIKI_DASHBOARD_HOST=127.0.0.1` to open the dashboard to this machine only. With a published port (`-p`), keep the default.
+- **The tests also run on Node.** CI runs the unit and integration tests on Node 22 as well as on Bun.
+
+### Bug Fixes
+
+- **Cron schedules work on Node.** Activating one returned 500 with `CronExpressionParser.parse is not a function`. Bun was not affected, and neither were interval schedules.
+- **A jittered retry no longer fails the run or retries it forever.** The strategy produced a delay with a fraction of a millisecond, which the server rejects. A task with a jittered retry failed its run with `Input validation failed`. A workflow with one was executed again every time its claim expired, past `maxAttempts`. Delays are now whole milliseconds, and a jittered delay is at least 1 ms.
+- **An event sent to several runs is delivered once to each.** A run listed twice in the request received the event twice, unless the send carried a reference ID.
+- **The server stops on `SIGTERM` when Postgres is unreachable.** The app server and the `aiki` binary kept running, because closing the database never finished. They now exit about 10 seconds after the signal.
+- **`@aikirun/types` exports `./infra/hasher`.** It exported `./infra/hash`, a file the build never produced, while the types of `@aikirun/workflow` import `@aikirun/types/infra/hasher`. A project with `skipLibCheck: false` failed to compile with `Cannot find module '@aikirun/types/infra/hasher'`. This was broken since 0.39.0.
+
 ## 0.43.0
 
 Aiki now runs on SQLite as well as Postgres, and SQLite is the default in the docs: the database is one file, with no server to run. A new package, `@aikirun/codec`, builds codecs that record their name, run in sequence, and switch from an old codec to a new one. The server and IAM log which migrations a database is missing when they first connect, and errors print what caused them. A run's history is ordered by revision instead of by id, so servers whose clocks disagree no longer list it out of order, and `handle.wait()` no longer misses a finished run for the same reason. Redis and in-memory queues are isolated by namespace. The server listens on `127.0.0.1` by default. Four database migrations (`0041` through `0044`) ship with this release, and the server, workers and clients must be upgraded together.

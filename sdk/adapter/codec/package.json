@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/codec",
-	"version": "0.43.0",
+	"version": "0.43.1",
 	"description": "Toolkit for payload transformation",
 	"type": "module",
 	"engines": {
