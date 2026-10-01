@@ -4,7 +4,7 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
 
 ## 0.43.1
 
-IAM works on a fresh install again, cron schedules work on Node, and a jittered retry no longer fails a run or retries it forever. A schedule's first run is on time, and the server stops on `SIGTERM` when Postgres is unreachable. Projects that type-check their dependencies compile against `@aikirun/workflow` again, the dashboard Docker image can be told which address to listen on, and the Quick Start app stops on Ctrl+C and accepts connections from your machine only.
+IAM works on a fresh install again, cron schedules work on Node, and a jittered retry no longer fails a run or retries it forever. A schedule's first run is on time, and the server stops on `SIGTERM` when Postgres is unreachable. Projects that type-check their dependencies compile against `@aikirun/workflow` again, and the dashboard Docker image can be told which address to listen on.
 
 ### Breaking Changes
 
