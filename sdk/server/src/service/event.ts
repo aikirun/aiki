@@ -44,10 +44,11 @@ export const createEventService = ({ repos, workflowRunStateMachine }: EventServ
 	): Promise<EventMulticastResult> {
 		const { runIds, eventName, data, clientCodecApplied, reference } = params;
 
+		const uniqueRunIds = Array.from(new Set(runIds));
 		const sentIds: string[] = [];
 		const failedIds: string[] = [];
 
-		await runConcurrently(context, runIds, async (runId, spanCtx) => {
+		await runConcurrently(context, uniqueRunIds, async (runId, spanCtx) => {
 			try {
 				await repos.transaction(async (txRepos) =>
 					sendEventToWorkflowRunInTx(

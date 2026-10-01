@@ -295,6 +295,24 @@ describe("EventService multicastEventToWorkflowRuns", () => {
 			]);
 		}));
 
+	test("delivers once to a run listed twice", () =>
+		withHarness(async ({ repos, context, publisher }) => {
+			const { runId } = await seedClaimedRun({ repos, namespaceRequestContext: context, publisher });
+
+			const result = await createService(repos).multicastEventToWorkflowRuns(context, {
+				runIds: [runId, runId] as WorkflowRunId[],
+				eventName: "orderShipped",
+				data: asOpaquePayload({ trackingId: "TRK-1" }),
+				clientCodecApplied: false,
+				reference: undefined,
+			});
+
+			expect(result).toEqual({ sentIds: [runId], failedIds: [] });
+			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([
+				expect.objectContaining({ name: "orderShipped", status: "received", data: { trackingId: "TRK-1" } }),
+			]);
+		}));
+
 	test("delivers to the runs it reached and reports the one it could not", () =>
 		withHarness(async ({ repos, context, publisher }) => {
 			const reachable = await seedClaimedRun({ repos, namespaceRequestContext: context, publisher });
