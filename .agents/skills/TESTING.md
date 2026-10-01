@@ -327,6 +327,10 @@ Before writing any test, study the exemplars for its tier and match their idioms
   method's describe; no claim the body doesn't check ("then id" with no tied rows); say what
   the write does, not what a caller does with it (`returnToPending` makes the row due at once
   and keeps the publish times its backoff is anchored on).
+- A title names the situation and the outcome a reader cares about, not the internal states that
+  encode them. "runs a task again after an interrupted attempt, even when it has no retry" says
+  what happened and what follows; "re-runs a replayed running task as the same attempt" makes the
+  reader decode which statuses and counters mean that.
 
 ## Concurrency
 
