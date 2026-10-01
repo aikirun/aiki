@@ -1,9 +1,11 @@
 import type { DatabaseConfig } from "@aikirun/lib/db";
-import type { CreateDatabase, Database } from "@aikirun/types/infra/db";
+import type { CreateDatabase, Database, DatabaseCloseOptions } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
 import type { PgClient } from "./pg/provider";
 import type { SqliteClient } from "./sqlite/client";
+
+const DEFAULT_CLOSE_TIMEOUT_MS = 5_000;
 
 export function database(config: DatabaseConfig): CreateDatabase {
 	let createDbPromise: Promise<Database> | undefined;
@@ -35,7 +37,7 @@ export function database(config: DatabaseConfig): CreateDatabase {
 	};
 
 	return Object.assign(createDbFn, {
-		close: async (): Promise<void> => {
+		close: async (options?: DatabaseCloseOptions): Promise<void> => {
 			if (!createDbPromise) {
 				return;
 			}
@@ -48,7 +50,8 @@ export function database(config: DatabaseConfig): CreateDatabase {
 				}
 				case "pg": {
 					const client = db[INTERNAL].client as PgClient;
-					await client.end();
+					const timeoutMs = options?.timeoutMs ?? DEFAULT_CLOSE_TIMEOUT_MS;
+					await client.end({ timeout: timeoutMs / 1_000 });
 					return;
 				}
 				// case "mysql":

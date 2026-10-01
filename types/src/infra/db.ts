@@ -7,7 +7,15 @@ export interface Database {
 	readonly [INTERNAL]: { client: unknown };
 }
 
+export interface DatabaseCloseOptions {
+	/**
+	 * How long to wait for queries that are still running before closing the connections
+	 * (default: 5 seconds).
+	 */
+	timeoutMs?: number;
+}
+
 export interface CreateDatabase {
 	(): Promise<Database>;
-	close(): Promise<void>;
+	close(options?: DatabaseCloseOptions): Promise<void>;
 }
