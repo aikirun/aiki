@@ -79,7 +79,7 @@ export async function createHandler(params: CreateHandlerParams) {
 		imminentRunTimerQueue,
 	});
 	const workflowService = createWorkflowService({ repos });
-	const scheduleService = createScheduleService({ repos });
+	const scheduleService = createScheduleService({ repos, imminentRunTimerQueue });
 	const taskService = createTaskService({ repos });
 	const eventService = createEventService({ repos, workflowRunStateMachine });
 	const workflowRunOutboxService = createWorkflowRunOutboxService({ repos });

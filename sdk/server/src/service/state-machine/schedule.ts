@@ -6,6 +6,7 @@ import { ulid } from "ulidx";
 import { InvalidScheduleStateTransitionError } from "../../errors";
 import type { TxRepositories } from "../../infra/db/types";
 import type { ScheduleRow, ScheduleRowUpdate } from "../../infra/db/types/schedule";
+import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
 
 const scheduleStateTransitionValidator: Record<
 	ScheduleStatus,
@@ -45,7 +46,8 @@ export async function writeScheduleStateInTx(
 			| "definitionHash"
 			| "referenceId"
 		>;
-	}
+	},
+	imminentRunTimerQueue?: ImminentRunTimerQueue
 ): Promise<ScheduleRow> {
 	const transitionId = ulid();
 	const row = await txRepos.schedule.update(
@@ -67,12 +69,22 @@ export async function writeScheduleStateInTx(
 		revision: row.revision,
 		state: params.state,
 	});
+
+	if (imminentRunTimerQueue && params.state.status === "active") {
+		txRepos.onCommit(() =>
+			imminentRunTimerQueue.add([
+				{ type: "recurring", id: row.id, dueAt: row.nextRunAt, priority: row.workflowRunOptions?.priority },
+			])
+		);
+	}
+
 	return row;
 }
 
 export async function transitionScheduleInTx(
 	txRepos: TxRepositories,
-	params: { namespaceId: NamespaceId; id: string; state: ScheduleState }
+	params: { namespaceId: NamespaceId; id: string; state: ScheduleState },
+	imminentRunTimerQueue?: ImminentRunTimerQueue
 ): Promise<void> {
 	const { namespaceId, id, state } = params;
 	const existing = await txRepos.schedule.get(namespaceId, { id }, { lock: "update" });
@@ -83,5 +95,5 @@ export async function transitionScheduleInTx(
 		return;
 	}
 	assertIsValidScheduleStateTransition(id, existing.status, state);
-	await writeScheduleStateInTx(txRepos, params);
+	await writeScheduleStateInTx(txRepos, params, imminentRunTimerQueue);
 }

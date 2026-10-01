@@ -17,6 +17,7 @@ import { getOrCreateWorkflowInTx } from "./workflow";
 import { ScheduleConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleRow } from "../infra/db/types/schedule";
+import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 import { candidateHashes } from "../lib/hash";
 
 export function getReferenceId(scheduleId: string, occurrence: number) {
@@ -145,15 +146,18 @@ export function getNextOccurrence(spec: ScheduleSpec, anchor: number): number {
 
 export interface ScheduleServiceDeps {
 	repos: Repositories;
+	imminentRunTimerQueue?: ImminentRunTimerQueue;
 }
 
-export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
+export const createScheduleService = ({ repos, imminentRunTimerQueue }: ScheduleServiceDeps) => ({
 	async activateSchedule(
 		namespaceId: NamespaceId,
 		request: ScheduleActivateRequestV1
 	): Promise<{ schedule: Schedule }> {
 		const definitionHashes = await hashScheduleDefinitions(request);
-		return repos.transaction(async (txRepos) => activateScheduleInTx(namespaceId, request, definitionHashes, txRepos));
+		return repos.transaction(async (txRepos) =>
+			activateScheduleInTx(namespaceId, request, definitionHashes, txRepos, imminentRunTimerQueue)
+		);
 	},
 
 	async getScheduleById(namespaceId: NamespaceId, id: string) {
@@ -224,11 +228,15 @@ export const createScheduleService = ({ repos }: ScheduleServiceDeps) => ({
 
 	async resumeSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
 		await repos.transaction((txRepos) =>
-			transitionScheduleInTx(txRepos, {
-				namespaceId,
-				id,
-				state: { status: "active", reason: "resumed" },
-			})
+			transitionScheduleInTx(
+				txRepos,
+				{
+					namespaceId,
+					id,
+					state: { status: "active", reason: "resumed" },
+				},
+				imminentRunTimerQueue
+			)
 		);
 	},
 
@@ -275,7 +283,8 @@ async function activateScheduleInTx(
 	namespaceId: NamespaceId,
 	request: ScheduleActivateRequestV1,
 	definitionHashes: Hash,
-	txRepos: TxRepositories
+	txRepos: TxRepositories,
+	imminentRunTimerQueue?: ImminentRunTimerQueue
 ) {
 	const { workflowName, workflowVersionId, workflowRunOptions, spec, options } = request;
 	const currentDefinitionHash = definitionHashes.value;
@@ -315,21 +324,29 @@ async function activateScheduleInTx(
 		);
 
 		const schedule = existingScheduleByDefinition
-			? await activateExistingSchedule(txRepos, {
-					namespaceId,
-					existing: existingScheduleByDefinition,
-					payload,
-					nextDefinitionHash: definitionHashes.nextValue,
-				})
-			: await createSchedule(txRepos, {
-					namespaceId,
-					workflowId: workflowRow.id,
-					spec,
-					payload,
-					referenceId: undefined,
-					workflowRunOptions,
-					nextRunAt,
-				});
+			? await activateExistingSchedule(
+					txRepos,
+					{
+						namespaceId,
+						existing: existingScheduleByDefinition,
+						payload,
+						nextDefinitionHash: definitionHashes.nextValue,
+					},
+					imminentRunTimerQueue
+				)
+			: await createSchedule(
+					txRepos,
+					{
+						namespaceId,
+						workflowId: workflowRow.id,
+						spec,
+						payload,
+						referenceId: undefined,
+						workflowRunOptions,
+						nextRunAt,
+					},
+					imminentRunTimerQueue
+				);
 
 		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 	}
@@ -344,12 +361,16 @@ async function activateScheduleInTx(
 			return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
 		}
 
-		const schedule = await activateExistingSchedule(txRepos, {
-			namespaceId,
-			existing: existingScheduleByReference,
-			payload,
-			nextDefinitionHash: definitionHashes.nextValue,
-		});
+		const schedule = await activateExistingSchedule(
+			txRepos,
+			{
+				namespaceId,
+				existing: existingScheduleByReference,
+				payload,
+				nextDefinitionHash: definitionHashes.nextValue,
+			},
+			imminentRunTimerQueue
+		);
 
 		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 	}
@@ -362,25 +383,33 @@ async function activateScheduleInTx(
 	);
 
 	if (existingNonReferencedSchedule) {
-		const schedule = await activateExistingSchedule(txRepos, {
-			namespaceId,
-			existing: existingNonReferencedSchedule,
-			payload,
-			nextDefinitionHash: definitionHashes.nextValue,
-			referenceIdToAttach: referenceId,
-		});
+		const schedule = await activateExistingSchedule(
+			txRepos,
+			{
+				namespaceId,
+				existing: existingNonReferencedSchedule,
+				payload,
+				nextDefinitionHash: definitionHashes.nextValue,
+				referenceIdToAttach: referenceId,
+			},
+			imminentRunTimerQueue
+		);
 		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 	}
 
-	const schedule = await createSchedule(txRepos, {
-		namespaceId,
-		workflowId: workflowRow.id,
-		spec,
-		payload,
-		referenceId,
-		workflowRunOptions,
-		nextRunAt,
-	});
+	const schedule = await createSchedule(
+		txRepos,
+		{
+			namespaceId,
+			workflowId: workflowRow.id,
+			spec,
+			payload,
+			referenceId,
+			workflowRunOptions,
+			nextRunAt,
+		},
+		imminentRunTimerQueue
+	);
 
 	return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 }
@@ -393,7 +422,8 @@ async function activateExistingSchedule(
 		payload: SchedulePayload;
 		nextDefinitionHash: string | undefined;
 		referenceIdToAttach?: string;
-	}
+	},
+	imminentRunTimerQueue: ImminentRunTimerQueue | undefined
 ): Promise<ScheduleRow> {
 	// Callers lock the matching schedule before entering this function. A reference is supplied
 	// only after the locked lookup confirmed the schedule has none, so attaching it cannot
@@ -439,12 +469,16 @@ async function activateExistingSchedule(
 		return updatedRow;
 	}
 
-	return writeScheduleStateInTx(txRepos, {
-		namespaceId: params.namespaceId,
-		id: existing.id,
-		state: { status: "active", reason: "reactivated" },
-		updates,
-	});
+	return writeScheduleStateInTx(
+		txRepos,
+		{
+			namespaceId: params.namespaceId,
+			id: existing.id,
+			state: { status: "active", reason: "reactivated" },
+			updates,
+		},
+		imminentRunTimerQueue
+	);
 }
 
 async function createSchedule(
@@ -457,7 +491,8 @@ async function createSchedule(
 		referenceId: string | undefined;
 		workflowRunOptions: WorkflowRunOptions | undefined;
 		nextRunAt: TimestampMs;
-	}
+	},
+	imminentRunTimerQueue: ImminentRunTimerQueue | undefined
 ): Promise<ScheduleRow> {
 	const { spec, payload } = params;
 	const transitionId = ulid();
@@ -488,6 +523,20 @@ async function createSchedule(
 		revision: created.revision,
 		state: { status: "active", reason: "activated" },
 	});
+
+	if (imminentRunTimerQueue) {
+		txRepos.onCommit(() =>
+			imminentRunTimerQueue.add([
+				{
+					type: "recurring",
+					id: created.id,
+					dueAt: created.nextRunAt,
+					priority: params.workflowRunOptions?.priority,
+				},
+			])
+		);
+	}
+
 	return created;
 }
 
