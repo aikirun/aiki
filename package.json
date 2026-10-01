@@ -24,6 +24,7 @@
 	],
 	"scripts": {
 		"check": "tsc --noEmit -p tsconfig.check.json && tsc --noEmit -p app/dashboard/tsconfig.json && bun run --cwd app/website check",
+		"smoke-test:packages": "bun scripts/smoke-test-packages.ts",
 		"lint": "bunx @biomejs/biome check .",
 		"lint:fix": "bunx @biomejs/biome check --write .",
 		"test:unit": "bun test --concurrent $(find . -name '*.test.ts' -not -name '*.integration.test.ts' -not -path '*/node_modules/*' -not -path '*/dist/*')",
