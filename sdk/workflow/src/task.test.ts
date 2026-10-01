@@ -462,13 +462,66 @@ describe("task", () => {
 				expect(handlerCalls).toBe(1);
 			}));
 
-		test("does not retry a replayed task whose stored options have no retry", () =>
+		test("runs a task again after an interrupted attempt, even when it has no retry", () =>
 			withFakeClient(async (client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
 
-				// The definition carries a retry, but the stored options do not — the stored
-				// options are the ones that count.
-				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				let handlerCalls = 0;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						handlerCalls++;
+						return "charged";
+					},
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name, attempts: 1 });
+				const recordWithTask = { ...runRecord, tasks: { [address]: [runningTaskInfo] } };
+				const run = createTestWorkflowRun(client, recordWithTask);
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "retry",
+							id: runningTaskInfo.id,
+							attempts: 1,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: { status: "completed", output: asOpaquePayload("charged") },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{
+							taskInfo: completedTaskInfoFactory.build({
+								id: runningTaskInfo.id,
+								name: chargeCard.name,
+								attempts: 1,
+								state: { output: asOpaquePayload("charged") },
+							}),
+						}
+					);
+
+				expect(await chargeCard.start(run, input)).toBe("charged");
+				expect(handlerCalls).toBe(1);
+			}));
+
+		test("does not use up a retry when an attempt is interrupted", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+
+				const retry = { type: "fixed", maxAttempts: 2, delayMs: 60_000 } as const;
 				let handlerCalls = 0;
 				const chargeCard = task<{ cardId: string }, string>({
 					name: "charge-card",
@@ -482,12 +535,47 @@ describe("task", () => {
 				const input = { cardId: "card-1" };
 				const inputHash = await hashInput(input);
 				const address = getCompositeId({ name: chargeCard.name, referenceId: inputHash });
-				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({ name: chargeCard.name });
-				const recordWithTask = { ...runRecord, tasks: { [address]: [awaitingRetryTaskInfo] } };
+				const runningTaskInfo = runningTaskInfoFactory.build({
+					name: chargeCard.name,
+					options: { retry },
+					attempts: 2,
+				});
+				const recordWithTask = { ...runRecord, tasks: { [address]: [runningTaskInfo] } };
 				const run = createTestWorkflowRun(client, recordWithTask);
 
-				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
-				expect(handlerCalls).toBe(0);
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "retry",
+							id: runningTaskInfo.id,
+							attempts: 2,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 2,
+							state: { status: "completed", output: asOpaquePayload("charged") },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{
+							taskInfo: completedTaskInfoFactory.build({
+								id: runningTaskInfo.id,
+								name: chargeCard.name,
+								attempts: 2,
+								state: { output: asOpaquePayload("charged") },
+							}),
+						}
+					);
+
+				expect(await chargeCard.start(run, input)).toBe("charged");
+				expect(handlerCalls).toBe(1);
 			}));
 
 		test("fails the task and throws TaskFailedError when there is no retry budget", () =>

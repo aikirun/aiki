@@ -241,9 +241,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		existingTaskState.status satisfies "running" | "awaiting_retry";
 
-		const attempts = existingTaskInfo.attempts;
+		let attempts = existingTaskInfo.attempts;
+		if (existingTaskState.status === "running") {
+			// The attempt was interrupted before it produced a result, so it runs again as the same attempt.
+			attempts -= 1;
+		}
 		const retryStrategy = existingTaskInfo.options?.retry ?? { type: "never" };
-		this.assertRetryAttemptsLeft(existingTaskInfo.id as TaskId, attempts, retryStrategy, logger);
 		if (existingTaskState.status === "awaiting_retry") {
 			await this.assertRetryIsDue(
 				handle,
@@ -422,23 +425,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			error: createSerializableError(err),
 		});
 		throw err;
-	}
-
-	private assertRetryAttemptsLeft(
-		taskId: TaskId,
-		attempts: number,
-		retryStrategy: RetryStrategy,
-		logger: Logger
-	): void {
-		const retryParams = getRetryParams(attempts, retryStrategy);
-		if (!retryParams.retriesLeft) {
-			logger.error("Task retry not allowed", {
-				"aiki.taskName": this.name,
-				"aiki.taskId": taskId,
-				"aiki.attempts": attempts,
-			});
-			throw new TaskFailedError(taskId, attempts, "Task retry not allowed");
-		}
 	}
 
 	private async assertRetryIsDue(

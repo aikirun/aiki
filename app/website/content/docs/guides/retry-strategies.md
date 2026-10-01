@@ -17,7 +17,7 @@ retry: { type: "never" }
 
 **Use when:**
 - Operations that shouldn't be retried (e.g., user input validation)
-- Non-idempotent operations that can't safely be repeated
+- Operations that are unsafe to repeat once they have failed. An attempt interrupted by a crash still runs again, so `never` does not mean a task runs at most once.
 - You want manual control over retry logic
 
 ### Fixed
