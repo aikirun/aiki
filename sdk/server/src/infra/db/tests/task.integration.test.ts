@@ -295,10 +295,12 @@ describe("task repository listByWorkflowRunIdsAndStatuses", () => {
 			);
 
 			const awaitingRetryRows = await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["awaiting_retry"]);
-			expect([...awaitingRetryRows].sort(orderById)).toEqual([
-				{ id: taskInfo.id, workflowRunId: runId, attempts: 1, status: "awaiting_retry" },
-				{ id: siblingTaskInfo.id, workflowRunId: runId, attempts: 1, status: "awaiting_retry" },
-			]);
+			expect([...awaitingRetryRows].sort(orderById)).toEqual(
+				[
+					{ id: taskInfo.id, workflowRunId: runId, attempts: 1, status: "awaiting_retry" as const },
+					{ id: siblingTaskInfo.id, workflowRunId: runId, attempts: 1, status: "awaiting_retry" as const },
+				].sort(orderById)
+			);
 			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["running"])).toEqual([
 				{ id: runningTask.taskInfo.id, workflowRunId: runId, attempts: 1, status: "running" },
 			]);
@@ -312,10 +314,12 @@ describe("task repository listByWorkflowRunIdsAndStatuses", () => {
 
 			const rows = await repos.task.listByWorkflowRunIdsAndStatuses([firstRun.runId, secondRun.runId], ["running"]);
 
-			expect([...rows].sort(orderById)).toEqual([
-				{ id: firstRun.taskInfo.id, workflowRunId: firstRun.runId, attempts: 1, status: "running" },
-				{ id: secondRun.taskInfo.id, workflowRunId: secondRun.runId, attempts: 1, status: "running" },
-			]);
+			expect([...rows].sort(orderById)).toEqual(
+				[
+					{ id: firstRun.taskInfo.id, workflowRunId: firstRun.runId, attempts: 1, status: "running" as const },
+					{ id: secondRun.taskInfo.id, workflowRunId: secondRun.runId, attempts: 1, status: "running" as const },
+				].sort(orderById)
+			);
 		}));
 });
 
