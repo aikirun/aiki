@@ -20,7 +20,10 @@ Create a project:
 mkdir aiki-quickstart && cd aiki-quickstart
 npm init -y
 npm pkg set type=module
+npm install --save-dev tsx
 ```
+
+The last line installs `tsx`, which runs TypeScript files on Node.
 
 </Tab>
 <Tab value="Bun">
@@ -152,11 +155,19 @@ const aikiServer = server({
   db: database({ provider: "sqlite", path: "./aiki.db" }),
   timerPriorityQueue: inMemoryTimerPriorityQueue(),
 });
-aikiServer.runtime.start();
-serve({ port: 9850, fetch: aikiServer.handler });
+const runtimeHandle = aikiServer.runtime.start();
+serve({ port: 9850, hostname: "127.0.0.1", fetch: aikiServer.handler });
 
 const aikiClient = client({ handler: aikiServer.handler });
-worker({ workflows: [trialV1] }).start(aikiClient);
+const workerHandle = worker({ workflows: [trialV1] }).start(aikiClient);
+
+const shutdown = async () => {
+  await workerHandle.stop();
+  await runtimeHandle.stop();
+  process.exit(0);
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 ```
 
 </Tab>
@@ -174,19 +185,28 @@ const aikiServer = server({
   db: database({ provider: "pg", url: "postgresql://user:password@your-db-host:5432/aiki" }),
   timerPriorityQueue: inMemoryTimerPriorityQueue(),
 });
-aikiServer.runtime.start();
-serve({ port: 9850, fetch: aikiServer.handler });
+const runtimeHandle = aikiServer.runtime.start();
+serve({ port: 9850, hostname: "127.0.0.1", fetch: aikiServer.handler });
 
 const aikiClient = client({ handler: aikiServer.handler });
-worker({ workflows: [trialV1] }).start(aikiClient);
+const workerHandle = worker({ workflows: [trialV1] }).start(aikiClient);
+
+const shutdown = async () => {
+  await workerHandle.stop();
+  await runtimeHandle.stop();
+  process.exit(0);
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 ```
 
 </Tab>
 </Tabs>
 
 - `runtime.start()` runs the server's background loops, and the timer priority queue lets them wake a run the moment it's ready.
-- `serve(...)` puts the server on http://localhost:9850, so your scripts and the dashboard can reach it.
-- The worker executes your workflows. Its client calls the server inside the same process.
+- `serve(...)` puts the server on http://localhost:9850, so the scripts in the next steps and the dashboard can reach it. `hostname: "127.0.0.1"` lets only programs on your machine connect, because the server in this guide runs without authentication.
+- The worker executes your workflows. Its client calls the server inside the same process, with no network hop.
+- When you stop the app, for example with Ctrl+C, `shutdown` [stops the worker](../core-concepts/workers.md#graceful-shutdown) and the runtime before the app exits.
 
 Start the app and leave it running:
 
@@ -211,14 +231,31 @@ bun app.ts
 
 The dashboard is a web page that shows your runs. It reads them from the server your app serves on port 9850. With [Docker](https://docs.docker.com/get-docker/), start it in a new terminal:
 
+<Tabs groupId="docker" persist items={["Docker Desktop", "Docker Engine on Linux"]}>
+<Tab value="Docker Desktop">
+
 ```bash
-docker run --rm -p 9851:9851 \
-  --add-host=host.docker.internal:host-gateway \
+docker run --rm -p 127.0.0.1:9851:9851 \
   -e AIKI_SERVER_UPSTREAM_URL=http://host.docker.internal:9850 \
   ghcr.io/aikirun/dashboard:latest
 ```
 
-The dashboard runs inside a container, where `localhost` means the container itself. `host.docker.internal` is how it reaches your app.
+`AIKI_SERVER_UPSTREAM_URL` tells the dashboard where your app is. It can't be `localhost`: the dashboard runs inside a container, where `localhost` means the container itself. `host.docker.internal` is the name Docker gives your machine. `-p 127.0.0.1:9851:9851` opens the dashboard on port 9851, to your machine only.
+
+</Tab>
+<Tab value="Docker Engine on Linux">
+
+```bash
+docker run --rm --network host \
+  -e AIKI_DASHBOARD_HOST=127.0.0.1 \
+  -e AIKI_SERVER_UPSTREAM_URL=http://127.0.0.1:9850 \
+  ghcr.io/aikirun/dashboard:latest
+```
+
+`AIKI_SERVER_UPSTREAM_URL` tells the dashboard where your app is. On Linux a container has its own network, and your app only accepts connections from your machine. `--network host` runs the dashboard on your machine's network instead, and `AIKI_DASHBOARD_HOST=127.0.0.1` opens it to your machine only.
+
+</Tab>
+</Tabs>
 
 Open http://localhost:9851. The list of runs is empty for now. Reload the page after each of the next steps to follow the run.
 
@@ -254,7 +291,7 @@ bun start.ts
 </Tab>
 </Tabs>
 
-It prints the run's id; keep it for step 6. In the app's terminal you'll see:
+The last line it prints is the run's id; keep it for step 6. In the app's terminal, among Aiki's own log lines for the run, you'll see the line `activateTrial` printed:
 
 ```
 Activated 14-day trial for user-123

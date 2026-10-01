@@ -1,5 +1,5 @@
 server {
-    listen 9851;
+    listen ${AIKI_DASHBOARD_HOST}:9851;
     server_name localhost;
     root /usr/share/nginx/html;
     index index.html;
@@ -10,7 +10,8 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
-    # ${AIKI_SERVER_UPSTREAM_URL} is substituted by the nginx entrypoint at container start;
+    # ${AIKI_DASHBOARD_HOST} and ${AIKI_SERVER_UPSTREAM_URL} are substituted by the
+    # nginx entrypoint at container start;
     # the runtime nginx variables ($host, $uri, ...) are left untouched because
     # envsubst only replaces variables defined in the environment
     proxy_set_header Host $host;

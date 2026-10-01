@@ -333,6 +333,7 @@ These apply to the standalone server and the dashboard. If you embed the server 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `AIKI_SERVER_UPSTREAM_URL` | If using the docker image | — | Server address the dashboard docker image proxies to; read at container start |
+| `AIKI_DASHBOARD_HOST` | No | `0.0.0.0` | Address the dashboard docker image listens on. Set `127.0.0.1` when the container runs with `--network host`, so it accepts connections from this machine only. Keep the default when you publish the port with `-p` |
 | `AIKI_DASHBOARD_PORT` | No | `9851` | Port for the dashboard |
 | `VITE_AIKI_SERVER_URL` | If on a static host | — | Build-time server URL for a dashboard served outside the docker image |
 
