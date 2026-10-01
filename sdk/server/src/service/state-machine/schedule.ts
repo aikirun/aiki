@@ -6,7 +6,7 @@ import { ulid } from "ulidx";
 import { InvalidScheduleStateTransitionError } from "../../errors";
 import type { TxRepositories } from "../../infra/db/types";
 import type { ScheduleRow, ScheduleRowUpdate } from "../../infra/db/types/schedule";
-import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
+import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-timer-queue";
 
 const scheduleStateTransitionValidator: Record<
 	ScheduleStatus,

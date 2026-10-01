@@ -14,7 +14,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import type { Capabilities } from "./capabilities";
 import { defaultServerHandlerConfig, type ServerHandlerConfig, type ServerHandlerConfigOverrides } from "./config";
 import { createRepos } from "./infra/db/repo";
-import { createImminentRunTimerQueue } from "./infra/timer/imminent-run-timer-queue";
+import { createImminentRunTimerQueue } from "./infra/timer/imminent-timer-queue";
 import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
 import { createNamespaceAuthedRouter } from "./router/index";
 import { createChildRunCanceller } from "./service/cancel-child-runs";

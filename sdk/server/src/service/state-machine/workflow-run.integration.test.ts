@@ -13,7 +13,7 @@ import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-ru
 import { processImminentSleepElapsedRuns } from "../../daemon/imminent-sleep-elapsed-runs";
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
 import type { Repositories, TxRepositories } from "../../infra/db/types";
-import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
+import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../../infra/timer/imminent-timer-queue";
 import { computeRank } from "../../lib/rank";
 import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";

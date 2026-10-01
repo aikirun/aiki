@@ -10,7 +10,7 @@ import { describe, expect, test } from "vitest";
 import { createScheduleService, type ScheduleService } from "./schedule";
 import { InvalidScheduleStateTransitionError } from "../errors";
 import type { Repositories } from "../infra/db/types";
-import { createImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import { createImminentRunTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { computeRank } from "../lib/rank";
 import { withFakeClock } from "../testing/clock";
 import { createServiceHarness, withRepos } from "../testing/harness";

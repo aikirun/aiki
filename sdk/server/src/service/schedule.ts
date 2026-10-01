@@ -17,7 +17,7 @@ import { getOrCreateWorkflowInTx } from "./workflow";
 import { ScheduleConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleRow } from "../infra/db/types/schedule";
-import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import type { ImminentRunTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { candidateHashes } from "../lib/hash";
 
 export function getReferenceId(scheduleId: string, occurrence: number) {

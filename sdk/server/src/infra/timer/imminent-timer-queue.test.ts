@@ -3,7 +3,7 @@ import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { describe, expect, test } from "vitest";
 
-import { createImminentRunTimerQueue } from "./imminent-run-timer-queue";
+import { createImminentRunTimerQueue } from "./imminent-timer-queue";
 import { computeRank } from "../../lib/rank";
 
 function createQueues(lookaheadWindowMs: number) {

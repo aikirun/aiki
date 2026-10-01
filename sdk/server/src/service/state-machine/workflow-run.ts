@@ -18,7 +18,7 @@ import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
 import type { Repositories, TxRepositories } from "../../infra/db/types";
-import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
+import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-timer-queue";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import type { ChildRunCanceller } from "../cancel-child-runs";
 import { deliverTerminatedSignalToParentRun } from "../deliver-terminated-signals";

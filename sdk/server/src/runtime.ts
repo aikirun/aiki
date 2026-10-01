@@ -8,7 +8,7 @@ import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 import { defaultServerRuntimeConfig, type ServerRuntimeConfig, type ServerRuntimeConfigOverrides } from "./config";
 import { startDaemons } from "./daemon";
 import { createRepos } from "./infra/db/repo";
-import { createImminentRunTimerQueue } from "./infra/timer/imminent-run-timer-queue";
+import { createImminentRunTimerQueue } from "./infra/timer/imminent-timer-queue";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 
 export interface StartRuntimeParams {

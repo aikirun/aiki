@@ -44,7 +44,7 @@ import type { EventWaitRow } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { ChildRunWithWorkflow, WorkflowRunWithWorkflowAndState } from "../infra/db/types/workflow-run";
-import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import type { ImminentRunTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { candidateHashes } from "../lib/hash";
 import type { NamespaceRequestContext } from "../middleware/context";
 import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
