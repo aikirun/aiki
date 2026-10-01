@@ -1,11 +1,17 @@
 import { createBinaryLatch } from "@aikirun/lib/async";
+import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
+import { noopLogger } from "@aikirun/lib/logger";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { describe, expect, test } from "vitest";
 
 import { createScheduleService, type ScheduleService } from "./schedule";
 import { InvalidScheduleStateTransitionError } from "../errors";
 import type { Repositories } from "../infra/db/types";
+import { createImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
+import { computeRank } from "../lib/rank";
 import { withFakeClock } from "../testing/clock";
 import { createServiceHarness, withRepos } from "../testing/harness";
 
@@ -609,6 +615,132 @@ describe("ScheduleService activateSchedule and the next run", () => {
 					nextRunAt: unreferenced.nextRunAt,
 				})
 			);
+		}));
+
+	test("adds a new schedule's timer to the priority queue when its first run is within the lookahead", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const scheduleService = createScheduleService({
+				repos,
+				imminentTimerQueue: createImminentTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				}),
+			});
+			const workflowRunInput = { region: "eu-west" };
+
+			const activatedAt = Date.now() as TimestampMs;
+			const { schedule } = await withFakeClock(activatedAt, async () =>
+				scheduleService.activateSchedule(context.namespaceId, {
+					workflowName: "send-invoices",
+					workflowVersionId: "v1",
+					workflowRunInput: asOpaquePayload(workflowRunInput),
+					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					spec: { type: "interval", everyMs: 5_000 },
+				})
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: activatedAt + 5_000 }) },
+			]);
+		}));
+
+	test("adds no timer for a new schedule whose first run is beyond the lookahead", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const scheduleService = createScheduleService({
+				repos,
+				imminentTimerQueue: createImminentTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				}),
+			});
+			const workflowRunInput = { region: "eu-west" };
+
+			await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			});
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([]);
+		}));
+
+	test("resuming a paused schedule adds its timer to the priority queue when its next run is due within the lookahead", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const scheduleService = createScheduleService({
+				repos,
+				imminentTimerQueue: createImminentTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				}),
+			});
+			const workflowRunInput = { region: "eu-west" };
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			});
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
+
+			// Two periods on
+			await withFakeClock(schedule.nextRunAt + 120_000, () =>
+				scheduleService.resumeSchedule(context.namespaceId, schedule.id)
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: schedule.nextRunAt }) },
+			]);
+		}));
+
+	test("activating a deactivated schedule again adds its timer to the priority queue when its next run is due within the lookahead", () =>
+		withHarness(async ({ context, repos }) => {
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const scheduleService = createScheduleService({
+				repos,
+				imminentTimerQueue: createImminentTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					logger: noopLogger,
+				}),
+			});
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			};
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
+
+			// Two periods on
+			await withFakeClock(schedule.nextRunAt + 120_000, () =>
+				scheduleService.activateSchedule(context.namespaceId, request)
+			);
+
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: schedule.nextRunAt }) },
+			]);
 		}));
 });
 

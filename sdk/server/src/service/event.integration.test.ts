@@ -9,7 +9,7 @@ import { describe, expect, test } from "vitest";
 
 import { createWorkflowRunStateMachine } from "./state-machine/workflow-run";
 import type { Repositories } from "../infra/db/types";
-import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import { createImminentTimerQueue, type ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { computeRank } from "../lib/rank";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createEventService } from "../service/event";
@@ -19,9 +19,9 @@ import { seedAwaitingEventRun, seedClaimedRun, seedSleepingRun } from "../testin
 
 const withHarness = createServiceHarness();
 
-function createService(repos: Repositories, imminentRunTimerQueue?: ImminentRunTimerQueue) {
+function createService(repos: Repositories, imminentTimerQueue?: ImminentTimerQueue) {
 	const childRunCanceller = createChildRunCanceller();
-	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller, imminentRunTimerQueue });
+	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller, imminentTimerQueue });
 	return createEventService({ repos, workflowRunStateMachine });
 }
 
@@ -195,7 +195,7 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const eventService = createService(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,

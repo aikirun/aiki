@@ -14,7 +14,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import type { Capabilities } from "./capabilities";
 import { defaultServerHandlerConfig, type ServerHandlerConfig, type ServerHandlerConfigOverrides } from "./config";
 import { createRepos } from "./infra/db/repo";
-import { createImminentRunTimerQueue } from "./infra/timer/imminent-run-timer-queue";
+import { createImminentTimerQueue } from "./infra/timer/imminent-timer-queue";
 import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
 import { createNamespaceAuthedRouter } from "./router/index";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
@@ -54,15 +54,15 @@ export async function createHandler(params: CreateHandlerParams) {
 	const timerPriorityQueue = params.timerPriorityQueue?.({
 		logger: logger.child({ "aiki.subComponent": "timer-priority-queue" }),
 	});
-	const imminentRunTimerQueue =
+	const imminentTimerQueue =
 		timerPriorityQueue &&
-		createImminentRunTimerQueue({
+		createImminentTimerQueue({
 			timerPriorityQueue,
 			configProvider: configProvider.scope("imminentRuns"),
 			logger,
 		});
 
-	const childRunCanceller = createChildRunCanceller(imminentRunTimerQueue);
+	const childRunCanceller = createChildRunCanceller(imminentTimerQueue);
 
 	const apiAuthorizer = (iam?.api ?? noopApiAuthorizer)({ logger });
 	const dashboardIam = iam?.dashboard?.({ logger });
@@ -70,16 +70,16 @@ export async function createHandler(params: CreateHandlerParams) {
 	const workflowRunStateMachine = createWorkflowRunStateMachine({
 		repos,
 		childRunCanceller,
-		imminentRunTimerQueue,
+		imminentTimerQueue,
 	});
 	const taskStateMachine = createTaskStateMachine({ repos });
 	const workflowRunService = createWorkflowRunService({
 		repos,
 		childRunCanceller,
-		imminentRunTimerQueue,
+		imminentTimerQueue,
 	});
 	const workflowService = createWorkflowService({ repos });
-	const scheduleService = createScheduleService({ repos });
+	const scheduleService = createScheduleService({ repos, imminentTimerQueue });
 	const taskService = createTaskService({ repos });
 	const eventService = createEventService({ repos, workflowRunStateMachine });
 	const workflowRunOutboxService = createWorkflowRunOutboxService({ repos });

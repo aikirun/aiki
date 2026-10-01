@@ -13,7 +13,7 @@ import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-ru
 import { processImminentSleepElapsedRuns } from "../../daemon/imminent-sleep-elapsed-runs";
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
 import type { Repositories, TxRepositories } from "../../infra/db/types";
-import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../../infra/timer/imminent-run-timer-queue";
+import { createImminentTimerQueue, type ImminentTimerQueue } from "../../infra/timer/imminent-timer-queue";
 import { computeRank } from "../../lib/rank";
 import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
@@ -28,8 +28,8 @@ const withHarness = createServiceHarness();
 
 const daemonContext = daemonContextFactory.build();
 
-function createStateMachine(repos: Repositories, imminentRunTimerQueue?: ImminentRunTimerQueue) {
-	return createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller(), imminentRunTimerQueue });
+function createStateMachine(repos: Repositories, imminentTimerQueue?: ImminentTimerQueue) {
+	return createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller(), imminentTimerQueue });
 }
 
 describe("WorkflowRunStateMachine transition preconditions", () => {
@@ -933,7 +933,7 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1091,7 +1091,7 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 				const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 				const stateMachine = createStateMachine(
 					repos,
-					createImminentRunTimerQueue({
+					createImminentTimerQueue({
 						timerPriorityQueue,
 						configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 						logger: noopLogger,
@@ -1138,7 +1138,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1166,7 +1166,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1201,7 +1201,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1241,7 +1241,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1274,7 +1274,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1308,7 +1308,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1337,7 +1337,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1371,7 +1371,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -1408,7 +1408,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const stateMachine = createStateMachine(
 				repos,
-				createImminentRunTimerQueue({
+				createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,

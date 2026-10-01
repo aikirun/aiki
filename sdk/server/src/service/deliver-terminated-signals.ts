@@ -12,7 +12,7 @@ import { ulid } from "ulidx";
 
 import type { TxRepositories } from "../infra/db/types";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
-import type { ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
+import type { ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 
 export interface TerminatedChildRun {
 	namespaceId: NamespaceId;
@@ -33,7 +33,7 @@ export async function deliverTerminatedSignalToParentRun(
 	now: TimestampMs,
 	txRepos: TxRepositories,
 	logger: Logger,
-	imminentRunTimerQueue: ImminentRunTimerQueue | undefined
+	imminentTimerQueue: ImminentTimerQueue | undefined
 ): Promise<void> {
 	const parentsRunsById = new Map<WorkflowRunId, { namespaceId: NamespaceId; id: WorkflowRunId }>();
 	for (const run of runs) {
@@ -142,9 +142,9 @@ export async function deliverTerminatedSignalToParentRun(
 		await txRepos.stateTransition.appendBatch(parentRunStateTransitionEntriesToInsert);
 	}
 
-	if (imminentRunTimerQueue) {
+	if (imminentTimerQueue) {
 		txRepos.onCommit(() =>
-			imminentRunTimerQueue.add(
+			imminentTimerQueue.add(
 				asNonEmptyArray(
 					scheduledParentRunIds.map((id) => ({
 						type: "scheduled",
