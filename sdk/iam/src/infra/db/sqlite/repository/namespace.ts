@@ -66,6 +66,7 @@ export const createNamespaceRepository = (db: SqliteDb): NamespaceRepository => 
 				id: namespace.id,
 				name: namespace.name,
 				organizationId: namespace.organizationId,
+				memberCount: namespace.memberCount,
 				status: namespace.status,
 				createdAt: namespace.createdAt,
 				updatedAt: namespace.updatedAt,

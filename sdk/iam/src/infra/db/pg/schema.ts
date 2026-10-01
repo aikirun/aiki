@@ -1,6 +1,6 @@
 import { NAMESPACE_ROLES } from "@aikirun/types/namespace";
 import { sql } from "drizzle-orm";
-import { boolean, foreignKey, index, jsonb, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { timestampMs } from "./timestamp";
 import { API_KEY_STATUSES } from "../constants/api-key";
@@ -174,6 +174,7 @@ export const namespace = pgTable(
 		id: text("id").primaryKey(),
 		name: text("name").notNull(),
 		organizationId: text("organization_id").notNull(),
+		memberCount: integer("member_count").notNull().default(0),
 		status: namespaceStatusEnum("status").notNull().default("active"),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
@@ -195,6 +196,7 @@ export const namespaceMember = pgTable(
 		namespaceId: text("namespace_id").notNull(),
 		userId: text("user_id").notNull(),
 		role: namespaceRoleEnum("role").notNull().default("viewer"),
+		membershipKey: text("membership_key").unique("uq_namespace_member_membership_key"),
 		createdAt: timestampMs("created_at").notNull().default(sql`now()`),
 		updatedAt: timestampMs("updated_at").notNull().default(sql`now()`),
 	},

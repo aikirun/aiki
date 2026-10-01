@@ -15,6 +15,13 @@
 			"when": 1779757970475,
 			"tag": "0001_fancy_daredevil",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1790855439076,
+			"tag": "0002_even_mindworm",
+			"breakpoints": true
 		}
 	]
 }

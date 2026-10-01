@@ -69,7 +69,6 @@
 		"typescript": "^5.7.2"
 	},
 	"overrides": {
-		"better-auth": "1.6.11",
 		"mdast-util-to-markdown": "2.1.2"
 	}
 }

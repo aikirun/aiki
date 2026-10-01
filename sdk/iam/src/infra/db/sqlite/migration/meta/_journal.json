@@ -8,6 +8,13 @@
 			"when": 1790553900993,
 			"tag": "0000_last_chat",
 			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "6",
+			"when": 1790855439329,
+			"tag": "0001_far_silver_sable",
+			"breakpoints": true
 		}
 	]
 }
