@@ -9,7 +9,7 @@ import type { OpaquePayload } from "@aikirun/types/payload";
 import type { Schedule, ScheduleSpec } from "@aikirun/types/schedule";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
-import CronExpressionParser from "cron-parser";
+import { CronExpressionParser } from "cron-parser";
 import { ulid } from "ulidx";
 
 import { transitionScheduleInTx, writeScheduleStateInTx } from "./state-machine/schedule";
