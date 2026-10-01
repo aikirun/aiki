@@ -207,10 +207,10 @@ describe("withRetry", () => {
 	});
 
 	describe("shouldNotRetryOnError", () => {
-		test("re-throws when callback returns true", () => {
+		test("re-throws when callback returns true", async () => {
 			const thrownError = new Error("fatal");
 
-			expect(
+			await expect(
 				withRetry(
 					async () => {
 						throw thrownError;
@@ -233,10 +233,10 @@ describe("withRetry", () => {
 			expect(result).toEqual({ state: "timeout" });
 		});
 
-		test("supports async callback", () => {
+		test("supports async callback", async () => {
 			const fatal = new Error("fatal");
 
-			expect(
+			await expect(
 				withRetry(
 					async () => {
 						throw fatal;

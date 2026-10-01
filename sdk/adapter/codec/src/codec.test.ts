@@ -30,16 +30,16 @@ describe("codec", () => {
 	});
 
 	test("decode rejects a value that was not encoded", async () => {
-		expect(instance.decode({ name: "alice" })).rejects.toMatchObject({
+		await expect(instance.decode({ name: "alice" })).rejects.toMatchObject({
 			name: "InvalidEncodedValueError",
 			codecName: "test-codec",
 			message: 'Codec "test-codec" received a value that was not produced by encode',
 		});
-		expect(instance.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidEncodedValueError);
+		await expect(instance.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidEncodedValueError);
 	});
 
 	test("decode rejects a mismatched codec name", async () => {
-		expect(
+		await expect(
 			instance.decode({
 				codecName: "other-codec",
 				body: { wrapped: JSON.stringify({ name: "alice" }) },
@@ -50,7 +50,7 @@ describe("codec", () => {
 			payloadName: "other-codec",
 			message: 'Codec name mismatch: expected "test-codec", got "other-codec"',
 		});
-		expect(
+		await expect(
 			instance.decode({
 				codecName: "other-codec",
 				body: { wrapped: JSON.stringify({ name: "alice" }) },

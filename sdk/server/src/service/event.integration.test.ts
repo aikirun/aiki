@@ -146,7 +146,7 @@ describe("EventService sendEventToWorkflowRun", () => {
 
 	test("rejects a send to a run that does not exist", () =>
 		withHarness(async ({ repos, context }) => {
-			expect(
+			await expect(
 				createService(repos).sendEventToWorkflowRun(context, {
 					runId: "01JZZZZZZZZZZZZZZZZZZZZZZZ" as WorkflowRunId,
 					eventName: "orderShipped",

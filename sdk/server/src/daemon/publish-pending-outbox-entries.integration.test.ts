@@ -40,7 +40,7 @@ describe("publishPendingOutboxEntries", () => {
 
 				publisher.publishRuns.rejectsOnce(expect.anything(), new Error("broker down"));
 
-				expect(publishPendingOutboxEntries(context, { repos, publisher }, configBuilder.build())).rejects.toThrow(
+				await expect(publishPendingOutboxEntries(context, { repos, publisher }, configBuilder.build())).rejects.toThrow(
 					"broker down"
 				);
 
@@ -259,7 +259,7 @@ describe("publishOutboxEntries — outcome writes", () => {
 
 				publisher.publishRuns.rejectsOnce(expect.anything(), new Error("broker down"));
 
-				expect(
+				await expect(
 					publishPendingOutboxEntries(
 						context,
 						{ repos, publisher },

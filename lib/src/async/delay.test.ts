@@ -15,18 +15,18 @@ describe("delay", () => {
 		expect(resolved).toBe(true);
 	});
 
-	test("rejects immediately when abort signal is already aborted", () => {
+	test("rejects immediately when abort signal is already aborted", async () => {
 		const controller = new AbortController();
 		controller.abort("cancelled");
 
-		expect(delay(1_000, { signal: controller.signal })).rejects.toBe("cancelled");
+		await expect(delay(1_000, { signal: controller.signal })).rejects.toBe("cancelled");
 	});
 
-	test("rejects when abort signal fires during delay", () => {
+	test("rejects when abort signal fires during delay", async () => {
 		const controller = new AbortController();
 		const promise = delay(5_000, { signal: controller.signal });
 		controller.abort("stopped");
 
-		expect(promise).rejects.toBe("stopped");
+		await expect(promise).rejects.toBe("stopped");
 	});
 });

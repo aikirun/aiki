@@ -36,7 +36,7 @@ describe("taskExecutionTracker", () => {
 			const tracker = createTracker();
 			tracker.end();
 
-			expect(flush()).resolves.toBeUndefined();
+			await expect(flush()).resolves.toBeUndefined();
 		}));
 
 	test("flush transitions the run only after every task execution ends", () =>
@@ -111,7 +111,7 @@ describe("taskExecutionTracker", () => {
 				{ code: "SOME_OTHER_ERROR" }
 			);
 
-			expect(flush()).resolves.toBeUndefined();
+			await expect(flush()).resolves.toBeUndefined();
 		}));
 
 	test("flush resolves even when the transition hits a revision conflict", () =>
@@ -129,6 +129,6 @@ describe("taskExecutionTracker", () => {
 				{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 			);
 
-			expect(flush()).resolves.toBeUndefined();
+			await expect(flush()).resolves.toBeUndefined();
 		}));
 });

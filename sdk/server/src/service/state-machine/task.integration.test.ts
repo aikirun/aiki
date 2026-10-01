@@ -33,7 +33,7 @@ describe("TaskStateMachine transitionState", () => {
 			});
 
 			const taskStateMachine = createTaskStateMachine({ repos });
-			expect(
+			await expect(
 				taskStateMachine.transitionState(context, {
 					workflowRunId: attackerRunSeed.runId,
 					expectedWorkflowRunRevision: attackerRunSeed.revisionWhenClaimed,

@@ -83,7 +83,7 @@ describe("runConcurrently", () => {
 	test("runs every item even when one of them throws", async () => {
 		const startedItems: number[] = [];
 
-		expect(
+		await expect(
 			runConcurrently(
 				context(),
 				[1, 2, 3],
@@ -103,7 +103,7 @@ describe("runConcurrently", () => {
 	test("stops at the first failure when failFast is set", async () => {
 		const startedItems: number[] = [];
 
-		expect(
+		await expect(
 			runConcurrently(
 				context(),
 				[1, 2, 3],

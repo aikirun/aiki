@@ -27,7 +27,7 @@ describe("validateWithSchema", () => {
 		}));
 
 	test("fails the run with cause self and throws WorkflowRunFailedError when a sync validator rejects", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build();
 			const handle = workflowRunHandle(client, record);
 			const alwaysInvalid: StandardSchemaV1<string> = {
@@ -55,7 +55,7 @@ describe("validateWithSchema", () => {
 				{ revision: record.revision, state: record.state, attempts: record.attempts }
 			);
 
-			expect(
+			await expect(
 				validateWithSchema(handle, alwaysInvalid, "anything", client.logger, "Invalid test data")
 			).rejects.toBeInstanceOf(WorkflowRunFailedError);
 		}));
@@ -78,7 +78,7 @@ describe("validateWithSchema", () => {
 		}));
 
 	test("fails the run with cause self and throws WorkflowRunFailedError when an async validator rejects", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build();
 			const handle = workflowRunHandle(client, record);
 			const alwaysInvalidAsync: StandardSchemaV1<string> = {
@@ -106,7 +106,7 @@ describe("validateWithSchema", () => {
 				{ revision: record.revision, state: record.state, attempts: record.attempts }
 			);
 
-			expect(
+			await expect(
 				validateWithSchema(handle, alwaysInvalidAsync, "anything", client.logger, "Invalid test data")
 			).rejects.toBeInstanceOf(WorkflowRunFailedError);
 		}));

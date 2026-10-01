@@ -54,7 +54,7 @@ describe("event wait repository", () => {
 			};
 			await repos.eventWait.insert({ ...timeoutRow, id: "01-declares-false", clientCodecApplied: false });
 
-			expect(
+			await expect(
 				repos.eventWait.insert({ ...timeoutRow, id: "02-declares-true", clientCodecApplied: true })
 			).rejects.toThrow();
 			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([

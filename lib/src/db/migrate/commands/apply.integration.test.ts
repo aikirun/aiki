@@ -99,7 +99,7 @@ describe("migrateApply", () => {
 				db: dbConfig,
 			});
 
-			expect(applying).rejects.toThrow(
+			await expect(applying).rejects.toThrow(
 				"migration 0000_create_widget has changed since it was applied to this database; a migration must not change once applied"
 			);
 			await Promise.allSettled([applying]);
@@ -126,7 +126,7 @@ describe("migrateApply", () => {
 				db: dbConfig,
 			});
 
-			expect(applying).rejects.toThrow(
+			await expect(applying).rejects.toThrow(
 				`${fixture.migrationsTable} has a migration created at 1700000009000, which this version does not ship`
 			);
 			await Promise.allSettled([applying]);
@@ -150,7 +150,7 @@ describe("migrateApply", () => {
 				db: dbConfig,
 			});
 
-			expect(applying).rejects.toThrow(
+			await expect(applying).rejects.toThrow(
 				"migration 0000_create_widget has changed since it was applied to this database; a migration must not change once applied"
 			);
 			await Promise.allSettled([applying]);
@@ -201,7 +201,7 @@ describe("migrateApply", () => {
 				db: dbConfig,
 			});
 
-			expect(applying).rejects.toThrow();
+			await expect(applying).rejects.toThrow();
 			await Promise.allSettled([applying]);
 			expect(await runSql(`SELECT id FROM ${fixture.widgetTable}`)).toEqual([]);
 			expect(await readMigrationsTable(fixture.migrationsTable)).toEqual([

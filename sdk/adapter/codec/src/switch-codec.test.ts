@@ -42,7 +42,7 @@ describe("switchCodecs", () => {
 	});
 
 	test("decode rejects a codecName that matches no member", async () => {
-		expect(
+		await expect(
 			switched.decode({
 				codecName: "v0",
 				body: { v0: { name: "alice" } },
@@ -53,7 +53,7 @@ describe("switchCodecs", () => {
 			knownCodecNames: ["v2", "v1"],
 			message: 'No codec named "v0"; known: "v2", "v1"',
 		});
-		expect(
+		await expect(
 			switched.decode({
 				codecName: "v0",
 				body: { v0: { name: "alice" } },
@@ -62,11 +62,11 @@ describe("switchCodecs", () => {
 	});
 
 	test("decode rejects a value that was not encoded", async () => {
-		expect(switched.decode({ name: "alice" })).rejects.toMatchObject({
+		await expect(switched.decode({ name: "alice" })).rejects.toMatchObject({
 			name: "InvalidEncodedValueError",
 			codecName: "v2",
 		});
-		expect(switched.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidEncodedValueError);
+		await expect(switched.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidEncodedValueError);
 	});
 
 	test("rejects duplicate member names at construction", () => {

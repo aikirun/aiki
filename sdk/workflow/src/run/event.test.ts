@@ -164,7 +164,7 @@ describe("createEventWaiters", () => {
 		}));
 
 	test("throws ClientCodecMissingError when the recorded data expects a client codec the client lacks", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({
 				clientCodecApplied: false,
 				eventWaits: {
@@ -178,11 +178,11 @@ describe("createEventWaiters", () => {
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
-			expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(ClientCodecMissingError);
+			await expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(ClientCodecMissingError);
 		}));
 
 	test("transitions to awaiting_event and suspends when no wait is recorded", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
@@ -199,11 +199,11 @@ describe("createEventWaiters", () => {
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
-			expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			await expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 		}));
 
 	test("carries the timeout into the awaiting_event transition", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
@@ -220,11 +220,13 @@ describe("createEventWaiters", () => {
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
-			expect(waiters.orderShipped.wait({ timeout: { seconds: 30 } })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			await expect(waiters.orderShipped.wait({ timeout: { seconds: 30 } })).rejects.toBeInstanceOf(
+				WorkflowRunSuspendedError
+			);
 		}));
 
 	test("maps a revision conflict on the awaiting_event transition to a suspension", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
 			const handle = workflowRunHandle(client, record, definition);
@@ -241,7 +243,7 @@ describe("createEventWaiters", () => {
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
-			expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			await expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 		}));
 
 	test("advances the cursor across calls, consuming recorded waits in order", () =>
@@ -299,7 +301,7 @@ describe("createEventSenders", () => {
 		}));
 
 	test("throws SchemaValidationError and sends nothing when the data fails the schema", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const senders = createEventSenders(
 				client,
 				"run-1",
@@ -307,7 +309,7 @@ describe("createEventSenders", () => {
 				client.logger
 			);
 
-			expect(senders.note.send("bad")).rejects.toBeInstanceOf(SchemaValidationError);
+			await expect(senders.note.send("bad")).rejects.toBeInstanceOf(SchemaValidationError);
 		}));
 
 	test("threads builder options into the send", () =>
@@ -492,12 +494,12 @@ describe("createEventMulticasters", () => {
 		}));
 
 	test("throws SchemaValidationError and sends nothing when the data fails the schema", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const multicasters = createEventMulticasters(workflowName, versionId, {
 				note: event({ schema: alwaysInvalidSchema }),
 			});
 
-			expect(multicasters.note.send(client, "run-1", "bad")).rejects.toBeInstanceOf(SchemaValidationError);
+			await expect(multicasters.note.send(client, "run-1", "bad")).rejects.toBeInstanceOf(SchemaValidationError);
 		}));
 
 	test("threads builder options into the multicast", () =>

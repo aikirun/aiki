@@ -730,7 +730,7 @@ describe("ScheduleService status transitions", () => {
 			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, await activationRequest());
 			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
 
-			expect(scheduleService.resumeSchedule(context.namespaceId, schedule.id)).rejects.toThrow(
+			await expect(scheduleService.resumeSchedule(context.namespaceId, schedule.id)).rejects.toThrow(
 				InvalidScheduleStateTransitionError
 			);
 			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({
@@ -745,7 +745,7 @@ describe("ScheduleService status transitions", () => {
 			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, await activationRequest());
 			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
 
-			expect(scheduleService.pauseSchedule(context.namespaceId, schedule.id)).rejects.toThrow(
+			await expect(scheduleService.pauseSchedule(context.namespaceId, schedule.id)).rejects.toThrow(
 				InvalidScheduleStateTransitionError
 			);
 			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({

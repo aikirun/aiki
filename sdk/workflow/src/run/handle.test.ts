@@ -94,7 +94,7 @@ describe("workflowRunHandle", () => {
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);
 
-				expect(handle[INTERNAL].transitionState({ status: "running" })).rejects.toBeInstanceOf(
+				await expect(handle[INTERNAL].transitionState({ status: "running" })).rejects.toBeInstanceOf(
 					WorkflowRunRevisionConflictError
 				);
 			}));
@@ -110,7 +110,7 @@ describe("workflowRunHandle", () => {
 					nonConflictError
 				);
 
-				expect(handle[INTERNAL].transitionState({ status: "running" })).rejects.toBe(nonConflictError);
+				await expect(handle[INTERNAL].transitionState({ status: "running" })).rejects.toBe(nonConflictError);
 			}));
 	});
 
@@ -194,7 +194,9 @@ describe("workflowRunHandle", () => {
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);
 
-				expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBeInstanceOf(WorkflowRunRevisionConflictError);
+				await expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBeInstanceOf(
+					WorkflowRunRevisionConflictError
+				);
 			}));
 
 		test("propagates a non-conflict error without mapping it", () =>
@@ -216,7 +218,7 @@ describe("workflowRunHandle", () => {
 					nonConflictError
 				);
 
-				expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBe(nonConflictError);
+				await expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBe(nonConflictError);
 			}));
 	});
 

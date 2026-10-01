@@ -14,7 +14,7 @@ const withHarness = createServiceHarness();
 describe("transitionScheduleInTx", () => {
 	test("rejects an unknown schedule", () =>
 		withHarness(async ({ context, repos }) => {
-			expect(
+			await expect(
 				repos.transaction((txRepos) =>
 					transitionScheduleInTx(txRepos, {
 						namespaceId: context.namespaceId,
@@ -31,7 +31,7 @@ describe("transitionScheduleInTx", () => {
 			const before = await repos.schedule.get(context.namespaceId, { id: schedule.id });
 			const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
 
-			expect(
+			await expect(
 				repos.transaction((txRepos) =>
 					transitionScheduleInTx(txRepos, {
 						namespaceId: "other-namespace" as NamespaceId,
@@ -117,7 +117,7 @@ describe("transitionScheduleInTx", () => {
 			const before = await repos.schedule.get(context.namespaceId, { id: schedule.id });
 			const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
 
-			expect(
+			await expect(
 				repos.transaction((txRepos) =>
 					transitionScheduleInTx(txRepos, {
 						namespaceId: context.namespaceId,
@@ -137,7 +137,7 @@ describe("transitionScheduleInTx", () => {
 			const before = await repos.schedule.get(context.namespaceId, { id: schedule.id });
 			const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
 
-			expect(
+			await expect(
 				repos.transaction((txRepos) =>
 					transitionScheduleInTx(
 						{

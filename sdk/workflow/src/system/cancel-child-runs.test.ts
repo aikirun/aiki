@@ -155,7 +155,7 @@ describe("createCancelChildRunsV1", () => {
 				{ cancelledIds: nonTerminalChildRunIds }
 			);
 
-			expect(canceChildRunsV1[INTERNAL].handler(run, parentRunId)).resolves.toBeUndefined();
+			await expect(canceChildRunsV1[INTERNAL].handler(run, parentRunId)).resolves.toBeUndefined();
 		}));
 
 	test("does not cancel anything when the parent has no non-terminal children", () =>
@@ -231,6 +231,6 @@ describe("createCancelChildRunsV1", () => {
 				{ runs: [] }
 			);
 
-			expect(canceChildRunsV1[INTERNAL].handler(run, parentRunId)).resolves.toBeUndefined();
+			await expect(canceChildRunsV1[INTERNAL].handler(run, parentRunId)).resolves.toBeUndefined();
 		}));
 });

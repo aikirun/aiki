@@ -36,7 +36,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 	test("rejects a transition for an unknown run", () =>
 		withHarness(async ({ context, repos }) => {
 			const stateMachine = createStateMachine(repos);
-			expect(
+			await expect(
 				stateMachine.transitionState(context, {
 					type: "pessimistic",
 					id: "run-missing",
@@ -54,7 +54,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			});
 
 			const stateMachine = createStateMachine(repos);
-			expect(
+			await expect(
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
@@ -160,7 +160,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			// A worker that fetched the run before another worker finished it still holds the
 			// pre-completion revision and asks for 'running'. It is told the run moved, not that
 			// the move is illegal, so it settles the delivery instead of reporting an error.
-			expect(
+			await expect(
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
@@ -188,7 +188,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			});
 
 			const stateMachine = createStateMachine(repos);
-			expect(
+			await expect(
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
@@ -430,7 +430,7 @@ describe("WorkflowRunStateMachine task-retry park", () => {
 			});
 
 			const stateMachine = createStateMachine(repos);
-			expect(
+			await expect(
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
@@ -696,7 +696,7 @@ describe("WorkflowRunStateMachine redelivery", () => {
 			const { runId } = await seedStalledRun({ namespaceRequestContext: context, repos });
 
 			const stateMachine = createStateMachine(repos);
-			expect(
+			await expect(
 				stateMachine.transitionState(context, {
 					type: "pessimistic",
 					id: runId,

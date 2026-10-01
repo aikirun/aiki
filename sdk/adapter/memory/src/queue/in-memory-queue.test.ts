@@ -78,7 +78,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 			const queue = inMemoryQueue();
 
 			const subscriber = queue.subscriber(subscriberContext(client.api));
-			expect(subscriber.getReadyRuns(10)).rejects.toBe(lookupError);
+			await expect(subscriber.getReadyRuns(10)).rejects.toBe(lookupError);
 		}));
 
 	test("looks the namespace up again after a failed lookup", () =>
@@ -88,7 +88,7 @@ describe("inMemoryQueue publish/subscribe", () => {
 			await queue.publisher(publisherContext()).publishRuns([readyWorkflowRunFactory.build({ id: "run-1" })]);
 
 			const subscriber = queue.subscriber(subscriberContext(client.api));
-			expect(subscriber.getReadyRuns(10)).rejects.toThrow("server unavailable");
+			await expect(subscriber.getReadyRuns(10)).rejects.toThrow("server unavailable");
 			expect(await subscriber.getReadyRuns(10)).toEqual([{ data: { id: "run-1" as WorkflowRunId } }]);
 		}));
 

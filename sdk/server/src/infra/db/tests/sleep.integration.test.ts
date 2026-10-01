@@ -19,7 +19,7 @@ describe("sleep repository create", () => {
 				{ sleepName: "cooldown", durationMs: 60_000 }
 			);
 
-			expect(
+			await expect(
 				repos.sleep.create({
 					id: "01-second-sleep",
 					workflowRunId: runId,

@@ -29,7 +29,7 @@ describe("transaction onCommit", () => {
 				throw new Error("rollback");
 			});
 
-			expect(transactionPromise).rejects.toThrow("rollback");
+			await expect(transactionPromise).rejects.toThrow("rollback");
 			expect(events).toEqual([]);
 		}));
 

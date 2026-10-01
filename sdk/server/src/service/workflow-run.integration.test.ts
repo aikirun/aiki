@@ -198,8 +198,8 @@ describe("WorkflowRunService hasTerminated", () => {
 			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
 			const otherNamespaceContext = namespaceRequestContextFactory.build();
 
-			expect(service.hasTerminated(context, ulid())).rejects.toThrow(NotFoundError);
-			expect(service.hasTerminated(otherNamespaceContext, runId)).rejects.toThrow(NotFoundError);
+			await expect(service.hasTerminated(context, ulid())).rejects.toThrow(NotFoundError);
+			await expect(service.hasTerminated(otherNamespaceContext, runId)).rejects.toThrow(NotFoundError);
 		}));
 
 	test("a running run has not terminated", () =>
@@ -656,7 +656,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			});
 
 			const childInput = { orderId: "order-9" };
-			expect(
+			await expect(
 				service.createWorkflowRun(context, {
 					name: parent.workflowName,
 					versionId: parent.workflowVersionId,
@@ -860,7 +860,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				options,
 			});
 
-			expect(
+			await expect(
 				service.createWorkflowRun(context, {
 					name: "checkout",
 					versionId: "v1",

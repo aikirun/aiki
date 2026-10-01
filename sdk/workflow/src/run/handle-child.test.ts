@@ -146,7 +146,7 @@ describe("childWorkflowRunHandle", () => {
 			}));
 
 		test("transitions the parent to awaiting_child_workflow and suspends when no wait is recorded", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentRecord = runningWorkflowRunRecordFactory.build({
 					childWorkflowRunWaits: { [childRecord.id]: { timeouts: [] } },
@@ -168,11 +168,11 @@ describe("childWorkflowRunHandle", () => {
 					{ revision: 1, state: workflowRunStateByStatus.awaiting_child_workflow, attempts: parentRecord.attempts }
 				);
 
-				expect(childHandle.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				await expect(childHandle.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("carries the timeout into the parent transition", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentRecord = runningWorkflowRunRecordFactory.build({
 					childWorkflowRunWaits: { [childRecord.id]: { timeouts: [] } },
@@ -195,11 +195,11 @@ describe("childWorkflowRunHandle", () => {
 					{ revision: 1, state: workflowRunStateByStatus.awaiting_child_workflow, attempts: parentRecord.attempts }
 				);
 
-				expect(childHandle.wait({ timeout: { minutes: 5 } })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				await expect(childHandle.wait({ timeout: { minutes: 5 } })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("maps a parent-transition conflict to a suspension", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentRecord = runningWorkflowRunRecordFactory.build({
 					childWorkflowRunWaits: { [childRecord.id]: { timeouts: [] } },
@@ -221,7 +221,7 @@ describe("childWorkflowRunHandle", () => {
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);
 
-				expect(childHandle.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				await expect(childHandle.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 	});
 

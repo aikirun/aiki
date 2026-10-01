@@ -15,7 +15,7 @@ function createTestSleeper(client: Omit<FakeClient, "verify">, record: WorkflowR
 describe("createSleeper", () => {
 	describe("first encounter", () => {
 		test("transitions the run to sleeping and suspends", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 				const sleep = createTestSleeper(client, record);
 
@@ -29,11 +29,11 @@ describe("createSleeper", () => {
 					{ revision: 1, state: { status: "sleeping", sleepName: "nap", wakeupAt: 0 }, attempts: 1 }
 				);
 
-				expect(sleep("nap", { seconds: 60 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				await expect(sleep("nap", { seconds: 60 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("maps a revision conflict on the sleep transition to a suspension", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 				const sleep = createTestSleeper(client, record);
 
@@ -47,11 +47,11 @@ describe("createSleeper", () => {
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);
 
-				expect(sleep("nap", { seconds: 60 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				await expect(sleep("nap", { seconds: 60 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("propagates a non-conflict transition error without suspending", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 				const sleep = createTestSleeper(client, record);
 				const nonConflictError = { code: "SOME_OTHER_ERROR" };
@@ -66,19 +66,19 @@ describe("createSleeper", () => {
 					nonConflictError
 				);
 
-				expect(sleep("nap", { seconds: 60 })).rejects.toBe(nonConflictError);
+				await expect(sleep("nap", { seconds: 60 })).rejects.toBe(nonConflictError);
 			}));
 	});
 
 	describe("replay", () => {
 		test("suspends again without a transition when the recorded sleep is still sleeping", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({
 					sleeps: { nap: [{ status: "sleeping", wakeupAt: 0 }] },
 				});
 				const sleep = createTestSleeper(client, record);
 
-				expect(sleep("nap", { seconds: 60 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				await expect(sleep("nap", { seconds: 60 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
 		test("returns cancelled when the recorded sleep was cancelled", () =>
@@ -112,7 +112,7 @@ describe("createSleeper", () => {
 			}));
 
 		test("sleeps for the remaining duration when the replay duration is longer", () =>
-			withFakeClient((client) => {
+			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({
 					revision: 4,
 					sleeps: { nap: [{ status: "completed", durationMs: 60_000, completedAt: 0 }] },
@@ -129,7 +129,7 @@ describe("createSleeper", () => {
 					{ revision: 5, state: { status: "sleeping", sleepName: "nap", wakeupAt: 0 }, attempts: 1 }
 				);
 
-				expect(sleep("nap", { seconds: 90 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				await expect(sleep("nap", { seconds: 90 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 	});
 
@@ -166,10 +166,10 @@ describe("createSleeper", () => {
 	});
 
 	test("throws when the duration exceeds the maximum", () =>
-		withFakeClient((client) => {
+		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build();
 			const sleep = createTestSleeper(client, record);
 
-			expect(sleep("nap", { days: 3651 })).rejects.toThrow(/exceeds maximum/);
+			await expect(sleep("nap", { days: 3651 })).rejects.toThrow(/exceeds maximum/);
 		}));
 });

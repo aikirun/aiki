@@ -134,7 +134,7 @@ describe("schedule repository create", () => {
 			const { schedule } = await seedActiveSchedule({ namespaceRequestContext: context, repos });
 			const row = await getScheduleRow(repos, context.namespaceId, schedule.id);
 
-			expect(repos.schedule.create({ ...row, id: ulid() })).rejects.toThrow(ScheduleConflictError);
+			await expect(repos.schedule.create({ ...row, id: ulid() })).rejects.toThrow(ScheduleConflictError);
 		}));
 
 	test("rejects a second schedule with the same reference id in the namespace", () =>
@@ -145,7 +145,7 @@ describe("schedule repository create", () => {
 			);
 			const row = await getScheduleRow(repos, context.namespaceId, schedule.id);
 
-			expect(repos.schedule.create({ ...row, id: ulid(), definitionHash: "another-definition" })).rejects.toThrow(
+			await expect(repos.schedule.create({ ...row, id: ulid(), definitionHash: "another-definition" })).rejects.toThrow(
 				ScheduleConflictError
 			);
 		}));

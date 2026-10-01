@@ -20,7 +20,7 @@ describe("fakePublisher", () => {
 
 		publisher.publishRuns.rejectsOnce(expect.anything(), new Error("broker down"));
 
-		expect(publisher.publishRuns([readyRun1])).rejects.toThrow("broker down");
+		await expect(publisher.publishRuns([readyRun1])).rejects.toThrow("broker down");
 		expect(await publisher.publishRuns([readyRun2])).toEqual({
 			published: { runs: [{ run: readyRun2 }] },
 		});
@@ -52,7 +52,7 @@ describe("fakePublisher", () => {
 
 		publisher.publishRuns.once([readyWorkflowRunFactory.build({ id: "expected" })], { published: { runs: [] } });
 
-		expect(publisher.publishRuns([readyWorkflowRunFactory.build({ id: "actual" })])).rejects.toThrow();
+		await expect(publisher.publishRuns([readyWorkflowRunFactory.build({ id: "actual" })])).rejects.toThrow();
 	});
 
 	test("applies scripted calls in FIFO order, then defaults", async () => {
@@ -67,7 +67,7 @@ describe("fakePublisher", () => {
 			.rejectsOnce(expect.anything(), new Error("first"))
 			.once(expect.anything(), { published: { runs: [] } });
 
-		expect(publisher.publishRuns([readyRun1])).rejects.toThrow("first");
+		await expect(publisher.publishRuns([readyRun1])).rejects.toThrow("first");
 		expect(await publisher.publishRuns([readyRun2])).toEqual({ published: { runs: [] } });
 		expect(await publisher.publishRuns([readyRun3])).toEqual({
 			published: { runs: [{ run: readyRun3 }] },

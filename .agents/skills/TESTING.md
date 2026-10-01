@@ -88,8 +88,9 @@ Before writing any test, study the exemplars for its tier and match their idioms
   	},
   };
   ```
-- Assert async rejections with a floating `expect(promise).rejects.toThrow(...)` — do not await
-  it and do not rewrite it as try/catch.
+- Await async assertions: `await expect(promise).rejects.toThrow(...)`, and the same for
+  `.resolves`. Bun finishes an un-awaited one before the next line runs, but other test runners
+  do not, so the lines after it would run too early there. Do not rewrite it as try/catch.
 
 ## Seeding (integration tests)
 

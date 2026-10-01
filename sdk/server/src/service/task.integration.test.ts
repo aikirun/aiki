@@ -69,7 +69,7 @@ describe("TaskService getTaskById", () => {
 			});
 
 			const taskService = createTaskService({ repos });
-			expect(taskService.getTaskById(context, foreignTaskSeed.taskInfo.id)).rejects.toBeInstanceOf(NotFoundError);
+			await expect(taskService.getTaskById(context, foreignTaskSeed.taskInfo.id)).rejects.toBeInstanceOf(NotFoundError);
 		}));
 });
 
@@ -172,7 +172,7 @@ describe("TaskService setTaskState", () => {
 			});
 
 			const taskService = createTaskService({ repos });
-			expect(
+			await expect(
 				taskService.setTaskState(context, {
 					id: victimTaskSeed.taskInfo.id,
 					workflowRunId: attackerRunSeed.runId,
@@ -197,7 +197,7 @@ describe("TaskService setTaskState", () => {
 			expect(taskRowBefore).toEqual(expect.objectContaining({ id: taskInfo.id, status: "running" }));
 
 			const taskService = createTaskService({ repos });
-			expect(
+			await expect(
 				taskService.setTaskState(context, {
 					id: taskInfo.id,
 					workflowRunId: runId,
@@ -219,7 +219,7 @@ describe("TaskService setTaskState", () => {
 			expect(taskRowBefore).toEqual(expect.objectContaining({ id: taskInfo.id, status: "completed" }));
 
 			const taskService = createTaskService({ repos });
-			expect(
+			await expect(
 				taskService.setTaskState(context, {
 					id: taskInfo.id,
 					workflowRunId: runId,
@@ -255,7 +255,7 @@ describe("TaskService setTaskState", () => {
 			expect(taskRowBefore).toEqual(expect.objectContaining({ id: taskInfo.id, status: "awaiting_retry" }));
 
 			const taskService = createTaskService({ repos });
-			expect(
+			await expect(
 				taskService.setTaskState(context, {
 					id: taskInfo.id,
 					workflowRunId: runId,

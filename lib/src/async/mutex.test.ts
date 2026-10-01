@@ -40,7 +40,7 @@ describe("createMutex", () => {
 	test("runExclusive releases when fn rejects", async () => {
 		const mutex = createMutex();
 
-		expect(
+		await expect(
 			mutex.runExclusive(async () => {
 				throw new Error("boom");
 			})

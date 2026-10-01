@@ -107,13 +107,13 @@ describe("untilReadyHandshake", () => {
 		await handshakeReadyPromise;
 	});
 
-	test("rejects when the connection closes before becoming ready", () => {
+	test("rejects when the connection closes before becoming ready", async () => {
 		const redis = fakeRedis("connecting");
 		const handshakeReadyPromise = untilReadyHandshake(redis);
 
 		redis.emit("close");
 
-		expect(handshakeReadyPromise).rejects.toThrow("closed before completing the ready handshake");
+		await expect(handshakeReadyPromise).rejects.toThrow("closed before completing the ready handshake");
 	});
 
 	test("removes both listeners after resolving", async () => {
@@ -130,7 +130,7 @@ describe("untilReadyHandshake", () => {
 	test("rejects when the connection does not become ready within the connect timeout", async () => {
 		const handshakeReadyPromise = untilReadyHandshake(fakeRedis("wait", 5));
 
-		expect(handshakeReadyPromise).rejects.toThrow("did not complete the ready handshake within 5ms");
+		await expect(handshakeReadyPromise).rejects.toThrow("did not complete the ready handshake within 5ms");
 		expect(await settleWithin(handshakeReadyPromise, 1_000)).toBe(true);
 	});
 
@@ -149,7 +149,7 @@ describe("untilReadyHandshake", () => {
 		const handshakeReadyPromise = untilReadyHandshake(redis);
 
 		redis.emit("close");
-		expect(handshakeReadyPromise).rejects.toThrow();
+		await expect(handshakeReadyPromise).rejects.toThrow();
 
 		expect(redis.listenerCount("ready")).toBe(0);
 		expect(redis.listenerCount("close")).toBe(0);
