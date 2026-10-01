@@ -1,8 +1,8 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { WorkflowMeta, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import { describe, expect, test } from "vitest";
 
 import { getWorkflowQueueName, getWorkflowQueueNames } from "./key";
-import { describe, expect, test } from "bun:test";
 
 describe("getWorkflowQueueName", () => {
 	test("builds the queue name from the namespace, workflow and pool", () => {

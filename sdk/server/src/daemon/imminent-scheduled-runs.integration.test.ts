@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { processImminentScheduledRuns } from "./imminent-scheduled-runs";
-import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";

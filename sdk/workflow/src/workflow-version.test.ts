@@ -26,6 +26,7 @@ import {
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import { describe, expect, test } from "vitest";
 
 import type { WorkflowRun } from "./run";
 import { workflowRunHandle } from "./run/handle";
@@ -33,7 +34,6 @@ import { createReplayManifest } from "./run/replay-manifest";
 import { taskExecutionTracker } from "./run/task-execution-tracker";
 import { task } from "./task";
 import { workflow } from "./workflow";
-import { describe, expect, test } from "bun:test";
 
 function createTestWorkflowRun(client: Client, record: WorkflowRunRecord): WorkflowRun<null, Record<string, never>> {
 	const handle = workflowRunHandle(client, record);

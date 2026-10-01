@@ -1,7 +1,7 @@
 import { type } from "arktype";
+import { describe, expect, test } from "vitest";
 
 import { retryStrategySchema } from "./retry";
-import { describe, expect, test } from "bun:test";
 
 describe("retryStrategySchema", () => {
 	test("accepts a fractional factor on an exponential strategy", () => {

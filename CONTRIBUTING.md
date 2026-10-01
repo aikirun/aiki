@@ -39,6 +39,8 @@ Run these from the repo root:
 | -------------------------- | ---------------------------------------------------------------------- |
 | `bun run test:unit`        | Run the unit test suite (no database needed)                           |
 | `bun run test:integration` | Run the integration tests (needs a test database — see below)          |
+| `bun run test:unit:node`   | Run the unit test suite on Node instead of Bun                         |
+| `bun run test:integration:node` | Run the integration tests on Node instead of Bun                  |
 | `bun run check`            | Type-check every package with `tsc`                                    |
 | `bun run lint`             | Lint & format check with Biome                                         |
 | `bun run lint:fix`         | Auto-fix lint/format issues                                            |
@@ -148,7 +150,7 @@ locally**: `docker exec aiki-pg createdb -U user aiki_test`. `DATABASE_URL` and
 `REDIS_URL` in `.env.test` point the suite elsewhere.
 
 CI runs all of this automatically against throwaway Redis and Postgres services,
-and runs the suite on SQLite too, so opening a PR does not require local services
+and runs the suite on SQLite too, each on Bun and on Node, so opening a PR does not require local services
 — but run the tests locally when your change touches the database layer or a
 timer-queue adapter.
 

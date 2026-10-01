@@ -1,5 +1,6 @@
+import { describe, expect, expectTypeOf, test } from "vitest";
+
 import { type NestedMap, nestedMap } from "./nested-map";
-import { describe, expect, expectTypeOf, test } from "bun:test";
 
 interface Row {
 	region: string;

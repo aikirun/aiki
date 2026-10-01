@@ -9,9 +9,9 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
 import { createCancelChildRunsV1 } from "./cancel-child-runs";
-import { describe, expect, test } from "bun:test";
 import type { WorkflowRun } from "../run";
 import { workflowRunHandle } from "../run/handle";
 import { createReplayManifest } from "../run/replay-manifest";

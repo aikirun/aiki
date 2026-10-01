@@ -1,8 +1,8 @@
 import { noopLogger } from "@aikirun/lib/logger";
+import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { codec, type EncodedValue, type NamedCreateCodec } from "./codec";
 import { pipeCodecs } from "./pipe-codec";
-import { describe, expect, expectTypeOf, test } from "bun:test";
 
 describe("pipeCodecs", () => {
 	const inner = codec({

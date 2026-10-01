@@ -4,6 +4,13 @@ Two tiers: `*.test.ts` are hermetic unit tests (`bun run test:unit`, no database
 `*.integration.test.ts` run against a live Postgres (`bun run test:integration`, credentials in
 `.env.test` — see DB.md).
 
+Both tiers run on Bun and on Node. `bun run test:unit` and `bun run test:integration` use Bun's
+test runner; `bun run test:unit:node` and `bun run test:integration:node` run the same files on
+Node through Vitest. Import the test functions from `vitest`, never from `bun:test`: Bun runs a
+file that imports `vitest` with its own runner, and Vitest's types hold the tests to what both
+runners have, so a matcher only Bun has does not compile. Spies and mocks are `vi.spyOn` and
+`vi.fn`.
+
 Before writing any test, study the exemplars for its tier and match their idioms:
 
 - `sdk/server/src/daemon/publish-pending-outbox-entries.integration.test.ts` — minimal integration shape.

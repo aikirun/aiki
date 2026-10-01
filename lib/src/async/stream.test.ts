@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { streamChunks } from "./stream";
-import { describe, expect, test } from "bun:test";
 
 async function collect<T>(generator: AsyncGenerator<T>): Promise<T[]> {
 	const results: T[] = [];

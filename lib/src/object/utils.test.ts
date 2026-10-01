@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { getByPath, omitUndefined } from "./utils";
-import { describe, expect, test } from "bun:test";
 
 describe("getByPath", () => {
 	const obj = {

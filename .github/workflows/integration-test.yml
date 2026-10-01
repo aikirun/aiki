@@ -6,12 +6,13 @@ on:
 
 jobs:
   integration-test:
-    name: Integration Test (${{ matrix.database-provider }})
+    name: Integration Test (${{ matrix.database-provider }}, ${{ matrix.runtime }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         database-provider: [pg, sqlite]
+        runtime: [bun, node]
     timeout-minutes: 10
     services:
       postgres:
@@ -50,4 +51,14 @@ jobs:
         run: bun run test:db:migrate:apply
 
       - name: Run test
+        if: matrix.runtime == 'bun'
         run: bun run test:integration
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        if: matrix.runtime == 'node'
+        with:
+          node-version: 22
+
+      - name: Run test (Node)
+        if: matrix.runtime == 'node'
+        run: bun run test:integration:node

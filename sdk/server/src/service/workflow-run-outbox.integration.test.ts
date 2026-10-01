@@ -1,6 +1,6 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { describe, expect, test } from "vitest";
 
-import { describe, expect, test } from "bun:test";
 import { recoverOverdueOutboxEntries } from "../daemon/recover-overdue-outbox-entries";
 import type { WorkflowRunOutboxStatus } from "../infra/db/constants/workflow-run-outbox";
 import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";

@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { describeErrorCauses } from "./cause";
-import { describe, expect, test } from "bun:test";
 
 describe("describeErrorCauses", () => {
 	test("describes nothing for an error that wraps no other", () => {

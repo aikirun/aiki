@@ -1,7 +1,7 @@
 import type { PublishRunsResult } from "@aikirun/types/infra/queue";
+import { describe, expect, test } from "vitest";
 
 import { fakePublisher } from "./publisher";
-import { describe, expect, test } from "bun:test";
 import { readyWorkflowRunFactory } from "../../data-factory/infra/queue";
 
 describe("fakePublisher", () => {

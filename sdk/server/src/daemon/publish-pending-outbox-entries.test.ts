@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { computeRepublishBackoffMs } from "./publish-pending-outbox-entries";
-import { describe, expect, test } from "bun:test";
 
 describe("computeRepublishBackoffMs", () => {
 	test("waits the elapsed durationSinceFirstPublish when within bounds", () => {

@@ -1,8 +1,8 @@
 import { noopLogger } from "@aikirun/lib/logger";
 import type { CreateCodec } from "@aikirun/types/infra/codec";
+import { describe, expect, test } from "vitest";
 
 import { client } from "./client";
-import { describe, expect, test } from "bun:test";
 
 const handler = async () => new Response();
 

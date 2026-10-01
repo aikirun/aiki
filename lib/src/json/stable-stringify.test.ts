@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { stableStringify } from "./stable-stringify";
-import { describe, expect, test } from "bun:test";
 
 describe("stableStringify", () => {
 	test("sorts object keys alphabetically", () => {

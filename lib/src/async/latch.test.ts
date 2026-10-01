@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { createBinaryLatch } from "./latch";
-import { describe, expect, test } from "bun:test";
 
 describe("createBinaryLatch", () => {
 	test("wait blocks until signal is called", async () => {

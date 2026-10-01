@@ -7,12 +7,12 @@ import type { ApiClient } from "@aikirun/types/client";
 import type { PublisherContext, SubscriberContext } from "@aikirun/types/infra/queue";
 import type { WorkflowMeta, WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
 import { type Broker, createBroker } from "./broker";
 import { inMemoryQueue } from "./in-memory-queue";
 import { createInMemoryPublisher } from "./publisher";
 import { createInMemorySubscriber } from "./subscriber";
-import { describe, expect, test } from "bun:test";
 
 const logger = noopLogger;
 

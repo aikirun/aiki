@@ -1,10 +1,10 @@
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { event } from "./run/event";
 import { workflow } from "./workflow";
 import type { WorkflowVersion } from "./workflow-version";
-import { describe, expect, expectTypeOf, test } from "bun:test";
 
 describe("workflow", () => {
 	test("has the given name", () => {

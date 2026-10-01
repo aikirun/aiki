@@ -1,8 +1,15 @@
 import { workflow } from "@aikirun/workflow";
+import { expect, test } from "vitest";
 
 import { worker } from "./worker";
 
 const ordersV1 = workflow({ name: "orders" }).v("v1", { handler: async () => {} });
+
+test("with returns a copy of the worker", () => {
+	const ordersWorker = worker({ workflows: [ordersV1] });
+
+	expect(ordersWorker.with("pools", ["tenant-acme"])).not.toBe(ordersWorker);
+});
 
 // Compile-time guarantees, never executed. Each `@ts-expect-error` fails the build if its error stops
 // being reported, so they hold `WorkerParams.workflows` to workflows a worker can actually run.

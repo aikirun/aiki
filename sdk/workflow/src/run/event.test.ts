@@ -6,10 +6,10 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import { ClientCodecMissingError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import { describe, expect, test } from "vitest";
 
 import { createEventMulticasters, createEventSenders, createEventWaiters, event } from "./event";
 import { workflowRunHandle } from "./handle";
-import { describe, expect, test } from "bun:test";
 
 const appendBangSchema: StandardSchemaV1<string> = {
 	"~standard": {

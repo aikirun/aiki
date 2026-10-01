@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { createMutex } from "./mutex";
-import { describe, expect, test } from "bun:test";
 
 describe("createMutex", () => {
 	test("acquire waits until the holder releases", async () => {

@@ -2,8 +2,8 @@ import { asNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/arr
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
 import { ulid } from "ulidx";
+import { describe, expect, test } from "vitest";
 
-import { describe, expect, test } from "bun:test";
 import { withFakeClock } from "../../../testing/clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../../../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../../../testing/harness";

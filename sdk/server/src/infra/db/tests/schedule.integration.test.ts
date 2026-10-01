@@ -2,8 +2,8 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
 import { ulid } from "ulidx";
+import { describe, expect, test } from "vitest";
 
-import { describe, expect, test } from "bun:test";
 import { ScheduleConflictError } from "../../../errors";
 import { END_OF_TIME, withFakeClock } from "../../../testing/clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../../../testing/data-factory/middleware/context";

@@ -2,8 +2,8 @@ import { createBinaryLatch } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
-import { describe, expect, test } from "bun:test";
 import { withFakeClock } from "../../../testing/clock";
 import { pendingWorkflowRunOutboxRowFactory } from "../../../testing/data-factory/infra/workflow-run-outbox";
 import { namespaceRequestContextFactory } from "../../../testing/data-factory/middleware/context";

@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { prefixRangeEnd } from "./prefix-range";
-import { describe, expect, test } from "bun:test";
 
 describe("prefixRangeEnd", () => {
 	test("advances the last character", () => {

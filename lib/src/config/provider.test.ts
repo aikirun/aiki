@@ -1,5 +1,6 @@
+import { describe, expect, test, vi } from "vitest";
+
 import { asConfigProvider, dynamicConfigProvider } from "./provider";
-import { describe, expect, spyOn, test } from "bun:test";
 import { createBinaryLatch, delay } from "../async";
 import { noopLogger } from "../logger";
 
@@ -121,7 +122,7 @@ describe("dynamicConfigProvider", () => {
 		const abortController = new AbortController();
 
 		const refreshFailed = createBinaryLatch();
-		const warnSpy = spyOn(logger, "warn").mockImplementation(() => refreshFailed.signal());
+		const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => refreshFailed.signal());
 
 		const provider = dynamicConfigProvider({
 			initial: { v: 1 },

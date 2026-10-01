@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { getDueOccurrences } from "./schedule";
-import { describe, expect, test } from "bun:test";
 
 describe("getDueOccurrences", () => {
 	const timestampMs = (iso: string) => new Date(iso).getTime();

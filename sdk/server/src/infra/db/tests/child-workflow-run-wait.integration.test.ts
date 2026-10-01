@@ -1,7 +1,7 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import { describe, expect, test } from "vitest";
 
-import { describe, expect, test } from "bun:test";
 import { createChildRunCanceller } from "../../../service/cancel-child-runs";
 import { createWorkflowRunStateMachine } from "../../../service/state-machine/workflow-run";
 import { withFakeClock } from "../../../testing/clock";

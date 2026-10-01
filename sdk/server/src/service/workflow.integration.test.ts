@@ -1,9 +1,9 @@
 import { createBinaryLatch } from "@aikirun/lib/async";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
+import { describe, expect, test } from "vitest";
 
 import { bulkGetOrCreateWorkflowsInTx, createWorkflowService, getOrCreateWorkflowInTx } from "./workflow";
-import { describe, expect, test } from "bun:test";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowIdentity, WorkflowRow } from "../infra/db/types/workflow";
 import { withFakeClock } from "../testing/clock";

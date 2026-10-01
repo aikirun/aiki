@@ -1,3 +1,5 @@
+import { describe, expect, test } from "vitest";
+
 import { migrateApply } from "./commands/apply";
 import type { MigrationsDatabase } from "./migrations-table";
 import { type ReportPendingMigrationsParams, reportPendingMigrations } from "./pending-migrations";
@@ -7,7 +9,6 @@ import {
 	type MigrationsFixture,
 	withMigrationsFixture,
 } from "./testing/migrations-fixture";
-import { describe, expect, test } from "bun:test";
 import type { Logger } from "../../logger";
 import { noopLogger } from "../../logger";
 import { loadDatabaseConfig } from "../config";

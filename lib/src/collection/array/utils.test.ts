@@ -1,5 +1,6 @@
+import { describe, expect, test, vi } from "vitest";
+
 import { asNonEmptyArray, chunkLazy, groupBy, isNonEmptyArray, partitionArray, shuffleArray } from "./utils";
-import { describe, expect, spyOn, test } from "bun:test";
 
 describe("isNonEmptyArray", () => {
 	test("returns true for array with elements", () => {
@@ -128,7 +129,7 @@ describe("shuffleArray", () => {
 	});
 
 	test("produces deterministic output with mocked random", () => {
-		const mock = spyOn(Math, "random").mockReturnValue(0);
+		const mock = vi.spyOn(Math, "random").mockReturnValue(0);
 		const result = shuffleArray([1, 2, 3]);
 		expect(result).toEqual([2, 3, 1]);
 		mock.mockRestore();

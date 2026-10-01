@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { findPendingMigrationTags } from "./pending-migrations";
-import { describe, expect, test } from "bun:test";
 
 describe("findPendingMigrationTags", () => {
 	const journal = {

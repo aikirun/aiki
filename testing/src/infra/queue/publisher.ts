@@ -1,8 +1,7 @@
 import { inspect } from "node:util";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Publisher, PublishRunsResult, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
-
-import { expect } from "bun:test";
+import { expect } from "vitest";
 
 type PublishRunsRequest = NonEmptyArray<ReadyWorkflowRun>;
 type PublishRunsResponse = PublishRunsResult | ((request: PublishRunsRequest) => PublishRunsResult);

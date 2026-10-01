@@ -1,8 +1,8 @@
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { describe, expect, test } from "vitest";
 
 import { processImminentTaskRetryableRuns } from "./imminent-task-retryable-runs";
-import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
 import { withFakeClock } from "../testing/clock";

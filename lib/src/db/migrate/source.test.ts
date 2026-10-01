@@ -2,9 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { readMigrationFiles } from "drizzle-orm/migrator";
+import { afterAll, describe, expect, test } from "vitest";
 
 import { type Migrations, migrationSource, readMigrationsDirectory } from "./source";
-import { afterAll, describe, expect, test } from "bun:test";
 
 // A fixture migration folder shaped like drizzle-kit's output.
 const migrationsDir = fs.mkdtempSync(path.join(os.tmpdir(), "migrate-source-"));

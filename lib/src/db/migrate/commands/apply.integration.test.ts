@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { migrateApply } from "./apply";
-import { describe, expect, test } from "bun:test";
 import { sha256 } from "../../../crypto";
 import { loadDatabaseConfig } from "../../config";
 import { type Migrations, migrationSource } from "../source";

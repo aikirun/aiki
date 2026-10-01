@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { createKeysetStreamCursorAdvancer } from "./keyset-stream";
-import { describe, expect, test } from "bun:test";
 
 const advanceCursor = createKeysetStreamCursorAdvancer<{ order: number; id: string }>({
 	getOrder: (item) => item.order,

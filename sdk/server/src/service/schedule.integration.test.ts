@@ -1,9 +1,9 @@
 import { createBinaryLatch } from "@aikirun/lib/async";
 import { hashInput } from "@aikirun/lib/crypto";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import { describe, expect, test } from "vitest";
 
 import { createScheduleService, type ScheduleService } from "./schedule";
-import { describe, expect, test } from "bun:test";
 import { InvalidScheduleStateTransitionError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import { withFakeClock } from "../testing/clock";

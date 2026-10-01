@@ -1,8 +1,8 @@
 import { noopLogger } from "@aikirun/lib/logger";
+import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { codec, type EncodedValue, InvalidEncodedValueError, type NamedCreateCodec } from "./codec";
 import { DuplicateCodecNameError, switchCodecs, UnknownCodecNameError } from "./switch-codec";
-import { describe, expect, expectTypeOf, test } from "bun:test";
 
 describe("switchCodecs", () => {
 	const current = codec({

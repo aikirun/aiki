@@ -2,9 +2,9 @@ import { loadDatabaseConfig, loadDatabaseProvider, type PgDatabaseConfig } from 
 import { is } from "drizzle-orm";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import postgres from "postgres";
+import { expect, test } from "vitest";
 
 import * as schema from "./schema";
-import { expect, test } from "bun:test";
 
 const UPDATED_AT_TRIGGER_FUNCTION = "iam_set_updated_at_column";
 

@@ -1,8 +1,8 @@
 import { is } from "drizzle-orm";
 import { getTableConfig, SQLiteTable } from "drizzle-orm/sqlite-core";
+import { expect, test } from "vitest";
 
 import * as schema from "./schema";
-import { expect, test } from "bun:test";
 
 const tables = (Object.values(schema) as unknown[])
 	.filter((value): value is SQLiteTable => is(value, SQLiteTable))

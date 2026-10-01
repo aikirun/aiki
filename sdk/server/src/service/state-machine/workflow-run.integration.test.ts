@@ -6,9 +6,9 @@ import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunTransitionStateRequestV1 } from "@aikirun/types/api/workflow-run";
 import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
 import { createWorkflowRunStateMachine } from "./workflow-run";
-import { describe, expect, test } from "bun:test";
 import { processImminentScheduledRuns } from "../../daemon/imminent-scheduled-runs";
 import { processImminentSleepElapsedRuns } from "../../daemon/imminent-sleep-elapsed-runs";
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";

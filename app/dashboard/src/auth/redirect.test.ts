@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { getSafeRedirect } from "./redirect";
-import { describe, expect, test } from "bun:test";
 
 const origin = "https://dashboard.example.com";
 

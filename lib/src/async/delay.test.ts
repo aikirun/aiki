@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { delay } from "./delay";
-import { describe, expect, test } from "bun:test";
 
 describe("delay", () => {
 	test("does not resolve synchronously and resolves after the timer fires", async () => {

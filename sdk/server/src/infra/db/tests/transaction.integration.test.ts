@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
+
 import { withRepos } from "../../../testing/harness";
 import type { TxRepositories } from "../types";
 

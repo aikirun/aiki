@@ -1,12 +1,12 @@
 import { noopLogger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { describe, expect, test } from "vitest";
 
 import {
 	processImminentChildRunWaitTimedOutRuns,
 	queueChildRunWaitTimedOutRuns,
 } from "./imminent-child-run-wait-timed-out-runs";
-import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
 import { createChildRunCanceller } from "../service/cancel-child-runs";

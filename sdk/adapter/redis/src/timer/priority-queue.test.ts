@@ -1,9 +1,9 @@
 import { EventEmitter } from "node:events";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { Redis } from "ioredis";
+import { describe, expect, test } from "vitest";
 
 import { redisTimerPriorityQueue } from "./priority-queue";
-import { describe, expect, test } from "bun:test";
 
 function fakeRedis(options: { lazyConnect: boolean }) {
 	const duplicateOverrides: unknown[] = [];

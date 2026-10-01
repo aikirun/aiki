@@ -1,8 +1,9 @@
+import { afterAll, describe, expect, test, vi } from "vitest";
+
 import { createConsoleLogger } from "./console-logger";
-import { afterAll, describe, expect, spyOn, test } from "bun:test";
 
 describe("createConsoleLogger", () => {
-	const consoleError = spyOn(console, "error").mockImplementation(() => {});
+	const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
 	afterAll(() => {
 		consoleError.mockRestore();

@@ -1,3 +1,5 @@
+import { describe, expect, test } from "vitest";
+
 import {
 	asAikiError,
 	ConflictError,
@@ -6,7 +8,6 @@ import {
 	UnauthorizedError,
 	ValidationError,
 } from "./aiki-error";
-import { describe, expect, test } from "bun:test";
 
 describe("asAikiError", () => {
 	// Bundlers inline lib into every package that depends on it, so an error thrown inside one

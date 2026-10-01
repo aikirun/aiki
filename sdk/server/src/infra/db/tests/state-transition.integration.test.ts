@@ -1,7 +1,7 @@
 import type { NamespaceId } from "@aikirun/types/namespace";
 import { ulid } from "ulidx";
+import { describe, expect, test } from "vitest";
 
-import { describe, expect, test } from "bun:test";
 import { createChildRunCanceller } from "../../../service/cancel-child-runs";
 import { createScheduleService } from "../../../service/schedule";
 import { createWorkflowRunStateMachine } from "../../../service/state-machine/workflow-run";

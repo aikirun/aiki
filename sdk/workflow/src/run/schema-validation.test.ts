@@ -2,10 +2,10 @@ import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import { WorkflowRunFailedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import { describe, expect, test } from "vitest";
 
 import { workflowRunHandle } from "./handle";
 import { validateWithSchema } from "./schema-validation";
-import { describe, expect, test } from "bun:test";
 
 describe("validateWithSchema", () => {
 	test("returns a sync validator's value directly, without wrapping it in a promise", () =>

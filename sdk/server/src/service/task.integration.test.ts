@@ -1,9 +1,9 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { NamespaceId } from "@aikirun/types/namespace";
+import { describe, expect, test } from "vitest";
 
 import { createTaskStateMachine } from "./state-machine/task";
-import { describe, expect, test } from "bun:test";
 import { InvalidTaskStateTransitionError, WorkflowRunTerminatedError } from "../errors";
 import { createTaskService } from "../service/task";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";

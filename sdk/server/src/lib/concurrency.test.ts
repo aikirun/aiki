@@ -1,8 +1,8 @@
 import { createBinaryLatch } from "@aikirun/lib/async";
 import { noopLogger } from "@aikirun/lib/logger";
+import { describe, expect, test } from "vitest";
 
 import { runConcurrently } from "./concurrency";
-import { describe, expect, test } from "bun:test";
 import { createDaemonContext } from "../middleware/context";
 
 const context = (signal = new AbortController().signal) =>

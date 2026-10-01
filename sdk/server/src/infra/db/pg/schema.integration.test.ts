@@ -2,10 +2,10 @@ import { loadDatabaseConfig, loadDatabaseProvider } from "@aikirun/lib/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { is } from "drizzle-orm";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
+import { expect, test } from "vitest";
 
 import type { PgClient } from "./provider";
 import * as schema from "./schema";
-import { expect, test } from "bun:test";
 import { database } from "..";
 
 const UPDATED_AT_TRIGGER_FUNCTION = "server_set_updated_at_column";

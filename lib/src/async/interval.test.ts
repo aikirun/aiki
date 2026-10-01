@@ -1,7 +1,8 @@
+import { describe, expect, test, vi } from "vitest";
+
 import { delay } from "./delay";
 import { runOnInterval } from "./interval";
 import { createBinaryLatch } from "./latch";
-import { describe, expect, spyOn, test } from "bun:test";
 
 describe("runOnInterval", () => {
 	test("does not invoke fn synchronously", () => {
@@ -149,7 +150,7 @@ describe("runOnInterval", () => {
 
 	test("stop detaches the abort listener", () => {
 		const controller = new AbortController();
-		const removeListener = spyOn(controller.signal, "removeEventListener");
+		const removeListener = vi.spyOn(controller.signal, "removeEventListener");
 
 		const { stop } = runOnInterval(async () => {}, {
 			intervalMs: 1_000,

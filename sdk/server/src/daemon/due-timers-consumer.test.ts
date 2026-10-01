@@ -3,9 +3,9 @@ import { asConfigProvider } from "@aikirun/lib/config";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
+import { describe, expect, test } from "vitest";
 
 import { startDueTimersConsumer } from "./due-timers-consumer";
-import { describe, expect, test } from "bun:test";
 import type { Repositories } from "../infra/db/types";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
 

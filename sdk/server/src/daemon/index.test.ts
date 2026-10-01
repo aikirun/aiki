@@ -4,9 +4,9 @@ import { type Logger, noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
+import { describe, expect, test } from "vitest";
 
 import { pollingDaemon, startDaemons } from "./index";
-import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
 import type { DaemonContext } from "../middleware/context";

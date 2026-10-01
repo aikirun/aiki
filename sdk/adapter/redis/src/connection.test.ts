@@ -2,9 +2,9 @@ import { EventEmitter } from "node:events";
 import { createBinaryLatch, delay, settleWithin } from "@aikirun/lib/async";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Redis } from "ioredis";
+import { describe, expect, test } from "vitest";
 
 import { attachConnectionSupervisor, connectionTracker, untilReadyHandshake } from "./connection";
-import { describe, expect, test } from "bun:test";
 
 function fakeRedis(status: Redis["status"], connectTimeoutMs?: number) {
 	return Object.assign(new EventEmitter(), {

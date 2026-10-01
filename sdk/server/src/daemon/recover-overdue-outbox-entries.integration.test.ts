@@ -1,8 +1,8 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { describe, expect, test } from "vitest";
 
 import { recoverOverdueOutboxEntries } from "./recover-overdue-outbox-entries";
 import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
-import { describe, expect, test } from "bun:test";
 import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";

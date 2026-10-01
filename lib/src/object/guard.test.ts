@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { propsDefined, propsRequiredNonNull } from "./guard";
-import { describe, expect, test } from "bun:test";
 
 describe("propsDefined", () => {
 	test("returns true when single prop is defined", () => {

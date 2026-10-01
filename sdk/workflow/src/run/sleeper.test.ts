@@ -3,10 +3,10 @@ import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
 import { workflowRunHandle } from "./handle";
 import { createSleeper } from "./sleeper";
-import { describe, expect, test } from "bun:test";
 
 function createTestSleeper(client: Omit<FakeClient, "verify">, record: WorkflowRunRecord) {
 	return createSleeper(workflowRunHandle(client, record), client.logger);

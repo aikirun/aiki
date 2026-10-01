@@ -9,10 +9,10 @@ import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { Client } from "@aikirun/types/client";
 import type { ScheduleId } from "@aikirun/types/schedule";
 import { INTERNAL } from "@aikirun/types/symbols";
+import { describe, expect, test } from "vitest";
 
 import { schedule } from "./schedule";
 import { workflow } from "./workflow";
-import { describe, expect, test } from "bun:test";
 
 const syncInventoryWorkflow = workflow({ name: "sync-inventory" }).v<{ warehouseId: string }>("1.0.0", {
 	handler: async () => {},

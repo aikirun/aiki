@@ -1,7 +1,7 @@
 import { objectOverrider } from "@aikirun/lib/object";
+import { describe, expect, test } from "vitest";
 
 import { publishPendingOutboxEntries } from "./publish-pending-outbox-entries";
-import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { withFakeClock } from "../testing/clock";
 import { pendingWorkflowRunOutboxRowFactory } from "../testing/data-factory/infra/workflow-run-outbox";

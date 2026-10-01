@@ -1,5 +1,6 @@
+import { describe, expect, test, vi } from "vitest";
+
 import { getRetryParams, withRetry } from "./strategy";
-import { describe, expect, spyOn, test } from "bun:test";
 
 describe("getRetryParams", () => {
 	describe("never strategy", () => {
@@ -76,13 +77,13 @@ describe("getRetryParams", () => {
 		const strategy = { type: "jittered" as const, maxAttempts: 5, baseDelayMs: 100 };
 
 		test("returns delay between 0 and base on first attempt", () => {
-			const mock = spyOn(Math, "random").mockReturnValue(0.5);
+			const mock = vi.spyOn(Math, "random").mockReturnValue(0.5);
 			expect(getRetryParams(1, strategy)).toEqual({ retriesLeft: true, delayMs: 50 });
 			mock.mockRestore();
 		});
 
 		test("scales jitter with attempt number using default factor", () => {
-			const mock = spyOn(Math, "random").mockReturnValue(0.5);
+			const mock = vi.spyOn(Math, "random").mockReturnValue(0.5);
 			expect(getRetryParams(1, strategy)).toEqual({ retriesLeft: true, delayMs: 50 });
 			expect(getRetryParams(2, strategy)).toEqual({ retriesLeft: true, delayMs: 100 });
 			expect(getRetryParams(3, strategy)).toEqual({ retriesLeft: true, delayMs: 200 });
@@ -90,7 +91,7 @@ describe("getRetryParams", () => {
 		});
 
 		test("uses custom factor", () => {
-			const mock = spyOn(Math, "random").mockReturnValue(0.5);
+			const mock = vi.spyOn(Math, "random").mockReturnValue(0.5);
 			const customFactor = { ...strategy, factor: 3 };
 			expect(getRetryParams(1, customFactor)).toEqual({ retriesLeft: true, delayMs: 50 });
 			expect(getRetryParams(2, customFactor)).toEqual({ retriesLeft: true, delayMs: 150 });
@@ -99,20 +100,20 @@ describe("getRetryParams", () => {
 		});
 
 		test("rounds a fractional delay to whole milliseconds", () => {
-			const mock = spyOn(Math, "random").mockReturnValue(0.333);
+			const mock = vi.spyOn(Math, "random").mockReturnValue(0.333);
 			expect(getRetryParams(1, strategy)).toEqual({ retriesLeft: true, delayMs: 33 });
 			mock.mockRestore();
 		});
 
 		test("returns a 1ms delay when random returns 0", () => {
-			const mock = spyOn(Math, "random").mockReturnValue(0);
+			const mock = vi.spyOn(Math, "random").mockReturnValue(0);
 			const result = getRetryParams(1, strategy);
 			expect(result).toEqual({ retriesLeft: true, delayMs: 1 });
 			mock.mockRestore();
 		});
 
 		test("caps delay at maxDelayMs", () => {
-			const mock = spyOn(Math, "random").mockReturnValue(0.9);
+			const mock = vi.spyOn(Math, "random").mockReturnValue(0.9);
 			const capped = { ...strategy, maxDelayMs: 50 };
 			expect(getRetryParams(1, capped)).toEqual({ retriesLeft: true, delayMs: 50 });
 			expect(getRetryParams(3, capped)).toEqual({ retriesLeft: true, delayMs: 50 });

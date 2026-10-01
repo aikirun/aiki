@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { computeRank, extractRankDueAtMs, extractRankPriority } from "./rank";
-import { describe, expect, test } from "bun:test";
 
 describe("computeRank", () => {
 	test("encodes the due time in the high digits and the priority in the low digit", () => {

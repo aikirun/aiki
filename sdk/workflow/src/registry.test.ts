@@ -1,8 +1,8 @@
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
+import { describe, expect, test } from "vitest";
 
 import { workflowRegistry } from "./registry";
 import { workflow } from "./workflow";
-import { describe, expect, test } from "bun:test";
 
 const orders = workflow({ name: "orders" });
 const ordersV1 = orders.v("v1", { handler: async () => {} });

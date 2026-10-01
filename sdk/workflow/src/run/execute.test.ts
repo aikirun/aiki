@@ -17,11 +17,11 @@ import {
 	WorkflowRunRevisionConflictError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
+import { describe, expect, test, vi } from "vitest";
 
 import type { EventsDefinition } from "./event";
 import { executeWorkflowRun } from "./execute";
 import type { WorkflowRun } from "./index";
-import { describe, expect, spyOn, test } from "bun:test";
 import { task } from "../task";
 import type { AnyWorkflowVersion } from "../workflow-version";
 
@@ -103,7 +103,7 @@ describe("executeWorkflowRun", () => {
 				const workflowVersion = fakeWorkflowVersion(async () => {
 					throw new Error("boom");
 				});
-				const errorLog = spyOn(client.logger, "error");
+				const errorLog = vi.spyOn(client.logger, "error");
 
 				const result = await executeWorkflowRun({
 					client,

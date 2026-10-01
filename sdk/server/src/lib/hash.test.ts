@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { candidateHashes } from "./hash";
-import { describe, expect, test } from "bun:test";
 
 describe("candidateHashes", () => {
 	test("is the current value alone when the hash carries no others", () => {

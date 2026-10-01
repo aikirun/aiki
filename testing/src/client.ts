@@ -3,8 +3,7 @@ import { noopLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
-
-import { expect, type Mock, mock } from "bun:test";
+import { expect, type Mock, vi } from "vitest";
 
 type MockEndpoint<Args extends unknown[], Return> = Mock<(...args: Args) => Return> & {
 	/**
@@ -112,7 +111,7 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 			return typeof response === "function" ? response(actualRequest) : response;
 		};
 
-		const endpoint = Object.assign(mock(handler), {
+		const endpoint = Object.assign(vi.fn(handler), {
 			once: (expectedRequest: unknown, response?: unknown) => {
 				expectedCalls.push({ request: expectedRequest, result: { type: "resolve", response } });
 				return endpoint;

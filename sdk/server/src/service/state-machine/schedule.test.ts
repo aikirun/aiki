@@ -6,9 +6,9 @@ import {
 	type ScheduleState,
 	type ScheduleStatus,
 } from "@aikirun/types/schedule";
+import { describe, expect, test } from "vitest";
 
 import { assertIsValidScheduleStateTransition } from "./schedule";
-import { describe, expect, test } from "bun:test";
 import { InvalidScheduleStateTransitionError } from "../../errors";
 
 describe("assertIsValidScheduleStateTransition", () => {

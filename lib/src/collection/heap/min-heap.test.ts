@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { createMinHeap } from "./min-heap";
-import { describe, expect, test } from "bun:test";
 
 const numericMinHeap = () => createMinHeap<number>((a, b) => a - b);
 

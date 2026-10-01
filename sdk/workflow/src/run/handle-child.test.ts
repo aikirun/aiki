@@ -3,10 +3,10 @@ import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aiki
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
 import { workflowRunHandle } from "./handle";
 import { childWorkflowRunHandle } from "./handle-child";
-import { describe, expect, test } from "bun:test";
 
 describe("childWorkflowRunHandle", () => {
 	describe("wait", () => {

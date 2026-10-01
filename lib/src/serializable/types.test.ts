@@ -1,5 +1,6 @@
+import { describe, expectTypeOf, test } from "vitest";
+
 import type { Serializable } from "./types";
-import { describe, expectTypeOf, test } from "bun:test";
 
 interface Order {
 	id: string;

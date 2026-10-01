@@ -2,10 +2,10 @@ import { delay } from "@aikirun/lib/async";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import { INTERNAL } from "@aikirun/types/symbols";
+import { describe, expect, test } from "vitest";
 
 import { workflowRunHandle } from "./handle";
 import { taskExecutionTracker } from "./task-execution-tracker";
-import { describe, expect, test } from "bun:test";
 
 describe("taskExecutionTracker", () => {
 	test("flush waits for open task executions even when none awaited a retry", () =>

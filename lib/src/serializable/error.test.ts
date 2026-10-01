@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { createSerializableError } from "./error";
-import { describe, expect, test } from "bun:test";
 
 describe("createSerializableError", () => {
 	test("extracts message, name, and stack from an Error", () => {

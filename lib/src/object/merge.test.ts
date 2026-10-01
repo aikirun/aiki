@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { merge } from "./merge";
-import { describe, expect, test } from "bun:test";
 
 describe("merge", () => {
 	test("returns the defaults when overrides are omitted", () => {

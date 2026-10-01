@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { settleWithin } from "./settle-within";
-import { describe, expect, test } from "bun:test";
 
 describe("settleWithin", () => {
 	test("returns true when the promise settles within the budget", async () => {

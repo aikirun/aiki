@@ -4,9 +4,9 @@ import { noopLogger } from "@aikirun/lib/logger";
 import type { Database } from "@aikirun/types/infra/db";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
+import { describe, expect, test } from "vitest";
 
 import { createHandler } from "./handler";
-import { describe, expect, test } from "bun:test";
 
 // iam ships as its own bundle with its own copy of the lib error classes, so the error its
 // authorizer throws is never built by the constructor this package imports. This stands in

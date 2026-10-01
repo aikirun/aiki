@@ -11,8 +11,8 @@ import type {
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
+import { describe, expect, test } from "vitest";
 
-import { describe, expect, test } from "bun:test";
 import type { NamespaceRequestContext } from "../../../middleware/context";
 import { createChildRunCanceller } from "../../../service/cancel-child-runs";
 import { createWorkflowRunService } from "../../../service/workflow-run";

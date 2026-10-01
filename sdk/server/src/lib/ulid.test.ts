@@ -1,7 +1,7 @@
 import { decodeTime, ulid } from "ulidx";
+import { describe, expect, test } from "vitest";
 
 import { ulidUpperBound } from "./ulid";
-import { describe, expect, test } from "bun:test";
 
 describe("ulidUpperBound", () => {
 	test("an id minted before the timestamp sorts below the upper bound", () => {

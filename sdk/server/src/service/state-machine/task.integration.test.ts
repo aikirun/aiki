@@ -1,9 +1,9 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { NamespaceId } from "@aikirun/types/namespace";
+import { describe, expect, test } from "vitest";
 
 import { createTaskStateMachine } from "./task";
-import { describe, expect, test } from "bun:test";
 import { namespaceRequestContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness } from "../../testing/harness";
 import { seedClaimedRun } from "../../testing/seed/run";

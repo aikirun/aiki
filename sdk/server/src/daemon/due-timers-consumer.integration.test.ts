@@ -3,9 +3,9 @@ import { hashInput } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import { describe, expect, test } from "vitest";
 
 import { processDueTimers } from "./due-timers-consumer";
-import { describe, expect, test } from "bun:test";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
 import { createChildRunCanceller } from "../service/cancel-child-runs";

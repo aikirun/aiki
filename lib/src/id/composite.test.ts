@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { getCompositeId } from "./composite";
-import { describe, expect, test } from "bun:test";
 
 describe("getCompositeId", () => {
 	test("without version id", () => {

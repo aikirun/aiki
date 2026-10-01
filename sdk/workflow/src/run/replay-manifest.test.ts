@@ -5,9 +5,9 @@ import {
 import { completedTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import type { WorkflowRunAddress } from "@aikirun/types/workflow/run";
 import type { TaskAddress } from "@aikirun/types/workflow/task";
+import { describe, expect, test } from "vitest";
 
 import { createReplayManifest } from "./replay-manifest";
-import { describe, expect, test } from "bun:test";
 
 const taskAddressA = "task-addr-a" as TaskAddress;
 const taskAddressB = "task-addr-b" as TaskAddress;

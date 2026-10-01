@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { objectOverrider } from "./overrider";
-import { describe, expect, test } from "bun:test";
 
 interface TestObject {
 	name: string;

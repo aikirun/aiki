@@ -2,9 +2,9 @@ import { withFakeClient } from "@aikirun/testing/client";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { ClientCodecMissingError, type WorkflowRunId } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
 import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./bound-codec";
-import { describe, expect, test } from "bun:test";
 
 describe("toBoundCodec", () => {
 	test("delegates encode and decode to the codec", async () => {

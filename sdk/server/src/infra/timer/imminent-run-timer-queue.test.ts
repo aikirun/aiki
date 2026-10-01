@@ -1,9 +1,9 @@
 import { asConfigProvider } from "@aikirun/lib/config";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { describe, expect, test } from "vitest";
 
 import { createImminentRunTimerQueue } from "./imminent-run-timer-queue";
-import { describe, expect, test } from "bun:test";
 import { computeRank } from "../../lib/rank";
 
 function createQueues(lookaheadWindowMs: number) {

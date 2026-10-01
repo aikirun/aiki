@@ -15,9 +15,9 @@ import {
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
 } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
 import { workflowRunHandle } from "./handle";
-import { describe, expect, test } from "bun:test";
 
 describe("workflowRunHandle", () => {
 	describe("construction", () => {

@@ -1,9 +1,9 @@
 import { NotFoundError } from "@aikirun/lib/error";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { ScheduleState, ScheduleStatus } from "@aikirun/types/schedule";
+import { describe, expect, test } from "vitest";
 
 import { transitionScheduleInTx } from "./schedule";
-import { describe, expect, test } from "bun:test";
 import { InvalidScheduleStateTransitionError } from "../../errors";
 import { createServiceHarness } from "../../testing/harness";
 import { seedActiveSchedule } from "../../testing/seed/schedule";

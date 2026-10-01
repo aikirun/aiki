@@ -1,7 +1,7 @@
 import { noopLogger } from "@aikirun/lib/logger";
+import { describe, expect, test } from "vitest";
 
 import { CodecNameMismatchError, codec, InvalidEncodedValueError } from "./codec";
-import { describe, expect, test } from "bun:test";
 
 describe("codec", () => {
 	const created = codec({

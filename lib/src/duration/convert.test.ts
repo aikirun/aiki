@@ -1,5 +1,6 @@
+import { describe, expect, test } from "vitest";
+
 import { toMilliseconds } from "./convert";
-import { describe, expect, test } from "bun:test";
 
 describe("toMilliseconds", () => {
 	describe("valid inputs", () => {

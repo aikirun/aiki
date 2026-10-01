@@ -9,10 +9,10 @@ import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
+import { describe, expect, test } from "vitest";
 
 import { createTaskStateMachine } from "./state-machine/task";
 import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./state-machine/workflow-run";
-import { describe, expect, test } from "bun:test";
 import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";

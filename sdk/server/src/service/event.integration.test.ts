@@ -5,9 +5,9 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import { describe, expect, test } from "vitest";
 
 import { createWorkflowRunStateMachine } from "./state-machine/workflow-run";
-import { describe, expect, test } from "bun:test";
 import type { Repositories } from "../infra/db/types";
 import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infra/timer/imminent-run-timer-queue";
 import { computeRank } from "../lib/rank";
