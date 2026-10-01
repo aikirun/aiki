@@ -35,7 +35,7 @@ describe("task repository getByIdWithState", () => {
 
 			const row = await repos.task.getByIdWithState(context.namespaceId, taskInfo.id);
 
-			expect(row?.state).toContainKey("output");
+			expect(row?.state).toHaveProperty("output");
 			expect(row?.state).toEqual({ status: "completed", output: undefined });
 		}));
 

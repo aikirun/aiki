@@ -71,10 +71,12 @@ describe("workflowRegistry", () => {
 		registry.addMany("user", [ordersV1, paymentsV1]);
 
 		const all = registry.getAll();
-		expect(all).toContainValues([
-			{ source: "user", workflow: ordersV1 },
-			{ source: "user", workflow: paymentsV1 },
-		]);
+		expect(all).toEqual(
+			expect.arrayContaining([
+				{ source: "user", workflow: ordersV1 },
+				{ source: "user", workflow: paymentsV1 },
+			])
+		);
 	});
 
 	test("remove deletes a workflow", () => {
@@ -128,11 +130,13 @@ describe("workflowRegistry", () => {
 		registry.add("user", ordersV1).add("user", ordersV2).add("system", systemOrdersV1);
 
 		const all = registry.getAll();
-		expect(all).toContainValues([
-			{ source: "user", workflow: ordersV1 },
-			{ source: "user", workflow: ordersV2 },
-			{ source: "system", workflow: systemOrdersV1 },
-		]);
+		expect(all).toEqual(
+			expect.arrayContaining([
+				{ source: "user", workflow: ordersV1 },
+				{ source: "user", workflow: ordersV2 },
+				{ source: "system", workflow: systemOrdersV1 },
+			])
+		);
 	});
 
 	test("methods return the registry for chaining", () => {

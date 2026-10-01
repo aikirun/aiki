@@ -45,7 +45,7 @@ describe("workflow", () => {
 
 		const all = orders[INTERNAL].getAllVersions();
 		expect(all).toHaveLength(2);
-		expect(all).toContainValues([ordersV1, ordersV2]);
+		expect(all).toEqual(expect.arrayContaining([ordersV1, ordersV2]));
 	});
 
 	test("getVersion returns a version by id", () => {

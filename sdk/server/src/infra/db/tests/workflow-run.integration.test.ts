@@ -136,7 +136,7 @@ describe("getByIdWithState", () => {
 
 			const row = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 
-			expect(row?.state).toContainKey("output");
+			expect(row?.state).toHaveProperty("output");
 			expect(row?.state).toEqual({ status: "completed", output: undefined });
 		}));
 });
@@ -156,7 +156,7 @@ describe("getByIdWithWorkflowAndState", () => {
 			const row = await repos.workflowRun.getByIdWithWorkflowAndState({ namespaceId: context.namespaceId, id: runId });
 
 			expect(row?.workflow).toEqual({ name: workflowName, versionId: workflowVersionId, source: workflowSource });
-			expect(row?.state).toContainKey("output");
+			expect(row?.state).toHaveProperty("output");
 			expect(row?.state).toEqual({ status: "completed", output: undefined });
 		}));
 });
@@ -182,7 +182,7 @@ describe("getByReferenceWithWorkflowAndState", () => {
 				referenceId,
 			});
 
-			expect(row?.state).toContainKey("output");
+			expect(row?.state).toHaveProperty("output");
 			expect(row?.state).toEqual({ status: "completed", output: undefined });
 		}));
 

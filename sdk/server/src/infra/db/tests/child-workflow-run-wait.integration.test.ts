@@ -107,7 +107,7 @@ describe("child workflow run wait repository listByParentRunIdWithChildState", (
 			const waits = await repos.childWorkflowRunWait.listByParentRunIdWithChildState(parent.runId);
 
 			const childState = waits.find((wait) => wait.childWorkflowRunId === child.runId)?.childWorkflowRunState;
-			expect(childState).toContainKey("output");
+			expect(childState).toHaveProperty("output");
 			expect(childState).toEqual({ status: "completed", output: undefined });
 		}));
 

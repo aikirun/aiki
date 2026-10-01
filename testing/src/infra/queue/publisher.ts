@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { Publisher, PublishRunsResult, ReadyWorkflowRun } from "@aikirun/types/infra/queue";
 
@@ -59,7 +60,7 @@ export function fakePublisher(): FakePublisher {
 				const problems: string[] = [];
 				for (const [name, expectedCalls] of expectedCallsByName) {
 					for (const expectedCall of expectedCalls) {
-						problems.push(`expected call to ${name}(${Bun.inspect(expectedCall.request)}) was never made`);
+						problems.push(`expected call to ${name}(${inspect(expectedCall.request)}) was never made`);
 					}
 				}
 				if (problems.length > 0) {

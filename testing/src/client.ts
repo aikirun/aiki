@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -98,7 +99,7 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 
 			const expectedCall = expectedCalls[actualCalls.length - 1];
 			if (expectedCall === undefined) {
-				throw new Error(`Fake client: unexpected call to ${endpointName}(${Bun.inspect(actualRequest)})`);
+				throw new Error(`Fake client: unexpected call to ${endpointName}(${inspect(actualRequest)})`);
 			}
 			expect(actualRequest).toEqual(expectedCall.request);
 
@@ -180,15 +181,15 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 				const actualCall = actualCalls[i];
 
 				if (expectedCall === undefined) {
-					problems.push(`unexpected call to ${name}(${Bun.inspect(actualCall?.request)})`);
+					problems.push(`unexpected call to ${name}(${inspect(actualCall?.request)})`);
 				} else if (actualCall === undefined) {
-					problems.push(`expected call to ${name}(${Bun.inspect(expectedCall.request)}) was never made`);
+					problems.push(`expected call to ${name}(${inspect(expectedCall.request)}) was never made`);
 				} else {
 					try {
 						expect(actualCall.request).toEqual(expectedCall.request);
 					} catch {
 						problems.push(
-							`call to ${name} expected ${Bun.inspect(expectedCall.request)} but received ${Bun.inspect(actualCall.request)}`
+							`call to ${name} expected ${inspect(expectedCall.request)} but received ${inspect(actualCall.request)}`
 						);
 					}
 				}

@@ -630,14 +630,14 @@ describe("WorkflowRunService cancelByIds", () => {
 				inputHash: await hashInput(taskInput),
 			});
 
-			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"])).toBeEmpty();
+			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"])).toEqual([]);
 			const runningTasks = await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["running"]);
 			expect(runningTasks).toEqual([expect.objectContaining({ id: taskInfo.id, workflowRunId: runId })]);
 
 			const { service } = createService(repos);
 			await service.cancelByIds(context, { ids: [runId] });
 
-			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["running"])).toBeEmpty();
+			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["running"])).toEqual([]);
 			const discardedTasks = await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"]);
 			expect(discardedTasks).toEqual([expect.objectContaining({ id: taskInfo.id, workflowRunId: runId })]);
 		}));
@@ -668,7 +668,7 @@ describe("WorkflowRunService cancelByIds", () => {
 				})
 			).rejects.toThrow(WorkflowRunRevisionConflictError);
 
-			expect(await repos.workflowRun.getChildRuns({ namespaceId: context.namespaceId, id: parent.runId })).toBeEmpty();
+			expect(await repos.workflowRun.getChildRuns({ namespaceId: context.namespaceId, id: parent.runId })).toEqual([]);
 		}));
 
 	test("cancelling a parent with a live child schedules the cancel-child-runs workflow", () =>
