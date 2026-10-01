@@ -2,6 +2,23 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.43.1
+
+Projects that type-check their dependencies compile against `@aikirun/workflow` again. The dashboard Docker image can be told which address to listen on. The Quick Start app stops on Ctrl+C and accepts connections from your machine only.
+
+### Improvements
+
+- **The dashboard Docker image reads its listen address from `AIKI_DASHBOARD_HOST`.** It defaults to `0.0.0.0`, as before. Run the container with `--network host` and `AIKI_DASHBOARD_HOST=127.0.0.1` to open the dashboard to this machine only. With a published port (`-p`), keep the default.
+
+### Bug Fixes
+
+- **`@aikirun/types` exports `./infra/hasher`.** It exported `./infra/hash`, a file the build never produced, while the types of `@aikirun/workflow` import `@aikirun/types/infra/hasher`. A project with `skipLibCheck: false` failed to compile with `Cannot find module '@aikirun/types/infra/hasher'`. This was broken since 0.39.0.
+
+### Documentation
+
+- **The Quick Start app stops on Ctrl+C.** It kept running, because srvx closed its own HTTP server without exiting. The app now stops the worker and the runtime on `SIGINT` and `SIGTERM`, then exits.
+- **The Quick Start server listens on `127.0.0.1`.** It listened on every network interface with no authentication. The dashboard step now has one command for Docker Desktop and one for Docker Engine on Linux, both limited to your machine.
+
 ## 0.43.0
 
 Aiki now runs on SQLite as well as Postgres, and SQLite is the default in the docs: the database is one file, with no server to run. A new package, `@aikirun/codec`, builds codecs that record their name, run in sequence, and switch from an old codec to a new one. The server and IAM log which migrations a database is missing when they first connect, and errors print what caused them. A run's history is ordered by revision instead of by id, so servers whose clocks disagree no longer list it out of order, and `handle.wait()` no longer misses a finished run for the same reason. Redis and in-memory queues are isolated by namespace. The server listens on `127.0.0.1` by default. Four database migrations (`0041` through `0044`) ship with this release, and the server, workers and clients must be upgraded together.
