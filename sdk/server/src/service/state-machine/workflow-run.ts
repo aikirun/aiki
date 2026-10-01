@@ -18,7 +18,7 @@ import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
 import type { Repositories, TxRepositories } from "../../infra/db/types";
-import type { ImminentRunTimerQueue } from "../../infra/timer/imminent-timer-queue";
+import type { ImminentTimerQueue } from "../../infra/timer/imminent-timer-queue";
 import type { NamespaceRequestContext } from "../../middleware/context";
 import type { ChildRunCanceller } from "../cancel-child-runs";
 import { deliverTerminatedSignalToParentRun } from "../deliver-terminated-signals";
@@ -127,13 +127,13 @@ export function assertIsValidWorkflowRunStateTransition(
 export interface WorkflowRunStateMachineDeps {
 	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
-	imminentRunTimerQueue?: ImminentRunTimerQueue;
+	imminentTimerQueue?: ImminentTimerQueue;
 }
 
 export const createWorkflowRunStateMachine = ({
 	repos,
 	childRunCanceller,
-	imminentRunTimerQueue,
+	imminentTimerQueue,
 }: WorkflowRunStateMachineDeps) => ({
 	async transitionState(
 		context: NamespaceRequestContext,
@@ -141,9 +141,9 @@ export const createWorkflowRunStateMachine = ({
 		txRepos?: TxRepositories
 	): Promise<WorkflowRunTransitionStateResponseV1> {
 		const response = txRepos
-			? await transitionStateInTx(context, request, childRunCanceller, txRepos, imminentRunTimerQueue)
+			? await transitionStateInTx(context, request, childRunCanceller, txRepos, imminentTimerQueue)
 			: await repos.transaction(async (newTxRepos) =>
-					transitionStateInTx(context, request, childRunCanceller, newTxRepos, imminentRunTimerQueue)
+					transitionStateInTx(context, request, childRunCanceller, newTxRepos, imminentTimerQueue)
 				);
 		context.logger.info("Workflow state transition", {
 			"aiki.runId": request.id,
@@ -161,7 +161,7 @@ async function transitionStateInTx(
 	request: WorkflowRunTransitionStateRequestV1,
 	childRunCanceller: ChildRunCanceller,
 	txRepos: TxRepositories,
-	imminentRunTimerQueue?: ImminentRunTimerQueue
+	imminentTimerQueue?: ImminentTimerQueue
 ): Promise<WorkflowRunTransitionStateResponseV1> {
 	const namespaceId = context.namespaceId;
 	const runId = request.id as WorkflowRunId;
@@ -263,10 +263,10 @@ async function transitionStateInTx(
 		state: toState,
 	});
 
-	if (imminentRunTimerQueue) {
+	if (imminentTimerQueue) {
 		const timer = extractTimer(toState);
 		if (timer) {
-			txRepos.onCommit(() => imminentRunTimerQueue.add([{ ...timer, id: runId, priority: run.options?.priority }]));
+			txRepos.onCommit(() => imminentTimerQueue.add([{ ...timer, id: runId, priority: run.options?.priority }]));
 		}
 	}
 
@@ -293,7 +293,7 @@ async function transitionStateInTx(
 			now,
 			txRepos,
 			context.logger,
-			imminentRunTimerQueue
+			imminentTimerQueue
 		);
 	}
 

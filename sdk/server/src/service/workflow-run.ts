@@ -44,7 +44,7 @@ import type { EventWaitRow } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { ChildRunWithWorkflow, WorkflowRunWithWorkflowAndState } from "../infra/db/types/workflow-run";
-import type { ImminentRunTimerQueue } from "../infra/timer/imminent-timer-queue";
+import type { ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { candidateHashes } from "../lib/hash";
 import type { NamespaceRequestContext } from "../middleware/context";
 import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
@@ -54,21 +54,15 @@ import { discardStaleTasks } from "../service/discard-stale-tasks";
 export interface WorkflowRunServiceDeps {
 	repos: Repositories;
 	childRunCanceller: ChildRunCanceller;
-	imminentRunTimerQueue?: ImminentRunTimerQueue;
+	imminentTimerQueue?: ImminentTimerQueue;
 }
 
-export const createWorkflowRunService = ({
-	repos,
-	childRunCanceller,
-	imminentRunTimerQueue,
-}: WorkflowRunServiceDeps) => ({
+export const createWorkflowRunService = ({ repos, childRunCanceller, imminentTimerQueue }: WorkflowRunServiceDeps) => ({
 	async createWorkflowRun(
 		context: NamespaceRequestContext,
 		request: WorkflowRunCreateRequestV1
 	): Promise<WorkflowRunId> {
-		return repos.transaction(async (txRepos) =>
-			createWorkflowRunInTx(context, request, txRepos, imminentRunTimerQueue)
-		);
+		return repos.transaction(async (txRepos) => createWorkflowRunInTx(context, request, txRepos, imminentTimerQueue));
 	},
 
 	async getWorkflowRunById(context: NamespaceRequestContext, id: string): Promise<WorkflowRunRecord> {
@@ -298,7 +292,7 @@ export const createWorkflowRunService = ({
 		}
 
 		return repos.transaction(async (txRepos) =>
-			cancelByIdsInTx(context, ids, txRepos, childRunCanceller, imminentRunTimerQueue)
+			cancelByIdsInTx(context, ids, txRepos, childRunCanceller, imminentTimerQueue)
 		);
 	},
 
@@ -317,7 +311,7 @@ async function createWorkflowRunInTx(
 	{ namespaceId, logger }: NamespaceRequestContext,
 	request: WorkflowRunCreateRequestV1,
 	txRepos: TxRepositories,
-	imminentRunTimerQueue?: ImminentRunTimerQueue
+	imminentTimerQueue?: ImminentTimerQueue
 ): Promise<WorkflowRunId> {
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
@@ -398,9 +392,9 @@ async function createWorkflowRunInTx(
 		state,
 	});
 
-	if (imminentRunTimerQueue) {
+	if (imminentTimerQueue) {
 		txRepos.onCommit(() =>
-			imminentRunTimerQueue.add([{ type: "scheduled", id: runId, dueAt: scheduledAt, priority: options?.priority }])
+			imminentTimerQueue.add([{ type: "scheduled", id: runId, dueAt: scheduledAt, priority: options?.priority }])
 		);
 	}
 
@@ -420,7 +414,7 @@ async function cancelByIdsInTx(
 	ids: NonEmptyArray<string>,
 	txRepos: TxRepositories,
 	childRunCanceller: ChildRunCanceller,
-	imminentRunTimerQueue?: ImminentRunTimerQueue
+	imminentTimerQueue?: ImminentTimerQueue
 ) {
 	const { namespaceId, logger } = context;
 	const cancelledRuns = await txRepos.workflowRun.bulkTransitionToCancelledInNamespace(namespaceId, ids);
@@ -476,7 +470,7 @@ async function cancelByIdsInTx(
 	}
 
 	if (isNonEmptyArray(cancelledRunsHavingParent)) {
-		await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, logger, imminentRunTimerQueue);
+		await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, logger, imminentTimerQueue);
 	}
 
 	if (isNonEmptyArray(cancelledRunsMeta)) {

@@ -8,7 +8,7 @@ import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 import { defaultServerRuntimeConfig, type ServerRuntimeConfig, type ServerRuntimeConfigOverrides } from "./config";
 import { startDaemons } from "./daemon";
 import { createRepos } from "./infra/db/repo";
-import { createImminentRunTimerQueue } from "./infra/timer/imminent-timer-queue";
+import { createImminentTimerQueue } from "./infra/timer/imminent-timer-queue";
 import { createChildRunCanceller } from "./service/cancel-child-runs";
 
 export interface StartRuntimeParams {
@@ -49,7 +49,7 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 
 	const childRunCanceller = createChildRunCanceller(
 		timerPriorityQueue &&
-			createImminentRunTimerQueue({
+			createImminentTimerQueue({
 				timerPriorityQueue,
 				configProvider: asConfigProvider(() => ({
 					lookaheadWindowMs: configProvider.config.daemons.imminentScheduledRuns.lookaheadWindowMs,

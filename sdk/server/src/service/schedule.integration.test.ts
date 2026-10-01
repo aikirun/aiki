@@ -10,7 +10,7 @@ import { describe, expect, test } from "vitest";
 import { createScheduleService, type ScheduleService } from "./schedule";
 import { InvalidScheduleStateTransitionError } from "../errors";
 import type { Repositories } from "../infra/db/types";
-import { createImminentRunTimerQueue } from "../infra/timer/imminent-timer-queue";
+import { createImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { computeRank } from "../lib/rank";
 import { withFakeClock } from "../testing/clock";
 import { createServiceHarness, withRepos } from "../testing/harness";
@@ -622,7 +622,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const scheduleService = createScheduleService({
 				repos,
-				imminentRunTimerQueue: createImminentRunTimerQueue({
+				imminentTimerQueue: createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -653,7 +653,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const scheduleService = createScheduleService({
 				repos,
-				imminentRunTimerQueue: createImminentRunTimerQueue({
+				imminentTimerQueue: createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -679,7 +679,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const scheduleService = createScheduleService({
 				repos,
-				imminentRunTimerQueue: createImminentRunTimerQueue({
+				imminentTimerQueue: createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,
@@ -713,7 +713,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const scheduleService = createScheduleService({
 				repos,
-				imminentRunTimerQueue: createImminentRunTimerQueue({
+				imminentTimerQueue: createImminentTimerQueue({
 					timerPriorityQueue,
 					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
 					logger: noopLogger,

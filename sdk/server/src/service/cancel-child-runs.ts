@@ -18,7 +18,7 @@ import type { TxRepositories } from "../infra/db/types";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowIdentity } from "../infra/db/types/workflow";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
-import type { ImminentRunTimerQueue } from "../infra/timer/imminent-timer-queue";
+import type { ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 
 export interface CancelledRunMeta {
 	namespaceId: NamespaceId;
@@ -27,7 +27,7 @@ export interface CancelledRunMeta {
 	priority: number | undefined;
 }
 
-export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimerQueue) => ({
+export const createChildRunCanceller = (imminentTimerQueue?: ImminentTimerQueue) => ({
 	async cancel(runs: NonEmptyArray<CancelledRunMeta>, txRepos: TxRepositories, logger: Logger): Promise<void> {
 		if (!isNonEmptyArray(NON_TERMINAL_WORKFLOW_RUN_STATUSES)) {
 			return;
@@ -125,14 +125,14 @@ export const createChildRunCanceller = (imminentRunTimerQueue?: ImminentRunTimer
 			await txRepos.workflowRun.insert(workflowRunEntries);
 			await txRepos.stateTransition.appendBatch(stateTransitionEntries);
 
-			if (imminentRunTimerQueue) {
+			if (imminentTimerQueue) {
 				const imminentRuns = workflowRunEntries.map((entry) => ({
 					type: "scheduled" as const,
 					id: entry.id,
 					dueAt: now,
 					priority: entry.options?.priority,
 				}));
-				txRepos.onCommit(() => imminentRunTimerQueue.add(asNonEmptyArray(imminentRuns)));
+				txRepos.onCommit(() => imminentTimerQueue.add(asNonEmptyArray(imminentRuns)));
 			}
 		}
 	},

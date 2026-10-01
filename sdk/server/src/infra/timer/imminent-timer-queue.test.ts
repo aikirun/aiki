@@ -3,14 +3,14 @@ import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { describe, expect, test } from "vitest";
 
-import { createImminentRunTimerQueue } from "./imminent-timer-queue";
+import { createImminentTimerQueue } from "./imminent-timer-queue";
 import { computeRank } from "../../lib/rank";
 
 function createQueues(lookaheadWindowMs: number) {
 	const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 	return {
 		timerPriorityQueue,
-		imminentRunTimerQueue: createImminentRunTimerQueue({
+		imminentTimerQueue: createImminentTimerQueue({
 			timerPriorityQueue,
 			configProvider: asConfigProvider(() => ({ lookaheadWindowMs })),
 			logger: noopLogger,
@@ -18,11 +18,11 @@ function createQueues(lookaheadWindowMs: number) {
 	};
 }
 
-describe("ImminentRunTimerQueue", () => {
+describe("ImminentTimerQueue", () => {
 	test("adds a timer of the run's type for a run due within the window", async () => {
-		const { timerPriorityQueue, imminentRunTimerQueue } = createQueues(60_000);
+		const { timerPriorityQueue, imminentTimerQueue } = createQueues(60_000);
 
-		imminentRunTimerQueue.add([{ type: "sleep", id: "run-1", dueAt: 0, priority: undefined }]);
+		imminentTimerQueue.add([{ type: "sleep", id: "run-1", dueAt: 0, priority: undefined }]);
 
 		expect(await timerPriorityQueue.popDue({ maxRank: computeRank({ dueAt: 0 }), limit: 10 })).toEqual([
 			{ type: "sleep", id: "run-1", rank: computeRank({ dueAt: 0 }) },
@@ -30,9 +30,9 @@ describe("ImminentRunTimerQueue", () => {
 	});
 
 	test("mints the timer's rank with the run's priority", async () => {
-		const { timerPriorityQueue, imminentRunTimerQueue } = createQueues(60_000);
+		const { timerPriorityQueue, imminentTimerQueue } = createQueues(60_000);
 
-		imminentRunTimerQueue.add([{ type: "sleep", id: "run-1", dueAt: 0, priority: 2 }]);
+		imminentTimerQueue.add([{ type: "sleep", id: "run-1", dueAt: 0, priority: 2 }]);
 
 		expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
 			{ type: "sleep", id: "run-1", rank: computeRank({ dueAt: 0, priority: 2 }) },
@@ -40,9 +40,9 @@ describe("ImminentRunTimerQueue", () => {
 	});
 
 	test("skips runs due beyond the window", async () => {
-		const { timerPriorityQueue, imminentRunTimerQueue } = createQueues(60_000);
+		const { timerPriorityQueue, imminentTimerQueue } = createQueues(60_000);
 
-		imminentRunTimerQueue.add([
+		imminentTimerQueue.add([
 			{ type: "sleep", id: "run-due", dueAt: 0, priority: undefined },
 			{ type: "sleep", id: "run-far", dueAt: Number.MAX_SAFE_INTEGER, priority: undefined },
 		]);

@@ -15,7 +15,7 @@ import { createTaskStateMachine } from "./state-machine/task";
 import { createWorkflowRunStateMachine, type WorkflowRunStateMachine } from "./state-machine/workflow-run";
 import { WorkflowRunReferenceConflictError, WorkflowRunRevisionConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
-import { createImminentRunTimerQueue, type ImminentRunTimerQueue } from "../infra/timer/imminent-timer-queue";
+import { createImminentTimerQueue, type ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { computeRank } from "../lib/rank";
 import type { NamespaceRequestContext } from "../middleware/context";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
@@ -29,18 +29,18 @@ import { seedCompletedTask, seedRunningTask } from "../testing/seed/task";
 
 const withHarness = createServiceHarness();
 
-function createService(repos: Repositories, imminentRunTimerQueue?: ImminentRunTimerQueue) {
-	const childRunCanceller = createChildRunCanceller(imminentRunTimerQueue);
+function createService(repos: Repositories, imminentTimerQueue?: ImminentTimerQueue) {
+	const childRunCanceller = createChildRunCanceller(imminentTimerQueue);
 	const workflowRunStateMachine = createWorkflowRunStateMachine({
 		repos,
 		childRunCanceller,
-		imminentRunTimerQueue,
+		imminentTimerQueue,
 	});
 	return {
 		service: createWorkflowRunService({
 			repos,
 			childRunCanceller,
-			imminentRunTimerQueue,
+			imminentTimerQueue,
 		}),
 		stateMachine: workflowRunStateMachine,
 	};
@@ -50,11 +50,11 @@ function createTimerPriorityQueue() {
 	return inMemoryTimerPriorityQueue()({ logger: noopLogger });
 }
 
-function createTestImminentRunTimerQueue(params: {
+function createTestImminentTimerQueue(params: {
 	timerPriorityQueue: TimerPriorityQueue;
 	lookaheadWindowMs: number;
-}): ImminentRunTimerQueue {
-	return createImminentRunTimerQueue({
+}): ImminentTimerQueue {
+	return createImminentTimerQueue({
 		timerPriorityQueue: params.timerPriorityQueue,
 		configProvider: asConfigProvider(() => ({ lookaheadWindowMs: params.lookaheadWindowMs })),
 		logger: noopLogger,
@@ -460,7 +460,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			const timerPriorityQueue = createTimerPriorityQueue();
 			const { service, stateMachine } = createService(
 				repos,
-				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+				createTestImminentTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
 			);
 			await stateMachine.transitionState(context, {
 				type: "optimistic",
@@ -880,7 +880,7 @@ describe("WorkflowRunService imminent run timers", () => {
 			const timerPriorityQueue = createTimerPriorityQueue();
 			const { service } = createService(
 				repos,
-				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+				createTestImminentTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
 			);
 
 			const input = { orderId: "order-1" };
@@ -907,7 +907,7 @@ describe("WorkflowRunService imminent run timers", () => {
 			const timerPriorityQueue = createTimerPriorityQueue();
 			const { service } = createService(
 				repos,
-				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+				createTestImminentTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
 			);
 
 			const input = { orderId: "order-1" };
@@ -935,7 +935,7 @@ describe("WorkflowRunService imminent run timers", () => {
 			const timerPriorityQueue = createTimerPriorityQueue();
 			const { service } = createService(
 				repos,
-				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+				createTestImminentTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
 			);
 
 			const input = { orderId: "order-1" };
@@ -957,7 +957,7 @@ describe("WorkflowRunService imminent run timers", () => {
 			const timerPriorityQueue = createTimerPriorityQueue();
 			const { service } = createService(
 				repos,
-				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+				createTestImminentTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
 			);
 
 			const input = { orderId: "order-1" };
@@ -990,7 +990,7 @@ describe("WorkflowRunService imminent run timers", () => {
 			const timerPriorityQueue = createTimerPriorityQueue();
 			const { service } = createService(
 				repos,
-				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+				createTestImminentTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
 			);
 
 			const childInput = { orderId: "order-9" };
@@ -1039,7 +1039,7 @@ describe("WorkflowRunService imminent run timers", () => {
 			const timerPriorityQueue = createTimerPriorityQueue();
 			const { service } = createService(
 				repos,
-				createTestImminentRunTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
+				createTestImminentTimerQueue({ timerPriorityQueue, lookaheadWindowMs: 30_000 })
 			);
 
 			// The child carries no priority of its own: the cascade's priority can only come
