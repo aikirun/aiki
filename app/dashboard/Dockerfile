@@ -42,5 +42,8 @@ COPY --from=builder /aiki/app/dashboard/dist /usr/share/nginx/html
 COPY app/dashboard/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --chmod=755 app/dashboard/docker-entrypoint.d/05-require-server-upstream-url.sh /docker-entrypoint.d/05-require-server-upstream-url.sh
 
+# Inside a container, the loopback address is unreachable from outside it.
+ENV AIKI_DASHBOARD_HOST=0.0.0.0
+
 EXPOSE 9851
 CMD ["nginx", "-g", "daemon off;"]
