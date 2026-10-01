@@ -12,13 +12,13 @@ export const retryStrategySchema = type({
 		type: "'exponential'",
 		maxAttempts: "number.integer > 0",
 		baseDelayMs: "number.integer > 0",
-		"factor?": "number.integer > 0 | undefined",
+		"factor?": "number >= 1 | undefined",
 		"maxDelayMs?": "number.integer > 0 | undefined",
 	})
 	.or({
 		type: "'jittered'",
 		maxAttempts: "number.integer > 0",
 		baseDelayMs: "number.integer > 0",
-		"factor?": "number.integer > 0 | undefined",
+		"factor?": "number >= 1 | undefined",
 		"maxDelayMs?": "number.integer > 0 | undefined",
 	});

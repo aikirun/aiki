@@ -53,6 +53,12 @@ describe("getRetryParams", () => {
 			expect(getRetryParams(3, customFactorStrategy)).toEqual({ retriesLeft: true, delayMs: 900 });
 		});
 
+		test("rounds a fractional delay to whole milliseconds", () => {
+			const fractionalFactorStrategy = { ...strategy, factor: 1.5 };
+			// 100 * 1.5^3 = 337.5
+			expect(getRetryParams(4, fractionalFactorStrategy)).toEqual({ retriesLeft: true, delayMs: 338 });
+		});
+
 		test("caps delay at maxDelayMs", () => {
 			const cappedDelayStrategy = { ...strategy, maxDelayMs: 300 };
 			expect(getRetryParams(1, cappedDelayStrategy)).toEqual({ retriesLeft: true, delayMs: 100 });
@@ -92,10 +98,16 @@ describe("getRetryParams", () => {
 			mock.mockRestore();
 		});
 
-		test("returns 0 delay when random returns 0", () => {
+		test("rounds a fractional delay to whole milliseconds", () => {
+			const mock = spyOn(Math, "random").mockReturnValue(0.333);
+			expect(getRetryParams(1, strategy)).toEqual({ retriesLeft: true, delayMs: 33 });
+			mock.mockRestore();
+		});
+
+		test("returns a 1ms delay when random returns 0", () => {
 			const mock = spyOn(Math, "random").mockReturnValue(0);
 			const result = getRetryParams(1, strategy);
-			expect(result).toEqual({ retriesLeft: true, delayMs: 0 });
+			expect(result).toEqual({ retriesLeft: true, delayMs: 1 });
 			mock.mockRestore();
 		});
 
