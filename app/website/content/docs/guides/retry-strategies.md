@@ -58,15 +58,15 @@ retry: {
 
 ### Jittered
 
-Exponential backoff with randomization to prevent thundering herd problems.
+Exponential backoff with randomization to prevent thundering herd problems. Each delay is a random value between 0 and the exponential delay for that attempt.
 
 ```typescript
 retry: {
 	type: "jittered",
 	maxAttempts: 5,
 	baseDelayMs: 1000,
-	jitterFactor: 0.5,    // Add up to 50% random variation (default)
-	maxDelayMs: 30000,
+	factor: 2,            // Double the upper bound each time (default)
+	maxDelayMs: 30000,    // Cap at 30 seconds (optional)
 }
 ```
 

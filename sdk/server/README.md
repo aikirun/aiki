@@ -15,10 +15,14 @@ Install the driver for your database: `@libsql/client` for SQLite, `postgres` fo
 
 ```typescript
 import { client } from "@aikirun/client";
+import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { database, server } from "@aikirun/server";
 
-const aikiServer = server({ db: database({ provider: "sqlite", path: "./aiki.db" }) });
-// or Postgres: database({ provider: "pg", url: databaseUrl })
+const aikiServer = server({
+	db: database({ provider: "sqlite", path: "./aiki.db" }),
+	// or Postgres: database({ provider: "pg", url: databaseUrl })
+	timerPriorityQueue: inMemoryTimerPriorityQueue(),
+});
 const runtimeHandle = aikiServer.runtime.start();
 
 // In-process client — or serve aikiServer.handler over HTTP

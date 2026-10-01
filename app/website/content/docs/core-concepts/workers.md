@@ -19,7 +19,7 @@ const aikiClient = client({
 
 const aikiWorker = worker({
   workflows: [orderWorkflowV1, userWorkflowV1],
-  options: {
+  config: {
     maxConcurrentWorkflowRuns: 10,
   },
 });
@@ -70,7 +70,7 @@ The `stop()` method on the handle signals the worker to stop accepting new work,
 
 ## Configuration Reference
 
-Worker configuration is split between **params** (identity) and **options** (tuning).
+Worker configuration is split between **params** (identity), **config** (tuning) and **start options**.
 
 **Params** are passed directly to `worker()`:
 
@@ -78,15 +78,26 @@ Worker configuration is split between **params** (identity) and **options** (tun
 |-------|-------------|
 | `workflows` | Workflow versions this worker executes |
 | `subscriber` | Optional subscriber factory for work discovery (default: claims from the server over HTTP). Use `inMemoryQueue()` from `@aikirun/memory` or `redisSubscriber()` from `@aikirun/redis` for push delivery |
+| `config` | Optional tuning settings, listed below |
 
-**Options** are passed via `options` param or `with()` builder:
+**Config** settings are passed in the `config` param. See [Runtime Configuration](../guides/configuration.md) for changing them while the worker runs:
 
-| Option | Default | Description |
-|--------|---------|-------------|
+| Setting | Default | Description |
+|---------|---------|-------------|
 | `maxConcurrentWorkflowRuns` | 1 | Max parallel executions |
 | `gracefulShutdownTimeoutMs` | 5,000 | Shutdown wait time (ms) |
 | `workflowRun.claimRefreshIntervalMs` | 30,000 | How often the worker refreshes its run claim (ms) |
+
+**Start options** are set with the `with()` builder before `start()`:
+
+```typescript
+const handle = aikiWorker.with("pools", ["tenant-acme"]).start(aikiClient);
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
 | `pools` | — | Worker pools to process |
+| `reference.id` | — | Your own ID for this worker, added to its logs |
 
 ## Pluggable Subscribers
 

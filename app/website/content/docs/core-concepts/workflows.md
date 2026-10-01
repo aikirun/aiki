@@ -299,7 +299,7 @@ The handle returned from `.start()` provides:
 | `refresh()` | Refresh run data from the server |
 | `wait()` | Wait for a terminal status (`completed`, `failed`, `cancelled`) |
 | `cancel(explanation?)` | Cancel the workflow run |
-| `pause()` | Pause the workflow |
+| `pause()` | Pause a run that is `scheduled`, `queued` or `running`; rejected in any other state |
 | `resume()` | Resume a paused workflow |
 | `wakeup()` | Wake a sleeping workflow |
 
@@ -332,6 +332,17 @@ await handle.resume();
 // Cancel a workflow
 await handle.cancel("User requested cancellation");
 ```
+
+#### Cancelling a Run
+
+Any run that has not finished can be cancelled, whether it is queued, running, paused, sleeping or waiting. Cancelling does four things:
+
+- The run moves to `cancelled`, and a caller in `wait()` gets that state.
+- Its unfinished tasks are discarded and a sleep in progress ends. See [Tasks](./tasks.md).
+- Its child workflows are cancelled, and their children after them. A system workflow does this, so it happens shortly after the cancel, once a worker picks that workflow up.
+- A parent waiting on the run gets `cancelled` as the child's state.
+
+Cancelling does not interrupt code that is already running. A task handler in progress runs to its end, but its result is not recorded: the worker's next write to the server is rejected, and the worker stops executing the run.
 
 ## Child Workflows
 
@@ -429,7 +440,7 @@ const childHandle = await childWorkflowV1
 	.startAsChild(run, { userId: input.userId });
 ```
 
-Without a reference ID, child workflows are deduplicated by input hash.
+Without a reference ID, every call starts a new child. When the parent replays, each call is matched by its input to the child it started before, so replay does not start that child again.
 
 ### Conflict Policies
 
