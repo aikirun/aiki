@@ -4,20 +4,33 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
 
 ## 0.43.1
 
-Projects that type-check their dependencies compile against `@aikirun/workflow` again. The dashboard Docker image can be told which address to listen on. The Quick Start app stops on Ctrl+C and accepts connections from your machine only.
+IAM works on a fresh install again, cron schedules work on Node, and a jittered retry no longer fails a run or retries it forever. A schedule's first run is on time, and the server stops on `SIGTERM` when Postgres is unreachable. Projects that type-check their dependencies compile against `@aikirun/workflow` again, the dashboard Docker image can be told which address to listen on, and the Quick Start app stops on Ctrl+C and accepts connections from your machine only.
+
+### Breaking Changes
+
+- **IAM has one new migration and uses better-auth 1.7.** `@aikirun/iam` declared `better-auth: ^1.4.14`, so a fresh install got better-auth 1.7. That version expects two columns the IAM schema did not have, and sign-up returned 500. IAM now declares `~1.7.7`, and the migration adds `namespace.member_count` and `namespace_member.membership_key`. Existing rows need no backfill. Apply it before starting this version:
+
+  ```bash
+  npx aiki-iam migrate apply
+  # or, with the aiki binary
+  aiki migrate apply --package server,iam
+  ```
 
 ### Improvements
 
+- **A schedule's first run after it becomes active is on time.** On a server with a timer queue, activating or resuming a schedule adds a timer for its next run when that run is within 30 seconds. The run used to wait for the next scan, up to 10 seconds late.
+- **`close()` on the database takes a time limit.** `database(...).close({ timeoutMs })` waits that long for running queries, 5 seconds by default, then closes the Postgres connections anyway.
+- **Exponential and jittered retries accept a fractional `factor`.** Any value of 1 or more works, such as `1.5`. The server rejected everything but whole numbers, although the SDK's type allowed them.
 - **The dashboard Docker image reads its listen address from `AIKI_DASHBOARD_HOST`.** It defaults to `0.0.0.0`, as before. Run the container with `--network host` and `AIKI_DASHBOARD_HOST=127.0.0.1` to open the dashboard to this machine only. With a published port (`-p`), keep the default.
+- **The tests also run on Node.** CI runs the unit and integration tests on Node 22 as well as on Bun.
 
 ### Bug Fixes
 
+- **Cron schedules work on Node.** Activating one returned 500 with `CronExpressionParser.parse is not a function`. Bun was not affected, and neither were interval schedules.
+- **A jittered retry no longer fails the run or retries it forever.** The strategy produced a delay with a fraction of a millisecond, which the server rejects. A task with a jittered retry failed its run with `Input validation failed`. A workflow with one was executed again every time its claim expired, past `maxAttempts`. Delays are now whole milliseconds, and a jittered delay is at least 1 ms.
+- **An event sent to several runs is delivered once to each.** A run listed twice in the request received the event twice, unless the send carried a reference ID.
+- **The server stops on `SIGTERM` when Postgres is unreachable.** The app server and the `aiki` binary kept running, because closing the database never finished. They now exit about 10 seconds after the signal.
 - **`@aikirun/types` exports `./infra/hasher`.** It exported `./infra/hash`, a file the build never produced, while the types of `@aikirun/workflow` import `@aikirun/types/infra/hasher`. A project with `skipLibCheck: false` failed to compile with `Cannot find module '@aikirun/types/infra/hasher'`. This was broken since 0.39.0.
-
-### Documentation
-
-- **The Quick Start app stops on Ctrl+C.** It kept running, because srvx closed its own HTTP server without exiting. The app now stops the worker and the runtime on `SIGINT` and `SIGTERM`, then exits.
-- **The Quick Start server listens on `127.0.0.1`.** It listened on every network interface with no authentication. The dashboard step now has one command for Docker Desktop and one for Docker Engine on Linux, both limited to your machine.
 
 ## 0.43.0
 
