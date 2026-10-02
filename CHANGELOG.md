@@ -2,6 +2,15 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.43.2
+
+A run now survives a worker crash during a task and a lost request to the server. Both used to fail the run.
+
+### Bug Fixes
+
+- **A worker crash during a task no longer fails the run.** When a worker died while a task was running, the next worker to pick up the run treated the unfinished attempt as a failed one. With the default `never` retry it failed the run with `Task retry not allowed` and left the task `running`. With a retry strategy, each crash used up one attempt. The attempt now runs again as the same attempt, under every strategy. A task with `never` can therefore run again after a crash.
+- **A request that gets no answer no longer fails the run.** When a state transition, task update or child workflow start got no response, the error surfaced in the workflow code and the run was recorded as `failed`, or used up a workflow attempt. The executor now stops, and the run is recovered the same way as after a crash: it resumes once its claim goes idle, 90 seconds by default. The same applies when the server answers with a 5xx, or the request times out (408) or is rate-limited (429). Workflow code sees this as a `WorkflowRunStateUnknownError`, exported from `@aikirun/workflow`.
+
 ## 0.43.1
 
 IAM works on a fresh install again, cron schedules work on Node, and a jittered retry no longer fails a run or retries it forever. A schedule's first run is on time, and the server stops on `SIGTERM` when Postgres is unreachable. Projects that type-check their dependencies compile against `@aikirun/workflow` again, and the dashboard Docker image can be told which address to listen on.

@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/memory",
-	"version": "0.43.1",
+	"version": "0.43.2",
 	"description": "In-memory adapter for Aiki - publisher, subscriber, and timer sorted set backed by in-process data structures",
 	"type": "module",
 	"engines": {
