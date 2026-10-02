@@ -89,7 +89,7 @@ describe("taskExecutionTracker", () => {
 				},
 				{ revision: 4, state: { status: "sleeping", sleepName: "nap", wakeupAt: 60_001 }, attempts: 1 }
 			);
-			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName: "nap", durationMs: 60_000 });
+			await handle[INTERNAL].transitionStateOptimistic({ status: "sleeping", sleepName: "nap", durationMs: 60_000 });
 
 			await flush();
 

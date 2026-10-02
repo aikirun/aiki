@@ -14,6 +14,7 @@ import {
 	WorkflowRunNotExecutableError,
 	type WorkflowRunRecord,
 	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 
@@ -59,8 +60,8 @@ export interface WorkflowExecutionConfig {
  *
  * Returns true when the segment reached a recorded outcome (completed, suspended, failed,
  * or the run was not executable), so the caller can settle the delivery.
- * Returns false on an unexpected error, so the caller can leave the delivery eligible for
- * redelivery.
+ * Returns false when the run's state is unknown or on an unexpected error, so the caller can leave
+ * the delivery eligible for redelivery.
  */
 export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<Context>): Promise<boolean> {
 	const { client, workflowRun, workflowVersion, logger, configProvider, heartbeat, signal } = params;
@@ -150,6 +151,11 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 	} catch (err) {
 		if (err instanceof ClientCodecMissingError) {
 			logger.error("The workflow run  expects a client codec, but none present", { err });
+			return false;
+		}
+
+		if (err instanceof WorkflowRunStateUnknownError) {
+			logger.warn("Workflow run state unknown, leaving it for recovery", { err });
 			return false;
 		}
 

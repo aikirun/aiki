@@ -19,6 +19,7 @@ import {
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 import type {
@@ -359,7 +360,8 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				if (
 					err instanceof WorkflowRunSuspendedError ||
 					err instanceof WorkflowRunFailedError ||
-					err instanceof WorkflowRunRevisionConflictError
+					err instanceof WorkflowRunRevisionConflictError ||
+					err instanceof WorkflowRunStateUnknownError
 				) {
 					throw err;
 				}
@@ -419,7 +421,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			"aiki.unconsumedManifestEntries": unconsumedManifestEntries,
 		});
 		const err = new NonDeterminismError(handle.run.id as WorkflowRunId, handle.run.attempts, unconsumedManifestEntries);
-		await handle[INTERNAL].transitionState({
+		await handle[INTERNAL].transitionStateOptimistic({
 			status: "failed",
 			cause: "self",
 			error: createSerializableError(err),

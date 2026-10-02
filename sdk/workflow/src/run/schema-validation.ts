@@ -50,7 +50,7 @@ async function failOnSchemaIssues(
 	errorMessage: string
 ): Promise<never> {
 	logger.error(errorMessage, { "aiki.issues": issues });
-	await handle[INTERNAL].transitionState({
+	await handle[INTERNAL].transitionStateOptimistic({
 		status: "failed",
 		cause: "self",
 		error: {

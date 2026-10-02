@@ -67,7 +67,7 @@ export function taskExecutionTracker(
 			}
 
 			try {
-				await handle[INTERNAL].transitionState({ status: "awaiting_task_retry" });
+				await handle[INTERNAL].transitionStateOptimistic({ status: "awaiting_task_retry" });
 			} catch (err) {
 				if (err instanceof WorkflowRunRevisionConflictError) {
 					return;

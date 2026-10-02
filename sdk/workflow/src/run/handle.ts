@@ -4,7 +4,11 @@ import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import type { DistributiveOmit } from "@aikirun/lib/object";
 import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
-import type { WorkflowRunStateRequest, WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
+import type {
+	WorkflowRunTransitionStateRequestOptimistic,
+	WorkflowRunTransitionStateRequestPessimistic,
+	WorkflowRunTransitionStateResponseV1,
+} from "@aikirun/types/api/workflow-run";
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type {
@@ -13,7 +17,11 @@ import type {
 	WorkflowRunRecord,
 	WorkflowRunState,
 } from "@aikirun/types/workflow/run";
-import { WorkflowRunNotExecutableError, WorkflowRunRevisionConflictError } from "@aikirun/types/workflow/run";
+import {
+	WorkflowRunNotExecutableError,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
+} from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import { type BoundCodec, bindDeclaredCodec } from "./bound-codec";
@@ -134,7 +142,7 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 	[INTERNAL]: {
 		client: Client<Context>;
 		codec: BoundCodec;
-		transitionState: (state: WorkflowRunStateRequest) => Promise<void>;
+		transitionStateOptimistic: (state: WorkflowRunTransitionStateRequestOptimistic["state"]) => Promise<void>;
 		transitionTaskState: (
 			request: DistributiveOmit<
 				TaskTransitionStateRequestV1,
@@ -210,7 +218,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 				runId: this._run.id as WorkflowRunId,
 				clientCodecApplied: this._run.clientCodecApplied,
 			}),
-			transitionState: this.transitionState.bind(this),
+			transitionStateOptimistic: this.transitionStateOptimistic.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
 		};
@@ -302,44 +310,31 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 	}
 
 	public async cancel(explanation?: string): Promise<void> {
-		await this.transitionState({ status: "cancelled", explanation });
+		await this.transitionStatePessimistic({ status: "cancelled", explanation });
 		this.logger.info("Workflow cancelled");
 	}
 
 	public async pause(): Promise<void> {
-		await this.transitionState({ status: "paused" });
+		await this.transitionStatePessimistic({ status: "paused" });
 		this.logger.info("Workflow paused");
 	}
 
 	public async resume(): Promise<void> {
-		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "resumption" });
+		await this.transitionStatePessimistic({ status: "scheduled", scheduledInMs: 0, reason: "resumption" });
 		this.logger.info("Workflow resumed");
 	}
 
 	public async wakeup(): Promise<void> {
-		await this.transitionState({ status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" });
+		await this.transitionStatePessimistic({ status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" });
 		this.logger.info("Workflow woken up");
 	}
 
-	private async transitionState(targetState: WorkflowRunStateRequest): Promise<void> {
+	private async transitionStateOptimistic(
+		targetState: WorkflowRunTransitionStateRequestOptimistic["state"]
+	): Promise<void> {
 		try {
 			let response: WorkflowRunTransitionStateResponseV1;
-			if (
-				(targetState.status === "scheduled" &&
-					(targetState.reason === "new" ||
-						targetState.reason === "resumption" ||
-						targetState.reason === "wakeup_early" ||
-						targetState.reason === "redelivery")) ||
-				targetState.status === "paused" ||
-				targetState.status === "stalled" ||
-				targetState.status === "cancelled"
-			) {
-				response = await this.api.workflowRun.transitionStateV1({
-					type: "pessimistic",
-					id: this.run.id,
-					state: targetState,
-				});
-			} else if (targetState.status === "awaiting_event" || targetState.status === "awaiting_child_workflow") {
+			if (targetState.status === "awaiting_event" || targetState.status === "awaiting_child_workflow") {
 				response = await this.api.workflowRun.transitionStateV1({
 					type: "optimistic",
 					id: this.run.id,
@@ -362,8 +357,24 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 			if (isWorkflowRunRevisionConflictError(err)) {
 				throw new WorkflowRunRevisionConflictError(this.run.id as WorkflowRunId);
 			}
+			if (isRequestUnanswered(err)) {
+				throw new WorkflowRunStateUnknownError(this.run.id as WorkflowRunId, err);
+			}
 			throw err;
 		}
+	}
+
+	private async transitionStatePessimistic(
+		targetState: WorkflowRunTransitionStateRequestPessimistic["state"]
+	): Promise<void> {
+		const response = await this.api.workflowRun.transitionStateV1({
+			type: "pessimistic",
+			id: this.run.id,
+			state: targetState,
+		});
+		this._run.revision = response.revision;
+		this._run.state = response.state as WorkflowRunState;
+		this._run.attempts = response.attempts;
 	}
 
 	private async transitionTaskState(
@@ -384,6 +395,9 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 			if (isWorkflowRunRevisionConflictError(err)) {
 				throw new WorkflowRunRevisionConflictError(this.run.id as WorkflowRunId);
 			}
+			if (isRequestUnanswered(err)) {
+				throw new WorkflowRunStateUnknownError(this.run.id as WorkflowRunId, err);
+			}
 			throw err;
 		}
 	}
@@ -398,4 +412,13 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 
 export function isWorkflowRunRevisionConflictError(err: unknown): boolean {
 	return err != null && typeof err === "object" && "code" in err && err.code === "WORKFLOW_RUN_REVISION_CONFLICT";
+}
+
+/**
+ * True when a request failed without the server rejecting it: no response arrived, the server
+ * answered with a 5xx, or the request timed out (408) or was rate-limited (429) on the way.
+ */
+export function isRequestUnanswered(err: unknown): boolean {
+	const status = err != null && typeof err === "object" && "status" in err ? err.status : undefined;
+	return typeof status !== "number" || status >= 500 || status === 408 || status === 429;
 }

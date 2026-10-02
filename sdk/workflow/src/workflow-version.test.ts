@@ -23,6 +23,7 @@ import {
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
@@ -540,6 +541,10 @@ describe("workflow version execution", () => {
 			{ name: "WorkflowRunFailedError", create: (id, attempts) => new WorkflowRunFailedError(id, attempts) },
 			{ name: "WorkflowRunRevisionConflictError", create: (id) => new WorkflowRunRevisionConflictError(id) },
 			{
+				name: "WorkflowRunStateUnknownError",
+				create: (id) => new WorkflowRunStateUnknownError(id, new Error("fetch failed")),
+			},
+			{
 				name: "NonDeterminismError",
 				create: (id, attempts) => new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
 			},
@@ -950,6 +955,26 @@ describe("creating a workflow run", () => {
 				expect(childHandle.run.id).toBe(childRunRecord.id);
 			}));
 
+		test("passes on a failure to encode the child input as it is", () =>
+			withFakeClient(async (client) => {
+				const encodeError = new Error("cannot encode");
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw encodeError;
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBe(encodeError);
+			}));
+
 		test("hashes the child input with the parent run's hasher, not the client's", () =>
 			withFakeClient(async (client) => {
 				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
@@ -1045,6 +1070,97 @@ describe("creating a workflow run", () => {
 				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toThrow(
 					WorkflowRunRevisionConflictError
 				);
+			}));
+
+		test("reports the parent's state as unknown when creating the child gets no response", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.rejectsOnce(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					new Error("fetch failed")
+				);
+
+				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(
+					WorkflowRunStateUnknownError
+				);
+			}));
+
+		test("reports the parent's state as unknown when fetching the created child gets no response", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.rejectsOnce({ id: childRunRecord.id }, new Error("fetch failed"));
+
+				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(
+					WorkflowRunStateUnknownError
+				);
+			}));
+
+		test("passes on the server's rejection of a child as it is", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const inputHash = await hashInput("payload");
+				const rejection = { code: "BAD_REQUEST", status: 400 };
+
+				client.api.workflowRun.createV1.rejectsOnce(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					rejection
+				);
+
+				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBe(rejection);
 			}));
 
 		test("propagates the parent's pool to the child run", () =>
@@ -1206,6 +1322,36 @@ describe("creating a workflow run", () => {
 				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
 
 				expect(childHandle.run.id).toBe(recordedChildRun.id);
+			}));
+
+		test("reports the parent's state as unknown when fetching the recorded child on replay gets no response", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+
+				const inputHash = await hashInput("payload");
+				const address = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: inputHash,
+				});
+				const recordedChildRun = childWorkflowRunInfoFactory.build({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRuns: { [address]: [recordedChildRun] },
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				client.api.workflowRun.getByIdV1.rejectsOnce({ id: recordedChildRun.id }, new Error("fetch failed"));
+
+				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(
+					WorkflowRunStateUnknownError
+				);
 			}));
 
 		test("fails the parent with a non-determinism error when no recorded child matches", () =>

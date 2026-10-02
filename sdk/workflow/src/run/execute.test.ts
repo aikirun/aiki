@@ -15,6 +15,7 @@ import {
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test, vi } from "vitest";
@@ -95,6 +96,26 @@ describe("executeWorkflowRun", () => {
 				});
 
 				expect(result).toBe(false);
+			}));
+
+		test("returns false without logging an error when the handler throws WorkflowRunStateUnknownError", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new WorkflowRunStateUnknownError(workflowRun.id as WorkflowRunId, new Error("fetch failed"));
+				});
+				const errorLog = vi.spyOn(client.logger, "error");
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+				expect(errorLog).not.toHaveBeenCalled();
 			}));
 
 		test("returns false and logs when the handler throws an unexpected error", () =>

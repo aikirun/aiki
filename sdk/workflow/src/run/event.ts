@@ -169,7 +169,7 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
 
 		try {
-			await handle[INTERNAL].transitionState({
+			await handle[INTERNAL].transitionStateOptimistic({
 				status: "awaiting_event",
 				eventName,
 				timeoutInMs,

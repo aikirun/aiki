@@ -54,7 +54,7 @@ describe("createSleeper", () => {
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 				const sleep = createTestSleeper(client, record);
-				const nonConflictError = { code: "SOME_OTHER_ERROR" };
+				const nonConflictError = { code: "BAD_REQUEST", status: 400 };
 
 				client.api.workflowRun.transitionStateV1.rejectsOnce(
 					{

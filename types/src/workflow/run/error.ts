@@ -50,6 +50,20 @@ export class WorkflowRunRevisionConflictError extends Error {
 	}
 }
 
+/**
+ * A request the run's execution made got no definite answer, so the execution cannot tell what
+ * the server recorded. The run is left for recovery, which replays it from what the server has.
+ */
+export class WorkflowRunStateUnknownError extends Error {
+	public readonly id: WorkflowRunId;
+
+	constructor(id: WorkflowRunId, cause: unknown) {
+		super(`The state of workflow run ${id} is unknown`, { cause });
+		this.name = "WorkflowRunStateUnknownError";
+		this.id = id;
+	}
+}
+
 export class NonDeterminismError extends Error {
 	public readonly id: WorkflowRunId;
 	public readonly attempts: number;
