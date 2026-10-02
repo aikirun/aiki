@@ -135,7 +135,7 @@ function createWaiter<Output, Context, TEvents extends EventsDefinition>(
 		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
 
 		try {
-			await parentRunHandle[INTERNAL].transitionState({
+			await parentRunHandle[INTERNAL].transitionStateOptimistic({
 				status: "awaiting_child_workflow",
 				childWorkflowRunId: run.id,
 				timeoutInMs,

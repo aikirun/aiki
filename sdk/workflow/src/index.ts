@@ -29,6 +29,7 @@ export {
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 export type { TaskId, TaskInfo, TaskName, TaskState, TaskStatus } from "@aikirun/types/workflow/task";

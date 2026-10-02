@@ -7,6 +7,7 @@ import {
 import { runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { TransitionTaskStateToRunningCreate } from "@aikirun/types/api/task";
+import type { WorkflowRunTransitionStateRequestPessimistic } from "@aikirun/types/api/workflow-run";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
@@ -14,10 +15,11 @@ import {
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
-import { workflowRunHandle } from "./handle";
+import { isRequestUnanswered, type WorkflowRunHandle, workflowRunHandle } from "./handle";
 
 describe("workflowRunHandle", () => {
 	describe("construction", () => {
@@ -66,7 +68,7 @@ describe("workflowRunHandle", () => {
 			}));
 	});
 
-	describe("transitionState", () => {
+	describe("transitionStateOptimistic", () => {
 		test("uses the optimistic path with the run revision for a non-lifecycle transition", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 3, attempts: 1 });
@@ -77,7 +79,7 @@ describe("workflowRunHandle", () => {
 					{ revision: 4, state: { status: "running" }, attempts: 2 }
 				);
 
-				await handle[INTERNAL].transitionState({ status: "running" });
+				await handle[INTERNAL].transitionStateOptimistic({ status: "running" });
 
 				expect(handle.run.revision).toBe(4);
 				expect(handle.run.attempts).toBe(2);
@@ -94,23 +96,38 @@ describe("workflowRunHandle", () => {
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);
 
-				await expect(handle[INTERNAL].transitionState({ status: "running" })).rejects.toBeInstanceOf(
+				await expect(handle[INTERNAL].transitionStateOptimistic({ status: "running" })).rejects.toBeInstanceOf(
 					WorkflowRunRevisionConflictError
 				);
 			}));
 
-		test("propagates a non-conflict error without mapping it", () =>
+		test("reports the run's state as unknown when no response arrives", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 3 });
 				const handle = workflowRunHandle(client, record);
-				const nonConflictError = { code: "SOME_OTHER_ERROR" };
 
 				client.api.workflowRun.transitionStateV1.rejectsOnce(
 					{ type: "optimistic", id: record.id, state: { status: "running" }, expectedRevision: 3 },
-					nonConflictError
+					new Error("fetch failed")
 				);
 
-				await expect(handle[INTERNAL].transitionState({ status: "running" })).rejects.toBe(nonConflictError);
+				await expect(handle[INTERNAL].transitionStateOptimistic({ status: "running" })).rejects.toBeInstanceOf(
+					WorkflowRunStateUnknownError
+				);
+			}));
+
+		test("passes on a rejection from the server as it is", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build({ revision: 3 });
+				const handle = workflowRunHandle(client, record);
+				const rejection = { code: "BAD_REQUEST", status: 400 };
+
+				client.api.workflowRun.transitionStateV1.rejectsOnce(
+					{ type: "optimistic", id: record.id, state: { status: "running" }, expectedRevision: 3 },
+					rejection
+				);
+
+				await expect(handle[INTERNAL].transitionStateOptimistic({ status: "running" })).rejects.toBe(rejection);
 			}));
 	});
 
@@ -199,11 +216,10 @@ describe("workflowRunHandle", () => {
 				);
 			}));
 
-		test("propagates a non-conflict error without mapping it", () =>
+		test("reports the run's state as unknown when no response arrives", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
 				const handle = workflowRunHandle(client, record);
-				const nonConflictError = { code: "SOME_OTHER_ERROR" };
 				const request: Omit<
 					TransitionTaskStateToRunningCreate,
 					"workflowRunId" | "expectedWorkflowRunRevision" | "sequence"
@@ -215,10 +231,34 @@ describe("workflowRunHandle", () => {
 				};
 				client.api.task.transitionStateV1.rejectsOnce(
 					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5, sequence: 1 },
-					nonConflictError
+					new Error("fetch failed")
 				);
 
-				await expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBe(nonConflictError);
+				await expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBeInstanceOf(
+					WorkflowRunStateUnknownError
+				);
+			}));
+
+		test("passes on a rejection from the server as it is", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
+				const handle = workflowRunHandle(client, record);
+				const rejection = { code: "BAD_REQUEST", status: 400 };
+				const request: Omit<
+					TransitionTaskStateToRunningCreate,
+					"workflowRunId" | "expectedWorkflowRunRevision" | "sequence"
+				> = {
+					type: "create",
+					taskName: "reserve-seat",
+					options: {},
+					inputHash: "hash",
+				};
+				client.api.task.transitionStateV1.rejectsOnce(
+					{ ...request, workflowRunId: record.id, expectedWorkflowRunRevision: 5, sequence: 1 },
+					rejection
+				);
+
+				await expect(handle[INTERNAL].transitionTaskState(request)).rejects.toBe(rejection);
 			}));
 	});
 
@@ -321,6 +361,41 @@ describe("workflowRunHandle", () => {
 
 				await handle.wakeup();
 			}));
+
+		const lifecycleCalls: Record<
+			"cancel" | "pause" | "resume" | "wakeup",
+			{
+				state: WorkflowRunTransitionStateRequestPessimistic["state"];
+				call: (handle: WorkflowRunHandle<unknown, null>) => Promise<void>;
+			}
+		> = {
+			cancel: {
+				state: { status: "cancelled", explanation: "operator stopped it" },
+				call: (handle) => handle.cancel("operator stopped it"),
+			},
+			pause: { state: { status: "paused" }, call: (handle) => handle.pause() },
+			resume: {
+				state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" },
+				call: (handle) => handle.resume(),
+			},
+			wakeup: {
+				state: { status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" },
+				call: (handle) => handle.wakeup(),
+			},
+		};
+
+		for (const [name, { state, call }] of Object.entries(lifecycleCalls)) {
+			test(`${name} passes on the error as it is when no response arrives`, () =>
+				withFakeClient(async (client) => {
+					const record = runningWorkflowRunRecordFactory.build();
+					const handle = workflowRunHandle(client, record);
+					const error = new Error("fetch failed");
+
+					client.api.workflowRun.transitionStateV1.rejectsOnce({ type: "pessimistic", id: record.id, state }, error);
+
+					await expect(call(handle)).rejects.toBe(error);
+				}));
+		}
 	});
 
 	describe("wait", () => {
@@ -436,5 +511,24 @@ describe("workflowRunHandle", () => {
 
 				expect(result).toEqual({ success: false, cause: "aborted" });
 			}));
+	});
+});
+
+describe("isRequestUnanswered", () => {
+	const unansweredRequestErrors: Array<{ name: string; error: unknown }> = [
+		{ name: "no response arrives", error: new Error("fetch failed") },
+		{ name: "the server answers with a 500", error: { code: "INTERNAL_SERVER_ERROR", status: 500 } },
+		{ name: "the request times out with a 408", error: { code: "TIMEOUT", status: 408 } },
+		{ name: "the request is rate-limited with a 429", error: { code: "TOO_MANY_REQUESTS", status: 429 } },
+	];
+
+	for (const { name, error } of unansweredRequestErrors) {
+		test(`is true when ${name}`, () => {
+			expect(isRequestUnanswered(error)).toBe(true);
+		});
+	}
+
+	test("is false when the server rejects the request", () => {
+		expect(isRequestUnanswered({ code: "BAD_REQUEST", status: 400 })).toBe(false);
 	});
 });

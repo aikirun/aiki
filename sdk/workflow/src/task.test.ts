@@ -23,6 +23,7 @@ import {
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
+	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 import { TaskFailedError } from "@aikirun/types/workflow/task";
@@ -759,6 +760,54 @@ describe("task", () => {
 				);
 
 				await expect(validateInput.start(run, "anything")).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+
+		test("does not record the task as failed when the request to fail the run gets no response", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const alwaysInvalid: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: () => ({ issues: [{ message: "invalid output" }] }),
+					},
+				};
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => "sent",
+					schema: { output: alwaysInvalid },
+				});
+
+				const input = { to: "info@aiki.run" };
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+
+				client.api.task.transitionStateV1.once(
+					{
+						type: "create",
+						input: asOpaquePayload(input),
+						inputHash,
+						taskName: sendEmail.name,
+						options: {},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
+					},
+					{ taskInfo: runningTaskInfo }
+				);
+				client.api.workflowRun.transitionStateV1.rejectsOnce(
+					{
+						type: "optimistic",
+						id: runRecord.id,
+						state: expect.objectContaining({ status: "failed", cause: "self" }),
+						expectedRevision: runRecord.revision,
+					},
+					new Error("fetch failed")
+				);
+
+				await expect(sendEmail.start(run, input)).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
 			}));
 
 		test("replays a failed task from history as TaskFailedError without touching the client", () =>

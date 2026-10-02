@@ -28,7 +28,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logge
 
 		if (!existingSleep) {
 			try {
-				await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs });
+				await handle[INTERNAL].transitionStateOptimistic({ status: "sleeping", sleepName, durationMs });
 				logger.info("Going to sleep", {
 					"aiki.sleepName": sleepName,
 					"aiki.durationMs": durationMs,
@@ -82,7 +82,7 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logge
 		});
 		const durationLeftMs = durationMs - existingSleep.durationMs;
 		try {
-			await handle[INTERNAL].transitionState({ status: "sleeping", sleepName, durationMs: durationLeftMs });
+			await handle[INTERNAL].transitionStateOptimistic({ status: "sleeping", sleepName, durationMs: durationLeftMs });
 			logger.info("Sleeping", {
 				"aiki.sleepName": sleepName,
 				"aiki.durationMs": durationLeftMs,

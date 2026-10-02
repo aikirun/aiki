@@ -30,6 +30,7 @@ import {
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 import { TaskFailedError } from "@aikirun/types/workflow/task";
@@ -38,7 +39,12 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { WorkflowRun } from "./run";
 import { noopCodec, toBoundCodec } from "./run/bound-codec";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
-import { isWorkflowRunRevisionConflictError, type WorkflowRunHandle, workflowRunHandle } from "./run/handle";
+import {
+	isRequestUnanswered,
+	isWorkflowRunRevisionConflictError,
+	type WorkflowRunHandle,
+	workflowRunHandle,
+} from "./run/handle";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
 import { validateWithSchema } from "./run/schema-validation";
 
@@ -251,7 +257,15 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		if (parentRunReplayManifest.hasUnconsumedEntries()) {
 			const existingRunInfo = parentRunReplayManifest.consumeNextChildWorkflowRun(address);
 			if (existingRunInfo) {
-				const { run: existingRun } = await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id });
+				let existingRun: WorkflowRunRecord;
+				try {
+					existingRun = (await client.api.workflowRun.getByIdV1({ id: existingRunInfo.id })).run as WorkflowRunRecord;
+				} catch (err) {
+					if (isRequestUnanswered(err)) {
+						throw new WorkflowRunStateUnknownError(parentRun.id, err);
+					}
+					throw err;
+				}
 
 				const logger = parentRunLogger.child({
 					"aiki.childWorkflowName": existingRun.name,
@@ -259,13 +273,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					"aiki.childWorkflowRunId": existingRun.id,
 				});
 
-				return childWorkflowRunHandle(
-					client,
-					existingRun as WorkflowRunRecord,
-					parentRunHandle,
-					logger,
-					this[INTERNAL].eventsDefinition
-				);
+				return childWorkflowRunHandle(client, existingRun, parentRunHandle, logger, this[INTERNAL].eventsDefinition);
 			}
 
 			await this.throwNonDeterminismError(
@@ -277,12 +285,14 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			);
 		}
 
-		let newRunId: string | undefined;
+		const encodedInput = await parentRunCodec.encode(input);
+
+		let newRun: WorkflowRunRecord;
 		try {
 			const response = await client.api.workflowRun.createV1({
 				name: this.name,
 				versionId: this.versionId,
-				input: await parentRunCodec.encode(input),
+				input: encodedInput,
 				inputHash,
 				clientHasherApplied: parentRunHandle.run.clientHasherApplied,
 				clientCodecApplied: parentRunHandle.run.clientCodecApplied,
@@ -293,14 +303,16 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					priority: startOptions.priority ?? parentRun.options.priority,
 				},
 			});
-			newRunId = response.id;
+			newRun = (await client.api.workflowRun.getByIdV1({ id: response.id })).run as WorkflowRunRecord;
 		} catch (err) {
 			if (isWorkflowRunRevisionConflictError(err)) {
 				throw new WorkflowRunRevisionConflictError(parentRun.id);
 			}
+			if (isRequestUnanswered(err)) {
+				throw new WorkflowRunStateUnknownError(parentRun.id, err);
+			}
 			throw err;
 		}
-		const { run: newRun } = await client.api.workflowRun.getByIdV1({ id: newRunId });
 
 		const logger = parentRunLogger.child({
 			"aiki.childWorkflowName": newRun.name,
@@ -310,13 +322,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		logger.info("Created child workflow");
 
-		return childWorkflowRunHandle(
-			client,
-			newRun as WorkflowRunRecord,
-			parentRunHandle,
-			logger,
-			this[INTERNAL].eventsDefinition
-		);
+		return childWorkflowRunHandle(client, newRun, parentRunHandle, logger, this[INTERNAL].eventsDefinition);
 	}
 
 	private async throwNonDeterminismError(
@@ -343,7 +349,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			parentRunHandle.run.attempts,
 			unconsumedManifestEntries
 		);
-		await parentRunHandle[INTERNAL].transitionState({
+		await parentRunHandle[INTERNAL].transitionStateOptimistic({
 			status: "failed",
 			cause: "self",
 			error: createSerializableError(err),
@@ -372,18 +378,18 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 	private async handler(run: WorkflowRun<Context, TEvents>, input: Input): Promise<void> {
 		const { logger } = run;
-		const { assertExecutionAllowed, codec, transitionState } = run[INTERNAL].handle[INTERNAL];
+		const { assertExecutionAllowed, codec, transitionStateOptimistic } = run[INTERNAL].handle[INTERNAL];
 
 		assertExecutionAllowed();
 
 		const retryStrategy = run.options.retry ?? this.params.retry ?? { type: "never" };
 
 		logger.info("Starting workflow");
-		await transitionState({ status: "running" });
+		await transitionStateOptimistic({ status: "running" });
 
 		const output = await this.tryExecuteWorkflow(input, run, retryStrategy);
 
-		await transitionState({ status: "completed", output: await codec.encode(output) });
+		await transitionStateOptimistic({ status: "completed", output: await codec.encode(output) });
 		logger.info("Workflow complete");
 	}
 
@@ -414,6 +420,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 					err instanceof WorkflowRunSuspendedError ||
 					err instanceof WorkflowRunFailedError ||
 					err instanceof WorkflowRunRevisionConflictError ||
+					err instanceof WorkflowRunStateUnknownError ||
 					err instanceof NonDeterminismError ||
 					err instanceof ClientCodecMissingError
 				) {
@@ -425,7 +432,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 				if (!retryParams.retriesLeft) {
 					const failedState = this.createFailedState(err);
-					await handle[INTERNAL].transitionState(failedState);
+					await handle[INTERNAL].transitionStateOptimistic(failedState);
 
 					const logMeta: Record<string, unknown> = {};
 					for (const [key, value] of Object.entries(failedState)) {
@@ -439,7 +446,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				}
 
 				const awaitingRetryState = this.createAwaitingRetryState(err, retryParams.delayMs);
-				await handle[INTERNAL].transitionState(awaitingRetryState);
+				await handle[INTERNAL].transitionStateOptimistic(awaitingRetryState);
 
 				const logMeta: Record<string, unknown> = {};
 				for (const [key, value] of Object.entries(awaitingRetryState)) {
