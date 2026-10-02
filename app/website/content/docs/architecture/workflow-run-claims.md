@@ -30,6 +30,12 @@ When an executor crashes mid-execution:
 
 **`claimIdleTimeoutMs`** is a server-side config, 90 seconds by default. It's how long the server waits after the last claim refresh before treating a run as abandoned. Keep it above the claim refresh interval, so a run only goes idle when an executor actually stops refreshing. The default 90 seconds against 30-second refreshes leaves ample margin. The recovery daemon reads it from the server runtime config under `daemons.recoverOverdueOutboxEntries`. See [Runtime Configuration](../guides/configuration.md).
 
+## Unanswered Requests
+
+If an executor cannot confirm an update with the server, for example during a brief outage, it does not fail the run. It stops executing, and the run is recovered the same way as after a crash.
+
+Workflow code sees this as a `WorkflowRunStateUnknownError`.
+
 ## Zombie Executor Prevention
 
 Claim recovery assumes the original executor is dead, but what if it's just slow? An executor presumed dead might wake up and try to continue executing a run that another has already claimed.
