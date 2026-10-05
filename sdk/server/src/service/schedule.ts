@@ -302,75 +302,82 @@ async function activateScheduleInTx(
 	const referenceId = options?.reference?.id;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 	const candidateDefinitionHashes = candidateHashes(definitionHashes);
-
-	// A reference id bound to another definition is settled before the request's workflow is
-	// recorded: that schedule may belong to another workflow, and the request schedules nothing.
-	const existingScheduleByReference = referenceId
-		? await txRepos.schedule.get(namespaceId, { referenceId }, { lock: "update" })
-		: null;
-	if (existingScheduleByReference && !candidateDefinitionHashes.includes(existingScheduleByReference.definitionHash)) {
-		if (conflictPolicy === "error") {
-			throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
-		}
-		conflictPolicy satisfies "return_existing";
-		const existingScheduleWithWorkflow = await txRepos.schedule.getByIdWithWorkflow(
-			namespaceId,
-			existingScheduleByReference.id
-		);
-		if (!existingScheduleWithWorkflow) {
-			throw new NotFoundError(`Schedule not found: ${existingScheduleByReference.id}`);
-		}
-		return {
-			schedule: scheduleRowToDomain(existingScheduleWithWorkflow.schedule, existingScheduleWithWorkflow.workflow),
-		};
-	}
-
-	const workflowRow = await getOrCreateWorkflowInTx(
-		{
-			namespaceId,
-			name: workflowName as WorkflowName,
-			versionId: workflowVersionId as WorkflowVersionId,
-			source: "user",
-		},
-		txRepos
-	);
-
-	const workflowInfo = { workflowSource: workflowRow.source, workflowName, workflowVersionId };
 	const now = Date.now();
 	const nextRunAt = getNextOccurrence(spec, now) as TimestampMs;
 
-	// With no reference id, the definition matches a schedule whatever reference id it carries.
-	// With a free reference id, it matches only an unreferenced schedule, which this activation adopts.
-	const existingSchedule =
-		existingScheduleByReference ??
-		(await txRepos.schedule.get(
+	let existingSchedule = await getScheduleByReferenceOrDefinitionForUpdate(txRepos, {
+		namespaceId,
+		referenceId,
+		definitionHashes: candidateDefinitionHashes,
+	});
+	if (!existingSchedule) {
+		const workflowRow = await getOrCreateWorkflowInTx(
+			{
+				namespaceId,
+				name: workflowName as WorkflowName,
+				versionId: workflowVersionId as WorkflowVersionId,
+				source: "user",
+			},
+			txRepos
+		);
+		const createdSchedule = await createSchedule(
+			txRepos,
+			{ namespaceId, workflowId: workflowRow.id, spec, payload, referenceId, workflowRunOptions, nextRunAt },
+			imminentTimerQueue
+		);
+		if (createdSchedule) {
+			return {
+				schedule: scheduleRowToDomain(createdSchedule, {
+					workflowSource: workflowRow.source,
+					workflowName,
+					workflowVersionId,
+				}),
+			};
+		}
+
+		// The insert added nothing: another activation created a schedule with this definition or
+		// reference id after the lookup above, and this lookup finds it.
+		existingSchedule = await getScheduleByReferenceOrDefinitionForUpdate(txRepos, {
 			namespaceId,
-			referenceId
-				? { definitionHashes: candidateDefinitionHashes, referenceId: null }
-				: { definitionHashes: candidateDefinitionHashes },
-			{ lock: "update" }
-		));
+			referenceId,
+			definitionHashes: candidateDefinitionHashes,
+		});
+		if (!existingSchedule) {
+			throw new Error(`Failed to get or create schedule with definition ${currentDefinitionHash}`);
+		}
+	}
 
-	const schedule = existingSchedule
-		? await activateExistingSchedule(
-				txRepos,
-				{
-					namespaceId,
-					existing: existingSchedule,
-					payload,
-					nextDefinitionHash: definitionHashes.nextValue,
-					referenceIdToAttach: existingSchedule.referenceId === null ? referenceId : undefined,
-					nextRunAt,
-				},
-				imminentTimerQueue
-			)
-		: await createSchedule(
-				txRepos,
-				{ namespaceId, workflowId: workflowRow.id, spec, payload, referenceId, workflowRunOptions, nextRunAt },
-				imminentTimerQueue
-			);
+	if (referenceId !== undefined) {
+		const existingReferenceId = existingSchedule.referenceId;
 
-	return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
+		if (existingReferenceId !== null && existingReferenceId !== referenceId) {
+			// The requested definition already has a schedule under a different reference id.
+			throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
+		}
+
+		if (existingReferenceId === referenceId && !candidateDefinitionHashes.includes(existingSchedule.definitionHash)) {
+			if (conflictPolicy === "error") {
+				throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
+			}
+			conflictPolicy satisfies "return_existing";
+			return { schedule: await scheduleRowToDomainInTx(txRepos, namespaceId, existingSchedule) };
+		}
+	}
+
+	const schedule = await activateExistingSchedule(
+		txRepos,
+		{
+			namespaceId,
+			existing: existingSchedule,
+			payload,
+			nextDefinitionHash: definitionHashes.nextValue,
+			referenceIdToAttach: existingSchedule.referenceId === null ? referenceId : undefined,
+			nextRunAt,
+		},
+		imminentTimerQueue
+	);
+
+	return { schedule: await scheduleRowToDomainInTx(txRepos, namespaceId, schedule) };
 }
 
 async function activateExistingSchedule(
@@ -454,7 +461,7 @@ async function createSchedule(
 		nextRunAt: TimestampMs;
 	},
 	imminentTimerQueue: ImminentTimerQueue | undefined
-): Promise<ScheduleRow> {
+): Promise<ScheduleRow | null> {
 	const { spec, payload } = params;
 	const transitionId = ulid();
 	const created = await txRepos.schedule.create({
@@ -477,6 +484,9 @@ async function createSchedule(
 		nextRunAt: params.nextRunAt,
 		latestStateTransitionId: transitionId,
 	});
+	if (!created) {
+		return null;
+	}
 	await txRepos.stateTransition.append({
 		id: transitionId,
 		type: "schedule",
@@ -499,6 +509,33 @@ async function createSchedule(
 	}
 
 	return created;
+}
+
+async function getScheduleByReferenceOrDefinitionForUpdate(
+	txRepos: TxRepositories,
+	params: { namespaceId: NamespaceId; referenceId: string | undefined; definitionHashes: string[] }
+): Promise<ScheduleRow | null> {
+	const { namespaceId, referenceId, definitionHashes } = params;
+	const scheduleByReference = referenceId
+		? await txRepos.schedule.get(namespaceId, { referenceId }, { lock: "update" })
+		: null;
+	return scheduleByReference ?? (await txRepos.schedule.get(namespaceId, { definitionHashes }, { lock: "update" }));
+}
+
+async function scheduleRowToDomainInTx(
+	txRepos: TxRepositories,
+	namespaceId: NamespaceId,
+	schedule: ScheduleRow
+): Promise<Schedule> {
+	const workflowRow = await txRepos.workflow.getById(namespaceId, schedule.workflowId);
+	if (!workflowRow) {
+		throw new NotFoundError(`Workflow not found: ${schedule.workflowId}`);
+	}
+	return scheduleRowToDomain(schedule, {
+		workflowSource: workflowRow.source,
+		workflowName: workflowRow.name,
+		workflowVersionId: workflowRow.versionId,
+	});
 }
 
 export function scheduleRowToDomain(

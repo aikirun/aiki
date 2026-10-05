@@ -1,13 +1,13 @@
+import { createBinaryLatch } from "@aikirun/lib/async";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
 import { ulid } from "ulidx";
 import { describe, expect, test } from "vitest";
 
-import { ScheduleConflictError } from "../../../errors";
 import { END_OF_TIME, withFakeClock } from "../../../testing/clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../../../testing/data-factory/middleware/context";
-import { createServiceHarness } from "../../../testing/harness";
+import { createServiceHarness, withRepos } from "../../../testing/harness";
 import {
 	type SeedScheduleDeps,
 	seedActiveSchedule,
@@ -129,26 +129,67 @@ describe("schedule repository bulkUpdateOccurrence", () => {
 });
 
 describe("schedule repository create", () => {
-	test("rejects a second schedule with the same definition in the namespace", () =>
+	test("returns null and adds nothing for a second schedule with the same definition in the namespace", () =>
 		withHarness(async ({ context, repos }) => {
 			const { schedule } = await seedActiveSchedule({ namespaceRequestContext: context, repos });
 			const row = await getScheduleRow(repos, context.namespaceId, schedule.id);
+			const secondScheduleId = ulid();
 
-			await expect(repos.schedule.create({ ...row, id: ulid() })).rejects.toThrow(ScheduleConflictError);
+			expect(await repos.schedule.create({ ...row, id: secondScheduleId })).toBeNull();
+			expect(await repos.schedule.get(context.namespaceId, { id: secondScheduleId })).toBeNull();
 		}));
 
-	test("rejects a second schedule with the same reference id in the namespace", () =>
+	test("returns null and adds nothing for a second schedule with the same reference id in the namespace", () =>
 		withHarness(async ({ context, repos }) => {
 			const { schedule } = await seedActiveSchedule(
 				{ namespaceRequestContext: context, repos },
 				{ referenceId: "monthly-close" }
 			);
 			const row = await getScheduleRow(repos, context.namespaceId, schedule.id);
+			const secondScheduleId = ulid();
 
-			await expect(repos.schedule.create({ ...row, id: ulid(), definitionHash: "another-definition" })).rejects.toThrow(
-				ScheduleConflictError
-			);
+			expect(
+				await repos.schedule.create({ ...row, id: secondScheduleId, definitionHash: "another-definition" })
+			).toBeNull();
+			expect(await repos.schedule.get(context.namespaceId, { id: secondScheduleId })).toBeNull();
 		}));
+
+	test("returns null when another transaction commits the same definition first", () =>
+		withHarness(async ({ context, repos: primaryRepos }) =>
+			withRepos(async (secondaryRepos) => {
+				const { schedule } = await seedActiveSchedule({ namespaceRequestContext: context, repos: primaryRepos });
+				const row = await getScheduleRow(primaryRepos, context.namespaceId, schedule.id);
+				const primaryScheduleId = ulid();
+				const secondaryScheduleId = ulid();
+
+				const primaryScheduleCreated = createBinaryLatch();
+				const commitPrimaryTx = createBinaryLatch();
+
+				// Transaction A creates the schedule, then stays open (uncommitted) until released.
+				const primaryPromise = primaryRepos.transaction(async (txRepos) => {
+					const created = await txRepos.schedule.create({
+						...row,
+						id: primaryScheduleId,
+						definitionHash: "another-definition",
+					});
+					primaryScheduleCreated.signal();
+					await commitPrimaryTx.wait();
+					return created;
+				});
+				await primaryScheduleCreated.wait();
+
+				// Connection B creates the same definition while A is still open.
+				const secondaryPromise = secondaryRepos.schedule.create({
+					...row,
+					id: secondaryScheduleId,
+					definitionHash: "another-definition",
+				});
+
+				commitPrimaryTx.signal();
+				expect(await primaryPromise).toEqual(expect.objectContaining({ id: primaryScheduleId }));
+				expect(await secondaryPromise).toBeNull();
+			})
+		));
 
 	test("creates the same definition in another namespace and returns it", () =>
 		withHarness(async ({ context, repos }) => {

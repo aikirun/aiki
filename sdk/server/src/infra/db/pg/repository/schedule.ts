@@ -4,7 +4,6 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import { and, count, eq, getTableColumns, inArray, isNull, lte, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
-import { ScheduleConflictError } from "../../../../errors";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
@@ -32,15 +31,9 @@ export interface ScheduleOccurrenceUpdate {
 }
 
 export const createScheduleRepository = (db: PgDb) => ({
-	async create(input: ScheduleRowInsert): Promise<ScheduleRow> {
+	async create(input: ScheduleRowInsert): Promise<ScheduleRow | null> {
 		const [created] = await db.insert(schedule).values(input).onConflictDoNothing().returning();
-		if (!created) {
-			throw new ScheduleConflictError({
-				definitionHash: input.definitionHash,
-				referenceId: input.referenceId ?? undefined,
-			});
-		}
-		return created;
+		return created ?? null;
 	},
 
 	async update(
