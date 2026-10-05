@@ -266,6 +266,7 @@ pre {
 .timeline .late-label { fill: var(--late); font-weight: 600; text-anchor: middle; }
 .timeline .due { fill: var(--timer); }
 .timeline .due-label { fill: var(--timer); font-weight: 600; }
+.timeline .due-stem { stroke: var(--timer); stroke-width: 2; }
 .timeline .window { fill: var(--timer-surface); stroke: var(--timer-rule); stroke-width: 2; }
 .timeline .window-label { fill: var(--timer); font-weight: 600; text-anchor: middle; }
 .timeline .window.is-miss { fill: var(--database-surface); stroke: var(--database-rule); }
@@ -1438,7 +1439,8 @@ function renderTicks(ticks, classes) {
 			${polls}
 			<line class="late-span" x1="${x(ticks.dueAtMs)}" y1="${axisY}" x2="${x(foundAtMs)}" y2="${axisY}"/>
 			<circle class="due" cx="${x(ticks.dueAtMs)}" cy="${axisY}" r="8"/>
-			<text class="due-label" text-anchor="end" x="${x(ticks.dueAtMs) - 14}" y="${axisY - 26}">${escapeHtml(ticks.dueLabel)}</text>
+			<line class="due-stem" x1="${x(ticks.dueAtMs)}" y1="${axisY - 14}" x2="${x(ticks.dueAtMs)}" y2="${axisY - 44}"/>
+			<text class="due-label" text-anchor="middle" x="${x(ticks.dueAtMs)}" y="${axisY - 54}">${escapeHtml(ticks.dueLabel)}</text>
 			<text class="late-label" x="${(x(ticks.dueAtMs) + x(foundAtMs)) / 2}" y="${axisY - 26}">${lateMs} ms late</text>
 		</svg>`;
 }
