@@ -5,15 +5,23 @@ import { noopLogger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import { SCHEDULE_CONFLICT_POLICIES, type Schedule, type ScheduleStatus } from "@aikirun/types/schedule";
 import { describe, expect, test } from "vitest";
 
 import { createScheduleService, type ScheduleService } from "./schedule";
-import { InvalidScheduleStateTransitionError } from "../errors";
+import { InvalidScheduleStateTransitionError, ScheduleConflictError } from "../errors";
 import type { Repositories } from "../infra/db/types";
 import { createImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { computeRank } from "../lib/rank";
 import { withFakeClock } from "../testing/clock";
 import { createServiceHarness, withRepos } from "../testing/harness";
+import {
+	type SeedScheduleDeps,
+	type SeedScheduleOverrides,
+	seedActiveSchedule,
+	seedInactiveSchedule,
+	seedPausedSchedule,
+} from "../testing/seed/schedule";
 
 const withHarness = createServiceHarness();
 
@@ -832,6 +840,264 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: reactivatedAt + 5_000 }) },
 			]);
 		}));
+});
+
+describe("ScheduleService activateSchedule and reference ids", () => {
+	const everyMinute = { type: "interval" as const, everyMs: 60_000 };
+	const everyFiveMinutes = { type: "interval" as const, everyMs: 300_000 };
+
+	const seedScheduleByStatus = {
+		active: seedActiveSchedule,
+		paused: seedPausedSchedule,
+		inactive: seedInactiveSchedule,
+	} satisfies Record<
+		ScheduleStatus,
+		(deps: SeedScheduleDeps, overrides?: SeedScheduleOverrides) => Promise<{ schedule: Schedule }>
+	>;
+
+	for (const [status, seedSchedule] of Object.entries(seedScheduleByStatus)) {
+		test(`activating another definition under the ${status} schedule's reference id is refused and leaves the schedule untouched`, () =>
+			withHarness(async ({ context, repos }) => {
+				const scheduleService = createScheduleService({ repos });
+				const { schedule } = await seedSchedule(
+					{ repos, namespaceRequestContext: context },
+					{ spec: everyMinute, referenceId: "invoices-eu-west" }
+				);
+				const scheduleBefore = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+				const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
+				const workflowRunInput = { region: "eu-west" };
+				const request = {
+					workflowName: "send-invoices",
+					workflowVersionId: "v1",
+					workflowRunInput: asOpaquePayload(workflowRunInput),
+					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					spec: everyFiveMinutes,
+				};
+
+				await expect(
+					scheduleService.activateSchedule(context.namespaceId, {
+						...request,
+						options: { reference: { id: "invoices-eu-west" } },
+					})
+				).rejects.toThrow(ScheduleConflictError);
+
+				expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(scheduleBefore);
+				expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual(historyBefore);
+			}));
+
+		test(`activating another definition under the ${status} schedule's reference id with return_existing returns the schedule untouched`, () =>
+			withHarness(async ({ context, repos }) => {
+				const scheduleService = createScheduleService({ repos });
+				const { schedule } = await seedSchedule(
+					{ repos, namespaceRequestContext: context },
+					{ spec: everyMinute, referenceId: "invoices-eu-west" }
+				);
+				const scheduleBefore = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+				const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
+				const workflowRunInput = { region: "eu-west" };
+				const request = {
+					workflowName: "send-invoices",
+					workflowVersionId: "v1",
+					workflowRunInput: asOpaquePayload(workflowRunInput),
+					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					spec: everyFiveMinutes,
+				};
+
+				const { schedule: returnedSchedule } = await scheduleService.activateSchedule(context.namespaceId, {
+					...request,
+					options: { reference: { id: "invoices-eu-west", conflictPolicy: "return_existing" } },
+				});
+
+				expect(returnedSchedule).toEqual(expect.objectContaining({ id: schedule.id, status, spec: everyMinute }));
+				expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(scheduleBefore);
+				expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual(historyBefore);
+			}));
+	}
+
+	test("activating another workflow under a schedule's reference id with return_existing returns the schedule with its own workflow", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const { schedule } = await seedActiveSchedule(
+				{ repos, namespaceRequestContext: context },
+				{ workflowName: "send-invoices", workflowVersionId: "v1", referenceId: "invoices-eu-west" }
+			);
+			const workflowRunInput = { region: "eu-west" };
+
+			const { schedule: returnedSchedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "archive-orders",
+				workflowVersionId: "v2",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: everyMinute,
+				options: { reference: { id: "invoices-eu-west", conflictPolicy: "return_existing" } },
+			});
+
+			expect(returnedSchedule).toEqual(
+				expect.objectContaining({ id: schedule.id, workflowName: "send-invoices", workflowVersionId: "v1" })
+			);
+		}));
+
+	test("activating another workflow under a schedule's reference id with return_existing creates no workflow for the request", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			await seedActiveSchedule(
+				{ repos, namespaceRequestContext: context },
+				{ workflowName: "send-invoices", workflowVersionId: "v1", referenceId: "invoices-eu-west" }
+			);
+			const workflowRunInput = { region: "eu-west" };
+
+			await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "archive-orders",
+				workflowVersionId: "v2",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: everyMinute,
+				options: { reference: { id: "invoices-eu-west", conflictPolicy: "return_existing" } },
+			});
+
+			expect(
+				await repos.workflow.listByNameAndVersionPairs(context.namespaceId, [
+					{ source: "user", name: "archive-orders", versionId: "v2" },
+				])
+			).toEqual([]);
+		}));
+
+	for (const conflictPolicy of SCHEDULE_CONFLICT_POLICIES) {
+		test(`activating a referenced schedule's definition under another reference id is refused with conflict policy ${conflictPolicy}`, () =>
+			withHarness(async ({ context, repos }) => {
+				const scheduleService = createScheduleService({ repos });
+				const workflowRunInput = { region: "eu-west" };
+				const request = {
+					workflowName: "send-invoices",
+					workflowVersionId: "v1",
+					workflowRunInput: asOpaquePayload(workflowRunInput),
+					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					spec: everyMinute,
+				};
+
+				const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+					...request,
+					options: { reference: { id: "invoices-eu-west" } },
+				});
+
+				await expect(
+					scheduleService.activateSchedule(context.namespaceId, {
+						...request,
+						options: { reference: { id: "invoices-emea", conflictPolicy } },
+					})
+				).rejects.toThrow(ScheduleConflictError);
+
+				expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+					expect.objectContaining({ id: schedule.id, referenceId: "invoices-eu-west" })
+				);
+			}));
+	}
+
+	test("activating a referenced schedule's definition without a reference id returns that schedule untouched", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: everyMinute,
+			};
+
+			const { schedule: referencedSchedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				...request,
+				options: { reference: { id: "invoices-eu-west" } },
+			});
+			const scheduleBefore = await repos.schedule.get(context.namespaceId, { id: referencedSchedule.id });
+
+			const { schedule: returnedSchedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+
+			expect(returnedSchedule).toEqual(
+				expect.objectContaining({ id: referencedSchedule.id, referenceId: "invoices-eu-west" })
+			);
+			expect(await repos.schedule.get(context.namespaceId, { id: referencedSchedule.id })).toEqual(scheduleBefore);
+		}));
+
+	test("activating a paused schedule again by its reference id leaves the schedule and its history untouched", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: everyMinute,
+				options: { reference: { id: "invoices-eu-west" } },
+			};
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
+			const scheduleBefore = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+			const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
+
+			// Two periods on
+			await withFakeClock(schedule.nextRunAt + 120_000, () =>
+				scheduleService.activateSchedule(context.namespaceId, request)
+			);
+
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(scheduleBefore);
+			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual(historyBefore);
+		}));
+
+	test("two concurrent adoptions of one unreferenced schedule under different reference ids keep the first reference id and refuse the second", () =>
+		withHarness(async ({ context, repos }) =>
+			withRepos(async (secondaryRepos) => {
+				const scheduleService = createScheduleService({ repos });
+				const workflowRunInput = { region: "eu-west" };
+				const request = {
+					workflowName: "send-invoices",
+					workflowVersionId: "v1",
+					workflowRunInput: asOpaquePayload(workflowRunInput),
+					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					spec: everyMinute,
+				};
+				const { schedule: unreferencedSchedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+
+				await expect(
+					runConcurrentScheduleOperations(
+						repos,
+						secondaryRepos,
+						(primary) =>
+							primary.activateSchedule(context.namespaceId, {
+								...request,
+								options: { reference: { id: "invoices-eu-west" } },
+							}),
+						(secondary) =>
+							secondary.activateSchedule(context.namespaceId, {
+								...request,
+								options: { reference: { id: "invoices-emea" } },
+							})
+					)
+				).rejects.toThrow(ScheduleConflictError);
+
+				expect(await repos.schedule.get(context.namespaceId, { id: unreferencedSchedule.id })).toEqual(
+					expect.objectContaining({ id: unreferencedSchedule.id, referenceId: "invoices-eu-west" })
+				);
+			})
+		));
 });
 
 describe("ScheduleService status transitions", () => {
