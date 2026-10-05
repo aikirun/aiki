@@ -101,7 +101,7 @@ const syncSchedule = schedule({
 | `"skip"` (default) | Skip this occurrence if a run is still active |
 | `"cancel_previous"` | Cancel the active run and start a new one |
 
-The policy also decides what happens to the occurrences a schedule missed, whether because the server was down or because the schedule was paused. `"allow"` runs every missed occurrence, oldest first, working through a large backlog in batches rather than all at once. `"skip"` and `"cancel_previous"` run only the most recent one.
+The policy also decides what happens to the occurrences a schedule missed, whether because the server was down or because the schedule was paused. `"allow"` runs every missed occurrence, oldest first, working through a large backlog in batches rather than all at once. `"skip"` and `"cancel_previous"` run only the most recent one. A [deactivated](#managing-schedules) schedule is different: the occurrences that fall while it is deactivated never run, under any policy.
 
 Overlap policies are evaluated per schedule instance, not globally. If you activate the same schedule for multiple tenants with different inputs, each tenant has independent overlap handling.
 
@@ -163,7 +163,7 @@ const handle = await dailyReport
 | `"error"` (default) | Throw a `ScheduleConflictError` if the reference ID already identifies a schedule with a different definition |
 | `"return_existing"` | Return the existing schedule unchanged |
 
-The definition is immutable, so a reference ID that already points at a different definition is a conflict, not an update. With `"error"` the activation throws a `ScheduleConflictError`; with `"return_existing"` it returns the existing schedule as-is. Re-activating with the *same* definition is idempotent: it returns the existing schedule. If that schedule is paused, re-activating does not resume it; only `resume()` does. If the schedule was deactivated, re-activating brings it back.
+The definition is immutable, so a reference ID that already points at a different definition is a conflict, not an update. With `"error"` the activation throws a `ScheduleConflictError`; with `"return_existing"` it returns the existing schedule as-is. Re-activating with the *same* definition is idempotent: it returns the existing schedule. If that schedule is paused, re-activating does not resume it; only `resume()` does. If the schedule was deactivated, re-activating brings it back and it [starts again from its next occurrence](#managing-schedules).
 
 For more on reference IDs in workflows and events, see the [Reference IDs guide](../guides/reference-ids.md).
 
@@ -176,7 +176,7 @@ const handle = await mySchedule.activate(aikiClient, workflowV1);
 
 await handle.pause();      // Stop triggering until resumed
 await handle.resume();     // Resume a paused schedule
-await handle.deactivate(); // Deactivate schedule
+await handle.deactivate(); // Stop triggering until activated again
 ```
 
 | Property/Method | Description |
@@ -184,7 +184,16 @@ await handle.deactivate(); // Deactivate schedule
 | `id` | Unique identifier for this schedule |
 | `pause()` | Stop triggering until resumed. Rejected on a deactivated schedule |
 | `resume()` | Resume a paused schedule. Rejected on a deactivated schedule; `activate()` brings it back |
-| `deactivate()` | Deactivate schedule |
+| `deactivate()` | Stop triggering until activated again |
+
+Pausing and deactivating both stop a schedule from triggering. They differ in how the schedule comes back and in what happens to the occurrences that fell in between:
+
+| | Comes back with | Occurrences in between |
+|---|---|---|
+| `pause()` | `resume()` | Run as the [overlap policy](#overlap-policy) decides |
+| `deactivate()` | `activate()` with the same definition | Never run |
+
+A schedule activated again after being deactivated starts the way a new one does: an interval schedule runs one interval after the activation, and a cron schedule runs the next time its expression matches.
 
 ## Multi-Tenant Schedules
 
