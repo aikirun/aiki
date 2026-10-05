@@ -3,7 +3,6 @@ import { and, count, eq, getTableColumns, inArray, isNull, lte, sql } from "driz
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import { valuesTable } from "./lib/values-table";
-import { ScheduleConflictError } from "../../../../errors";
 import type { ScheduleRepository } from "../../types/schedule";
 import type { SqliteDb } from "../provider";
 import { schedule, workflow } from "../schema";
@@ -11,13 +10,7 @@ import { schedule, workflow } from "../schema";
 export const createScheduleRepository = (db: SqliteDb): ScheduleRepository => ({
 	async create(input) {
 		const [created] = await db.insert(schedule).values(input).onConflictDoNothing().returning();
-		if (!created) {
-			throw new ScheduleConflictError({
-				definitionHash: input.definitionHash,
-				referenceId: input.referenceId ?? undefined,
-			});
-		}
-		return created;
+		return created ?? null;
 	},
 
 	async update(namespaceId, filter, updates) {

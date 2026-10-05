@@ -217,6 +217,57 @@ describe("ScheduleService activateSchedule", () => {
 			expect(migrated).toEqual(expect.objectContaining({ id: schedule.id, workflowRunInputHash: currentHash }));
 			expect(migrated?.definitionHash).not.toBe(stored?.definitionHash);
 		}));
+
+	test("returns the schedule when another activation creates it at the same moment", () =>
+		withHarness(async ({ context, repos }) => {
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "interval" as const, everyMs: 60_000 },
+			};
+			const { schedule } = await createScheduleService({ repos }).activateSchedule(context.namespaceId, request);
+			const scheduleBefore = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+			const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
+
+			// The other activation commits while this one's insert waits on it, so this one's lookups
+			// find nothing until it has tried to insert.
+			let hasTriedToInsert = false;
+			const scheduleService = createScheduleService({
+				repos: {
+					...repos,
+					transaction: (fn) =>
+						repos.transaction((txRepos) =>
+							fn({
+								...txRepos,
+								schedule: {
+									...txRepos.schedule,
+									get: async (...args) => {
+										if (!hasTriedToInsert) {
+											return null;
+										}
+										return txRepos.schedule.get(...args);
+									},
+									create: async (...args) => {
+										hasTriedToInsert = true;
+										return txRepos.schedule.create(...args);
+									},
+								},
+							})
+						),
+				},
+			});
+
+			const { schedule: returnedSchedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+
+			expect(returnedSchedule.id).toBe(schedule.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(scheduleBefore);
+			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual(historyBefore);
+		}));
 });
 
 describe("ScheduleService activateSchedule recording the client codec", () => {
