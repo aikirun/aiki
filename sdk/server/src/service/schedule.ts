@@ -302,6 +302,31 @@ async function activateScheduleInTx(
 	const referenceId = options?.reference?.id;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 
+	// A reference id bound to another definition is settled before the request's workflow is
+	// recorded: that schedule may belong to another workflow, and the request schedules nothing.
+	const existingScheduleByReference = referenceId
+		? await txRepos.schedule.get(namespaceId, { referenceId }, { lock: "update" })
+		: null;
+	if (
+		existingScheduleByReference &&
+		!candidateHashes(definitionHashes).includes(existingScheduleByReference.definitionHash)
+	) {
+		if (conflictPolicy === "error") {
+			throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
+		}
+		conflictPolicy satisfies "return_existing";
+		const existingScheduleWithWorkflow = await txRepos.schedule.getByIdWithWorkflow(
+			namespaceId,
+			existingScheduleByReference.id
+		);
+		if (!existingScheduleWithWorkflow) {
+			throw new NotFoundError(`Schedule not found: ${existingScheduleByReference.id}`);
+		}
+		return {
+			schedule: scheduleRowToDomain(existingScheduleWithWorkflow.schedule, existingScheduleWithWorkflow.workflow),
+		};
+	}
+
 	const workflowRow = await getOrCreateWorkflowInTx(
 		{
 			namespaceId,
@@ -352,16 +377,7 @@ async function activateScheduleInTx(
 		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 	}
 
-	const existingScheduleByReference = await txRepos.schedule.get(namespaceId, { referenceId }, { lock: "update" });
 	if (existingScheduleByReference) {
-		if (!candidateHashes(definitionHashes).includes(existingScheduleByReference.definitionHash)) {
-			if (conflictPolicy === "error") {
-				throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
-			}
-			conflictPolicy satisfies "return_existing";
-			return { schedule: scheduleRowToDomain(existingScheduleByReference, workflowInfo) };
-		}
-
 		const schedule = await activateExistingSchedule(
 			txRepos,
 			{
