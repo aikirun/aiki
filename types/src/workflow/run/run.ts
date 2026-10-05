@@ -52,6 +52,17 @@ export function isTerminalWorkflowRunStatus(status: WorkflowRunStatus): status i
  */
 export type WaitingForSignalWorkflowRunStatus = "awaiting_event" | "awaiting_child_workflow";
 
+/**
+ * The statuses in which a run is waiting for a point in time.
+ */
+export type TimedWorkflowRunStatus =
+	| "scheduled"
+	| "sleeping"
+	| "awaiting_retry"
+	| "awaiting_task_retry"
+	| "awaiting_event"
+	| "awaiting_child_workflow";
+
 export const WORKFLOW_RUN_CONFLICT_POLICIES = ["error", "return_existing"] as const;
 export type WorkflowRunConflictPolicy = (typeof WORKFLOW_RUN_CONFLICT_POLICIES)[number];
 

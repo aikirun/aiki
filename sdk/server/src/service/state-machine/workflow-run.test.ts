@@ -4,6 +4,7 @@ import { workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunStateRequest } from "@aikirun/types/api/workflow-run";
 import {
+	type TimedWorkflowRunStatus,
 	WORKFLOW_RUN_QUEUED_REASON,
 	WORKFLOW_RUN_SCHEDULED_REASONS,
 	WORKFLOW_RUN_STATUSES,
@@ -224,16 +225,10 @@ describe("convertDurationToTimestamp", () => {
 		cancelled: { status: "cancelled" },
 		failed: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
 	} satisfies {
-		[Status in Exclude<
-			WorkflowRunStatus,
-			| "scheduled"
-			| "sleeping"
-			| "awaiting_event"
-			| "awaiting_retry"
-			| "awaiting_task_retry"
-			| "awaiting_child_workflow"
-			| "completed"
-		>]: Extract<WorkflowRunStateRequest, { status: Status }>;
+		[Status in Exclude<WorkflowRunStatus, TimedWorkflowRunStatus | "completed">]: Extract<
+			WorkflowRunStateRequest,
+			{ status: Status }
+		>;
 	}).forEach(([status, request]) => {
 		test(`${status}: carries no duration and passes through unchanged`, () => {
 			expect(convertDurationToTimestamp(request, now)).toEqual(request);

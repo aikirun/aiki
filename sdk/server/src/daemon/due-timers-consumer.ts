@@ -3,10 +3,11 @@ import { groupBy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/colle
 import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import { type RetryStrategy, withRetry } from "@aikirun/lib/retry";
+import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
 import type { DueTimer, TimerPriorityQueue, TimerPriorityQueueWaiter, TimerType } from "@aikirun/types/infra/timer";
 import type { NamespaceId } from "@aikirun/types/namespace";
-import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
+import type { TimedWorkflowRunStatus } from "@aikirun/types/workflow/run";
 
 import { queueChildRunWaitTimedOutRuns } from "./imminent-child-run-wait-timed-out-runs";
 import { queueEventWaitTimedOutRuns } from "./imminent-event-wait-timed-out-runs";
@@ -185,11 +186,13 @@ export async function processDueTimers(
 		} else {
 			const rankById = new Map(timers.map((timer) => [timer.id, timer.rank]));
 			const runStatus = timerTypeToWorkflowRunStatus[timerType];
-			const runs: WorkflowRunMeta[] = await repos.workflowRun.listByIdsAndStatus(
-				context,
-				Array.from(rankById.keys()) as NonEmptyArray<string>,
-				runStatus
-			);
+			// The queue never drops a timer, so one can pop for a run that has since been parked on a
+			// later due time. The run's own due time decides.
+			const runs: WorkflowRunMeta[] = await repos.workflowRun.listDueByIdsAndStatus(context, {
+				ids: Array.from(rankById.keys()) as NonEmptyArray<string>,
+				status: runStatus,
+				dueBy: Date.now() as TimestampMs,
+			});
 
 			const rankedRuns: Ranked<WorkflowRunMeta>[] = [];
 			for (const run of runs) {
@@ -266,7 +269,7 @@ export async function processDueTimers(
 	await Promise.all(promises);
 }
 
-const timerTypeToWorkflowRunStatus: Record<Exclude<TimerType, "recurring">, WorkflowRunStatus> = {
+const timerTypeToWorkflowRunStatus: Record<Exclude<TimerType, "recurring">, TimedWorkflowRunStatus> = {
 	sleep: "sleeping",
 	retry: "awaiting_retry",
 	task_retry: "awaiting_task_retry",

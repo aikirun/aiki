@@ -232,7 +232,7 @@ describe("startDaemons", () => {
 		const seenRunLookups: { ids: string[]; status: string }[] = [];
 		const repos = {
 			workflowRun: {
-				listByIdsAndStatus: async (_context: unknown, ids: string[], status: string) => {
+				listDueByIdsAndStatus: async (_context: unknown, { ids, status }: { ids: string[]; status: string }) => {
 					seenRunLookups.push({ ids, status });
 					consumerProcessingReached.signal();
 					return [];
