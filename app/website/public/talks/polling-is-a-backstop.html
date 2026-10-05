@@ -168,11 +168,14 @@ h2 {
 }
 
 .bio {
+	flex: 1;
 	display: grid;
 	grid-template-columns: 220px 1fr;
 	column-gap: 48px;
-	align-items: start;
+	align-content: center;
+	align-items: center;
 }
+.bio .lines p:last-child { margin-bottom: 0; }
 .bio img {
 	width: 220px;
 	height: 220px;
@@ -1382,10 +1385,9 @@ function renderLines(slide) {
 		return `${heading(slide)}<section class="lines">${lines}</section>`;
 	}
 	return `
-		${heading(slide)}
 		<section class="bio">
 			<img src="${ASSETS[slide.photo]}" alt="${escapeHtml(slide.title)}">
-			<div class="lines">${lines}</div>
+			<div class="lines">${heading(slide)}${lines}</div>
 		</section>`;
 }
 
