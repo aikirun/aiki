@@ -301,16 +301,14 @@ async function activateScheduleInTx(
 
 	const referenceId = options?.reference?.id;
 	const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
+	const candidateDefinitionHashes = candidateHashes(definitionHashes);
 
 	// A reference id bound to another definition is settled before the request's workflow is
 	// recorded: that schedule may belong to another workflow, and the request schedules nothing.
 	const existingScheduleByReference = referenceId
 		? await txRepos.schedule.get(namespaceId, { referenceId }, { lock: "update" })
 		: null;
-	if (
-		existingScheduleByReference &&
-		!candidateHashes(definitionHashes).includes(existingScheduleByReference.definitionHash)
-	) {
+	if (existingScheduleByReference && !candidateDefinitionHashes.includes(existingScheduleByReference.definitionHash)) {
 		if (conflictPolicy === "error") {
 			throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
 		}
@@ -341,94 +339,36 @@ async function activateScheduleInTx(
 	const now = Date.now();
 	const nextRunAt = getNextOccurrence(spec, now) as TimestampMs;
 
-	if (!referenceId) {
-		const existingScheduleByDefinition = await txRepos.schedule.get(
+	// With no reference id, the definition matches a schedule whatever reference id it carries.
+	// With a free reference id, it matches only an unreferenced schedule, which this activation adopts.
+	const existingSchedule =
+		existingScheduleByReference ??
+		(await txRepos.schedule.get(
 			namespaceId,
-			{ definitionHashes: candidateHashes(definitionHashes) },
+			referenceId
+				? { definitionHashes: candidateDefinitionHashes, referenceId: null }
+				: { definitionHashes: candidateDefinitionHashes },
 			{ lock: "update" }
-		);
+		));
 
-		const schedule = existingScheduleByDefinition
-			? await activateExistingSchedule(
-					txRepos,
-					{
-						namespaceId,
-						existing: existingScheduleByDefinition,
-						payload,
-						nextDefinitionHash: definitionHashes.nextValue,
-						nextRunAt,
-					},
-					imminentTimerQueue
-				)
-			: await createSchedule(
-					txRepos,
-					{
-						namespaceId,
-						workflowId: workflowRow.id,
-						spec,
-						payload,
-						referenceId: undefined,
-						workflowRunOptions,
-						nextRunAt,
-					},
-					imminentTimerQueue
-				);
-
-		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
-	}
-
-	if (existingScheduleByReference) {
-		const schedule = await activateExistingSchedule(
-			txRepos,
-			{
-				namespaceId,
-				existing: existingScheduleByReference,
-				payload,
-				nextDefinitionHash: definitionHashes.nextValue,
-				nextRunAt,
-			},
-			imminentTimerQueue
-		);
-
-		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
-	}
-
-	// Reference id is free, but the definition may already exist.
-	const existingNonReferencedSchedule = await txRepos.schedule.get(
-		namespaceId,
-		{ definitionHashes: candidateHashes(definitionHashes), referenceId: null },
-		{ lock: "update" }
-	);
-
-	if (existingNonReferencedSchedule) {
-		const schedule = await activateExistingSchedule(
-			txRepos,
-			{
-				namespaceId,
-				existing: existingNonReferencedSchedule,
-				payload,
-				nextDefinitionHash: definitionHashes.nextValue,
-				referenceIdToAttach: referenceId,
-				nextRunAt,
-			},
-			imminentTimerQueue
-		);
-		return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
-	}
-
-	const schedule = await createSchedule(
-		txRepos,
-		{
-			namespaceId,
-			workflowId: workflowRow.id,
-			spec,
-			payload,
-			referenceId,
-			workflowRunOptions,
-			nextRunAt,
-		},
-		imminentTimerQueue
-	);
+	const schedule = existingSchedule
+		? await activateExistingSchedule(
+				txRepos,
+				{
+					namespaceId,
+					existing: existingSchedule,
+					payload,
+					nextDefinitionHash: definitionHashes.nextValue,
+					referenceIdToAttach: existingSchedule.referenceId === null ? referenceId : undefined,
+					nextRunAt,
+				},
+				imminentTimerQueue
+			)
+		: await createSchedule(
+				txRepos,
+				{ namespaceId, workflowId: workflowRow.id, spec, payload, referenceId, workflowRunOptions, nextRunAt },
+				imminentTimerQueue
+			);
 
 	return { schedule: scheduleRowToDomain(schedule, workflowInfo) };
 }
@@ -445,7 +385,7 @@ async function activateExistingSchedule(
 	},
 	imminentTimerQueue: ImminentTimerQueue | undefined
 ): Promise<ScheduleRow> {
-	// Callers lock the matching schedule before entering this function. A reference is supplied
+	// The caller locks the matching schedule before entering this function. A reference is supplied
 	// only after the locked lookup confirmed the schedule has none, so attaching it cannot
 	// overwrite a reference assigned by another activation.
 	const { existing, payload } = params;
