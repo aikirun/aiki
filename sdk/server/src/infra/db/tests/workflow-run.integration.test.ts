@@ -6,6 +6,7 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
 import type {
 	TerminalWorkflowRunStatus,
+	TimedWorkflowRunStatus,
 	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunId,
 	WorkflowRunStatus,
@@ -750,7 +751,7 @@ describe("bulkIncrementSignalSequence", () => {
 		}));
 });
 
-describe("listByIdsAndStatus", () => {
+describe("listDueByIdsAndStatus", () => {
 	test("lists the given runs in the status from any namespace and ignores the others", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const otherNamespaceContext = namespaceRequestContextFactory.build();
@@ -762,11 +763,11 @@ describe("listByIdsAndStatus", () => {
 			});
 			const absentRunId = ulid();
 
-			const rows = await repos.workflowRun.listByIdsAndStatus(
-				daemonContextFactory.build(),
-				[runningRun.runId, scheduledRun.runId, scheduledRunInOtherNamespace.runId, absentRunId],
-				"scheduled"
-			);
+			const rows = await repos.workflowRun.listDueByIdsAndStatus(daemonContextFactory.build(), {
+				ids: [runningRun.runId, scheduledRun.runId, scheduledRunInOtherNamespace.runId, absentRunId],
+				status: "scheduled",
+				dueBy: END_OF_TIME,
+			});
 
 			expect([...rows].sort(orderById)).toEqual(
 				[
@@ -787,6 +788,89 @@ describe("listByIdsAndStatus", () => {
 					.map((run) => expect.objectContaining(run))
 			);
 		}));
+
+	describe("due time", () => {
+		const parkedAt = 1_000 as TimestampMs;
+		const dueAt = 4_000_000 as TimestampMs;
+
+		/** One run per status that waits on a due time, each seeded so that its due time is `dueAt`. */
+		const dueRunCaseByStatus = {
+			scheduled: {
+				status: "scheduled",
+				seedRun: (deps) => withFakeClock(dueAt, () => seedScheduledRun(deps)),
+			},
+			sleeping: {
+				status: "sleeping",
+				seedRun: (deps) =>
+					withFakeClock(parkedAt, () => seedSleepingRun(deps, { sleepName: "cooldown", durationMs: dueAt - parkedAt })),
+			},
+			awaiting_retry: {
+				status: "awaiting_retry",
+				seedRun: (deps) => seedAwaitingRetryRun(deps, { nextAttemptAt: dueAt }),
+			},
+			awaiting_task_retry: {
+				status: "awaiting_task_retry",
+				seedRun: (deps) => seedAwaitingTaskRetryRun(deps, { nextAttemptAt: dueAt }),
+			},
+			awaiting_event: {
+				status: "awaiting_event",
+				seedRun: (deps) =>
+					withFakeClock(parkedAt, () =>
+						seedAwaitingEventRun(deps, { eventName: "orderShipped", timeoutInMs: dueAt - parkedAt })
+					),
+			},
+			awaiting_child_workflow: {
+				status: "awaiting_child_workflow",
+				seedRun: (deps) => withFakeClock(parkedAt, () => seedAwaitingChildRun(deps, { timeoutInMs: dueAt - parkedAt })),
+			},
+		} satisfies { [Status in TimedWorkflowRunStatus]: { status: Status; seedRun: RunSeed } };
+
+		for (const { status, seedRun } of Object.values(dueRunCaseByStatus)) {
+			test(`lists a run in ${status} due at the cutoff and leaves it out a millisecond earlier`, () =>
+				withHarness(async ({ context, repos, publisher }) => {
+					const { runId } = await seedRun({ namespaceRequestContext: context, repos, publisher });
+					const daemonContext = daemonContextFactory.build();
+
+					expect(
+						await repos.workflowRun.listDueByIdsAndStatus(daemonContext, { ids: [runId], status, dueBy: dueAt })
+					).toEqual([expect.objectContaining({ id: runId })]);
+					expect(
+						await repos.workflowRun.listDueByIdsAndStatus(daemonContext, {
+							ids: [runId],
+							status,
+							dueBy: (dueAt - 1) as TimestampMs,
+						})
+					).toEqual([]);
+				}));
+		}
+
+		/** The two waits that can be parked with no deadline at all. */
+		const waitWithoutDeadlineCaseByStatus = {
+			awaiting_event: {
+				status: "awaiting_event",
+				seedRun: (deps) => seedAwaitingEventRun(deps, { eventName: "orderShipped" }),
+			},
+			awaiting_child_workflow: {
+				status: "awaiting_child_workflow",
+				seedRun: (deps) => seedAwaitingChildRun(deps),
+			},
+		} satisfies { [Status in WaitingForSignalWorkflowRunStatus]: { status: Status; seedRun: RunSeed } };
+
+		for (const { status, seedRun } of Object.values(waitWithoutDeadlineCaseByStatus)) {
+			test(`never lists a run in ${status} parked without a deadline`, () =>
+				withHarness(async ({ context, repos, publisher }) => {
+					const { runId } = await seedRun({ namespaceRequestContext: context, repos, publisher });
+
+					expect(
+						await repos.workflowRun.listDueByIdsAndStatus(daemonContextFactory.build(), {
+							ids: [runId],
+							status,
+							dueBy: END_OF_TIME,
+						})
+					).toEqual([]);
+				}));
+		}
+	});
 });
 
 describe("getChildRuns", () => {

@@ -3,7 +3,12 @@ import { asNonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
-import type { WaitingForSignalWorkflowRunStatus, WorkflowRunId, WorkflowRunStatus } from "@aikirun/types/workflow/run";
+import type {
+	TimedWorkflowRunStatus,
+	WaitingForSignalWorkflowRunStatus,
+	WorkflowRunId,
+	WorkflowRunStatus,
+} from "@aikirun/types/workflow/run";
 import { NON_TERMINAL_WORKFLOW_RUN_STATUSES } from "@aikirun/types/workflow/run";
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 
@@ -261,7 +266,10 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 		return { run: row.run, workflow: row.workflow, state: toWorkflowRunState(row.state) };
 	},
 
-	async listByIdsAndStatus(_context: DaemonContext, ids: NonEmptyArray<string>, status: WorkflowRunStatus) {
+	async listDueByIdsAndStatus(
+		_context: DaemonContext,
+		filter: { ids: NonEmptyArray<string>; status: TimedWorkflowRunStatus; dueBy: TimestampMs }
+	) {
 		return db
 			.select({
 				id: workflowRun.id,
@@ -273,7 +281,13 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 				latestStateTransitionId: workflowRun.latestStateTransitionId,
 			})
 			.from(workflowRun)
-			.where(and(inArray(workflowRun.id, ids), eq(workflowRun.status, status)));
+			.where(
+				and(
+					inArray(workflowRun.id, filter.ids),
+					eq(workflowRun.status, filter.status),
+					lte(dueTimestampColumn(filter.status), filter.dueBy)
+				)
+			);
 	},
 
 	async getChildRuns(filter: {
@@ -659,13 +673,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 
 	async bulkTransitionToQueued(
 		_context: DaemonContext,
-		fromStatus:
-			| "scheduled"
-			| "sleeping"
-			| "awaiting_retry"
-			| "awaiting_task_retry"
-			| "awaiting_event"
-			| "awaiting_child_workflow",
+		fromStatus: TimedWorkflowRunStatus,
 		runs: NonEmptyArray<{ filter: { id: string; revision: number }; update: { stateTransitionId: string } }>,
 		options?: { incrementAttempts?: boolean }
 	): Promise<Array<{ id: string; revision: number }>> {
@@ -837,3 +845,20 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 		return map;
 	},
 });
+
+function dueTimestampColumn(status: TimedWorkflowRunStatus) {
+	switch (status) {
+		case "scheduled":
+			return workflowRun.scheduledAt;
+		case "sleeping":
+			return workflowRun.wakeupAt;
+		case "awaiting_retry":
+		case "awaiting_task_retry":
+			return workflowRun.nextAttemptAt;
+		case "awaiting_event":
+		case "awaiting_child_workflow":
+			return workflowRun.timeoutAt;
+		default:
+			return status satisfies never;
+	}
+}

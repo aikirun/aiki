@@ -4,6 +4,7 @@ import type { Hash } from "../infra/hasher";
 import type { OpaquePayload } from "../payload";
 import type { WorkflowSource } from "../workflow";
 import type {
+	TimedWorkflowRunStatus,
 	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunRecord,
 	WorkflowRunState,
@@ -146,18 +147,7 @@ export type WorkflowRunStateAwaitingChildWorkflowRequest = Omit<WorkflowRunState
 };
 
 export type WorkflowRunStateRequest =
-	| Exclude<
-			WorkflowRunState,
-			{
-				status:
-					| "scheduled"
-					| "sleeping"
-					| "awaiting_event"
-					| "awaiting_retry"
-					| "awaiting_task_retry"
-					| "awaiting_child_workflow";
-			}
-	  >
+	| Exclude<WorkflowRunState, { status: TimedWorkflowRunStatus }>
 	| WorkflowRunStateScheduledRequest
 	| WorkflowRunStateSleepingRequest
 	| WorkflowRunStateAwaitingEventRequest
