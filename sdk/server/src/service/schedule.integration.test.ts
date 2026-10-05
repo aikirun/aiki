@@ -583,6 +583,95 @@ describe("ScheduleService activateSchedule and the next run", () => {
 			);
 		}));
 
+	test("activating a deactivated schedule again sets its next run one period after the activation", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			};
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
+
+			// One and a half periods on, so a next run still counted from the old one would differ.
+			const reactivatedAt = schedule.nextRunAt + 90_000;
+			await withFakeClock(reactivatedAt, () => scheduleService.activateSchedule(context.namespaceId, request));
+
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ id: schedule.id, status: "active", nextRunAt: reactivatedAt + 60_000 })
+			);
+		}));
+
+	test("activating a deactivated schedule again by its reference id sets its next run one period after the activation", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+				options: { reference: { id: "invoices-eu-west" } },
+			};
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
+
+			// One and a half periods on, so a next run still counted from the old one would differ.
+			const reactivatedAt = schedule.nextRunAt + 90_000;
+			await withFakeClock(reactivatedAt, () => scheduleService.activateSchedule(context.namespaceId, request));
+
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ id: schedule.id, status: "active", nextRunAt: reactivatedAt + 60_000 })
+			);
+		}));
+
+	test("adopting a reference id onto a deactivated schedule sets its next run one period after the activation", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			};
+
+			const { schedule: unreferencedSchedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			await scheduleService.deactivateSchedule(context.namespaceId, unreferencedSchedule.id);
+
+			// One and a half periods on, so a next run still counted from the old one would differ.
+			const reactivatedAt = unreferencedSchedule.nextRunAt + 90_000;
+			await withFakeClock(reactivatedAt, () =>
+				scheduleService.activateSchedule(context.namespaceId, {
+					...request,
+					options: { reference: { id: "invoices-eu-west" } },
+				})
+			);
+
+			expect(await repos.schedule.get(context.namespaceId, { id: unreferencedSchedule.id })).toEqual(
+				expect.objectContaining({
+					id: unreferencedSchedule.id,
+					status: "active",
+					referenceId: "invoices-eu-west",
+					nextRunAt: reactivatedAt + 60_000,
+				})
+			);
+		}));
+
 	test("adopting a reference id onto an unreferenced schedule leaves its next run untouched", () =>
 		withHarness(async ({ context, repos }) => {
 			const scheduleService = createScheduleService({ repos });
@@ -727,19 +816,20 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				spec,
+				spec: { type: "interval" as const, everyMs: 5_000 },
 			};
 
 			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
 			await scheduleService.deactivateSchedule(context.namespaceId, schedule.id);
 
-			// Two periods on
-			await withFakeClock(schedule.nextRunAt + 120_000, () =>
-				scheduleService.activateSchedule(context.namespaceId, request)
-			);
+			// One and a half periods on
+			const reactivatedAt = schedule.nextRunAt + 7_500;
+			await withFakeClock(reactivatedAt, () => scheduleService.activateSchedule(context.namespaceId, request));
 
+			// The first timer is the one added when the schedule was created.
 			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
 				{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: schedule.nextRunAt }) },
+				{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: reactivatedAt + 5_000 }) },
 			]);
 		}));
 });
@@ -1032,7 +1122,6 @@ describe("ScheduleService status transitions", () => {
 						id: schedule.id,
 						status: "active",
 						referenceId: "invoices-eu-west",
-						nextRunAt: schedule.nextRunAt,
 					})
 				);
 				expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual({

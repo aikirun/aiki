@@ -23,6 +23,7 @@ export type ScheduleRowUpdate = Partial<
 		| "clientHasherApplied"
 		| "clientCodecApplied"
 		| "definitionHash"
+		| "nextRunAt"
 	>
 >;
 export interface ScheduleOccurrenceUpdate {

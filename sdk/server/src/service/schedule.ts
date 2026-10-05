@@ -331,6 +331,7 @@ async function activateScheduleInTx(
 						existing: existingScheduleByDefinition,
 						payload,
 						nextDefinitionHash: definitionHashes.nextValue,
+						nextRunAt,
 					},
 					imminentTimerQueue
 				)
@@ -368,6 +369,7 @@ async function activateScheduleInTx(
 				existing: existingScheduleByReference,
 				payload,
 				nextDefinitionHash: definitionHashes.nextValue,
+				nextRunAt,
 			},
 			imminentTimerQueue
 		);
@@ -391,6 +393,7 @@ async function activateScheduleInTx(
 				payload,
 				nextDefinitionHash: definitionHashes.nextValue,
 				referenceIdToAttach: referenceId,
+				nextRunAt,
 			},
 			imminentTimerQueue
 		);
@@ -422,6 +425,7 @@ async function activateExistingSchedule(
 		payload: SchedulePayload;
 		nextDefinitionHash: string | undefined;
 		referenceIdToAttach?: string;
+		nextRunAt: TimestampMs;
 	},
 	imminentTimerQueue: ImminentTimerQueue | undefined
 ): Promise<ScheduleRow> {
@@ -469,13 +473,14 @@ async function activateExistingSchedule(
 		return updatedRow;
 	}
 
+	// A reactivated schedule starts from its next occurrence: what fell while it was inactive is not owed.
 	return writeScheduleStateInTx(
 		txRepos,
 		{
 			namespaceId: params.namespaceId,
 			id: existing.id,
 			state: { status: "active", reason: "reactivated" },
-			updates,
+			updates: { ...updates, nextRunAt: params.nextRunAt },
 		},
 		imminentTimerQueue
 	);

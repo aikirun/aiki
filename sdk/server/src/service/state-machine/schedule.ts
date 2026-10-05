@@ -45,6 +45,7 @@ export async function writeScheduleStateInTx(
 			| "clientCodecApplied"
 			| "definitionHash"
 			| "referenceId"
+			| "nextRunAt"
 		>;
 	},
 	imminentTimerQueue?: ImminentTimerQueue
