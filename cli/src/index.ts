@@ -1,7 +1,7 @@
 import process from "node:process";
 import { loadAppServerConfig, startAppServer } from "@aikirun/app-server";
 import { loadDatabaseConfig, loadDatabaseProvider } from "@aikirun/lib/db";
-import { migrateApply, migrateList, migrationSource } from "@aikirun/lib/db/migrate";
+import { migrateApply, migrateList, migrateReset, migrationSource } from "@aikirun/lib/db/migrate";
 import { isMigrateSubcommand, MIGRATE_SUBCOMMAND_HELP, MIGRATE_SUBCOMMANDS } from "@aikirun/lib/db/migrate/cli";
 import { describeErrorCauses } from "@aikirun/lib/error";
 import { consoleLogger } from "@aikirun/lib/logger";
@@ -44,12 +44,13 @@ function parseMigrationPackageList(value: unknown): MigrationPackage[] {
 const cli = cac("aiki");
 
 cli
-	.command("migrate [subcommand]", "Database migration commands (apply | list)")
+	.command("migrate [subcommand]", "Database migration commands (apply | list | reset)")
 	.option("--package <names>", `Comma-separated packages: ${MIGRATION_PACKAGES.join(", ")} (default: server)`)
 	.option("--env-file <path>", "Path to env file")
 	.example((name) => `  $ ${name} migrate apply                        apply the server's pending migrations`)
 	.example((name) => `  $ ${name} migrate apply --package server,iam   apply server and iam migrations, in order`)
 	.example((name) => `  $ ${name} migrate list                         list the migrations the binary ships`)
+	.example((name) => `  $ ${name} migrate reset                        wipe the schema and clear applied migrations`)
 	.action(async (subcommand: string | undefined, options: { package?: unknown; envFile?: string }) => {
 		if (subcommand === undefined) {
 			cli.outputHelp();
@@ -110,6 +111,20 @@ cli
 					migrateList({ source: migrationSource(migrations), dbProvider });
 				}
 				console.log("");
+				return;
+			}
+			case "reset": {
+				const dbConfig = loadDatabaseConfig();
+				for (const pkg of packages) {
+					const packageData = embeddedMigrationData[pkg];
+					if (!packageData) {
+						throw new Error(`the binary ships no migrations for ${pkg}`);
+					}
+					await migrateReset({
+						migrationsTable: packageData.migrationsTable,
+						db: dbConfig,
+					});
+				}
 				return;
 			}
 			default:

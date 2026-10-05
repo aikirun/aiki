@@ -4,13 +4,14 @@ import { config as loadEnv } from "dotenv";
 
 import { migrateApply } from "./commands/apply";
 import { migrateList } from "./commands/list";
+import { migrateReset } from "./commands/reset";
 import type { MigrationSource } from "./source";
 import { describeErrorCauses } from "../../error/cause";
 import { consoleLogger } from "../../logger";
 import { loadDatabaseConfig, loadDatabaseProvider } from "../config";
 import type { DatabaseProvider } from "../provider";
 
-export const MIGRATE_SUBCOMMANDS = ["apply", "list"] as const;
+export const MIGRATE_SUBCOMMANDS = ["apply", "list", "reset"] as const;
 export type MigrateSubcommand = (typeof MIGRATE_SUBCOMMANDS)[number];
 
 export function isMigrateSubcommand(value: string): value is MigrateSubcommand {
@@ -25,6 +26,7 @@ export function isMigrateSubcommand(value: string): value is MigrateSubcommand {
 export const MIGRATE_SUBCOMMAND_HELP: Record<MigrateSubcommand, string> = {
 	apply: "Apply pending migrations to the database",
 	list: "List the migrations this package ships",
+	reset: "Wipe the schema and clear this package's applied migrations",
 };
 
 export interface MigrateCliParams {
@@ -38,10 +40,11 @@ export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 	const cli = cac(params.name);
 
 	cli
-		.command("migrate [subcommand]", "Database migration commands (apply | list)")
+		.command("migrate [subcommand]", "Database migration commands (apply | list | reset)")
 		.option("--env-file <path>", "Path to env file")
 		.example((name) => `  $ ${name} migrate apply    apply pending migrations to the database`)
 		.example((name) => `  $ ${name} migrate list     list the migrations this package ships`)
+		.example((name) => `  $ ${name} migrate reset    wipe the schema and clear applied migrations`)
 		.action(async (subcommand: string | undefined, options: { envFile?: string }) => {
 			if (subcommand === undefined) {
 				cli.outputHelp();
@@ -70,6 +73,14 @@ export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 				case "list": {
 					const dbProvider = loadDatabaseProvider();
 					migrateList({ source: params.resolveSource(dbProvider), dbProvider });
+					return;
+				}
+				case "reset": {
+					const dbConfig = loadDatabaseConfig();
+					await migrateReset({
+						migrationsTable: params.migrationsTable,
+						db: dbConfig,
+					});
 					return;
 				}
 				default:

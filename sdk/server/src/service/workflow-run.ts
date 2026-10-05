@@ -357,7 +357,12 @@ async function createWorkflowRunInTx(
 		clientCodecApplied: request.clientCodecApplied,
 		input,
 		inputHash: inputHash.value,
-		options: options && { retry: options.retry, pool: options.pool, priority: options.priority },
+		options: options && {
+			retry: options.retry,
+			pool: options.pool,
+			priority: options.priority,
+			clientCodecPolicy: options.clientCodecPolicy,
+		},
 		referenceId,
 		latestStateTransitionId: transitionId,
 		scheduledAt: scheduledAt as TimestampMs,

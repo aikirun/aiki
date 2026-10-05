@@ -622,6 +622,9 @@ function ScheduleRow({
 							<Meta label="Retry" value={retrySummary(schedule.workflowRunOptions.retry)} />
 						)}
 						{schedule.workflowRunOptions?.pool && <Meta label="Pool" value={schedule.workflowRunOptions.pool} />}
+						{schedule.workflowRunOptions?.clientCodecPolicy && (
+							<Meta label="Codec Policy" value={schedule.workflowRunOptions.clientCodecPolicy} />
+						)}
 						<Meta label="Total Runs" value={runCount.toLocaleString()} />
 						<Meta label="Created" value={fmtDate(schedule.createdAt)} />
 					</div>

@@ -6,7 +6,7 @@ import type { Client } from "@aikirun/types/client";
 import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, ScheduleSpec } from "@aikirun/types/schedule";
 import { INTERNAL } from "@aikirun/types/symbols";
 
-import { noopCodec, toBoundCodec } from "./run/bound-codec";
+import { resolveClientCodec } from "./run/bound-codec";
 import type { EventsDefinition } from "./run/event";
 import type { WorkflowVersion } from "./workflow-version";
 
@@ -76,7 +76,8 @@ async function activateWithOptions<Input, Output, Context, TEvents extends Event
 ): Promise<ScheduleHandle> {
 	const workflowRunInput = args[0];
 	const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
-	const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+	const workflowRunOptions = workflow[INTERNAL].runOptions();
+	const { codec, applied: clientCodecApplied } = resolveClientCodec(clientCodec, workflowRunOptions.clientCodecPolicy);
 	const workflowRunInputHash = clientHasher
 		? await clientHasher(workflowRunInput)
 		: { value: await hashInput(workflowRunInput) };
@@ -99,9 +100,9 @@ async function activateWithOptions<Input, Output, Context, TEvents extends Event
 		workflowRunInput: await codec.encode(workflowRunInput),
 		workflowRunInputHash,
 		clientHasherApplied: clientHasher !== undefined,
-		clientCodecApplied: clientCodec !== undefined,
+		clientCodecApplied,
 		options,
-		workflowRunOptions: workflow[INTERNAL].runOptions(),
+		workflowRunOptions,
 	});
 	client.logger.info("Schedule activated", {
 		"aiki.scheduleSpec": scheduleSpec,

@@ -71,6 +71,9 @@ export interface WorkflowReference {
 	conflictPolicy?: WorkflowRunConflictPolicy;
 }
 
+export const CLIENT_CODEC_POLICIES = ["apply", "skip"] as const;
+export type ClientCodecPolicy = (typeof CLIENT_CODEC_POLICIES)[number];
+
 export interface WorkflowRunOptions {
 	retry?: RetryStrategy;
 	pool?: string;
@@ -79,6 +82,16 @@ export interface WorkflowRunOptions {
 	 * same millisecond; a run due earlier always dispatches first, whatever the priorities.
 	 */
 	priority?: number;
+	/**
+	 * Whether the client's codec encodes this run's payloads. `"apply"` (the default) encrypts when
+	 * the client has a codec; `"skip"` leaves every payload this run writes as plaintext. The choice
+	 * is run-scoped: it covers the workflow input and every task payload written under the run.
+	 * Identity hashing is unaffected — a keyed hasher still runs. Because this is a run option, it
+	 * is hashed into a schedule's definition, so flipping it on an active schedule does not update
+	 * that schedule; the next activation creates a twin and the old one keeps minting under the old
+	 * policy until deactivated.
+	 */
+	clientCodecPolicy?: ClientCodecPolicy;
 }
 
 export interface WorkflowStartOptions extends WorkflowRunOptions {
