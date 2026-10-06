@@ -15,6 +15,7 @@ import { createImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { computeRank } from "../lib/rank";
 import { withFakeClock } from "../testing/clock";
 import { createServiceHarness, withRepos } from "../testing/harness";
+import { allowsConcurrentWriteTransactions } from "../testing/infra/db/transaction";
 import {
 	type SeedScheduleDeps,
 	type SeedScheduleOverrides,
@@ -218,56 +219,231 @@ describe("ScheduleService activateSchedule", () => {
 			expect(migrated?.definitionHash).not.toBe(stored?.definitionHash);
 		}));
 
-	test("returns the schedule when another activation creates it at the same moment", () =>
+	test("refuses an activation whose input hashes match two schedules", () =>
 		withHarness(async ({ context, repos }) => {
-			const workflowRunInput = { region: "eu-west" };
+			const scheduleService = createScheduleService({ repos });
 			const request = {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
-				workflowRunInput: asOpaquePayload(workflowRunInput),
-				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				workflowRunInput: asOpaquePayload({ region: "eu-west" }),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
 				spec: { type: "interval" as const, everyMs: 60_000 },
 			};
-			const { schedule } = await createScheduleService({ repos }).activateSchedule(context.namespaceId, request);
-			const scheduleBefore = await repos.schedule.get(context.namespaceId, { id: schedule.id });
-			const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
-
-			// The other activation commits while this one's insert waits on it, so this one's lookups
-			// find nothing until it has tried to insert.
-			let hasTriedToInsert = false;
-			const scheduleService = createScheduleService({
-				repos: {
-					...repos,
-					transaction: (fn) =>
-						repos.transaction((txRepos) =>
-							fn({
-								...txRepos,
-								schedule: {
-									...txRepos.schedule,
-									get: async (...args) => {
-										if (!hasTriedToInsert) {
-											return null;
-										}
-										return txRepos.schedule.get(...args);
-									},
-									create: async (...args) => {
-										hasTriedToInsert = true;
-										return txRepos.schedule.create(...args);
-									},
-								},
-							})
-						),
-				},
+			await scheduleService.activateSchedule(context.namespaceId, {
+				...request,
+				workflowRunInputHash: { value: "previous-hash" },
+			});
+			await scheduleService.activateSchedule(context.namespaceId, {
+				...request,
+				workflowRunInputHash: { value: "current-hash" },
 			});
 
-			const { schedule: returnedSchedule } = await scheduleService.activateSchedule(context.namespaceId, request);
-
-			expect(returnedSchedule.id).toBe(schedule.id);
-			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(scheduleBefore);
-			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual(historyBefore);
+			await expect(
+				scheduleService.activateSchedule(context.namespaceId, {
+					...request,
+					workflowRunInputHash: { value: "current-hash", deprecatedValues: ["previous-hash"] },
+				})
+			).rejects.toThrow(ScheduleConflictError);
 		}));
+
+	test("refuses an activation by reference id whose input hashes match two schedules", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload({ region: "eu-west" }),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "interval" as const, everyMs: 60_000 },
+			};
+			await scheduleService.activateSchedule(context.namespaceId, {
+				...request,
+				workflowRunInputHash: { value: "previous-hash" },
+				options: { reference: { id: "invoices-eu-west" } },
+			});
+			await scheduleService.activateSchedule(context.namespaceId, {
+				...request,
+				workflowRunInputHash: { value: "current-hash" },
+			});
+
+			await expect(
+				scheduleService.activateSchedule(context.namespaceId, {
+					...request,
+					workflowRunInputHash: { value: "current-hash", deprecatedValues: ["previous-hash"] },
+					options: { reference: { id: "invoices-eu-west" } },
+				})
+			).rejects.toThrow(ScheduleConflictError);
+		}));
+
+	test.skipIf(!allowsConcurrentWriteTransactions())(
+		"two activations by different reference ids whose input hashes match the same two schedules are both refused",
+		() =>
+			withHarness(async ({ context, repos }) =>
+				withRepos(async (secondaryRepos) => {
+					const request = {
+						workflowName: "send-invoices",
+						workflowVersionId: "v1",
+						workflowRunInput: asOpaquePayload({ region: "eu-west" }),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						spec: { type: "interval" as const, everyMs: 60_000 },
+					};
+					const scheduleService = createScheduleService({ repos });
+					await scheduleService.activateSchedule(context.namespaceId, {
+						...request,
+						workflowRunInputHash: { value: "previous-hash" },
+						options: { reference: { id: "invoices-eu-west" } },
+					});
+					await scheduleService.activateSchedule(context.namespaceId, {
+						...request,
+						workflowRunInputHash: { value: "current-hash" },
+						options: { reference: { id: "invoices-emea" } },
+					});
+
+					const primaryHoldsItsSchedule = createBinaryLatch();
+					const releasePrimary = createBinaryLatch();
+					const secondaryStartedItsSearch = createBinaryLatch();
+					const primaryService = createScheduleService({
+						repos: {
+							...repos,
+							transaction: (fn) =>
+								repos.transaction((txRepos) =>
+									fn({
+										...txRepos,
+										schedule: {
+											...txRepos.schedule,
+											listByDefinitionHashes: async (...args) => {
+												primaryHoldsItsSchedule.signal();
+												await releasePrimary.wait();
+												return txRepos.schedule.listByDefinitionHashes(...args);
+											},
+										},
+									})
+								),
+						},
+					});
+					const secondaryService = createScheduleService({
+						repos: {
+							...secondaryRepos,
+							transaction: (fn) =>
+								secondaryRepos.transaction((txRepos) =>
+									fn({
+										...txRepos,
+										schedule: {
+											...txRepos.schedule,
+											listByDefinitionHashes: (...args) => {
+												secondaryStartedItsSearch.signal();
+												return txRepos.schedule.listByDefinitionHashes(...args);
+											},
+										},
+									})
+								),
+						},
+					});
+					const workflowRunInputHash = { value: "current-hash", deprecatedValues: ["previous-hash"] };
+
+					// Each activation locks the schedule under its own reference id, then searches by hash.
+					// The first one pauses before its search until the second has started its own.
+					const primaryActivation = Promise.allSettled([
+						primaryService.activateSchedule(context.namespaceId, {
+							...request,
+							workflowRunInputHash,
+							options: { reference: { id: "invoices-eu-west" } },
+						}),
+					]);
+					await primaryHoldsItsSchedule.wait();
+					const secondaryActivation = Promise.allSettled([
+						secondaryService.activateSchedule(context.namespaceId, {
+							...request,
+							workflowRunInputHash,
+							options: { reference: { id: "invoices-emea" } },
+						}),
+					]);
+					await secondaryStartedItsSearch.wait();
+					releasePrimary.signal();
+
+					expect(await primaryActivation).toEqual([{ status: "rejected", reason: expect.any(ScheduleConflictError) }]);
+					expect(await secondaryActivation).toEqual([
+						{ status: "rejected", reason: expect.any(ScheduleConflictError) },
+					]);
+				})
+			)
+	);
+
+	test.skipIf(!allowsConcurrentWriteTransactions())(
+		"returns the schedule when another activation creates it at the same moment",
+		() =>
+			withHarness(async ({ context, repos }) =>
+				withRepos(async (secondaryRepos) => {
+					const request = {
+						workflowName: "send-invoices",
+						workflowVersionId: "v1",
+						workflowRunInput: asOpaquePayload({ region: "eu-west" }),
+						workflowRunInputHash: { value: "current-hash" },
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						spec: { type: "interval" as const, everyMs: 60_000 },
+					};
+					// The workflow already exists. With a new one, the second activation would wait for
+					// the first while recording the workflow, and would then find the schedule.
+					await seedActiveSchedule(
+						{ repos, namespaceRequestContext: context },
+						{ workflowName: "send-invoices", workflowVersionId: "v1", spec: { type: "interval", everyMs: 300_000 } }
+					);
+
+					const primaryCreatedSchedule = createBinaryLatch();
+					const commitPrimary = createBinaryLatch();
+					const secondarySearched = createBinaryLatch();
+					const primaryService = createScheduleService({
+						repos: {
+							...repos,
+							transaction: (fn) =>
+								repos.transaction(async (txRepos) => {
+									const result = await fn(txRepos);
+									primaryCreatedSchedule.signal();
+									await commitPrimary.wait();
+									return result;
+								}),
+						},
+					});
+					const secondarySearches: string[][] = [];
+					const secondaryService = createScheduleService({
+						repos: {
+							...secondaryRepos,
+							transaction: (fn) =>
+								secondaryRepos.transaction((txRepos) =>
+									fn({
+										...txRepos,
+										schedule: {
+											...txRepos.schedule,
+											listByDefinitionHashes: async (...args) => {
+												const schedules = await txRepos.schedule.listByDefinitionHashes(...args);
+												secondarySearches.push(schedules.map((schedule) => schedule.id));
+												secondarySearched.signal();
+												return schedules;
+											},
+										},
+									})
+								),
+						},
+					});
+
+					// The first activation creates the schedule and stays open. It is committed only after
+					// the second has searched and found nothing.
+					const primaryActivation = primaryService.activateSchedule(context.namespaceId, request);
+					await primaryCreatedSchedule.wait();
+					const secondaryActivation = secondaryService.activateSchedule(context.namespaceId, request);
+					await secondarySearched.wait();
+					commitPrimary.signal();
+					const [primaryResult, secondaryResult] = await Promise.all([primaryActivation, secondaryActivation]);
+
+					expect(secondaryResult.schedule.id).toBe(primaryResult.schedule.id);
+					expect(secondarySearches).toEqual([[], [primaryResult.schedule.id]]);
+				})
+			)
+	);
 });
 
 describe("ScheduleService activateSchedule recording the client codec", () => {

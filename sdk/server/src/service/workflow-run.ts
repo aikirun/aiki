@@ -337,7 +337,7 @@ async function createWorkflowRunInTx(
 			referenceId,
 		});
 		if (existingRun) {
-			if (!candidateHashes(inputHash).includes(existingRun.inputHash)) {
+			if (!candidateHashes(inputHash).all.includes(existingRun.inputHash)) {
 				const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
 				if (conflictPolicy === "error") {
 					throw new WorkflowRunReferenceConflictError(name, versionId, referenceId);

@@ -329,20 +329,42 @@ describe("schedule repository update", () => {
 		}));
 });
 
-describe("schedule repository get", () => {
-	test("finds a schedule by any of the given definition hashes", () =>
-		withHarness(async ({ context, repos }) => {
-			const { schedule } = await seedActiveSchedule({ namespaceRequestContext: context, repos });
-			const row = await getScheduleRow(repos, context.namespaceId, schedule.id);
+describe("schedule repository listByDefinitionHashes", () => {
+	function orderById(a: { id: string }, b: { id: string }): number {
+		return a.id < b.id ? -1 : 1;
+	}
 
-			expect(
-				await repos.schedule.get(context.namespaceId, {
-					definitionHashes: ["no-such-definition", row.definitionHash],
-				})
-			).toEqual(row);
-			expect(await repos.schedule.get(context.namespaceId, { definitionHashes: ["no-such-definition"] })).toBeNull();
+	test("lists every schedule stored under one of the definition hashes", () =>
+		withHarness(async ({ context, repos }) => {
+			const deps = { namespaceRequestContext: context, repos };
+			const invoicesSchedule = await seedActiveSchedule(deps, { workflowName: "send-invoices" });
+			const remindersSchedule = await seedActiveSchedule(deps, { workflowName: "send-reminders" });
+			await seedActiveSchedule(deps, { workflowName: "archive-orders" });
+			const invoicesRow = await getScheduleRow(repos, context.namespaceId, invoicesSchedule.schedule.id);
+			const remindersRow = await getScheduleRow(repos, context.namespaceId, remindersSchedule.schedule.id);
+
+			const rows = await repos.schedule.listByDefinitionHashes(context.namespaceId, [
+				remindersRow.definitionHash,
+				"no-such-definition",
+				invoicesRow.definitionHash,
+			]);
+
+			expect([...rows].sort(orderById)).toEqual([invoicesRow, remindersRow].sort(orderById));
 		}));
 
+	test("leaves out a schedule with the same definition hash in another namespace", () =>
+		withHarness(async ({ context, repos }) => {
+			const otherNamespaceContext = namespaceRequestContextFactory.build();
+			const { schedule } = await seedActiveSchedule({ namespaceRequestContext: otherNamespaceContext, repos });
+			const rowInOtherNamespace = await getScheduleRow(repos, otherNamespaceContext.namespaceId, schedule.id);
+
+			expect(
+				await repos.schedule.listByDefinitionHashes(context.namespaceId, [rowInOtherNamespace.definitionHash])
+			).toEqual([]);
+		}));
+});
+
+describe("schedule repository get", () => {
 	test("a null reference id matches only an unreferenced schedule, and a value matches its reference", () =>
 		withHarness(async ({ context, repos }) => {
 			const deps = { namespaceRequestContext: context, repos };
