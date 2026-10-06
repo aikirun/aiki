@@ -99,11 +99,12 @@ describe("resolveParentCodec", () => {
 		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ clientMarked: payload }));
 	});
 
-	test("keeps the parent's skipped declaration when the policy is unset", () => {
-		expect(resolveParentCodec(noopCodec, false, undefined, clientCodec)).toEqual({
-			codec: noopCodec,
-			applied: false,
-		});
+	test("falls back to the client codec when the policy is unset and the parent did not apply", async () => {
+		const { codec, applied } = resolveParentCodec(noopCodec, false, undefined, clientCodec);
+		const payload = { value: 1 };
+
+		expect(applied).toBe(true);
+		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ clientMarked: payload }));
 	});
 
 	test("skips even when the parent applied the codec", async () => {

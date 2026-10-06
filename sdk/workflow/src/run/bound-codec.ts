@@ -37,8 +37,8 @@ export function resolveClientCodec(
 /**
  * Picks the codec a child start should use from the parent's bound codec and the child's policy.
  * `"skip"` yields the noop and `applied: false`. When the parent applied a codec, the child
- * inherits it. When the parent did not, `"apply"` falls through to the client codec; an unset
- * policy keeps the parent's skipped declaration.
+ * inherits it. When the parent did not, `"apply"` (the default when the policy is unset) falls
+ * through to the client codec.
  */
 export function resolveParentCodec(
 	parentCodec: BoundCodec,
@@ -54,11 +54,7 @@ export function resolveParentCodec(
 		return { codec: parentCodec, applied: true };
 	}
 
-	if (policy === "apply") {
-		return resolveClientCodec(clientCodec, "apply");
-	}
-
-	return { codec: parentCodec, applied: parentApplied };
+	return resolveClientCodec(clientCodec, "apply");
 }
 
 /**
