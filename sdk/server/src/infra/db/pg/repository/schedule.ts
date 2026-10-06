@@ -94,16 +94,13 @@ export const createScheduleRepository = (db: PgDb) => ({
 
 	async get(
 		namespaceId: NamespaceId,
-		filter: { id?: string; definitionHashes?: string[]; referenceId?: string | null },
+		filter: { id?: string; referenceId?: string | null },
 		options?: { lock?: "update" }
 	): Promise<ScheduleRow | null> {
 		const conditions = [eq(schedule.namespaceId, namespaceId)];
 
 		if (filter.id) {
 			conditions.push(eq(schedule.id, filter.id));
-		}
-		if (filter.definitionHashes && filter.definitionHashes.length > 0) {
-			conditions.push(inArray(schedule.definitionHash, filter.definitionHashes));
 		}
 		if (filter.referenceId !== undefined) {
 			if (filter.referenceId === null) {
@@ -121,6 +118,19 @@ export const createScheduleRepository = (db: PgDb) => ({
 
 		const result = options?.lock ? await query.for(options.lock) : await query;
 		return result[0] ?? null;
+	},
+
+	async listByDefinitionHashes(
+		namespaceId: NamespaceId,
+		definitionHashes: NonEmptyArray<string>,
+		options?: { lock?: "update" }
+	): Promise<ScheduleRow[]> {
+		const query = db
+			.select()
+			.from(schedule)
+			.where(and(eq(schedule.namespaceId, namespaceId), inArray(schedule.definitionHash, definitionHashes)));
+
+		return options?.lock ? await query.for(options.lock) : await query;
 	},
 
 	async listByFilters(

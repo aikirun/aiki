@@ -18,7 +18,7 @@ import { ScheduleConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleRow } from "../infra/db/types/schedule";
 import type { ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
-import { candidateHashes } from "../lib/hash";
+import { type CandidateHashes, candidateHashes } from "../lib/hash";
 
 export function getReferenceId(scheduleId: string, occurrence: number) {
 	return `schedule:${scheduleId}:${occurrence}`;
@@ -308,7 +308,7 @@ async function activateScheduleInTx(
 	let existingSchedule = await getScheduleByReferenceOrDefinitionForUpdate(txRepos, {
 		namespaceId,
 		referenceId,
-		definitionHashes: candidateDefinitionHashes,
+		candidateDefinitionHashes,
 	});
 	if (!existingSchedule) {
 		const workflowRow = await getOrCreateWorkflowInTx(
@@ -340,7 +340,7 @@ async function activateScheduleInTx(
 		existingSchedule = await getScheduleByReferenceOrDefinitionForUpdate(txRepos, {
 			namespaceId,
 			referenceId,
-			definitionHashes: candidateDefinitionHashes,
+			candidateDefinitionHashes,
 		});
 		if (!existingSchedule) {
 			throw new Error(`Failed to get or create schedule with definition ${currentDefinitionHash}`);
@@ -355,7 +355,10 @@ async function activateScheduleInTx(
 			throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
 		}
 
-		if (existingReferenceId === referenceId && !candidateDefinitionHashes.includes(existingSchedule.definitionHash)) {
+		if (
+			existingReferenceId === referenceId &&
+			!candidateDefinitionHashes.all.includes(existingSchedule.definitionHash)
+		) {
 			if (conflictPolicy === "error") {
 				throw new ScheduleConflictError({ definitionHash: currentDefinitionHash, referenceId });
 			}
@@ -513,13 +516,28 @@ async function createSchedule(
 
 async function getScheduleByReferenceOrDefinitionForUpdate(
 	txRepos: TxRepositories,
-	params: { namespaceId: NamespaceId; referenceId: string | undefined; definitionHashes: string[] }
+	params: { namespaceId: NamespaceId; referenceId: string | undefined; candidateDefinitionHashes: CandidateHashes }
 ): Promise<ScheduleRow | null> {
-	const { namespaceId, referenceId, definitionHashes } = params;
+	const { namespaceId, referenceId, candidateDefinitionHashes } = params;
 	const scheduleByReference = referenceId
 		? await txRepos.schedule.get(namespaceId, { referenceId }, { lock: "update" })
 		: null;
-	return scheduleByReference ?? (await txRepos.schedule.get(namespaceId, { definitionHashes }, { lock: "update" }));
+
+	// The schedule found by reference id is already locked. Locking another one here could
+	// deadlock: two activations each hold one schedule and wait for the other's.
+	const schedulesByDefinition = await txRepos.schedule.listByDefinitionHashes(
+		namespaceId,
+		candidateDefinitionHashes.all,
+		scheduleByReference ? undefined : { lock: "update" }
+	);
+
+	// Two schedules can be stored under one request's hashes: an older one under a deprecated hash,
+	// and one created under the current hash by an activation that did not declare the deprecated one.
+	if (schedulesByDefinition.length > 1) {
+		throw new ScheduleConflictError({ definitionHash: candidateDefinitionHashes.current, referenceId });
+	}
+
+	return scheduleByReference ?? schedulesByDefinition[0] ?? null;
 }
 
 async function scheduleRowToDomainInTx(

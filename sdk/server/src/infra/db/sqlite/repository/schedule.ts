@@ -67,9 +67,6 @@ export const createScheduleRepository = (db: SqliteDb): ScheduleRepository => ({
 		if (filter.id) {
 			conditions.push(eq(schedule.id, filter.id));
 		}
-		if (filter.definitionHashes && filter.definitionHashes.length > 0) {
-			conditions.push(inArray(schedule.definitionHash, filter.definitionHashes));
-		}
 		if (filter.referenceId !== undefined) {
 			if (filter.referenceId === null) {
 				conditions.push(isNull(schedule.referenceId));
@@ -84,6 +81,14 @@ export const createScheduleRepository = (db: SqliteDb): ScheduleRepository => ({
 			.where(and(...conditions))
 			.limit(1);
 		return result[0] ?? null;
+	},
+
+	// Needs no row lock: a transaction holds the database's write lock from its start.
+	async listByDefinitionHashes(namespaceId, definitionHashes) {
+		return db
+			.select()
+			.from(schedule)
+			.where(and(eq(schedule.namespaceId, namespaceId), inArray(schedule.definitionHash, definitionHashes)));
 	},
 
 	async listByFilters(namespaceId, filter, limit = 50, offset = 0) {
