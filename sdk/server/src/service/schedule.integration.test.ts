@@ -1325,6 +1325,94 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 				);
 			})
 		));
+
+	test.skipIf(!allowsConcurrentWriteTransactions())(
+		"two concurrent activations of different definitions under one new reference id create the first and refuse the second",
+		() =>
+			withHarness(async ({ context, repos }) =>
+				withRepos(async (secondaryRepos) => {
+					const request = {
+						workflowName: "send-invoices",
+						workflowVersionId: "v1",
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						spec: everyMinute,
+						options: { reference: { id: "invoices-eu" } },
+					};
+					// The workflow already exists. With a new one, the second activation would wait for
+					// the first while recording the workflow, and would then find the reference id taken.
+					await seedActiveSchedule(
+						{ repos, namespaceRequestContext: context },
+						{ workflowName: "send-invoices", workflowVersionId: "v1", spec: everyFiveMinutes }
+					);
+
+					const primaryCreatedSchedule = createBinaryLatch();
+					const commitPrimary = createBinaryLatch();
+					const secondarySearched = createBinaryLatch();
+					const primaryService = createScheduleService({
+						repos: {
+							...repos,
+							transaction: (fn) =>
+								repos.transaction(async (txRepos) => {
+									const result = await fn(txRepos);
+									primaryCreatedSchedule.signal();
+									await commitPrimary.wait();
+									return result;
+								}),
+						},
+					});
+					const secondaryReferenceLookups: (string | null)[] = [];
+					const secondaryService = createScheduleService({
+						repos: {
+							...secondaryRepos,
+							transaction: (fn) =>
+								secondaryRepos.transaction((txRepos) =>
+									fn({
+										...txRepos,
+										schedule: {
+											...txRepos.schedule,
+											get: async (...args) => {
+												const schedule = await txRepos.schedule.get(...args);
+												secondaryReferenceLookups.push(schedule?.id ?? null);
+												return schedule;
+											},
+											listByDefinitionHashes: async (...args) => {
+												const schedules = await txRepos.schedule.listByDefinitionHashes(...args);
+												secondarySearched.signal();
+												return schedules;
+											},
+										},
+									})
+								),
+						},
+					});
+
+					// The first activation creates the schedule and stays open. It is committed only after
+					// the second has looked for the reference id and for its own definition.
+					const primaryActivation = primaryService.activateSchedule(context.namespaceId, {
+						...request,
+						workflowRunInput: asOpaquePayload({ region: "eu-west" }),
+						workflowRunInputHash: { value: "eu-west-hash" },
+					});
+					await primaryCreatedSchedule.wait();
+					const secondaryActivation = Promise.allSettled([
+						secondaryService.activateSchedule(context.namespaceId, {
+							...request,
+							workflowRunInput: asOpaquePayload({ region: "eu-north" }),
+							workflowRunInputHash: { value: "eu-north-hash" },
+						}),
+					]);
+					await secondarySearched.wait();
+					commitPrimary.signal();
+					const primaryResult = await primaryActivation;
+
+					expect(await secondaryActivation).toEqual([
+						{ status: "rejected", reason: expect.any(ScheduleConflictError) },
+					]);
+					expect(secondaryReferenceLookups).toEqual([null, primaryResult.schedule.id]);
+				})
+			)
+	);
 });
 
 describe("ScheduleService status transitions", () => {
