@@ -1,4 +1,4 @@
-import { createBinaryLatch } from "@aikirun/lib/async";
+import { createBinaryLatch, settleWithin } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
@@ -1258,6 +1258,35 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 			expect(await repos.schedule.get(context.namespaceId, { id: referencedSchedule.id })).toEqual(scheduleBefore);
 		}));
 
+	test("activating an active schedule again by its reference id returns it and leaves the schedule and its history untouched", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const request = {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: everyMinute,
+				options: { reference: { id: "invoices-eu-west" } },
+			};
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, request);
+			const scheduleBefore = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+			const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
+
+			// Two periods on
+			const { schedule: returnedSchedule } = await withFakeClock(schedule.nextRunAt + 120_000, () =>
+				scheduleService.activateSchedule(context.namespaceId, request)
+			);
+
+			expect(returnedSchedule).toEqual(expect.objectContaining({ id: schedule.id, referenceId: "invoices-eu-west" }));
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(scheduleBefore);
+			expect(await repos.stateTransition.listByScheduleId(schedule.id)).toEqual(historyBefore);
+		}));
+
 	test("activating a paused schedule again by its reference id leaves the schedule and its history untouched", () =>
 		withHarness(async ({ context, repos }) => {
 			const scheduleService = createScheduleService({ repos });
@@ -1799,7 +1828,6 @@ async function runConcurrentScheduleOperations<T>(
 ): Promise<T> {
 	const primaryWritten = createBinaryLatch();
 	const commitPrimary = createBinaryLatch();
-	const secondaryTransactionRequested = createBinaryLatch();
 	const primaryService = createScheduleService({
 		repos: {
 			...primaryRepos,
@@ -1812,20 +1840,13 @@ async function runConcurrentScheduleOperations<T>(
 				}),
 		},
 	});
-	const secondaryService = createScheduleService({
-		repos: {
-			...secondaryRepos,
-			transaction: (fn) => {
-				secondaryTransactionRequested.signal();
-				return secondaryRepos.transaction(fn);
-			},
-		},
-	});
+	const secondaryService = createScheduleService({ repos: secondaryRepos });
 
 	const primaryPromise = primaryOperation(primaryService);
 	await primaryWritten.wait();
 	const secondaryPromise = secondaryOperation(secondaryService);
-	await secondaryTransactionRequested.wait();
+	// The second operation cannot finish while the first is open: it needs the schedule the first holds.
+	expect(await settleWithin(secondaryPromise, 100)).toBe(false);
 	commitPrimary.signal();
 	await primaryPromise;
 	return secondaryPromise;
