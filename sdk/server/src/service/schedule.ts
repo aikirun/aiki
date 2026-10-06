@@ -467,7 +467,7 @@ async function createSchedule(
 ): Promise<ScheduleRow | null> {
 	const { spec, payload } = params;
 	const transitionId = ulid();
-	const created = await txRepos.schedule.create({
+	const created = await txRepos.schedule.createIfMissing({
 		id: ulid(),
 		namespaceId: params.namespaceId,
 		workflowId: params.workflowId,

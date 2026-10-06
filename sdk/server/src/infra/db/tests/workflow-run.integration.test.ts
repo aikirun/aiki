@@ -1,3 +1,4 @@
+import { createBinaryLatch, settleWithin } from "@aikirun/lib/async";
 import { hashInput } from "@aikirun/lib/crypto";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
@@ -18,8 +19,9 @@ import type { NamespaceRequestContext } from "../../../middleware/context";
 import { createChildRunCanceller } from "../../../service/cancel-child-runs";
 import { createWorkflowRunService } from "../../../service/workflow-run";
 import { END_OF_TIME, withFakeClock } from "../../../testing/clock";
+import { referencedWorkflowRunRowFactory } from "../../../testing/data-factory/infra/workflow-run";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../../../testing/data-factory/middleware/context";
-import { createServiceHarness } from "../../../testing/harness";
+import { createServiceHarness, withRepos } from "../../../testing/harness";
 import { readWorkflowRunDueTimes } from "../../../testing/infra/db/workflow-run";
 import {
 	type SeedRunDeps,
@@ -970,6 +972,102 @@ describe("hasChildRuns", () => {
 				new Set([parentRun.runId])
 			);
 		}));
+});
+
+describe("insertIfMissing", () => {
+	test("adds a run whose reference id is not used under its workflow and returns true", () =>
+		withHarness(async ({ context, repos }) => {
+			const { workflowName, workflowVersionId, workflowSource } = await seedScheduledRun(
+				{ namespaceRequestContext: context, repos },
+				{ options: { reference: { id: "order-7-ref" } } }
+			);
+			const workflowId = await getWorkflowId(repos, context.namespaceId, {
+				name: workflowName,
+				versionId: workflowVersionId,
+				source: workflowSource,
+			});
+			const secondRun = referencedWorkflowRunRowFactory.build({
+				namespaceId: context.namespaceId,
+				workflowId,
+				referenceId: "order-8-ref",
+			});
+
+			expect(await repos.workflowRun.insertIfMissing(secondRun)).toBe(true);
+			expect(await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: secondRun.id })).toEqual({
+				id: secondRun.id,
+				revision: 0,
+				status: "scheduled",
+			});
+		}));
+
+	test("returns false and adds nothing for a second run with the same workflow and reference id", () =>
+		withHarness(async ({ context, repos }) => {
+			const referenceId = "order-7-ref";
+			const { workflowName, workflowVersionId, workflowSource } = await seedScheduledRun(
+				{ namespaceRequestContext: context, repos },
+				{ options: { reference: { id: referenceId } } }
+			);
+			const workflowId = await getWorkflowId(repos, context.namespaceId, {
+				name: workflowName,
+				versionId: workflowVersionId,
+				source: workflowSource,
+			});
+			const secondRun = referencedWorkflowRunRowFactory.build({
+				namespaceId: context.namespaceId,
+				workflowId,
+				referenceId,
+			});
+
+			expect(await repos.workflowRun.insertIfMissing(secondRun)).toBe(false);
+			expect(await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: secondRun.id })).toBeNull();
+		}));
+
+	test("returns false when another transaction commits the same workflow and reference id first", () =>
+		withHarness(async ({ context, repos: primaryRepos }) =>
+			withRepos(async (secondaryRepos) => {
+				const { workflowName, workflowVersionId, workflowSource } = await seedScheduledRun({
+					namespaceRequestContext: context,
+					repos: primaryRepos,
+				});
+				const workflowId = await getWorkflowId(primaryRepos, context.namespaceId, {
+					name: workflowName,
+					versionId: workflowVersionId,
+					source: workflowSource,
+				});
+				const referenceId = "order-8-ref";
+				const primaryRun = referencedWorkflowRunRowFactory.build({
+					namespaceId: context.namespaceId,
+					workflowId,
+					referenceId,
+				});
+				const secondaryRun = referencedWorkflowRunRowFactory.build({
+					namespaceId: context.namespaceId,
+					workflowId,
+					referenceId,
+				});
+
+				const primaryRunInserted = createBinaryLatch();
+				const commitPrimaryTx = createBinaryLatch();
+
+				// Transaction A inserts the run, then stays open (uncommitted) until released.
+				const primaryPromise = primaryRepos.transaction(async (txRepos) => {
+					const runInserted = await txRepos.workflowRun.insertIfMissing(primaryRun);
+					primaryRunInserted.signal();
+					await commitPrimaryTx.wait();
+					return runInserted;
+				});
+				await primaryRunInserted.wait();
+
+				// Connection B inserts a run with the same workflow and reference id while A is still open.
+				const secondaryPromise = secondaryRepos.workflowRun.insertIfMissing(secondaryRun);
+				// B cannot answer while A is open: A may still roll back.
+				expect(await settleWithin(secondaryPromise, 100)).toBe(false);
+
+				commitPrimaryTx.signal();
+				expect(await primaryPromise).toBe(true);
+				expect(await secondaryPromise).toBe(false);
+			})
+		));
 });
 
 describe("getByWorkflowAndReferenceId", () => {

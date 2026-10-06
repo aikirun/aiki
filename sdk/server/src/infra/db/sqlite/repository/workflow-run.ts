@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { asNonEmptyArray } from "@aikirun/lib/collection/array";
+import type { RequiredNonNullableProp } from "@aikirun/lib/object";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowSource } from "@aikirun/types/workflow";
@@ -32,6 +33,15 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 	async insert(input: WorkflowRunRowInsert | NonEmptyArray<WorkflowRunRowInsert>): Promise<void> {
 		const values = Array.isArray(input) ? input : [input];
 		await db.insert(workflowRun).values(values);
+	},
+
+	async insertIfMissing(input: RequiredNonNullableProp<WorkflowRunRowInsert, "referenceId">): Promise<boolean> {
+		const insertedRuns = await db
+			.insert(workflowRun)
+			.values(input)
+			.onConflictDoNothing()
+			.returning({ id: workflowRun.id });
+		return insertedRuns.length > 0;
 	},
 
 	async update(params: UpdateWorkflowRunParams): Promise<{ revision: number; signalSequence: number } | null> {

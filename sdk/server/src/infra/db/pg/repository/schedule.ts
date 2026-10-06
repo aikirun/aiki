@@ -31,7 +31,7 @@ export interface ScheduleOccurrenceUpdate {
 }
 
 export const createScheduleRepository = (db: PgDb) => ({
-	async create(input: ScheduleRowInsert): Promise<ScheduleRow | null> {
+	async createIfMissing(input: ScheduleRowInsert): Promise<ScheduleRow | null> {
 		const [created] = await db.insert(schedule).values(input).onConflictDoNothing().returning();
 		return created ?? null;
 	},

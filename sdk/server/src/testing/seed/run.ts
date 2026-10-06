@@ -67,7 +67,15 @@ export async function seedScheduledRun(
 		parent: overrides?.parent,
 	});
 
-	return { runId, inputHash, revisionWhenScheduled: 0, attemptsWhenScheduled: 1 };
+	return {
+		runId,
+		inputHash,
+		revisionWhenScheduled: 0,
+		attemptsWhenScheduled: 1,
+		workflowSource: seededWorkflow.source,
+		workflowName: seededWorkflow.name,
+		workflowVersionId: seededWorkflow.versionId,
+	};
 }
 
 export async function seedPooledQueuedRun(deps: SeedRunDeps) {
