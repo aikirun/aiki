@@ -246,18 +246,18 @@ describe("update", () => {
 		const waitingStatusCases = {
 			awaiting_event: {
 				status: "awaiting_event",
-				listTimedOutRuns: (repos: Repositories, before: TimestampMs) =>
-					repos.workflowRun.listEventWaitTimedOutRuns(daemonContextFactory.build(), before, 10),
+				listTimedOutRuns: (repos: Repositories, dueBy: TimestampMs) =>
+					repos.workflowRun.listEventWaitTimedOutRuns(daemonContextFactory.build(), dueBy, 10),
 			},
 			awaiting_child_workflow: {
 				status: "awaiting_child_workflow",
-				listTimedOutRuns: (repos: Repositories, before: TimestampMs) =>
-					repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContextFactory.build(), before, 10),
+				listTimedOutRuns: (repos: Repositories, dueBy: TimestampMs) =>
+					repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContextFactory.build(), dueBy, 10),
 			},
 		} satisfies {
 			[S in WaitingForSignalWorkflowRunStatus]: {
 				status: S;
-				listTimedOutRuns: (repos: Repositories, before: TimestampMs) => Promise<DueWorkflowRun[]>;
+				listTimedOutRuns: (repos: Repositories, dueBy: TimestampMs) => Promise<DueWorkflowRun[]>;
 			};
 		};
 
@@ -1330,15 +1330,15 @@ describe("listChildRunWaitTimedOutRuns", () => {
 			});
 
 			const daemonContext = daemonContextFactory.build();
-			const before = 3_000_000 as TimestampMs;
+			const dueBy = 3_000_000 as TimestampMs;
 
-			expect(await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, before, 2)).toEqual([
+			expect(await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, dueBy, 2)).toEqual([
 				expect.objectContaining({ id: runA, dueAt: 1_000_000 }),
 				expect.objectContaining({ id: runB, dueAt: 2_000_000 }),
 			]);
 
 			expect(
-				await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, before, 2, {
+				await repos.workflowRun.listChildRunWaitTimedOutRuns(daemonContext, dueBy, 2, {
 					order: 2_000_000,
 					id: runB,
 					maxSeenId: runB,

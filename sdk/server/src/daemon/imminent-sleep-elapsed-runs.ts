@@ -29,10 +29,10 @@ export async function processImminentSleepElapsedRuns(
 	config: PageProcessingConfig & { lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
 ) {
 	const { pageSize, lookaheadWindowMs, republishBackoff, chunk } = config;
-	const dueBefore = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
+	const dueBy = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
-		(cursor) => repos.workflowRun.listSleepElapsedRuns(context, dueBefore, pageSize, cursor),
+		(cursor) => repos.workflowRun.listSleepElapsedRuns(context, dueBy, pageSize, cursor),
 		{ until: (page) => page.length < pageSize }
 	)) {
 		if (isNonEmptyArray(runsDueNow)) {

@@ -27,10 +27,10 @@ export const createImminentTimerQueue = ({ timerPriorityQueue, configProvider, l
 	 * latency, never the run or the schedule occurrence it stands for.
 	 */
 	add(timers: NonEmptyArray<Timer>): void {
-		const dueBefore = Date.now() + configProvider.config.lookaheadWindowMs;
+		const dueBy = Date.now() + configProvider.config.lookaheadWindowMs;
 		const imminentTimers: TimerEntry[] = [];
 		for (const { type, id, dueAt, priority } of timers) {
-			if (dueAt <= dueBefore) {
+			if (dueAt <= dueBy) {
 				imminentTimers.push({ type, id, rank: computeRank({ dueAt, priority }) });
 			}
 		}

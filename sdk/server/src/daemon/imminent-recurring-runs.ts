@@ -60,10 +60,10 @@ export async function processImminentRecurringRuns(
 	}
 ) {
 	const { pageSize, lookaheadWindowMs, maxOccurrencesPerSchedule, republishBackoff, chunk } = config;
-	const dueBefore = (Date.now() + (deps.timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
+	const dueBy = (Date.now() + (deps.timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	for await (const rows of streamChunks(
-		(cursor) => deps.repos.schedule.listDueSchedules(context, dueBefore, pageSize, cursor),
+		(cursor) => deps.repos.schedule.listDueSchedules(context, dueBy, pageSize, cursor),
 		{
 			advanceCursor: advanceScheduleCursor,
 			until: (page) => page.length < pageSize,

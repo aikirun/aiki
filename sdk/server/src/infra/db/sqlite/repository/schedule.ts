@@ -146,7 +146,7 @@ export const createScheduleRepository = (db: SqliteDb): ScheduleRepository => ({
 			.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
 	},
 
-	async listDueSchedules(_context, before, limit, cursor) {
+	async listDueSchedules(_context, dueBy, limit, cursor) {
 		return db
 			.select({
 				schedule: getTableColumns(schedule),
@@ -161,7 +161,7 @@ export const createScheduleRepository = (db: SqliteDb): ScheduleRepository => ({
 			.where(
 				and(
 					eq(schedule.status, "active"),
-					lte(schedule.nextRunAt, before),
+					lte(schedule.nextRunAt, dueBy),
 					keysetStreamCursorFilter(schedule.nextRunAt, schedule.id, cursor)
 				)
 			)

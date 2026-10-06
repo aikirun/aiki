@@ -198,7 +198,7 @@ export const createScheduleRepository = (db: PgDb) => ({
 			.where(and(eq(schedule.status, "active"), inArray(schedule.id, ids)));
 	},
 
-	async listDueSchedules(_context: DaemonContext, before: TimestampMs, limit: number, cursor?: KeysetStreamCursor) {
+	async listDueSchedules(_context: DaemonContext, dueBy: TimestampMs, limit: number, cursor?: KeysetStreamCursor) {
 		return db
 			.select({
 				schedule: getTableColumns(schedule),
@@ -213,7 +213,7 @@ export const createScheduleRepository = (db: PgDb) => ({
 			.where(
 				and(
 					eq(schedule.status, "active"),
-					lte(schedule.nextRunAt, before),
+					lte(schedule.nextRunAt, dueBy),
 					keysetStreamCursorFilter(schedule.nextRunAt, schedule.id, cursor)
 				)
 			)

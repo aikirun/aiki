@@ -469,7 +469,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 
 	async listDueScheduleRuns(
 		_context: DaemonContext,
-		before: TimestampMs,
+		dueBy: TimestampMs,
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
@@ -488,7 +488,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 			.where(
 				and(
 					eq(workflowRun.status, "scheduled"),
-					lte(workflowRun.scheduledAt, before),
+					lte(workflowRun.scheduledAt, dueBy),
 					keysetStreamCursorFilter(workflowRun.scheduledAt, workflowRun.id, cursor)
 				)
 			)
@@ -498,7 +498,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 
 	async listSleepElapsedRuns(
 		_context: DaemonContext,
-		before: TimestampMs,
+		dueBy: TimestampMs,
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
@@ -517,7 +517,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 			.where(
 				and(
 					eq(workflowRun.status, "sleeping"),
-					lte(workflowRun.wakeupAt, before),
+					lte(workflowRun.wakeupAt, dueBy),
 					keysetStreamCursorFilter(workflowRun.wakeupAt, workflowRun.id, cursor)
 				)
 			)
@@ -527,7 +527,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 
 	async listRetryableRuns(
 		_context: DaemonContext,
-		before: TimestampMs,
+		dueBy: TimestampMs,
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
@@ -546,7 +546,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 			.where(
 				and(
 					eq(workflowRun.status, "awaiting_retry"),
-					lte(workflowRun.nextAttemptAt, before),
+					lte(workflowRun.nextAttemptAt, dueBy),
 					keysetStreamCursorFilter(workflowRun.nextAttemptAt, workflowRun.id, cursor)
 				)
 			)
@@ -556,7 +556,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 
 	async listTaskRetryableRuns(
 		_context: DaemonContext,
-		before: TimestampMs,
+		dueBy: TimestampMs,
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
@@ -575,7 +575,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 			.where(
 				and(
 					eq(workflowRun.status, "awaiting_task_retry"),
-					lte(workflowRun.nextAttemptAt, before),
+					lte(workflowRun.nextAttemptAt, dueBy),
 					keysetStreamCursorFilter(workflowRun.nextAttemptAt, workflowRun.id, cursor)
 				)
 			)
@@ -585,7 +585,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 
 	async listEventWaitTimedOutRuns(
 		_context: DaemonContext,
-		before: TimestampMs,
+		dueBy: TimestampMs,
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
@@ -604,7 +604,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 			.where(
 				and(
 					eq(workflowRun.status, "awaiting_event"),
-					lte(workflowRun.timeoutAt, before),
+					lte(workflowRun.timeoutAt, dueBy),
 					keysetStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
 				)
 			)
@@ -614,7 +614,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 
 	async listChildRunWaitTimedOutRuns(
 		_context: DaemonContext,
-		before: TimestampMs,
+		dueBy: TimestampMs,
 		limit: number,
 		cursor?: KeysetStreamCursor
 	): Promise<DueWorkflowRun[]> {
@@ -633,7 +633,7 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 			.where(
 				and(
 					eq(workflowRun.status, "awaiting_child_workflow"),
-					lte(workflowRun.timeoutAt, before),
+					lte(workflowRun.timeoutAt, dueBy),
 					keysetStreamCursorFilter(workflowRun.timeoutAt, workflowRun.id, cursor)
 				)
 			)
