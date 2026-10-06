@@ -8,7 +8,7 @@ import type { SqliteDb } from "../provider";
 import { schedule, workflow } from "../schema";
 
 export const createScheduleRepository = (db: SqliteDb): ScheduleRepository => ({
-	async create(input) {
+	async createIfMissing(input) {
 		const [created] = await db.insert(schedule).values(input).onConflictDoNothing().returning();
 		return created ?? null;
 	},

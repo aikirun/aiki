@@ -1,3 +1,4 @@
+import { createBinaryLatch, settleWithin } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError } from "@aikirun/lib/error";
@@ -23,7 +24,7 @@ import { createEventService } from "../service/event";
 import { createWorkflowRunService } from "../service/workflow-run";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
-import { createServiceHarness } from "../testing/harness";
+import { createServiceHarness, withRepos } from "../testing/harness";
 import { seedClaimedRun } from "../testing/seed/run";
 import { seedCompletedTask, seedRunningTask } from "../testing/seed/task";
 
@@ -872,6 +873,51 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				})
 			).rejects.toThrow(WorkflowRunReferenceConflictError);
 		}));
+
+	test("returns the run that another request creates under the same reference id at the same moment", () =>
+		withHarness(async ({ context, repos }) =>
+			withRepos(async (secondaryRepos) => {
+				const input = { orderId: "order-1" };
+				const request = {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					inputHash: { value: await hashInput(input) },
+					options: { reference: { id: "order-ref-1" } },
+				};
+				// The workflow already exists. With a new one, the second create would wait for the
+				// first to commit while recording the workflow.
+				await createService(repos).service.createWorkflowRun(context, { ...request, options: undefined });
+
+				const primaryInsertedRun = createBinaryLatch();
+				const commitPrimary = createBinaryLatch();
+				const { service: primaryService } = createService({
+					...repos,
+					transaction: (fn) =>
+						repos.transaction(async (txRepos) => {
+							const result = await fn(txRepos);
+							primaryInsertedRun.signal();
+							await commitPrimary.wait();
+							return result;
+						}),
+				});
+				const { service: secondaryService } = createService(secondaryRepos);
+
+				// The first create inserts its run and stays open (uncommitted) until released.
+				const primaryCreate = primaryService.createWorkflowRun(context, request);
+				await primaryInsertedRun.wait();
+
+				const secondaryCreate = secondaryService.createWorkflowRun(context, request);
+				// The second create cannot answer while the first is open: the first may still roll back.
+				expect(await settleWithin(secondaryCreate, 100)).toBe(false);
+
+				commitPrimary.signal();
+				const [primaryRunId, secondaryRunId] = await Promise.all([primaryCreate, secondaryCreate]);
+				expect(secondaryRunId).toBe(primaryRunId);
+			})
+		));
 });
 
 describe("WorkflowRunService imminent run timers", () => {

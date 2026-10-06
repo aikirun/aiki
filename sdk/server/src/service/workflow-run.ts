@@ -2,6 +2,7 @@ import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/arr
 import { toMilliseconds } from "@aikirun/lib/duration";
 import { NotFoundError } from "@aikirun/lib/error";
 import { getCompositeId } from "@aikirun/lib/id";
+import { propsRequiredNonNull } from "@aikirun/lib/object";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunCancelByIdsRequestV1,
@@ -43,7 +44,11 @@ import type { ChildRunWaitWithState } from "../infra/db/types/child-workflow-run
 import type { EventWaitRow } from "../infra/db/types/event-wait";
 import type { SleepRow } from "../infra/db/types/sleep";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
-import type { ChildRunWithWorkflow, WorkflowRunWithWorkflowAndState } from "../infra/db/types/workflow-run";
+import type {
+	ChildRunWithWorkflow,
+	WorkflowRunRowInsert,
+	WorkflowRunWithWorkflowAndState,
+} from "../infra/db/types/workflow-run";
 import type { ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { candidateHashes } from "../lib/hash";
 import type { NamespaceRequestContext } from "../middleware/context";
@@ -308,11 +313,12 @@ export const createWorkflowRunService = ({ repos, childRunCanceller, imminentTim
 export type WorkflowRunService = ReturnType<typeof createWorkflowRunService>;
 
 async function createWorkflowRunInTx(
-	{ namespaceId, logger }: NamespaceRequestContext,
+	context: NamespaceRequestContext,
 	request: WorkflowRunCreateRequestV1,
 	txRepos: TxRepositories,
 	imminentTimerQueue?: ImminentTimerQueue
 ): Promise<WorkflowRunId> {
+	const { namespaceId, logger } = context;
 	const name = request.name as WorkflowName;
 	const versionId = request.versionId as WorkflowVersionId;
 	const { input, inputHash, options, parent } = request;
@@ -330,29 +336,6 @@ async function createWorkflowRunInTx(
 
 	const workflow = await getOrCreateWorkflowInTx({ namespaceId, name, versionId, source: "user" }, txRepos);
 
-	if (referenceId) {
-		const existingRun = await txRepos.workflowRun.getByWorkflowAndReferenceId({
-			namespaceId,
-			workflowId: workflow.id,
-			referenceId,
-		});
-		if (existingRun) {
-			if (!candidateHashes(inputHash).all.includes(existingRun.inputHash)) {
-				const conflictPolicy = options?.reference?.conflictPolicy ?? "error";
-				if (conflictPolicy === "error") {
-					throw new WorkflowRunReferenceConflictError(name, versionId, referenceId);
-				}
-				conflictPolicy satisfies "return_existing";
-			}
-
-			logger.info("Returning existing run from reference ID", {
-				"aiki.runId": existingRun.id,
-				"aiki.referenceId": referenceId,
-			});
-			return existingRun.id as WorkflowRunId;
-		}
-	}
-
 	const now = Date.now();
 	const runId = ulid() as WorkflowRunId;
 	const delay = options?.delay;
@@ -361,7 +344,7 @@ async function createWorkflowRunInTx(
 
 	const transitionId = ulid();
 
-	await txRepos.workflowRun.insert({
+	const workflowRunEntry: WorkflowRunRowInsert = {
 		id: runId,
 		namespaceId,
 		workflowId: workflow.id,
@@ -375,7 +358,25 @@ async function createWorkflowRunInTx(
 		referenceId,
 		latestStateTransitionId: transitionId,
 		scheduledAt: scheduledAt as TimestampMs,
-	});
+	};
+	if (propsRequiredNonNull(workflowRunEntry, "referenceId")) {
+		const runInserted = await txRepos.workflowRun.insertIfMissing(workflowRunEntry);
+		if (!runInserted) {
+			// The workflow already has a run with this reference id.
+			const existingRun = await getExistingWorkflowRunByReferenceInTx(
+				context,
+				request,
+				{ workflowId: workflow.id, referenceId: workflowRunEntry.referenceId },
+				txRepos
+			);
+			if (!existingRun) {
+				throw new Error(`Failed to get or create workflow run ${name}:${versionId} with reference id ${referenceId}`);
+			}
+			return existingRun.id as WorkflowRunId;
+		}
+	} else {
+		await txRepos.workflowRun.insert(workflowRunEntry);
+	}
 
 	const state: WorkflowRunStateScheduledByNew = {
 		status: "scheduled",
@@ -407,6 +408,32 @@ async function createWorkflowRunInTx(
 	});
 
 	return runId;
+}
+
+async function getExistingWorkflowRunByReferenceInTx(
+	{ namespaceId }: NamespaceRequestContext,
+	request: WorkflowRunCreateRequestV1,
+	{ workflowId, referenceId }: { workflowId: string; referenceId: string },
+	txRepos: TxRepositories
+) {
+	const existingRun = await txRepos.workflowRun.getByWorkflowAndReferenceId({ namespaceId, workflowId, referenceId });
+	if (!existingRun) {
+		return null;
+	}
+
+	if (!candidateHashes(request.inputHash).all.includes(existingRun.inputHash)) {
+		const conflictPolicy = request.options?.reference?.conflictPolicy ?? "error";
+		if (conflictPolicy === "error") {
+			throw new WorkflowRunReferenceConflictError(
+				request.name as WorkflowName,
+				request.versionId as WorkflowVersionId,
+				referenceId
+			);
+		}
+		conflictPolicy satisfies "return_existing";
+	}
+
+	return existingRun;
 }
 
 async function cancelByIdsInTx(

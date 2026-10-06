@@ -1,4 +1,4 @@
-import { createBinaryLatch } from "@aikirun/lib/async";
+import { createBinaryLatch, settleWithin } from "@aikirun/lib/async";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { Schedule, ScheduleSpec, ScheduleStatus } from "@aikirun/types/schedule";
@@ -128,14 +128,14 @@ describe("schedule repository bulkUpdateOccurrence", () => {
 		}));
 });
 
-describe("schedule repository create", () => {
+describe("schedule repository createIfMissing", () => {
 	test("returns null and adds nothing for a second schedule with the same definition in the namespace", () =>
 		withHarness(async ({ context, repos }) => {
 			const { schedule } = await seedActiveSchedule({ namespaceRequestContext: context, repos });
 			const row = await getScheduleRow(repos, context.namespaceId, schedule.id);
 			const secondScheduleId = ulid();
 
-			expect(await repos.schedule.create({ ...row, id: secondScheduleId })).toBeNull();
+			expect(await repos.schedule.createIfMissing({ ...row, id: secondScheduleId })).toBeNull();
 			expect(await repos.schedule.get(context.namespaceId, { id: secondScheduleId })).toBeNull();
 		}));
 
@@ -149,7 +149,7 @@ describe("schedule repository create", () => {
 			const secondScheduleId = ulid();
 
 			expect(
-				await repos.schedule.create({ ...row, id: secondScheduleId, definitionHash: "another-definition" })
+				await repos.schedule.createIfMissing({ ...row, id: secondScheduleId, definitionHash: "another-definition" })
 			).toBeNull();
 			expect(await repos.schedule.get(context.namespaceId, { id: secondScheduleId })).toBeNull();
 		}));
@@ -167,7 +167,7 @@ describe("schedule repository create", () => {
 
 				// Transaction A creates the schedule, then stays open (uncommitted) until released.
 				const primaryPromise = primaryRepos.transaction(async (txRepos) => {
-					const created = await txRepos.schedule.create({
+					const created = await txRepos.schedule.createIfMissing({
 						...row,
 						id: primaryScheduleId,
 						definitionHash: "another-definition",
@@ -179,11 +179,13 @@ describe("schedule repository create", () => {
 				await primaryScheduleCreated.wait();
 
 				// Connection B creates the same definition while A is still open.
-				const secondaryPromise = secondaryRepos.schedule.create({
+				const secondaryPromise = secondaryRepos.schedule.createIfMissing({
 					...row,
 					id: secondaryScheduleId,
 					definitionHash: "another-definition",
 				});
+				// B cannot answer while A is open: A may still roll back.
+				expect(await settleWithin(secondaryPromise, 100)).toBe(false);
 
 				commitPrimaryTx.signal();
 				expect(await primaryPromise).toEqual(expect.objectContaining({ id: primaryScheduleId }));
@@ -198,9 +200,9 @@ describe("schedule repository create", () => {
 			const otherNamespaceId = namespaceRequestContextFactory.build().namespaceId;
 			const otherScheduleId = ulid();
 
-			expect(await repos.schedule.create({ ...row, id: otherScheduleId, namespaceId: otherNamespaceId })).toEqual(
-				expect.objectContaining({ id: otherScheduleId, namespaceId: otherNamespaceId })
-			);
+			expect(
+				await repos.schedule.createIfMissing({ ...row, id: otherScheduleId, namespaceId: otherNamespaceId })
+			).toEqual(expect.objectContaining({ id: otherScheduleId, namespaceId: otherNamespaceId }));
 		}));
 });
 
