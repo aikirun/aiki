@@ -1,0 +1,78 @@
+name: Platform Test
+
+# Runs the tests that need no backing services on the operating systems the Linux jobs do not
+# cover. SQLite is the part most likely to differ: on macOS Bun uses the SQLite that ships with the
+# system, and on Windows an open file cannot be deleted.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  platform-test:
+    name: Platform Test (${{ matrix.os }}, ${{ matrix.runtime }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        runtime: [bun, node]
+    defaults:
+      run:
+        shell: bash
+    env:
+      DATABASE_PROVIDER: sqlite
+      DATABASE_PATH: aiki_test.db
+    steps:
+      # A migration is recorded with the hash of its SQL, so the files must be the same bytes on
+      # every system.
+      - name: Keep LF line endings
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: ./.github/actions/setup-workspace
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        if: matrix.runtime == 'node'
+        with:
+          node-version: 22
+
+      - name: Unit Test
+        if: matrix.runtime == 'bun'
+        run: bun run test:unit
+
+      - name: Unit Test (Node)
+        if: matrix.runtime == 'node'
+        run: bun run test:unit:node
+
+      - name: Migrate test database
+        run: bun run test:db:migrate:apply
+
+      # The Redis adapter's test needs a Redis server, which these runners do not have.
+      - name: Find the integration tests that need only the database
+        run: |
+          files=$(find . -name '*.integration.test.ts' -not -path '*/node_modules/*' -not -path '*/dist/*' -not -path './sdk/adapter/redis/*' | tr '\n' ' ')
+          echo "INTEGRATION_TEST_FILES=$files" >> "$GITHUB_ENV"
+
+      - name: Integration Test
+        if: matrix.runtime == 'bun'
+        run: echo "$INTEGRATION_TEST_FILES" | xargs bun test
+
+      - name: Integration Test (Node)
+        if: matrix.runtime == 'node'
+        run: echo "$INTEGRATION_TEST_FILES" | xargs node node_modules/vitest/vitest.mjs run --project integration
+
+      # The released macOS binary is compiled on Linux, where it cannot run. This one is compiled
+      # here, so it migrates a database on the system's own SQLite.
+      - name: Build the aiki binary
+        if: runner.os == 'macOS' && matrix.runtime == 'bun'
+        run: bun run --cwd cli build
+
+      - uses: ./.github/actions/smoke-test-binary-on-sqlite
+        if: runner.os == 'macOS' && matrix.runtime == 'bun'
+        with:
+          binary: cli/dist/aiki

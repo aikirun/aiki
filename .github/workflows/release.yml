@@ -135,6 +135,9 @@ jobs:
   integration-test:
     uses: ./.github/workflows/integration-test.yml
 
+  platform-test:
+    uses: ./.github/workflows/platform-test.yml
+
   image-smoke-test:
     uses: ./.github/workflows/image-smoke-test.yml
     with:
@@ -146,7 +149,7 @@ jobs:
   # a different commit, so here a tag that exists is a heal re-run at this same
   # commit — skip it — and otherwise we create.
   tag:
-    needs: [verify, integration-test, image-smoke-test]
+    needs: [verify, integration-test, platform-test, image-smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     environment: release
