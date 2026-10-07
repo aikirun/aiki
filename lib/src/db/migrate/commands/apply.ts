@@ -157,6 +157,13 @@ async function applyPg(
 	const client = postgres(config.url, {
 		max: 1,
 		ssl: config.caCert ? { ca: config.caCert, rejectUnauthorized: true } : undefined,
+		onnotice: (notice) => {
+			if (notice.severity === "WARNING") {
+				logger.warn(`Postgres warning: ${notice.message}`);
+				return;
+			}
+			logger.debug(`Postgres notice: ${notice.message}`);
+		},
 	});
 	const db = drizzle(client);
 	const table = sql`drizzle.${sql.identifier(migrationsTable)}`;
