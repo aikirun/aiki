@@ -11,7 +11,7 @@ import {
 } from "@aikirun/lib/object";
 import type { RetryStrategy } from "@aikirun/lib/retry";
 import { getRetryParams } from "@aikirun/lib/retry";
-import type { Serializable } from "@aikirun/lib/serializable";
+import type { Serializable, SerializableError } from "@aikirun/lib/serializable";
 import { createSerializableError } from "@aikirun/lib/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { UnconsumedManifestEntries, WorkflowRunId } from "@aikirun/types/workflow/run";
@@ -336,20 +336,9 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		let attempts = currentAttempt;
 
 		while (true) {
+			let outputRaw: Output;
 			try {
-				const outputRaw = await this.params.handler(input);
-				const outputSchema = this.params.schema?.output;
-				const outputSchemaValidationResult = outputSchema
-					? validateWithSchema(handle, outputSchema, outputRaw, logger, "Invalid task data")
-					: (outputRaw as Output);
-				const output =
-					outputSchemaValidationResult instanceof Promise
-						? await outputSchemaValidationResult
-						: outputSchemaValidationResult;
-				return {
-					output: output !== undefined ? JSON.parse(JSON.stringify(output)) : output,
-					lastAttempt: attempts,
-				};
+				outputRaw = await this.params.handler(input);
 			} catch (err) {
 				if (
 					err instanceof WorkflowRunSuspendedError ||
@@ -400,7 +389,58 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				executionTracker.awaitingRetry();
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
+
+			let output = outputRaw;
+			const outputSchema = this.params.schema?.output;
+			if (outputSchema) {
+				const outputSchemaValidation = outputSchema["~standard"].validate(outputRaw);
+				const outputSchemaValidationResult =
+					outputSchemaValidation instanceof Promise ? await outputSchemaValidation : outputSchemaValidation;
+				if (outputSchemaValidationResult.issues) {
+					return this.failTaskAndRun(
+						handle,
+						{
+							taskId,
+							attempts,
+							error: { name: "SchemaValidationError", message: JSON.stringify(outputSchemaValidationResult.issues) },
+						},
+						logger
+					);
+				}
+				output = outputSchemaValidationResult.value;
+			}
+
+			try {
+				return {
+					output: output !== undefined ? JSON.parse(JSON.stringify(output)) : output,
+					lastAttempt: attempts,
+				};
+			} catch (err) {
+				return this.failTaskAndRun(handle, { taskId, attempts, error: createSerializableError(err) }, logger);
+			}
 		}
+	}
+
+	// The task is failed before the run. If the run's failure is not recorded, a replay finds the
+	// failed task and does not run the handler again.
+	private async failTaskAndRun(
+		handle: UnknownWorkflowRunHandle,
+		params: { taskId: TaskId; attempts: number; error: SerializableError },
+		logger: Logger
+	): Promise<never> {
+		const { taskId, attempts, error } = params;
+
+		logger.error("Task failed", {
+			"aiki.attempts": attempts,
+			"aiki.reason": error.message,
+		});
+		await handle[INTERNAL].transitionTaskState({
+			id: taskId,
+			attempts,
+			state: { status: "failed", error },
+		});
+		await handle[INTERNAL].transitionStateOptimistic({ status: "failed", cause: "task", taskId });
+		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 	}
 
 	private async throwNonDeterminismError(
