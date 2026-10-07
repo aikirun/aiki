@@ -17,6 +17,15 @@ export async function seedOrganizationWithNamespace(deps: SeedUserDeps) {
 	return { owner, organizationId, namespaceId };
 }
 
+/** An organization with a namespace its owner created and then removed, beside the one it keeps. */
+export async function seedRemovedNamespace(deps: SeedUserDeps) {
+	const { owner, organizationId } = await seedOrganizationWithNamespace(deps);
+	const created = await owner.callDashboard("/namespace/createV1", { name: "staging" });
+	const removedNamespaceId = (created.output as { namespace: { id: string } }).namespace.id;
+	await owner.callDashboard("/namespace/deleteV1", { id: removedNamespaceId });
+	return { owner, organizationId, removedNamespaceId };
+}
+
 /** A new user who accepted the owner's invitation with the given role and has the organization active. */
 export async function seedOrganizationMember(
 	deps: SeedUserDeps,

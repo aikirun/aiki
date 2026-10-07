@@ -55,7 +55,13 @@ export const createNamespaceRepository = (db: SqliteDb): NamespaceRepository => 
 		const [row] = await db
 			.select({ id: namespace.id })
 			.from(namespace)
-			.where(and(eq(namespace.organizationId, filter.organizationId), eq(namespace.id, filter.namespaceId)))
+			.where(
+				and(
+					eq(namespace.organizationId, filter.organizationId),
+					eq(namespace.id, filter.namespaceId),
+					eq(namespace.status, "active")
+				)
+			)
 			.limit(1);
 		return row?.id !== undefined;
 	},

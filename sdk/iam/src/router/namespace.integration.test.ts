@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
 
 import { createIamHarness } from "../testing/harness";
-import { seedOrganizationMember, seedOrganizationWithNamespace } from "../testing/seed/organization";
+import {
+	seedOrganizationMember,
+	seedOrganizationWithNamespace,
+	seedRemovedNamespace,
+} from "../testing/seed/organization";
+import type { SignedInUser } from "../testing/seed/user";
 
 const withHarness = createIamHarness();
 
@@ -54,4 +59,27 @@ describe("namespace setActiveV1", () => {
 			expect(selected).toEqual({ status: 404, error: "Namespace not found" });
 			await expect(admin.authorizeApiRequest()).rejects.toThrow("No active namespace selected");
 		}));
+});
+
+describe("a removed namespace", () => {
+	const callByRoute = {
+		deleteV1: (owner: SignedInUser, id: string) => owner.callDashboard("/namespace/deleteV1", { id }),
+		setActiveV1: (owner: SignedInUser, id: string) => owner.callDashboard("/namespace/setActiveV1", { id }),
+		setMembershipV1: (owner: SignedInUser, id: string) =>
+			owner.callDashboard("/namespace/setMembershipV1", { id, members: [{ userId: owner.userId, role: "admin" }] }),
+		removeMembershipV1: (owner: SignedInUser, id: string) =>
+			owner.callDashboard("/namespace/removeMembershipV1", { id, userId: owner.userId }),
+		listMembersV1: (owner: SignedInUser, id: string) => owner.callDashboard("/namespace/listMembersV1", { id }),
+	};
+
+	for (const [route, callRoute] of Object.entries(callByRoute)) {
+		test(`is not found by ${route}`, () =>
+			withHarness(async (deps) => {
+				const { owner, removedNamespaceId } = await seedRemovedNamespace(deps);
+
+				const response = await callRoute(owner, removedNamespaceId);
+
+				expect(response).toEqual({ status: 404, error: "Namespace not found" });
+			}));
+	}
 });
