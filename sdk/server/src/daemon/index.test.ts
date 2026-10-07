@@ -243,7 +243,7 @@ describe("startDaemons", () => {
 
 		const daemons = startTestDaemons(abortController.signal, noopLogger, { timerPriorityQueue, repos });
 
-		await timerPriorityQueue.add([{ type: "scheduled", id: "timer-1", rank: 0 }]);
+		await timerPriorityQueue.add({ timers: [{ type: "scheduled", id: "timer-1", rank: 0 }], overdueRank: 0 });
 		await consumerProcessingReached.wait();
 
 		abortController.abort();

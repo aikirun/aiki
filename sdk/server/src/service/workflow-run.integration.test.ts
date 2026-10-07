@@ -57,7 +57,7 @@ function createTestImminentTimerQueue(params: {
 }): ImminentTimerQueue {
 	return createImminentTimerQueue({
 		timerPriorityQueue: params.timerPriorityQueue,
-		configProvider: asConfigProvider(() => ({ lookaheadWindowMs: params.lookaheadWindowMs })),
+		configProvider: asConfigProvider(() => ({ lookaheadWindowMs: params.lookaheadWindowMs, overshootMs: 0 })),
 		logger: noopLogger,
 	});
 }

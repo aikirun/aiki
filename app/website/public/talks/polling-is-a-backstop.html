@@ -1197,7 +1197,7 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 		say: "The others sleep on. The scan again.",
 		why: "The case where one consumer holds the only plan to wake, and dies. The scan covers it.",
 		asked: [
-			["What happens after that?", "When the scan finds the queue's earliest timer already overdue, it sends a signal too, so a surviving consumer wakes and the fast path carries on."],
+			["What happens after that?", "A is still in the queue. The next add, from a new timer or from the scan, sees that the earliest timer is overdue and sends a signal, so a surviving consumer wakes and the fast path carries on."],
 		],
 	},
 	{

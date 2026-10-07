@@ -4,7 +4,7 @@ import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import type { TimerEntry, TimerPriorityQueue, TimerType } from "@aikirun/types/infra/timer";
 
-import { computeRank } from "../../lib/rank";
+import { computeMaxRank, computeRank } from "../../lib/rank";
 
 interface Timer {
 	type: TimerType;
@@ -15,7 +15,7 @@ interface Timer {
 
 export interface ImminentTimerQueueDeps {
 	timerPriorityQueue: TimerPriorityQueue;
-	configProvider: ConfigProvider<{ lookaheadWindowMs: number }>;
+	configProvider: ConfigProvider<{ lookaheadWindowMs: number; overshootMs: number }>;
 	logger: Logger;
 }
 
@@ -27,7 +27,9 @@ export const createImminentTimerQueue = ({ timerPriorityQueue, configProvider, l
 	 * latency, never the run or the schedule occurrence it stands for.
 	 */
 	add(timers: NonEmptyArray<Timer>): void {
-		const dueBy = Date.now() + configProvider.config.lookaheadWindowMs;
+		const now = Date.now();
+		const { lookaheadWindowMs, overshootMs } = configProvider.config;
+		const dueBy = now + lookaheadWindowMs;
 		const imminentTimers: TimerEntry[] = [];
 		for (const { type, id, dueAt, priority } of timers) {
 			if (dueAt <= dueBy) {
@@ -39,11 +41,13 @@ export const createImminentTimerQueue = ({ timerPriorityQueue, configProvider, l
 		}
 
 		fireAndForget(
-			timerPriorityQueue.add(imminentTimers).then((result) => {
-				if (result.status === "failed") {
-					logger.debug("Failed to add imminent timers", { "aiki.count": imminentTimers.length });
-				}
-			}),
+			timerPriorityQueue
+				.add({ timers: imminentTimers, overdueRank: computeMaxRank({ dueBy: now - overshootMs }) })
+				.then((result) => {
+					if (result.status === "failed") {
+						logger.debug("Failed to add imminent timers", { "aiki.count": imminentTimers.length });
+					}
+				}),
 			(err) => logger.debug("Failed to add imminent timers", { err, "aiki.count": imminentTimers.length })
 		);
 	},

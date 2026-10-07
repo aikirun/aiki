@@ -71,7 +71,8 @@ export function inMemoryTimerPriorityQueue(): InMemoryTimerPriorityQueue {
 	}
 
 	const createTimerPriorityQueue = (_context: TimerPriorityQueueContext): TimerPriorityQueue => ({
-		async add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult> {
+		async add(params: { timers: NonEmptyArray<TimerEntry>; overdueRank: number }): Promise<TimerAddResult> {
+			const { timers, overdueRank } = params;
 			const minRank = heap.peek()?.rank;
 
 			let proposedMinRank = timers[0].rank;
@@ -87,6 +88,11 @@ export function inMemoryTimerPriorityQueue(): InMemoryTimerPriorityQueue {
 			// for the current earliest, so only a new front-of-queue sends one.
 			if (minRank === undefined || proposedMinRank < minRank) {
 				signals.push(proposedMinRank);
+				waiterHandles.values().next().value?.wake();
+			} else if (minRank <= overdueRank && signals.length === 0) {
+				// An overdue front has no waiter about to pop it, so the wake the rule above
+				// counts on is not coming. One pending signal is enough to bring a waiter back.
+				signals.push(minRank);
 				waiterHandles.values().next().value?.wake();
 			}
 

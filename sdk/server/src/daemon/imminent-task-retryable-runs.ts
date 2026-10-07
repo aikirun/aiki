@@ -14,7 +14,7 @@ import type { WorkflowRow } from "../infra/db/types/workflow";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
 import { runConcurrently } from "../lib/concurrency";
-import type { Ranked } from "../lib/rank";
+import { computeMaxRank, type Ranked } from "../lib/rank";
 import { streamTimers } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 
@@ -27,9 +27,9 @@ export interface ProcessImminentTaskRetryableRunsDeps {
 export async function processImminentTaskRetryableRuns(
 	context: DaemonContext,
 	{ repos, publisher, timerPriorityQueue }: ProcessImminentTaskRetryableRunsDeps,
-	config: PageProcessingConfig & { lookaheadWindowMs: number; republishBackoff: RepublishBackoff }
+	config: PageProcessingConfig & { lookaheadWindowMs: number; overshootMs: number; republishBackoff: RepublishBackoff }
 ) {
-	const { pageSize, lookaheadWindowMs, republishBackoff, chunk } = config;
+	const { pageSize, lookaheadWindowMs, overshootMs, republishBackoff, chunk } = config;
 	const dueBy = (Date.now() + (timerPriorityQueue ? lookaheadWindowMs : 0)) as TimestampMs;
 
 	for await (const { dueNow: runsDueNow, dueSoon: runsDueSoon } of streamTimers(
@@ -46,7 +46,10 @@ export async function processImminentTaskRetryableRuns(
 				id: run.id,
 				rank: run.rank,
 			}));
-			const result = await timerPriorityQueue.add(asNonEmptyArray(timers));
+			const result = await timerPriorityQueue.add({
+				timers: asNonEmptyArray(timers),
+				overdueRank: computeMaxRank({ dueBy: Date.now() - overshootMs }),
+			});
 			if (result.status === "failed") {
 				context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
 			}

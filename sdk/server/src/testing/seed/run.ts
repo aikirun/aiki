@@ -98,6 +98,7 @@ export async function seedQueuedRun(deps: SeedRunDeps, overrides?: SeedRunOverri
 		{
 			pageSize: 100,
 			lookaheadWindowMs: 0,
+			overshootMs: 0,
 			republishBackoff: publishPendingOutboxEntriesDaemonConfig.republishBackoff,
 			chunk: { size: 100, maxConcurrency: 10 },
 		}

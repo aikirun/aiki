@@ -24,9 +24,9 @@ export interface DueTimer {
 
 export interface TimerPriorityQueueWaiter {
 	/**
-	 * Resolves when a new timer whose rank is lower than the
-	 * queue front's rank arrives, or null on timeout or close.
-	 * `timeoutSeconds` of 0 waits indefinitely.
+	 * Resolves with the queue front's rank when an add wakes this waiter, or with null on
+	 * timeout or close. Not every add wakes a waiter: the two cases that do are listed on
+	 * `TimerPriorityQueue.add`. `timeoutSeconds` of 0 waits indefinitely.
 	 */
 	wait(timeoutSeconds: number): Promise<{ rank: number } | null>;
 	close(): Promise<void>;
@@ -35,7 +35,14 @@ export interface TimerPriorityQueueWaiter {
 export type TimerAddResult = { status: "added" } | { status: "failed" };
 
 export interface TimerPriorityQueue {
-	add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult>;
+	/**
+	 * Adds the timers. The queue front is the timer with the lowest rank. The add wakes a
+	 * waiter with the queue front's rank in two cases, and in no other:
+	 * - an added timer becomes the queue front;
+	 * - the queue front before the add was at or below `overdueRank`, which means no waiter
+	 *   is about to wake for it.
+	 */
+	add(params: { timers: NonEmptyArray<TimerEntry>; overdueRank: number }): Promise<TimerAddResult>;
 	popDue(params: { maxRank: number; limit: number }): Promise<DueTimer[]>;
 	peekNext(): Promise<{ rank: number } | null>;
 	createWaiter(): TimerPriorityQueueWaiter;
