@@ -37,7 +37,7 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
-import { resolveClientCodec, resolveParentCodec } from "./run/bound-codec";
+import { resolveClientCodec } from "./run/bound-codec";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import {
 	isRequestUnanswered,
@@ -68,7 +68,7 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 	 *
 	 * Which type comes back depends on what the option answers. `retry` answers "if this fails, try
 	 * three more times"; `pool` answers "run on this kind of workers"; `clientCodecPolicy` answers
-	 * "leave this run's payloads as plaintext" (or encrypt them). Answers like those fit any run, so
+	 * "store this run's payloads with or without the client's codec applied". Answers like those fit any run, so
 	 * setting one — see {@link WorkflowRunOptions} — returns a {@link WorkflowVersion}, which you can
 	 * go on starting as often as you like.
 	 *
@@ -226,6 +226,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		return this.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);
 	}
 
+	// TODO: restrict cancelling codec for child when parent applied!
 	private async startAsChildWithOptions(
 		parentRun: WorkflowRun<Context, EventsDefinition>,
 		startOptions: WorkflowStartOptions,
@@ -235,7 +236,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			logger: parentRunLogger,
 			[INTERNAL]: { handle: parentRunHandle, hasher: parentRunHasher, replayManifest: parentRunReplayManifest },
 		} = parentRun;
-		const { assertExecutionAllowed, client, codec: parentRunCodec } = parentRunHandle[INTERNAL];
+		const { assertExecutionAllowed, client } = parentRunHandle[INTERNAL];
 		assertExecutionAllowed();
 
 		const inputRaw = args[0];
@@ -247,11 +248,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		// we should use a parent hasher instead of the client to enforce consistency
 		const inputHash = { value: await parentRunHasher(input) };
-		const { codec, applied: clientCodecApplied } = resolveParentCodec(
-			parentRunCodec,
-			parentRunHandle.run.clientCodecApplied,
-			startOptions.clientCodecPolicy,
-			client[INTERNAL].codec
+		const { codec, applied: clientCodecApplied } = resolveClientCodec(
+			client[INTERNAL].codec,
+			startOptions.clientCodecPolicy
 		);
 
 		const referenceId = startOptions.reference?.id;

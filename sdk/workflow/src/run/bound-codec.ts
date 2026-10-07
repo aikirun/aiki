@@ -35,29 +35,6 @@ export function resolveClientCodec(
 }
 
 /**
- * Picks the codec a child start should use from the parent's bound codec and the child's policy.
- * `"skip"` yields the noop and `applied: false`. When the parent applied a codec, the child
- * inherits it. When the parent did not, `"apply"` (the default when the policy is unset) falls
- * through to the client codec.
- */
-export function resolveParentCodec(
-	parentCodec: BoundCodec,
-	parentApplied: boolean,
-	policy: ClientCodecPolicy | undefined,
-	clientCodec: Codec<unknown> | undefined
-): { codec: BoundCodec; applied: boolean } {
-	if (policy === "skip") {
-		return { codec: noopCodec, applied: false };
-	}
-
-	if (parentApplied) {
-		return { codec: parentCodec, applied: true };
-	}
-
-	return resolveClientCodec(clientCodec, "apply");
-}
-
-/**
  * Binds the codec a stored record declares: the client's when the record says the client codec was
  * applied, the noop otherwise. Throws when the record expects a codec the client lacks.
  */

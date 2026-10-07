@@ -4,7 +4,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import { ClientCodecMissingError, type WorkflowRunId } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
-import { bindDeclaredCodec, noopCodec, resolveClientCodec, resolveParentCodec, toBoundCodec } from "./bound-codec";
+import { bindDeclaredCodec, noopCodec, resolveClientCodec, toBoundCodec } from "./bound-codec";
 
 describe("toBoundCodec", () => {
 	test("delegates encode and decode to the codec", async () => {
@@ -62,57 +62,6 @@ describe("resolveClientCodec", () => {
 		expect(resolveClientCodec(undefined, "apply")).toEqual({ codec: noopCodec, applied: false });
 		expect(resolveClientCodec(undefined, "skip")).toEqual({ codec: noopCodec, applied: false });
 		expect(resolveClientCodec(undefined, undefined)).toEqual({ codec: noopCodec, applied: false });
-	});
-});
-
-describe("resolveParentCodec", () => {
-	const parentCodec = toBoundCodec({
-		encode: async (payload: unknown) => ({ marked: payload }),
-		decode: async (payload: unknown) => ({ unmarked: payload }),
-	});
-	const clientCodec = {
-		encode: async (payload: unknown) => ({ clientMarked: payload }),
-		decode: async (payload: unknown) => ({ clientUnmarked: payload }),
-	};
-
-	test("uses the parent's codec when the parent applied it and the policy is unset", async () => {
-		const { codec, applied } = resolveParentCodec(parentCodec, true, undefined, clientCodec);
-		const payload = { value: 1 };
-
-		expect(applied).toBe(true);
-		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
-	});
-
-	test("uses the parent's codec when the policy is apply and the parent applied it", async () => {
-		const { codec, applied } = resolveParentCodec(parentCodec, true, "apply", clientCodec);
-		const payload = { value: 1 };
-
-		expect(applied).toBe(true);
-		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
-	});
-
-	test("falls back to the client codec when the policy is apply and the parent did not apply", async () => {
-		const { codec, applied } = resolveParentCodec(noopCodec, false, "apply", clientCodec);
-		const payload = { value: 1 };
-
-		expect(applied).toBe(true);
-		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ clientMarked: payload }));
-	});
-
-	test("falls back to the client codec when the policy is unset and the parent did not apply", async () => {
-		const { codec, applied } = resolveParentCodec(noopCodec, false, undefined, clientCodec);
-		const payload = { value: 1 };
-
-		expect(applied).toBe(true);
-		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ clientMarked: payload }));
-	});
-
-	test("skips even when the parent applied the codec", async () => {
-		const { codec, applied } = resolveParentCodec(parentCodec, true, "skip", clientCodec);
-		const payload = { value: 1 };
-
-		expect(applied).toBe(false);
-		expect(await codec.encode(payload)).toBe(asOpaquePayload(payload));
 	});
 });
 
