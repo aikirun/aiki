@@ -33,3 +33,19 @@ export async function seedOrganizationMember(
 	await invitee.callAuth("/organization/set-active", { organizationId });
 	return invitee;
 }
+
+/** An invitation the owner sent that nobody has answered. */
+export async function seedPendingInvitation(params: {
+	owner: SignedInUser;
+	organizationId: string;
+	email: string;
+	role: "admin" | "member";
+}) {
+	const { owner, organizationId, email, role } = params;
+	const invitation = await owner.callAuth("/organization/invite-member", { email, role, organizationId });
+	const invitationId = invitation.body?.id;
+	if (typeof invitationId !== "string") {
+		throw new Error(`The invitation was not created: ${invitation.status}`);
+	}
+	return { invitationId };
+}

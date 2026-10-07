@@ -10,6 +10,8 @@ export interface SignedInUser {
 	userId: string;
 	email: string;
 	callAuth(path: string, body: unknown): Promise<{ status: number; body: Record<string, unknown> | null }>;
+	/** Reads an auth route. The body is the parsed JSON, or the text when the response is not JSON. */
+	readAuth(path: string): Promise<{ status: number; body: unknown }>;
 	callDashboard(path: string, input: unknown): Promise<{ status: number; output?: unknown; error?: string }>;
 	authorizeApiRequest(): Promise<ApiAuthorization>;
 }
@@ -27,10 +29,8 @@ export async function seedSignedInUser(deps: SeedUserDeps): Promise<SignedInUser
 		}
 		return requestHeaders;
 	};
-	const post = async (handler: (request: Request) => Promise<Response>, path: string, body: unknown) => {
-		const response = await handler(
-			new Request(`${baseURL}${path}`, { method: "POST", headers: headers(), body: JSON.stringify(body) })
-		);
+	const send = async (handler: (request: Request) => Promise<Response>, request: Request) => {
+		const response = await handler(request);
 		for (const setCookie of response.headers.getSetCookie()) {
 			const [nameAndValue = ""] = setCookie.split(";");
 			const separatorIndex = nameAndValue.indexOf("=");
@@ -38,6 +38,8 @@ export async function seedSignedInUser(deps: SeedUserDeps): Promise<SignedInUser
 		}
 		return { status: response.status, text: await response.text() };
 	};
+	const post = (handler: (request: Request) => Promise<Response>, path: string, body: unknown) =>
+		send(handler, new Request(`${baseURL}${path}`, { method: "POST", headers: headers(), body: JSON.stringify(body) }));
 
 	const callAuth = async (path: string, body: unknown) => {
 		const { status, text } = await post(dashboardIam.authenticator, `/auth${path}`, body);
@@ -49,6 +51,12 @@ export async function seedSignedInUser(deps: SeedUserDeps): Promise<SignedInUser
 		userId: (signedUp.body?.user as { id: string }).id,
 		email,
 		callAuth,
+		async readAuth(path) {
+			const request = new Request(`${baseURL}/auth${path}`, { headers: headers() });
+			const { status, text } = await send(dashboardIam.authenticator, request);
+			const isJson = text.startsWith("{") || text.startsWith("[") || text === "null";
+			return { status, body: isJson ? (JSON.parse(text) as unknown) : text };
+		},
 		async callDashboard(path, input) {
 			const { status, text } = await post(dashboardIam.organization, `/dashboard${path}`, { json: input });
 			if (status === 200) {
