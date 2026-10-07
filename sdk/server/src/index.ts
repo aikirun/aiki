@@ -10,6 +10,7 @@ export { createConsoleLogger as consoleLogger } from "@aikirun/lib/logger";
 
 export type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./config";
 export { defaultServerRuntimeConfig, dynamicRuntimeConfigProvider, staticRuntimeConfigProvider } from "./config";
+export type { DatabaseOptions } from "./infra/db";
 export { database } from "./infra/db";
 export type { MigrateApplyParams } from "./migrate";
 export { migrateApply } from "./migrate";

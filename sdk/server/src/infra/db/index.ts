@@ -1,4 +1,5 @@
 import type { DatabaseConfig } from "@aikirun/lib/db";
+import { createConsoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { CreateDatabase, Database, DatabaseCloseOptions } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
@@ -7,7 +8,11 @@ import type { SqliteClient } from "./sqlite/client";
 
 const DEFAULT_CLOSE_TIMEOUT_MS = 5_000;
 
-export function database(config: DatabaseConfig): CreateDatabase {
+export interface DatabaseOptions {
+	logger?: Logger;
+}
+
+export function database(config: DatabaseConfig, options?: DatabaseOptions): CreateDatabase {
 	let createDbPromise: Promise<Database> | undefined;
 
 	const createDbFn = () => {
@@ -19,11 +24,19 @@ export function database(config: DatabaseConfig): CreateDatabase {
 				}
 				case "pg": {
 					const postgres = await importPostgres();
+					const logger = options?.logger ?? createConsoleLogger();
 					// Keys must be absent, not undefined: the driver merges options by key presence,
 					// so an explicit undefined beats its own default.
 					const client = postgres(config.url, {
 						...(config.maxConnections !== undefined && { max: config.maxConnections }),
 						...(config.caCert !== undefined && { ssl: { ca: config.caCert, rejectUnauthorized: true } }),
+						onnotice: (notice) => {
+							if (notice.severity === "WARNING") {
+								logger.warn(`Postgres warning: ${notice.message}`);
+								return;
+							}
+							logger.debug(`Postgres notice: ${notice.message}`);
+						},
 					});
 					return { provider: "pg", [INTERNAL]: { client } };
 				}

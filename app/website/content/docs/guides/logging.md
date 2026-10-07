@@ -18,10 +18,11 @@ interface Logger {
 }
 ```
 
-Pass your implementation to the client; every component built from that client — workers, endpoints, workflow runs — logs through it. The server takes its own, since it may run in a process with no client:
+Pass your implementation to the client; every component built from that client — workers, endpoints, workflow runs — logs through it. The server takes its own, since it may run in a process with no client, and so does the database, which logs Postgres notices and warnings:
 
 ```typescript
 const aikiClient = client({ url: "http://localhost:9850", logger: myLogger });
+const db = database({ provider: "pg", url: databaseUrl }, { logger: myLogger });
 const aikiServer = server({ db, logger: myLogger });
 ```
 
