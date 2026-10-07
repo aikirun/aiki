@@ -701,11 +701,16 @@ describe("WorkflowRunService cancelByIds", () => {
 					order: "asc",
 				}
 			);
-			expect(scheduledRuns).toEqual({
+			// The list is ordered by id. The child and the cascade run can be created in the same
+			// millisecond, and their ids then order at random, so both sides are sorted by name.
+			const orderByName = (a: { name: string }, b: { name: string }) => (a.name < b.name ? -1 : 1);
+			expect({ rows: [...scheduledRuns.rows].sort(orderByName), total: scheduledRuns.total }).toEqual({
 				rows: [
-					expect.objectContaining({ id: childRunId, status: "scheduled", name: parent.workflowName }),
-					expect.objectContaining({ status: "scheduled", name: "cancel-child-runs" }),
-				],
+					{ id: childRunId, status: "scheduled", name: parent.workflowName },
+					{ status: "scheduled", name: "cancel-child-runs" },
+				]
+					.sort(orderByName)
+					.map((scheduledRun) => expect.objectContaining(scheduledRun)),
 				total: 2,
 			});
 
