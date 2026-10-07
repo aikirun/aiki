@@ -44,7 +44,7 @@ SQLite needs no driver: Aiki uses the SQLite built into Node.js and Bun.
 </Tab>
 </Tabs>
 
-`@aikirun/server` declares the drivers as optional peer dependencies, so your package manager does not install them on its own.
+`@aikirun/server` declares `postgres` as an optional peer dependency, so your package manager does not install it on its own.
 
 ### Apply the schema migration
 
@@ -59,6 +59,8 @@ DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
 ```
 
 The file is created if it doesn't exist.
+
+On Node 22 and 24, this command and your app print `ExperimentalWarning: SQLite is an experimental feature and might change at any time`. It is Node's notice about its built-in SQLite.
 
 </Tab>
 <Tab value="Postgres">

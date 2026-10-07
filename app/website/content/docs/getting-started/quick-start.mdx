@@ -55,6 +55,8 @@ DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
   npx aiki-server migrate apply
 ```
 
+On Node 22 and 24, this command and your app print `ExperimentalWarning: SQLite is an experimental feature and might change at any time`. It is Node's notice about its built-in SQLite.
+
 </Tab>
 <Tab value="Bun">
 
