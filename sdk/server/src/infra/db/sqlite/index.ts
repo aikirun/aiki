@@ -1,4 +1,5 @@
-import type { SqliteClient } from "./client";
+import type { SqliteClient } from "@aikirun/lib/db/sqlite";
+
 import { createSqliteHandle, type SqliteDb } from "./provider";
 import { createChildWorkflowRunWaitRepository } from "./repository/child-workflow-run-wait";
 import { createEventWaitRepository } from "./repository/event-wait";
@@ -29,16 +30,20 @@ export function createSqliteRepos(client: SqliteClient): Repositories {
 		...createRepos(db),
 		async transaction<T>(fn: (txRepos: TxRepositories) => Promise<T>): Promise<T> {
 			const effects: Array<() => void> = [];
-			// libsql opens every transaction with BEGIN IMMEDIATE: it holds the database's write lock
-			// from its first statement, so nothing it reads changes before it commits.
-			const result = await db.transaction(async (tx) => {
-				const txRepos = Object.assign(createRepos(tx), {
+			const transaction = await client.transaction();
+			let result: T;
+			try {
+				const txRepos = Object.assign(createRepos(createSqliteHandle(transaction)), {
 					onCommit: (effect: () => void): void => {
 						effects.push(effect);
 					},
 				}) as TxRepositories;
-				return fn(txRepos);
-			});
+				result = await fn(txRepos);
+				await transaction.commit();
+			} catch (error) {
+				await transaction.rollback();
+				throw error;
+			}
 			for (const effect of effects) {
 				effect();
 			}

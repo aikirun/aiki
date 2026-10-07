@@ -1,7 +1,8 @@
-import type { Client } from "@libsql/client";
 import type { Sql } from "postgres";
 
-export type MigrationsDatabase = { provider: "sqlite"; client: Client } | { provider: "pg"; client: Sql };
+import type { SqliteClient } from "../sqlite";
+
+export type MigrationsDatabase = { provider: "sqlite"; client: SqliteClient } | { provider: "pg"; client: Sql };
 
 export type MigrationsTableState = "no_table" | "untagged" | "tagged";
 
@@ -17,11 +18,11 @@ export async function readMigrationsTableState(
 ): Promise<MigrationsTableState> {
 	switch (db.provider) {
 		case "sqlite": {
-			const columns = await db.client.execute(`PRAGMA table_info("${migrationsTable}")`);
+			const columns = await db.client.execute("SELECT name FROM pragma_table_info(?)", [migrationsTable]);
 			if (columns.rows.length === 0) {
 				return "no_table";
 			}
-			return columns.rows.some((column) => column.name === "tag") ? "tagged" : "untagged";
+			return columns.rows.some(([columnName]) => columnName === "tag") ? "tagged" : "untagged";
 		}
 		case "pg": {
 			const columns = await db.client<{ columnName: string }[]>`
@@ -46,7 +47,7 @@ export async function readAppliedMigrations(
 	switch (db.provider) {
 		case "sqlite": {
 			const appliedRows = await db.client.execute(`SELECT tag, hash FROM "${migrationsTable}"`);
-			return appliedRows.rows.map((appliedRow) => ({ tag: String(appliedRow.tag), hash: String(appliedRow.hash) }));
+			return appliedRows.rows.map(([tag, hash]) => ({ tag: String(tag), hash: String(hash) }));
 		}
 		case "pg": {
 			return await db.client<AppliedMigration[]>`SELECT tag, hash FROM drizzle.${db.client(migrationsTable)}`;

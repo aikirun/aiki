@@ -4,7 +4,7 @@
 	"description": "Worker SDK for Aiki - execute workflows and tasks with durable state management and automatic recovery",
 	"type": "module",
 	"engines": {
-		"node": ">=22"
+		"node": ">=22.16"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

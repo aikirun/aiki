@@ -4,7 +4,7 @@
 	"description": "Client SDK for Aiki - connect to the server, start workflows, and manage execution",
 	"type": "module",
 	"engines": {
-		"node": ">=22"
+		"node": ">=22.16"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

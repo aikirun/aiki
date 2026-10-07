@@ -9,7 +9,7 @@ The Aiki server runs inside your app, so there is no separate Aiki server to run
 
 ## Prerequisites
 
-You need Node.js 22+ or Bun 1.0+, and a database: SQLite, which needs nothing installed, or a PostgreSQL server.
+You need Node.js 22.16+ or Bun 1.4+, and a database: SQLite, which needs nothing installed, or a PostgreSQL server.
 
 Create a project:
 
@@ -42,10 +42,10 @@ Install the SDK and apply the database migrations. [Installation](./installation
 <Tab value="SQLite">
 
 ```package-install
-@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory @libsql/client srvx
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory srvx
 ```
 
-`@libsql/client` is the driver for SQLite, and `srvx` serves the Aiki server over HTTP.
+SQLite needs no driver: Aiki uses the SQLite built into Node.js and Bun. `srvx` serves the Aiki server over HTTP.
 
 <Tabs groupId="runtime" persist items={["Node", "Bun"]}>
 <Tab value="Node">
@@ -54,6 +54,8 @@ Install the SDK and apply the database migrations. [Installation](./installation
 DATABASE_PROVIDER=sqlite DATABASE_PATH=./aiki.db \
   npx aiki-server migrate apply
 ```
+
+On Node 22 and 24, this command and your app print `ExperimentalWarning: SQLite is an experimental feature and might change at any time`. It is Node's notice about its built-in SQLite.
 
 </Tab>
 <Tab value="Bun">

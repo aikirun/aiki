@@ -1,8 +1,8 @@
+import type { SqliteClient } from "@aikirun/lib/db/sqlite";
 import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { eq } from "drizzle-orm";
 
-import type { SqliteClient } from "../../../../infra/db/sqlite/client";
 import { createSqliteHandle } from "../../../../infra/db/sqlite/provider";
 import { workflowRun } from "../../../../infra/db/sqlite/schema";
 

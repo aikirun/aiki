@@ -1,9 +1,9 @@
-import type { Client } from "@libsql/client";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { nestedMap } from "../../../collection/map";
 import type { Logger } from "../../../logger";
 import type { DatabaseConfig, PgDatabaseConfig, SqliteDatabaseConfig } from "../../config";
+import type { SqliteClient } from "../../sqlite";
 import {
 	type AppliedMigration,
 	type MigrationsDatabase,
@@ -82,21 +82,8 @@ async function applySqlite(params: {
 
 			logger.info(`Applying migration ${migration.tag}`);
 
-			// Not a plain transaction: drizzle-kit changes a SQLite table by rebuilding it (create a
-			// copy, move the rows, drop the original). While foreign keys are enforced, dropping the
-			// original fails if rows in other tables still point at it. SQLite ignores switching
-			// them off inside a transaction, so migrate() switches them off first, then runs the
-			// statements in one.
-			// The migration's row goes first: when another migrator has applied it since the read
-			// above, the insert fails on the unique tag before any statement runs.
 			try {
-				await client.migrate([
-					{
-						sql: `INSERT INTO ${quotedMigrationsTable} (tag, hash, created_at) VALUES (?, ?, ?)`,
-						args: [migration.tag, migration.hash, migration.folderMillis],
-					},
-					...migration.sql,
-				]);
+				await applySqliteMigration({ client, migrationsTable, migration });
 			} catch (error) {
 				// The failed transaction left nothing behind, so a recorded tag means another migrator
 				// applied this migration.
@@ -111,18 +98,52 @@ async function applySqlite(params: {
 	}
 }
 
+// Not a plain transaction: drizzle-kit changes a SQLite table by rebuilding it (create a copy, move
+// the rows, drop the original). While foreign keys are enforced, dropping the original fails if
+// rows in other tables still point at it. SQLite ignores switching them off inside a transaction,
+// so they are switched off first, and the statements then run in one.
+// The migration's row goes first: when another migrator has applied it since the migrations table
+// was read, the insert fails on the unique tag before any statement runs.
+async function applySqliteMigration(params: {
+	client: SqliteClient;
+	migrationsTable: string;
+	migration: MigrationMeta;
+}): Promise<void> {
+	const { client, migrationsTable, migration } = params;
+	await client.execute("PRAGMA foreign_keys = OFF");
+	try {
+		const transaction = await client.transaction();
+		try {
+			await transaction.execute(`INSERT INTO "${migrationsTable}" (tag, hash, created_at) VALUES (?, ?, ?)`, [
+				migration.tag,
+				migration.hash,
+				migration.folderMillis,
+			]);
+			for (const statement of migration.sql) {
+				await transaction.executeScript(statement);
+			}
+			await transaction.commit();
+		} catch (error) {
+			await transaction.rollback();
+			throw error;
+		}
+	} finally {
+		await client.execute("PRAGMA foreign_keys = ON");
+	}
+}
+
 // SQLite cannot add a NOT NULL column to a table, so the table is rebuilt with one.
 async function addTagColumnToSqliteMigrationsTable(
-	client: Client,
+	client: SqliteClient,
 	migrationsTable: string,
 	migrations: MigrationMeta[]
 ): Promise<void> {
 	const quotedMigrationsTable = `"${migrationsTable}"`;
-	const transaction = await client.transaction("write");
+	const transaction = await client.transaction();
 	try {
 		const legacyRows = await transaction.execute(`SELECT hash, created_at FROM ${quotedMigrationsTable}`);
 		const appliedMigrations = matchLegacyRowsToMigrations(
-			legacyRows.rows.map((row) => ({ hash: String(row.hash), createdAtMs: Number(row.created_at) })),
+			legacyRows.rows.map(([hash, createdAt]) => ({ hash: String(hash), createdAtMs: Number(createdAt) })),
 			migrations,
 			migrationsTable
 		);
@@ -137,21 +158,27 @@ async function addTagColumnToSqliteMigrationsTable(
 			)
 		`);
 		for (const migration of appliedMigrations) {
-			await transaction.execute({
-				sql: `INSERT INTO ${quotedRebuiltTable} (tag, hash, created_at) VALUES (?, ?, ?)`,
-				args: [migration.tag, migration.hash, migration.folderMillis],
-			});
+			await transaction.execute(`INSERT INTO ${quotedRebuiltTable} (tag, hash, created_at) VALUES (?, ?, ?)`, [
+				migration.tag,
+				migration.hash,
+				migration.folderMillis,
+			]);
 		}
 		await transaction.execute(`DROP TABLE ${quotedMigrationsTable}`);
 		await transaction.execute(`ALTER TABLE ${quotedRebuiltTable} RENAME TO ${quotedMigrationsTable}`);
 		await transaction.commit();
-	} finally {
-		transaction.close();
+	} catch (error) {
+		await transaction.rollback();
+		throw error;
 	}
 }
 
-async function sqliteMigrationsTableHasTag(client: Client, migrationsTable: string, tag: string): Promise<boolean> {
-	const taggedRows = await client.execute({ sql: `SELECT 1 FROM "${migrationsTable}" WHERE tag = ?`, args: [tag] });
+async function sqliteMigrationsTableHasTag(
+	client: SqliteClient,
+	migrationsTable: string,
+	tag: string
+): Promise<boolean> {
+	const taggedRows = await client.execute(`SELECT 1 FROM "${migrationsTable}" WHERE tag = ?`, [tag]);
 	return taggedRows.rows.length > 0;
 }
 
@@ -330,7 +357,11 @@ function assertAppliedMigrationsUnchanged(appliedMigrations: AppliedMigration[],
 	const migrationsByTag = new Map(migrations.map((migration) => [migration.tag, migration]));
 	for (const appliedMigration of appliedMigrations) {
 		const migration = migrationsByTag.get(appliedMigration.tag);
-		if (migration && migration.hash !== appliedMigration.hash) {
+		if (
+			migration &&
+			migration.hash !== appliedMigration.hash &&
+			!migration.previousHashes.includes(appliedMigration.hash)
+		) {
 			throw changedMigrationError([migration.tag]);
 		}
 	}

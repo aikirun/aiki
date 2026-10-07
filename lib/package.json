@@ -97,7 +97,6 @@
 		"build": "tsup"
 	},
 	"devDependencies": {
-		"@libsql/client": "^0.18.0",
 		"arktype": "^2.1.29",
 		"cac": "^6.7.14",
 		"dotenv": "^16.4.5",

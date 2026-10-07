@@ -1,4 +1,6 @@
-import { createSqliteHandle, type SqliteClient, type SqliteDb } from "./provider";
+import type { SqliteClient } from "@aikirun/lib/db/sqlite";
+
+import { createSqliteHandle, type SqliteDb } from "./provider";
 import { createApiKeyRepository } from "./repository/api-key";
 import { createNamespaceRepository } from "./repository/namespace";
 import { createOrganizationRepository } from "./repository/organization";
@@ -17,7 +19,16 @@ export function createSqliteRepos(client: SqliteClient): Repositories {
 	return {
 		...createRepos(db),
 		async transaction<T>(fn: (txRepos: TxRepositories) => Promise<T>): Promise<T> {
-			return db.transaction(async (tx) => fn(createRepos(tx) as TxRepositories));
+			const transaction = await client.transaction();
+			let result: T;
+			try {
+				result = await fn(createRepos(createSqliteHandle(transaction)) as TxRepositories);
+				await transaction.commit();
+			} catch (error) {
+				await transaction.rollback();
+				throw error;
+			}
+			return result;
 		},
 	};
 }

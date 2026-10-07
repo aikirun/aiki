@@ -7,7 +7,7 @@
 	"scripts": {
 		"start": "bun run src/main.ts",
 		"start:watch": "bun --watch run src/main.ts",
-		"build": "bun ../../scripts/compile.ts src/main.ts --outfile dist/aiki-app-server",
+		"build": "bun build --compile src/main.ts --outfile dist/aiki-app-server",
 		"db:migrate:apply:server": "bun ../../sdk/server/src/bin.ts migrate apply --env-file ./.env",
 		"db:migrate:apply:iam": "bun ../../sdk/iam/src/bin.ts migrate apply --env-file ./.env",
 		"db:migrate:apply": "bun run db:migrate:apply:server && bun run db:migrate:apply:iam"

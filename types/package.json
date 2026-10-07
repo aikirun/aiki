@@ -4,7 +4,7 @@
 	"description": "Core type definitions for Aiki",
 	"type": "module",
 	"engines": {
-		"node": ">=22"
+		"node": ">=22.16"
 	},
 	"exports": {
 		"./api/identity": {

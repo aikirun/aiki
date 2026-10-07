@@ -4,7 +4,7 @@
 	"description": "Push-based HTTP endpoint for Aiki - execute workflows from serverless environments",
 	"type": "module",
 	"engines": {
-		"node": ">=22"
+		"node": ">=22.16"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

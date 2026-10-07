@@ -193,6 +193,34 @@ describe("migrateApply", () => {
 			expect(await runSql(`SELECT id FROM ${fixture.widgetTable}`)).toEqual([]);
 		}));
 
+	test("accepts an applied migration recorded with SQL the migration shipped with earlier", () =>
+		withMigrationsFixture(async (fixture) => {
+			await migrateApply({
+				source: migrationSource(fixture.firstMigrationOnly),
+				migrationsTable: fixture.migrationsTable,
+				db: dbConfig,
+				logger: noopLogger,
+			});
+			const editedMigrations: Migrations = {
+				journal: fixture.migrations.journal,
+				files: { ...fixture.migrations.files, "0000_create_widget": `${fixture.createWidgetSql};\n` },
+				previousHashes: { "0000_create_widget": [sha256(fixture.createWidgetSql)] },
+			};
+
+			await migrateApply({
+				source: migrationSource(editedMigrations),
+				migrationsTable: fixture.migrationsTable,
+				db: dbConfig,
+				logger: noopLogger,
+			});
+
+			expect(await runSql(`SELECT id FROM ${fixture.widgetTable}`)).toEqual([{ id: "first-widget" }]);
+			expect(await readMigrationsTable(fixture.migrationsTable)).toEqual([
+				{ tag: "0000_create_widget", hash: sha256(fixture.createWidgetSql), createdAtMs: 1_700_000_000_000 },
+				{ tag: "0001_insert_widget", hash: sha256(fixture.insertWidgetSql), createdAtMs: 1_700_000_001_000 },
+			]);
+		}));
+
 	test("skips a migration that another migrator applied after this one read the migrations table", () =>
 		withMigrationsFixture(async (fixture) => {
 			// The first migration also does what another migrator applying the second one does: runs its
