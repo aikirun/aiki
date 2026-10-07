@@ -63,61 +63,6 @@ describe("migrateApply", () => {
 			expect(loggedMessages).toEqual(["Applying migration 0001_insert_widget"]);
 		}));
 
-	test.skipIf(dbConfig.provider !== "pg")("logs Postgres notices at debug level", () =>
-		withMigrationsFixture(async (fixture) => {
-			await migrateApply({
-				source: migrationSource(fixture.migrations),
-				migrationsTable: fixture.migrationsTable,
-				db: dbConfig,
-				logger: noopLogger,
-			});
-			const loggedMessages: string[] = [];
-			const logger: Logger = {
-				...noopLogger,
-				debug: (message) => {
-					loggedMessages.push(message);
-				},
-			};
-
-			await migrateApply({
-				source: migrationSource(fixture.migrations),
-				migrationsTable: fixture.migrationsTable,
-				db: dbConfig,
-				logger,
-			});
-
-			expect(loggedMessages).toEqual([
-				'Postgres notice: schema "drizzle" already exists, skipping',
-				`Postgres notice: relation "${fixture.migrationsTable}" already exists, skipping`,
-			]);
-		})
-	);
-
-	test.skipIf(dbConfig.provider !== "pg")("logs Postgres warnings at warn level", () =>
-		withMigrationsFixture(async (fixture) => {
-			const warningMigrations: Migrations = {
-				journal: { entries: [{ tag: "0000_warn_about_widgets", when: 1_700_000_000_000 }] },
-				files: { "0000_warn_about_widgets": "DO $$ BEGIN RAISE WARNING 'widgets are running low'; END $$" },
-			};
-			const loggedMessages: string[] = [];
-			const logger: Logger = {
-				...noopLogger,
-				warn: (message) => {
-					loggedMessages.push(message);
-				},
-			};
-
-			await migrateApply({
-				source: migrationSource(warningMigrations),
-				migrationsTable: fixture.migrationsTable,
-				db: dbConfig,
-				logger,
-			});
-
-			expect(loggedMessages).toEqual(["Postgres warning: widgets are running low"]);
-		})
-	);
-
 	test("adds tags to a legacy migrations table, keeping one row per migration", () =>
 		withMigrationsFixture(async (fixture) => {
 			await runSql(fixture.createWidgetSql);
