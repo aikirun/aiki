@@ -6,6 +6,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { namespaceAuthedClient } from "../api/client";
 import { useSchedules, useWorkflowVersions } from "../api/hooks";
+import { ConfirmPrompt } from "../components/common/ConfirmPrompt";
 import { CopyButton } from "../components/common/CopyButton";
 import { DataBlock } from "../components/common/DataBlock";
 import {
@@ -450,6 +451,7 @@ function ScheduleRow({
 	onAction: (action: "pause" | "resume" | "deactivate", id: string) => void;
 }) {
 	const [open, setOpen] = useState(false);
+	const [isConfirmingDeactivate, setIsConfirmingDeactivate] = useState(false);
 	const [rowRef, rowWidth] = useElementWidth<HTMLDivElement>();
 	const showRef = rowWidth >= 480;
 	const showOverlap = rowWidth >= 380;
@@ -640,21 +642,36 @@ function ScheduleRow({
 							justifyContent: "space-between",
 						}}
 					>
-						<div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-							{schedule.status === "active" && (
-								<ActionBtn label="Pause" color="var(--accent-amber)" onClick={() => onAction("pause", schedule.id)} />
-							)}
-							{schedule.status === "paused" && (
-								<ActionBtn label="Resume" color="var(--accent-green)" onClick={() => onAction("resume", schedule.id)} />
-							)}
-							{schedule.status !== "inactive" && (
-								<ActionBtn
-									label="Deactivate"
-									color="var(--accent-red)"
-									onClick={() => onAction("deactivate", schedule.id)}
-								/>
-							)}
-						</div>
+						{schedule.status !== "inactive" && isConfirmingDeactivate ? (
+							<ConfirmPrompt
+								question="Deactivate this schedule? It can only be activated again from code."
+								onConfirm={() => {
+									setIsConfirmingDeactivate(false);
+									onAction("deactivate", schedule.id);
+								}}
+								onCancel={() => setIsConfirmingDeactivate(false)}
+							/>
+						) : (
+							<div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+								{schedule.status === "active" && (
+									<ActionBtn label="Pause" color="var(--accent-amber)" onClick={() => onAction("pause", schedule.id)} />
+								)}
+								{schedule.status === "paused" && (
+									<ActionBtn
+										label="Resume"
+										color="var(--accent-green)"
+										onClick={() => onAction("resume", schedule.id)}
+									/>
+								)}
+								{schedule.status !== "inactive" && (
+									<ActionBtn
+										label="Deactivate"
+										color="var(--accent-red)"
+										onClick={() => setIsConfirmingDeactivate(true)}
+									/>
+								)}
+							</div>
+						)}
 						<button
 							type="button"
 							onClick={() => onViewRuns(schedule.id)}

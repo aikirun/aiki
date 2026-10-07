@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { createNamespace, namespaceManagementClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { authClient } from "../auth/client";
+import { ConfirmPrompt } from "../components/common/ConfirmPrompt";
 import { btnPrimary, eyebrow, inputStyle as sharedInputStyle } from "../components/common/ui";
 import { getNamespaceDotColor } from "../constants/namespace";
 
@@ -745,6 +746,7 @@ function ConfirmRemoveRow({
 
 function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; onCancelled: () => void }) {
 	const [isCancelling, setIsCancelling] = useState(false);
+	const [isConfirmingCancel, setIsConfirmingCancel] = useState(false);
 	const [isCopied, setIsCopied] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -788,29 +790,43 @@ function InvitationRow({ invitation, onCancelled }: { invitation: Invitation; on
 				<div style={{ fontSize: 11, color: "var(--t3)" }}>as {invitation.role}</div>
 				{error && <p style={{ fontSize: 11, color: "var(--accent-red)", marginTop: 4 }}>{error}</p>}
 			</div>
-			<button
-				type="button"
-				onClick={handleCopyLink}
-				style={{
-					background: "none",
-					border: "1px solid var(--b1)",
-					borderRadius: "var(--r-chip)",
-					padding: "3px 10px",
-					fontSize: 11,
-					fontWeight: 600,
-					color: isCopied ? "var(--accent-green)" : "var(--t1)",
-					cursor: "pointer",
-					whiteSpace: "nowrap",
-					flexShrink: 0,
-					transition: "color 0.15s, border-color 0.15s",
-					borderColor: isCopied ? "var(--accent-green)" : "var(--b1)",
-				}}
-			>
-				{isCopied ? "Copied!" : "Copy Link"}
-			</button>
-			<DangerButton onClick={handleCancel} disabled={isCancelling}>
-				{isCancelling ? "Cancelling..." : "Cancel"}
-			</DangerButton>
+			{isConfirmingCancel ? (
+				<ConfirmPrompt
+					question="Cancel this invitation?"
+					cancelLabel="Keep"
+					onConfirm={() => {
+						setIsConfirmingCancel(false);
+						handleCancel();
+					}}
+					onCancel={() => setIsConfirmingCancel(false)}
+				/>
+			) : (
+				<>
+					<button
+						type="button"
+						onClick={handleCopyLink}
+						style={{
+							background: "none",
+							border: "1px solid var(--b1)",
+							borderRadius: "var(--r-chip)",
+							padding: "3px 10px",
+							fontSize: 11,
+							fontWeight: 600,
+							color: isCopied ? "var(--accent-green)" : "var(--t1)",
+							cursor: "pointer",
+							whiteSpace: "nowrap",
+							flexShrink: 0,
+							transition: "color 0.15s, border-color 0.15s",
+							borderColor: isCopied ? "var(--accent-green)" : "var(--b1)",
+						}}
+					>
+						{isCopied ? "Copied!" : "Copy Link"}
+					</button>
+					<DangerButton onClick={() => setIsConfirmingCancel(true)} disabled={isCancelling}>
+						{isCancelling ? "Cancelling..." : "Cancel"}
+					</DangerButton>
+				</>
+			)}
 		</div>
 	);
 }
@@ -835,6 +851,8 @@ function NamespaceRow({
 	const isNsAdmin = namespaceRole === "admin";
 	const canViewMembers = namespaceRole === "admin" || namespaceRole === "member";
 	const [isRemoving, setIsRemoving] = useState(false);
+	const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
+	const [confirmingRemoveMemberUserId, setConfirmingRemoveMemberUserId] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [showMembers, setShowMembers] = useState(false);
 	const [nsMembers, setNsMembers] = useState<NamespaceMemberInfo[] | null>(null);
@@ -971,40 +989,51 @@ function NamespaceRow({
 						</span>
 					</span>
 				</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-					{canViewMembers && !isPersonal && (
-						<button
-							type="button"
-							onClick={() => {
-								setShowMembers((prev) => !prev);
-								loadMembers();
-							}}
-							style={{
-								background: "var(--accent-tint)",
-								border: `1px solid ${showMembers ? "var(--accent-tint-border)" : "transparent"}`,
-								borderRadius: "var(--r-chip)",
-								padding: "3px 10px",
-								fontSize: 11,
-								fontWeight: 600,
-								color: "var(--accent-ink)",
-								cursor: "pointer",
-								whiteSpace: "nowrap",
-								transition: "background 0.15s, border-color 0.15s",
-							}}
-						>
-							{showMembers ? "Hide members" : "Members"}
-						</button>
-					)}
-					{canManage && (
-						<DangerButton
-							onClick={handleRemove}
-							disabled={isLast || isRemoving}
-							title={isLast ? "Cannot remove the last namespace" : undefined}
-						>
-							{isRemoving ? "Removing..." : "Remove"}
-						</DangerButton>
-					)}
-				</div>
+				{isConfirmingRemove ? (
+					<ConfirmPrompt
+						question="Remove this namespace and revoke its API keys?"
+						onConfirm={() => {
+							setIsConfirmingRemove(false);
+							handleRemove();
+						}}
+						onCancel={() => setIsConfirmingRemove(false)}
+					/>
+				) : (
+					<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+						{canViewMembers && !isPersonal && (
+							<button
+								type="button"
+								onClick={() => {
+									setShowMembers((prev) => !prev);
+									loadMembers();
+								}}
+								style={{
+									background: "var(--accent-tint)",
+									border: `1px solid ${showMembers ? "var(--accent-tint-border)" : "transparent"}`,
+									borderRadius: "var(--r-chip)",
+									padding: "3px 10px",
+									fontSize: 11,
+									fontWeight: 600,
+									color: "var(--accent-ink)",
+									cursor: "pointer",
+									whiteSpace: "nowrap",
+									transition: "background 0.15s, border-color 0.15s",
+								}}
+							>
+								{showMembers ? "Hide members" : "Members"}
+							</button>
+						)}
+						{canManage && (
+							<DangerButton
+								onClick={() => setIsConfirmingRemove(true)}
+								disabled={isLast || isRemoving}
+								title={isLast ? "Cannot remove the last namespace" : undefined}
+							>
+								{isRemoving ? "Removing..." : "Remove"}
+							</DangerButton>
+						)}
+					</div>
+				)}
 			</div>
 			{showMembers && canViewMembers && (
 				<div
@@ -1029,7 +1058,16 @@ function NamespaceRow({
 									style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}
 								>
 									<Identity name={m.name} email={m.email} />
-									{isNsAdmin ? (
+									{isNsAdmin && confirmingRemoveMemberUserId === m.userId ? (
+										<ConfirmPrompt
+											question={`Remove from ${namespace.name}?`}
+											onConfirm={() => {
+												setConfirmingRemoveMemberUserId(null);
+												handleRemoveMember(m.userId);
+											}}
+											onCancel={() => setConfirmingRemoveMemberUserId(null)}
+										/>
+									) : isNsAdmin ? (
 										<div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
 											<select
 												value={m.role}
@@ -1050,7 +1088,7 @@ function NamespaceRow({
 												<option value="member">member</option>
 												<option value="viewer">viewer</option>
 											</select>
-											<DangerButton onClick={() => handleRemoveMember(m.userId)} disabled={isSaving}>
+											<DangerButton onClick={() => setConfirmingRemoveMemberUserId(m.userId)} disabled={isSaving}>
 												Remove
 											</DangerButton>
 										</div>

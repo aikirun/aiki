@@ -6,6 +6,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { namespaceAuthedClient } from "../api/client";
 import { useWorkflowRun, useWorkflowRunTransitions } from "../api/hooks";
+import { ConfirmPrompt } from "../components/common/ConfirmPrompt";
 import { CopyButton } from "../components/common/CopyButton";
 import { SpinnerIcon } from "../components/common/Icons";
 import { NotFound } from "../components/common/NotFound";
@@ -92,6 +93,9 @@ export function RunDetail() {
 	const queryClient = useQueryClient();
 	const [actionLoading, setActionLoading] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
+	// A link from one run to another keeps this page mounted, so the question is tied to the run it
+	// was asked about.
+	const [confirmingCancelRunId, setConfirmingCancelRunId] = useState<string | null>(null);
 	// scrollToTaskId is preserved for ExecutionTab deep-link support (future use)
 	const [scrollToTaskId] = useState<string | null>(null);
 
@@ -197,6 +201,7 @@ export function RunDetail() {
 	const statusColor = WORKFLOW_RUN_STATUS_COLORS[status];
 	const isTerminal = isTerminalWorkflowRunStatus(status);
 	const canCancel = !isTerminal;
+	const isConfirmingCancel = confirmingCancelRunId === currentRun.id;
 	const canPause = ["scheduled", "queued", "running"].includes(status);
 	const canResume = status === "paused";
 	const canRequeue = status === "stalled";
@@ -286,8 +291,26 @@ export function RunDetail() {
 						{currentRun.parentWorkflowRunId && <span style={chipStatus("var(--accent-purple)")}>child</span>}
 					</div>
 
+					{canCancel && isConfirmingCancel && (
+						<ConfirmPrompt
+							question="Cancel this run? This cannot be undone."
+							cancelLabel="Keep"
+							onConfirm={() => {
+								setConfirmingCancelRunId(null);
+								handleAction("cancel", () =>
+									namespaceAuthedClient.workflowRun.transitionStateV1({
+										type: "pessimistic",
+										id: currentRun.id,
+										state: { status: "cancelled" },
+									})
+								);
+							}}
+							onCancel={() => setConfirmingCancelRunId(null)}
+						/>
+					)}
+
 					{/* Action buttons — only shown for non-terminal runs */}
-					{!isTerminal && (
+					{!isTerminal && !isConfirmingCancel && (
 						<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>
 							{canResume && (
 								<ActionBtn
@@ -358,15 +381,7 @@ export function RunDetail() {
 									label="Cancel"
 									color="var(--accent-red)"
 									loading={actionLoading === "cancel"}
-									onClick={() =>
-										handleAction("cancel", () =>
-											namespaceAuthedClient.workflowRun.transitionStateV1({
-												type: "pessimistic",
-												id: currentRun.id,
-												state: { status: "cancelled" },
-											})
-										)
-									}
+									onClick={() => setConfirmingCancelRunId(currentRun.id)}
 								/>
 							)}
 						</div>
