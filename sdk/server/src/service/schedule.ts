@@ -1,12 +1,12 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput } from "@aikirun/lib/crypto";
-import { NotFoundError } from "@aikirun/lib/error";
+import { NotFoundError, ValidationError } from "@aikirun/lib/error";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { ScheduleActivateRequestV1, ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { Hash } from "@aikirun/types/infra/hasher";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OpaquePayload } from "@aikirun/types/payload";
-import type { Schedule, ScheduleSpec } from "@aikirun/types/schedule";
+import type { CronScheduleSpec, Schedule, ScheduleSpec } from "@aikirun/types/schedule";
 import type { WorkflowName, WorkflowSource, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 import { CronExpressionParser } from "cron-parser";
@@ -154,6 +154,9 @@ export const createScheduleService = ({ repos, imminentTimerQueue }: ScheduleSer
 		namespaceId: NamespaceId,
 		request: ScheduleActivateRequestV1
 	): Promise<{ schedule: Schedule }> {
+		if (request.spec.type === "cron") {
+			assertIsValidCronSpec(request.spec);
+		}
 		const definitionHashes = await hashScheduleDefinitions(request);
 		return repos.transaction(async (txRepos) =>
 			activateScheduleInTx(namespaceId, request, definitionHashes, txRepos, imminentTimerQueue)
@@ -602,4 +605,23 @@ function toScheduleSpec(schedule: ScheduleRow): ScheduleSpec {
 		throw new Error(`Interval schedule has no interval: ${schedule.id}`);
 	}
 	return { type: "interval", everyMs: schedule.intervalMs, overlapPolicy };
+}
+
+function assertIsValidCronSpec(spec: CronScheduleSpec): void {
+	const now = Date.now();
+
+	try {
+		getNextOccurrence({ type: "cron", expression: spec.expression }, now);
+	} catch (error) {
+		const reason = error instanceof Error ? error.message : String(error);
+		throw new ValidationError(`Invalid cron expression "${spec.expression}": ${reason}`);
+	}
+
+	if (spec.timezone !== undefined) {
+		try {
+			getNextOccurrence(spec, now);
+		} catch {
+			throw new ValidationError(`Invalid cron timezone "${spec.timezone}"`);
+		}
+	}
 }

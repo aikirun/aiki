@@ -1,6 +1,7 @@
 import { createBinaryLatch, settleWithin } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
+import { ValidationError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
@@ -48,6 +49,44 @@ describe("ScheduleService activateSchedule", () => {
 				timezone: "Europe/Berlin",
 				overlapPolicy: undefined,
 			});
+		}));
+
+	test("refuses an activation whose cron expression is invalid", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+
+			const activating = scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "cron", expression: "61 9 * * *" },
+			});
+
+			await expect(activating).rejects.toThrow(ValidationError);
+			await expect(activating).rejects.toThrow('Invalid cron expression "61 9 * * *"');
+		}));
+
+	test("refuses an activation whose cron timezone is invalid", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+
+			const activating = scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "cron", expression: "0 9 * * *", timezone: "Europe/Atlantis" },
+			});
+
+			await expect(activating).rejects.toThrow(ValidationError);
+			await expect(activating).rejects.toThrow('Invalid cron timezone "Europe/Atlantis"');
 		}));
 
 	test("matches an existing schedule by a deprecated input hash", () =>
