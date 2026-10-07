@@ -2,6 +2,98 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.44.0
+
+Timers are more exact: a timer left over from an earlier wait no longer ends a later one, and timers no longer run late after a due-timers consumer stops. Two calls that create the same run or the same schedule at the same moment now both get it. A schedule activated again after being deactivated starts from its next occurrence. The built-in console logger is exported with a level and a pretty option, prints JSON by default, and logs the steps of a run at `debug`. One Postgres migration (`0045`) ships with this release.
+
+### Breaking Changes
+
+- **One Postgres migration ships with this release.** `0045` widens `schedule.interval_ms` to a 64-bit integer. SQLite has no new migration. Apply it before starting this version:
+
+  ```bash
+  npx aiki-server migrate apply
+  # or, with the aiki binary
+  aiki migrate apply --package server
+  ```
+
+- **The default logger prints one JSON line per entry.** The logger that `client()`, `server()` and `migrateApply()` fall back to used to print coloured, multi-line entries. An error in an entry is written with its name, message, stack and the errors it wraps.
+
+  ```
+  {"level":"info","time":1791348078090,"orderId":"order-1","msg":"Payment authorized"}
+  ```
+
+  To keep the old output, pass the logger yourself:
+
+  ```typescript
+  import { client, consoleLogger } from "@aikirun/client";
+
+  const aikiClient = client({ url, logger: consoleLogger({ pretty: true }) });
+  ```
+
+  The compose files now default `PRETTY_LOGS` to `false` as well. Set `PRETTY_LOGS=true` in `.env` to keep the coloured output there.
+
+- **Activating a deactivated schedule again no longer runs what it missed.** Deactivating left the schedule's next run where it was, so activating it again ran the occurrences in between, as the overlap policy decides. It now starts the way a new schedule does: an interval schedule runs one interval after the activation, and a cron schedule runs the next time its expression matches. Pausing and resuming still runs what was missed.
+
+  ```
+  10:00:00  the schedule fires, every minute     next run 10:01:00
+  10:00:30  it is deactivated
+  10:05:30  it is activated again
+            before  allow                  10:01:00 to 10:05:00 run, five runs; next run 10:06:00
+                    skip, cancel_previous  10:05:00 runs; next run 10:06:00
+            after   any overlap policy     nothing runs; next run 10:06:30
+  ```
+
+- **An activation whose hashes match two schedules is refused.** An activation that declares a current and a deprecated hash can match two schedules: one stored under the old hash, and one created under the new hash by an activation that did not declare the old one. It now fails with `SCHEDULE_CONFLICT`, and neither schedule is touched. It used to fail with a database error, a 500. An activation by reference id is refused in this case too; it used to return the schedule holding the reference id when that one was stored under the current hash.
+
+- **The Redis timer queue's signal key has a new name.** Update any Redis ACL rules or tooling that match key names. The timers key is unchanged unless it contains a brace outside a hash tag. `aiki:timers:signal` is no longer used and can be deleted.
+
+  ```
+  key passed       signal key before       signal key after
+  aiki:timers      aiki:timers:signal      {aiki:timers}:signal
+  aiki:{timers}    aiki:{timers}:signal    aiki:{timers}:signal
+  ```
+
+- **`TimerPriorityQueue.add` takes `{ timers, overdueRank }`.** This affects a custom timer queue only. The queue has to wake a waiter with the front's rank when the front was already at or below `overdueRank` before the add.
+
+  ```typescript
+  // Before
+  add(timers);
+
+  // After
+  add({ timers, overdueRank });
+  ```
+
+### New Features
+
+- **`consoleLogger()` is exported from `@aikirun/client` and `@aikirun/server`.** `level` is the lowest level printed: `"trace"`, `"debug"`, `"info"`, `"warn"` or `"error"`, `"info"` by default. `pretty` prints the coloured, multi-line entries, and is `false` by default.
+
+  ```typescript
+  const logger = consoleLogger({ level: "warn", pretty: true });
+  ```
+
+- **`database()` takes a logger.** `database({ provider: "pg", url }, { logger })` sends Postgres warnings to it at `warn` and other notices at `debug`. The driver used to print each notice to the console as a raw object.
+
+- **`migrateApply()` takes a logger.** `migrateApply({ db, logger })` in `@aikirun/server` and `@aikirun/iam` logs each migration it applies, and Postgres notices, through it. Without one it uses the console logger.
+
+### Improvements
+
+- **The steps of a run are logged at `debug`.** A run starting and completing, a task starting and completing, a sleep, a wait for an event or a child, an event being sent, a run being created, and the server's line for each of these requests were at `info`. Still at `info`: a client or worker starting, a worker stopping, a schedule activated, a run paused, resumed, cancelled or woken up, a run awaiting retry, and stalled runs.
+- **A request that fails validation says which field is wrong.** The 400 used to say `Input validation failed` and nothing else. It now lists each problem, for example `Input validation failed: options.retry.factor must be at least 1 (was 0.5)`.
+- **An invalid cron expression or timezone is refused with a 400.** Activating a schedule with one returned a 500. The message names the field: `Invalid cron expression "61 9 * * *": ...` or `Invalid cron timezone "Europe/Atlantis"`.
+- **A time after the year 9999 is refused with a 400.** This covers a run's start delay, a sleep, the timeout of an event wait or a child wait, a retry delay, a task's retry delay, and a schedule's interval. Postgres failed these with a database error, and SQLite stored a time no date can express.
+- **`migrate apply` no longer prints Postgres's skip notices.** On every run after the first, Postgres answered `CREATE SCHEMA IF NOT EXISTS` with a notice that the driver printed as a raw object. The command's own lines now go through the console logger: `Applying migration 0001_blue_firelord`.
+
+### Bug Fixes
+
+- **A timer left over from an earlier wait no longer ends a later one.** When a wait ended early, its timer stayed in the timer queue. If the run was waiting again in the same status when the timer came due, the timer was applied to the new wait: an event wait with no timeout was timed out, or a sleep ended early. A timer now takes effect only when the run's own due time has passed.
+- **Timers fire on time again after a due-timers consumer stops.** When the consumer that was about to wake for the earliest timer stopped, the others kept waiting, and every later timer fired from the polling daemons instead, up to 10 seconds late, until a server restarted. Adding a timer now wakes a consumer when the timer at the front of the queue is overdue. The request handler's config gains `imminentRuns.overshootMs`, 30 ms by default, to match the consumer's.
+- **A task whose output is rejected is marked `failed`.** When the output failed the task's output schema, the run failed with cause `self` and the task stayed `running`. When the output could not be stored as JSON, the handler ran again on each retry. In both cases the task now goes `failed` at once and the run fails with cause `task`, without a task retry or a workflow retry.
+- **Two calls that create a run under the same reference id at once both get the run.** On Postgres the second call failed with a database error, a 500. It now gets what any later call gets: the run when its input matches, and the conflict policy when it differs.
+- **Two activations that create the same schedule at once both get the schedule.** On Postgres the second one failed with `SCHEDULE_CONFLICT`, though the schedule that existed was the one it asked for.
+- **`return_existing` returns the schedule with its own workflow.** When a reference id already belonged to a schedule of another workflow, the response named the workflow from the request, and a workflow was created for the request's name and version. The response now names the schedule's own workflow, and nothing is written.
+- **Interval schedules longer than 24.8 days work on Postgres.** The interval was stored in a 32-bit column, so activating one failed with a database error. SQLite was not affected.
+- **An unknown CLI command exits with an error.** `aiki` and each package's own CLI printed the help and exited with code 0, so a typo in a script passed as a success. They now print `Unknown command "..."` and exit with 1.
+
 ## 0.43.2
 
 A run now survives a worker crash during a task and a lost request to the server. Both used to fail the run.

@@ -1,6 +1,6 @@
 {
 	"name": "@aikirun/server",
-	"version": "0.43.2",
+	"version": "0.44.0",
 	"description": "Aiki server library \u2014 durable execution orchestrator.",
 	"type": "module",
 	"engines": {
