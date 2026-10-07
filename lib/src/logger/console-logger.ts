@@ -15,29 +15,60 @@ const colors = {
 } as const;
 
 const logLevelConfig: Record<LogLevel, { level: number; color: string }> = {
-	TRACE: { level: 10, color: colors.gray },
-	DEBUG: { level: 20, color: colors.blue },
-	INFO: { level: 30, color: colors.green },
-	WARN: { level: 40, color: colors.yellow },
-	ERROR: { level: 50, color: colors.red },
+	trace: { level: 10, color: colors.gray },
+	debug: { level: 20, color: colors.blue },
+	info: { level: 30, color: colors.green },
+	warn: { level: 40, color: colors.yellow },
+	error: { level: 50, color: colors.red },
 };
 
-interface ConsoleLoggerOptions {
+export interface ConsoleLoggerOptions {
+	/** The lowest level that is printed (default: "info"). */
 	level?: LogLevel;
-	bindings?: Record<string, unknown>;
+	/**
+	 * Print coloured, multi-line entries for reading in a terminal, instead of one JSON line per
+	 * entry (default: false).
+	 */
+	pretty?: boolean;
 }
 
 export function createConsoleLogger(options: ConsoleLoggerOptions = {}): Logger {
-	const level = logLevelConfig[options.level ?? "INFO"].level;
-	const bindings = options.bindings ?? {};
+	return createConsoleLoggerWithBindings({
+		level: options.level ?? "info",
+		pretty: options.pretty ?? false,
+		bindings: {},
+	});
+}
+
+function createConsoleLoggerWithBindings(params: {
+	level: LogLevel;
+	pretty: boolean;
+	bindings: Record<string, unknown>;
+}): Logger {
+	const { pretty, bindings } = params;
+	const level = logLevelConfig[params.level].level;
 
 	function format(logLevel: LogLevel, message: string, metadata?: Record<string, unknown>): string {
-		const timestamp = new Date().toISOString();
 		const mergedMetadata = { ...bindings, ...metadata };
+
+		if (!pretty) {
+			const entry: Record<string, unknown> = { level: logLevel, time: Date.now() };
+			for (const [key, value] of Object.entries(mergedMetadata)) {
+				// Error properties are non-enumerable, so JSON.stringify renders the error as "{}".
+				entry[key] =
+					value instanceof Error
+						? { name: value.name, message: value.message, stack: value.stack, causes: describeErrorCauses(value) }
+						: value;
+			}
+			entry.msg = message;
+			return JSON.stringify(entry);
+		}
+
+		const timestamp = new Date().toISOString();
 		const levelColor = logLevelConfig[logLevel].color ?? colors.reset;
 
 		const timestampStr = `${colors.dim}${timestamp}${colors.reset}`;
-		const levelStr = `${levelColor}${colors.bold}${logLevel.padEnd(5)}${colors.reset}`;
+		const levelStr = `${levelColor}${colors.bold}${logLevel.toUpperCase().padEnd(5)}${colors.reset}`;
 		const messageStr = `${colors.cyan}${message}${colors.reset}`;
 
 		let output = `${timestampStr} ${levelStr} ${messageStr}`;
@@ -64,33 +95,34 @@ export function createConsoleLogger(options: ConsoleLoggerOptions = {}): Logger 
 
 	return {
 		trace(message, metadata) {
-			if (level <= logLevelConfig.TRACE.level) {
-				console.debug(format("TRACE", message, metadata));
+			if (level <= logLevelConfig.trace.level) {
+				console.debug(format("trace", message, metadata));
 			}
 		},
 		debug(message, metadata) {
-			if (level <= logLevelConfig.DEBUG.level) {
-				console.debug(format("DEBUG", message, metadata));
+			if (level <= logLevelConfig.debug.level) {
+				console.debug(format("debug", message, metadata));
 			}
 		},
 		info(message, metadata) {
-			if (level <= logLevelConfig.INFO.level) {
-				console.info(format("INFO", message, metadata));
+			if (level <= logLevelConfig.info.level) {
+				console.info(format("info", message, metadata));
 			}
 		},
 		warn(message, metadata) {
-			if (level <= logLevelConfig.WARN.level) {
-				console.warn(format("WARN", message, metadata));
+			if (level <= logLevelConfig.warn.level) {
+				console.warn(format("warn", message, metadata));
 			}
 		},
 		error(message, metadata) {
-			if (level <= logLevelConfig.ERROR.level) {
-				console.error(format("ERROR", message, metadata));
+			if (level <= logLevelConfig.error.level) {
+				console.error(format("error", message, metadata));
 			}
 		},
 		child(childBindings) {
-			return createConsoleLogger({
-				level: Object.entries(logLevelConfig).find(([, v]) => v.level === level)?.[0] as LogLevel,
+			return createConsoleLoggerWithBindings({
+				level: params.level,
+				pretty,
 				bindings: { ...bindings, ...childBindings },
 			});
 		},

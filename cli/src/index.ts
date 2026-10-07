@@ -76,7 +76,7 @@ cli
 		switch (subcommand) {
 			case "apply": {
 				const dbConfig = loadDatabaseConfig();
-				const logger = createConsoleLogger();
+				const logger = createConsoleLogger({ pretty: true });
 				for (const pkg of packages) {
 					const packageData = embeddedMigrationData[pkg];
 					if (!packageData) {

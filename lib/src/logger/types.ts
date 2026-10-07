@@ -1,4 +1,4 @@
-export type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR";
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
 
 export interface Logger {
 	trace(message: string, metadata?: Record<string, unknown>): void;

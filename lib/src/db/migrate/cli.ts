@@ -63,7 +63,7 @@ export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 						source: params.resolveSource(dbConfig.provider),
 						migrationsTable: params.migrationsTable,
 						db: dbConfig,
-						logger: createConsoleLogger(),
+						logger: createConsoleLogger({ pretty: true }),
 					});
 					return;
 				}

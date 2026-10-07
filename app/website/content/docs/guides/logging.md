@@ -3,7 +3,7 @@ title: Logging
 description: Plug your own logger into Aiki and log from workflow code with run-scoped metadata.
 ---
 
-Aiki logs through a single `Logger` you can replace. The default is a built-in console logger at `INFO` level.
+Aiki logs through a single `Logger` you can replace. The default is a built-in console logger that prints one JSON line per entry, at `info` and above.
 
 ## The Logger Contract
 
@@ -24,6 +24,22 @@ Pass your implementation to the client; every component built from that client â
 const aikiClient = client({ url: "http://localhost:9850", logger: myLogger });
 const aikiServer = server({ db, logger: myLogger });
 ```
+
+## The Built-in Console Logger
+
+`consoleLogger()` builds the default logger with your own settings. It is exported from `@aikirun/client` and `@aikirun/server`:
+
+```typescript
+import { client, consoleLogger } from "@aikirun/client";
+
+const logger = consoleLogger({ level: "warn", pretty: true });
+const aikiClient = client({ url: "http://localhost:9850", logger });
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `level` | `"info"` | The lowest level that is printed: `"trace"`, `"debug"`, `"info"`, `"warn"` or `"error"` |
+| `pretty` | `false` | Print coloured, multi-line entries for reading in a terminal. `false` prints one JSON line per entry |
 
 ## Logging from Workflow Code
 
