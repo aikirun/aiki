@@ -52,6 +52,43 @@ describe("handler API authorization", () => {
 	});
 });
 
+describe("handler input validation", () => {
+	test("an invalid request answers 400 naming each invalid field", async () => {
+		const handler = await createHandler({ db: {} as Database, logger: noopLogger });
+		const response = await handler(
+			new Request("http://localhost/api/schedule/activateV1", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					json: {
+						workflowName: "send-invoices",
+						workflowVersionId: "v1",
+						workflowRunInputHash: { value: "input-hash" },
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						spec: { type: "interval", everyMs: 0 },
+						workflowRunOptions: { retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 100, factor: 0.5 } },
+					},
+				}),
+			})
+		);
+
+		expect([response.status, await response.json()]).toEqual([
+			400,
+			{
+				json: {
+					defined: false,
+					code: "BAD_REQUEST",
+					status: 400,
+					message: expect.stringMatching(
+						/^Input validation failed: spec\.everyMs [^;]+; workflowRunOptions\.retry\.factor [^;]+$/
+					),
+				},
+			},
+		]);
+	});
+});
+
 describe("identity API", () => {
 	test("returns the namespace and organization from authenticated credentials", async () => {
 		const handler = await createHandler({
