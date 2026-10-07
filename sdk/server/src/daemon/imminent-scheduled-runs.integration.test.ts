@@ -23,7 +23,13 @@ describe("processImminentScheduledRuns", () => {
 				await processImminentScheduledRuns(
 					context,
 					{ repos },
-					{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+					{
+						pageSize: 100,
+						lookaheadWindowMs: 0,
+						overshootMs: 0,
+						republishBackoff,
+						chunk: { size: 100, maxConcurrency: 10 },
+					}
 				);
 
 				const row = await repos.workflowRunOutbox.getByWorkflowRunId({

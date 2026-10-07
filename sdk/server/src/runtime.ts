@@ -53,6 +53,7 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 				timerPriorityQueue,
 				configProvider: asConfigProvider(() => ({
 					lookaheadWindowMs: configProvider.config.daemons.imminentScheduledRuns.lookaheadWindowMs,
+					overshootMs: configProvider.config.daemons.dueTimersConsumer.overshootMs,
 				})),
 				logger,
 			})

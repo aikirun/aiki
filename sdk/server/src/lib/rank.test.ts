@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { computeRank, extractRankDueAtMs, extractRankPriority } from "./rank";
+import { computeMaxRank, computeRank, extractRankDueAtMs, extractRankPriority } from "./rank";
 
 describe("computeRank", () => {
 	test("encodes the due time in the high digits and the priority in the low digit", () => {
@@ -21,6 +21,12 @@ describe("computeRank", () => {
 
 		expect(extractRankDueAtMs(rank)).toBe(dueAt);
 		expect(extractRankPriority(rank)).toBe(3);
+	});
+});
+
+describe("computeMaxRank", () => {
+	test("is the rank of the lowest priority due at the cutoff", () => {
+		expect(computeMaxRank({ dueBy: 1_000 })).toBe(10_009);
 	});
 });
 

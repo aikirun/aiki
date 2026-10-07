@@ -71,7 +71,13 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
 				{ repos },
-				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 100,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			const run = await repos.workflowRun.getByIdWithState({
@@ -98,7 +104,13 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 				processImminentChildRunWaitTimedOutRuns(
 					context,
 					{ repos },
-					{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+					{
+						pageSize: 100,
+						lookaheadWindowMs: 0,
+						overshootMs: 0,
+						republishBackoff,
+						chunk: { size: 100, maxConcurrency: 10 },
+					}
 				)
 			);
 
@@ -134,7 +146,13 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
 				{ repos },
-				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 100,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			expect(
@@ -166,7 +184,13 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
 				{ repos },
-				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 100,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			const run = await repos.workflowRun.getByIdWithState({
@@ -188,7 +212,13 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
 				{ repos, publisher },
-				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 100,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			expect(
@@ -207,7 +237,13 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
 				{ repos },
-				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 100,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			const run = await repos.workflowRun.getByIdWithState({
@@ -242,7 +278,13 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
 				{ repos },
-				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 100,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			const run = await repos.workflowRun.getByIdWithState({
@@ -285,6 +327,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 					{
 						pageSize: 100,
 						lookaheadWindowMs: 2 * ONE_HOUR_MS,
+						overshootMs: 0,
 						republishBackoff,
 						chunk: { size: 100, maxConcurrency: 10 },
 					}
@@ -337,7 +380,13 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
 				{ repos },
-				{ pageSize: 2, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 2,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			for (const { parentRunId } of parked) {

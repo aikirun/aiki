@@ -102,6 +102,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			(config) => ({
 				...config.imminentScheduledRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+				overshootMs: config.dueTimersConsumer.overshootMs,
 			})
 		),
 		startPollingDaemon(
@@ -111,6 +112,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			(config) => ({
 				...config.imminentSleepElapsedRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+				overshootMs: config.dueTimersConsumer.overshootMs,
 			})
 		),
 		startPollingDaemon(
@@ -120,6 +122,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			(config) => ({
 				...config.imminentRetryableRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+				overshootMs: config.dueTimersConsumer.overshootMs,
 			})
 		),
 		startPollingDaemon(
@@ -129,6 +132,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			(config) => ({
 				...config.imminentTaskRetryableRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+				overshootMs: config.dueTimersConsumer.overshootMs,
 			})
 		),
 		startPollingDaemon(
@@ -138,6 +142,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			(config) => ({
 				...config.imminentEventWaitTimedOutRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+				overshootMs: config.dueTimersConsumer.overshootMs,
 			})
 		),
 		startPollingDaemon(
@@ -147,6 +152,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			(config) => ({
 				...config.imminentChildRunWaitTimedOutRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+				overshootMs: config.dueTimersConsumer.overshootMs,
 			})
 		),
 		startPollingDaemon(
@@ -156,6 +162,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 			(config) => ({
 				...config.imminentRecurringRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
+				overshootMs: config.dueTimersConsumer.overshootMs,
 			})
 		),
 		startPollingDaemon(

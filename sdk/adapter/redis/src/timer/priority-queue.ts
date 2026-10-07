@@ -30,16 +30,24 @@ function decodeMember(member: string, rank: number): DueTimer {
  * batch's minimum rank — but only when that minimum beats the previous earliest
  * entry, or the set was empty. A signal exists to shorten the waiter's sleep;
  * a timer behind the current earliest is already covered by the wake the
- * waiter has scheduled for it. ARGV[1] is the minimum rank; subsequent pairs
+ * waiter has scheduled for it.
+ *
+ * An overdue earliest entry has no waiter about to pop it, so that wake is not
+ * coming. The add then pushes the earliest entry's rank instead, unless a signal
+ * is already pending: one is enough to bring a waiter back.
+ *
+ * ARGV[1] is the minimum rank and ARGV[2] the overdue rank; subsequent pairs
  * are score/member.
  */
 const ADD_AND_SIGNAL_SCRIPT = `
 local head = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
-for i = 2, #ARGV - 1, 2 do
+for i = 3, #ARGV - 1, 2 do
   redis.call('ZADD', KEYS[1], ARGV[i], ARGV[i + 1])
 end
 if #head == 0 or tonumber(ARGV[1]) < tonumber(head[2]) then
   redis.call('LPUSH', KEYS[2], ARGV[1])
+elseif tonumber(head[2]) <= tonumber(ARGV[2]) and redis.call('LLEN', KEYS[2]) == 0 then
+  redis.call('LPUSH', KEYS[2], head[2])
 end
 return 1
 `;
@@ -83,11 +91,12 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 		const redisTracker = connectionTracker(redis);
 
 		return {
-			async add(timers: NonEmptyArray<TimerEntry>): Promise<TimerAddResult> {
+			async add(params: { timers: NonEmptyArray<TimerEntry>; overdueRank: number }): Promise<TimerAddResult> {
 				if (!redisTracker.isAvailable()) {
 					return { status: "failed" };
 				}
 
+				const { timers, overdueRank } = params;
 				let minRank = timers[0].rank;
 				const args: (string | number)[] = [];
 				for (const timer of timers) {
@@ -99,7 +108,7 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 				}
 
 				try {
-					await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minRank, ...args);
+					await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minRank, overdueRank, ...args);
 				} catch (err) {
 					logger.warn("Timer add command failed", { err, "aiki.count": timers.length });
 					return { status: "failed" };

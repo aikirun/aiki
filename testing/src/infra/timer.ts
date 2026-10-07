@@ -18,6 +18,9 @@ interface TestRunner {
 	expect(actual: unknown): Expectation;
 }
 
+/** An overdue rank below every rank the suite adds, so no timer counts as overdue. */
+const BELOW_EVERY_RANK = 0;
+
 /**
  * Provides a queue to one test. Called once per test; hand `fn` a fresh,
  * empty queue, and tear it down after `fn` resolves. Isolation between calls
@@ -42,7 +45,10 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 		describe("add", () => {
 			test("add reports the batch as added", () =>
 				withQueue(async (queue) => {
-					const result = await queue.add([{ type: "sleep", id: "timer-a", rank: 10 }]);
+					const result = await queue.add({
+						timers: [{ type: "sleep", id: "timer-a", rank: 10 }],
+						overdueRank: BELOW_EVERY_RANK,
+					});
 					expect(result).toEqual({ status: "added" });
 				}));
 		});
@@ -50,11 +56,14 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 		describe("popDue", () => {
 			test("popDue removes and returns the timers at or below the max rank, earliest first", () =>
 				withQueue(async (queue) => {
-					await queue.add([
-						{ type: "sleep", id: "timer-a", rank: 10 },
-						{ type: "scheduled", id: "timer-c", rank: 30 },
-						{ type: "retry", id: "timer-b", rank: 20 },
-					]);
+					await queue.add({
+						timers: [
+							{ type: "sleep", id: "timer-a", rank: 10 },
+							{ type: "scheduled", id: "timer-c", rank: 30 },
+							{ type: "retry", id: "timer-b", rank: 20 },
+						],
+						overdueRank: BELOW_EVERY_RANK,
+					});
 
 					const dueTimers = await queue.popDue({ maxRank: 20, limit: 10 });
 
@@ -67,11 +76,14 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 
 			test("popDue honors the limit and leaves the remainder for the next call", () =>
 				withQueue(async (queue) => {
-					await queue.add([
-						{ type: "sleep", id: "timer-a", rank: 10 },
-						{ type: "scheduled", id: "timer-c", rank: 30 },
-						{ type: "retry", id: "timer-b", rank: 20 },
-					]);
+					await queue.add({
+						timers: [
+							{ type: "sleep", id: "timer-a", rank: 10 },
+							{ type: "scheduled", id: "timer-c", rank: 30 },
+							{ type: "retry", id: "timer-b", rank: 20 },
+						],
+						overdueRank: BELOW_EVERY_RANK,
+					});
 
 					const firstChunk = await queue.popDue({ maxRank: 30, limit: 2 });
 					const secondChunk = await queue.popDue({ maxRank: 30, limit: 2 });
@@ -85,7 +97,7 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 
 			test("popDue returns nothing when no timer is at or below the max rank", () =>
 				withQueue(async (queue) => {
-					await queue.add([{ type: "sleep", id: "timer-a", rank: 30 }]);
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 30 }], overdueRank: BELOW_EVERY_RANK });
 
 					expect(await queue.popDue({ maxRank: 29, limit: 10 })).toEqual([]);
 					expect(await queue.peekNext()).toEqual({ rank: 30 });
@@ -100,10 +112,13 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 		describe("peekNext", () => {
 			test("peekNext returns the earliest entry without removing it", () =>
 				withQueue(async (queue) => {
-					await queue.add([
-						{ type: "retry", id: "timer-b", rank: 20 },
-						{ type: "sleep", id: "timer-a", rank: 10 },
-					]);
+					await queue.add({
+						timers: [
+							{ type: "retry", id: "timer-b", rank: 20 },
+							{ type: "sleep", id: "timer-a", rank: 10 },
+						],
+						overdueRank: BELOW_EVERY_RANK,
+					});
 
 					expect(await queue.peekNext()).toEqual({ rank: 10 });
 					expect(await queue.peekNext()).toEqual({ rank: 10 });
@@ -132,30 +147,33 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 
 			test("an add into an empty queue wakes the waiter with the batch's minimum rank", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
-					await queue.add([
-						{ type: "sleep", id: "timer-a", rank: 30 },
-						{ type: "retry", id: "timer-b", rank: 15 },
-					]);
+					await queue.add({
+						timers: [
+							{ type: "sleep", id: "timer-a", rank: 30 },
+							{ type: "retry", id: "timer-b", rank: 15 },
+						],
+						overdueRank: BELOW_EVERY_RANK,
+					});
 
 					expect(await waiter.wait(0)).toEqual({ rank: 15 });
 				}));
 
 			test("an add that beats the current earliest wakes the waiter with the new minimum", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
-					await queue.add([{ type: "sleep", id: "timer-a", rank: 50 }]);
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 50 }], overdueRank: BELOW_EVERY_RANK });
 					expect(await waiter.wait(0)).toEqual({ rank: 50 });
 
-					await queue.add([{ type: "retry", id: "timer-b", rank: 40 }]);
+					await queue.add({ timers: [{ type: "retry", id: "timer-b", rank: 40 }], overdueRank: BELOW_EVERY_RANK });
 
 					expect(await waiter.wait(0)).toEqual({ rank: 40 });
 				}));
 
 			test("an add behind the current earliest does not wake the waiter", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
-					await queue.add([{ type: "sleep", id: "timer-a", rank: 10 }]);
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: BELOW_EVERY_RANK });
 					expect(await waiter.wait(0)).toEqual({ rank: 10 });
 
-					await queue.add([{ type: "retry", id: "timer-b", rank: 20 }]);
+					await queue.add({ timers: [{ type: "retry", id: "timer-b", rank: 20 }], overdueRank: BELOW_EVERY_RANK });
 
 					// Absence check: a timer behind the current earliest never needs to wake a
 					// waiter, so the only correct outcome is a timeout.
@@ -168,30 +186,61 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 
 			test("an add that ties the current earliest does not wake the waiter", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
-					await queue.add([{ type: "sleep", id: "timer-a", rank: 10 }]);
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: BELOW_EVERY_RANK });
 					expect(await waiter.wait(0)).toEqual({ rank: 10 });
 
-					await queue.add([{ type: "retry", id: "timer-b", rank: 10 }]);
+					await queue.add({ timers: [{ type: "retry", id: "timer-b", rank: 10 }], overdueRank: BELOW_EVERY_RANK });
+
+					expect(await waiter.wait(0.1)).toBeNull();
+				}));
+
+			test("an add behind the current earliest wakes the waiter with the earliest's rank when the earliest is overdue", () =>
+				withQueueAndWaiter(async (queue, waiter) => {
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: BELOW_EVERY_RANK });
+					expect(await waiter.wait(0)).toEqual({ rank: 10 });
+
+					await queue.add({ timers: [{ type: "retry", id: "timer-b", rank: 20 }], overdueRank: 10 });
+
+					expect(await waiter.wait(0)).toEqual({ rank: 10 });
+				}));
+
+			test("an add behind the current earliest does not wake the waiter when the earliest is one rank above the overdue rank", () =>
+				withQueueAndWaiter(async (queue, waiter) => {
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: BELOW_EVERY_RANK });
+					expect(await waiter.wait(0)).toEqual({ rank: 10 });
+
+					await queue.add({ timers: [{ type: "retry", id: "timer-b", rank: 20 }], overdueRank: 9 });
 
 					expect(await waiter.wait(0.1)).toBeNull();
 				}));
 
 			test("a parked waiter wakes on a qualifying add", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
-					await queue.add([{ type: "sleep", id: "timer-a", rank: 50 }]);
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 50 }], overdueRank: BELOW_EVERY_RANK });
 					expect(await waiter.wait(0)).toEqual({ rank: 50 });
 
 					const waitPromise = waiter.wait(0);
-					await queue.add([{ type: "retry", id: "timer-b", rank: 5 }]);
+					await queue.add({ timers: [{ type: "retry", id: "timer-b", rank: 5 }], overdueRank: BELOW_EVERY_RANK });
 
 					expect(await waitPromise).toEqual({ rank: 5 });
+				}));
+
+			test("a parked waiter wakes on an add behind the current earliest when the earliest is overdue", () =>
+				withQueueAndWaiter(async (queue, waiter) => {
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: BELOW_EVERY_RANK });
+					expect(await waiter.wait(0)).toEqual({ rank: 10 });
+
+					const waitPromise = waiter.wait(0);
+					await queue.add({ timers: [{ type: "retry", id: "timer-b", rank: 20 }], overdueRank: 10 });
+
+					expect(await waitPromise).toEqual({ rank: 10 });
 				}));
 
 			test("close resolves a parked wait with null", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
 					// The first wake completes any lazy connection setup, so the second wait
 					// is genuinely parked when close arrives.
-					await queue.add([{ type: "sleep", id: "timer-a", rank: 50 }]);
+					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 50 }], overdueRank: BELOW_EVERY_RANK });
 					expect(await waiter.wait(0)).toEqual({ rank: 50 });
 
 					const waitPromise = waiter.wait(0);

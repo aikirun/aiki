@@ -197,7 +197,7 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);

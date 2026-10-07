@@ -7,7 +7,7 @@ import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { keysetStreamCursorFilter } from "./lib/keyset-stream";
 import type { KeysetStreamCursor } from "../../../../lib/keyset-stream";
-import { computeRank, PRIORITY_LEVELS } from "../../../../lib/rank";
+import { computeMaxRank, PRIORITY_LEVELS } from "../../../../lib/rank";
 import type { DaemonContext } from "../../../../middleware/context";
 import type { PgDb } from "../provider";
 import { workflowRunOutbox } from "../schema";
@@ -54,8 +54,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 	): Promise<WorkflowRunOutboxRowPending[]> {
 		const { leaseDurationMs, limit } = params;
 		const now = Date.now();
-		// PRIORITY_LEVELS - 1 is the least priority and produces a rank greater than or equal to any rank due on or before now.
-		const maxNextPublishAttemptRank = computeRank({ dueAt: now, priority: PRIORITY_LEVELS - 1 });
+		const maxNextPublishAttemptRank = computeMaxRank({ dueBy: now });
 
 		const leaseRankBase = (now + leaseDurationMs) * PRIORITY_LEVELS;
 
@@ -166,8 +165,7 @@ export const createWorkflowRunOutboxRepository = (db: PgDb) => ({
 		params: { limit: number; cursor?: KeysetStreamCursor }
 	): Promise<WorkflowRunOutboxRowPublished[]> {
 		const { limit, cursor } = params;
-		// PRIORITY_LEVELS - 1 is the least priority and produces a rank greater than or equal to any rank due on or before now.
-		const maxNextPublishAttemptRank = computeRank({ dueAt: Date.now(), priority: PRIORITY_LEVELS - 1 });
+		const maxNextPublishAttemptRank = computeMaxRank({ dueBy: Date.now() });
 
 		const rows = await db
 			.select()

@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 
 import { processImminentRecurringRuns } from "./imminent-recurring-runs";
 import { defaultServerRuntimeConfig } from "../config/runtime";
-import { computeRank, PRIORITY_LEVELS } from "../lib/rank";
+import { computeMaxRank, computeRank } from "../lib/rank";
 import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createScheduleService, getReferenceId } from "../service/schedule";
 import { withFakeClock } from "../testing/clock";
@@ -24,6 +24,7 @@ const NO_CAP = Number.MAX_SAFE_INTEGER;
 const config = {
 	pageSize: 100,
 	lookaheadWindowMs: 0,
+	overshootMs: 0,
 	maxOccurrencesPerSchedule: NO_CAP,
 	republishBackoff,
 	chunk: { size: 100, maxConcurrency: 10 },
@@ -229,6 +230,40 @@ describe("processImminentRecurringRuns", () => {
 			]);
 		}));
 
+	test("firing a schedule wakes a waiter when the earliest queued timer is overdue", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+
+			const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
+			});
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const waiter = timerPriorityQueue.createWaiter();
+			// Due 30ms before the scan's clock, which is exactly the overshoot, so it sits at the overdue cutoff.
+			const frontRank = computeRank({ dueAt: schedule.nextRunAt - 30 });
+			await timerPriorityQueue.add({ timers: [{ type: "sleep", id: "run-front", rank: frontRank }], overdueRank: 0 });
+			expect(await waiter.wait(0)).toEqual({ rank: frontRank });
+
+			await withFakeClock(schedule.nextRunAt, () =>
+				processImminentRecurringRuns(
+					context,
+					{ repos, childRunCanceller: createChildRunCanceller(), timerPriorityQueue },
+					{ ...config, lookaheadWindowMs: 60_000, overshootMs: 30 }
+				)
+			);
+
+			expect(await waiter.wait(0)).toEqual({ rank: frontRank });
+			await waiter.close();
+		}));
+
 	test("firing a schedule arms no timer when its next run falls beyond the lookahead", () =>
 		withHarness(async ({ context, repos }) => {
 			const scheduleService = createScheduleService({ repos });
@@ -285,7 +320,7 @@ describe("processImminentRecurringRuns", () => {
 
 			expect(
 				await timerPriorityQueue.popDue({
-					maxRank: computeRank({ dueAt: now, priority: PRIORITY_LEVELS - 1 }),
+					maxRank: computeMaxRank({ dueBy: now }),
 					limit: 10,
 				})
 			).toEqual([{ type: "recurring", id: schedule.id, rank: computeRank({ dueAt: now }) }]);

@@ -90,6 +90,7 @@ export async function seedRunFromSchedule(
 			{
 				pageSize: 100,
 				lookaheadWindowMs: 0,
+				overshootMs: 0,
 				maxOccurrencesPerSchedule: 1,
 				republishBackoff,
 				chunk: { size: 100, maxConcurrency: 10 },

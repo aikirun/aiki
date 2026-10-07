@@ -948,7 +948,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				repos,
 				imminentTimerQueue: createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				}),
 			});
@@ -979,7 +979,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				repos,
 				imminentTimerQueue: createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				}),
 			});
@@ -1005,7 +1005,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				repos,
 				imminentTimerQueue: createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				}),
 			});
@@ -1039,7 +1039,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				repos,
 				imminentTimerQueue: createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				}),
 			});

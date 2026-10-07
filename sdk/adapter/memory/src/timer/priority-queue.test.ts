@@ -18,7 +18,7 @@ describe("inMemoryTimerPriorityQueue clear", () => {
 	test("clear drops every queued timer", async () => {
 		const createTimerPriorityQueue = inMemoryTimerPriorityQueue();
 		const queue = createTimerPriorityQueue({ logger: noopLogger });
-		await queue.add([{ type: "sleep", id: "timer-a", rank: 10 }]);
+		await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: 0 });
 
 		createTimerPriorityQueue.clear();
 
@@ -28,7 +28,7 @@ describe("inMemoryTimerPriorityQueue clear", () => {
 	test("clear leaves no pending wake for a later waiter", async () => {
 		const createTimerPriorityQueue = inMemoryTimerPriorityQueue();
 		const queue = createTimerPriorityQueue({ logger: noopLogger });
-		await queue.add([{ type: "sleep", id: "timer-a", rank: 10 }]);
+		await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: 0 });
 
 		createTimerPriorityQueue.clear();
 

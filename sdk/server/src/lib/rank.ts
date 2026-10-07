@@ -13,6 +13,11 @@ export function computeRank(params: { dueAt: number; priority?: number }): numbe
 	return params.dueAt * PRIORITY_LEVELS + (params.priority ?? DEFAULT_PRIORITY);
 }
 
+/** The highest rank of anything due at or before `dueBy`: the lowest priority at that instant. */
+export function computeMaxRank(params: { dueBy: number }): number {
+	return computeRank({ dueAt: params.dueBy, priority: PRIORITY_LEVELS - 1 });
+}
+
 export function extractRankDueAtMs(rank: number): number {
 	return Math.floor(rank / PRIORITY_LEVELS);
 }

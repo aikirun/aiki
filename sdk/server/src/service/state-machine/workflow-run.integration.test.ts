@@ -552,6 +552,7 @@ describe("WorkflowRunStateMachine sleep lifecycle", () => {
 					{
 						pageSize: 100,
 						lookaheadWindowMs: 0,
+						overshootMs: 0,
 						republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
 						chunk: { size: 100, maxConcurrency: 10 },
 					}
@@ -668,6 +669,7 @@ describe("WorkflowRunStateMachine redelivery", () => {
 				{
 					pageSize: 100,
 					lookaheadWindowMs: 0,
+					overshootMs: 0,
 					republishBackoff: { baseDelayMs: 5_000, maxDelayMs: 300_000, declinedBackoffMs: 30_000 },
 					chunk: { size: 100, maxConcurrency: 10 },
 				}
@@ -935,7 +937,7 @@ describe("WorkflowRunStateMachine signal sequence guarded parking", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1093,7 +1095,7 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 					repos,
 					createImminentTimerQueue({
 						timerPriorityQueue,
-						configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+						configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 						logger: noopLogger,
 					})
 				);
@@ -1140,7 +1142,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1168,7 +1170,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1203,7 +1205,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1243,7 +1245,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1276,7 +1278,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1310,7 +1312,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1339,7 +1341,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1373,7 +1375,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);
@@ -1410,7 +1412,7 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				repos,
 				createImminentTimerQueue({
 					timerPriorityQueue,
-					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000 })),
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
 					logger: noopLogger,
 				})
 			);

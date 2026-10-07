@@ -28,7 +28,13 @@ describe("processImminentTaskRetryableRuns", () => {
 			await processImminentTaskRetryableRuns(
 				context,
 				{ repos },
-				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 100,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			const run = await repos.workflowRun.getByIdWithState({
@@ -68,7 +74,13 @@ describe("processImminentTaskRetryableRuns", () => {
 				processImminentTaskRetryableRuns(
 					context,
 					{ repos, timerPriorityQueue },
-					{ pageSize: 100, lookaheadWindowMs: 60_000, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+					{
+						pageSize: 100,
+						lookaheadWindowMs: 60_000,
+						overshootMs: 0,
+						republishBackoff,
+						chunk: { size: 100, maxConcurrency: 10 },
+					}
 				)
 			);
 
@@ -83,6 +95,35 @@ describe("processImminentTaskRetryableRuns", () => {
 			).toBeNull();
 		}));
 
+	test("a run due within the lookahead window wakes a waiter when the earliest queued timer is overdue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			await seedAwaitingTaskRetryRun({ namespaceRequestContext, repos, publisher }, { nextAttemptAt: 1_030_000 });
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const waiter = timerPriorityQueue.createWaiter();
+			// Due 30ms before the scan's clock, which is exactly the overshoot, so it sits at the overdue cutoff.
+			const frontRank = computeRank({ dueAt: 999_970 });
+			await timerPriorityQueue.add({ timers: [{ type: "sleep", id: "run-front", rank: frontRank }], overdueRank: 0 });
+			expect(await waiter.wait(0)).toEqual({ rank: frontRank });
+
+			await withFakeClock(1_000_000, () =>
+				processImminentTaskRetryableRuns(
+					context,
+					{ repos, timerPriorityQueue },
+					{
+						pageSize: 100,
+						lookaheadWindowMs: 60_000,
+						overshootMs: 30,
+						republishBackoff,
+						chunk: { size: 100, maxConcurrency: 10 },
+					}
+				)
+			);
+
+			expect(await waiter.wait(0)).toEqual({ rank: frontRank });
+			await waiter.close();
+		}));
+
 	test("a running run with a due awaiting_retry task is not requeued", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			// The task is due, but the run is still running, not awaiting_task_retry — only
@@ -95,7 +136,13 @@ describe("processImminentTaskRetryableRuns", () => {
 			await processImminentTaskRetryableRuns(
 				context,
 				{ repos },
-				{ pageSize: 100, lookaheadWindowMs: 0, republishBackoff, chunk: { size: 100, maxConcurrency: 10 } }
+				{
+					pageSize: 100,
+					lookaheadWindowMs: 0,
+					overshootMs: 0,
+					republishBackoff,
+					chunk: { size: 100, maxConcurrency: 10 },
+				}
 			);
 
 			const run = await repos.workflowRun.getByIdWithState({

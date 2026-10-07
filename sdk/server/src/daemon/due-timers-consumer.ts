@@ -20,7 +20,7 @@ import type { RepublishBackoff } from "./publish-pending-outbox-entries";
 import type { PageProcessingConfig } from "../config/runtime";
 import type { Repositories } from "../infra/db/types";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
-import { computeRank, extractRankDueAtMs, PRIORITY_LEVELS, type Ranked } from "../lib/rank";
+import { computeMaxRank, extractRankDueAtMs, type Ranked } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 import { createDaemonContext } from "../middleware/context";
 import type { ChildRunCanceller } from "../service/cancel-child-runs";
@@ -116,8 +116,7 @@ async function dueTimersConsumerLoop(
 				const context = createDaemonContext({ name: "process-due-timers", logger, signal });
 				const next = () =>
 					timerPriorityQueue.popDue({
-						// The cutoff must cover every priority digit, so it takes the lowest priority, not the default.
-						maxRank: computeRank({ dueAt: Date.now(), priority: PRIORITY_LEVELS - 1 }),
+						maxRank: computeMaxRank({ dueBy: Date.now() }),
 						limit: configProvider.config.pageSize,
 					});
 
@@ -180,6 +179,7 @@ export async function processDueTimers(
 				queueRecurringRuns(context, deps, schedules, configProvider.config.republishBackoff, {
 					maxOccurrencesPerSchedule: configProvider.config.maxOccurrencesPerSchedule,
 					lookaheadWindowMs: configProvider.config.lookaheadWindowMs,
+					overshootMs: configProvider.config.overshootMs,
 					chunk: chunkConfig,
 				})
 			);
