@@ -612,8 +612,8 @@ function assertIsValidCronSpec(spec: CronScheduleSpec): void {
 
 	try {
 		getNextOccurrence({ type: "cron", expression: spec.expression }, now);
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
+	} catch (err) {
+		const reason = err instanceof Error ? err.message : String(err);
 		throw new ValidationError(`Invalid cron expression "${spec.expression}": ${reason}`);
 	}
 
