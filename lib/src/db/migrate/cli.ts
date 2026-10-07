@@ -6,6 +6,7 @@ import { migrateApply } from "./commands/apply";
 import { migrateList } from "./commands/list";
 import type { MigrationSource } from "./source";
 import { describeErrorCauses } from "../../error/cause";
+import { createConsoleLogger } from "../../logger";
 import { loadDatabaseConfig, loadDatabaseProvider } from "../config";
 import type { DatabaseProvider } from "../provider";
 
@@ -62,6 +63,7 @@ export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 						source: params.resolveSource(dbConfig.provider),
 						migrationsTable: params.migrationsTable,
 						db: dbConfig,
+						logger: createConsoleLogger(),
 					});
 					return;
 				}

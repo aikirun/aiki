@@ -50,6 +50,7 @@ describe("reportPendingMigrations", () => {
 				source: migrationSource(fixture.firstMigrationOnly),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			await reportPendingMigrations(fixture.reportParams);
@@ -70,6 +71,7 @@ describe("reportPendingMigrations", () => {
 				source: migrationSource(fixture.migrations),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			await reportPendingMigrations(fixture.reportParams);

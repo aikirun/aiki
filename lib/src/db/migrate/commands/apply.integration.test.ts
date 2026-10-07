@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { migrateApply } from "./apply";
 import { sha256 } from "../../../crypto";
+import { type Logger, noopLogger } from "../../../logger";
 import { loadDatabaseConfig } from "../../config";
 import { type Migrations, migrationSource } from "../source";
 import {
@@ -20,11 +21,13 @@ describe("migrateApply", () => {
 				source: migrationSource(fixture.migrations),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 			await migrateApply({
 				source: migrationSource(fixture.migrations),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			expect(await runSql(`SELECT id FROM ${fixture.widgetTable}`)).toEqual([{ id: "first-widget" }]);
@@ -32,6 +35,32 @@ describe("migrateApply", () => {
 				{ tag: "0000_create_widget", hash: sha256(fixture.createWidgetSql), createdAtMs: 1_700_000_000_000 },
 				{ tag: "0001_insert_widget", hash: sha256(fixture.insertWidgetSql), createdAtMs: 1_700_000_001_000 },
 			]);
+		}));
+
+	test("logs only the migrations it applies", () =>
+		withMigrationsFixture(async (fixture) => {
+			await migrateApply({
+				source: migrationSource(fixture.firstMigrationOnly),
+				migrationsTable: fixture.migrationsTable,
+				db: dbConfig,
+				logger: noopLogger,
+			});
+			const loggedMessages: string[] = [];
+			const logger: Logger = {
+				...noopLogger,
+				info: (message) => {
+					loggedMessages.push(message);
+				},
+			};
+
+			await migrateApply({
+				source: migrationSource(fixture.migrations),
+				migrationsTable: fixture.migrationsTable,
+				db: dbConfig,
+				logger,
+			});
+
+			expect(loggedMessages).toEqual(["Applying migration 0001_insert_widget"]);
 		}));
 
 	test("adds tags to a legacy migrations table, keeping one row per migration", () =>
@@ -47,6 +76,7 @@ describe("migrateApply", () => {
 				source: migrationSource(fixture.migrations),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			expect(await runSql(`SELECT id FROM ${fixture.widgetTable}`)).toEqual([{ id: "first-widget" }]);
@@ -78,6 +108,7 @@ describe("migrateApply", () => {
 				source: migrationSource(migrationsCreatedTogether),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			expect(await runSql(`SELECT id FROM ${fixture.widgetTable}`)).toEqual([{ id: "first-widget" }]);
@@ -98,6 +129,7 @@ describe("migrateApply", () => {
 				source: migrationSource(fixture.migrations),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			await expect(applying).rejects.toThrow(
@@ -125,6 +157,7 @@ describe("migrateApply", () => {
 				source: migrationSource(fixture.migrations),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			await expect(applying).rejects.toThrow(
@@ -139,6 +172,7 @@ describe("migrateApply", () => {
 				source: migrationSource(fixture.firstMigrationOnly),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 			const editedMigrations: Migrations = {
 				journal: fixture.migrations.journal,
@@ -149,6 +183,7 @@ describe("migrateApply", () => {
 				source: migrationSource(editedMigrations),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			await expect(applying).rejects.toThrow(
@@ -177,6 +212,7 @@ describe("migrateApply", () => {
 				source: migrationSource(migrationsAppliedMeanwhile),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			expect(await runSql(`SELECT id FROM ${fixture.widgetTable}`)).toEqual([{ id: "first-widget" }]);
@@ -200,6 +236,7 @@ describe("migrateApply", () => {
 				source: migrationSource(duplicateWidgetMigrations),
 				migrationsTable: fixture.migrationsTable,
 				db: dbConfig,
+				logger: noopLogger,
 			});
 
 			await expect(applying).rejects.toThrow();

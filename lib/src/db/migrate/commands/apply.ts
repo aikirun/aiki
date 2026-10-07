@@ -2,6 +2,7 @@ import type { Client } from "@libsql/client";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { nestedMap } from "../../../collection/map";
+import type { Logger } from "../../../logger";
 import type { DatabaseConfig, PgDatabaseConfig, SqliteDatabaseConfig } from "../../config";
 import {
 	type AppliedMigration,
@@ -15,6 +16,7 @@ interface MigrateApplyParams {
 	source: MigrationSource;
 	migrationsTable: string;
 	db: DatabaseConfig;
+	logger: Logger;
 }
 
 export async function migrateApply(params: MigrateApplyParams): Promise<void> {
@@ -22,10 +24,10 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 
 	switch (dbConfig.provider) {
 		case "sqlite":
-			await applySqlite(dbConfig, params.source.read(), params.migrationsTable);
+			await applySqlite(dbConfig, params.source.read(), params.migrationsTable, params.logger);
 			return;
 		case "pg":
-			await applyPg(dbConfig, params.source.read(), params.migrationsTable);
+			await applyPg(dbConfig, params.source.read(), params.migrationsTable, params.logger);
 			return;
 		// case "mysql":
 		// 	throw new Error(`DATABASE_PROVIDER=${dbConfig.provider} is not yet supported.`);
@@ -37,7 +39,8 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 async function applySqlite(
 	config: SqliteDatabaseConfig,
 	migrations: MigrationMeta[],
-	migrationsTable: string
+	migrationsTable: string,
+	logger: Logger
 ): Promise<void> {
 	const { openSqliteClient } = await import("../../sqlite");
 	const client = await openSqliteClient(config);
@@ -66,7 +69,7 @@ async function applySqlite(
 				continue;
 			}
 
-			console.log(`applying migration ${migration.tag}`);
+			logger.info(`Applying migration ${migration.tag}`);
 
 			// Not a plain transaction: drizzle-kit changes a SQLite table by rebuilding it (create a
 			// copy, move the rows, drop the original). While foreign keys are enforced, dropping the
@@ -141,7 +144,12 @@ async function sqliteMigrationsTableHasTag(client: Client, migrationsTable: stri
 	return taggedRows.rows.length > 0;
 }
 
-async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], migrationsTable: string): Promise<void> {
+async function applyPg(
+	config: PgDatabaseConfig,
+	migrations: MigrationMeta[],
+	migrationsTable: string,
+	logger: Logger
+): Promise<void> {
 	const { sql } = await import("drizzle-orm");
 	// Import the driver first: drizzle-orm/postgres-js imports it too, and would throw before the guard runs.
 	const postgres = await importPostgres();
@@ -177,7 +185,7 @@ async function applyPg(config: PgDatabaseConfig, migrations: MigrationMeta[], mi
 				continue;
 			}
 
-			console.log(`applying migration ${migration.tag}`);
+			logger.info(`Applying migration ${migration.tag}`);
 
 			// The migration's row goes first: when another migrator has applied it since the read
 			// above, the insert fails on the unique tag before any statement runs.
