@@ -4,7 +4,7 @@
 	"description": "Aiki server library \u2014 durable execution orchestrator.",
 	"type": "module",
 	"engines": {
-		"node": ">=22"
+		"node": ">=22.16"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

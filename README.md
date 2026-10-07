@@ -200,7 +200,7 @@ You choose where each component runs: everything in one process, or a central se
 
 ## Requirements
 
-- **Runtime**: Node.js 22+ or Bun 1.0+
+- **Runtime**: Node.js 22.16+ or Bun 1.4+
 - **Modules**: ESM only (`import`/`export`); CommonJS is not supported
 - **Database**: SQLite or PostgreSQL 14+ (MySQL coming soon)
 

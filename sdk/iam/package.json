@@ -4,7 +4,7 @@
 	"description": "Aiki IAM library \u2014 pluggable identity & access management",
 	"type": "module",
 	"engines": {
-		"node": ">=22"
+		"node": ">=22.16"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

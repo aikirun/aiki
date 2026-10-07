@@ -4,7 +4,7 @@
 	"description": "In-memory adapter for Aiki - publisher, subscriber, and timer sorted set backed by in-process data structures",
 	"type": "module",
 	"engines": {
-		"node": ">=22"
+		"node": ">=22.16"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
