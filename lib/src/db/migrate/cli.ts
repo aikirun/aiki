@@ -96,6 +96,10 @@ export async function runMigrateCli(params: MigrateCliParams): Promise<void> {
 		if (cli.matchedCommand) {
 			await cli.runMatchedCommand();
 		} else if (!cli.options.help && !cli.options.version) {
+			if (cli.args.length > 0) {
+				const commandNames = cli.commands.map((command) => command.name);
+				throw new Error(`Unknown command "${cli.args[0]}". Expected one of: ${commandNames.join(", ")}.`);
+			}
 			cli.outputHelp();
 		}
 	} catch (err) {
