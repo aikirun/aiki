@@ -69,6 +69,45 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 Starting several tasks with `Promise.all` works, and interleaves them the way any async code interleaves in one process - useful for overlapping I/O, but it does not spread the work across workers. Reach for [child workflows](./workflows.md#child-workflows) when you want that.
 
+## Defining a Task Inside a Workflow
+
+A task can be defined where it is used, inside the workflow handler:
+
+```typescript
+const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	async handler(run, input: { orderId: string; email: string }) {
+		const receipt = await task({
+			name: "charge-order",
+			handler: ({ orderId }: { orderId: string }) => chargeOrder(orderId),
+		}).start(run, { orderId: input.orderId });
+
+		await task({
+			name: "email-receipt",
+			handler: ({ email, receiptId }: { email: string; receiptId: string }) => emailReceipt(email, receiptId),
+		}).start(run, { email: input.email, receiptId: receipt.id });
+	},
+});
+```
+
+It is a task like any other. Aiki identifies it by its name and input, and a replay that reaches it with a different input gets a [non-determinism error](../guides/refactoring-workflows.md#changing-task-inputs).
+
+A handler can also take no input and use values from the workflow handler directly:
+
+```typescript
+const receipt = await task({
+	name: "charge-order",
+	handler: () => chargeOrder(input.orderId),
+}).start(run);
+```
+
+> **Warning:** Prefer passing input. Without it, the name is all that identifies the task, and Aiki does not see the values the handler uses:
+>
+> - A replay returns the recorded result even when the values the task takes from the workflow handler have changed. No non-determinism error is raised.
+> - Tasks that share a name get their recorded results in the order they are called, so reordering them swaps their results.
+> - Tasks that share a name and are started together, as with `Promise.all`, can get each other's results on replay.
+>
+> If you do use it, give each task its own name, which avoids the last two.
+
 ## Task Retry
 
 Configure automatic retries for failed tasks using the `retry` property:
