@@ -41,9 +41,11 @@ jobs:
         with:
           node-version: 22
 
+      # The file list is built here, not by the package script: run through `bun run` on Windows,
+      # the script's quoted patterns reach find already expanded, and find rejects them.
       - name: Unit Test
         if: matrix.runtime == 'bun'
-        run: bun run test:unit
+        run: find . -name '*.test.ts' -not -name '*.integration.test.ts' -not -path '*/node_modules/*' -not -path '*/dist/*' -print0 | xargs -0 bun test --concurrent
 
       - name: Unit Test (Node)
         if: matrix.runtime == 'node'
