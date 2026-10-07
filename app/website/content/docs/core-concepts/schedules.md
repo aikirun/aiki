@@ -160,10 +160,10 @@ const handle = await dailyReport
 
 | Policy | Behavior |
 |--------|----------|
-| `"error"` (default) | Throw a `ScheduleConflictError` if the reference ID already identifies a schedule with a different definition |
+| `"error"` (default) | Throw an error with code `SCHEDULE_CONFLICT` if the reference ID already identifies a schedule with a different definition |
 | `"return_existing"` | Return the existing schedule unchanged |
 
-The definition is immutable, so a reference ID that already points at a different definition is a conflict, not an update. With `"error"` the activation throws a `ScheduleConflictError`; with `"return_existing"` it returns the existing schedule as-is. Re-activating with the *same* definition is idempotent: it returns the existing schedule. If that schedule is paused, re-activating does not resume it; only `resume()` does. If the schedule was deactivated, re-activating brings it back and it [starts again from its next occurrence](#managing-schedules).
+The definition is immutable, so a reference ID that already points at a different definition is a conflict, not an update. With `"error"` the activation throws an error whose `code` is `"SCHEDULE_CONFLICT"`; with `"return_existing"` it returns the existing schedule as-is. Re-activating with the *same* definition is idempotent: it returns the existing schedule. If that schedule is paused, re-activating does not resume it; only `resume()` does. If the schedule was deactivated, re-activating brings it back and it [starts again from its next occurrence](#managing-schedules).
 
 For more on reference IDs in workflows and events, see the [Reference IDs guide](../guides/reference-ids.md).
 

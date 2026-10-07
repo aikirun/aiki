@@ -43,7 +43,7 @@ await orderWorkflowV1.events.paymentReceived.sendByReferenceId(client, "order-12
 
 ### Conflict Handling
 
-By default, Aiki throws an error when you try to start a workflow with a reference ID that already exists but with different input. You can configure this behavior with the `conflictPolicy` option:
+By default, Aiki throws an error when you try to start a workflow with a reference ID that already exists but with different input. The error's `code` is `"WORKFLOW_RUN_REFERENCE_CONFLICT"`. You can configure this behavior with the `conflictPolicy` option:
 
 ```typescript
 // Default behavior: throw error on conflict
@@ -99,10 +99,10 @@ Schedules use the same conflict policies as workflows:
 
 | Policy | Behavior |
 |--------|----------|
-| `"error"` (default) | Throw a `ScheduleConflictError` if the reference ID already identifies a schedule with a different definition |
+| `"error"` (default) | Throw an error with code `SCHEDULE_CONFLICT` if the reference ID already identifies a schedule with a different definition |
 | `"return_existing"` | Return the existing schedule unchanged |
 
-A schedule's definition is immutable, so a reference ID that already points at a different definition is a conflict, never an update. `"error"` throws a `ScheduleConflictError`; `"return_existing"` hands back the existing schedule as-is.
+A schedule's definition is immutable, so a reference ID that already points at a different definition is a conflict, never an update. `"error"` throws an error whose `code` is `"SCHEDULE_CONFLICT"`; `"return_existing"` hands back the existing schedule as-is.
 
 See the [Schedules documentation](../core-concepts/schedules.md#reference-ids) for more details.
 
