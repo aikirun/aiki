@@ -1,8 +1,9 @@
 import { createBinaryLatch, settleWithin } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
-import { NotFoundError } from "@aikirun/lib/error";
+import { NotFoundError, ValidationError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
+import { MAX_TIMESTAMP_MS } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunTransitionStateResponseV1 } from "@aikirun/types/api/workflow-run";
@@ -918,6 +919,56 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				expect(secondaryRunId).toBe(primaryRunId);
 			})
 		));
+});
+
+describe("WorkflowRunService createWorkflowRun delay", () => {
+	test("accepts a delay that starts the run in the last millisecond of the year 9999", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const now = 1_000_000;
+
+			const runId = await withFakeClock(now, async () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					inputHash: { value: await hashInput(input) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					options: { delay: { milliseconds: MAX_TIMESTAMP_MS - now } },
+				})
+			);
+
+			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+				expect.objectContaining({
+					id: runId,
+					state: expect.objectContaining({ status: "scheduled", scheduledAt: MAX_TIMESTAMP_MS }),
+				})
+			);
+		}));
+
+	test("refuses a delay that starts the run after the year 9999", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const now = 1_000_000;
+
+			const creating = withFakeClock(now, async () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					inputHash: { value: await hashInput(input) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					options: { delay: { milliseconds: MAX_TIMESTAMP_MS - now + 1 } },
+				})
+			);
+
+			await expect(creating).rejects.toThrow(ValidationError);
+			await expect(creating).rejects.toThrow("The delay is too long");
+		}));
 });
 
 describe("WorkflowRunService imminent run timers", () => {

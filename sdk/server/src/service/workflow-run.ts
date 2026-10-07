@@ -1,9 +1,9 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { toMilliseconds } from "@aikirun/lib/duration";
-import { NotFoundError } from "@aikirun/lib/error";
+import { NotFoundError, ValidationError } from "@aikirun/lib/error";
 import { getCompositeId } from "@aikirun/lib/id";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
-import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunCancelByIdsRequestV1,
 	WorkflowRunCreateRequestV1,
@@ -341,6 +341,9 @@ async function createWorkflowRunInTx(
 	const delay = options?.delay;
 
 	const scheduledAt = delay ? now + toMilliseconds(delay) : now;
+	if (scheduledAt > MAX_TIMESTAMP_MS) {
+		throw new ValidationError("The delay is too long: the run would start after the year 9999");
+	}
 
 	const transitionId = ulid();
 
