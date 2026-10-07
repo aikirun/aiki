@@ -38,13 +38,9 @@
 		"ulidx": "^2.4.1"
 	},
 	"peerDependencies": {
-		"@libsql/client": "^0.18.0",
 		"postgres": "^3.4.8"
 	},
 	"peerDependenciesMeta": {
-		"@libsql/client": {
-			"optional": true
-		},
 		"postgres": {
 			"optional": true
 		}
@@ -52,7 +48,6 @@
 	"devDependencies": {
 		"@aikirun/lib": "workspace:*",
 		"@aikirun/server": "workspace:*",
-		"@libsql/client": "^0.18.0",
 		"drizzle-kit": "^0.31.8",
 		"postgres": "^3.4.8"
 	},

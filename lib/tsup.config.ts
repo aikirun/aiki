@@ -29,5 +29,5 @@ export default defineConfig({
 	clean: true,
 	outDir: "dist",
 	removeNodeProtocol: false,
-	external: ["@libsql/client", "arktype", "cac", "dotenv", "drizzle-orm", "postgres"],
+	external: ["arktype", "cac", "dotenv", "drizzle-orm", "postgres"],
 });

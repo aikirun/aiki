@@ -1,9 +1,9 @@
+import type { SqliteClient } from "@aikirun/lib/db/sqlite";
 import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { getTableName, is } from "drizzle-orm";
 import { SQLiteTable } from "drizzle-orm/sqlite-core";
 
-import type { SqliteClient } from "../../../../infra/db/sqlite/client";
 import * as schema from "../../../../infra/db/sqlite/schema";
 
 // The migrations bookkeeping table lives outside the schema, so it is left untouched.
@@ -17,5 +17,14 @@ const resetStatements = [
 
 export async function deleteSqliteRows(db: Database): Promise<void> {
 	const client = db[INTERNAL].client as SqliteClient;
-	await client.batch(resetStatements, "write");
+	const transaction = await client.transaction();
+	try {
+		for (const resetStatement of resetStatements) {
+			await transaction.execute(resetStatement);
+		}
+		await transaction.commit();
+	} catch (error) {
+		await transaction.rollback();
+		throw error;
+	}
 }

@@ -9,8 +9,7 @@ inputs:
 runs:
   using: composite
   steps:
-    # Run away from node_modules: next to it, a binary missing its embedded libsql addon would load
-    # the addon from disk and pass.
+    # Run away from node_modules, so the binary can only use what it embeds.
     - shell: bash
       env:
         BINARY: ${{ inputs.binary }}

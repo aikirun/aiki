@@ -1,8 +1,8 @@
+import type { SqliteClient } from "@aikirun/lib/db/sqlite";
 import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
 import type { PgClient } from "./pg/provider";
-import type { SqliteClient } from "./sqlite/provider";
 import type { Repositories } from "./types";
 
 export async function createRepos(db: Database): Promise<Repositories> {

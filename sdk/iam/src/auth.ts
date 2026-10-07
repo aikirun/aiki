@@ -1,3 +1,4 @@
+import { drizzleSqliteProxyCallback, type SqliteClient } from "@aikirun/lib/db/sqlite";
 import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { betterAuth } from "better-auth";
@@ -7,7 +8,6 @@ import { organization } from "better-auth/plugins";
 
 import type { PgClient } from "./infra/db/pg/provider";
 import { createRepos } from "./infra/db/repo";
-import type { SqliteClient } from "./infra/db/sqlite/provider";
 
 type BetterAuthSchema = Record<
 	| "user"
@@ -38,8 +38,8 @@ async function createDrizzleAdapter(db: Database) {
 				namespace_member: schema.namespaceMember,
 			} satisfies BetterAuthSchema;
 			const client = db[INTERNAL].client as SqliteClient;
-			const { drizzle } = await import("drizzle-orm/libsql");
-			const handle = drizzle(client, { schema: betterAuthSchema });
+			const { drizzle } = await import("drizzle-orm/sqlite-proxy");
+			const handle = drizzle(drizzleSqliteProxyCallback(client), { schema: betterAuthSchema });
 			return drizzleAdapter(handle, { provider: db.provider, schema: betterAuthSchema });
 		}
 		case "pg": {

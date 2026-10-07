@@ -84,7 +84,7 @@ export async function runSql(statement: string): Promise<Record<string, unknown>
 			try {
 				const queryResult = await client.execute(statement);
 				return queryResult.rows.map((row) =>
-					Object.fromEntries(queryResult.columns.map((column) => [column, row[column]]))
+					Object.fromEntries(queryResult.columns.map((column, columnIndex) => [column, row[columnIndex]]))
 				);
 			} finally {
 				client.close();

@@ -1,10 +1,10 @@
 import type { DatabaseConfig } from "@aikirun/lib/db";
+import type { SqliteClient } from "@aikirun/lib/db/sqlite";
 import { consoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { CreateDatabase, Database, DatabaseCloseOptions } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
 import type { PgClient } from "./pg/provider";
-import type { SqliteClient } from "./sqlite/client";
 
 const DEFAULT_CLOSE_TIMEOUT_MS = 5_000;
 

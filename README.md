@@ -62,10 +62,10 @@ The Aiki server is a library: `server({ db })` returns a fetch API HTTP handler 
 Install the SDK packages:
 
 ```bash
-npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory @libsql/client
+npm install @aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory
 ```
 
-`@libsql/client` is the driver for SQLite, so there is nothing else to install. To use Postgres instead, install `postgres` in its place. `@aikirun/server` declares both drivers as optional peer dependencies, so your package manager does not install either on its own.
+SQLite needs no driver: Aiki uses the SQLite built into Node.js and Bun. To use Postgres instead, also install `postgres`. `@aikirun/server` declares it as an optional peer dependency, so your package manager does not install it on its own.
 
 Apply Aiki's schema migration to your database:
 

@@ -1,11 +1,11 @@
 import { fireAndForget } from "@aikirun/lib/async";
 import { reportPendingMigrations as _reportPendingMigrations, type MigrationsDatabase } from "@aikirun/lib/db/migrate";
+import type { SqliteClient } from "@aikirun/lib/db/sqlite";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
 import type { PgClient } from "./infra/db/pg/provider";
-import type { SqliteClient } from "./infra/db/sqlite/provider";
 import { MIGRATIONS_TABLE, migrationJournal } from "./migrate";
 
 // Logs the migrations this version ships that the database has not applied. It reports once per

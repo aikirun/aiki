@@ -5,13 +5,12 @@
 	"description": "Aiki CLI - apply migrations, start server and dashboard",
 	"type": "module",
 	"scripts": {
-		"build": "bun scripts/generate-embedded-data.ts && bun ../scripts/compile.ts src/index.ts --outfile dist/aiki"
+		"build": "bun scripts/generate-embedded-data.ts && bun build --compile src/index.ts --outfile dist/aiki"
 	},
 	"dependencies": {
 		"@aikirun/app-server": "workspace:*",
 		"@aikirun/iam": "workspace:*",
 		"@aikirun/server": "workspace:*",
-		"@libsql/client": "^0.18.0",
 		"cac": "^6.7.14",
 		"dotenv": "^16.4.5",
 		"drizzle-orm": "^0.45.1",

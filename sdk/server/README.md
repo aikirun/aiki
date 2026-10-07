@@ -5,11 +5,11 @@ The Aiki server as a library — orchestrates workflow runs and persists state i
 ## Installation
 
 ```bash
-npm install @aikirun/server @aikirun/client @aikirun/memory @libsql/client   # SQLite
-npm install @aikirun/server @aikirun/client @aikirun/memory postgres         # Postgres
+npm install @aikirun/server @aikirun/client @aikirun/memory            # SQLite
+npm install @aikirun/server @aikirun/client @aikirun/memory postgres   # Postgres
 ```
 
-Install the driver for your database: `@libsql/client` for SQLite, `postgres` for Postgres. `@aikirun/server` declares both as optional peer dependencies, so your package manager does not install either on its own.
+SQLite needs no driver: Aiki uses the SQLite built into Node.js and Bun. Postgres needs `postgres`, which `@aikirun/server` declares as an optional peer dependency, so your package manager does not install it on its own.
 
 `@aikirun/client` and `@aikirun/memory` are for the Quick Start below: the client that talks to the server, and the in-process timer priority queue.
 

@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.4 AS builder
+FROM oven/bun:1.4.2 AS builder
 
 WORKDIR /aiki
 
@@ -32,7 +32,6 @@ COPY sdk/adapter/redis/ ./sdk/adapter/redis/
 COPY sdk/iam/ ./sdk/iam/
 COPY sdk/server/ ./sdk/server/
 COPY app/server/ ./app/server/
-COPY scripts/compile.ts ./scripts/
 COPY tsconfig.json ./
 
 RUN bunx tsc --noEmit

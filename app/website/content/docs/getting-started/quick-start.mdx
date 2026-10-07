@@ -42,10 +42,10 @@ Install the SDK and apply the database migrations. [Installation](./installation
 <Tab value="SQLite">
 
 ```package-install
-@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory @libsql/client srvx
+@aikirun/workflow @aikirun/client @aikirun/worker @aikirun/server @aikirun/memory srvx
 ```
 
-`@libsql/client` is the driver for SQLite, and `srvx` serves the Aiki server over HTTP.
+SQLite needs no driver: Aiki uses the SQLite built into Node.js and Bun. `srvx` serves the Aiki server over HTTP.
 
 <Tabs groupId="runtime" persist items={["Node", "Bun"]}>
 <Tab value="Node">
