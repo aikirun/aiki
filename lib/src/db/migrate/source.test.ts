@@ -39,6 +39,26 @@ describe("migrationSource from readMigrationsDirectory", () => {
 
 		expect(actualMigrations.map(comparable)).toEqual(expectedMigrations.map(comparable));
 	});
+
+	test("reads each migration's previous hashes from the file kept beside the SQL", () => {
+		const migrationsDirWithPreviousHashes = fs.mkdtempSync(path.join(os.tmpdir(), "migrate-source-"));
+		try {
+			fs.cpSync(migrationsDir, migrationsDirWithPreviousHashes, { recursive: true });
+			fs.writeFileSync(
+				path.join(migrationsDirWithPreviousHashes, "previous-hashes.json"),
+				JSON.stringify({ "0001_add_column": ["hash-of-the-sql-before-its-edit"] })
+			);
+
+			const migrations = migrationSource(readMigrationsDirectory(migrationsDirWithPreviousHashes)).read();
+
+			expect(migrations.map(({ tag, previousHashes }) => ({ tag, previousHashes }))).toEqual([
+				{ tag: "0000_initial", previousHashes: [] },
+				{ tag: "0001_add_column", previousHashes: ["hash-of-the-sql-before-its-edit"] },
+			]);
+		} finally {
+			fs.rmSync(migrationsDirWithPreviousHashes, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("migrationSource", () => {

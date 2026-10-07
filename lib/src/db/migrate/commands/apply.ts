@@ -357,7 +357,11 @@ function assertAppliedMigrationsUnchanged(appliedMigrations: AppliedMigration[],
 	const migrationsByTag = new Map(migrations.map((migration) => [migration.tag, migration]));
 	for (const appliedMigration of appliedMigrations) {
 		const migration = migrationsByTag.get(appliedMigration.tag);
-		if (migration && migration.hash !== appliedMigration.hash) {
+		if (
+			migration &&
+			migration.hash !== appliedMigration.hash &&
+			!migration.previousHashes.includes(appliedMigration.hash)
+		) {
 			throw changedMigrationError([migration.tag]);
 		}
 	}

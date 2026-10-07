@@ -7,7 +7,7 @@ CREATE TABLE `__new_workflow` (
 	`name_lowercase` text NOT NULL,
 	`version_id` text NOT NULL,
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
-	CONSTRAINT "chk_workflow_source" CHECK("__new_workflow"."source" IN ('user', 'system'))
+	CONSTRAINT "chk_workflow_source" CHECK("source" IN ('user', 'system'))
 );
 --> statement-breakpoint
 INSERT INTO `__new_workflow`("id", "namespace_id", "source", "name", "name_lowercase", "version_id", "created_at")
