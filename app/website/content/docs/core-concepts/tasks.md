@@ -135,12 +135,14 @@ A task moves through these states:
 - `running` - Executing now
 - `awaiting_retry` - The attempt failed and the task is backing off before the next one; carries the error and the time of the next attempt
 - `completed` - Succeeded; its output is recorded and returned on replay
-- `failed` - The retry strategy has no attempts left
+- `failed` - The retry strategy has no attempts left, or the task's output was rejected
 - `discarded` - An unfinished task the run left behind; it no longer takes part in replay
 
 While a task sits in `awaiting_retry`, its run parks in `awaiting_task_retry` and releases its worker; the server re-queues the run when the task is due. Short backoffs are the exception: a delay within `maxInlineWaitMs` (10ms by default) is waited out in place, so the task stays `running` and the run never parks.
 
 A task's attempts are its own, separate from the run's, so a task backing off does not move the run's attempt count. When the task runs out of attempts it goes `failed`, and that failure becomes the workflow attempt's failure: the run moves to [`awaiting_retry`](./workflows.md#states) if the workflow has attempts left, or to `failed` if it does not, with cause `task` either way.
+
+A task whose output fails its [output schema](#schema-validation), or cannot be stored as JSON, is not retried: it goes `failed` at once, and the run goes `failed` with cause `task` without a workflow retry.
 
 Only unfinished tasks are ever discarded. Cancelling or stalling a run discards the tasks it left `running` or `awaiting_retry`, since nothing will finish them. Retrying a workflow attempt discards those too, along with any `failed` task, so the new attempt runs them again from their first attempt. A `completed` task is never discarded - its output is kept and replayed, so a retry resumes rather than repeating work that already succeeded.
 

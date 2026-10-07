@@ -868,10 +868,12 @@ describe("task", () => {
 				await expect(validateInput.start(run, "anything")).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
-		test("does not record the task as failed when the request to fail the run gets no response", () =>
+		test("fails the task and the run without a retry when the output schema rejects", () =>
 			withFakeClient(async (client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
-				const run = createTestWorkflowRun(client, runRecord);
+				// The max inline wait admits the retry delay, so a rejected output counted as a failed attempt
+				// would run the handler again in process.
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: Number.MAX_SAFE_INTEGER });
 
 				const alwaysInvalid: StandardSchemaV1<string> = {
 					"~standard": {
@@ -880,40 +882,213 @@ describe("task", () => {
 						validate: () => ({ issues: [{ message: "invalid output" }] }),
 					},
 				};
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
+				let handlerCalls = 0;
 				const sendEmail = task<{ to: string }, string>({
 					name: "send-email",
-					handler: async () => "sent",
+					handler: async () => {
+						handlerCalls++;
+						return "sent";
+					},
 					schema: { output: alwaysInvalid },
+					retry,
 				});
 
 				const input = { to: "info@aiki.run" };
-				const inputHash = await hashInput(input);
 				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const failedTaskState = {
+					status: "failed",
+					error: { name: "SchemaValidationError", message: JSON.stringify([{ message: "invalid output" }]) },
+				} as const;
 
-				client.api.task.transitionStateV1.once(
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash: await hashInput(input),
+							taskName: sendEmail.name,
+							options: { retry },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: failedTaskState,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{
+							taskInfo: failedTaskInfoFactory.build({
+								id: runningTaskInfo.id,
+								name: sendEmail.name,
+								state: failedTaskState,
+							}),
+						}
+					);
+				client.api.workflowRun.transitionStateV1.once(
 					{
-						type: "create",
-						input: asOpaquePayload(input),
-						inputHash,
-						taskName: sendEmail.name,
-						options: {},
-						workflowRunId: runRecord.id,
-						expectedWorkflowRunRevision: runRecord.revision,
-						sequence: 1,
+						type: "optimistic",
+						id: runRecord.id,
+						state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+						expectedRevision: runRecord.revision,
 					},
-					{ taskInfo: runningTaskInfo }
+					{
+						revision: runRecord.revision + 1,
+						state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+						attempts: runRecord.attempts,
+					}
 				);
+
+				await expect(sendEmail.start(run, input)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+				expect(handlerCalls).toBe(1);
+			}));
+
+		test("does not re-run the handler when failing the task for a rejected output gets no response", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				// The max inline wait admits the retry delay, so an unanswered request counted as a failed
+				// attempt would run the handler again in process.
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: Number.MAX_SAFE_INTEGER });
+
+				const alwaysInvalid: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: () => ({ issues: [{ message: "invalid output" }] }),
+					},
+				};
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "sent";
+					},
+					schema: { output: alwaysInvalid },
+					retry,
+				});
+
+				const input = { to: "info@aiki.run" };
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const failedTaskState = {
+					status: "failed",
+					error: { name: "SchemaValidationError", message: JSON.stringify([{ message: "invalid output" }]) },
+				} as const;
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash: await hashInput(input),
+							taskName: sendEmail.name,
+							options: { retry },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.rejectsOnce(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: failedTaskState,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						new Error("fetch failed")
+					);
+
+				await expect(sendEmail.start(run, input)).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
+				expect(handlerCalls).toBe(1);
+			}));
+
+		test("does not re-run the handler when failing the run for a rejected output gets no response", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				// The max inline wait admits the retry delay, so an unanswered request counted as a failed
+				// attempt would run the handler again in process.
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: Number.MAX_SAFE_INTEGER });
+
+				const alwaysInvalid: StandardSchemaV1<string> = {
+					"~standard": {
+						version: 1,
+						vendor: "test",
+						validate: () => ({ issues: [{ message: "invalid output" }] }),
+					},
+				};
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "sent";
+					},
+					schema: { output: alwaysInvalid },
+					retry,
+				});
+
+				const input = { to: "info@aiki.run" };
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const failedTaskState = {
+					status: "failed",
+					error: { name: "SchemaValidationError", message: JSON.stringify([{ message: "invalid output" }]) },
+				} as const;
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash: await hashInput(input),
+							taskName: sendEmail.name,
+							options: { retry },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: failedTaskState,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{
+							taskInfo: failedTaskInfoFactory.build({
+								id: runningTaskInfo.id,
+								name: sendEmail.name,
+								state: failedTaskState,
+							}),
+						}
+					);
 				client.api.workflowRun.transitionStateV1.rejectsOnce(
 					{
 						type: "optimistic",
 						id: runRecord.id,
-						state: expect.objectContaining({ status: "failed", cause: "self" }),
+						state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
 						expectedRevision: runRecord.revision,
 					},
 					new Error("fetch failed")
 				);
 
 				await expect(sendEmail.start(run, input)).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
+				expect(handlerCalls).toBe(1);
 			}));
 
 		test("replays a failed task from history as TaskFailedError without touching the client", () =>
@@ -1124,6 +1299,76 @@ describe("task output on the first run", () => {
 				);
 
 			expect(await syncInventory.start(run, input)).toEqual(storedOutput);
+		}));
+
+	test("fails the task and the run without a retry when the output cannot be stored as JSON", () =>
+		withFakeClient(async (client) => {
+			const runRecord = runningWorkflowRunRecordFactory.build();
+			// The max inline wait admits the retry delay, so an output that cannot be stored counted as a
+			// failed attempt would run the handler again in process.
+			const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: Number.MAX_SAFE_INTEGER });
+
+			const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
+			let handlerCalls = 0;
+			const countStock = task<string, number>({
+				name: "count-stock",
+				handler: async () => {
+					handlerCalls++;
+					// The type says number but it really is a bigint
+					return 12n as unknown as number;
+				},
+				retry,
+			});
+			const input = "wh-1";
+			const runningTaskInfo = runningTaskInfoFactory.build({ name: countStock.name });
+
+			client.api.task.transitionStateV1
+				.once(
+					{
+						type: "create",
+						input: asOpaquePayload(input),
+						inputHash: await hashInput(input),
+						taskName: countStock.name,
+						options: { retry },
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
+					},
+					{ taskInfo: runningTaskInfo }
+				)
+				.once(
+					{
+						id: runningTaskInfo.id,
+						attempts: 1,
+						state: { status: "failed", error: expect.objectContaining({ name: "TypeError" }) },
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 2,
+					},
+					{
+						taskInfo: failedTaskInfoFactory.build({
+							id: runningTaskInfo.id,
+							name: countStock.name,
+							state: { status: "failed", error: { name: "TypeError", message: "cannot serialize a bigint" } },
+						}),
+					}
+				);
+			client.api.workflowRun.transitionStateV1.once(
+				{
+					type: "optimistic",
+					id: runRecord.id,
+					state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+					expectedRevision: runRecord.revision,
+				},
+				{
+					revision: runRecord.revision + 1,
+					state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+					attempts: runRecord.attempts,
+				}
+			);
+
+			await expect(countStock.start(run, input)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			expect(handlerCalls).toBe(1);
 		}));
 
 	test("returns undefined when the handler returns nothing", () =>
