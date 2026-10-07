@@ -154,6 +154,20 @@ export const inputStyle: CSSProperties = {
 	transition: "background-color .16s ease, border-color .16s ease, box-shadow .16s ease",
 };
 
+/**
+ * The surface of a select, with the dashboard's own arrow. The browser draws its arrow against the
+ * right edge whatever the padding, so the select drops it and draws one with room around it.
+ * Spread it after the select's `padding`, so its right padding is the one that applies.
+ */
+export function selectSurface(color: string): CSSProperties {
+	return {
+		appearance: "none",
+		WebkitAppearance: "none",
+		background: `${color} var(--select-arrow) no-repeat right 9px center / 9px 6px`,
+		paddingRight: 26,
+	};
+}
+
 /** Focus/blur handlers that give a filled control the accent ring on focus. */
 export const inputFocusProps = {
 	onFocus: (e: { currentTarget: HTMLElement }) => {

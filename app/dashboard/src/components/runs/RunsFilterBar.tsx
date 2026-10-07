@@ -3,7 +3,7 @@ import type { WorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { StatusChips } from "./StatusChips";
 import { WorkflowSearchInput } from "./WorkflowSearchInput";
 import { useWorkflowVersions } from "../../api/hooks";
-import { card, inputFocusProps, inputStyle } from "../common/ui";
+import { card, inputFocusProps, inputStyle, selectSurface } from "../common/ui";
 
 interface RunsFilterBarProps {
 	idFilter: string;
@@ -80,7 +80,14 @@ export function RunsFilterBar({
 					<select
 						value={versionFilter}
 						onChange={(e) => onVersionFilterChange(e.target.value)}
-						style={{ ...inputStyle, flex: "0 1 auto", width: "auto", minWidth: 0, cursor: "pointer" }}
+						style={{
+							...inputStyle,
+							...selectSurface("var(--s2)"),
+							flex: "0 1 auto",
+							width: "auto",
+							minWidth: 0,
+							cursor: "pointer",
+						}}
 					>
 						<option value="">All versions</option>
 						{versionsData.versions.map((v) => (

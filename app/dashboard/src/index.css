@@ -97,6 +97,9 @@
 
 	/* Vertical hairline rule that fills the page gutters, as on the site. */
 	--grid-rule: rgba(23, 23, 26, 0.032);
+
+	/* The arrow of a select, stroked in --t2. An image cannot read a variable, so each theme carries its own. */
+	--select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%235c5c64' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
 }
 
 [data-theme="dark"] {
@@ -143,6 +146,7 @@
 	--code-border: rgba(255, 255, 255, 0.06);
 
 	--grid-rule: rgba(255, 255, 255, 0.035);
+	--select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%23a3a1ac' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
 }
 
 html {

@@ -20,6 +20,7 @@ import {
 	inputFocusProps,
 	inputStyle,
 	LIST_ROWS,
+	selectSurface,
 } from "../components/common/ui";
 import { WorkflowSearchInput } from "../components/runs/WorkflowSearchInput";
 import { SCHEDULE_STATUS_CONFIG } from "../constants/schedule-status";
@@ -285,7 +286,14 @@ export function SchedulesList() {
 								setVersionFilter(e.target.value);
 								updateParams({ version: e.target.value });
 							}}
-							style={{ ...inputStyle, flex: "0 1 auto", width: "auto", minWidth: 0, cursor: "pointer" }}
+							style={{
+								...inputStyle,
+								...selectSurface("var(--s2)"),
+								flex: "0 1 auto",
+								width: "auto",
+								minWidth: 0,
+								cursor: "pointer",
+							}}
 						>
 							<option value="">All versions</option>
 							{versionsData.versions.map((v) => (

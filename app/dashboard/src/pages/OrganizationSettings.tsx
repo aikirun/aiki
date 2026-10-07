@@ -7,7 +7,7 @@ import { createNamespace, namespaceManagementClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { authClient } from "../auth/client";
 import { ConfirmPrompt } from "../components/common/ConfirmPrompt";
-import { btnPrimary, eyebrow, inputStyle as sharedInputStyle } from "../components/common/ui";
+import { btnPrimary, eyebrow, selectSurface, inputStyle as sharedInputStyle } from "../components/common/ui";
 import { getNamespaceDotColor } from "../constants/namespace";
 
 // --- Types ---
@@ -546,6 +546,7 @@ function InviteMemberInline({
 						onChange={(e) => setRole(e.target.value)}
 						style={{
 							...inputStyle,
+							...selectSurface("var(--s2)"),
 							width: 100,
 							cursor: "pointer",
 						}}
@@ -682,7 +683,6 @@ function MemberRow({
 						onChange={(e) => handleRoleChange(e.target.value)}
 						disabled={isUpdating}
 						style={{
-							background: "var(--s2)",
 							border: "1px solid var(--b1)",
 							borderRadius: "var(--r-chip)",
 							padding: "3px 8px",
@@ -690,6 +690,7 @@ function MemberRow({
 							color: "var(--t1)",
 							cursor: isUpdating ? "not-allowed" : "pointer",
 							fontFamily: "inherit",
+							...selectSurface("var(--s2)"),
 						}}
 					>
 						<option value="admin">admin</option>
@@ -1074,7 +1075,6 @@ function NamespaceRow({
 												onChange={(e) => handleRoleChange(m.userId, e.target.value as NamespaceRole)}
 												disabled={isSaving}
 												style={{
-													background: "var(--s1)",
 													border: "1px solid var(--b0)",
 													borderRadius: "var(--r-chip)",
 													padding: "3px 7px",
@@ -1082,6 +1082,7 @@ function NamespaceRow({
 													color: "var(--t1)",
 													cursor: isSaving ? "not-allowed" : "pointer",
 													fontFamily: "var(--sans)",
+													...selectSurface("var(--s1)"),
 												}}
 											>
 												<option value="admin">admin</option>
@@ -1145,8 +1146,11 @@ function NamespaceRow({
 										onChange={(e) => setAddUserId(e.target.value)}
 										style={{
 											...inputStyle,
-											flex: 1,
 											padding: "4px 8px",
+											...selectSurface("var(--s2)"),
+											// A select is as wide as its longest option unless it is told it may shrink.
+											flex: 1,
+											minWidth: 0,
 										}}
 									>
 										<option value="">Add member...</option>
@@ -1161,8 +1165,9 @@ function NamespaceRow({
 										onChange={(e) => setAddRole(e.target.value as NamespaceRole)}
 										style={{
 											...inputStyle,
-											width: 80,
 											padding: "4px 8px",
+											...selectSurface("var(--s2)"),
+											flexShrink: 0,
 										}}
 									>
 										<option value="admin">admin</option>
