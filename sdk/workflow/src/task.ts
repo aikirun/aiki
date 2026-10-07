@@ -195,7 +195,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			"aiki.taskId": taskInfo.id,
 		});
 
-		taskLogger.info("Task started", { "aiki.attempts": attempts });
+		taskLogger.debug("Task started", { "aiki.attempts": attempts });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(
 			handle,
@@ -213,7 +213,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			attempts: lastAttempt,
 			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
 		});
-		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
+		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
 	}
@@ -300,7 +300,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			"aiki.taskName": this.name,
 			"aiki.taskId": taskInfo.id,
 		});
-		taskLogger.info("Task started", { "aiki.attempts": attempts });
+		taskLogger.debug("Task started", { "aiki.attempts": attempts });
 
 		const { output, lastAttempt } = await this.tryExecuteTask(
 			handle,
@@ -318,7 +318,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			attempts: lastAttempt,
 			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
 		});
-		taskLogger.info("Task complete", { "aiki.attempts": lastAttempt });
+		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
 	}

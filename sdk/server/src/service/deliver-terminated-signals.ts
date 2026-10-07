@@ -157,5 +157,5 @@ export async function deliverTerminatedSignalToParentRun(
 		);
 	}
 
-	logger.info("Woke parents parked on terminal children", { "aiki.parentRunIds": scheduledParentRunIds });
+	logger.debug("Woke parents parked on terminal children", { "aiki.parentRunIds": scheduledParentRunIds });
 }

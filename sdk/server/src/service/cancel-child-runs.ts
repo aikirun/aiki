@@ -43,7 +43,7 @@ export const createChildRunCanceller = (imminentTimerQueue?: ImminentTimerQueue)
 			return;
 		}
 
-		logger.info("Scheduling cancel-child-runs workflows", { "aiki.parentRunIds": runIdsHavingChildren });
+		logger.debug("Scheduling cancel-child-runs workflows", { "aiki.parentRunIds": runIdsHavingChildren });
 
 		const workflowEntries: WorkflowIdentity[] = [];
 		const inputHashPromises: Array<Promise<string>> = [];

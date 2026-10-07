@@ -118,6 +118,13 @@ const downgradeToFree = task({
   },
 });
 
+const sendReceipt = task({
+  name: "send-receipt",
+  async handler(userId: string) {
+    console.log(`Sent a receipt to ${userId}`);
+  },
+});
+
 export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
   events: {
     paymentReceived: event(),
@@ -129,12 +136,14 @@ export const trialV1 = workflow({ name: "subscription-trial" }).v("1.0.0", {
     const result = await run.events.paymentReceived.wait({ timeout: { days: 14 } });
     if (result.timeout) {
       await downgradeToFree.start(run, input.userId);
+    } else {
+      await sendReceipt.start(run, input.userId);
     }
   },
 });
 ```
 
-`activateTrial` runs, then `paymentReceived.wait()` pauses the run until the payment arrives. If 14 days pass first, the user is downgraded instead.
+`activateTrial` runs, then `paymentReceived.wait()` pauses the run until the payment arrives, and the user gets a receipt. If 14 days pass first, the user is downgraded instead.
 
 ## 2. The app
 
@@ -291,7 +300,7 @@ bun start.ts
 </Tab>
 </Tabs>
 
-The last line it prints is the run's id; keep it for step 6. In the app's terminal, among Aiki's own log lines for the run, you'll see the line `activateTrial` printed:
+The last line it prints is the run's id; keep it for step 6. In the app's terminal, you'll see the line `activateTrial` printed:
 
 ```
 Activated 14-day trial for user-123
@@ -342,11 +351,17 @@ bun pay.ts <run id>
 </Tab>
 </Tabs>
 
-The payment ends the wait, and the run completes. The workflow continues from the line after the wait, as if the app had never gone down. The payment came before the 14 days were up, so `downgradeToFree` never runs. In the dashboard, the run now shows as Completed.
+The payment ends the wait, and the run completes. In the app's terminal, you'll see the line `sendReceipt` printed:
+
+```
+Sent a receipt to user-123
+```
+
+The workflow continues from the line after the wait, as if the app had never gone down. The payment came before the 14 days were up, so `downgradeToFree` never runs. In the dashboard, the run now shows as Completed.
 
 ## What you just used
 
-- **[Task](../core-concepts/tasks.md)** — `activateTrial` / `downgradeToFree`: a unit of work whose result is saved, so a restart never redoes it.
+- **[Task](../core-concepts/tasks.md)** — `activateTrial` / `sendReceipt` / `downgradeToFree`: a unit of work whose result is saved, so a restart never redoes it.
 - **[Workflow](../core-concepts/workflows.md)** — `trialV1`: runs tasks in order and waits for events, and every step is saved.
 - **[Event](../core-concepts/events.md)** — `paymentReceived`: `wait()` pauses the run with nothing held; `send()` or the 14-day timeout resumes it.
 - **[Server](../architecture/server.md)** — `server({ db, timerPriorityQueue })` + `runtime.start()`: keeps track of every run and wakes it when it's ready.

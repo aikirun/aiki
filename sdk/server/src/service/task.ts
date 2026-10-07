@@ -34,7 +34,7 @@ export const createTaskService = ({ repos }: TaskServiceDeps) => ({
 
 	async setTaskState(context: NamespaceRequestContext, request: TaskSetStateRequestV1): Promise<void> {
 		await repos.transaction(async (txRepos) => setTaskStateInTx(context, request, txRepos));
-		context.logger.info("Task state set", {
+		context.logger.debug("Task state set", {
 			"aiki.workflowRunId": request.workflowRunId,
 			"aiki.taskId": request.id,
 			"aiki.state": request.state,

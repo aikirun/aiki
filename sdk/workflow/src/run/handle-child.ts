@@ -140,7 +140,7 @@ function createWaiter<Output, Context, TEvents extends EventsDefinition>(
 				childWorkflowRunId: run.id,
 				timeoutInMs,
 			});
-			logger.info("Waiting for child Workflow", {
+			logger.debug("Waiting for child Workflow", {
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
 		} catch (err) {

@@ -174,7 +174,7 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 				eventName,
 				timeoutInMs,
 			});
-			logger.info("Waiting for event", {
+			logger.debug("Waiting for event", {
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
 		} catch (err) {
@@ -246,7 +246,7 @@ function createEventSender<Data, Context>(
 			options,
 		});
 
-		logger.info("Sent event to workflow", {
+		logger.debug("Sent event to workflow", {
 			...(options?.reference ? { "aiki.referenceId": options.reference.id } : {}),
 		});
 	}
@@ -325,7 +325,7 @@ function createEventMulticaster<Data>(
 			options,
 		});
 
-		client.logger.info("Multicasted event to workflows", {
+		client.logger.debug("Multicasted event to workflows", {
 			"aiki.workflowName": workflowName,
 			"aiki.workflowVersionId": workflowVersionId,
 			"aiki.sentWorkflowRunIds": result.sentIds,
@@ -379,7 +379,7 @@ function createEventMulticaster<Data>(
 			options,
 		});
 
-		client.logger.info("Multicasted event by reference", {
+		client.logger.debug("Multicasted event by reference", {
 			"aiki.workflowName": workflowName,
 			"aiki.workflowVersionId": workflowVersionId,
 			"aiki.referenceIds": referenceIds,

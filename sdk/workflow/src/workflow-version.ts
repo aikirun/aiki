@@ -209,7 +209,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			options: startOptions,
 		});
 
-		client.logger.info("Created workflow", {
+		client.logger.debug("Created workflow", {
 			"aiki.workflowName": this.name,
 			"aiki.workflowVersionId": this.versionId,
 			"aiki.workflowRunId": id,
@@ -320,7 +320,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			"aiki.childWorkflowRunId": newRun.id,
 		});
 
-		logger.info("Created child workflow");
+		logger.debug("Created child workflow");
 
 		return childWorkflowRunHandle(client, newRun, parentRunHandle, logger, this[INTERNAL].eventsDefinition);
 	}
@@ -384,13 +384,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		const retryStrategy = run.options.retry ?? this.params.retry ?? { type: "never" };
 
-		logger.info("Starting workflow");
+		logger.debug("Starting workflow");
 		await transitionStateOptimistic({ status: "running" });
 
 		const output = await this.tryExecuteWorkflow(input, run, retryStrategy);
 
 		await transitionStateOptimistic({ status: "completed", output: await codec.encode(output) });
-		logger.info("Workflow complete");
+		logger.debug("Workflow complete");
 	}
 
 	private async tryExecuteWorkflow(

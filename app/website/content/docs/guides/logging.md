@@ -61,11 +61,13 @@ const paymentWorkflowV1 = paymentWorkflow.v("1.0.0", {
 });
 ```
 
+A workflow handler runs again from the start each time the run is [replayed](./determinism.md), for example after a sleep or an event wait. A line logged before that point is printed again on the replay. When a line must appear once, write it from a task.
+
 Task handlers are plain functions and receive no logger. If a task needs one, inject it the way you inject any dependency — see [Dependency Injection](./dependency-injection.md).
 
 ## What Aiki Logs
 
-The SDK logs run lifecycle (claims, execution, retries, claim refreshes etc.) and component activity at `info` and below, with problems at `warn` and `error`. Aiki's metadata keys are namespaced under `aiki.*` (for example `aiki.workflowRunId`), so they do not collide with your fields, and errors are attached under the `err` key.
+At `info`, Aiki logs its components starting and stopping, and the rarer things that happen to a run, such as a pause, a cancel or a retry. The steps of each run - its start, tasks, waits and completion - are at `debug`. Problems are at `warn` and `error`. Aiki's metadata keys are namespaced under `aiki.*` (for example `aiki.workflowRunId`), so they do not collide with your fields, and errors are attached under the `err` key.
 
 ## Next Steps
 

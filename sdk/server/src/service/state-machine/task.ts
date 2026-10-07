@@ -121,7 +121,7 @@ async function transitionStateInTx(
 			state: taskState,
 		});
 
-		logger.info("Created new task", {
+		logger.debug("Created new task", {
 			"aiki.runId": runId,
 			"aiki.taskId": taskId,
 			"aiki.taskState": taskState,
@@ -196,7 +196,7 @@ async function transitionStateInTx(
 		});
 	}
 
-	logger.info("Transitioning task state", {
+	logger.debug("Transitioning task state", {
 		"aiki.runId": runId,
 		"aiki.taskId": taskId,
 		"aiki.taskState": taskState,

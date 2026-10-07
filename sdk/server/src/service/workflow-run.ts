@@ -402,7 +402,7 @@ async function createWorkflowRunInTx(
 		);
 	}
 
-	logger.info("Created workflow run", {
+	logger.debug("Created workflow run", {
 		"aiki.workflowName": name,
 		"aiki.versionId": versionId,
 		"aiki.runId": runId,

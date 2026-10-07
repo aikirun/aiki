@@ -145,7 +145,7 @@ export const createWorkflowRunStateMachine = ({
 			: await repos.transaction(async (newTxRepos) =>
 					transitionStateInTx(context, request, childRunCanceller, newTxRepos, imminentTimerQueue)
 				);
-		context.logger.info("Workflow state transition", {
+		context.logger.debug("Workflow state transition", {
 			"aiki.runId": request.id,
 			"aiki.state": response.state,
 			"aiki.attempts": response.attempts,
