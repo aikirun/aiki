@@ -215,6 +215,7 @@
       },
       "devDependencies": {
         "@aikirun/lib": "workspace:*",
+        "@aikirun/server": "workspace:*",
         "@libsql/client": "^0.18.0",
         "drizzle-kit": "^0.31.8",
         "postgres": "^3.4.8",
