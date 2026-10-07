@@ -156,7 +156,8 @@ function FullAuthProvider({ children }: { children: ReactNode }) {
 				setNamespaces(newNamespaces);
 
 				if (newNamespaces.length > 0) {
-					await authClient.organization.setActiveTeam({ teamId: newNamespaces[0].id });
+					await namespaceManagementClient.setActiveV1({ id: newNamespaces[0].id });
+					await refetch();
 					setActiveNamespaceState(newNamespaces[0]);
 				} else {
 					setActiveNamespaceState(null);
@@ -168,16 +169,17 @@ function FullAuthProvider({ children }: { children: ReactNode }) {
 				setNamespacesInitialized(true);
 			}
 		},
-		[queryClient, fetchNamespacesForOrg]
+		[queryClient, fetchNamespacesForOrg, refetch]
 	);
 
 	const setActiveNamespace = useCallback(
 		async (namespace: Namespace) => {
-			await authClient.organization.setActiveTeam({ teamId: namespace.id });
+			await namespaceManagementClient.setActiveV1({ id: namespace.id });
+			await refetch();
 			setActiveNamespaceState(namespace);
 			queryClient.invalidateQueries();
 		},
-		[queryClient]
+		[queryClient, refetch]
 	);
 
 	const signOut = useCallback(async () => {

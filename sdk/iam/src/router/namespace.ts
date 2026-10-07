@@ -43,6 +43,14 @@ export function createNamespaceRouter(namespaceService: NamespaceService) {
 		await namespaceService.softDeleteNamespaceById(context, namespaceId);
 	});
 
+	const setActiveV1 = os.setActiveV1.handler(async ({ input, context }) => {
+		const namespaceId = input.id as NamespaceId;
+		await assertNamespaceBelongsToOrganization(context, namespaceId);
+		// Any role in the namespace is enough. Resolving the role refuses a user who has none.
+		await namespaceService.resolveRole(context, namespaceId);
+		await namespaceService.setActiveNamespace(context, namespaceId);
+	});
+
 	const listForUserV1 = os.listForUserV1.handler(async ({ input, context }) => {
 		assertIsOrganizationManager(context);
 		const namespaces = await namespaceService.listNamespacesForUser(context, input.userId);
@@ -87,6 +95,7 @@ export function createNamespaceRouter(namespaceService: NamespaceService) {
 		createV1,
 		listV1,
 		deleteV1,
+		setActiveV1,
 		listForUserV1,
 		setMembershipV1,
 		removeMembershipV1,

@@ -9,6 +9,8 @@ const listV1 = oc.input(type("undefined")).output(type({ namespaces: namespaceIn
 
 const deleteV1 = oc.input(type({ id: "string > 0" })).output(type("undefined"));
 
+const setActiveV1 = oc.input(type({ id: "string > 0" })).output(type("undefined"));
+
 const listForUserV1 = oc
 	.input(type({ userId: "string > 0" }))
 	.output(type({ namespaces: namespaceInfoSchema.array() }));
@@ -30,6 +32,7 @@ export const namespaceContract = {
 	createV1,
 	listV1,
 	deleteV1,
+	setActiveV1,
 	listForUserV1,
 	setMembershipV1,
 	removeMembershipV1,

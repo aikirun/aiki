@@ -28,6 +28,7 @@ export interface OrganizationDashboardAuthorization {
 	organizationId: OrganizationId;
 	organizationRole: OrganizationRole;
 	userId: string;
+	sessionId: string;
 }
 
 export interface DashboardSessionIamParams {
@@ -82,6 +83,7 @@ async function authorizeOrganizationSession(
 	return {
 		organizationId: activeOrganizationId as OrganizationId,
 		userId: session.session.userId,
+		sessionId: session.session.id,
 		organizationRole,
 	};
 }
@@ -169,6 +171,7 @@ function createOrganizationHandler(
 						url: request.url,
 						organizationId: authorization.organizationId,
 						userId: authorization.userId,
+						sessionId: authorization.sessionId,
 						organizationRole: authorization.organizationRole,
 					};
 

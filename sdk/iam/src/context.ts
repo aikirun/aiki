@@ -7,6 +7,7 @@ export interface OrganizationSessionRequestContext extends AuthedRequestContextB
 	organizationId: OrganizationId;
 	organizationRole: OrganizationRole;
 	userId: string;
+	sessionId: string;
 }
 
 export type OrganizationManagerSessionRequestContext = OrganizationSessionRequestContext & {

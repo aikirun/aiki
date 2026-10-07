@@ -78,6 +78,10 @@ export const createNamespaceService = ({ repos, apiKeyCache }: NamespaceServiceD
 		return repos.namespace.exists({ organizationId: context.organizationId, namespaceId: namespaceId });
 	},
 
+	async setActiveNamespace(context: OrganizationSessionRequestContext, namespaceId: NamespaceId): Promise<void> {
+		await repos.session.setActiveNamespace(context.sessionId, namespaceId);
+	},
+
 	async setMembership(
 		_context: OrganizationSessionRequestContext,
 		namespaceId: NamespaceId,
