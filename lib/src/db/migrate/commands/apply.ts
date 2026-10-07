@@ -24,10 +24,20 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 
 	switch (dbConfig.provider) {
 		case "sqlite":
-			await applySqlite(dbConfig, params.source.read(), params.migrationsTable, params.logger);
+			await applySqlite({
+				config: dbConfig,
+				migrations: params.source.read(),
+				migrationsTable: params.migrationsTable,
+				logger: params.logger,
+			});
 			return;
 		case "pg":
-			await applyPg(dbConfig, params.source.read(), params.migrationsTable, params.logger);
+			await applyPg({
+				config: dbConfig,
+				migrations: params.source.read(),
+				migrationsTable: params.migrationsTable,
+				logger: params.logger,
+			});
 			return;
 		// case "mysql":
 		// 	throw new Error(`DATABASE_PROVIDER=${dbConfig.provider} is not yet supported.`);
@@ -36,12 +46,13 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 	}
 }
 
-async function applySqlite(
-	config: SqliteDatabaseConfig,
-	migrations: MigrationMeta[],
-	migrationsTable: string,
-	logger: Logger
-): Promise<void> {
+async function applySqlite(params: {
+	config: SqliteDatabaseConfig;
+	migrations: MigrationMeta[];
+	migrationsTable: string;
+	logger: Logger;
+}): Promise<void> {
+	const { config, migrations, migrationsTable, logger } = params;
 	const { openSqliteClient } = await import("../../sqlite");
 	const client = await openSqliteClient(config);
 	const quotedMigrationsTable = `"${migrationsTable}"`;
@@ -144,12 +155,13 @@ async function sqliteMigrationsTableHasTag(client: Client, migrationsTable: stri
 	return taggedRows.rows.length > 0;
 }
 
-async function applyPg(
-	config: PgDatabaseConfig,
-	migrations: MigrationMeta[],
-	migrationsTable: string,
-	logger: Logger
-): Promise<void> {
+async function applyPg(params: {
+	config: PgDatabaseConfig;
+	migrations: MigrationMeta[];
+	migrationsTable: string;
+	logger: Logger;
+}): Promise<void> {
+	const { config, migrations, migrationsTable, logger } = params;
 	const { sql } = await import("drizzle-orm");
 	// Import the driver first: drizzle-orm/postgres-js imports it too, and would throw before the guard runs.
 	const postgres = await importPostgres();
