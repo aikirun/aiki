@@ -37,7 +37,7 @@ services:
       DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
       REDIS_URL: ${REDIS_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      PRETTY_LOGS: ${PRETTY_LOGS:-true}
+      PRETTY_LOGS: ${PRETTY_LOGS:-false}
     volumes:
       - aiki-data:/data
     extra_hosts:
